@@ -15,9 +15,11 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 import zipfile
 from pathlib import Path
+from typing import NamedTuple
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -1212,6 +1214,443 @@ class AuthorizingFinalizerRetryTests(unittest.TestCase):
                                              capture_output=True, text=True, check=False)
                     self.assertEqual(initial.returncode, 0, initial.stdout + initial.stderr)
                     self.assertTrue(calls.exists(), 'first-attempt positive publication was suppressed')
+
+
+PRIOR_MERGE, REGENERATED_MERGE = "7" * 40, "9" * 40
+PRIOR_CI_RUN = 200
+HEAD_REF = "integration/process-security-m4"
+ACTIONS_TOKEN, INSTALLATION_TOKEN = "offline-actions-token", "offline-installation-token"
+CHECK_RUN_APPS = {
+    ACTIONS_TOKEN: {"id": 15368, "slug": "github-actions"},
+    INSTALLATION_TOKEN: {"id": APP_ID, "slug": "chio-security-authority"},
+}
+PUBLICATION_PROBE = "success publication reached"
+BUILD_MIRROR_QUERY = "check_name=Security%20mirror%20%2F%20Build%2C%20lint%2C%20test"
+CI_HISTORY_QUERY = f"actions/workflows/ci.yml/runs?event=pull_request&head_sha={EVIDENCE}&per_page=100&page=1"
+# Observed REST state after main advanced past an open pull request: the pull
+# still reported the old base.sha and its test merge kept the old base parent.
+STALE_BASE, ADVANCED_MAIN = "b5b44d6c20605087d35b7e5f42fb679e0ac8e35f", "eb6c77b835acea73346aeff6a9e64ecec7a68f01"
+STALE_HEAD, STALE_MERGE, STALE_TREE = (
+    "161132fdaa4232d10003d47afb23a5f4efb3ff53", "baf9ac4159d4d242e7f08dc4ebb11447fd777475",
+    "1a6c8898d7bfe5f4520be9349e1005aa4d5c86b5",
+)
+
+
+def foreign_mirror(head_sha: str) -> dict:
+    # Shape of a check run that an unrelated Actions workflow posted under a
+    # mirror name with the Actions token (observed check run 113139755293).
+    return {
+        "id": 113139755293, "name": "Security mirror / Build, lint, test", "head_sha": head_sha,
+        "external_id": "e8b6b49f-75e8-5c85-8b08-87b6cfd6ec76", "status": "completed", "conclusion": "success",
+        "started_at": "2026-10-08T03:50:04Z", "completed_at": "2026-10-08T03:50:04Z",
+        "output": {"title": None, "summary": None, "text": None, "annotations_count": 0},
+        "check_suite": {"id": 102200875191}, "app": {"id": 15368, "slug": "github-actions"},
+    }
+
+
+LOGGED_GH = r'''#!/usr/bin/env -S python3 -I -S
+import os,sys
+path=next((a for a in sys.argv[1:] if a.startswith('repos/')),'')
+if path:
+    with open(os.environ['API_LOG'],'a') as log: log.write('GET '+path+'\n')
+os.execv(sys.executable,[sys.executable,'-I','-S',os.environ['FAKE_GH_PATH']]+sys.argv[1:])
+'''
+
+CHECK_STORE_CURL = r'''#!/usr/bin/env -S python3 -I -S
+import json,os,sys,pathlib,urllib.parse
+args=sys.argv[1:]
+url=next(a for a in args if a.startswith('https://api.github.com/'))
+parts=urllib.parse.urlsplit(url)
+path=parts.path.lstrip('/')
+query={key:values[0] for key,values in urllib.parse.parse_qs(parts.query).items()}
+method=args[args.index('--request')+1] if '--request' in args else 'GET'
+token=next((a.split('Bearer ',1)[1] for a in args if a.startswith('Authorization: Bearer ')),'')
+with open(os.environ['API_LOG'],'a') as log: log.write(method+' '+path+('?'+parts.query if parts.query else '')+'\n')
+fixture=pathlib.Path(os.environ['API_FIXTURE']);data=json.loads(fixture.read_text())
+prefix='repos/'+os.environ['GITHUB_REPOSITORY']+'/'
+def fail(message):
+    sys.stderr.write(message+'\n');sys.exit(22)
+def page(records):
+    size=int(query.get('per_page','30'));number=int(query.get('page','1'))
+    return records[(number-1)*size:number*size]
+def stores():
+    return [data[key]['check_runs'] for key in data if key.startswith(prefix+'commits/') and key.endswith('/check-runs')]
+if method=='GET':
+    segments=path[len(prefix):].split('/')
+    if len(segments)==3 and segments[0]=='commits' and segments[2]=='check-runs':
+        if query.get('filter')!='all': fail('unsupported check-run filter')
+        runs=[c for c in data.get(path,{'check_runs':[]})['check_runs']
+              if c['name']==query.get('check_name',c['name']) and str(c['app']['id'])==query.get('app_id',str(c['app']['id']))]
+        print(json.dumps({'total_count':len(runs),'check_runs':page(runs)}));sys.exit(0)
+    key=path+('?ref='+query['ref'] if 'ref' in query else '')
+    if key not in data: fail('unprovided API '+key)
+    result=data[key]
+    if isinstance(result,list):
+        result=page([r for r in result if path!=prefix+'pulls' or query.get('state','open') in ('all',r['state'])])
+    elif path.endswith('/runs') and 'workflow_runs' in result:
+        runs=[r for r in result['workflow_runs'] if all(str(r.get(field))==query[field] for field in ('event','head_sha') if field in query)]
+        result={'total_count':len(runs),'workflow_runs':page(runs)}
+    elif query.get('page','1')!='1': fail('unexpected missing API page')
+    print(json.dumps(result));sys.exit(0)
+apps=json.loads(os.environ['CHECK_RUN_APPS'])
+if token not in apps: fail('token cannot write check runs')
+app=apps[token]
+payload=json.loads(args[args.index('--data-binary')+1])
+if method=='POST' and path==prefix+'check-runs':
+    identifier=1+max([c['id'] for runs in stores() for c in runs]+[990000])
+    check={'id':identifier,'name':payload['name'],'head_sha':payload['head_sha'],'external_id':payload.get('external_id'),
+           'status':payload.get('status','queued'),'conclusion':payload.get('conclusion'),'completed_at':payload.get('completed_at'),
+           'details_url':payload.get('details_url'),'output':payload.get('output',{}),'app':app,'check_suite':{'id':identifier+1}}
+    store=data.setdefault(prefix+'commits/'+payload['head_sha']+'/check-runs',{'total_count':0,'check_runs':[]})
+    store['check_runs'].append(check);store['total_count']=len(store['check_runs'])
+elif method=='PATCH' and path.startswith(prefix+'check-runs/'):
+    matches=[c for runs in stores() for c in runs if c['id']==int(path.rsplit('/',1)[1])]
+    if len(matches)!=1: fail('unknown check run')
+    check=matches[0]
+    if check['app']['id']!=app['id']: fail('check run belongs to another app')
+    for field in ('name','external_id','status','conclusion','completed_at','details_url','output'):
+        if field in payload: check[field]=payload[field]
+else: fail('unexpected mutation '+method+' '+path)
+data[prefix+'check-runs/'+str(check['id'])]=check
+fixture.write_text(json.dumps(data));print(json.dumps(check))
+'''
+
+# The fixtures hold only completed runs, so any poll means no run matched.
+# Refusing at the first poll is the outcome the step reaches when its poll
+# budget runs out, without the wall-clock wait.
+POLL_LIMIT_SLEEP = "#!/usr/bin/env bash\nprintf 'sleep %s\\n' \"$*\" >> \"${API_LOG}\"\nexit 75\n"
+
+
+class OfflineRun(NamedTuple):
+    result: subprocess.CompletedProcess
+    data: dict
+    calls: list[str]
+    output: str
+    collected: dict[str, str]
+
+
+def run_offline_step(script: str, data: dict, environment: dict[str, str], *, poll_limit: bool = False,
+                     files: dict[str, bytes] | None = None, collect: tuple[str, ...] = ()) -> OfflineRun:
+    with tempfile.TemporaryDirectory(prefix="chio-evidence-head-") as raw:
+        root = Path(raw)
+        fixture, log, output, binary = root / "api.json", root / "api.log", root / "output", root / "bin"
+        fixture.write_text(json.dumps(data))
+        log.write_text("")
+        (root / "gh-fixture").write_text(FAKE_GH)
+        binary.mkdir()
+        tools = {"gh": LOGGED_GH, "curl": CHECK_STORE_CURL} | ({"sleep": POLL_LIMIT_SLEEP} if poll_limit else {})
+        for name, source in tools.items():
+            (binary / name).write_text(source)
+            (binary / name).chmod(0o755)
+        for name, content in (files or {}).items():
+            (root / name).parent.mkdir(parents=True, exist_ok=True)
+            (root / name).write_bytes(content)
+        env = os.environ | {
+            "PATH": str(binary) + os.pathsep + os.environ["PATH"], "API_FIXTURE": str(fixture), "API_LOG": str(log),
+            "FAKE_GH_PATH": str(root / "gh-fixture"), "CHECK_RUN_APPS": json.dumps(CHECK_RUN_APPS),
+            "COMMENT_FILE": str(root / "comment.md"), "GITHUB_OUTPUT": str(output), "GITHUB_REPOSITORY": REPOSITORY,
+            "GITHUB_REPOSITORY_OWNER": "bb-connor", "GITHUB_STEP_SUMMARY": str(root / "summary.md"),
+            "RUNNER_TEMP": str(root),
+        } | environment
+        result = subprocess.run(["bash", "-c", script], cwd=root, env=env, capture_output=True, text=True,
+                                check=False, timeout=300)
+        collected = {name: (root / name).read_text() for name in collect if (root / name).exists()}
+        return OfflineRun(result, json.loads(fixture.read_text()), log.read_text().splitlines(),
+                          output.read_text() if output.exists() else "", collected)
+
+
+def workflow_step(name: str, job: str, step: str) -> str:
+    return next(item["run"] for item in workflow(name)["jobs"][job]["steps"] if item.get("name") == step)
+
+
+def live_pull_request(number: int = PR, head: str = EVIDENCE, base: str = BASE, merge: str = MERGE,
+                      head_ref: str = HEAD_REF) -> dict:
+    repository = {"id": 1195888645, "full_name": REPOSITORY}
+    return {
+        "number": number, "state": "open", "merged": False, "draft": False, "merge_commit_sha": merge,
+        "mergeable": True, "mergeable_state": "blocked", "user": {"login": "bb-connor"},
+        "author_association": "OWNER", "labels": [],
+        "head": {"label": f"bb-connor:{head_ref}", "ref": head_ref, "sha": head, "repo": repository},
+        "base": {"label": "bb-connor:main", "ref": "main", "sha": base, "repo": repository},
+    }
+
+
+def live_tuple(live_merge: str = MERGE, main: str = BASE, base: str = BASE, head: str = EVIDENCE,
+               tree: str = TREE, merges: tuple[str, ...] = (MERGE, PRIOR_MERGE, REGENERATED_MERGE)) -> dict:
+    prefix = f"repos/{REPOSITORY}"
+    pull = live_pull_request(head=head, base=base, merge=live_merge)
+    data = {
+        f"{prefix}/pulls/{PR}": pull,
+        f"{prefix}/pulls": [copy.deepcopy(pull)],
+        f"{prefix}/commits/{head}/pulls": [copy.deepcopy(pull)],
+        f"{prefix}/git/ref/pull/{PR}/merge": {"ref": f"refs/pull/{PR}/merge", "object": {"type": "commit", "sha": live_merge}},
+        f"{prefix}/git/ref/heads/main": {"ref": "refs/heads/main", "object": {"type": "commit", "sha": main}},
+    }
+    for merge in merges:
+        data[f"{prefix}/git/commits/{merge}"] = {"sha": merge, "parents": [{"sha": base}, {"sha": head}], "tree": {"sha": tree}}
+    return data
+
+
+def pull_request_ci_run(run_id: int, title_merge: str, conclusion: str | None = "success", attempt: int = 1,
+                        check_suite_id: int = 401, display_title: str | None = None) -> dict:
+    repository = {"id": 1195888645, "full_name": REPOSITORY}
+    return {
+        "id": run_id, "name": "CI", "workflow_id": CI_WORKFLOW, "path": ".github/workflows/ci.yml",
+        "display_title": display_title or f"CI N={PR} E={EVIDENCE} B={BASE} M={title_merge}",
+        "event": "pull_request", "head_sha": EVIDENCE, "head_branch": HEAD_REF, "run_attempt": attempt,
+        "status": "completed", "conclusion": conclusion, "check_suite_id": check_suite_id,
+        "repository": repository, "head_repository": repository,
+        "actor": {"login": "bb-connor"}, "triggering_actor": {"login": "bb-connor"},
+        "created_at": "2026-10-06T00:00:00Z", "updated_at": "2026-10-06T00:04:00Z",
+    }
+
+
+def add_ci_runs(data: dict, *runs: dict) -> None:
+    prefix = f"repos/{REPOSITORY}"
+    listing = [copy.deepcopy(run) for run in sorted(runs, key=lambda run: run["id"], reverse=True)]
+    data[f"{prefix}/actions/workflows/ci.yml/runs"] = {"total_count": len(listing), "workflow_runs": listing}
+    for run in runs:
+        data[f"{prefix}/actions/runs/{run['id']}"] = copy.deepcopy(run)
+        data[f"{prefix}/actions/runs/{run['id']}/attempts/{run['run_attempt']}"] = copy.deepcopy(run)
+
+
+def publication_binding(base: str = BASE, evidence: str = EVIDENCE, merge: str = MERGE, tree: str = TREE) -> str:
+    binding = {
+        "artifact": {"digest": "sha256:" + "6" * 64, "id": "811", "name": f"enterprise-linux-capture-{evidence}-401-1",
+                     "size": "4096"},
+        "authorized_source_sha": SOURCE, "base": {"ref": "main", "repository": REPOSITORY, "sha": base},
+        "capture": {"actor": "github-actions[bot]", "definition_blob": "6" * 40, "issued_at_unix_ms": "1791244860000",
+                    "job_id": "821", "run_attempt": "1", "run_id": "401", "workflow_id": "105"},
+        "ci": {"aggregate_check_run_id": "505",
+               "merge_binding": {"artifact_digest": "sha256:" + "7" * 64, "artifact_id": "812",
+                                 "attestation_bundle_sha256": "8" * 64, "binding_sha256": "9" * 64},
+               "required_check_run_ids": {"build": "501", "deny": "504", "msrv": "502", "vet": "503"},
+               "run_attempt": "1", "run_id": str(CI_RUN), "workflow_id": str(CI_WORKFLOW)},
+        "committed_binding_digest": "a" * 64, "configuration_digest": "b" * 64,
+        "controller": {"actor": "bb-connor", "definition_blob": "6" * 40, "issued_at_unix_ms": "1791244800000",
+                       "run_attempt": "1", "run_id": "111", "workflow_id": "104"},
+        "evidence_sha": evidence,
+        "gate_result_digests": {name: "c" * 64 for name in (
+            "broker_boundary", "cage_enforcement", "committed_adversarial_evidence", "key_log_transparency",
+            "linux_adversarial_controls", "migration_state_store", "runner_contract")},
+        "inventory_digest": "d" * 64, "labels_digest": hashlib.sha256(b"[]").hexdigest(),
+        "merge_commit_sha": merge, "merge_tree_sha": tree, "pr_number": str(PR), "repository": REPOSITORY,
+        "runner": {"arch": "X64", "labels_digest": "e" * 64, "name": "GitHub Actions 7", "os": "Linux"},
+        "schema": "chio.security-check-publication.v1", "security_definition_sha": DEFINITION,
+    }
+    return json.dumps(binding, sort_keys=True, separators=(",", ":"))
+
+
+def checks_on(data: dict, name: str, app_id: int, conclusion: str) -> list[dict]:
+    prefix = f"repos/{REPOSITORY}/commits/"
+    return [check for key, store in data.items() if key.startswith(prefix) and key.endswith("/check-runs")
+            for check in store["check_runs"] if check["name"] == name and check["app"]["id"] == app_id
+            and check["status"] == "completed" and check["conclusion"] == conclusion]
+
+
+def security_contract_failures(data: dict) -> list[dict]:
+    return checks_on(data, "Security contract", APP_ID, "failure")
+
+
+def publisher_body() -> str:
+    return workflow_step("enterprise-evidence-finalizer.yml", "publish-security-contract",
+                         "Reconcile exact five-context merge authority")
+
+
+def publication_head_revalidation() -> str:
+    body = publisher_body()
+    return body[body.index("revalidate_live_publication_head() {"):body.index("list_actions_mirror_checks() {")]
+
+
+def publisher_environment() -> dict[str, str]:
+    return {
+        "AUTHORIZED_SOURCE_SHA": SOURCE, "CI_RUN_ATTEMPT": "1", "CI_RUN_ID": str(CI_RUN),
+        "CI_WORKFLOW_ID": str(CI_WORKFLOW), "EVIDENCE_SHA": EVIDENCE, "EXTERNAL_ID": EXTERNAL_ID,
+        "GH_TOKEN": ACTIONS_TOKEN, "MERGE_COMMIT_SHA": MERGE, "PR_NUMBER": str(PR),
+        "SECURITY_APP_ID": str(APP_ID), "SECURITY_DEFINITION_SHA": DEFINITION,
+        "installation_token": INSTALLATION_TOKEN, "canonical_binding": publication_binding(),
+    }
+
+
+def revalidate_publication_head(data: dict, evidence: str = EVIDENCE, merge: str = MERGE, base: str = BASE,
+                                tree: str = TREE) -> OfflineRun:
+    script = ("set -euo pipefail\nshopt -s inherit_errexit\n" + publication_head_revalidation()
+              + f'\nrevalidate_live_publication_head\necho "{PUBLICATION_PROBE}"\n')
+    return run_offline_step(script, data, {"GH_TOKEN": ACTIONS_TOKEN, "PR_NUMBER": str(PR), "EVIDENCE_SHA": evidence,
+                                           "canonical_binding": publication_binding(base, evidence, merge, tree)})
+
+
+def reconcile_bad_ci_then_publish(data: dict) -> OfflineRun:
+    body = publisher_body()
+    script = ("set -euo pipefail\nshopt -s inherit_errexit\n" + publication_head_revalidation()
+              + body[body.index("list_namespace_checks() {"):body.index("reconcile_bad_authorizing_finalizer() {")]
+              + f'publish_success_authority() {{ echo "{PUBLICATION_PROBE}"; }}\n'
+              + body[body.index('\nreconcile_bad_ci\nif test "${bad_ci_observed}" = false; then'):])
+    return run_offline_step(script, data, publisher_environment())
+
+
+def bad_ci_fixture(*extra_runs: dict, mirrors: tuple[dict, ...] = ()) -> dict:
+    data = live_tuple()
+    add_ci_runs(data, pull_request_ci_run(CI_RUN, MERGE), *extra_runs)
+    data[f"repos/{REPOSITORY}/commits/{MERGE}/check-runs"] = {"total_count": len(mirrors), "check_runs": list(mirrors)}
+    return data
+
+
+def prior_failed_ci_run(title_merge: str, display_title: str | None = None) -> dict:
+    return pull_request_ci_run(PRIOR_CI_RUN, title_merge, conclusion="failure", check_suite_id=400,
+                               display_title=display_title)
+
+
+def authenticate_ci(data: dict, recorded_merge: str) -> OfflineRun:
+    body = workflow_step("enterprise-evidence-finalizer.yml", "authorize-security-check-publication",
+                         "Authenticate exact successful current CI run")
+    return run_offline_step(body, data, {
+        "BASE_REF": "main", "BASE_SHA": BASE, "CI_WORKFLOW_ID": str(CI_WORKFLOW), "EVIDENCE_SHA": EVIDENCE,
+        "GH_TOKEN": ACTIONS_TOKEN, "HEAD_REF": HEAD_REF, "MERGE_COMMIT_SHA": recorded_merge, "MERGE_TREE_SHA": TREE,
+        "PR_NUMBER": str(PR),
+    }, poll_limit=True)
+
+
+def ci_authentication_fixture(live_merge: str = MERGE) -> dict:
+    prefix = f"repos/{REPOSITORY}"
+    data = live_tuple(live_merge=live_merge)
+    add_ci_runs(data, pull_request_ci_run(CI_RUN, MERGE))
+    jobs = []
+    for identifier, name in enumerate([name for name, _ in ORDINARY] + ["Security contract"], 501):
+        jobs.append({"id": identifier, "run_id": CI_RUN, "name": name, "head_sha": EVIDENCE, "status": "completed",
+                     "conclusion": "success", "check_run_url": f"https://api.github.com/{prefix}/check-runs/{identifier}"})
+        data[f"{prefix}/check-runs/{identifier}"] = {
+            "id": identifier, "name": name, "head_sha": EVIDENCE, "status": "completed", "conclusion": "success",
+            "check_suite": {"id": 401}, "app": {"id": 15368, "slug": "github-actions"}}
+    data[f"{prefix}/actions/runs/{CI_RUN}/attempts/1/jobs"] = {"total_count": len(jobs), "jobs": jobs}
+    return data
+
+
+def stale_base_tuple(main: str) -> dict:
+    return live_tuple(live_merge=STALE_MERGE, main=main, base=STALE_BASE, head=STALE_HEAD, tree=STALE_TREE,
+                      merges=(STALE_MERGE,))
+
+
+class PublisherEvidenceHeadOriginalRedTests(unittest.TestCase):
+    def test_ci_authentication_survives_same_parent_tree_merge_regeneration(self) -> None:
+        control = authenticate_ci(ci_authentication_fixture(), MERGE)
+        self.assertEqual(control.result.returncode, 0, control.result.stderr)
+        self.assertIn(f"ci_run_id={CI_RUN}\n", control.output)
+        commits = f"repos/{REPOSITORY}/git/commits/"
+        for recorded in (MERGE, REGENERATED_MERGE):
+            with self.subTest(recorded_merge=recorded):
+                data = ci_authentication_fixture(live_merge=REGENERATED_MERGE)
+                self.assertEqual({key: value for key, value in data[commits + REGENERATED_MERGE].items() if key != "sha"},
+                                 {key: value for key, value in data[commits + MERGE].items() if key != "sha"})
+                run = authenticate_ci(data, recorded)
+                self.assertIn(f"GET repos/{REPOSITORY}/{CI_HISTORY_QUERY}", run.calls)
+                if recorded == MERGE:
+                    self.assertIn(f"GET repos/{REPOSITORY}/git/ref/pull/{PR}/merge", run.calls)
+                self.assertEqual(run.result.returncode, 0,
+                                 "a test merge regenerated with the same parents and tree left the exact successful "
+                                 f"CI run unbindable (polls for a matching run: {run.calls.count('sleep 30')})")
+                self.assertIn(f"ci_run_id={CI_RUN}\n", run.output)
+
+    def test_publication_head_revalidation_survives_same_parent_tree_merge_regeneration(self) -> None:
+        control = revalidate_publication_head(live_tuple())
+        self.assertEqual(control.result.returncode, 0, control.result.stderr)
+        self.assertIn(PUBLICATION_PROBE, control.result.stdout)
+        run = revalidate_publication_head(live_tuple(live_merge=REGENERATED_MERGE))
+        self.assertIn(f"GET repos/{REPOSITORY}/git/ref/pull/{PR}/merge", run.calls)
+        self.assertEqual(run.result.returncode, 0, "publication refused a live test merge with the recorded parents and tree")
+        self.assertIn(PUBLICATION_PROBE, run.result.stdout)
+
+    def test_failed_ci_under_a_prior_test_merge_blocks_publication_for_the_same_evidence(self) -> None:
+        healthy = reconcile_bad_ci_then_publish(bad_ci_fixture())
+        self.assertEqual(healthy.result.returncode, 0, healthy.result.stderr)
+        self.assertIn(PUBLICATION_PROBE, healthy.result.stdout)
+        current = reconcile_bad_ci_then_publish(bad_ci_fixture(prior_failed_ci_run(MERGE)))
+        self.assertNotEqual(current.result.returncode, 0)
+        self.assertNotIn(PUBLICATION_PROBE, current.result.stdout)
+        self.assertEqual(len(security_contract_failures(current.data)), 1, current.result.stderr)
+        prior = reconcile_bad_ci_then_publish(bad_ci_fixture(prior_failed_ci_run(PRIOR_MERGE)))
+        self.assertIn(f"GET repos/{REPOSITORY}/{CI_HISTORY_QUERY}", prior.calls)
+        self.assertNotIn(PUBLICATION_PROBE, prior.result.stdout,
+                         f"failed CI run {PRIOR_CI_RUN} on the same evidence head under a prior test merge did not block publication")
+        self.assertNotEqual(prior.result.returncode, 0)
+        self.assertEqual(len(security_contract_failures(prior.data)), 1, prior.result.stderr)
+
+    def test_foreign_mirror_cannot_block_the_bad_ci_security_contract_tombstone(self) -> None:
+        clean = reconcile_bad_ci_then_publish(bad_ci_fixture(prior_failed_ci_run(MERGE)))
+        self.assertEqual(len(security_contract_failures(clean.data)), 1, clean.result.stderr)
+        polluted = reconcile_bad_ci_then_publish(bad_ci_fixture(prior_failed_ci_run(MERGE), mirrors=(foreign_mirror(MERGE),)))
+        self.assertTrue(any(BUILD_MIRROR_QUERY in call for call in polluted.calls), polluted.calls)
+        self.assertNotIn(PUBLICATION_PROBE, polluted.result.stdout)
+        self.assertEqual(len(security_contract_failures(polluted.data)), 1,
+                         "a foreign Actions mirror without the required external id stopped bad-CI revocation "
+                         "before the Security contract tombstone")
+        self.assertTrue(any(check["id"] == 113139755293 for key, store in polluted.data.items()
+                            if key.endswith("/check-runs") for check in store["check_runs"]))
+
+    def test_publication_head_revalidation_refuses_main_advanced_past_a_stale_pull_base(self) -> None:
+        stale = (STALE_HEAD, STALE_MERGE, STALE_BASE, STALE_TREE)
+        control = revalidate_publication_head(stale_base_tuple(STALE_BASE), *stale)
+        self.assertEqual(control.result.returncode, 0, control.result.stderr)
+        self.assertIn(PUBLICATION_PROBE, control.result.stdout)
+        run = revalidate_publication_head(stale_base_tuple(ADVANCED_MAIN), *stale)
+        self.assertIn(f"GET repos/{REPOSITORY}/git/commits/{STALE_MERGE}", run.calls)
+        self.assertNotIn(PUBLICATION_PROBE, run.result.stdout,
+                         f"publication accepted base {STALE_BASE} after main advanced to {ADVANCED_MAIN}")
+        self.assertNotEqual(run.result.returncode, 0)
+
+    def test_capture_revalidation_refuses_main_advanced_past_a_stale_pull_base(self) -> None:
+        prefix = f"repos/{REPOSITORY}"
+        issued = int(time.time()) - 120
+        body = workflow_step("enterprise-evidence-finalizer.yml", "validate-capture",
+                             "Revalidate live authorization and issuance freshness")
+        script = (body.replace("${{ steps.validate.outputs.authorized_source_sha }}", SOURCE)
+                  .replace("${{ github.event.repository.default_branch }}", "main"))
+        self.assertNotIn("${{", script)
+
+        def capture(main: str) -> OfflineRun:
+            data = stale_base_tuple(main) | {
+                f"{prefix}/actions/workflows/enterprise-evidence-controller.yml": {
+                    "id": 104, "path": ".github/workflows/enterprise-evidence-controller.yml", "state": "active"},
+                f"{prefix}/actions/runs/111": {
+                    "id": 111, "workflow_id": 104, "path": ".github/workflows/enterprise-evidence-controller.yml",
+                    "event": "pull_request_target", "status": "completed", "conclusion": "success",
+                    "head_sha": DEFINITION, "head_branch": "main", "run_attempt": 1,
+                    "actor": {"login": "bb-connor"}, "triggering_actor": {"login": "bb-connor"},
+                    "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(issued))},
+                f"{prefix}/contents/.github/workflows/enterprise-evidence-controller.yml?ref={DEFINITION}": {"sha": "6" * 40},
+                f"{prefix}/commits/{STALE_HEAD}": {"sha": STALE_HEAD, "parents": [{"sha": SOURCE}], "files": [
+                    {"filename": f"audits/evidence/enterprise-linux/{name}", "status": "modified"} for name in (
+                        "enterprise-migration-canary.json", "enterprise-migration-canary.json.sha256",
+                        "enterprise-migration-binding-digest.txt")]},
+                f"{prefix}/git/commits/{STALE_HEAD}": {"sha": STALE_HEAD, "parents": [{"sha": SOURCE}], "tree": {"sha": "e0" * 20}},
+            }
+            for parent, component, child in (("e0", "audits", "e1"), ("e1", "evidence", "e2"),
+                                              ("e2", "enterprise-linux", "e3")):
+                data[f"{prefix}/git/trees/{parent * 20}"] = {"sha": parent * 20, "truncated": False, "tree": [
+                    {"path": component, "mode": "040000", "type": "tree", "sha": child * 20}]}
+            data[f"{prefix}/git/trees/{'e3' * 20}"] = {"sha": "e3" * 20, "truncated": False, "tree": [
+                {"path": name, "mode": "100644", "type": "blob", "sha": "f" * 40} for name in (
+                    "enterprise-migration-binding-digest.txt", "enterprise-migration-canary.json",
+                    "enterprise-migration-canary.json.sha256")]}
+            return run_offline_step(script, data, {
+                "AUTHORIZED_SOURCE_SHA": SOURCE, "ENTERPRISE_SECURITY_DEFINITION_SHA": DEFINITION,
+                "GH_TOKEN": ACTIONS_TOKEN, "BASE_REF": "main", "BASE_REPOSITORY": REPOSITORY, "BASE_SHA": STALE_BASE,
+                "CAPTURE_ISSUED_AT_UNIX_MS": str((issued + 60) * 1000), "CAPTURE_RUN_ATTEMPT": "1",
+                "CAPTURE_RUN_ID": "401", "CONTROLLER_ACTOR": "bb-connor", "CONTROLLER_DEFINITION_BLOB": "6" * 40,
+                "CONTROLLER_ISSUED_AT_UNIX_MS": str(issued * 1000), "CONTROLLER_RUN_ATTEMPT": "1",
+                "CONTROLLER_RUN_ID": "111", "CONTROLLER_WORKFLOW_ID": "104",
+                "LABELS_DIGEST": hashlib.sha256(b"[]").hexdigest(), "MERGE_COMMIT_SHA": STALE_MERGE,
+                "MERGE_TREE_SHA": STALE_TREE, "PR_NUMBER": str(PR), "SECURITY_DEFINITION_SHA": DEFINITION,
+                "SOURCE_REPOSITORY": REPOSITORY, "SOURCE_SHA": STALE_HEAD,
+            })
+
+        control = capture(STALE_BASE)
+        self.assertEqual(control.result.returncode, 0, control.result.stderr)
+        self.assertIn(f"GET repos/{REPOSITORY}/git/trees/{'e3' * 20}", control.calls)
+        run = capture(ADVANCED_MAIN)
+        self.assertIn(f"GET repos/{REPOSITORY}/git/commits/{STALE_MERGE}", run.calls)
+        self.assertNotEqual(run.result.returncode, 0,
+                            f"capture revalidation accepted base {STALE_BASE} after main advanced to {ADVANCED_MAIN}")
 
 
 if __name__ == "__main__":
