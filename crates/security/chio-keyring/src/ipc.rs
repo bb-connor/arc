@@ -175,22 +175,29 @@ pub(crate) fn validate_service_identifier(value: &str, kind: &'static str) -> Re
     Ok(())
 }
 
+/// A frame fault as a keyring error. Transfer faults keep their I/O error so
+/// a caller can tell an elapsed deadline from a hangup.
+fn frame_error(error: chio_secure_ipc::frame::FrameError, refusal: &'static str) -> KeyringError {
+    use chio_secure_ipc::frame::FrameError;
+    match error {
+        FrameError::Prefix(error) | FrameError::Body(error) | FrameError::Write(error) => {
+            KeyringError::Io(error)
+        }
+        FrameError::InvalidLimit { .. } => KeyringError::NumericRange,
+        FrameError::Empty | FrameError::Oversized { .. } => {
+            KeyringError::Canonical(refusal.to_string())
+        }
+    }
+}
+
 pub fn write_canonical_frame<W, T>(writer: &mut W, value: &T) -> Result<()>
 where
     W: Write,
     T: Serialize,
 {
     let canonical = canonical_json_bytes(value)?;
-    if canonical.is_empty() || canonical.len() > MAX_KEY_LOG_IPC_FRAME_BYTES {
-        return Err(KeyringError::Canonical(
-            "canonical IPC record has an invalid length".to_string(),
-        ));
-    }
-    let length = u32::try_from(canonical.len()).map_err(|_| KeyringError::NumericRange)?;
-    writer.write_all(&length.to_be_bytes())?;
-    writer.write_all(&canonical)?;
-    writer.flush()?;
-    Ok(())
+    chio_secure_ipc::frame::write_frame(writer, &canonical, MAX_KEY_LOG_IPC_FRAME_BYTES)
+        .map_err(|error| frame_error(error, "canonical IPC record has an invalid length"))
 }
 
 pub fn read_canonical_frame<R, T>(reader: &mut R) -> Result<T>
@@ -198,17 +205,8 @@ where
     R: Read,
     T: serde::de::DeserializeOwned + Serialize,
 {
-    let mut length_bytes = [0_u8; 4];
-    reader.read_exact(&mut length_bytes)?;
-    let length = usize::try_from(u32::from_be_bytes(length_bytes))
-        .map_err(|_| KeyringError::NumericRange)?;
-    if length == 0 || length > MAX_KEY_LOG_IPC_FRAME_BYTES {
-        return Err(KeyringError::Canonical(
-            "canonical IPC frame has an invalid length".to_string(),
-        ));
-    }
-    let mut bytes = vec![0_u8; length];
-    reader.read_exact(&mut bytes)?;
+    let bytes = chio_secure_ipc::frame::read_frame(reader, MAX_KEY_LOG_IPC_FRAME_BYTES)
+        .map_err(|error| frame_error(error, "canonical IPC frame has an invalid length"))?;
     Ok(chio_core_types::canonical::UntrustedJsonText::from_wire(
         &bytes,
         MAX_KEY_LOG_IPC_FRAME_BYTES,
