@@ -48,11 +48,8 @@ fn indexed_caller_shares_match_verified_operations_for_each_parent() -> TestResu
 
     let store = runtime.authority.admission_operation_store();
     let fence = runtime.authority.mutation_fence();
-    let now = u64::try_from(
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)?
-            .as_millis(),
-    )?;
+    let now =
+        chio_security_types::clock::Clock::unix_millis(&*chio_test_support::clock::clock())?.get();
     let requests = [&settled, &live, &other];
     for (parent, expected) in [
         (first_family.parent.id.as_str(), Some(&live)),
