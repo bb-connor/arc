@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use chio_core::capability::governance::{GovernedApprovalToken, GovernedTransactionIntent};
 use chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS;
 use chio_core::capability::token::CapabilityToken;
-use chio_core::{canonical_json_bytes, Hash, PublicKey, Signature, SigningAlgorithm};
+use chio_core::{canonical_json_bytes, PublicKey, Signature, SigningAlgorithm};
 use chio_kernel::threshold_approval::ThresholdApprovalProposal;
 use chio_kernel::{
     active_response_admission_artifact_payload_digest,
@@ -22,6 +22,8 @@ use chio_security_types::{
     MAX_RESPONSE_EFFECTS,
 };
 use serde::{Deserialize, Serialize};
+
+use super::active_response_validation::decode_lower_hex_digest;
 
 mod validation;
 use validation::{decode_authority_request, VerifiedAuthorityRequest};
@@ -302,8 +304,8 @@ pub fn validate_active_response_artifacts_draft(
 ) -> PortResult<()> {
     let proof = &draft.submission_proof;
     let body = &draft.authority_attestation_body;
-    let plan_body_hash = canonical_hex_digest(&proof.body.plan_body_hash)?;
-    let governed_intent_hash = canonical_hex_digest(&proof.body.governed_intent_hash)?;
+    let plan_body_hash = nonzero_lower_hex_digest(&proof.body.plan_body_hash)?;
+    let governed_intent_hash = nonzero_lower_hex_digest(&proof.body.governed_intent_hash)?;
     let expected_payload_digest = active_response_admission_artifact_payload_digest(
         &response_plan.authorization_body(),
         &draft.operator_capability,
@@ -355,12 +357,10 @@ pub fn validate_active_response_artifacts_draft(
     Ok(())
 }
 
-fn canonical_hex_digest(value: &str) -> PortResult<Digest32> {
-    let parsed = Hash::from_hex(value).map_err(|_| PortError::integrity_failure())?;
-    if parsed.to_hex() != value || parsed.as_bytes().iter().all(|byte| *byte == 0) {
-        return Err(PortError::integrity_failure());
-    }
-    Ok(Digest32::new(*parsed.as_bytes()))
+fn nonzero_lower_hex_digest(value: &str) -> PortResult<Digest32> {
+    decode_lower_hex_digest(value)
+        .filter(|digest| !digest.is_zero())
+        .ok_or_else(PortError::integrity_failure)
 }
 
 #[cfg(any(test, feature = "fuzz"))]
