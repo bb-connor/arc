@@ -1653,5 +1653,141 @@ class PublisherEvidenceHeadOriginalRedTests(unittest.TestCase):
                             f"capture revalidation accepted base {STALE_BASE} after main advanced to {ADVANCED_MAIN}")
 
 
+REVOKER_BLOB = "4" * 40
+
+
+def revoker_run(run_id: int, event: str) -> dict:
+    repository = {"id": 1195888645, "full_name": REPOSITORY}
+    return {
+        "id": run_id, "workflow_id": 103, "path": ".github/workflows/security-contract-revocation.yml", "event": event,
+        "status": "in_progress", "conclusion": None, "head_sha": DEFINITION, "head_branch": "main", "run_attempt": 1,
+        "actor": {"login": "bb-connor"}, "triggering_actor": {"login": "bb-connor"},
+        "repository": repository, "head_repository": repository,
+    }
+
+
+def revoker_fixture(live_merge: str = MERGE, mirrors: tuple[dict, ...] = ()) -> dict:
+    prefix = f"repos/{REPOSITORY}"
+    data = live_tuple(live_merge=live_merge)
+    data[f"{prefix}/contents/.github/workflows/security-contract-revocation.yml?ref={DEFINITION}"] = {"sha": REVOKER_BLOB}
+    data[f"{prefix}/commits/{MERGE}/check-runs"] = {"total_count": len(mirrors), "check_runs": list(mirrors)}
+    return data
+
+
+def revoke_five_contexts(data: dict, event_name: str) -> OfflineRun:
+    body = workflow_step("security-contract-revocation.yml", "revoke-security-contract",
+                         "Revoke exact Actions mirrors and dedicated App namespace")
+    script = body[:body.index('private_key="${RUNNER_TEMP}')] + body[body.index("list_checks() {"):]
+    manual = event_name == "workflow_dispatch"
+    return run_offline_step(script, data, {
+        "AUTHORIZED_SOURCE_SHA": SOURCE, "BASE_SHA": BASE, "CREATE_MISSING": "true", "DEFAULT_BRANCH": "main",
+        "EVIDENCE_SHA": EVIDENCE, "EVENT_NAME": event_name, "GH_TOKEN": ACTIONS_TOKEN,
+        "LIVE_AUTHORIZED_SOURCE_SHA": SOURCE, "LIVE_COMMITTED_EVIDENCE_SHA": "0" * 40 if manual else EVIDENCE,
+        "LIVE_SECURITY_DEFINITION_SHA": DEFINITION, "MERGE_COMMIT_SHA": MERGE, "MERGE_TREE_SHA": TREE,
+        "PR_NUMBER": str(PR), "REASON": "operator-security-revocation" if manual else "ci-regression",
+        "REVOKER_REF": "refs/heads/main", "REVOKER_SHA": DEFINITION, "SECURITY_APP_ID": str(APP_ID),
+        "SECURITY_APP_INSTALLATION_ID": "1", "SECURITY_DEFINITION_SHA": DEFINITION,
+        "installation_token": INSTALLATION_TOKEN,
+    })
+
+
+def bind_manual_revocation(data: dict) -> OfflineRun:
+    body = workflow_step("security-contract-revocation.yml", "bind-revocation", "Bind frozen manual revocation")
+    return run_offline_step(body, data, {
+        "AUTHORIZED_SOURCE_SHA": SOURCE, "DEFAULT_BRANCH": "main", "EVIDENCE_SHA": EVIDENCE, "GH_TOKEN": ACTIONS_TOKEN,
+        "MERGE_COMMIT_SHA": MERGE, "PR_NUMBER": str(PR), "REASON": "operator-security-revocation",
+        "REVOKER_ACTOR": "bb-connor", "REVOKER_REF": "refs/heads/main", "REVOKER_RUN_ID": "902",
+        "REVOKER_SHA": DEFINITION, "REVOKER_TRIGGERING_ACTOR": "bb-connor", "RUN_ATTEMPT": "1",
+        "SECURITY_DEFINITION_SHA": DEFINITION,
+    })
+
+
+def failed_ci_listener_fixture(event_run: dict, jobs: list[dict], live_merge: str = MERGE,
+                               earlier_attempts: tuple[dict, ...] = ()) -> dict:
+    prefix = f"repos/{REPOSITORY}"
+    data = revoker_fixture(live_merge=live_merge)
+    run_id, attempt = event_run["id"], event_run["run_attempt"]
+    data[f"{prefix}/actions/runs/{run_id}"] = copy.deepcopy(event_run)
+    for record in (*earlier_attempts, event_run):
+        data[f"{prefix}/actions/runs/{run_id}/attempts/{record['run_attempt']}"] = copy.deepcopy(record)
+    data[f"{prefix}/actions/runs/{run_id}/attempts/{attempt}/jobs"] = {"total_count": len(jobs), "jobs": jobs}
+    data[f"{prefix}/actions/runs/{run_id}/artifacts"] = {"total_count": 0, "artifacts": []}
+    data[f"{prefix}/actions/runs/901/attempts/1"] = revoker_run(901, "workflow_run")
+    for ref in (SOURCE, EVIDENCE, MERGE):
+        data[f"{prefix}/contents/.github/workflows/ci.yml?ref={ref}"] = {"sha": "3" * 40}
+    return data
+
+
+def failed_builder_jobs(run_id: int) -> list[dict]:
+    return [{"id": 509, "name": "attest exact pull request merge binding", "run_id": run_id, "head_sha": EVIDENCE,
+             "status": "completed", "conclusion": "failure", "workflow_name": "CI"},
+            {"id": 501, "name": "Build, lint, test", "run_id": run_id, "head_sha": EVIDENCE,
+             "status": "completed", "conclusion": "failure", "workflow_name": "CI"}]
+
+
+def bind_failed_ci(data: dict, event_run: dict) -> OfflineRun:
+    body = workflow_step("security-contract-revocation.yml", "bind-revocation", "Bind later failed CI rerun to existing authority")
+    return run_offline_step(body, data, {
+        "AUTHORIZED_SOURCE_SHA": SOURCE, "COMMITTED_EVIDENCE_SHA": EVIDENCE, "DEFAULT_BRANCH": "main",
+        "EVENT_ACTION": "completed", "EVENT_CONCLUSION": event_run["conclusion"] or "",
+        "EVENT_RUN_ATTEMPT": str(event_run["run_attempt"]), "EVENT_RUN_ID": str(event_run["id"]),
+        "EVENT_WORKFLOW_ID": str(CI_WORKFLOW), "GH_TOKEN": ACTIONS_TOKEN, "LISTENER_REF": "refs/heads/main",
+        "LISTENER_RUN_ATTEMPT": "1", "LISTENER_RUN_ID": "901", "LISTENER_SHA": DEFINITION,
+        "REPOSITORY_ID": "1195888645", "REPOSITORY_OWNER_ID": "1", "SECURITY_APP_ID": str(APP_ID),
+        "SECURITY_DEFINITION_SHA": DEFINITION,
+    })
+
+
+class RevokerEvidenceHeadOriginalRedTests(unittest.TestCase):
+    def test_foreign_mirror_cannot_block_the_revoker_security_contract_tombstone(self) -> None:
+        for event_name in ("workflow_run", "workflow_dispatch"):
+            with self.subTest(event=event_name):
+                clean = revoke_five_contexts(revoker_fixture(), event_name)
+                self.assertEqual(clean.result.returncode, 0, clean.result.stderr)
+                self.assertEqual(len(security_contract_failures(clean.data)), 1)
+                polluted = revoke_five_contexts(revoker_fixture(mirrors=(foreign_mirror(MERGE),)), event_name)
+                self.assertTrue(any(BUILD_MIRROR_QUERY in call for call in polluted.calls), polluted.calls)
+                self.assertEqual(len(security_contract_failures(polluted.data)), 1,
+                                 "a foreign Actions mirror without the required external id stopped revocation "
+                                 "before the Security contract tombstone")
+                self.assertTrue(any(check["id"] == 113139755293 for check in
+                                    polluted.data[f"repos/{REPOSITORY}/commits/{MERGE}/check-runs"]["check_runs"]))
+
+    def test_manual_revocation_survives_same_parent_tree_merge_regeneration(self) -> None:
+        prefix = f"repos/{REPOSITORY}"
+        control = revoker_fixture()
+        control[f"{prefix}/actions/runs/902/attempts/1"] = revoker_run(902, "workflow_dispatch")
+        bound = bind_manual_revocation(control)
+        self.assertEqual(bound.result.returncode, 0, bound.result.stderr)
+        self.assertIn("eligible=true\n", bound.output)
+        regenerated = revoker_fixture(live_merge=REGENERATED_MERGE)
+        regenerated[f"{prefix}/actions/runs/902/attempts/1"] = revoker_run(902, "workflow_dispatch")
+        run = bind_manual_revocation(regenerated)
+        self.assertIn(f"GET {prefix}/git/ref/pull/{PR}/merge", run.calls)
+        self.assertEqual(run.result.returncode, 0,
+                         "manual revocation of the recorded authority failed once the test merge was regenerated "
+                         "with the same parents and tree")
+        self.assertIn("eligible=true\n", run.output)
+        self.assertIn(f"evidence_sha={EVIDENCE}\n", run.output)
+
+    def test_failed_ci_rerun_after_merge_regeneration_still_records_a_tombstone(self) -> None:
+        first = pull_request_ci_run(CI_RUN, MERGE)
+        rerun = pull_request_ci_run(CI_RUN, MERGE, conclusion="failure", attempt=2)
+        jobs = failed_builder_jobs(CI_RUN)
+        control = bind_failed_ci(failed_ci_listener_fixture(rerun, jobs, earlier_attempts=(first,)), rerun)
+        self.assertEqual(control.result.returncode, 0, control.result.stderr)
+        self.assertIn("eligible=true\n", control.output)
+        self.assertIn("create_missing=true\n", control.output)
+        run = bind_failed_ci(failed_ci_listener_fixture(rerun, jobs, live_merge=REGENERATED_MERGE,
+                                                        earlier_attempts=(first,)), rerun)
+        self.assertEqual(run.result.returncode, 0, run.result.stderr)
+        self.assertIn(f"GET repos/{REPOSITORY}/git/ref/pull/{PR}/merge", run.calls)
+        self.assertIn("eligible=true\n", run.output,
+                      "an authenticated failed CI rerun for the committed evidence head recorded no tombstone "
+                      "after the test merge was regenerated with the same parents and tree")
+        self.assertIn("create_missing=true\n", run.output)
+        self.assertIn(f"evidence_sha={EVIDENCE}\n", run.output)
+
+
 if __name__ == "__main__":
     unittest.main()
