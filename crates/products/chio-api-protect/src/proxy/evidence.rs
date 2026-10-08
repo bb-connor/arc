@@ -25,6 +25,9 @@ pub(crate) fn load_signer(config: &ProtectConfig, durable: bool) -> Result<Keypa
     }
 }
 
+/// A shared handle to the durable receipt store. It is cloned into blocking
+/// workers; the store serializes its own writes.
+#[derive(Clone)]
 pub(crate) struct SqliteReceiptStore {
     pub(crate) core: Arc<chio_store_sqlite::SqliteReceiptStore>,
 }

@@ -558,9 +558,12 @@ pub(crate) async fn record_receipt(
     state: &Arc<ProxyState>,
     receipt: &HttpReceipt,
 ) -> Result<(), ProtectError> {
-    if let Some(store) = &state.receipt_store {
-        let store = store.lock().await;
-        store.append(receipt, &state.signer_keypair)?;
+    if let Some(store) = state.receipt_store.clone() {
+        let receipt = receipt.clone();
+        let signer = state.signer_keypair.clone();
+        blocking(move || store.append(&receipt, &signer))
+            .await
+            .map_err(receipt_worker_failed)??;
     }
 
     #[cfg(test)]
@@ -578,9 +581,11 @@ pub(crate) async fn record_tool_receipt(
     state: &Arc<ProxyState>,
     receipt: &ChioReceipt,
 ) -> Result<(), ProtectError> {
-    if let Some(store) = &state.receipt_store {
-        let store = store.lock().await;
-        store.append_tool_receipt(receipt)?;
+    if let Some(store) = state.receipt_store.clone() {
+        let receipt = receipt.clone();
+        blocking(move || store.append_tool_receipt(&receipt))
+            .await
+            .map_err(receipt_worker_failed)??;
     }
 
     #[cfg(test)]
@@ -600,28 +605,11 @@ pub(crate) async fn record_kernel_receipt(
     state: &Arc<ProxyState>,
     receipt: &ChioReceipt,
 ) -> Result<(), ProtectError> {
-    if let Some(store) = &state.receipt_store {
-        use chio_kernel::ReceiptStore;
-        let store = store.lock().await;
-        if let Err(error) = store
-            .core
-            .append_chio_receipt_with_timeout(receipt, std::time::Duration::from_secs(5))
-        {
-            // Archived IDs remain tombstoned against new writes. Redelivery
-            // succeeds only when the authenticated retained snapshot already
-            // contains this exact signed evidence, without appending anything.
-            let retained = store.core.load_retained_chio_receipt(&receipt.id)?;
-            let identical = match retained {
-                Some(retained) => {
-                    chio_core_types::canonical_json_bytes(&retained)?
-                        == chio_core_types::canonical_json_bytes(receipt)?
-                }
-                None => false,
-            };
-            if !identical {
-                return Err(error.into());
-            }
-        }
+    if let Some(store) = state.receipt_store.clone() {
+        let receipt = receipt.clone();
+        blocking(move || append_kernel_receipt(&store, &receipt))
+            .await
+            .map_err(receipt_worker_failed)??;
     }
     #[cfg(test)]
     {
@@ -632,6 +620,38 @@ pub(crate) async fn record_kernel_receipt(
         log.receipts.push(receipt.clone());
     }
     Ok(())
+}
+
+fn append_kernel_receipt(
+    store: &SqliteReceiptStore,
+    receipt: &ChioReceipt,
+) -> Result<(), ProtectError> {
+    use chio_kernel::ReceiptStore;
+    if let Err(error) = store
+        .core
+        .append_chio_receipt_with_timeout(receipt, std::time::Duration::from_secs(5))
+    {
+        // Archived IDs remain tombstoned against new writes. Redelivery
+        // succeeds only when the authenticated retained snapshot already
+        // contains this exact signed evidence, without appending anything.
+        let retained = store.core.load_retained_chio_receipt(&receipt.id)?;
+        let identical = match retained {
+            Some(retained) => {
+                chio_core_types::canonical_json_bytes(&retained)?
+                    == chio_core_types::canonical_json_bytes(receipt)?
+            }
+            None => false,
+        };
+        if !identical {
+            return Err(error.into());
+        }
+    }
+    Ok(())
+}
+
+/// A receipt append whose worker did not complete is a persistence failure.
+fn receipt_worker_failed(error: WorkerFailed) -> ProtectError {
+    ProtectError::ReceiptStore(error.to_string())
 }
 
 pub(crate) async fn finalize_and_record_receipt(

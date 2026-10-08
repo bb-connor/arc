@@ -191,7 +191,7 @@ fn test_state_with_receipt_db(
             let tool_receipts = store.load_tool_receipts().test_unwrap();
             let revoked_capability_ids = store.load_revoked_capability_ids().test_unwrap();
             (
-                Some(Mutex::new(store)),
+                Some(store),
                 receipts,
                 tool_receipts,
                 revoked_capability_ids,

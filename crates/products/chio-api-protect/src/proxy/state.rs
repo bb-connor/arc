@@ -134,7 +134,7 @@ pub(crate) struct ProxyState {
     pub(crate) receipt_log: Mutex<ReceiptLog>,
     #[cfg(test)]
     pub(crate) tool_receipt_log: Mutex<ToolReceiptLog>,
-    pub(crate) receipt_store: Option<Mutex<SqliteReceiptStore>>,
+    pub(crate) receipt_store: Option<SqliteReceiptStore>,
     /// Revocation store shared with the embedded kernel. With a receipt database
     /// it is the durable sibling file, so releases persist and a sibling replica
     /// on the same volume observes them even though its in-memory set is loaded
@@ -235,9 +235,10 @@ impl ProxyState {
     /// closed, so readiness reports unhealthy and a platform probe pulls the instance
     /// from rotation rather than routing traffic to a sidecar that can only deny.
     pub(crate) async fn readiness_status(&self) -> SidecarStatus {
-        if let Some(store) = &self.receipt_store {
-            let store = store.lock().await;
-            if !store.is_reachable() {
+        if let Some(store) = self.receipt_store.clone() {
+            // The health report reads SQLite, so it runs on the blocking pool; a
+            // worker that does not complete reports the store unreachable.
+            if !blocking(move || store.is_reachable()).await.unwrap_or(false) {
                 return SidecarStatus::Unhealthy;
             }
         }
@@ -529,9 +530,9 @@ impl ProtectProxy {
 
         let receipt_store = durable_receipt_store
             .as_ref()
-            .map(|store| Mutex::new(SqliteReceiptStore::from_shared(Arc::clone(store))));
+            .map(|store| SqliteReceiptStore::from_shared(Arc::clone(store)));
         let mut revoked_capability_ids = match &receipt_store {
-            Some(store) => store.lock().await.load_revoked_capability_ids()?,
+            Some(store) => store.load_revoked_capability_ids()?,
             None => HashSet::new(),
         };
 

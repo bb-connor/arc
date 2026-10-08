@@ -38,8 +38,6 @@ async fn health_route_reports_ready_when_the_receipt_store_is_reachable() {
         .receipt_store
         .as_ref()
         .test_unwrap()
-        .lock()
-        .await
         .core
         .flush_receipt_writes()
         .test_unwrap();

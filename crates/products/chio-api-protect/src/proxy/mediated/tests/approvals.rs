@@ -172,7 +172,7 @@ impl ApprovalHarness {
             Some(revocation),
         );
         let mutable = Arc::get_mut(&mut state).ok_or("unexpected shared fixture state")?;
-        mutable.receipt_store = Some(Mutex::new(SqliteReceiptStore::from_shared(evidence)));
+        mutable.receipt_store = Some(SqliteReceiptStore::from_shared(evidence));
         mutable.clock = self.clock.clone();
         mutable.mediation_kernel = Some(Arc::new(kernel));
         mutable.approval_admin = ApprovalAdmin::new(Arc::new(SqliteApprovalStore::open(
@@ -339,9 +339,7 @@ async fn ap23_signed_approval_survives_restart_and_dispatches_exact_call_once() 
     let store = state
         .receipt_store
         .as_ref()
-        .ok_or("shared receipt sink")?
-        .lock()
-        .await;
+        .ok_or("shared receipt sink")?;
     let bundle = store
         .core
         .build_evidence_export_bundle(&chio_kernel::EvidenceExportQuery::admin_all())?;

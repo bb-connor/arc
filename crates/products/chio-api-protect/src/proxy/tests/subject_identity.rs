@@ -113,7 +113,7 @@ async fn subject_identity_invalid_subjects_reject_before_mutation() {
             assert!(state.receipt_log.lock().await.receipts.is_empty());
             assert!(state.tool_receipt_log.lock().await.receipts.is_empty());
             assert!(state.revoked_capability_ids.lock().await.is_empty());
-            let store = state.receipt_store.as_ref().test_unwrap().lock().await;
+            let store = state.receipt_store.as_ref().test_unwrap();
             assert!(store.load_receipts().test_unwrap().is_empty());
             assert!(store.load_tool_receipts().test_unwrap().is_empty());
             assert!(store.load_revoked_capability_ids().test_unwrap().is_empty());

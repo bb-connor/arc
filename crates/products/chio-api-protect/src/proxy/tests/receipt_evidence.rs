@@ -170,3 +170,48 @@ async fn native_redelivery_recognizes_identical_authenticated_retained_evidence(
         Err(ProtectError::EvidenceStore(_))
     ));
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn concurrent_receipt_appends_share_the_store_without_a_sidecar_lock() {
+    const APPENDS: usize = 16;
+    let directory = tempfile::tempdir().test_unwrap();
+    let database = directory.path().join("receipts.db");
+    let canonical = chio_store_sqlite::SqliteReceiptStore::open(&database).test_unwrap();
+    let _approval = SqliteApprovalStore::open_colocated_with_receipt_store(&database).test_unwrap();
+    let state =
+        test_state_with_receipt_db(Vec::new(), "http://127.0.0.1:1".into(), database.to_str());
+    let appends: Vec<_> = (0..APPENDS)
+        .map(|index| {
+            let state = Arc::clone(&state);
+            tokio::spawn(async move {
+                let receipt = build_manual_receipt(
+                    &state,
+                    format!("concurrent-{index}"),
+                    "/denied".into(),
+                    HttpMethod::Post,
+                    "caller".into(),
+                    None,
+                    Verdict::deny("policy", "test"),
+                    403,
+                    100,
+                    chio_core_types::sha256_hex(index.to_string().as_bytes()),
+                    None,
+                    None,
+                    "test",
+                )?;
+                record_receipt(&state, &receipt).await
+            })
+        })
+        .collect();
+    for append in appends {
+        append.await.test_unwrap().test_unwrap();
+    }
+    assert_eq!(
+        canonical
+            .query_receipts(&chio_kernel::ReceiptQuery::default().local_operator_admin())
+            .test_unwrap()
+            .total_count,
+        APPENDS as u64
+    );
+    assert_eq!(state.readiness_status().await, SidecarStatus::Healthy);
+}

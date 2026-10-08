@@ -303,7 +303,7 @@ fn mediated_test_state_with_durable_admission(
         tool_receipt_log: Mutex::new(ToolReceiptLog {
             receipts: Vec::new(),
         }),
-        receipt_store: receipt_store.map(Mutex::new),
+        receipt_store,
         revocation_store,
         revoked_capability_ids: Mutex::new(std::collections::HashSet::new()),
         trusted_capability_issuers,
