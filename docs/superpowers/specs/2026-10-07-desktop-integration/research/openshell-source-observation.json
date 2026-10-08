@@ -1,0 +1,31 @@
+{
+  "observed_at": "2026-10-08T03:23:46.562387+00:00",
+  "commit": "277f922d6d3b08b16d825cbd97499fe1a50031ac",
+  "files": [
+    {
+      "path": "README.md",
+      "url": "https://raw.githubusercontent.com/NVIDIA/OpenShell/277f922d6d3b08b16d825cbd97499fe1a50031ac/README.md",
+      "sha256": "b28bf8191159a5ceb4800f30f44ba5979e7900e87975f8fbcf81e10f40c88883",
+      "bytes": 8050
+    },
+    {
+      "path": "docs/how-it-works/policies/schema.mdx",
+      "url": "https://raw.githubusercontent.com/NVIDIA/OpenShell/277f922d6d3b08b16d825cbd97499fe1a50031ac/docs/how-it-works/policies/schema.mdx",
+      "sha256": "89432bd6990c9dbb8e6c90c736dee587cdd17cec33f3b33efba591149267a34a",
+      "bytes": 30686
+    },
+    {
+      "path": "proto/supervisor_middleware.proto",
+      "url": "https://raw.githubusercontent.com/NVIDIA/OpenShell/277f922d6d3b08b16d825cbd97499fe1a50031ac/proto/supervisor_middleware.proto",
+      "sha256": "bee96ac940303d8a7530e6e2283a98077bb428a05ef610b51d018ea18377bebd",
+      "bytes": 31307
+    },
+    {
+      "path": "rfc/0011-multi-player-design/README.md",
+      "url": "https://raw.githubusercontent.com/NVIDIA/OpenShell/277f922d6d3b08b16d825cbd97499fe1a50031ac/rfc/0011-multi-player-design/README.md",
+      "sha256": "6dc5ead068b296c568e38659834e1157a4716e8d78c07a183274e1c890e85d17",
+      "bytes": 82031
+    }
+  ],
+  "qualification": "source read only; no runtime executed"
+}

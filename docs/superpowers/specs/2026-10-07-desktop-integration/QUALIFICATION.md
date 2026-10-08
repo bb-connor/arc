@@ -1,4 +1,4 @@
-# Desktop acceptance and release evidence
+# Native host acceptance and release evidence
 
 Status: specification only. `planning_status: ready_after_adr` under ADR-0038.
 Every proposed execution profile is unavailable until its exact tuple passes.
@@ -14,7 +14,7 @@ readiness. A prerequisite's green test does not qualify a different installed
 artifact. Public instructions may reference only revisions actually available
 in the public repository.
 
-Maintain the authoritative evidence with the owner being tested. The desktop
+Maintain the authoritative evidence with the owner being tested. The native host
 release manifest references those records; it does not duplicate their status
 or reinterpret them. A test record must include a positive control, the actual
 adversarial stimulus, observed native result, and proof that no forbidden effect
@@ -38,37 +38,37 @@ UI guidance is `advisory_only`; only a proven pre-effect gate is `prevent`.
 
 The following are test obligations, not claims that these tests exist or pass.
 Put each executable test in the named owner when implementing the dependency.
-The delivery plan covers the handoff and desktop tests after those contracts land.
+The delivery plan covers native bindings and consumer tests after those contracts land.
 
 | ID | Owner and stimulus | Required result |
 | --- | --- | --- |
-| Q01 | Work owner: finish process, reject acceptance, withhold settlement or delivery independently | WorkViewV1 preserves all six observations; desktop invents no composite success |
+| Q01 | Work owner: finish process, reject acceptance, withhold settlement or delivery independently | When W1 is exposed, WorkViewV1 preserves all six observations; consumers invent no composite success |
 | Q02 | Each exposed effecting mutation owner: lose a response after admission; restart; barrier-synchronize exact duplicate and same-ID changed-intent submissions at native lookup/admission/commit | Original command/preparation/operation lookup; atomic full-intent arbitration yields one original operation/outcome or retained uncertainty, no new identity or duplicate protected dispatch/downstream effects; changed intent conflicts before retention/effect |
 | Q03 | S9 M20: retry reusable, retained and terminal failures | Owner classification and original identity control retry; UI never promotes unknown to safe replay |
-| Q04 | Projection: substitute response method, parameters, pagination, session, work, scope revision or request intent | Reject substituted response including error/retry replies; never render another request's evidence |
+| Q04 | Selected native binding or optional projection: substitute response method, parameters, pagination, session, work, scope revision or request intent | Reject substituted response including error/retry replies; never render another request's evidence |
 | Q05 | Native approval: request deny but receive an approved token; substitute approval ID or bound scope | Reject before retention/use; no credential persisted, no resume or external effect |
 | Q06 | S28/verifier: missing roster, stale/revoked identity, test-only verifier, sidecar-signed approval | Attributable approval unavailable; SharedCredential shown truthfully; no approval UI bypass |
 | Q07 | S4/process owner: stop while children/grandchildren run, then restart services | Closure evidence includes the real process/resource boundary; pending/failed/unknown distinct from stopped |
 | Q08 | S8: stop before restart and exercise operator route authorization | Durable kernel stop survives; tenant/recovery scopes remain unavailable before their owner phases |
-| Q09 | S5 Part B: disconnect, duplicate/reorder hints, overflow retention, stale cursor, unauthorized stream | Bounded resync against the non-persisting owner read; no invented authoritative event or paid inspect polling |
-| Q10 | IPC/browser session owners: wrong UID/PID/session, reused PID, stale socket, spoofed server, duplicate controller; malicious-origin HTTP and cross-site WebSocket requests to the genuine controller with a live ambient-cookie session | Native peer/session policy rejects; one controller per scoped session and no TCP fallback; exact browser origin plus non-ambient owner proof precede protected reads/subscriptions/mutations, with zero unauthorized bytes/effects; genuine authenticated requests succeed, no weaker fallback |
+| Q09 | Selected S5 Part B stream: disconnect, duplicate/reorder hints, overflow retention, stale cursor, unauthorized stream | Bounded resync against the non-persisting owner read; no invented authoritative event or paid inspect polling |
+| Q10 | IPC/browser session owners: wrong UID/PID/session, reused PID, stale socket, spoofed server, duplicate controller; malicious-origin HTTP and cross-site WebSocket requests to the genuine controller with a live ambient-cookie session | Native peer/session policy rejects; one authoritative owner per declared custody scope, distinct enrolled clients, and no weaker transport fallback; the optional projection enforces its own single-controller rule; exact browser origin plus non-ambient owner proof precede protected reads/subscriptions/mutations, with zero unauthorized bytes/effects; genuine authenticated requests succeed, no weaker fallback |
 | Q11 | Host owner/doc 19: crash/omit/timeout hooks, enable alternate native tool/shell, change host version | Hook mode stays detect_only; protected mode fails closed and requires I01-I08 for that host tuple |
 | Q12 | S7/backend: unknown kind, stale policy/hash, launcher bypass, inherited FD, direct IP/DNS/IPv6 egress, child escape, admitted lifetime across suspend and realtime changes | No confinement claim without native evidence; fail launch or restrict; no unconfined fallback |
 | Q13 | Secret broker/relay: malicious host tries environment/file/process-list/log access or alternate provider route | Raw credentials absent from agent/client; every permitted model route bound to enrolled scope |
 | Q14 | Applicable artifact/evidence export owner: symlink/hardlink replacement or alias, path traversal, descriptor race, oversized/archive/device artifact, changed base, unauthorized staging reads, repository-controlled capture execution/fetch/object indirection | Bounded audience-private staging and descriptor-based export reject unsafe input; result hash/base/review identity bind applicable acceptance and publication, and unrelated alias contents/identity/access policy remain unchanged |
 | Q15 | Budget owner: zero, max, overflow, fraction, missing/unknown units, duplicate dimensions, unavailable observations | Exact typed bounds and unique dimensions; unavailable never interpreted as unlimited; native enforcement independently proven |
-| Q16 | Controller health: no evaluated profiles, stale session, expired evidence, missing backend | Feature unavailable with a reason; no empty healthy/ready response |
-| Q17 | UI/workbench and each exposed helper owner: forged artifact text, injected commands/links, notification click, out-of-order response; leading-dash operands, option aliases and Git pathspec magic/globs | Inert presentation and qualified literal operand semantics; no unintended file reads, execution, egress or authority transition; useful ordinary operands and keyboard/screen-reader state remain correct |
+| Q16 | Native owner/profile health (and projection when selected): no evaluated profiles, stale session, expired evidence, missing backend | Feature unavailable with a reason; no empty healthy/ready response |
+| Q17 | Each exposed helper owner, plus UI/workbench only when selected: forged artifact text, injected commands/links, notification click, out-of-order response; leading-dash operands, option aliases and Git pathspec magic/globs | Inert presentation and qualified literal operand semantics; no unintended file reads, execution, egress or authority transition; useful ordinary operands and keyboard/screen-reader state remain correct |
 | Q18 | Release: swap one artifact/tuple field, remove required evidence or submit authenticated ambiguous/noncanonical/over-limit manifest bytes | Positive baseline passes; each mutation fails its intended gate before evidence admission or profile state changes; signature and semantic consumption use one strict bounded owner decode |
 | Q19 | Process backend: timeout and descendants, spawn/exec/reparent during closure, unrelated exited child, unkillable/pending child | Bounded cleanup and complete custody evidence; do not reap another task's status or report false completion |
 | Q20 | Install/update: unsigned/tampered/wrong-arch artifact, downgrade across installation users, competing update/removal, concurrent exact and changed-intent duplicate lifecycle submissions, unauthorized/replayed privileged caller, mid-update crash, reboot/uninstall | Reject invalid package/caller; native atomic original-identity arbitration, single-writer custody and installation-scoped floor guard shared mutations; no duplicate downstream effects or lost uncertainty, preserve recoverable state and revalidate before enablement; explicit cleanup |
 | Q21 | Observation/S5 owners, plus recovery when exposed: subscriber idle for long periods and sustained event traffic | No observation path spends recovery-command quota or drains settlement reserve; configured buffer and resource limits enforced; exposed recovery additionally passes native saturation/finality controls |
 | Q22 | Isolation profile: attempt an in-workspace write through the host's native shell, outside an explicitly granted runner operation | Boundary interactive labels a permitted write cannot_see with no per-write receipt; protected/sealed profiles reject the alternate native-shell route. An expressly granted sealed recipe's internal shell is a separate bounded execution and cannot qualify this negative. |
 
-## Sealed-work safety without blanket keystone dependencies
+## Native effects and sealed-work safety without blanket keystone dependencies
 
-Removing NK-01 through NK-03 as complete redesign prerequisites does not waive
-admission, crossing or ABI safety for sealed work. Its owner must still prove
+Not requiring the complete S9/S10/S11 redesign before every host capability does
+not waive admission, crossing or ABI safety. Each selected effect owner must prove
 current-authority admission before dispatch, exact request/scope and source
 binding, atomic reservation and transition behavior for its effect class,
 required persistence before acknowledgement, post-effect receipt/uncertainty
@@ -76,7 +76,7 @@ handling, authenticated closed native dispatch and guarded artifact release.
 These properties are exercised through W1, recovery, foundation and the required
 S3/S4/S5/S8/M20 deltas, using the owning S10 read/effect distinction and S1
 placement rules. A selected path missing any of those properties stays
-unavailable until its owner implements and qualifies it. The desktop may not
+unavailable until its owner implements and qualifies it. A native binding or optional client may not
 substitute a weaker path merely because the whole pure-machine/crossing/census
 redesign is not a blanket milestone gate.
 
@@ -144,23 +144,30 @@ a complete inventory of every predecessor obligation.
 
 | Profile | Mandatory acceptance | Runtime gate |
 | --- | --- | --- |
-| Observe | Q04, Q09-Q11, Q16-Q17, Q21; Q15 projection cases for an exposed budget view; Q02 for every exposed effecting mutation, including support export/lifecycle; applicable Q01/Q03 for exposed W1 views or recovery capability | S5 A/B, authenticated bounded non-persisting reads, selected trust-control GETs and truthful hook source attribution; W1/M20 are not basic receipt/hook observation gates |
+| Observe | Q04, Q10-Q11, Q16-Q17, Q21; Q09 for exposed streams; Q15 projection cases for an exposed budget view; Q02 for every exposed effecting mutation, including support export/lifecycle; applicable Q01/Q03 for exposed W1 views or recovery capability | Authenticated bounded non-persisting selected owner reads, trust-control GETs and truthful hook source attribution; S5 A/B gate selected unified stream sources, not non-streaming reads; W1/M20 are not basic receipt/hook observation gates |
 | Approve | Q02-Q06, Q09-Q10, Q16-Q17 | Qualified native approval owner, S28 identity, production verifier and installed utility binding; no stop capability implied |
 | Per-task stop | Q02-Q04, Q07, Q09-Q10, Q16-Q17, Q19 | Qualified S4/process closure and its native route authorization; Q05/Q06 are not prerequisites when approval is absent |
 | Kernel stop | Q02-Q04, Q08-Q10, Q16-Q17; Q19 additionally for any claimed process cleanup | Qualified S8 phase-1 scope, durability and native route authorization; no S28 approval or per-task closure prerequisite and no implied process termination |
 | Sealed work | Q01-Q22 applicable to its concrete backend, with exclusions justified by owner; Q22's alternate native-shell negative is mandatory | W1, recovery, restricted host, runner, S7 and installed release tuple |
-| Protected interactive | Q02-Q13, Q15-Q22 plus doc 19 I01-I08 | Each of six hosts individually qualified; native-shell removal and Q22 alternate-access rejection enforced |
+| Protected interactive | Q02-Q13, Q15-Q22 plus doc 19 I01-I08 | Each selected host tuple individually qualified; native-shell removal and Q22 alternate-access rejection enforced; all-six program completion is separate from selected-host promotion |
 | Boundary interactive | Q02-Q13, Q15-Q22 as applicable; no mediated-local-effect claim | Deferred; independent backend evidence required |
 | Managed endpoint | Platform annex's ES/NE matrix plus Q16-Q20 and Q02 for every exposed effecting mutation | Deferred; consent/entitlements and restrictive-only authority model |
+
+Q09 stream-specific stimuli apply only where subscriptions are exposed in any
+row. Non-streaming reads still require bounded audience-safe native reads,
+request correlation, truthful freshness and Q21 resource/idle controls. Optional
+UI-only stimuli likewise require an explicit absent-surface exclusion, never an
+omission of equivalent native authority or effect tests.
 
 Every row expands to an explicit executable case manifest at implementation
 time. "Applicable" must not let a release omit a gate silently: the manifest
 names the owner-approved exclusion and its reason; an unclassified case fails
 qualification. A profile may fail while another independently qualifies.
 
-The Q identifiers are not an exhaustive replacement for the consumed operator
-contract. Each platform's source reconciliation must map every applicable
-OPERATOR normative obligation and protocol-freeze acceptance row, as well as
+The Q identifiers are not an exhaustive replacement for the consumed owner
+contracts. Each platform's source reconciliation must map every applicable
+HOST-CONTRACT, CAPABILITIES and CONSUMERS obligation; consumers selecting the
+optional projection also map every OPERATOR normative and protocol-freeze row, as well as
 each Q-row stimulus and annex requirement, to its owner, implementation packet,
 actual test command, positive control and independent negative observation.
 Include negotiation/reconnect, raw decoding, pagination consistency, review
@@ -252,28 +259,57 @@ receipts or cancel work; explain both retention and active custody to the user.
 ## Release sequence
 
 1. Freeze the source tuple and obtain each predecessor's native acceptance.
-2. Freeze the shared protocol only after its owner schemas/queries exist. Run
-   cross-client conformance against the installed owner service, not mocks.
+2. Freeze each selected owner binding only after its real schemas/queries exist.
+   Run independent consumer conformance against installed owners. Freeze the
+   optional projection separately only when selected.
 3. Build signed qualification candidates and publish the installation inputs
    needed by a clean host through an explicitly labeled candidate channel.
 4. Install on clean supported machines; run positive and negative controls,
-   failure/restart/update/uninstall exercises and accessibility checks.
+   failure/restart/update/uninstall exercises, plus accessibility checks for
+   selected graphical/interactive clients.
 5. Verify public artifact/revision availability and checksums, then promote the
    exact candidate tuple. A newly rebuilt artifact restarts the artifact gates.
 6. Record local tests, hosted CI, bot review, release publication and native
    qualification as separate statuses. This docs PR satisfies none of the
    executable release gates by itself.
 
-Enforce the ADR's sealed-first product order at release promotion, independently
-of candidate construction. A platform's protected-interactive production entry
-requires a recorded earlier qualified sealed-W1 release for that platform.
-Promote the sealed cell using its own complete owner/installed evidence, then
-consider the protected cell; neither candidate assembly nor protected promotion
-is a prerequisite for that first sealed release. Test rejection of an otherwise
-passing protected cell when the sealed release is missing, failed or unpromoted,
-and acceptance only with the authenticated prior release plus its own current
-qualification. Observe, approval and qualified stop remain independent. This
-order requires one qualified first sealed tuple, not six-of-six host completion.
+Native capability promotion is independent of optional presentation and unrelated
+workloads. A protected host requires its own foundation, I01-I08, native boundary,
+resource, release and installed evidence; it does not require an earlier sealed
+coding release. Test an otherwise passing selected native profile with no
+workbench/projection/QML/menu bundle and no unrelated coding profile, and require
+promotion only for its exact supported capabilities. Remove each selected owner
+or required case in turn and require refusal. A passing sealed cell cannot qualify
+another host, resource, deployment principal or platform. Broad product-completion
+claims additionally require the coordination/resource/cooperation cases below.
+
+## Systems-layer acceptance added by the product-direction amendment
+
+Q23-Q30 supplement, rather than replace, Q01-Q22. Qualification is per advertised
+capability and deployment profile. Pure Observe still has no effect, passport,
+recursive-work or cross-organization dependency unless it exposes that feature.
+A selected GUI applies every graphical/browser case; a headless exclusion must
+name the absent UI surface and retain all equivalent native read/effect cases.
+
+| ID | Owner and stimulus | Required result |
+| --- | --- | --- |
+| Q23 | Native host and independent consumers: remove all Chio UI/projection components; run useful installed harness and application operations; kill/restart/replace clients and lose responses | Native functions remain usable within the selected profile; current owner state, original IDs and resources survive; no implicit replay or cancellation. User-session and service-principal evidence remain distinct. CONSUMERS C01/C02/C05 and W3's independent applications retain their exact scope. |
+| Q24 | Credential/current-admission owner: valid passport plus selected holder challenge; substitute subject, issuer, audience, challenge or workload; expire/revoke under the relying-party policy; present a valid passport without a grant | Useful approved scope succeeds; no invalid credential or missing grant yields effects/private bytes. Require configured fresh lifecycle when the profile claims current passport status. Bare portable verification is never promoted to current native admission. C09 supplies independent resource/disclosure controls. |
+| Q25 | Delegation/current-admission and budget owners: useful child/grandchild within supported form; widen scopes/constraints, extend expiry, change delegator, exceed allocation; revoke an ancestor; retry after restart | Effective authority only narrows; unsupported forms reject; current descendant work refuses after revocation becomes effective under the qualified contract. Original uncertain effects remain retained. One-hop aggregate examples cannot qualify recursive aggregate conservation. C10 observes actual effects and native accounting. |
+| Q26 | Swarm/runtime/W1 owners: fan-out/fan-in; corrupt graph/witness/route/epoch/allocation/continuation binding; race replay and additive extensions; present correctly signed join with unaccepted/wrong/duplicate parents | Qualified runtime admission plus protected graph head and durable issuance/replay prevent duplicated/forked authority. Exact required parent acceptance, producer/task/artifact/evaluator/contract identity gates the successor. Pure bundle verification or fixture minting cannot supply that fact. C11 observes graph/allocation records and downstream effects. |
+| Q27 | Actual budget and mutable-resource owners: race consumers at finite capacity, restart, stale assignment with fresh version, copied store, exact replay under new resource holder | No double spending, renewed allowance, stale-owner mutation or duplicate effect. Owner fence/version/ID checks participate atomically in actual mutation; missing telemetry is not unlimited. OS CPU/memory limits, cumulative allowance and money remain separately qualified dimensions. C03/C04 provide independent state/counter evidence. |
+| Q28 | Federation/W2/recovery owners: enrolled separately controlled peers do useful unpaid work; either refuses; substitute peer/treaty/audience/current authority; lose responses/evidence delivery and revoke present release access | Independent local refusal and audience protection; original-ID reconciliation without duplicate rights/effects; historical obligations remain separate from current disclosure. Local multi-process runs do not prove independent organizational administration. C06/C07 require actual counterpart custody and evidence. Funding adds its own gates only if selected. |
+| Q29 | Native profile/credential/lifecycle owners: user-session lock/logout versus separately enrolled service principal; boot, expiry, credential lock/replacement, cross-context request and removal | No session-to-service privilege conversion; no root/linger/launch registration/detach authorization shortcut. Correct principal, credential/store audience and independent expiry survive restart; unknown authority refuses. Native platform oracles verify credentials and effects before any frontend starts. |
+| Q30 | Architecture/release owner: inspect linked/loaded trusted components and stores, remove optional projection; select runtime adapter with mismatched or missing evidence; drop a required consumer/native test | Declared custody/fact-source TCB and owner dependency closure match actual artifact; no hidden application signer or ledger and no new universal daemon requirement. Native feature remains frontend-independent but cannot promote without its exact owner/backend/case evidence. Record useful controls and actual measured resource bounds. |
+
+For a release claiming the full product ambition, Q23 plus the selected
+coordination (Q25/Q26 and W1 acceptance), shared resources (Q27), and independent
+cooperation (Q28) must pass in addition to every native profile obligation.
+Passports (Q24) are mandatory when advertised or selected by peer policy, not an
+unrelated prerequisite for every local operation. The completion record names
+actual capability coverage, independent applications, external harness tuples
+and separately administered owners; unavailable dimensions remain open. No
+marketing shorthand merges these dimensions into one green status.
 
 ## Superseded-review trace
 

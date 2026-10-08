@@ -1,5 +1,7 @@
 # Omarchy upstream research
 
+> Historical research, superseded for product scope and delivery ordering on 2026-10-08 UTC. Follow [HOST-CONTRACT](../../2026-10-07-desktop-integration/HOST-CONTRACT.md), the [current annex](../ANNEX.md) and [native Linux findings](native-host-services.md). Omarchy QML and the workbench are optional consumers of reusable native services/bindings; neither the operator projection nor a sealed-coding release is a prerequisite for an independently qualified native host. Retain the pinned upstream observations and all applicable selected-consumer acceptance below; they do not establish current runtime support.
+
 Status: Proposed research baseline, verified 2026-10-07. Confidence: high for the pinned source behavior below; unknown for Chio running on an actual Omarchy desktop. No runtime qualification is claimed.
 
 Scope: release versus development compatibility, shell plugin API, launch/menu paths, lifecycle, theme, input, notification privacy, and distribution. This research supports the desktop experience and plugin specifications. Native authority, isolation, and provider qualification remain separate prerequisites.

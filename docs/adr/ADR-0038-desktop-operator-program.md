@@ -1,149 +1,151 @@
-# ADR-0038: One desktop operator program
+# ADR-0038: Native host integration for the Chio kernel
 
-- Status: Accepted for planning, 2026-10-07; not implemented or qualified.
-- Decision owner: program owner, who instructed "Apply the broader architecture proposal now" after the cross-program review.
-- `boundary_class`: `advisory_only` for the controller and its displays; authority belongs to the referenced kernel owners.
-- `planning_status`: `ready_after_adr`; individual release gates below remain mandatory.
-- Scope: desktop integration only. This decision does not ratify unrelated NVIDIA strategy decisions or change Chio's public positioning.
-- Number allocation: ADR-0023 through ADR-0037 remain reserved for the strategy candidates indexed by input N in PROGRAM-MAP; choosing 0038 does not accept those candidates.
+- Status: Accepted for planning, 2026-10-07; amended 2026-10-08 UTC after the product-direction review. Not implemented or qualified.
+- Decision owner: program owner, who approved the combined program and then explicitly required the systems-layer direction grounded in Chio's public documentation and kernel roadmaps.
+- `boundary_class`: per native operation/profile; consumer projections are `advisory_only`.
+- `planning_status`: `ready_after_adr`; every selected owner and installed-profile gate remains mandatory.
+- Scope: shared native host integration, Linux/Omarchy and macOS platform ports, and external consumer acceptance. This amendment replaces the workbench-first and sealed-coding-first delivery order.
+- Number allocation: ADR-0023 through ADR-0037 remain reserved for strategy candidates indexed by input N in PROGRAM-MAP. This decision does not accept those candidates wholesale.
 
-## Decision
+## Product decision
 
-Build one operator surface over Chio's work, recovery, process and security
-programs. The workbench is the first client. Omarchy QML, the macOS menu bar
-and CLI entry points are additional clients of the same controller and proposed
-`chio.operator.v1` projection. The controller is an S1 C-layer component outside
-the trusted computing base, in a separate process from the gateway and process
-host. It holds no authority signing keys, asserts no trusted facts, issues no
-capabilities and maintains no competing ledger. The existing `chio` CLI is an explicit shared delivery obligation (packet 4a), with its own native and installed cross-client conformance; platform UI acceptance cannot substitute for a missing terminal client.
+**Chio is a Rust kernel for agentic operating systems that coordinate work,
+share resources, and cooperate across organizational boundaries.**
 
-The first execution product is **sealed, single-owner work**: select a project,
-review a fixed recipe and acceptance contract, run an eligible host using
-kernel-owned tools, inspect the resulting artifact, inspect evaluator-derived acceptance, then separately approve or reject patch
-application and authorize any publication. A human click does not set W1
-acceptance; the original configured evaluator and evidence contract do. Reuse the W1 work contract,
-`chio-mini-swe`, restricted host sessions and the workbench. A new desktop task
-runtime is out of scope. Pi is first because of existing evidence; the contract
-must support doc 19's Claude Code, Codex, Cursor, Hermes, Pi and OpenClaw hosts.
-Historical Pi evidence does not qualify a new version tuple.
+Implement reusable userspace systems services above the existing OS kernel.
+Applications, agent harnesses, Herdr and domain schedulers use Chio's native
+contracts for identity, authority, resource custody, work/evidence and recovery.
+They retain planning, model/context management and UX. A useful qualified native
+profile must work with every Chio graphical frontend and optional operator
+projection absent. A user-presence approval policy can still require its
+specified interaction; headless deployment cannot bypass that policy.
 
-Existing hook sessions are useful immediately as observation, with their actual
-boundary displayed. No hook plugin or `chio run` launcher becomes an isolation
-boundary through this decision. `chio run` speaks the native framed protocol;
-it is not a general-purpose launcher for existing coding agents.
+The [host contract](../superpowers/specs/2026-10-07-desktop-integration/HOST-CONTRACT.md)
+defines embedded, user-session and service-principal profiles. They are separate
+identity, credential and lifecycle contracts. No new universal daemon is
+required. Reuse existing owner processes where their custody model requires
+separation; an embedded consumer that holds authority or trusted ports is part
+of the declared TCB. Removing a UI does not remove login, lock, expiration or
+revocation checks from a user-session profile.
 
-## Isolation denies, Chio grants
+The first product proof is independent installed consumers performing useful
+work through qualified native owners without a Chio frontend. Early Observe,
+process, resource and control slices have independent gates. Durable verifiable
+work, shared resources and independently administered cooperation extend that
+proof through their own owner gates. A complete cross-organization claim needs
+the cooperation acceptance, not merely two local interfaces. Sealed coding is
+one workload. It is not a prerequisite for every host integration or resource.
 
-Use replaceable, thin isolation adapters. Do not expand `chio-cage`, a restricted
-tool-server profile, into a general-purpose Node agent sandbox. Chio continues
-to own the grant path: gateway, model relay, secret broker, kernel resources,
-approvals, receipts, work and recovery. An external runtime's policy or approval
-does not issue a Chio capability or count as an operator endorsement.
+## Existing technology controls the design
 
-For the desktop program, this scopes the proposed ADR-0023 layer decision:
-OS adapters remain allowed where a qualified runtime is unavailable. The
-strategy owner must reconcile that amendment in ADR-0023; the unamended proposal
-must not be cited as permission to freeze the secret broker or remove a grant
-gate. No broader F-1 to F-17 decisions are implied.
+[PROGRAM-MAP](../architecture/PROGRAM-MAP.md) pins the implementation and roadmap
+owners. [CAPABILITIES](../superpowers/specs/2026-10-07-desktop-integration/CAPABILITIES.md)
+traces product decisions to passports, recursive delegation, swarm authority,
+processes, verifiable work, shared resources, federation, recovery and evidence.
+Each capability has a consumer benefit and a qualification obligation.
 
-The S7 owner must add and qualify evidence kinds for Linux agent-host bubblewrap,
-macOS Seatbelt and any selected macOS VM runtime before they may render as
-confined. These names are design candidates, not existing wire enum values.
-`ProcessContainer` already has an owner; reuse it for the existing container
-runner. Unknown kinds continue to render "not confined by Chio".
+- L0 admission, capability validation, native policy/guards, receipt and current
+  authority owners retain their semantics. L1 process identity/custody, L2
+  planned work and L3 recovery compose those owners. R11 lowering and R12
+  declared layer descent prevent a new desktop or application kernel dialect.
+- Portable agent identity and passport verification inform relying-party
+  policy. Neither a passport, discovery result, application account nor an OS
+  process identity independently grants tool, resource or result access.
+- Recursive attenuation, revocation, allocation and swarm graph/join authority
+  stay at their actual owners. Application task trees cannot stand in for
+  verified authority chains. Unsupported chain depth or shared-budget forms
+  fail closed; the Megastart direct-worker example grants no multi-hop waiver.
+- External applications choose task assignment and acceptance procedures. The
+  work owner binds the original contract and validates the configured evaluator
+  evidence. Six work observations remain independent; a UI click or process
+  exit cannot create acceptance or disclosure authority.
+- Shared allowances and mutable resources have an authoritative admission or
+  resource owner. Local consumer counters, OS scheduling quotas and portable
+  receipts cannot replace that owner or imply globally atomic fleet budgets.
+- Independent organizations retain separate keys, policy, stores and refusal.
+  Federation and scoped owner services require enrolled peers, current native
+  admission, audience checks and loss-safe evidence. Unpaid cooperation does
+  not require the full market/funding stack; the selected W2 transport and
+  cooperation gates still apply.
 
-On macOS, retain Seatbelt as a lower-assurance native profile. Evaluate existing
-VM runtimes before authoring a VZ supervisor or guest distribution. Apple
-Containerization and OpenShell MicroVM are candidates, not selected or qualified
-dependencies. Backend selection requires the annex's executable experiments.
-An unsuccessful evaluation leaves the VM feature unavailable, not silently
-replaced by Seatbelt.
+Public documentation and Megastart/Herdr supply product and application evidence.
+Their application-specific API is not the kernel ABI. Existing code, planned
+interfaces, historical exercises, installed acceptance and public availability
+remain separate evidence classes.
 
-## Product profiles and claims
+## Native OS ports and isolation
 
-`planning_status` is planning permission under ADR-0011, never runtime readiness.
-Each session shows its exact host, backend, policy, software revisions, evidence
-age and receipt kind beside the boundary class. One global "protected" badge is
-insufficient.
+Chio owns grant semantics and trusted custody. macOS/Linux supply process,
+identity, IPC, filesystem, network, timing and service-management mechanisms.
+Implement thin qualified adapters in the existing owners, with independently
+observed denial, cleanup and recovery. Do not expand the restricted tool-server
+`chio-cage` into a general Node-agent sandbox. No hook or launcher becomes an
+isolation boundary through this decision. `chio run` retains its native framed
+protocol meaning.
 
-| Profile | `boundary_class` by operation | `planning_status` | Required owner evidence |
-| --- | --- | --- | --- |
-| Observe | `detect_only` for hook activity; `cannot_see` for uninstrumented activity | `ready_after_adr` | S5 Part B and source-attributed observations; gaps shown |
-| Approve and stop | `prevent` at the native pre-effect gate; display remains `advisory_only` | `ready_after_adr` | Approval: S28 identity, production endorsement verifier and exact decision binding. Independently gate per-task stop through S4 and Kernel stop through S8 with their own native authorization; absent approval prerequisites do not disable a qualified stop. |
-| Sealed work | `prevent` for kernel-owned tools; isolation coverage separately attested | `ready_after_adr` | W1, recovery fixes, restricted host and runner, S7 backend evidence |
-| Protected interactive | `prevent` only for qualified mediated tools; native shell removed | `ready_after_adr` | Host-specific doc 19 I01-I08 acceptance |
-| Boundary interactive | `prevent` at qualified routed grant points; `cannot_see` for permitted local shell/file effects | `deferred` | Qualified isolation/egress/descendant coverage and S7 kind; no per-write receipt claim |
-| Managed endpoint | `detect_only` for observations; restrictive OS control separately identified | `deferred` | ES/NE entitlements, consent or MDM, independent containment evidence |
+The strategy's proposed ADR-0023 must be reconciled with this split: reusable
+external containment and thin native OS adapters are allowed, while secret
+brokering, native authority and resource/evidence joins stay in Chio's owners.
+An external policy approval is not a Chio grant. OpenShell and other runtimes
+are candidates to qualify at an explicit seam, not mandatory dependencies or
+proof of a native profile. NVIDIA research supplies strategic alternatives and
+historical measurements; it does not justify current exclusivity claims.
 
-Retire the former macOS `native-descendant-v1` proposal. It is not renamed to
-Seatbelt and its ES/NE gates are not removed from a continuing release profile.
-Reintroducing that design requires a separate decision and its original
-restriction and network-containment evidence. ES/NE remain a managed-endpoint
-track, not a shortcut to complete mediation.
+S7 must own and qualify new agent-host bubblewrap, Seatbelt or selected macOS VM
+evidence kinds before any confinement claim. `ProcessContainer` has an existing
+owner. Unknown kinds remain unconfined. macOS Seatbelt stays a separate lower
+assurance profile; evaluate existing VM runtimes before a bespoke supervisor.
+Failed VM evaluation leaves that profile unavailable. ES/NE remain a separately
+qualified managed-endpoint track. The retired `native-descendant-v1` design is
+not revived under a new name.
 
-## Reference before redefine
+## Optional consumers and controls
 
-[PROGRAM-MAP](../architecture/PROGRAM-MAP.md) names the source owners and pinned
-inputs. [OPERATOR](../superpowers/specs/2026-10-07-desktop-integration/OPERATOR.md) defines the desktop projection and
-the conditions for a future wire freeze. The owner contracts control task
-observations, recovery, events, stop, identity, IPC, processes, credentials,
-host qualification and confinement. Missing owner functionality is a dependency
-to implement there, not a desktop-private substitute.
+`chio.operator.v1` remains a proposed bounded C-layer projection for applications
+that choose shared operator views. It is outside the TCB, holds no authority
+signer or competing ledger, and does not become a universal execution ABI.
+Workbench, Omarchy QML, macOS menu bar and notifications are optional consumers.
+Their browser, accessibility, privacy and native approval obligations remain
+mandatory when selected. Their absence cannot disable a qualified owner stop,
+recovery query, resource operation or harness binding.
 
-Specifically:
+The existing `chio` CLI is a required diagnostic/admin consumer for the native
+host release, using the actual selected owner bindings. Packet 4a retains
+source and installed CLI acceptance. No command is advertised before it exists.
+No failure may fall back to a more privileged CLI path.
 
-- Work status preserves execution, acceptance, result, recovery, settlement and
-  delivery as independent observations. Completion does not imply acceptance.
-- Per-task stop uses S4 closure. S8 emergency control retains its own scopes and
-  result kinds. A UI timeout is not proof of either stop.
-- Stable subscriptions belong to S5 Part B. Events are hints, not grants;
-  reconnect and retention gaps require owner reconciliation. Repeated paid
-  `InspectWorkflow` polling is not a desktop event transport.
-- Approvals require the S28 roster, a production verifier and exact requested
-  decision/approval-ID binding in the installed native utility. The Pi wrapper's
-  refusal is useful containment, not proof that its bundled utility is fixed.
-- Reuse `chio-secure-ipc`; implement Darwin peer authentication in that owner.
-  Reuse `chio-process` and the secret broker/model relay rather than parallel
-  supervisors, key stores or proxies.
+Approval, per-task stop and kernel stop qualify separately. S28 and the production
+endorsement verifier gate attributable approval; the installed approval utility
+must bind exact decision and approval ID. S4/process closure gates task stop;
+S8's selected scope/durability gates kernel stop. Missing approval never disables
+an independently authorized qualified stop. UI timeout is no stop evidence.
 
-## Scope removed and retained
+## Delivery and retained obligations
 
-Remove Omarchy compositor tools and configuration repair. Delegation belongs to
-the kernel/process/work programs and is not a desktop phase. Preserve platform
-research, plugin packaging, compatibility experiments, failure/recovery UX,
-accessibility, privacy and release acceptance in the two annexes.
+1. Reconcile pinned sources, real API/ABI and selected deployment capability set.
+2. Qualify native identity, IPC, custody, storage, time and selected owner actions.
+3. Bind existing Rust/SDK/native contracts; freeze only implemented surfaces
+   against independent consumers and owner conformance.
+4. Deliver headless external harness/application acceptance and the existing CLI.
+5. Prove selected coordination, shared resources and independent-owner cooperation;
+   sealed coding and funded settlement are separately selected workload profiles.
+6. Qualify exact native packages, upgrades, recovery and removal. Add optional
+   presentation independently with its complete selected-surface matrix.
 
-Retire the two proposed platform protocols and their synthetic schema corpora.
-Their correctness findings become owner acceptance obligations in the shared
-projection and qualification plan. They are not compatibility commitments or
-evidence of working software. Git history retains the repaired proposals and
-validation records; the replacement is intentionally smaller.
+[QUALIFICATION](../superpowers/specs/2026-10-07-desktop-integration/QUALIFICATION.md)
+retains the prior native adversarial obligations and adds headless/product tests.
+S1/S9/S10/S11 remain the kernel simplification, admission/crossing and integrity
+roadmaps. Whole-program completion is not a blanket gate for every host read,
+but selected admission, persistence, current authority, crossing, ABI and
+post-effect uncertainty invariants cannot be waived. Tests and owner-approved
+exclusions, not prose scope changes, decide each release claim.
 
-The shared-program/Omarchy change owns this ADR and the common documents. The
-macOS annex is reviewed as a dependent change on that branch. No merge or
-runtime rollout is authorized by documentation approval. The PRs remain open
-for review; bot verdicts are documentation-review evidence, not product qualification.
+Omarchy compositor tools and configuration repair remain removed. Delegation is
+a kernel capability consumed by this program, not a desktop-owned implementation.
+The old independent platform protocols and synthetic corpora remain retired;
+their native safety findings survive in owner acceptance. Existing paths and
+packet IDs remain for continuity and do not imply a desktop-led architecture.
 
-## Positioning and alternatives
-
-Preserve Chio's positioning as a modern Rust kernel for agentic operating
-systems. This change also aligns README, AGENTS and their public diagrams with
-the boundary classes in [ADR-0011](ADR-0011-boundary-taxonomy-product-wording.md).
-The opening leads with capability, scopes the described operations once, and
-links to a consolidated account of boundaries and current limits. Platform
-rows retain their specific qualification status. Public captions explain
-authorization directly rather than using internal program-map vocabulary.
-
-Track a receipt-copy follow-up against [S3 phase 1 in PROGRAM-MAP](../architecture/PROGRAM-MAP.md):
-only after the D1 closure is implemented and its production conformance is
-qualified may the affected paths claim a signed terminal receipt or explicit
-retained uncertainty. Landing a plan or source change alone does not justify
-that stronger claim; current copy preserves possible effects after receipt
-failure. Onboarding follows the same capability-first, evidence-bound rule.
-
-Rejected: two independent controllers and task models; hook-based protection
-claims; a mandatory bespoke VM before evaluating existing runtimes; changing
-Omarchy's upstream launch defaults; and treating all north-star keystones as
-desktop blockers. Accepted instead: explicit owner sequencing and narrowly
-scoped platform adapters. The consequence is genuine predecessor work before
-some UI controls can be enabled, rather than a second implementation of it.
+Documentation review, hosted CI, runtime qualification and public release remain
+separate. The shared/Omarchy change owns this decision; macOS remains a dependent
+annex. No merge, runtime rollout or public-site publication follows from this ADR.

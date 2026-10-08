@@ -1,20 +1,24 @@
-# Chio desktop integration design
+# Chio native host integration design
 
-Status: accepted architecture for planning, 2026-10-07; no runtime qualification.
-`boundary_class: advisory_only`; `planning_status: ready_after_adr`.
+Status: accepted planning direction, amended 2026-10-08 UTC; no runtime qualification.
+`planning_status: ready_after_adr`; each native operation retains its boundary.
 
-The [shared desktop operator program](2026-10-07-desktop-integration/README.md)
-owns the common architecture, operator projection, predecessor map and
-qualification obligations. [ADR-0038](../../adr/ADR-0038-desktop-operator-program.md)
-records the owner-approved consolidation.
+The [shared native host program](2026-10-07-desktop-integration/README.md) implements
+the product ambition: Chio is a Rust kernel for agentic operating systems that
+coordinate work, share resources, and cooperate across organizational boundaries.
+[ADR-0038](../../adr/ADR-0038-desktop-operator-program.md) records the headless
+systems-layer direction and optional presentation scope.
 
-The [Omarchy annex](2026-10-07-omarchy-integration/ANNEX.md) owns platform
-presentation, lifecycle, packaging and compatibility. Its [implementation plan](../plans/2026-10-07-omarchy-integration/IMPLEMENTATION.md)
+Start with the [native host contract](2026-10-07-desktop-integration/HOST-CONTRACT.md),
+[capability crosswalk](2026-10-07-desktop-integration/CAPABILITIES.md) and
+[independent consumers](2026-10-07-desktop-integration/CONSUMERS.md).
+The [Omarchy/Linux annex](2026-10-07-omarchy-integration/ANNEX.md) owns native
+ports, service profiles, lifecycle, packaging and optional Omarchy presentation.
+Its [implementation plan](../plans/2026-10-07-omarchy-integration/IMPLEMENTATION.md)
 builds on the [shared delivery plan](../plans/2026-10-07-desktop-integration.md).
-The independent P0-P7 design, two unshipped platform protocols, compositor
-tools, configuration repair and desktop-owned delegation are superseded.
 
-The workbench is the first common client; sealed W1 work using existing owners
-is the first execution product. Hook sessions remain observation-only.
-[Review and verification](2026-10-07-desktop-integration/REVIEW.md) distinguishes
-source/document checks from native runtime and release evidence.
+External applications and harnesses consume native owner contracts before any
+Chio frontend. Sealed coding is one workload with its own gates. Hook activity
+remains observation-only. The old P0-P7 program, platform protocols, compositor
+tools, configuration repair and desktop-owned delegation remain superseded.
+[Review evidence](2026-10-07-desktop-integration/REVIEW.md) does not qualify runtime.

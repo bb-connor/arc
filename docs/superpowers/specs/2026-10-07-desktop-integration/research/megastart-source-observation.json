@@ -1,0 +1,49 @@
+{
+  "retrieved_utc": "2026-10-08T03:13:59.673671+00:00",
+  "url": "https://www.chio.computer/examples/megastart.zip",
+  "archive_sha256": "9dcbecec5bf9681c301ffd0bf7a2eeea685ec8b8b5911ac180692f66cf292050",
+  "archive_bytes": 335069,
+  "members": 59,
+  "checked_files": [
+    {
+      "path": "README.md",
+      "sha256": "ac23b9a07a329a874fdbb154671605c254099cb051057173dbca94900c1d9fb5",
+      "matches_local": true
+    },
+    {
+      "path": "Cargo.toml",
+      "sha256": "8382c9fd15041e6d4facabff8053f284d9a36a49897bbb73a4e9cda92f954d36",
+      "matches_local": true
+    },
+    {
+      "path": "herdr/CONTRACT.md",
+      "sha256": "1282916aefb717e28f11b7ccb62f7ef2d1f30f393eb381b5c0b0bb192f9591e4",
+      "matches_local": true
+    },
+    {
+      "path": "herdr/src/client.rs",
+      "sha256": "03c056d24d0b58ad6872de95caa32c0de8bca48a56b9e9b2a777bf448d84f263",
+      "matches_local": true
+    },
+    {
+      "path": "src/authority.rs",
+      "sha256": "88afb06b2baecc00b93a166b8a15335fe16890d7f14971b1de820e927c9d0bae",
+      "matches_local": true
+    },
+    {
+      "path": "src/mission.rs",
+      "sha256": "f71158b82e84abf09699896f75f61a49f10dd5f03de541151afa6ae77b0d8cd3",
+      "matches_local": true
+    },
+    {
+      "path": "src/operator.rs",
+      "sha256": "237d5c0bf552f9ff823500d01e70bcb5b0e83f36eed81643c92a92f15db802a7",
+      "matches_local": true
+    },
+    {
+      "path": "src/agents/service.rs",
+      "sha256": "f6f04bc05cb756ed95b3eb3d158a6fc192e0b63642c0a696bf1034fc8c30f9fa",
+      "matches_local": true
+    }
+  ]
+}

@@ -1,207 +1,182 @@
-# Shared Desktop Operator Implementation Plan
+# Native Host Integration Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox syntax for tracking.
+> **For agentic workers:** Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task by task. Expand each owner-dependent packet against its landed APIs before coding.
 
-**Goal:** Ship one operator experience over the existing work, recovery and security owners, with sealed single-owner work as its first execution product.
+**Goal:** Make Chio's Rust kernel a reusable native systems layer for external
+applications and agent harnesses on macOS and Linux/Omarchy, with demonstrable
+work coordination, shared resources and independently controlled cooperation.
 
-**Architecture:** A new outside-TCB controller projects owner contracts to the existing workbench first. The existing Chio CLI adds a terminal consumer; Omarchy and macOS add thin clients and qualified isolation adapters. The owner programs retain authority, durable state, process custody, evidence and runtime qualification.
+**Architecture:** Existing L0-L3 owners retain authority, process/resource custody,
+evidence and recovery. Thin native adapters connect those owners to the OS.
+Public Rust/SDK/native clients consume them directly. The workbench and proposed
+`chio.operator.v1` are optional consumers. This plan does not mandate a new daemon,
+application scheduler or wire protocol.
 
-**Tech Stack:** Rust owner clients and local authenticated IPC; existing workbench browser UI; platform QML and SwiftUI shells; existing restricted launchers and container execution.
+**Tech stack:** Existing Rust kernel/process/security/platform crates, selected
+language SDKs, authenticated native IPC, launchd/systemd and qualified native or
+external containment. QML, SwiftUI and browser surfaces apply only to selected
+presentation packages. Concrete owner paths are pinned in
+[PROGRAM-MAP](../../architecture/PROGRAM-MAP.md).
 
-`boundary_class: advisory_only` for the common controller; `planning_status: ready_after_adr` under [ADR-0038](../../adr/ADR-0038-desktop-operator-program.md). Native pre-effect gates retain their owners' `prevent` classification; observations remain `detect_only`.
+`planning_status: ready_after_adr` under [ADR-0038](../../adr/ADR-0038-desktop-operator-program.md).
+Native operations retain their actual boundary; projections are `advisory_only`.
+No implementation or installed release is qualified by this plan.
 
-## Execution contract
+## Execution contract and file ownership
 
-This is a dependency-gated integration plan. It does not invent code against
-unlanded APIs. Work packets 1-3 reconcile and qualify the selected profile's
-predecessor contracts. Packet 2's Observe lane independently permits a read-only
-packet 3 candidate and packet 4 client; its operator lane gates only the selected
-work/recovery/approval/stop capabilities. Packet 3 may create generated candidate
-bindings and conformance probes; packets 4-6 create product runtime code after
-the selected candidate is approved. At each code packet, expand the
-now-pinned owner API into a test-first patch plan with actual types and complete
-code before implementing it. A missing type or query stops that packet and
-returns the change to its named owner. It does not license a desktop substitute.
+Read [HOST-CONTRACT](../specs/2026-10-07-desktop-integration/HOST-CONTRACT.md),
+[CAPABILITIES](../specs/2026-10-07-desktop-integration/CAPABILITIES.md),
+[CONSUMERS](../specs/2026-10-07-desktop-integration/CONSUMERS.md) and
+[QUALIFICATION](../specs/2026-10-07-desktop-integration/QUALIFICATION.md).
+Packet IDs remain stable so platform references survive this amendment.
 
-The [program map](../../architecture/PROGRAM-MAP.md) contains exact source pins
-and existing paths. [OPERATOR](../specs/2026-10-07-desktop-integration/OPERATOR.md) and
-[QUALIFICATION](../specs/2026-10-07-desktop-integration/QUALIFICATION.md) define
-the required results. Platform plans cover their remaining lifecycle work.
-
-## File ownership
-
-| Location | Responsibility and availability |
+| Location | Responsibility |
 | --- | --- |
-| `docs/superpowers/specs/2026-10-07-desktop-integration/OPERATOR.md` | Current proposed common projection; owner schemas and profile-specific acceptance govern promotion |
-| `spec/OPERATOR.md` and `spec/README.md` | Future normative projection and index entry, created only at packet 4's implemented-client wire freeze for the exposed profile |
-| `docs/architecture/PROGRAM-MAP.md` | Source owner register and dependency acceptance |
-| `crates/products/chio-operator/` | Proposed new crate for bounded view composition and owner dispatch; no native authority |
-| `crates/products/chio-workbench/` | Existing first client on the pinned workbench branch; review and worktree UX |
-| `crates/products/chio-cli/` | Existing `chio` binary; packet 4a adds an operator consumer through current CLI parsing/dispatch owners, without a new launcher or authority path |
-| `tests/integration/operator/` | Proposed installed-owner, cross-client acceptance harness; no fake runtime success |
-| `crates/security/chio-secure-ipc/` | Existing native peer authentication; Darwin extension belongs here |
-| `crates/kernel/chio-process/`, `crates/products/chio-cli/PROCESS_HOST.md` | Existing process identity/custody/control; live control delta belongs here |
-| `sdks/python/chio-mini-swe/` | Existing sealed runner, verified export and evaluator integration |
-| Platform annexes and `integrations/`, `packaging/` targets named there | Native presentation, packaging and platform acceptance |
+| PROGRAM-MAP and proposed `docs/superpowers/evidence/native-host/` | Actual owner source, API, qualification and candidate case manifest |
+| Existing `chio-kernel`, `chio-process`, `chio-secure-ipc`, store, broker, trust-control, credential and swarm owners | Native semantics; no platform fork of their authority or state |
+| Landed W1-W3/recovery and SDK paths reconciled in packet 1 | Work preparation/submission/query, exact recovery and independent owner transport |
+| Existing `crates/products/chio-cli/` | Required terminal diagnostic/admin consumer, packet 4a |
+| Proposed `tests/integration/native_host/` | Independent installed owner/consumer acceptance; not a fake runtime |
+| Platform `integrations/` and `packaging/` paths selected in annexes | Native ports, installation, update/removal and optional UI |
+| `OPERATOR.md`; proposed `chio-operator` and `tests/integration/operator/` | Optional projection only, with its own freeze and complete selected-surface gates |
+| Existing workbench and mini-SWE owner paths | Optional application and coding workload, with inherited owner findings and evaluator/export gates |
 
-## Packet 1: Reconcile predecessor source and handoffs
+Code tasks begin only after the selected owner API exists or its owner approves
+and implements the missing delta. Record actual types, source/test paths, test
+commands and expected refusals at that point. Do not invent runnable commands
+for proposed crates or reuse a same-named historical ABI blindly. Independent
+capability slices can proceed in parallel once their own gates pass. An absence
+is recorded as unavailable and never as a skipped passing test.
 
-`boundary_class: advisory_only`; `planning_status: ready_after_adr`.
+## Packet 1: Reconcile source, capability and deployment profiles
 
-**Files:** Update `docs/architecture/PROGRAM-MAP.md`; add implementation-time
-`docs/superpowers/evidence/desktop-operator/predecessors.md`. Owner changes go to
-the exact paths in the map, not a desktop fork.
+**Files:** PROGRAM-MAP, selected owner specs and the proposed predecessor record.
 
-- [ ] Read every pinned owner document using `git show <full-pin>:<path>` from the register. Record the landed successor commit or explicit unmet gate for each row.
-- [ ] Record the existing trust-control GET owners and host-plugin/bridge provenance before compiling the read-only client. Reconcile W1.0 against the actually landed recovery/process ABI before adding W1 capabilities; record the real WorkClient/WorkTransport methods, work queries, preparation lookup and six observations. Missing W1 does not block basic receipt/hook observation.
-- [ ] Open the foundation landing ledger and workbench inherited findings. Bind acceptance to the selected source/profile; do not copy historical M0-M4 counts into a release verdict.
-- [ ] Record owner handoffs for S9's narrowly sequenced M20 delta, S7 new kinds, S1 controller classification and the ADR-0023 thin-adapter/grant split. These are amendments required in those programs.
-- [ ] Record the approval utility's installed archive pin and Q05's deny/ID-mismatch cases with the host owner. Record missing production approval-path integration and S28 attribution separately.
-- [ ] Commit the reconciled dependency record with `docs(desktop): pin operator predecessors`. A missing gate remains unavailable and blocks only its dependent behavior.
+- [ ] Read the exact pinned sources and public documentation observations. Replace each historical owner pin with its intended landed successor or an explicit unmet dependency. Preserve candidate, test-only, planned, installed-qualified and public-release status separately.
+- [ ] Create a decision record for every CAPABILITIES row: consumer problem, existing primitive, authoritative owner, OS binding, source status, chosen profile, required gate and reason for each excluded capability. Cover passports, delegation, swarm graphs, resources, work, federation and recovery explicitly.
+- [ ] Select embedded, user-session or independently enrolled service-principal deployment. Bind principal, audience, code/peer identity, credentials, storage, boot/incarnation, expiry, lock/logout and removal semantics. A background launcher cannot convert a session capability to a service grant.
+- [ ] Reconcile process ABI conflicts and real source symbols. W1.0 must bind actual Prepare/Submit/Query and release/recovery APIs before exposure; proposed WorkClient/WorkTransport names are not implementation evidence. Basic authenticated receipt/hook observation does not wait for W1.
+- [ ] Inventory existing trust-control GETs and bounded host provenance adapters. Native read-principal rules apply; paths shared with mutation handlers remain method-restricted. No authoritative session/work inventory is inferred from receipt queries.
+- [ ] Record exact owner deltas for Darwin IPC, multi-client enrollment, live process control, S3 post-effect handling, focused S9 M20 dispositions, S7 new evidence kinds, S28/production approval and S5 per-source streams. Record installed approval utility repair separately from wrapper refusal.
+- [ ] Reconcile the NVIDIA strategy's proposed isolation/custody freeze with ADR-0038 and the user-approved kernel direction. Keep replaceable containment and measured seam limits; do not adopt its narrower product category, broker freeze or commercial decisions implicitly.
+- [ ] Freeze a selected-profile case inventory joining every normative HOST-CONTRACT/CONSUMERS/CAPABILITIES obligation, applicable Q case and platform requirement to its owner and test. Optional projection consumers also map every OPERATOR obligation. Commit the predecessor/design record.
 
-**Acceptance:** Every desktop concept has exactly one owner and an inspectable
-source. No uncommitted worktree is a predecessor. No open upstream branch alone
-counts as a design defect; missing required native acceptance still blocks use.
+**Acceptance:** Each selected behavior has one accountable owner, real API or
+explicit owner delta, consumer value and native acceptance. No uncommitted
+source or open PR alone establishes runtime readiness.
 
-## Packet 2: Qualify Observe and selected operator lanes independently
+## Packet 2: Qualify native ports and owner capabilities independently
 
-`boundary_class: prevent` for owner actions and `detect_only` for event views;
-`planning_status: ready_after_adr`.
+**Files:** Existing owners in PROGRAM-MAP; platform ports; owner test suites.
 
-**Files:** Owner S3/S4/S5/S8/S9 design paths in PROGRAM-MAP; trust-control read
-handlers and host observation adapters; their owning crates;
-`docs/superpowers/evidence/desktop-operator/predecessors.md`.
+### Read and native host baseline
 
-### Observe lane
+- [ ] Qualify native peer and intended-server authentication, bounded decoding, scoped store access, competing-owner fencing, credential custody, boot/incarnation and profile lifecycle. Exercise direct installed IPC clients, including clients other than any optional controller. Refusal must precede protected bytes or effects.
+- [ ] Bind authenticated bounded receipt, lineage, usage and revocation reads. Preserve unknown/missing values and provenance. Hook omission/crash remains detect_only; hook success is not a verified native effect.
+- [ ] For streaming, qualify S5 Part A then the required Part B source adapters against independent headless consumers. Test audience, stable subscription identity, gap/restore and bounded non-persisting reads. Work and recovery sources wait for their respective owner gates. Do not spend settlement reserve on observation.
+- [ ] Qualify exact native resource bounds, persistent state/migration, secret/egress and lifecycle ports selected by the profile. Same-user arbitrary consumers require explicit enrollment/custody, not a broadened UID check. Record unsupported resource classes.
+- [ ] Pass applicable Q04/Q09-Q13/Q15-Q21 and Q23/Q29/Q30. Pure reads do not acquire W1/M20 or unexposed mutation gates. Any lifecycle or export mutation already exposed must pass Q02 at its actual owner.
 
-- [ ] Land and qualify S5 Part A, then Part B with desktop as the explicit second wire consumer. Qualify stable subscription identity, gap/restore semantics, audience authorization and bounded non-persisting re-reads. Reproduce Q09/Q21 without spending the work's settlement reserve. Recovery projection waits for its landed event/read owner; work projection waits for the W1 query, matching S5's per-source gates.
-- [ ] Bind the existing trust-control receipt query/analytics/tool/child, lineage, budget-usage and revocation GETs through bounded authenticated read adapters. Preserve native read-principal rules and exclude mutation methods even where paths are shared. Qualify request/filter/pagination correlation (Q04) and explicit feature availability (Q16).
-- [ ] Qualify the host owner's session/capability/receipt joins and hook source attribution (Q11). Host-reported success remains unverified and `detect_only`; trust-control receipt presence is not proof of a live or complete hook session. Expose no session inventory until its bounded authenticated host adapter exists.
-- [ ] Qualify the selected native IPC and non-persisting read adapters, including wrong-session/stale-peer refusal and no quota-draining inspect polling (Q09-Q10/Q21). Missing recovery adapters disable recovery views, not unrelated receipt/hook reads.
-- [ ] Record Observe predecessor acceptance. This independently permits the read-only packet 3 candidate and packet 4 controller/workbench work. Its complete client acceptance is Q04, Q09-Q11, Q16-Q17 and Q21, plus Q15 for selected budget projections. Q02 applies to each exposed effecting owner, including selected support-export/lifecycle actions without W1/M20; Q01/Q03 add only the relevant W1/recovery view obligations. Pure reads acquire no mutation-race dependency.
+### Selected work, authority and control capabilities
 
-### Selected operator/work/recovery lane
+- [ ] Qualify passport proof-of-possession/relying-party/lifecycle policy for a passport-selected profile; it grants no effect authority. Qualify recursive delegation at the actual serving path and its supported chain/budget form, including ancestor revocation. Qualify swarm graph head/issuance and accepted-parent joins when exposed (Q24-Q26).
+- [ ] Qualify S3 phase 1 and the owner-reviewed focused M20 disposition delta for selected effect/recovery paths. Current authority, exact intent, atomic transition, required persistence and retained uncertainty remain mandatory even before whole S9/S10 redesign completion.
+- [ ] Qualify S8 phase 1 kernel stop and S30 reach with native authorization and restart evidence (Q08). Tenant/recovery scopes remain unavailable before their own phases; kernel stop implies no task cleanup without separate custody evidence.
+- [ ] Qualify S4/process live cancel/revoke and descendant closure (Q07/Q19). Run the existing `cargo test --locked -p chio-cli --test process_host` at the reconciled owner plus its new live-control cases. Stopped-host admin tests do not prove live control.
+- [ ] Qualify W1 original preparation/command/work lookup, evaluator binding and selected recovery using actual current source and dispositions. A missing handle or response never authorizes a replacement dispatch.
+- [ ] Qualify S28, production endorsement verification and the installed utility's exact approval decision/ID binding (Q05/Q06). Native approvals, OS consent and application confirmation remain distinct.
+- [ ] Commit each delta in its owner program, then update references and case evidence here. A green consumer mock cannot close an owner gate.
 
-- [ ] For selected effect paths, land and qualify S3 phase 1 and the owner-reviewed M20 disposition delta. Verify terminal receipts and retained uncertainty with post-effect failures (Q02-Q04). These are not prerequisites for basic receipt/hook observation.
-- [ ] Qualify S8 phase 1 kernel-scope stop and S30 reach. Keep tenant/recovery stop unavailable until phases 4/5. Record route authorization and restart evidence (Q08).
-- [ ] Qualify S4 phases 1/2 and process-host live cancel/revoke. Reuse `cargo test --locked -p chio-cli --test process_host` for the existing process-host suite, then add native Q07/Q19 regressions in that owner. Existing stopped-host tests alone do not prove live control.
-- [ ] Qualify W1 preparation/command/work lookup with lost replies and missing handles before exposing those capabilities. Qualify recovery repairs at their current source, with complete dispositions for historical, merged/predecessor and later findings. Calling the old counts historical does not resolve them. Absence from one read is not proof no original effect occurred.
-- [ ] Qualify S28 roster plus the production endorsement path and installed native approval fix. Q05/Q06 must prove no retained approved artifact for deny or a mismatched approval ID.
-- [ ] Commit owner changes in their own programs, then update only the desktop dependency references. Do not use a green desktop mock to close any owner gate.
+**Acceptance:** Each capability is eligible only after its own native gates. Read,
+resource and stop capabilities can proceed independently where their contracts
+permit. No requirement to build a workbench or run sealed coding first.
 
-**Acceptance:** Each capability records its own predecessor evidence. Observe may
-advance while S4/S8/S28/M20/W1 or mutation recovery gates remain unmet; those
-capabilities stay explicitly unavailable. Passing one lane does not close another.
+## Packet 3: Bind real native owner interfaces and qualify candidates
 
-## Packet 3: Prepare the selected wire candidate after its owners
+**Files:** Existing Rust/SDK/native owner bindings reconciled in packet 1;
+proposed installed conformance harness and selected owner schemas.
 
-`boundary_class: advisory_only`; `planning_status: ready_after_adr`.
+- [ ] Describe the exact supported capability vector, protocol/ABI versions, profile identity and explicit unavailable outcomes. Use existing L0-L3 contracts and R11 lowering/R12 descent. Create no generic desktop WorkPhase, signer, ledger, scheduler or recovery enum.
+- [ ] Reuse canonical owner types and bounded native transports. Correlate full request/response identity, scope/audience, intent, pagination, errors and retry dispositions (Q04). Unknown versions or capabilities refuse without a weaker fallback.
+- [ ] Bind resource observations to exact units and native owner enforcement; absent data is unavailable, never unlimited. Freeze frame/queue/verification limits from owner constraints and measured useful controls.
+- [ ] Build a direct independent conformance client for the selected owner bindings, with installed negative controls and native effect observers. Maintain private current authority outside application display state.
+- [ ] Record provisional candidate acceptance for packet 4 development. Final owner API/ABI freeze follows installed independent consumer acceptance and owning program review; no optional operator schema is a prerequisite.
+- [ ] If a shared operator view is selected, follow OPERATOR's separate candidate/freeze matrix over landed owner types. Its absence affects only those consumers. Do not promote it to `spec/OPERATOR.md` or advertise it as stable until its implemented selected-surface acceptance passes.
 
-**Files:** `docs/superpowers/specs/2026-10-07-desktop-integration/OPERATOR.md`;
-owner schemas; proposed
-`tests/integration/operator/` and qualification manifest.
+**Acceptance:** Candidate bindings expose the owner semantics faithfully. Source
+or schema validation alone proves neither stable ABI nor native enforcement.
 
-- [ ] After packet 2's Observe lane, resolve selected read, scope/health and host provenance views through their owners. Add authenticated recovery reads and work enumeration only after their independent gates pass. W1's existing query inventory does not imply ListWork exists.
-- [ ] Import landed read/event types for the read-only candidate, then work/recovery/stop types only for separately eligible capabilities. Write one generated wire binding for `chio.operator.v1`, with an explicit supported-capability set and unavailable results for absent owners; retire platform names with no compatibility fallback because neither was released.
-- [ ] Encode full request/response identity, native session/audience and intent correlation, including errors, retries and pagination. Run Q04 substitutions individually against valid controls.
-- [ ] Cover Q16's nonempty evaluated profiles and fresh evidence. For any exposed typed budget/limit capability, also cover Q15: unique dimensions with exact units/bounds, missing values distinguished from unlimited and independent native enforcement of each claimed limit. A read-only usage row makes no new enforcement claim.
-- [ ] Freeze bounded frame/list/event limits and their refusal behavior from owner constraints and measurements. Unknown versions and unsupported owner capabilities fail explicitly.
-- [ ] Record provisional schema/binding approval for the exact supported capabilities with source hashes and owner-conformance probe results. Commit `feat(operator): add candidate owner projection`. This permits packet 4 development, not a frozen client ABI or release. A read-only candidate does not wait for unexposed mutations. Final wire freeze waits for implemented-client acceptance at the end of packet 4.
+## Packet 4: Prove independent external consumers without Chio UI
 
-**Acceptance:** No copied WorkPhase, retry enum, event store, capability issuer,
-receipt signer or approval state machine. Schema success alone cannot satisfy
-the installed-owner correlation tests.
+**Files:** Existing SDK/application/harness owners plus proposed
+`tests/integration/native_host/`; exact consumer paths chosen in packet 1.
 
-## Packet 4: Implement the common controller and workbench client
+- [ ] Implement CONSUMERS' installed application and harness scenarios using supported public candidate APIs. Use distinct application logic and domain acceptance; two skins over one application-private controller do not prove reuse. W3's two-application acceptance remains an owner gate, not waived by a CLI probe.
+- [ ] Start the selected native profile with workbench, optional operator projection, menu bar and Omarchy shell absent. User-session tests may retain their enrolled login; service-principal tests separately prove authorized unattended operation. Do not infer boot service support from detach.
+- [ ] Perform useful work and an actual denied attempt; independently count dispatch, effects, resource charges and disclosure. Demonstrate application scheduling, model/context management and UX remain external while native authority/state stays with Chio.
+- [ ] Lose replies before and after native commitment, kill/restart each consumer, race exact and changed-intent duplicates, reauthenticate and query the original identity. Preserve current versus historical authority and six independent W1 observations whenever W1 is selected.
+- [ ] Remove/restart the interface during work. Disconnection does not silently cancel or replay; explicit qualified stop and recovery remain reachable through owner routes.
+- [ ] Exercise two consumers against shared owner state with no competing authority, nonce, budget or recovery implementation. Qualify all selected source/profile tests and complete installed candidate evidence before freezing the supported owner bindings.
+- [ ] Measure integration effort and remaining application code, idle/cold/warm overhead, queue pressure and recovery latency. Record actual measurements and freeze release bounds. Claim no speedup or application-code reduction without a comparable baseline.
 
-`boundary_class: advisory_only` for the controller; `planning_status: ready_after_adr`.
+**Acceptance:** Independent external consumers perform useful bounded operations
+without a Chio frontend. The evidence names which ambition dimensions are
+qualified; a read-only or single-owner result cannot claim the complete program.
 
-**Files:** Create `crates/products/chio-operator/{Cargo.toml,src/lib.rs,src/main.rs}`
-and `tests/integration/operator/` after the selected packet 3 candidate; modify
-workspace `Cargo.toml`. At final wire freeze, promote the accepted projection to
-`spec/OPERATOR.md` and add its normative entry to `spec/README.md`.
-Adapt existing `crates/products/chio-workbench/src/{model.rs,engine.rs,web.rs}`,
-`web/{app.js,index.html,style.css}` and its `tests/{workbench.rs,git_tasks.rs,browser-smoke.mjs}`.
+## Packet 4a: Deliver the existing CLI as a native owner consumer
 
-- [ ] Write red tests for the selected observation surface, stale/error replies, absent owners and authority-bearing material in UI state. Add independent work-observation cases only when W1 is exposed. An unavailable owner must produce an explicit unavailable feature, not fixture data; an Observe build cannot dispatch unqualified mutations.
-- [ ] Implement authenticated owner connections and bounded in-memory projection only. Keep gateway/process host in separate processes. Bind browser sessions to local authenticated context; prohibit authority tokens in URLs and logs.
-- [ ] Adapt the workbench to this projection while preserving worktrees, patch SHA-256 and reviewable differences. Close its inherited findings before counting the workbench as accepted.
-- [ ] Run `cargo test --locked -p chio-operator` once the proposed crate exists; run the existing `cargo test --locked -p chio-workbench --test workbench` and `cargo test --locked -p chio-workbench --test git_tasks` against the reconciled workbench branch. Expected: all targeted owner/client cases pass, no skips masquerading as acceptance.
-- [ ] Execute the browser suite using the workbench's installed dependencies and documented fixture server. Exercise keyboard, screen reader, untrusted artifact content, revoked session and reconnect. Retain screenshots plus the native owner transcripts (Q17).
-- [ ] Measure idle/cold/warm resource use, event pressure and restart recovery. Freeze numeric release bounds and verify overload refuses new work without weakening a gate.
-- [ ] Run the profile-specific protocol-freeze matrix against the implemented workbench client and the independent conformance client from packet 3. An Observe-only freeze requires its full selected-surface matrix: Q04, Q09-Q11, Q16-Q17 and Q21, conditional Q15 budget projection, Q02 for any exposed effecting owner, and Q01/Q03 only for relevant W1/recovery views. Each capability carries its own owner evidence without turning absent execution into an observation gate. Freeze `chio.operator.v1` for the exact supported surface only after these cross-client/native results pass, promote it to `spec/OPERATOR.md`, and index it in `spec/README.md`. Unexposed mutation contracts remain proposed; later capability additions return to packet 3 conformance and owning qualification.
-- [ ] Commit `feat(operator): add workbench owner client` after code, security-boundary, final wire-freeze and native acceptance review.
+**Depends on:** packet 3's selected owner candidate, not an operator controller
+or workbench. Packet 4 and 4a can develop together; release requires their
+applicable installed evidence.
 
-## Packet 4a: Deliver the existing CLI as an operator client
+**Files:** Existing `crates/products/chio-cli/Cargo.toml`, `src/main.rs`,
+`src/cli/types.rs`, `src/cli/dispatch/mod.rs` and owner-selected modules/tests.
+Reconcile exact locations in packet 1; keep the existing `chio` binary. Command
+names, flags and a dedicated module are chosen only against landed owner APIs.
 
-`boundary_class: advisory_only` for terminal presentation;
-`planning_status: ready_after_adr`; not an implemented command surface.
+- [ ] Inventory promised diagnostic/admin capabilities and their exact owner scopes: reads first; work, resource, approval, stop, recovery and export only when qualified. Missing capabilities are explicit unavailable results.
+- [ ] Reuse accepted native owner codecs and authentication. An absent owner, expired profile or unsupported command never falls back to broader legacy CLI privileges. The optional projection is used only for selected view composition; direct owner functionality survives its absence.
+- [ ] Define bounded human/machine output and exit behavior for refusal, unavailable, unresolved and completed states. Escape terminal controls and preserve exact security identifiers. Keep credentials out of argv, environment, history and logs; use qualified native/private input paths.
+- [ ] CLI confirmation cannot replace required user-presence endorsement or evaluator acceptance. Interruption, pipe closure and noninteractive input cannot silently cancel, approve, resume or resubmit. Reconnect uses original owner identity and fresh native authentication.
+- [ ] Run owner-backed parsing, peer/session, stale version, malformed reply, Q04 substitution, terminal injection/literal operand, event-gap and lost-reply tests. Every selected mutation receives Q02 races with native effect/credential observers and useful authorized controls.
+- [ ] Compare CLI and independent application reads of the same state, then submit the same authorized native identity concurrently where applicable. Record exact actual test commands once the test exists. A printed fixture does not qualify CLI behavior.
+- [ ] Package and invoke the installed binary under the selected native principal. Repeat update, restart/logout, stale-client/server and recovery cases on each platform. Help and public documentation describe only implemented accepted commands.
 
-**Depends on:** packet 4's implemented read-only controller and accepted bindings.
-Build Observe first without W1/M20 or platform UI dependencies. Each later action
-requires its packet 2 owner gate, packet 3/4 capability conformance and, for
-sealed execution, packet 5. CLI implementation does not gate candidate assembly
-for those predecessors. Packet 6 release includes the promised CLI acceptance.
+**Acceptance:** The existing CLI is a useful installed consumer with its own
+source/native/cross-client evidence. A QML, Swift or browser shell cannot substitute.
 
-**Files:** Extend the existing `crates/products/chio-cli/Cargo.toml`,
-`src/main.rs`, `src/cli/types.rs` and `src/cli/dispatch/mod.rs`;
-create proposed `src/cli/operator.rs` and `tests/operator_client.rs` in that crate,
-and extend `tests/integration/operator/`. `src/bin/chio.rs` already includes
-`src/main.rs`; keep the existing `chio` binary. Reconcile these source locations
-at packet 1 before editing. Update the CLI README/help only after implementation.
-The proposed operator subcommand names and flags are chosen against the landed
-owner API; existing `chio run` retains its native framed-agent meaning.
+## Packet 5: Prove coordination, shared resources and cooperation
 
-- [ ] Register the CLI product owner and exact module/test entrypoints in the predecessor record. Enumerate the promised CLI capabilities and their owner dependencies: authenticated receipt/session/health observation first; sealed-work preparation/submission and views, original-operation lookup/recovery, exact native approval/stop and artifact review/delivery only when individually qualified. An absent capability reports unavailable rather than being omitted from completion accounting.
-- [ ] Reuse the generated common client codec and authenticated native controller transport. The operator subcommands do not build an in-process kernel, bootstrap a second controller, load signing/provider secrets, inherit broad admin credentials or call a bypass owner route. An unavailable controller or mismatched profile cannot fall back to existing broad CLI commands. Keep transport limits, audience/session binding and full request/response correlation identical to the other clients.
-- [ ] Design human and machine-readable output from the accepted projection. Preserve six work observations and native uncertainty independently; define and test explicit bounded output/exit behavior for unavailable, refused, unresolved and completed requests without a synthetic all-success state. Escape terminal control sequences and display original security-relevant identifiers without hidden normalization; machine output stays parseable, bounded and credential-free. Secret-bearing inputs use the native owner path and private input channels, never argv, environment, shell history or log output.
-- [ ] Implement only exact capability-bound requests. Navigation opens a fixed owner-approved review route without authority in its URL; a CLI confirmation flag, unattended input or successful process exit cannot replace passkey approval or evaluator acceptance. Mutations preserve the native original operation identity across response loss. CLI interruption/disconnection ends local observation and does not silently cancel, resume or resubmit work; explicit stop invokes only its separately qualified native scope. Reconnection reauthenticates and resolves the original operation through its owner.
-- [ ] Add owner-backed CLI integration cases for wrong peer/session, missing controller/profile, expired/revoked authority, malformed/oversized replies, all Q04 substitutions, event gaps/reconnect, terminal injection and literal operand handling. Exercise exact and changed-intent duplicate races for each exposed mutation (Q02), interrupted stdout/pipe closure, noninteractive input and lost replies/restart. Independent native dispatch, credential-retention and effect observations prove no bypass or duplicate effect. Pair refusals with useful authenticated Observe and each qualified action.
-- [ ] Compare CLI and workbench projections of the same native observations, including disagreeing work axes and retained uncertainty, then submit the same native operation identity from both clients concurrently. Native results and downstream effects must agree; clients cannot create competing identity or recovery models. Run `cargo test --locked -p chio-cli --test operator_client` after the proposed test exists, plus the actual existing CLI parsing/help regressions recorded by its owner and the shared installed-client harness. A test double of CLI output alone cannot qualify native behavior.
-- [ ] Package the CLI with the exact accepted controller/protocol tuple on each shipped platform. The platform candidate inventories name its final executable identity; installed tests invoke that binary under standard-user enrollment, including update, stale CLI/controller combinations, logout and lost-reply recovery. O7 and M9/M10 consume the shared CLI evidence for their selected capabilities. A native platform shell or independent packet 3 conformance probe cannot stand in for the product CLI.
-- [ ] Record candidate-bound CLI acceptance and update help/README with only commands present in that accepted binary. Commit the existing CLI extension in a separate reviewable slice. Shared-program completion and any release claiming CLI support require this packet's actual source and installed results; an unavailable baseline Observe CLI leaves the promised client undelivered.
+**Files:** Existing process, delegation, swarm, resource, W1-W3, federation and
+recovery owners; selected consumer fixtures and independent test observers.
 
-**Acceptance:** The installed existing `chio` binary is a useful consumer of the
-same accepted operator protocol and native outcomes as the workbench. Its exact
-capabilities have their own cross-client and installed evidence; it owns no
-parallel authority, workflow ledger or task runner. Later profile additions
-repeat the relevant source and installed qualification rather than inheriting
-Observe acceptance.
+- [ ] Execute the CAPABILITIES/CONSUMERS scenarios for stable process identity, narrowing delegation and current ancestor revocation at the actual serving route. Passport acceptance never bypasses current grants. Record unsupported recursive/aggregate forms explicitly.
+- [ ] Concurrently consume a finite shared allowance and mutate a fenced resource from distinct consumers. Restart and retry under original IDs; prove no overspend, stale assignment write, double charge or copied spendable allocator (Q25/Q27).
+- [ ] For accepted-result composition, qualify the original evaluator contract, exact parents, producer/task/artifact identity, protected graph head and unique joins. Application task completion or fixture minting cannot advance authority (Q26).
+- [ ] Execute unpaid cross-owner work with separate keys, stores, enrolled peers, local policies and refusal on either side (Q28). Distinguish multi-process laboratory evidence from separately administered organizations. Qualify actual W2 service/transport slice; W4/full marketplace completion is not an artificial prerequisite for narrower cooperation.
+- [ ] Lose owner/transport responses and result delivery, revoke present access while retaining historical obligations, and reconcile original identities. Evidence, acceptance, settlement and current disclosure stay separate. Funding is optional and adds its rail/finality gates only when selected.
+- [ ] For a selected sealed-coding workload, consume mini-SWE, W1 and S7 owner evidence. Qualify both recipe and evaluator boundaries separately; candidate imports/builds/tests cannot access outside files, credentials, direct egress, inherited handles, unrelated processes or the trusted acceptance channel. A known-good evaluator control must pass; failures/unknowns never accept work. Preserve safe capture/export, exact base/artifact review, separately authorized patch application and publication. Native-shell alternate access rejection remains mandatory. Coding qualification cannot be used to skip these cases or block unrelated resource profiles.
+- [ ] Qualify each selected doc 19 host with I01-I08 at its exact tuple. Historical Pi results do not qualify a new tuple or the other five hosts. Keep the six-host program open until each passes independently.
 
-## Packet 5: Deliver sealed work using the existing runner
+**Acceptance:** Product claims follow completed dimensions and exact capabilities.
+No synthetic green UI, application ledger or fixture signature can supply a
+native authority fact. Full ambition acceptance includes coordinated work,
+shared resources and independent-owner cooperation.
 
-`boundary_class: prevent` at kernel-owned tool routes;
-`planning_status: ready_after_adr`.
+## Packet 6: Package native services and optional consumers
 
-**Files:** Existing mini-swe `repository_container.py`, `repository_proof.py`,
-`repository_review.py`, model/gateway owner paths; W1 owner; selected host
-integration; workbench client; S7 owner evidence registration.
+**Files:** [Omarchy/Linux plan](2026-10-07-omarchy-integration/IMPLEMENTATION.md)
+and dependent macOS plan at
+`docs/superpowers/plans/2026-10-07-macos-integration/IMPLEMENTATION.md`.
 
-- [ ] Require packet 2's selected work/recovery/operator gates and the execution profile's foundation/S7 acceptance. A prior read-only packet 4 freeze provides no mutation or sealed-work qualification.
-- [ ] Bind the fixed recipe, project/base, artifact policy, evaluator, limits and acceptance contract to W1. Preserve original identity through every recovery action.
-- [ ] Reuse network-less container execution and restricted host tools. If native Seatbelt/bubblewrap is selected, require that exact launch/egress/descendant tuple and new S7 kind first; never run Node in the tool-server cage.
-- [ ] Place any external acceptance oracle in the runner/work owner. Bind its evidence to the original contract; keep artifact creation, acceptance, settlement and external delivery separate.
-- [ ] Close evaluator confinement before sealed acceptance. The pinned B workbench (`5bdf08fc3573eba00dd2be7b4fab1c22e48db1f7`, `crates/products/chio-workbench/README.md` security section and `src/tools.rs`) runs project checks with operator OS permissions; that source is not a qualified acceptance sandbox. Route all candidate imports/builds/tests through a separately qualified bounded runner boundary with captured inputs, pinned evaluator dependencies and no ambient host files, secrets, network, unrelated process control or owner signing channels. Keep trusted acceptance validation/commit outside candidate execution. At the actual runner/work/S7/process owners, run a known-good positive control and hostile import/build/test probes for outside file/credential access, direct egress, inherited handles, process signals/descendants, forged result channel, exhaustion and interrupted evaluation. Require independent no-effect/closure evidence and no accepted result on failed/unknown evaluation. Record exact commands, source and boundary tuple; existing recipe confinement alone cannot qualify a separate evaluator. Until this gate passes, sealed acceptance remains unavailable in both platform plans.
-- [ ] Run Q11-Q15 and Q18-Q20 against installed builds, including malformed exports and retained child processes. The controller does not implement a second artifact trust checker or supervisor.
-- [ ] Complete one unpaid work commitment end to end: approve exact scope, execute, stop/recover, inspect the patch and original evaluator-derived acceptance, approve/reject patch application, then separately request scoped publication. Human patch review never sets W1 acceptance. Prove a denial produces no publication effect.
-- [ ] Qualify Pi's exact current tuple first. Keep the six-host matrix open until every doc 19 host independently passes I01-I08; add hosts without changing the common task model.
-- [ ] Commit owner extensions and the workbench workflow in reviewable slices; promote no release based only on this successful development run.
+- [ ] Build signed/reproducible candidates for the selected native profile after required owner/consumer evidence. Candidate assembly precedes installed qualification. No workbench/projection dependency may enter the baseline through packaging.
+- [ ] Run the complete selected-profile case manifest, installed CLI/harness/application tests and native lifecycle/update/rollback/removal acceptance. Test case removal, tuple substitution and authenticated malformed evidence; none may promote a profile. Exclusions require explicit owner approval and capability absence.
+- [ ] Keep optional workbench/QML/Swift/notifications in an independent lane. Selected views consume native owners or the qualified optional projection. Preserve complete OPERATOR/Q17 browser, origin, privacy, accessibility, correlation and exact approval gates; close inherited workbench findings before shipping that client.
+- [ ] Verify native service identity, current credentials, package/architecture, migration/floor and single-writer custody after upgrade/reboot. No unsigned, stale, downgraded or missing backend may start an unconfined fallback.
+- [ ] Measure host resource bounds and preserve a qualified owner stop/recovery route when any UI is unavailable. Distinguish user unenrollment from authorized all-user removal and retained evidence custody.
+- [ ] Verify public revision/artifact availability separately from native acceptance. Record owner source, local, native, hosted checks, external-operator participation, public release and documentation review as separate dimensions.
 
-## Packet 6: Add platform clients and release
-
-`boundary_class: advisory_only` for native UI; `planning_status: ready_after_adr`.
-
-**Files:** [Omarchy plan](2026-10-07-omarchy-integration/IMPLEMENTATION.md) and the
-dependent macOS plan at `docs/superpowers/plans/2026-10-07-macos-integration/IMPLEMENTATION.md`.
-
-- [ ] Execute the platform plan after common-client acceptance. Reuse the same controller, work identifiers, recovery and projection tests.
-- [ ] Include packet 4a's existing CLI client in the exact platform package/protocol inventory and repeat its selected-capability cross-client tests against the installed binary. Program completion or claims of CLI support require actual CLI results; the workbench/QML/Swift clients cannot substitute.
-- [ ] Execute the complete installed qualification manifest with explicit reasons for owner-approved exclusions. Missing evidence or tuple substitutions fail qualification.
-- [ ] Publish signed qualification inputs to the candidate channel, install on clean hosts, and run upgrade/crash/rollback/uninstall exercises before promotion.
-- [ ] Record public artifact availability separately from native acceptance. Verify that public checkout instructions use public revisions, not this internal source register.
-- [ ] Promote the exact qualified tuple and keep the stop/rollback runbook reachable when the UI is unavailable. Record hosted checks, release publication and bot review separately.
-
-Boundary interactive and managed endpoint remain deferred. Omarchy compositor
-tools, configuration repair and desktop-owned delegation have no delivery
-packet. Adding them back requires a new scope decision, not a late task inserted
-into this plan.
+Boundary-interactive and managed-endpoint features retain their deferred native
+gates. Omarchy configuration repair, compositor tools and a desktop authority
+implementation remain out of scope. New resource backends or consumers enter
+through the same owner and evidence discipline.

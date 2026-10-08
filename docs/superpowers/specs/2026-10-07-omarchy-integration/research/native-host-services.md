@@ -1,0 +1,62 @@
+# Native Linux host services research
+
+Research inspected 2026-10-07; systems-layer direction amended 2026-10-08 UTC. Confidence: high in inspected source and primary Linux/systemd semantics, moderate in the proposed deployment, unknown in installed runtime qualification. No service, package, container, Omarchy session or native execution test was run for this research.
+
+The [HOST-CONTRACT](../../2026-10-07-desktop-integration/HOST-CONTRACT.md), [annex](../ANNEX.md) and [implementation plan](../../../plans/2026-10-07-omarchy-integration/IMPLEMENTATION.md) govern current direction. Workbench-first and first-sealed-release recommendations in older research are superseded. Their source observations and applicable native acceptance cases remain useful; none is a supported runtime claim.
+
+## Finding: Linux host integration is reusable infrastructure
+
+Native services/bindings must be consumable by the installed CLI, existing harnesses, Herdr and applications without QML, a workbench or a browser. The application owns planning and UX. Existing native owners retain authority, resource identity/capacity, work/process identity, effects, disclosure, receipts and recovery. A Linux unit, Unix socket or rootless container engine supplies host mechanisms, not independent semantic authority or cross-organization agreement.
+
+Reuse secure IPC, process custody, broker/relay, resource/runner, integrity and qualification owners. Linux adapters bind them to process identity, systemd lifecycle, cgroups, namespaces, credentials and I/O. The optional C-layer controller composes views for consumers; direct supported bindings need no new universal daemon. App-specific Herdr/Megastart/demo endpoints must not become a universal kernel ABI.
+
+## Exact implementation observations
+
+The foundation source alias `F` in [PROGRAM-MAP](../../../../architecture/PROGRAM-MAP.md) was inspected through its exact Git object, independently of concurrent worktree edits. These hashes identify research bytes, not public release/install revisions.
+
+| Source at F | SHA-256 | Required owner delta |
+| --- | --- | --- |
+| `crates/security/chio-secure-ipc/src/lib.rs` | `45a3e241ec3582f695b8f12c5524db15db387a1f181810915a4668abaec778ac` | `SecureUnixListener` checks one exact expected PID/UID/GID and retains socket lifecycle/inode custody. Multi-client enrollment, retained process-instance identity, session/service association and authorization are not delivered by that primitive alone. Extend its owner rather than add shim authentication. |
+| `sdks/python/chio-mini-swe/src/chio_mini_swe/repository_container.py` | `e43b8f10e18ca6246d2cc9c0c0b96123818619f30303a982023f9fd48add9b0a` | `engine()` explicitly rejects `name=rootless`/`name=userns`. Its named tmpfs volume uses UID/GID 65534 and it records exact engine/container identities. Rootless support requires a separately measured backend delta covering mapped ownership, volume and complete lifecycle behavior. |
+| `sdks/python/chio-mini-swe/src/chio_mini_swe/repository_transport.py` | `4121fbd6e90a5d64c14c62bd9fea36f2f41f486aa1bb53c29a60e46c695279f1` | Docker is pinned to `/usr/bin/docker --host unix:///var/run/docker.sock`; operation deadlines use `time.monotonic()`. The owner must support a verified rootless endpoint and the complete boot-bound/suspend-inclusive clock contract, without ambient contexts or weakened limits. |
+| `crates/kernel/chio-process/ARCHITECTURE.md` | `90a4ccab2dd616bd767157d86394b78ece890efa898303e14d61c1ba1e0cf598` | Durable process identity and lineage are above the kernel; the kernel retains dispatch/recovery semantics. OS termination is separate host work. A process cancellation record cannot prove descendant absence or undo an admitted external effect. |
+
+The mini-SWE source already sets network isolation, private IPC/cgroup namespace, read-only root, dropped capabilities, no-new-privileges, fixed user, CPU/memory/PID limits, bounded tmpfs, no container log driver, immutable image identities and holder/worker cleanup. Preserve those controls while adapting the owner. Deleting the rootless rejection, swapping a CLI alias or accepting flags is not backend qualification.
+
+## Verified upstream pins
+
+systemd v258 was resolved against its primary repository: tag object `009c4c9a7d95db221e4b9640ebcc34b3c6c8066a`, peeled commit `781d9d0789379d1ea1f2ecefb804d41e9c8b6c38`. The versioned manual sources below were fetched because hosted HTML returned HTTP 403. This is a documentation pin, not Omarchy's installed version.
+
+Omarchy source was fetched at retained development baseline `0f8af9be307d5d4f12cc0f6394892cac651ed5e6`; this does not assert it remains HEAD. Docker setup and service-enablement files were also fetched at released baseline `c668141e9c42b13c80c9ca4ea108e11708c5e8a5`. Their hashes matched at both pins: Docker setup `2409cbef7cb522fa9d6bd2a7153532c6ca3bbfa99d6425645df9ffd8efae9f05`; enable-services `346a98f550a2582faa668f8a699cfd027d1365a0672623a618ef26b196826f69`. Installed host measurements remain mandatory.
+
+| Primary source | Verified implication |
+| --- | --- |
+| [systemd pam_systemd](https://github.com/systemd/systemd/blob/781d9d0789379d1ea1f2ecefb804d41e9c8b6c38/man/pam_systemd.xml) | The user manager and its children are shared across login sessions and outside their individual scope limits. UID/user-manager availability is not enrolled-session authority. |
+| [systemd process/session APIs](https://github.com/systemd/systemd/blob/781d9d0789379d1ea1f2ecefb804d41e9c8b6c38/man/sd_pid_get_owner_uid.xml) | User-manager/DBus-launched applications may have no login session. `sd_peer_get_*` lookups use `/proc` and are unsuitable for authorization because they race; pidfd variants avoid PID-recycling races. Native enrollment still needs complete endpoint/client/authority binding. |
+| [systemd targets](https://github.com/systemd/systemd/blob/781d9d0789379d1ea1f2ecefb804d41e9c8b6c38/man/systemd.special.xml), [logind](https://github.com/systemd/systemd/blob/781d9d0789379d1ea1f2ecefb804d41e9c8b6c38/man/org.freedesktop.login1.xml) | Graphical-session targets and lock/sleep events are lifecycle inputs. They do not establish exact client enrollment or a pre-continuation native expiry fence. |
+| [systemd linger](https://github.com/systemd/systemd/blob/781d9d0789379d1ea1f2ecefb804d41e9c8b6c38/man/loginctl.xml) | Linger starts a user manager at boot and retains it after logout. It changes availability, not Chio grants. |
+| [Unix sockets](https://man7.org/linux/man-pages/man7/unix.7.html) | `SO_PEERCRED` reports credentials at connection/listen/socketpair time. Endpoint modes and credentials do not supply a Chio principal, login authority or ongoing liveness. Retain inherited/transferred-FD tests. |
+| [systemd cgroup delegation](https://github.com/systemd/systemd/blob/781d9d0789379d1ea1f2ecefb804d41e9c8b6c38/docs/CGROUP_DELEGATION.md), [kernel cgroup v2](https://docs.kernel.org/admin-guide/cgroup-v2.html) | Keep one writer per subtree; use qualified service/scope delegation and measure available/enabled controllers. Engines and native hosts cannot independently mutate systemd-owned trees. Resource/cgroup observations supplement process custody; they do not prove remote-effect settlement. |
+| [systemd execution settings](https://github.com/systemd/systemd/blob/781d9d0789379d1ea1f2ecefb804d41e9c8b6c38/man/systemd.exec.xml) | User-service hardening depends on available features; services inherit manager environment unless restricted. Read-only paths do not deny Unix socket access. Verify each role's effective protections and negative behavior. |
+| [Docker rootless operations](https://docs.docker.com/engine/security/rootless/tips/) | Rootless Docker uses a user service; a system-wide Docker service with `User=` is not supported. Rootless cgroup flags require cgroup v2/systemd and sufficient delegation, and can be ignored when prerequisites fail. |
+| [Podman service API](https://docs.podman.io/en/latest/markdown/podman-system-service.1.html) | Docker API compatibility is not mini-SWE equivalence. The endpoint provides arbitrary execution as the service user; it cannot be a guest or application-facing Chio API. |
+| [Omarchy Docker posture](https://github.com/omacom/omarchy/blob/0f8af9be307d5d4f12cc0f6394892cac651ed5e6/install/config/docker.sh), [service enablement](https://github.com/omacom/omarchy/blob/0f8af9be307d5d4f12cc0f6394892cac651ed5e6/install/config/enable-services.sh) | Omarchy enables the system Docker socket but withholds docker-group membership by default. Measure coexisting rootful access and prohibit fallback under the selected rootless profile. |
+| [Omarchy plugin installer](https://github.com/omacom/omarchy/blob/0f8af9be307d5d4f12cc0f6394892cac651ed5e6/bin/omarchy-plugin-add), [update](https://github.com/omacom/omarchy/blob/0f8af9be307d5d4f12cc0f6394892cac651ed5e6/bin/omarchy-update), [snapshot](https://github.com/omacom/omarchy/blob/0f8af9be307d5d4f12cc0f6394892cac651ed5e6/manual/47-system-snapshots.md) | Plugin installation is separate from native packages/enrollment. Post-update precedes later mise changes; root rollback excludes home/config. Qualify exact consumer/runtime pairing and state compatibility. |
+
+## Distinct enrollment profiles
+
+A user-session host can run with no Chio GUI while remaining bound to its explicitly enrolled graphical session. Preserve same-UID second-session refusal, lock/unknown-lock disclosure/action fences, scoped logout closure, missed-event handling, explicit re-enrollment and original-custody reconciliation. Do not guess a session for a user-manager client or treat pre-existing linger as enrollment.
+
+A service host requires a different native principal with operator authorization, host/installation identity, finite scopes and lease expiry, service credential custody, persistent state, boot/restart reconciliation and decommission. A dedicated stable unprivileged account is a candidate deployment, not a universal implementation requirement. Rootless Docker boot operation may use an explicitly provisioned user manager/linger arrangement for that service identity, independently of desktop onboarding. No root UID, unit registration or detached process supplies authority.
+
+Native credentials must work in the selected context without copying human-session credentials or requiring an unlocked graphical store. Missing service-credential/enrollment owner APIs leave that profile unavailable. Verify no-login cold boot, rotation/revocation, wrong principal, UID/unit/process replacement, expired lease, duplicate instances, interrupted enrollment, changed boot and store-custody failure. Neither profile may take over the other's original work.
+
+## Preserved acceptance and optional presentation
+
+Keep CPU/memory/PID, per-task/aggregate byte/inode and output/log limits separate from Chio invocation/token/money/time allowances. Account for host engine metadata, journals and spool files, including receipt/recovery/stop headroom. cgroup I/O rate is not storage capacity, and client output truncation is not producer/log enforcement. Preserve independent silent-write/output-flood/concurrent-pressure and cleanup observations.
+
+Preserve the actual native deadline contract: boot-associated `CLOCK_BOOTTIME`, separate authority absolute expiry, persistence/clock uncertainty/restart reconciliation and the annex's native resume fence. UI timers or delayed logind events cannot substitute. Preserve child-subreaper fixture custody, daemon/runner crashes, external process/cgroup oracles, unknown effects, complete original-operation identity and retained recovery state.
+
+O0 locates owners; O1 installs native services/bindings; O3 demonstrates CONSUMERS coordination, shared resources and separately gated independent organizational operation; O4/O5 qualify selected actions/harnesses; O6/O7 publish and independently qualify exact profiles. Sealed W1 coding is one useful workload, not a prior release required by another host. The full six-host program retains separate I01-I08 outcomes.
+
+O2 is optional presentation: status/navigation and qualified actions through shared native semantics, no authority or task database. Its reload, multi-monitor, keyboard/AT-SPI/IME, privacy, exact Git plugin delivery and browser CSRF cases remain required when those surfaces ship. A QML mismatch disables the affected consumer, not unrelated native service qualification. Minimal native installation and CONSUMERS acceptance run with every Chio GUI absent.
