@@ -1,3 +1,7 @@
+//! Challenge submission, evaluation and verdict recording.
+
+use super::*;
+
 // Challenge submission, evaluation, verdicts, and challenge reads.
 
 impl SqliteFindingChallengeStore {
@@ -299,7 +303,7 @@ impl SqliteFindingChallengeStore {
         Ok(target)
     }
 
-    fn authenticate_outcome(
+    pub(super) fn authenticate_outcome(
         &self,
         challenge_id: &str,
         signed_outcome: &SignedFindingChallengeOutcome,

@@ -715,7 +715,7 @@ impl SqliteFindingChallengeStore {
     }
 }
 
-include!("finding_challenge_store/challenge_lifecycle.rs");
+mod challenge_lifecycle;
 include!("finding_challenge_store/dispute_locks.rs");
 include!("finding_challenge_store/liability_lifecycle.rs");
 include!("finding_challenge_store/governance_claims.rs");
