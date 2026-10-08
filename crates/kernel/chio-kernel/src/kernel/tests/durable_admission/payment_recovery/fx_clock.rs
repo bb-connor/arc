@@ -643,6 +643,9 @@ fn assert_ordinary_quote_clock_fault(stamp: QuoteStamp, expected: ClockError) ->
         "{result:?}"
     );
     assert_quote_completed_before_clock_fault(&fx.timeline, &fx.kernel, expected)?;
+    fx.timeline
+        .clock
+        .set_secs(fx.timeline.start + ORACLE_IO_SECS)?;
     let usage = fx
         .kernel
         .budget_store
