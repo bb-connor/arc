@@ -22,6 +22,7 @@ const FOREIGN_CLAIM_TOKEN: &str = "other";
 struct DurableOperations {
     inner: InMemoryAdmissionOperationStore,
     fail_compensation_inventory: AtomicBool,
+    fail_receipt_inventory: AtomicBool,
     candidate_pages: AtomicUsize,
 }
 
@@ -77,6 +78,25 @@ impl AdmissionOperationStore for DurableOperations {
         self.candidate_pages.fetch_add(1, Ordering::SeqCst);
         self.inner
             .list_admission_recovery_candidates_page(kind, after_operation_id, limit)
+    }
+    fn list_operations_with_pending_cleanup_action_page(
+        &self,
+        operation_kind: AdmissionOperationKind,
+        action_kind: AdmissionCleanupActionKind,
+        after_operation_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<String>, AdmissionOperationError> {
+        if self.fail_receipt_inventory.load(Ordering::SeqCst) {
+            return Err(AdmissionOperationError::Unavailable(
+                "injected terminal receipt inventory failure".into(),
+            ));
+        }
+        self.inner.list_operations_with_pending_cleanup_action_page(
+            operation_kind,
+            action_kind,
+            after_operation_id,
+            limit,
+        )
     }
 }
 
@@ -284,6 +304,7 @@ impl Harness {
         let operations = Arc::new(DurableOperations {
             inner: InMemoryAdmissionOperationStore::new(),
             fail_compensation_inventory: AtomicBool::new(false),
+            fail_receipt_inventory: AtomicBool::new(false),
             candidate_pages: AtomicUsize::new(0),
         });
         let approvals = Arc::new(DurableApprovals {
@@ -482,6 +503,112 @@ impl Harness {
             ReplayReservationState::Reserved
         );
         Ok(())
+    }
+
+    fn terminal_receipt_action(
+        &self,
+        operation: &AdmissionOperation,
+    ) -> TestResult<AdmissionCleanupAction> {
+        Ok(self
+            .operations
+            .load_cleanup_actions(operation.operation_id())?
+            .into_iter()
+            .find(|action| action.kind() == AdmissionCleanupActionKind::TerminalReceipt)
+            .ok_or("terminal receipt outbox")?)
+    }
+
+    /// Another worker committed the atomic terminal transition and still
+    /// holds the signed receipt outbox lease while it persists the receipt.
+    fn seed_busy_terminal_receipt(
+        &self,
+        request_id: &str,
+    ) -> TestResult<(AdmissionOperation, u64)> {
+        let prepared =
+            prepared_active_response(&self.kernel, self.executor.authority_id(), request_id, None)?;
+        self.operations.create_prepared(prepared.clone())?;
+        let staged = self
+            .kernel
+            .stage_compensation_pending_with_terminal_receipt(
+                self.operations.as_ref(),
+                &prepared,
+                "terminal receipt lease held by another worker",
+            )?;
+        let outbox = self.terminal_receipt_action(&staged)?;
+        let AdmissionOperationCasOutcome::Applied(terminal) =
+            self.operations.compare_and_swap_with_cleanup_action(
+                AdmissionOperationCompareAndSwap {
+                    operation_id: staged.operation_id(),
+                    expected_version: staged.version(),
+                    coordinator_lease_epoch: staged.coordinator_lease_epoch(),
+                    next_state: AdmissionOperationState::CompensatedBeforeDispatch,
+                    next_dispatch_state: AdmissionDispatchState::NotStarted,
+                    next_coordinator_lease_epoch: staged.coordinator_lease_epoch(),
+                    last_error: staged.last_error().map(ToOwned::to_owned),
+                },
+                outbox.clone(),
+            )?
+        else {
+            return Err("atomic terminal receipt transition".into());
+        };
+        let deadline = self
+            .started_at_ms
+            .checked_add(CLEANUP_LEASE_MS)
+            .ok_or("lease deadline overflow")?;
+        let claimed = self.operations.claim_cleanup_action(
+            outbox.action_id(),
+            FOREIGN_CLAIM_TOKEN,
+            self.started_at_ms,
+            deadline,
+        )?;
+        assert!(
+            matches!(&claimed, AdmissionCleanupActionClaimOutcome::Claimed(action)
+                if action.claim_token() == Some(FOREIGN_CLAIM_TOKEN)
+                    && action.claim_deadline_unix_ms() == Some(deadline)),
+            "{claimed:?}"
+        );
+        Ok((terminal, deadline))
+    }
+
+    fn assert_receipt_lease_retained(
+        &self,
+        operation: &AdmissionOperation,
+        deadline: u64,
+    ) -> TestResult {
+        let outbox = self.terminal_receipt_action(operation)?;
+        assert_eq!(outbox.state(), AdmissionCleanupActionState::Claimed);
+        assert_eq!(outbox.claim_token(), Some(FOREIGN_CLAIM_TOKEN));
+        assert_eq!(outbox.claim_deadline_unix_ms(), Some(deadline));
+        assert_eq!(
+            self.state(operation)?,
+            AdmissionOperationState::CompensatedBeforeDispatch
+        );
+        Ok(())
+    }
+
+    /// The typed claim outcome at the kernel's authority time proves that
+    /// another token still holds an unexpired lease on the receipt outbox.
+    fn assert_receipt_lease_busy(
+        &self,
+        operation: &AdmissionOperation,
+        deadline: u64,
+    ) -> TestResult {
+        let now_ms = self.kernel.trusted_now_millis()?.get();
+        assert!(now_ms < deadline, "{now_ms} is not before {deadline}");
+        let probe = self.operations.claim_cleanup_action(
+            self.terminal_receipt_action(operation)?.action_id(),
+            "busy-probe",
+            now_ms,
+            now_ms
+                .checked_add(CLEANUP_LEASE_MS)
+                .ok_or("probe deadline overflow")?,
+        )?;
+        assert!(
+            matches!(&probe, AdmissionCleanupActionClaimOutcome::Busy(action)
+                if action.claim_token() == Some(FOREIGN_CLAIM_TOKEN)
+                    && action.claim_deadline_unix_ms() == Some(deadline)),
+            "{probe:?}"
+        );
+        self.assert_receipt_lease_retained(operation, deadline)
     }
 
     fn state(&self, operation: &AdmissionOperation) -> TestResult<AdmissionOperationState> {
@@ -719,6 +846,200 @@ fn activation_refuses_while_a_busy_cleanup_lease_remains() -> TestResult {
     assert_eq!(
         harness.approvals.state(busy.operation_id())?,
         ReplayReservationState::Cancelled
+    );
+    Ok(())
+}
+
+const RECEIPT_OUTBOXES_REMAIN: &str =
+    "one or more terminal receipt outboxes remain after the paged recovery pass";
+
+#[test]
+fn publication_services_later_candidates_while_a_terminal_receipt_lease_is_busy() -> TestResult {
+    let started_at_secs = current_unix_timestamp() + 1;
+    let _started = chio_test_support::clock::scope_unix_secs(started_at_secs);
+    let mut harness = Harness::new(started_at_secs)?;
+    let unpublished = harness.kernel.governed_security_runtime_status();
+    let authority = harness.executor.authority_id().to_owned();
+
+    let (busy, lease_deadline) = harness.seed_busy_terminal_receipt("busy-terminal-receipt")?;
+    harness.assert_receipt_lease_busy(&busy, lease_deadline)?;
+    let outbox_recovery = harness.kernel.recover_terminal_receipt_outboxes_with_store(
+        harness.operations.as_ref(),
+        AdmissionOperationKind::GovernedActiveResponse,
+        Some(&authority),
+    );
+    assert!(
+        matches!(&outbox_recovery, Err(KernelError::Internal(detail))
+            if detail == RECEIPT_OUTBOXES_REMAIN),
+        "{outbox_recovery:?}"
+    );
+    harness.assert_receipt_lease_busy(&busy, lease_deadline)?;
+
+    let released = harness.seed_reserved(&authority, "later-after-busy-receipt")?;
+    assert_eq!(released.coordinator_authority_id(), authority);
+    assert_eq!(harness.state(&released)?, AdmissionOperationState::Prepared);
+    assert_eq!(
+        harness.approval_action(&released)?.state(),
+        AdmissionCleanupActionState::Pending
+    );
+    assert_eq!(
+        harness.approvals.state(released.operation_id())?,
+        ReplayReservationState::Reserved
+    );
+
+    let refused = harness.publish();
+    assert_eq!(
+        harness.kernel.governed_security_runtime_status(),
+        unpublished
+    );
+    harness.assert_receipt_lease_busy(&busy, lease_deadline)?;
+    assert_eq!(
+        harness.state(&released)?,
+        AdmissionOperationState::CompensatedBeforeDispatch,
+        "{refused:?}"
+    );
+    assert_eq!(
+        harness.approvals.state(released.operation_id())?,
+        ReplayReservationState::Cancelled
+    );
+    assert_cleanup_pending(refused, &busy);
+
+    let _before_deadline = chio_test_support::clock::scope_unix_secs(lease_deadline / 1_000 - 1);
+    assert_cleanup_pending(harness.publish(), &busy);
+    harness.assert_receipt_lease_busy(&busy, lease_deadline)?;
+    assert_eq!(
+        harness.kernel.governed_security_runtime_status(),
+        unpublished
+    );
+
+    let _at_deadline = chio_test_support::clock::scope_unix_secs(lease_deadline / 1_000);
+    harness.publish()?;
+    assert_eq!(
+        harness.terminal_receipt_action(&busy)?.state(),
+        AdmissionCleanupActionState::Completed
+    );
+    assert_eq!(
+        harness.state(&busy)?,
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
+    let published = harness.kernel.governed_security_runtime_status();
+    assert_eq!(published.publication_generation, 1);
+    assert!(published.active_response_enabled);
+    Ok(())
+}
+
+#[test]
+fn activation_services_later_candidates_while_a_terminal_receipt_lease_is_busy() -> TestResult {
+    let started_at_secs = current_unix_timestamp() + 1;
+    let _started = chio_test_support::clock::scope_unix_secs(started_at_secs);
+    let mut harness = Harness::new(started_at_secs)?;
+    harness.install_independent_authorities()?;
+    let authority = harness.executor.authority_id().to_owned();
+    let (busy, lease_deadline) = harness.seed_busy_terminal_receipt("activation-busy-receipt")?;
+    harness.assert_receipt_lease_busy(&busy, lease_deadline)?;
+    let released = harness.seed_reserved(&authority, "activation-after-busy-receipt")?;
+    assert_eq!(harness.state(&released)?, AdmissionOperationState::Prepared);
+    assert_eq!(
+        harness.approval_action(&released)?.state(),
+        AdmissionCleanupActionState::Pending
+    );
+
+    let refused = harness.kernel.enable_governed_active_response_plans();
+    assert!(!harness.kernel.governed_active_response_plans_enabled);
+    harness.assert_receipt_lease_busy(&busy, lease_deadline)?;
+    assert_eq!(
+        harness.state(&released)?,
+        AdmissionOperationState::CompensatedBeforeDispatch,
+        "{refused:?}"
+    );
+    assert_eq!(
+        harness.approvals.state(released.operation_id())?,
+        ReplayReservationState::Cancelled
+    );
+    assert!(
+        matches!(&refused, Err(KernelError::Internal(detail))
+            if detail == RECEIPT_OUTBOXES_REMAIN),
+        "{refused:?}"
+    );
+
+    let _at_deadline = chio_test_support::clock::scope_unix_secs(lease_deadline / 1_000);
+    harness.kernel.enable_governed_active_response_plans()?;
+    assert!(harness.kernel.governed_active_response_plans_enabled);
+    assert_eq!(
+        harness.terminal_receipt_action(&busy)?.state(),
+        AdmissionCleanupActionState::Completed
+    );
+    Ok(())
+}
+
+#[test]
+fn publication_stops_at_a_fatal_terminal_receipt_inventory_failure() -> TestResult {
+    let started_at_secs = current_unix_timestamp() + 1;
+    let _started = chio_test_support::clock::scope_unix_secs(started_at_secs);
+    let mut harness = Harness::new(started_at_secs)?;
+    let unpublished = harness.kernel.governed_security_runtime_status();
+    let authority = harness.executor.authority_id().to_owned();
+    let healthy = harness.seed_reserved(&authority, "healthy-after-receipt-fatal")?;
+    harness
+        .operations
+        .fail_receipt_inventory
+        .store(true, Ordering::SeqCst);
+
+    let result = harness.publish();
+    let expected = format!(
+        "security admission operation failed: {}",
+        AdmissionOperationError::Unavailable("injected terminal receipt inventory failure".into())
+    );
+    assert!(
+        matches!(&result, Err(KernelError::Internal(detail)) if *detail == expected),
+        "{result:?}"
+    );
+    assert_eq!(harness.operations.candidate_pages.load(Ordering::SeqCst), 0);
+    assert_eq!(harness.state(&healthy)?, AdmissionOperationState::Prepared);
+    assert_eq!(
+        harness.approvals.state(healthy.operation_id())?,
+        ReplayReservationState::Reserved
+    );
+    assert_eq!(
+        harness.kernel.governed_security_runtime_status(),
+        unpublished
+    );
+    Ok(())
+}
+
+#[test]
+fn publication_keeps_a_receipt_inventory_fault_fatal_beside_a_busy_lease() -> TestResult {
+    let started_at_secs = current_unix_timestamp() + 1;
+    let _started = chio_test_support::clock::scope_unix_secs(started_at_secs);
+    let mut harness = Harness::new(started_at_secs)?;
+    let unpublished = harness.kernel.governed_security_runtime_status();
+    let authority = harness.executor.authority_id().to_owned();
+    let (busy, lease_deadline) = harness.seed_busy_terminal_receipt("busy-beside-receipt-fault")?;
+    let healthy = harness.seed_reserved(&authority, "healthy-beside-receipt-fault")?;
+    harness
+        .operations
+        .fail_receipt_inventory
+        .store(true, Ordering::SeqCst);
+
+    let result = harness.publish();
+    let expected = format!(
+        "security admission operation failed: {}",
+        AdmissionOperationError::Unavailable("injected terminal receipt inventory failure".into())
+    );
+    assert!(
+        matches!(&result, Err(KernelError::Internal(detail)) if *detail == expected),
+        "{result:?}"
+    );
+    assert_eq!(harness.operations.candidate_pages.load(Ordering::SeqCst), 0);
+    harness.assert_receipt_lease_busy(&busy, lease_deadline)?;
+    assert_eq!(harness.state(&healthy)?, AdmissionOperationState::Prepared);
+    assert_eq!(
+        harness.approvals.state(healthy.operation_id())?,
+        ReplayReservationState::Reserved
+    );
+    assert_eq!(
+        harness.kernel.governed_security_runtime_status(),
+        unpublished
     );
     Ok(())
 }
