@@ -1,6 +1,5 @@
 use std::error::Error;
 use std::fs;
-use std::io;
 use std::os::unix::fs::{symlink, MetadataExt, PermissionsExt};
 use std::path::Path;
 
@@ -33,9 +32,9 @@ fn private_reads_refuse_a_symlink() -> TestResult {
     write_private(&outside, b"{}")?;
     symlink(&outside, directory.path().join("host.json"))?;
 
-    let kind = os_error_kind(directory.read_private(Path::new("host.json"), &SECRET, 64))?;
+    let code = os_error_code(directory.read_private(Path::new("host.json"), &SECRET, 64))?;
 
-    assert_eq!(kind, io::ErrorKind::FilesystemLoop);
+    assert_eq!(code, symlink_loop());
     Ok(())
 }
 

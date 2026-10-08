@@ -209,16 +209,17 @@ pub(crate) fn prepare(
                             Err(Errno::EXIST) => false,
                             Err(error) => return Err(error.into()),
                         };
-                        let child = openat(parent, name, flags, Mode::empty()).map_err(|error| {
-                            let error = io::Error::from(error);
-                            io::Error::new(
-                                error.kind(),
-                                format!(
-                                    "failed to reopen private directory component {}: {error}",
-                                    resolved.join(name).display(),
-                                ),
-                            )
-                        })?;
+                        let child =
+                            openat(parent, name, flags, Mode::empty()).map_err(|error| {
+                                let error = io::Error::from(error);
+                                io::Error::new(
+                                    error.kind(),
+                                    format!(
+                                        "failed to reopen private directory component {}: {error}",
+                                        resolved.join(name).display(),
+                                    ),
+                                )
+                            })?;
                         if created {
                             harden_component(parent, name).map_err(|error| {
                                 io::Error::new(
@@ -309,7 +310,13 @@ pub(crate) fn relative_components(path: &Path) -> io::Result<Vec<&OsStr>> {
 
 /// Flushes a directory's entries to stable storage.
 pub(crate) fn sync_directory(directory: &File) -> io::Result<()> {
-    File::from(openat(directory, Path::new("."), read_flags(), Mode::empty())?).sync_all()
+    File::from(openat(
+        directory,
+        Path::new("."),
+        read_flags(),
+        Mode::empty(),
+    )?)
+    .sync_all()
 }
 
 fn harden_component(parent: &File, component: &OsStr) -> io::Result<()> {

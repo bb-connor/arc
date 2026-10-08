@@ -79,6 +79,26 @@ fn os_error_kind<T>(result: io::Result<T>) -> Result<io::ErrorKind, Box<dyn Erro
     }
 }
 
+/// The operating-system error code of a failed `result`.
+fn os_error_code<T>(result: io::Result<T>) -> Result<i32, Box<dyn Error>> {
+    match result {
+        Ok(_) => Err("operation was not refused".into()),
+        Err(error) => error
+            .raw_os_error()
+            .ok_or_else(|| format!("expected an operating-system error, got: {error}").into()),
+    }
+}
+
+/// `ELOOP`: a no-follow open met a symlink.
+fn symlink_loop() -> i32 {
+    rustix::io::Errno::LOOP.raw_os_error()
+}
+
+/// `ENOTDIR`: a no-follow directory open met a symlink on Linux.
+fn not_a_directory() -> i32 {
+    rustix::io::Errno::NOTDIR.raw_os_error()
+}
+
 fn name(value: &str) -> &OsStr {
     OsStr::new(value)
 }

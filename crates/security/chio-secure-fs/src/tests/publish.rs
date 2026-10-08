@@ -46,8 +46,7 @@ fn publish_refuses_an_existing_destination_when_absence_is_expected() -> TestRes
     let directory = state(root.path())?;
     directory.atomic_publish(name("seed"), b"first", 0o600, Expect::Absent, &SECRET)?;
 
-    let result =
-        directory.atomic_publish(name("seed"), b"second", 0o600, Expect::Absent, &SECRET);
+    let result = directory.atomic_publish(name("seed"), b"second", 0o600, Expect::Absent, &SECRET);
 
     assert_eq!(refusal_of(result)?, Refusal::DestinationExists);
     assert_eq!(fs::read(directory.path().join("seed"))?, b"first");
@@ -59,8 +58,7 @@ fn publish_refuses_an_existing_destination_when_absence_is_expected() -> TestRes
 fn publish_replaces_only_the_expected_identity() -> TestResult {
     let root = private_root()?;
     let directory = state(root.path())?;
-    let first =
-        directory.atomic_publish(name("seed"), b"first", 0o600, Expect::Absent, &SECRET)?;
+    let first = directory.atomic_publish(name("seed"), b"first", 0o600, Expect::Absent, &SECRET)?;
     let second = directory.atomic_publish(
         name("seed"),
         b"second",
@@ -88,8 +86,7 @@ fn publish_replaces_only_the_expected_identity() -> TestResult {
 fn publish_refuses_a_missing_expected_destination() -> TestResult {
     let root = private_root()?;
     let directory = state(root.path())?;
-    let first =
-        directory.atomic_publish(name("seed"), b"first", 0o600, Expect::Absent, &SECRET)?;
+    let first = directory.atomic_publish(name("seed"), b"first", 0o600, Expect::Absent, &SECRET)?;
     fs::remove_file(directory.path().join("seed"))?;
 
     let result = directory.atomic_publish(
@@ -147,8 +144,7 @@ fn publish_names_must_be_one_normal_component() -> TestResult {
     let directory = state(root.path())?;
 
     for invalid in ["a/b", "..", ".", "", "/seed", "seed/"] {
-        let result =
-            directory.atomic_publish(name(invalid), b"x", 0o600, Expect::Replace, &SECRET);
+        let result = directory.atomic_publish(name(invalid), b"x", 0o600, Expect::Replace, &SECRET);
         assert_eq!(refusal_of(result)?, Refusal::InvalidPath, "{invalid:?}");
     }
     assert!(entries(directory.path())?.is_empty());
@@ -163,7 +159,7 @@ fn path_publishing_refuses_a_symlinked_directory() -> TestResult {
     fs::create_dir(&real)?;
     symlink(&real, &alias)?;
 
-    let refused = os_error_kind(open_directory_nofollow(&alias))?;
+    let refused = os_error_code(open_directory_nofollow(&alias))?;
     let directory = open_directory_nofollow(&real)?;
     publish_at(
         &directory,
@@ -175,11 +171,8 @@ fn path_publishing_refuses_a_symlinked_directory() -> TestResult {
     )?;
 
     assert!(
-        matches!(
-            refused,
-            io::ErrorKind::NotADirectory | io::ErrorKind::FilesystemLoop
-        ),
-        "{refused:?}"
+        refused == not_a_directory() || refused == symlink_loop(),
+        "{refused}"
     );
     assert_eq!(fs::read(real.join("seed"))?, b"seed");
     Ok(())
@@ -213,10 +206,10 @@ fn locks_refuse_links_and_symlinks() -> TestResult {
         directory.path().join("other-alias.lock"),
     )?;
 
-    let symlinked = os_error_kind(directory.open_lock(name("host.lock"), 0o600, &SECRET))?;
+    let symlinked = os_error_code(directory.open_lock(name("host.lock"), 0o600, &SECRET))?;
     let linked = directory.open_lock(name("other.lock"), 0o600, &SECRET);
 
-    assert_eq!(symlinked, io::ErrorKind::FilesystemLoop);
+    assert_eq!(symlinked, symlink_loop());
     assert_eq!(refusal_of(linked)?, Refusal::LinkCount);
     Ok(())
 }

@@ -148,7 +148,8 @@ impl PrivateDirectory {
     /// Creates a new file with `mode` and durably writes `contents`, under the
     /// same rules as [`Self::create_new`].
     pub fn write_new(&self, relative: &Path, contents: &[u8], mode: u32) -> io::Result<()> {
-        self.create_and_write(relative, Some(contents), mode).map(drop)
+        self.create_and_write(relative, Some(contents), mode)
+            .map(drop)
     }
 
     fn create_and_write(

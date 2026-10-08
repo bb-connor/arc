@@ -83,14 +83,11 @@ fn prepare_refuses_a_final_symlink_without_changing_its_target() -> TestResult {
     fs::set_permissions(&target, fs::Permissions::from_mode(0o755))?;
     symlink(&target, &alias)?;
 
-    let kind = os_error_kind(PrivateDirectory::prepare(&alias, &DIRECTORY))?;
+    let code = os_error_code(PrivateDirectory::prepare(&alias, &DIRECTORY))?;
 
     assert!(
-        matches!(
-            kind,
-            io::ErrorKind::NotADirectory | io::ErrorKind::FilesystemLoop
-        ),
-        "{kind:?}"
+        code == not_a_directory() || code == symlink_loop(),
+        "{code}"
     );
     assert_eq!(mode_of(&target)?, 0o755);
     Ok(())
@@ -105,17 +102,14 @@ fn prepare_refuses_an_intermediate_symlink() -> TestResult {
     fs::create_dir(target_parent.join("project"))?;
     symlink(&target_parent, &alias_parent)?;
 
-    let kind = os_error_kind(PrivateDirectory::prepare(
+    let code = os_error_code(PrivateDirectory::prepare(
         &alias_parent.join("project"),
         &DIRECTORY,
     ))?;
 
     assert!(
-        matches!(
-            kind,
-            io::ErrorKind::NotADirectory | io::ErrorKind::FilesystemLoop
-        ),
-        "{kind:?}"
+        code == not_a_directory() || code == symlink_loop(),
+        "{code}"
     );
     Ok(())
 }
@@ -204,7 +198,10 @@ fn created_child_directories_follow_the_requested_mode() -> TestResult {
 
     let project = prepared.path();
     assert_eq!(mode_of(&project.join("src"))?, 0o700);
-    assert_eq!(fs::read(project.join("src/bin/main.rs"))?, b"fn main() {}\n");
+    assert_eq!(
+        fs::read(project.join("src/bin/main.rs"))?,
+        b"fn main() {}\n"
+    );
     assert!(!prepared.is_empty()?);
     Ok(())
 }
