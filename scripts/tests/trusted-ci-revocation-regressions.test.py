@@ -5,10 +5,11 @@ Every case runs the real finalizer and revocation shell from the workflow
 definitions through the offline API fakes of the landing regression suite,
 with each step's environment resolved from its own `env:` wiring. Only the
 GitHub App credential exchange is skipped; the installation token is the
-offline check-store token. Original cases describe behaviour the current
-producers get wrong; preservation cases pin refusals and denials that must
-hold before and after the repairs; prospective cases state an expectation the
-current producers have no code path to reach.
+offline check-store token. Original cases describe behaviour the producers
+got wrong before their repairs; preservation cases pin refusals and denials
+that must hold before and after the repairs; prospective design controls pin
+expectations no producer could reach before the P5/P6 boundary and are never
+genuine Originals.
 """
 
 from __future__ import annotations
@@ -43,24 +44,40 @@ PREFIX = f"repos/{REPOSITORY}"
 APP = {"id": APP_ID, "slug": "chio-security-authority"}
 CHECK_RUN_POST = f"POST {PREFIX}/check-runs"
 CI_HISTORY_GET = f"GET {PREFIX}/{LANDING.CI_HISTORY_QUERY}"
+# The repository-wide census Z of pull_request runs on E, read after the
+# per-workflow listing; every run the per-workflow listing holds must be in Z.
+CI_CENSUS_GET = (f"GET {PREFIX}/actions/runs?event=pull_request&head_sha={EVIDENCE}&exclude_pull_requests=true"
+                 "&per_page=100&page=1")
 FINALIZER = "enterprise-evidence-finalizer.yml"
 PUBLISHER_SETUP = [f"GET {PREFIX}/contents/.github/workflows/{FINALIZER}?ref={DEFINITION}"] * 2
 
+# The candidate identity I of the fixture tuple and its digest K.
+IDENTITY = {"authorized_source_sha": SOURCE, "base_sha": BASE, "evidence_sha": EVIDENCE, "merge_tree_sha": LANDING.TREE,
+            "pr_number": str(PR), "repository": REPOSITORY, "repository_id": REPOSITORY_ID,
+            "schema": "chio.security-candidate-identity.v1", "security_definition_sha": DEFINITION}
+IDENTITY_JSON = json.dumps(IDENTITY, sort_keys=True, separators=(",", ":"))
+IDENTITY_DIGEST = hashlib.sha256(IDENTITY_JSON.encode("ascii")).hexdigest()
+
 # The Security contract namespace the finalizer and the revoker bind for the
-# fixture tuple: the head their App checks are written to and the external ID
-# a denial for E carries. Every Original asserts its denial here, beside a
-# control that the current producers already deny in exactly this namespace.
-Y_HEAD, Y_EXTERNAL_ID = MERGE, LANDING.EXTERNAL_ID
-# The denial namespace when Security contract is placed on E itself. Only the
-# prospective cases use it: they have no namespace on the test merge.
-E_HEAD, E_DENIAL_EXTERNAL_ID = EVIDENCE, f"chio:v3:deny:{EVIDENCE}"
+# fixture tuple: every App check is written on E, a denial created for E
+# carries the deny ID, and a positive authority carries the v3 ID of I. Every
+# Original asserts its denial here, beside a control that the producers deny
+# in exactly this namespace.
+Y_HEAD, Y_EXTERNAL_ID = EVIDENCE, f"chio:v3:deny:{EVIDENCE}"
+AUTHORITY_EXTERNAL_ID = f"chio:v3:{PR}:{EVIDENCE}:{IDENTITY_DIGEST}"
+
+# What the binders observe of N, B, M and the merge tree for the fixture tuple.
+# The listener learns the tree only from a verified merge-binding artifact,
+# which a failed attestation job never uploads; the manual binder reads it from
+# the recorded M.
+LISTENER_OBSERVED = {"base_sha": BASE, "merge_commit_sha": MERGE, "merge_tree_sha": "", "pr_number": str(PR)}
+MANUAL_OBSERVED = LISTENER_OBSERVED | {"merge_tree_sha": LANDING.TREE}
 
 
-def revocation_text(reason: str) -> dict:
-    """The tombstone text the revoker writes for the fixture tuple."""
-    return {"identity": {"authorized_source_sha": SOURCE, "evidence_sha": EVIDENCE, "merge_commit_sha": MERGE,
-                         "pr_number": str(PR)},
-            "reason": reason, "schema": "chio.security-check-revocation.v1", "security_definition_sha": DEFINITION}
+def revocation_text(reason: str, observed: dict[str, str]) -> dict:
+    """The tombstone text the revoker writes for E; each observation is empty when the binder did not observe it."""
+    return {"authorized_source_sha": SOURCE, "evidence_sha": EVIDENCE, "observed": observed, "reason": reason,
+            "schema": "chio.security-check-revocation.v2", "security_definition_sha": DEFINITION}
 
 
 ORIGINAL_FAKE_GH, ORIGINAL_CHECK_STORE_CURL = LANDING.FAKE_GH, LANDING.CHECK_STORE_CURL
@@ -169,7 +186,8 @@ def publisher_context() -> dict[str, str]:
     authorization = {
         "authorized_source_sha": SOURCE, "ci_aggregate_check_run_id": "505", "ci_run_attempt": "1",
         "ci_run_id": str(CI_RUN), "ci_workflow_id": str(CI_WORKFLOW), "evidence_sha": EVIDENCE,
-        "external_id": LANDING.EXTERNAL_ID, "merge_commit_sha": MERGE, "pr_number": str(PR),
+        "external_id": LANDING.EXTERNAL_ID, "identity_digest": IDENTITY_DIGEST, "identity_json": IDENTITY_JSON,
+        "merge_commit_sha": MERGE, "pr_number": str(PR),
         "publication_binding_digest": hashlib.sha256(binding.encode()).hexdigest(),
         "publication_binding_json": binding, "security_definition_sha": DEFINITION,
     }
@@ -191,7 +209,9 @@ def run_publisher(data: dict):
 
 
 def ci_run(run_id: int, conclusion: str | None = "success", attempt: int = 1) -> dict:
-    return LANDING.pull_request_ci_run(run_id, MERGE, conclusion=conclusion, attempt=attempt, check_suite_id=2 * run_id)
+    """A CI run on E: the source run keeps the suite of its recorded check runs, every other run has its own."""
+    suite = {} if run_id == CI_RUN else {"check_suite_id": 2 * run_id}
+    return LANDING.pull_request_ci_run(run_id, MERGE, conclusion=conclusion, attempt=attempt, **suite)
 
 
 def publisher_fixture(*runs: dict) -> dict:
@@ -230,14 +250,16 @@ class PublisherReadErrorAfterObservedBadOriginalTests(unittest.TestCase):
     under `set -e` outside any condition, so the step exits before the
     bad-dominates-incomplete branch and writes nothing. The failure was
     observed and authenticated, so it must still deny E.
+    Ported to the P6 interfaces in "test(security): port the revocation
+    regressions to the evidence head".
     """
 
     def test_failed_attempt_read_before_a_later_run_read_error_still_denies_the_evidence_head(self) -> None:
         bad, unreadable = ci_run(200, conclusion="failure"), ci_run(202)
         LANDING.assert_authoritative_history(self, bad)
         control = run_publisher(publisher_fixture(bad, unreadable))
-        self.assertEqual(control.calls[:12], PUBLISHER_SETUP + [CI_HISTORY_GET, *run_reads(200), *run_reads(CI_RUN),
-                                                                  *run_reads(202)])
+        self.assertEqual(control.calls[:13], PUBLISHER_SETUP + [CI_HISTORY_GET, CI_CENSUS_GET, *run_reads(200),
+                                                                  *run_reads(CI_RUN), *run_reads(202)])
         assert_bad_ci_denial(self, control, [(200, 1, "failure")])
 
         data = publisher_fixture(bad, unreadable)
@@ -246,8 +268,8 @@ class PublisherReadErrorAfterObservedBadOriginalTests(unittest.TestCase):
                           data[f"{PREFIX}/actions/runs/200/attempts/1"]["conclusion"]), ("completed", "failure"))
         run = run_publisher(data)
         self.assertNotIn("unprovided API", run.result.stderr)
-        self.assertEqual(run.calls[:10], PUBLISHER_SETUP + [CI_HISTORY_GET, *run_reads(200), *run_reads(CI_RUN),
-                                                             f"GET {PREFIX}/actions/runs/202"])
+        self.assertEqual(run.calls[:11], PUBLISHER_SETUP + [CI_HISTORY_GET, CI_CENSUS_GET, *run_reads(200),
+                                                             *run_reads(CI_RUN), f"GET {PREFIX}/actions/runs/202"])
         self.assertEqual(mutations(run), [CHECK_RUN_POST],
                          f"the scan read failed attempt 1 of CI run 200, then the read of run 202 answered HTTP 502 and "
                          f"the step exited {run.result.returncode} with no denial; refused at: {refusals(run)}")
@@ -262,14 +284,16 @@ class PublisherReadErrorBeforeBadRunOriginalTests(unittest.TestCase):
     B's read, so A is never read: this case does not show an observed bad
     being dropped. It pins that one unreadable run cannot hide an
     authenticated failure later in the same history, which must deny E.
+    Ported to the P6 interfaces in "test(security): port the revocation
+    regressions to the evidence head".
     """
 
     def test_run_read_error_before_the_failed_run_still_denies_the_evidence_head(self) -> None:
         unreadable, bad = ci_run(200), ci_run(202, conclusion="failure")
         LANDING.assert_authoritative_history(self, bad)
         control = run_publisher(publisher_fixture(unreadable, bad))
-        self.assertEqual(control.calls[:12], PUBLISHER_SETUP + [CI_HISTORY_GET, *run_reads(200), *run_reads(CI_RUN),
-                                                                  *run_reads(202)])
+        self.assertEqual(control.calls[:13], PUBLISHER_SETUP + [CI_HISTORY_GET, CI_CENSUS_GET, *run_reads(200),
+                                                                  *run_reads(CI_RUN), *run_reads(202)])
         assert_bad_ci_denial(self, control, [(202, 1, "failure")])
 
         data = publisher_fixture(unreadable, bad)
@@ -278,7 +302,8 @@ class PublisherReadErrorBeforeBadRunOriginalTests(unittest.TestCase):
                           data[f"{PREFIX}/actions/runs/202/attempts/1"]["conclusion"]), ("completed", "failure"))
         run = run_publisher(data)
         self.assertNotIn("unprovided API", run.result.stderr)
-        self.assertEqual(run.calls[:4], PUBLISHER_SETUP + [CI_HISTORY_GET, f"GET {PREFIX}/actions/runs/200"])
+        self.assertEqual(run.calls[:5], PUBLISHER_SETUP + [CI_HISTORY_GET, CI_CENSUS_GET,
+                                                            f"GET {PREFIX}/actions/runs/200"])
         self.assertEqual(mutations(run), [CHECK_RUN_POST],
                          f"the read of CI run 200 answered HTTP 502 and the step exited {run.result.returncode} before "
                          f"reading failed run 202 (reads: {run.calls[2:]}); refused at: {refusals(run)}")
@@ -313,22 +338,25 @@ class PublisherAttemptCeilingOriginalTests(unittest.TestCase):
     successful, the step publishes. A history the producer cannot bound is
     unavailable: refuse without a tombstone and read no attempt past 100.
     Fails today at the mutation assertion: the step POSTs a success publication.
+    Ported to the P6 interfaces in "test(security): port the revocation
+    regressions to the evidence head".
     """
 
     def test_run_past_the_attempt_ceiling_refuses_without_a_tombstone(self) -> None:
         bounded = run_publisher(with_attempts(publisher_fixture(ci_run(CEILING_RUN, attempt=100)), CEILING_RUN, 100))
         self.assertEqual(bounded.result.returncode, 0, bounded.result.stderr)
-        self.assertEqual(first_scan(bounded)[:6], [CI_HISTORY_GET, *run_reads(CI_RUN), f"GET {PREFIX}/actions/runs/{CEILING_RUN}",
+        self.assertEqual(first_scan(bounded)[:7], [CI_HISTORY_GET, CI_CENSUS_GET, *run_reads(CI_RUN),
+                                                   f"GET {PREFIX}/actions/runs/{CEILING_RUN}",
                                                    f"GET {PREFIX}/actions/runs/{CEILING_RUN}/attempts/1"])
         self.assertEqual(mutations(bounded), [CHECK_RUN_POST])
         self.assertEqual([check_identity(check) for check in app_checks(bounded.data)],
-                         [("Security contract", APP, Y_HEAD, Y_EXTERNAL_ID, "completed", "success")])
+                         [("Security contract", APP, Y_HEAD, AUTHORITY_EXTERNAL_ID, "completed", "success")])
 
         data = with_attempts(publisher_fixture(ci_run(CEILING_RUN, attempt=101)), CEILING_RUN, 101)
         self.assertEqual(data[f"{PREFIX}/actions/runs/{CEILING_RUN}"]["run_attempt"], 101)
         run = run_publisher(data)
         self.assertNotIn("unprovided API", run.result.stderr)
-        self.assertEqual(run.calls[:7], PUBLISHER_SETUP + [CI_HISTORY_GET, *run_reads(CI_RUN),
+        self.assertEqual(run.calls[:8], PUBLISHER_SETUP + [CI_HISTORY_GET, CI_CENSUS_GET, *run_reads(CI_RUN),
                                                                 f"GET {PREFIX}/actions/runs/{CEILING_RUN}"])
         past_ceiling = f"GET {PREFIX}/actions/runs/{CEILING_RUN}/attempts/101"
         scanned = [call for call in first_scan(run) if call.startswith(f"GET {PREFIX}/actions/runs/{CEILING_RUN}/attempts/")]
@@ -372,12 +400,16 @@ class PublisherDualCensusOriginalTests(unittest.TestCase):
     The step publishes. That failure must deny E. The case asserts the denial
     outcome only, not the class the repair gives such a run.
     Fails today at the conclusion assertion: the one App check is a success.
+    Ported to the P6 interfaces in "test(security): port the revocation
+    regressions to the evidence head", with its scan-path precondition on the
+    repaired census path; RED provenance: Original 7c334778a2.
     """
 
     def test_failed_run_of_a_replaced_registration_denies_the_evidence_head(self) -> None:
         listed = ci_run(RETIRED_RUN, conclusion="failure")
         control = run_publisher(publisher_fixture(listed))
-        self.assertEqual(control.calls[:9], PUBLISHER_SETUP + [CI_HISTORY_GET, *run_reads(RETIRED_RUN), *run_reads(CI_RUN)])
+        self.assertEqual(control.calls[:10], PUBLISHER_SETUP + [CI_HISTORY_GET, CI_CENSUS_GET, *run_reads(RETIRED_RUN),
+                                                                 *run_reads(CI_RUN)])
         assert_bad_ci_denial(self, control, [(RETIRED_RUN, 1, "failure")])
 
         data = registry_replacement_fixture()
@@ -390,7 +422,7 @@ class PublisherDualCensusOriginalTests(unittest.TestCase):
         self.assertEqual([run["id"] for run in data[f"{PREFIX}/actions/runs"]["workflow_runs"]], [CI_RUN, RETIRED_RUN])
         run = run_publisher(data)
         self.assertNotIn("unprovided API", run.result.stderr)
-        self.assertEqual(run.calls[:6], PUBLISHER_SETUP + [CI_HISTORY_GET, *run_reads(CI_RUN)])
+        self.assertEqual(run.calls[:7], PUBLISHER_SETUP + [CI_HISTORY_GET, CI_CENSUS_GET, *run_reads(RETIRED_RUN)])
         listings = [call for call in run.calls if "/runs?" in call]
         self.assertEqual([check["conclusion"] for check in app_checks(run.data)], ["failure"],
                          f"the publisher read only {sorted(set(listings))} ({len(listings)} listing reads), never the "
@@ -550,13 +582,14 @@ def move_pull_request_head(data: dict, head: str, merge: str) -> None:
                                              "tree": {"sha": "1" * 40}}
 
 
-def assert_revocation_denial(test: unittest.TestCase, revocation: Revocation, reason: str) -> None:
+def assert_revocation_denial(test: unittest.TestCase, revocation: Revocation, reason: str,
+                             observed: dict[str, str]) -> None:
     """Exactly one POSTed Security contract failure for E in the revoker's namespace, with its exact text."""
     test.assertEqual(mutations(revocation), [CHECK_RUN_POST], revocation.steps[-1].result.stderr)
     checks = app_checks(revocation.data)
     test.assertEqual([check_identity(check) for check in checks],
                      [("Security contract", APP, Y_HEAD, Y_EXTERNAL_ID, "completed", "failure")])
-    test.assertEqual(json.loads(checks[0]["output"]["text"]), revocation_text(reason))
+    test.assertEqual(json.loads(checks[0]["output"]["text"]), revocation_text(reason, observed))
     test.assertEqual(revocation.steps[-1].result.returncode, 0, revocation.steps[-1].result.stderr)
 
 
@@ -576,7 +609,7 @@ MANUAL_SETUP = [
     f"GET {PREFIX}/contents/.github/workflows/{REVOCATION}?ref={DEFINITION}",
     f"GET {PREFIX}/contents/.github/workflows/{REVOCATION}?ref={DEFINITION}",
     f"GET {PREFIX}/actions/runs/902/attempts/1",
-    f"GET {PREFIX}/pulls/{PR}",
+    f"GET {PREFIX}/git/commits/{EVIDENCE}",
 ]
 
 
@@ -589,6 +622,8 @@ class ListenerClosedPullRequestOriginalTests(unittest.TestCase):
     (REV:570). An authenticated failed CI run for the committed E must deny E
     whatever the pull request's state, unless it merged with head E.
     Fails today at the binder-output assertion: `eligible=false`.
+    Ported to the P6 interfaces in "test(security): port the revocation
+    regressions to the evidence head".
     """
 
     def test_failed_ci_on_the_committed_head_of_a_closed_pull_request_denies_the_head(self) -> None:
@@ -596,7 +631,7 @@ class ListenerClosedPullRequestOriginalTests(unittest.TestCase):
         LANDING.assert_authoritative_history(self, event)
         control = revoke_failed_ci(listener_fixture(event), event)
         self.assertEqual((control.outputs["eligible"], control.outputs["create_missing"]), ("true", "true"))
-        assert_revocation_denial(self, control, "ci-regression")
+        assert_revocation_denial(self, control, "ci-regression", LISTENER_OBSERVED)
 
         data = listener_fixture(event)
         close_pull_request(data, merged=False)
@@ -609,7 +644,7 @@ class ListenerClosedPullRequestOriginalTests(unittest.TestCase):
         self.assertEqual((run.outputs.get("eligible"), run.outputs.get("create_missing")), ("true", "true"),
                          f"failed CI run {EVENT_RUN} on committed head {EVIDENCE} of closed pull request {PR} was not "
                          f"bound for denial: {binder_refusal(run)}; mutations {mutations(run)}")
-        assert_revocation_denial(self, run, "ci-regression")
+        assert_revocation_denial(self, run, "ci-regression", LISTENER_OBSERVED)
 
 
 MOVED_HEAD, MOVED_MERGE = "c4" * 20, "c5" * 20
@@ -624,12 +659,14 @@ class ManualRevocationOffHeadOriginalTests(unittest.TestCase):
     and for one whose head moved off E.
     Fails today at the binder-output assertion: the binder exits 1 at REV:136
     or REV:138 with no outputs.
+    Ported to the P6 interfaces in "test(security): port the revocation
+    regressions to the evidence head".
     """
 
     def test_manual_revocation_denies_e_for_a_closed_or_moved_pull_request(self) -> None:
         control = revoke_manually(revocation_fixture())
         self.assertEqual((control.outputs["eligible"], control.outputs["create_missing"]), ("true", "true"))
-        assert_revocation_denial(self, control, "operator-security-revocation")
+        assert_revocation_denial(self, control, "operator-security-revocation", MANUAL_OBSERVED)
 
         for label in ("closed", "head moved off E"):
             with self.subTest(pull_request=label):
@@ -645,7 +682,7 @@ class ManualRevocationOffHeadOriginalTests(unittest.TestCase):
                 self.assertEqual((run.outputs.get("eligible"), run.outputs.get("create_missing")), ("true", "true"),
                                  f"manual revocation of {EVIDENCE} under the freeze was refused for a {label} pull "
                                  f"request: {binder_refusal(run)}")
-                assert_revocation_denial(self, run, "operator-security-revocation")
+                assert_revocation_denial(self, run, "operator-security-revocation", MANUAL_OBSERVED)
 
 
 def unavailable_test_merges(data: dict) -> None:
@@ -667,6 +704,8 @@ class ListenerUnavailableTestMergeOriginalTests(unittest.TestCase):
     REV:322 read. The denial itself is prospective (see
     `ListenerUnavailableTestMergeProspectiveTests`): with M absent there is no
     test-merge namespace to deny in.
+    Ported to the P6 interfaces in "test(security): port the revocation
+    regressions to the evidence head".
     """
 
     def test_failed_ci_on_the_committed_head_binds_without_the_historical_test_merge(self) -> None:
@@ -701,6 +740,8 @@ class ListenerMismatchedTitleOriginalTests(unittest.TestCase):
     Fails today at the binder-output assertion: the binder exits 1 at REV:306.
     The denial itself is prospective (see `ListenerMismatchedTitleProspectiveTests`):
     a mismatched title supplies no authenticated test merge to deny in.
+    Ported to the P6 interfaces in "test(security): port the revocation
+    regressions to the evidence head".
     """
 
     def test_failed_ci_with_a_mismatched_title_binds_the_api_head(self) -> None:
@@ -758,7 +799,7 @@ class PublisherAttemptCeilingPreservationTests(unittest.TestCase):
                              CEILING_RUN, 101)
         run = run_publisher(data)
         self.assertNotIn("unprovided API", run.result.stderr)
-        self.assertEqual(run.calls[:6], PUBLISHER_SETUP + [CI_HISTORY_GET, *run_reads(200)])
+        self.assertEqual(run.calls[:7], PUBLISHER_SETUP + [CI_HISTORY_GET, CI_CENSUS_GET, *run_reads(200)])
         assert_bad_ci_denial(self, run, [(200, 1, "failure")])
 
     def test_failed_attempt_at_the_ceiling_still_denies_the_evidence_head(self) -> None:
@@ -804,10 +845,11 @@ class PublisherCensusPagePreservationTests(unittest.TestCase):
 
 
 class PublisherDualCensusProspectiveTests(unittest.TestCase):
-    """Prospective: a current-registration run missing from the repository-wide history (O-G2 control)."""
+    """A current-registration run missing from the repository-wide history (O-G2 control).
 
-    @unittest.skip("prospective: the publisher reads only actions/workflows/ci.yml/runs (FIN:2722); it has no "
-                   "repository-wide listing Z to hold the per-workflow listing A against until the dual census lands")
+    Prospective design control, activated at the P5/P6 boundary; never a genuine Original.
+    """
+
     def test_per_workflow_run_missing_from_the_repository_history_refuses_without_a_tombstone(self) -> None:
         data = publisher_fixture(ci_run(203))
         data[f"{PREFIX}/actions/runs"] = {"total_count": 1, "workflow_runs": [ci_run(CI_RUN)]}
@@ -850,7 +892,7 @@ class ListenerClosedPullRequestPreservationTests(unittest.TestCase):
     def test_existing_authority_of_a_closed_pull_request_is_failed_in_place(self) -> None:
         event, authority = failed_event(), existing_authority()
         self.assertEqual((authority["head_sha"], authority["external_id"], authority["conclusion"]),
-                         (Y_HEAD, Y_EXTERNAL_ID, "success"))
+                         (Y_HEAD, AUTHORITY_EXTERNAL_ID, "success"))
         data = listener_fixture(event, checks=(authority,))
         close_pull_request(data, merged=False)
         run = revoke_failed_ci(data, event)
@@ -936,7 +978,7 @@ class PublisherReopenedPullRequestPreservationTests(unittest.TestCase):
                          ("open", MERGE))
         run = run_publisher(data)
         self.assertNotIn("unprovided API", run.result.stderr)
-        self.assertEqual(run.calls[:6], PUBLISHER_SETUP + [CI_HISTORY_GET, *run_reads(200)])
+        self.assertEqual(run.calls[:7], PUBLISHER_SETUP + [CI_HISTORY_GET, CI_CENSUS_GET, *run_reads(200)])
         assert_bad_ci_denial(self, run, [(200, 1, "failure")])
 
 
@@ -975,48 +1017,34 @@ class ListenerRunIdentityPreservationTests(unittest.TestCase):
 
 def e_placed_authority() -> dict:
     """A Security contract success on E with the candidate identity of the fixture tuple."""
-    identity = {"authorized_source_sha": SOURCE, "base_sha": BASE, "evidence_sha": EVIDENCE,
-                "merge_tree_sha": LANDING.TREE, "pr_number": str(PR), "repository": REPOSITORY,
-                "repository_id": REPOSITORY_ID, "schema": "chio.security-candidate-identity.v1",
-                "security_definition_sha": DEFINITION}
-    digest = hashlib.sha256(json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     text = {"aggregate_check_run_id": "505", "ci_merge_binding": {"artifact_digest": "7" * 64, "artifact_id": "812",
                                                                   "binding_sha256": "9" * 64},
-            "identity": identity, "identity_digest": digest,
+            "identity": IDENTITY, "identity_digest": IDENTITY_DIGEST,
             "merge_observations": {"capture": LANDING.PRIOR_MERGE, "ci": MERGE}, "publication_binding_digest": "2" * 64,
             "required_check_run_ids": {"build": "501", "deny": "504", "msrv": "502", "vet": "503"},
             "schema": "chio.security-check-authority.v3",
             "source_ci": {"run_attempt": "1", "run_id": str(CI_RUN), "workflow_id": str(CI_WORKFLOW)}}
-    external_id = f"chio:v3:{PR}:{EVIDENCE}:{digest}"
-    return {"id": 605, "name": "Security contract", "head_sha": E_HEAD, "external_id": external_id,
+    return {"id": 605, "name": "Security contract", "head_sha": Y_HEAD, "external_id": AUTHORITY_EXTERNAL_ID,
             "status": "completed", "conclusion": "success", "app": dict(APP), "completed_at": "2026-10-06T00:06:00Z",
             "details_url": f"https://github.com/{REPOSITORY}/actions/runs/{FINALIZER_RUN}/attempts/1",
-            "output": {"title": "Chio security authority", "summary": f"Dedicated chio-security-authority approval for {external_id}.",
+            "output": {"title": "Chio security authority",
+                       "summary": f"Dedicated chio-security-authority approval for {AUTHORITY_EXTERNAL_ID}.",
                        "text": json.dumps(text, sort_keys=True, separators=(",", ":"))}}
-
-
-def e_denial_text(observed: dict[str, str]) -> dict:
-    return {"authorized_source_sha": SOURCE, "evidence_sha": EVIDENCE, "observed": observed, "reason": "ci-regression",
-            "schema": "chio.security-check-revocation.v2", "security_definition_sha": DEFINITION}
 
 
 def assert_e_denial(test: unittest.TestCase, revocation: Revocation, observed: dict[str, str]) -> None:
     test.assertEqual(mutations(revocation), [CHECK_RUN_POST], revocation.steps[-1].result.stderr)
     [check] = app_checks(revocation.data)
-    test.assertEqual(check_identity(check), ("Security contract", APP, E_HEAD, E_DENIAL_EXTERNAL_ID, "completed", "failure"))
-    test.assertEqual(json.loads(check["output"]["text"]), e_denial_text(observed))
-
-
-NO_TEST_MERGE_NAMESPACE = (
-    "prospective: the revoker writes its denial only in the test-merge namespace (external ID at REV:1012, "
-    "check listing on MERGE_COMMIT_SHA at REV:1102) and the finalizer places Security contract there too; ")
+    test.assertEqual(check_identity(check), ("Security contract", APP, Y_HEAD, Y_EXTERNAL_ID, "completed", "failure"))
+    test.assertEqual(json.loads(check["output"]["text"]), revocation_text("ci-regression", observed))
 
 
 class ListenerUnavailableTestMergeProspectiveTests(unittest.TestCase):
-    """Prospective: C-P5-3a and C-P5-3b, the denial for E once M_ci and M_cap are unreadable."""
+    """C-P5-3a and C-P5-3b, the denial for E once M_ci and M_cap are unreadable.
 
-    @unittest.skip(NO_TEST_MERGE_NAMESPACE + "with M_ci and M_cap absent there is no test merge to deny in, so the "
-                   "denial exists only with Security contract placed on E")
+    Prospective design control, activated at the P5/P6 boundary; never a genuine Original.
+    """
+
     def test_existing_e_authority_is_failed_in_place_without_the_test_merges(self) -> None:
         event, authority = failed_event(), e_placed_authority()
         data = listener_fixture(event, live_merge=LANDING.REGENERATED_MERGE, checks=(authority,))
@@ -1025,22 +1053,21 @@ class ListenerUnavailableTestMergeProspectiveTests(unittest.TestCase):
         self.assertEqual(run.outputs["eligible"], "true")
         assert_authority_failed_in_place(self, run, authority)
 
-    @unittest.skip(NO_TEST_MERGE_NAMESPACE + "with M_ci and M_cap absent there is no test merge to deny in, so the "
-                   "denial exists only with Security contract placed on E")
     def test_failed_ci_tombstones_e_without_the_test_merges(self) -> None:
         event = failed_event()
         data = listener_fixture(event, live_merge=LANDING.REGENERATED_MERGE)
         unavailable_test_merges(data)
         run = revoke_failed_ci(data, event)
         self.assertEqual((run.outputs["eligible"], run.outputs["create_missing"]), ("true", "true"))
-        assert_e_denial(self, run, {"base_sha": BASE, "merge_commit_sha": MERGE, "merge_tree_sha": "", "pr_number": str(PR)})
+        assert_e_denial(self, run, LISTENER_OBSERVED)
 
 
 class ListenerMismatchedTitleProspectiveTests(unittest.TestCase):
-    """Prospective: C-P5-9, the denial for E bound by API identity under a mismatched title."""
+    """C-P5-9, the denial for E bound by API identity under a mismatched title.
 
-    @unittest.skip(NO_TEST_MERGE_NAMESPACE + "a mismatched title supplies no authenticated N, B or M, so the "
-                   "denial is keyed on E alone and exists only with Security contract placed on E")
+    Prospective design control, activated at the P5/P6 boundary; never a genuine Original.
+    """
+
     def test_failed_ci_with_a_mismatched_title_tombstones_the_api_head(self) -> None:
         event = failed_event(f"CI N={PR} E={MISMATCHED_HEAD} B={BASE} M={MERGE}")
         run = revoke_failed_ci(listener_fixture(event), event)
