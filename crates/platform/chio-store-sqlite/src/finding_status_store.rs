@@ -1823,7 +1823,6 @@ mod schema;
 use persistence::*;
 use records::*;
 pub(crate) use schema::initialize_finding_status_schema;
-use schema::*;
 
 #[cfg(test)]
 #[path = "finding_status_store_tests.rs"]
