@@ -445,7 +445,10 @@ fn a_fresh_apply_with_a_stale_generation_is_refused_without_mutation() {
         .apply_egress_restriction(&first_request)
         .unwrap_or_else(|error| panic!("apply first: {error}"));
     assert_eq!(applied_first.generation, 1);
-    assert_eq!(applied_first.contributions.as_slice(), &[first.clone()]);
+    assert_eq!(
+        applied_first.contributions.as_slice(),
+        std::slice::from_ref(&first)
+    );
     assert_eq!(
         store
             .load_egress_restrictions(&key())
