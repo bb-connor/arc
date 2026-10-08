@@ -57,6 +57,8 @@ enum QuoteStamp {
     ReadStart,
     ReadEnd,
     AfterReadEnd(u64),
+    ReadEndWithClockFault(ClockError),
+    ReadEndWithClockRegression,
 }
 
 struct OracleRead {
@@ -83,7 +85,9 @@ impl PriceOracle for ClockAdvancingOracle {
             self.clock.set_secs(completed_at).map_err(clock_fault)?;
             let updated_at = match self.stamp {
                 QuoteStamp::ReadStart => started_at,
-                QuoteStamp::ReadEnd => completed_at,
+                QuoteStamp::ReadEnd
+                | QuoteStamp::ReadEndWithClockFault(_)
+                | QuoteStamp::ReadEndWithClockRegression => completed_at,
                 QuoteStamp::AfterReadEnd(secs) => completed_at + secs,
             };
             let rate = ExchangeRate {
@@ -108,6 +112,20 @@ impl PriceOracle for ClockAdvancingOracle {
                     completed_at,
                     quote: rate.clone(),
                 });
+            match self.stamp {
+                QuoteStamp::ReadEndWithClockFault(error) => {
+                    *self.clock.0.lock().map_err(|_| {
+                        PriceOracleError::Unavailable("test oracle clock lock".into())
+                    })? = Err(error);
+                }
+                QuoteStamp::ReadEndWithClockRegression => {
+                    let regressed = started_at.checked_sub(1).ok_or_else(|| {
+                        PriceOracleError::Unavailable("test oracle clock regression".into())
+                    })?;
+                    self.clock.set_secs(regressed).map_err(clock_fault)?;
+                }
+                _ => {}
+            }
             Ok(rate)
         })
     }
@@ -564,4 +582,105 @@ fn resolved_durable_pricing_replays_without_a_live_quote() -> TestResult {
     assert_eq!(fx.pricing(&replay)?, fx.converted(started_at, 2));
     assert_eq!(fx.invocations.load(Ordering::SeqCst), 1);
     Ok(())
+}
+
+/// The quote is valid at completion; only the fenced authority clock fails.
+fn assert_quote_completed_before_clock_fault(
+    timeline: &Timeline,
+    kernel: &ChioKernel,
+    expected: ClockError,
+) -> TestResult {
+    let completed_at = timeline.start + ORACLE_IO_SECS;
+    assert_eq!(
+        timeline.reads()?,
+        [(
+            timeline.start,
+            completed_at,
+            "ETH/USD".to_owned(),
+            completed_at
+        )]
+    );
+    timeline.last_quote()?.ensure_fresh(completed_at)?;
+    assert_eq!(kernel.read_authority_time(), Err(expected));
+    Ok(())
+}
+
+fn assert_durable_quote_clock_fault(stamp: QuoteStamp, expected: ClockError) -> TestResult {
+    let fx = durable_fx("fx-clock-durable-global-fault", stamp)?;
+    let result = fx.kernel.evaluate_tool_call_blocking(&fx.request);
+    assert!(
+        matches!(&result, Err(KernelError::Clock(error)) if *error == expected),
+        "{result:?}"
+    );
+    assert_quote_completed_before_clock_fault(&fx.timeline, &fx.kernel, expected)?;
+    assert!(fx.captures()?.is_empty());
+    assert_eq!(fx.invocations.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        fx.store
+            .payment_journal()
+            .ok_or("unresolved payment journal")?
+            .settle_amount_units,
+        None
+    );
+    let operation = fx.store.operation();
+    let outcome = fx
+        .store
+        .lookup_by_operation(operation.binding().operation_id())?
+        .ok_or("unresolved raw outcome")?;
+    assert!(matches!(
+        outcome.disposition(),
+        ResolvedToolOutcomeV1::Returned
+    ));
+    Ok(())
+}
+
+fn assert_ordinary_quote_clock_fault(stamp: QuoteStamp, expected: ClockError) -> TestResult {
+    let fx = ordinary_fx("fx-clock-ordinary-global-fault", stamp)?;
+    let result = fx.kernel.evaluate_tool_call_blocking(&fx.request);
+    assert!(
+        matches!(&result, Err(KernelError::Clock(error)) if *error == expected),
+        "{result:?}"
+    );
+    assert_quote_completed_before_clock_fault(&fx.timeline, &fx.kernel, expected)?;
+    let usage = fx
+        .kernel
+        .budget_store
+        .get_usage(&fx.request.capability.id, 0)?
+        .ok_or("retained provisional budget exposure")?;
+    assert_eq!(usage.total_cost_exposed, PROVISIONAL_CENTS);
+    assert_eq!(usage.total_cost_realized_spend, 0);
+    assert!(fx.kernel.receipt_log().is_empty());
+    Ok(())
+}
+
+#[test]
+fn durable_quote_clock_unavailability_stays_global_before_settlement() -> TestResult {
+    assert_durable_quote_clock_fault(
+        QuoteStamp::ReadEndWithClockFault(ClockError::Unavailable),
+        ClockError::Unavailable,
+    )
+}
+
+#[test]
+fn durable_quote_clock_regression_stays_global_before_settlement() -> TestResult {
+    assert_durable_quote_clock_fault(
+        QuoteStamp::ReadEndWithClockRegression,
+        ClockError::WallClockRegression,
+    )
+}
+
+#[test]
+fn ordinary_quote_clock_unavailability_stays_global_before_budget_reconciliation() -> TestResult {
+    assert_ordinary_quote_clock_fault(
+        QuoteStamp::ReadEndWithClockFault(ClockError::Unavailable),
+        ClockError::Unavailable,
+    )
+}
+
+#[test]
+fn ordinary_quote_clock_regression_stays_global_before_budget_reconciliation() -> TestResult {
+    assert_ordinary_quote_clock_fault(
+        QuoteStamp::ReadEndWithClockRegression,
+        ClockError::WallClockRegression,
+    )
 }
