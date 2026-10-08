@@ -404,8 +404,8 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/platform/chio-store-sqlite/src/finding_challenge_store_tests.rs": allow(
         "2027-01-31",
         "cognition challenge authority store regression suite; capped to current size until split",
-        max_lines=4_760,
-        max_fragments=2,
+        max_lines=4_718,
+        max_fragments=1,
     ),
     "crates/trust/chio-finding-challenge/tests/support/mod.rs": allow(
         "2026-11-30",

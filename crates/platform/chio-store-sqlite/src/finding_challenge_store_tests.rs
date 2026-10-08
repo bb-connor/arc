@@ -4367,7 +4367,8 @@ fn empty_v4_schema_adds_authenticated_projection_history() {
     )
     .expect("inspect projection history"));
 }
-include!("finding_challenge_store_root_refresh_tests.rs");
+#[path = "finding_challenge_store_root_refresh_tests.rs"]
+mod root_refresh;
 
 #[test]
 fn nonempty_v4_schema_is_not_adopted_without_projection_history() {

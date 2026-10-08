@@ -1,3 +1,7 @@
+//! Schema migration coverage for append-only effect-root refreshes.
+
+use super::*;
+
 #[test]
 fn v12_schema_adds_append_only_effect_root_refreshes() {
     let mut connection = Connection::open_in_memory().expect("open previous database");
