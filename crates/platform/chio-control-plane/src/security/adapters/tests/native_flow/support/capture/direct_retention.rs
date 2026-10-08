@@ -5,13 +5,26 @@ use chio_kernel::admission_operation::dpop_claim::DpopReplayClaimDisposition;
 use chio_kernel::admission_operation::governed_approval_claim::GovernedApprovalClaimDisposition;
 use chio_kernel::admission_operation::runtime_participant::RuntimeParticipantDisposition;
 use chio_store_sqlite::admission_operation_store::NativeDispatchLedgerTestFault;
+use std::sync::Mutex;
 
 // The combined profile accepts its runtime report through epoch + 60s.
 const RUNTIME_REPORT_EXPIRED_AT_MS: u64 = 60_001;
 const RECONCILIATION_REQUIRED: &str = "security dispatch outcome requires reconciliation: security native dispatch capture callback failed; authoritative recovery required";
+const RUNTIME_EXPIRED: &str =
+    "internal error: runtime pheromone policy revalidation failed: runtime_pheromone_advisory_stale";
+const ALREADY_ATTEMPTED: &str =
+    "durable admission failed: native capture authority already attempted capture";
+const EGRESS_EXPIRED: &str =
+    "durable admission failed: native egress deadline is expired or invalid";
+const UNCONFIRMED_REPLAY: &str =
+    "durable admission failed: native preparation requires original pre-budget authority";
+const COMPENSATED_REPLAY: &str =
+    "durable admission failed: request replay is retained in state CompensatedBeforeDispatch";
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Fault {
+    Healthy,
+    FenceExpiredBeforeRetention,
     RuntimeExpiredAfterRetention,
     LedgerAfterEgressCommit,
 }
@@ -23,6 +36,7 @@ struct DirectHook {
     clock: Arc<FlowTestClock>,
     fault: Fault,
     committed_egress: AtomicUsize,
+    outcomes: Mutex<Vec<String>>,
 }
 
 impl DirectHook {
@@ -43,10 +57,14 @@ impl DirectHook {
             .ok_or_else(|| KernelError::Internal("direct hook requires an egress plan".into()))?;
         drop(planned);
         let grant_index = authority.grant_index()?;
-        let (prepared, egress, ledger) =
-            authority
-                .prepare_egress()?
-                .retain_for_capture(Some(deadline), grant_index, &policy)?;
+        let spare = authority.prepare_egress()?;
+        let retained = authority.prepare_egress()?;
+        if self.fault == Fault::FenceExpiredBeforeRetention {
+            self.advance(deadline)?;
+        }
+        let retention = retained.retain_for_capture(Some(deadline), grant_index, &policy);
+        self.record(&retention)?;
+        let (prepared, egress, ledger) = retention?;
         if egress.is_some_and(|history| history.commitment.is_some()) {
             self.committed_egress.fetch_add(1, Ordering::SeqCst);
         }
@@ -55,7 +73,33 @@ impl DirectHook {
                 + RUNTIME_REPORT_EXPIRED_AT_MS;
             self.advance(expired)?;
         }
-        authority.capture(prepared, &ledger, &policy).map(|_| ())
+        let captured = authority.capture(prepared, &ledger, &policy).map(|_| ());
+        self.record(&captured)?;
+        if captured.is_err() {
+            // The capture authority stays single use after a failed attempt.
+            self.record(&authority.capture(spare, &ledger, &policy))?;
+        }
+        captured
+    }
+
+    fn record<T>(&self, result: &Result<T, KernelError>) -> Result<(), KernelError> {
+        let outcome = match result {
+            Ok(_) => "ok".to_owned(),
+            Err(error) => error.to_string(),
+        };
+        self.outcomes
+            .lock()
+            .map_err(|_| KernelError::Internal("direct hook outcomes poisoned".into()))?
+            .push(outcome);
+        Ok(())
+    }
+
+    fn outcomes(&self) -> TestResult<Vec<String>> {
+        Ok(self
+            .outcomes
+            .lock()
+            .map_err(|_| "direct hook outcomes poisoned")?
+            .clone())
     }
 
     fn advance(&self, unix_ms: u64) -> Result<(), KernelError> {
@@ -189,9 +233,34 @@ fn arrange(fault: Fault) -> TestResult<(Fixture, Arc<DirectHook>)> {
         clock: fixture.clock.clone(),
         fault,
         committed_egress: AtomicUsize::new(0),
+        outcomes: Mutex::new(Vec::new()),
     });
     fixture.kernel.set_security_pre_dispatch_hook(hook.clone());
     Ok((fixture, hook))
+}
+
+fn assert_released(custody: &Custody, fault: Fault) {
+    assert_eq!(
+        custody.state,
+        AdmissionOperationState::CompensatedBeforeDispatch,
+        "{fault:?}"
+    );
+    assert_eq!(custody.quota, (0, 0), "{fault:?}");
+    assert_eq!(
+        custody.runtime,
+        [RuntimeParticipantDisposition::ReleasedBeforeDispatch],
+        "{fault:?}"
+    );
+    assert_eq!(
+        custody.approval,
+        [GovernedApprovalClaimDisposition::ReleasedBeforeDispatch],
+        "{fault:?}"
+    );
+    assert_eq!(
+        custody.dpop,
+        [DpopReplayClaimDisposition::ReleasedBeforeDispatch],
+        "{fault:?}"
+    );
 }
 
 fn committed_custody_stays_unconfirmed(fault: Fault, ledger: bool) -> TestResult {
@@ -223,6 +292,11 @@ fn committed_custody_stays_unconfirmed(fault: Fault, ledger: bool) -> TestResult
     assert_eq!(after.ledger, ledger, "{fault:?}");
     if fault == Fault::RuntimeExpiredAfterRetention {
         assert_eq!(hook.committed_egress.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            hook.outcomes()?,
+            ["ok", RUNTIME_EXPIRED, ALREADY_ATTEMPTED],
+            "{fault:?}"
+        );
     }
     assert_eq!(
         after.state,
@@ -245,6 +319,23 @@ fn committed_custody_stays_unconfirmed(fault: Fault, ledger: bool) -> TestResult
         [DpopReplayClaimDisposition::ReservedBeforeDispatch],
         "{fault:?}"
     );
+
+    // Recovery resolves the unconfirmed capture and keeps the committed fence.
+    let replay = fixture
+        .kernel
+        .evaluate_tool_call_blocking_with_security_context(&fixture.request, &fixture.context)?;
+    assert_eq!(replay.verdict, Verdict::Deny, "{fault:?}");
+    assert_eq!(
+        replay.reason.as_deref(),
+        Some(UNCONFIRMED_REPLAY),
+        "{fault:?}"
+    );
+    assert!(replay.output.is_none(), "{fault:?}");
+    let recovered = custody(&fixture)?;
+    assert_released(&recovered, fault);
+    assert!(recovered.egress_committed, "{fault:?}");
+    assert_eq!(recovered.ledger, ledger, "{fault:?}");
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0, "{fault:?}");
     Ok(())
 }
 
@@ -256,4 +347,61 @@ fn native_direct_retention_runtime_expiry_after_egress_commit_stays_unconfirmed(
 #[test]
 fn native_direct_retention_ledger_fault_after_egress_commit_stays_unconfirmed() -> TestResult {
     committed_custody_stays_unconfirmed(Fault::LedgerAfterEgressCommit, false)
+}
+
+#[test]
+fn native_direct_retention_fence_expiry_before_any_write_is_a_clean_rejection() -> TestResult {
+    let fault = Fault::FenceExpiredBeforeRetention;
+    let (fixture, hook) = arrange(fault)?;
+    let response = fixture
+        .kernel
+        .evaluate_tool_call_blocking_with_security_context(&fixture.request, &fixture.context)?;
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert_eq!(response.reason.as_deref(), Some(RECONCILIATION_REQUIRED));
+    assert!(response.output.is_none());
+    assert_eq!(hook.outcomes()?, [EGRESS_EXPIRED]);
+    assert_eq!(hook.committed_egress.load(Ordering::SeqCst), 0);
+    let after = custody(&fixture)?;
+    assert_released(&after, fault);
+    assert!(!after.egress_committed);
+    assert!(!after.ledger);
+    let replay = fixture
+        .kernel
+        .evaluate_tool_call_blocking_with_security_context(&fixture.request, &fixture.context)?;
+    assert_eq!(replay.verdict, Verdict::Deny);
+    assert_eq!(replay.reason.as_deref(), Some(COMPENSATED_REPLAY));
+    assert!(replay.output.is_none());
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
+    assert_eq!(hook.outcomes()?, [EGRESS_EXPIRED]);
+    Ok(())
+}
+
+#[test]
+fn native_direct_retention_healthy_capture_executes_once() -> TestResult {
+    let (fixture, hook) = arrange(Fault::Healthy)?;
+    let response = fixture
+        .kernel
+        .evaluate_tool_call_blocking_with_security_context(&fixture.request, &fixture.context)?;
+    assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
+    assert!(
+        matches!(&response.output, Some(chio_kernel::ToolCallOutput::Value(value)) if value == &fixture.request.arguments)
+    );
+    assert!(response.receipt.verify_signature()?);
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
+    assert_eq!(hook.outcomes()?, ["ok", "ok"]);
+    assert_eq!(hook.committed_egress.load(Ordering::SeqCst), 1);
+    let after = custody(&fixture)?;
+    assert_eq!(after.state, AdmissionOperationState::Completed);
+    assert!(after.egress_committed);
+    assert!(after.ledger);
+    let replay = fixture
+        .kernel
+        .evaluate_tool_call_blocking_with_security_context(&fixture.request, &fixture.context)?;
+    assert_eq!(
+        chio_core::canonical_json_bytes(&replay.receipt)?,
+        chio_core::canonical_json_bytes(&response.receipt)?
+    );
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
+    assert_eq!(hook.outcomes()?, ["ok", "ok"]);
+    Ok(())
 }
