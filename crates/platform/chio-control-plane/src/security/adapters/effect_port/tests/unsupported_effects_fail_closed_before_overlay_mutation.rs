@@ -3,7 +3,9 @@ use super::*;
 #[test]
 fn unsupported_effects_fail_closed_before_overlay_mutation() {
     let store = Arc::new(RecordingOverlayStore::default());
-    let port = port(Arc::clone(&store));
+    let port = ActiveResponseEffectPort::session_suspension_only(Arc::new(
+        SessionSuspensionOverlayBackend::new(store.clone()),
+    ));
     let base = Digest32::new([0; 32]);
     for (kind, target) in [
         (

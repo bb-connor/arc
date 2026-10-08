@@ -13,13 +13,13 @@ use chio_security_types::ports::{
     empty_session_throttle_snapshot, session_throttle_version_hash, ActionId, AlertDeliveryQuery,
     AlertDeliveryStatus, CanonicalBody, ContainmentOverlayCommand, ContainmentOverlayStore,
     Digest32, EffectExecutionStatus, EffectId, EffectOperation, EffectPort, EffectRequest,
-    EffectResultQuery, EgressRestrictionSessionKey, EgressRestrictionStore, IsolationEpochId,
-    LeaseOwnerId, LineageId, OverlayApplyRequest, OverlayContribution, OverlayContributions,
-    OverlayRemoveRequest, OverlaySnapshot, PortError, PortErrorKind, PortResult, RecordId,
-    ResponsePlanRecord, ResponseStore, SchedulerClaimRequest, SecurityAlert, SecurityAlertPort,
-    SessionId, SessionThrottleApplyRequest, SessionThrottleConsumeRequest, SessionThrottleDecision,
-    SessionThrottleKey, SessionThrottleRemoveRequest, SessionThrottleSnapshot,
-    SessionThrottleStore, TenantId, TenantScopedId,
+    EffectResult, EffectResultQuery, EgressRestrictionSessionKey, EgressRestrictionStore,
+    IsolationEpochId, LeaseOwnerId, LineageId, OverlayApplyRequest, OverlayContribution,
+    OverlayContributions, OverlayRemoveRequest, OverlaySnapshot, PortError, PortErrorKind,
+    PortResult, RecordId, ResponsePlanRecord, ResponseStore, SchedulerClaimRequest, SecurityAlert,
+    SecurityAlertPort, SessionId, SessionThrottleApplyRequest, SessionThrottleConsumeRequest,
+    SessionThrottleDecision, SessionThrottleKey, SessionThrottleRemoveRequest,
+    SessionThrottleSnapshot, SessionThrottleStore, TenantId, TenantScopedId,
 };
 use chio_security_types::{PrincipalId, ResponseEffectKind, ResponseTarget};
 use chio_siem::{Alert, AlertBackend, ExportError};
@@ -731,25 +731,45 @@ fn query(request: &EffectRequest) -> EffectResultQuery {
     }
 }
 
-fn port(store: Arc<RecordingOverlayStore>) -> ActiveResponseEffectPort {
-    ActiveResponseEffectPort::session_suspension_only(Arc::new(
-        SessionSuspensionOverlayBackend::new(store),
-    ))
+/// One backend under test. Commands and result queries reach the backend
+/// directly; readiness is answered by a router holding only that backend.
+struct BackendEffects {
+    router: ActiveResponseEffectPort,
+    backend: Arc<dyn ResponseEffectBackend>,
 }
 
-fn alert_port(store: Arc<RecordingAlertStore>) -> ActiveResponseEffectPort {
+impl BackendEffects {
+    fn new(backend: Arc<dyn ResponseEffectBackend>) -> Self {
+        let router = ActiveResponseEffectPort::from_backends(vec![Arc::clone(&backend)])
+            .unwrap_or_else(|error| panic!("backend router: {error}"));
+        Self { router, backend }
+    }
+
+    fn execute(&self, request: &EffectRequest) -> PortResult<EffectResult> {
+        self.backend.execute(request)
+    }
+
+    fn load_result(&self, query: &EffectResultQuery) -> PortResult<EffectExecutionStatus> {
+        self.backend.load_result(query)
+    }
+
+    fn ensure_effects_ready(&self) -> PortResult<()> {
+        self.router.ensure_effects_ready()
+    }
+}
+
+fn port(store: Arc<RecordingOverlayStore>) -> BackendEffects {
+    BackendEffects::new(Arc::new(SessionSuspensionOverlayBackend::new(store)))
+}
+
+fn alert_port(store: Arc<RecordingAlertStore>) -> BackendEffects {
     let alert_store: Arc<dyn EscalateAlertStore> = store;
-    let backend: Arc<dyn ResponseEffectBackend> = Arc::new(EscalateAlertBackend::new(alert_store));
-    ActiveResponseEffectPort::from_backends(vec![backend])
-        .unwrap_or_else(|error| panic!("alert router: {error}"))
+    BackendEffects::new(Arc::new(EscalateAlertBackend::new(alert_store)))
 }
 
-fn throttle_port(store: Arc<RecordingThrottleStore>) -> ActiveResponseEffectPort {
+fn throttle_port(store: Arc<RecordingThrottleStore>) -> BackendEffects {
     let throttle_store: Arc<dyn SessionThrottleStore> = store;
-    let backend: Arc<dyn ResponseEffectBackend> =
-        Arc::new(SessionThrottleBackend::new(throttle_store));
-    ActiveResponseEffectPort::from_backends(vec![backend])
-        .unwrap_or_else(|error| panic!("throttle router: {error}"))
+    BackendEffects::new(Arc::new(SessionThrottleBackend::new(throttle_store)))
 }
 
 fn require_error<T: std::fmt::Debug>(result: PortResult<T>) -> PortError {

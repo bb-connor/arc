@@ -450,8 +450,10 @@ impl FenceLapseHarness {
 
     fn scheduler(&self) -> LapseScheduler {
         let backend: Arc<dyn ResponseEffectBackend> = Arc::new(self.backend());
+        let scheduler: Arc<dyn ResponseSchedulerStore> = self.store.clone();
         let effects = ActiveResponseEffectPort::from_backends(vec![backend])
-            .unwrap_or_else(|error| panic!("effect router: {error}"));
+            .unwrap_or_else(|error| panic!("effect router: {error}"))
+            .with_plan_authority(scheduler);
         let executor = ResponseExecutor::new(
             Arc::clone(&self.store),
             Arc::new(effects),

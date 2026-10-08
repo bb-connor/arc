@@ -12,6 +12,14 @@ use super::{
     LINEAGE_FENCE_MAX_LEASE_MS,
 };
 
+/// Error code of a command or result query sent through a router that holds
+/// no durable response-plan authority to bind it to.
+const EFFECT_PLAN_AUTHORITY_MISSING_CODE: &str = "response.effect_plan_authority_missing";
+
+#[derive(Debug, thiserror::Error)]
+#[error("effect router holds no durable response-plan authority")]
+struct EffectPlanAuthorityMissing;
+
 pub(super) const REQUIRED_EFFECT_KINDS: [ResponseEffectKind; 6] = [
     ResponseEffectKind::EscalateAlert,
     ResponseEffectKind::ThrottleSession,
@@ -68,7 +76,8 @@ impl std::error::Error for ActiveResponseEffectPortConfigError {}
 /// Readiness succeeds only when all six closed protocol effects have distinct,
 /// healthy backends and the router holds the durable response-plan authority.
 /// With that authority every command and result query is bound to the exact
-/// effect of its durable plan before it reaches a backend. The production tree
+/// effect of its durable plan before it reaches a backend; without it every
+/// command and result query is refused. The production tree
 /// has exact backends for all six closed kinds, including the commit-indexed
 /// issuance fence. A partial or unbound router cannot advertise global
 /// readiness. Additional backends can be injected without changing the effect
@@ -179,6 +188,16 @@ impl ActiveResponseEffectPort {
     fn backend(&self, kind: ResponseEffectKind) -> PortResult<&Arc<dyn ResponseEffectBackend>> {
         self.backends.get(&kind).ok_or_else(PortError::unavailable)
     }
+
+    fn plan_authority(&self) -> PortResult<&dyn ResponseSchedulerStore> {
+        self.plan_authority.as_deref().ok_or_else(|| {
+            PortError::with_source(
+                chio_security_types::ports::PortErrorKind::Unavailable,
+                EFFECT_PLAN_AUTHORITY_MISSING_CODE,
+                EffectPlanAuthorityMissing,
+            )
+        })
+    }
 }
 
 impl EffectPort for ActiveResponseEffectPort {
@@ -205,13 +224,12 @@ impl EffectPort for ActiveResponseEffectPort {
             request.scheduler_fencing_token,
             &request.idempotency_key,
         )?;
-        if let Some(plan_authority) = &self.plan_authority {
-            validate_durable_plan_binding(
-                plan_authority.as_ref(),
-                &DurablePlanBinding::from_request(request),
-            )?;
-        }
-        self.backend(request.effect_kind)?.execute(request)
+        let backend = self.backend(request.effect_kind)?;
+        validate_durable_plan_binding(
+            self.plan_authority()?,
+            &DurablePlanBinding::from_request(request),
+        )?;
+        backend.execute(request)
     }
 
     fn load_result(&self, query: &EffectResultQuery) -> PortResult<EffectExecutionStatus> {
@@ -223,13 +241,12 @@ impl EffectPort for ActiveResponseEffectPort {
             query.scheduler_fencing_token,
             &query.idempotency_key,
         )?;
-        if let Some(plan_authority) = &self.plan_authority {
-            validate_durable_plan_binding(
-                plan_authority.as_ref(),
-                &DurablePlanBinding::from_query(query),
-            )?;
-        }
-        self.backend(query.effect_kind)?.load_result(query)
+        let backend = self.backend(query.effect_kind)?;
+        validate_durable_plan_binding(
+            self.plan_authority()?,
+            &DurablePlanBinding::from_query(query),
+        )?;
+        backend.load_result(query)
     }
 
     fn maintain_lineage_fences(

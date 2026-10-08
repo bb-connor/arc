@@ -279,9 +279,13 @@ fn partial_rollback_truth() {
             inner: Arc::clone(&store),
             failed_target: failed_target.clone(),
         });
-    let effects = Arc::new(ActiveResponseEffectPort::session_suspension_only(Arc::new(
-        SessionSuspensionOverlayBackend::new(overlay_store),
-    )));
+    let plan_authority: Arc<dyn ResponseSchedulerStore> = store.clone();
+    let effects = Arc::new(
+        ActiveResponseEffectPort::session_suspension_only(Arc::new(
+            SessionSuspensionOverlayBackend::new(overlay_store),
+        ))
+        .with_plan_authority(plan_authority),
+    );
     let receipts = Arc::new(RecordingResponseReceipts::default());
     let alerts = Arc::new(RecordingResponseAlerts::default());
     let executor = ResponseExecutor::new(

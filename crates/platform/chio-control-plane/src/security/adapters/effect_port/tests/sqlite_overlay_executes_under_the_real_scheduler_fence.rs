@@ -42,9 +42,9 @@ fn sqlite_overlay_executes_under_the_real_scheduler_fence() {
         .unwrap_or_else(|error| panic!("target: {error}"));
     let base = session_overlay_version_hash(store.as_ref(), &target)
         .unwrap_or_else(|error| panic!("base version: {error}"));
-    let port = ActiveResponseEffectPort::session_suspension_only(Arc::new(
-        SessionSuspensionOverlayBackend::new(store.clone()),
-    ));
+    let port = BackendEffects::new(Arc::new(SessionSuspensionOverlayBackend::new(
+        store.clone(),
+    )));
     let mut apply = request(EffectOperation::Apply, base, 6);
     apply.scheduler_fencing_token = work[0].fencing_token;
     apply.plan_expires_at_unix_ms = now.saturating_add(30_000);

@@ -47,8 +47,7 @@ fn restrict_egress_backend_is_canonical_ack_safe_and_destination_scoped() {
     ResponseEffectBackend::ensure_ready(backend.as_ref())
         .unwrap_or_else(|error| panic!("egress readiness: {error}"));
     let routed: Arc<dyn ResponseEffectBackend> = backend;
-    let port = ActiveResponseEffectPort::from_backends(vec![routed])
-        .unwrap_or_else(|error| panic!("egress router: {error}"));
+    let port = BackendEffects::new(routed);
 
     let malformed = egress_request(EffectOperation::Apply, base, &["server-b", "server-a"]);
     let malformed_error = require_error(port.execute(&malformed));
