@@ -412,6 +412,118 @@ fn action_rebinding_and_stale_scheduler_fences_fail_closed() {
 }
 
 #[test]
+fn a_fresh_apply_with_a_stale_generation_is_refused_without_mutation() {
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let path = directory.path().join("egress-stale-generation.db");
+    let now = now_unix_ms();
+    let clock = Arc::new(MutableSecurityStateClock::new(now));
+    let store = SqliteSecurityStateStore::open_with_trusted_clock(
+        &path,
+        Arc::clone(&clock) as Arc<dyn Clock>,
+    )
+    .unwrap_or_else(|error| panic!("open store: {error}"));
+    let first_work = scheduled_action(&store, "action-first", "claim-first", now);
+    let second_work = scheduled_action(&store, "action-second", "claim-second", now);
+    let first = contribution("effect-first", &["server-a"], now + 60_000);
+    let second = contribution("effect-second", &["server-b"], now + 60_000);
+    let first_request = EgressRestrictionApplyRequest {
+        key: key(),
+        action_id: first_work.action_id.clone(),
+        contribution: first.clone(),
+        expected_generation: 0,
+        scheduler_fencing_token: first_work.fencing_token,
+        command: command(
+            &first_work.action_id,
+            &first,
+            EffectOperation::Apply,
+            first_work.fencing_token,
+            "response_effect_command:first-apply",
+        ),
+    };
+    let applied_first = store
+        .apply_egress_restriction(&first_request)
+        .unwrap_or_else(|error| panic!("apply first: {error}"));
+    assert_eq!(applied_first.generation, 1);
+    assert_eq!(applied_first.contributions.as_slice(), &[first.clone()]);
+    assert_eq!(
+        store
+            .load_egress_restrictions(&key())
+            .unwrap_or_else(|error| panic!("load after first apply: {error}")),
+        Some(applied_first.clone())
+    );
+
+    let stale_second = EgressRestrictionApplyRequest {
+        key: key(),
+        action_id: second_work.action_id.clone(),
+        contribution: second.clone(),
+        expected_generation: 0,
+        scheduler_fencing_token: second_work.fencing_token,
+        command: command(
+            &second_work.action_id,
+            &second,
+            EffectOperation::Apply,
+            second_work.fencing_token,
+            "response_effect_command:second-apply",
+        ),
+    };
+    // The second lease is live, its contribution is unexpired at trusted time
+    // and nothing is bound to its effect or command, so only the generation
+    // check can refuse it.
+    let trusted_now = clock
+        .unix_millis()
+        .unwrap_or_else(|error| panic!("trusted time: {error}"))
+        .get();
+    assert_eq!(trusted_now, now);
+    assert!(trusted_now < second_work.lease_expires_at_unix_ms);
+    assert!(trusted_now < second.expires_at_unix_ms);
+    assert_eq!(
+        store
+            .load_egress_restriction_result(&query(&stale_second.command.request))
+            .unwrap_or_else(|error| panic!("load second command before apply: {error}")),
+        EffectExecutionStatus::NotExecuted
+    );
+
+    let refusal = require_error(store.apply_egress_restriction(&stale_second));
+    assert_eq!(refusal.kind(), PortErrorKind::Conflict);
+    assert_eq!(refusal.code().as_str(), "store.conflict");
+    assert_eq!(
+        store
+            .load_egress_restrictions(&key())
+            .unwrap_or_else(|error| panic!("load after refusal: {error}")),
+        Some(applied_first.clone())
+    );
+    assert_eq!(
+        store
+            .load_egress_restriction_result(&query(&stale_second.command.request))
+            .unwrap_or_else(|error| panic!("load second command after refusal: {error}")),
+        EffectExecutionStatus::NotExecuted
+    );
+    assert_eq!(
+        store
+            .load_egress_restriction_result(&query(&first_request.command.request))
+            .unwrap_or_else(|error| panic!("load first command after refusal: {error}")),
+        EffectExecutionStatus::Completed {
+            result: first_request.command.result.clone()
+        }
+    );
+    let unrestricted = decision(&store, "server-b");
+    assert!(!unrestricted.denied);
+    assert!(unrestricted.active_effect_ids.is_empty());
+    assert_eq!(unrestricted.generation, 1);
+
+    // Only the expected generation differs from the refused request.
+    let applied_second = store
+        .apply_egress_restriction(&EgressRestrictionApplyRequest {
+            expected_generation: applied_first.generation,
+            ..stale_second
+        })
+        .unwrap_or_else(|error| panic!("apply second at current generation: {error}"));
+    assert_eq!(applied_second.generation, 2);
+    assert_eq!(applied_second.contributions.as_slice(), &[first, second]);
+}
+
+#[test]
 fn readiness_detects_corrupt_derived_generation() {
     let directory =
         chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
