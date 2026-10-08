@@ -102,6 +102,26 @@ commit. The Process read-source failure and Kani compiler failure remain open.
 No full owning-suite, funded Native, current historical-authority or P5/P6
 qualification follows from these scoped results.
 
+### Formal result accounting
+
+The public Kani gate now requires exactly one matching harness and exactly one
+successful completion record after a successful compiler process. Empty output,
+ambiguous selections, compiler errors and failed verification refuse. Six new
+Python controls passed in normal and optimized modes; the retained lifecycle,
+enrollment and workflow source checks also passed. The public-core shell source
+controls passed on GNU/Linux. The Mac attempt refused its older Bash without
+`mapfile`; that result remains retained. These checks use source inspection and
+test doubles. They are not Kani proofs.
+
+The hosted Kani 0.68.0 compiler expects an integer return from `catch_unwind`,
+while its selected nightly Rust intrinsic returns a boolean. That intrinsic is
+also unimplemented in the selected verifier. Correcting the diagnostic alone
+would not establish callback or unwind semantics. A supported compiler solution
+and all 49 original PR proof obligations remain open. The static TLS explanation
+is supported by pinned primary source; the specific first compiler traversal
+still needs an actual trace. The source investigation is retained under
+`target/recovery-pr/current-review-followup/api-kani-public-intrinsic-repair/`.
+
 ### Current Linux compilation and targeted controls
 
 The October 8 native GNU/Linux build compiled the five library test targets for

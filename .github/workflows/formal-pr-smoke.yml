@@ -42,6 +42,8 @@ on:
       - "scripts/tests/lean-assumption-audit.test.sh"
       - "scripts/generate-lean-json-fixtures.py"
       - "scripts/check-kani-public-core.sh"
+      - "scripts/check-kani-harness-result.py"
+      - "scripts/tests/check-kani-public-result.test.py"
       - "scripts/check-rust-verification-gates.sh"
       - "scripts/run-kani-manifest.sh"
       - "tests/bindings/vectors/canonical/v1.json"
@@ -113,7 +115,7 @@ jobs:
           workflow='^\.github/workflows/formal-pr-smoke\.yml$'
           rust_common="${workflow}|^(Cargo\.lock|Cargo\.toml|rust-toolchain\.toml|scripts/check-kani-toolchain\.sh|scripts/tests/check-kani-toolchain\.test\.sh|scripts/tests/check-kani-probe-lifecycle\.test\.py)$"
           set_output lean "${workflow}|^(formal/lean4/|formal/(proof-manifest\.toml|theorem-inventory\.json|assumptions\.toml)$|docs/reference/CLAIM_REGISTRY\.md$|scripts/(check-formal-proofs\.sh|lean-assumption-audit\.lean|generate-lean-json-fixtures\.py)$|scripts/tests/lean-assumption-audit\.test\.sh$|tests/bindings/vectors/canonical/v1\.json$)"
-          set_output kani_core "${rust_common}|^(\.kani/harnesses\.toml$|formal/rust-verification/kani-public-harnesses\.toml$|scripts/check-kani-public-core\.sh$|crates/(kernel/chio-kernel-core|core/chio-core-types|trust/chio-revocation-oracle)/(src/|Cargo\.toml$))"
+          set_output kani_core "${rust_common}|^(\.kani/harnesses\.toml$|formal/rust-verification/kani-public-harnesses\.toml$|scripts/check-kani-public-core\.sh$|scripts/check-kani-harness-result\.py$|scripts/tests/check-kani-public-result\.test\.py$|crates/(kernel/chio-kernel-core|core/chio-core-types|trust/chio-revocation-oracle)/(src/|Cargo\.toml$))"
           set_output kani_manifest "${rust_common}|^(\.kani/harnesses\.toml$|scripts/run-kani-manifest\.sh$|crates/(economy/chio-anchor|economy/chio-credit|economy/chio-open-market|economy/chio-web3|trust/chio-attest-verify|trust/chio-weights)/(src/|Cargo\.toml$))"
           set_output metadata "${workflow}|^(\.kani/harnesses\.toml$|formal/rust-verification/|scripts/check-rust-verification-gates\.sh$)"
           set_output fuzz_smoke "${workflow}|^(\.github/workflows/fuzz\.yml$|fuzz/)"
@@ -247,6 +249,9 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: "3.12"
+
+      - name: Check public Kani result handling without a compiler
+        run: python3 -B scripts/tests/check-kani-public-result.test.py
 
       - name: Restore Kani tool cache
         id: kani-cache

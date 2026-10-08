@@ -206,18 +206,27 @@ fi
 
 bash scripts/check-kani-toolchain.sh
 
+# Keep complete compiler output visible. Process success alone does not establish
+# that a selected harness ran; validate the pinned result before counting it.
+result_dir="$(mktemp -d "${TMPDIR:-/tmp}/chio-kani-public-result.XXXXXX")"
+trap 'rm -rf "$result_dir"' EXIT
+
 COUNT=0
 while IFS=$'\t' read -r harness unwinding_checks; do
   [[ -n "$harness" ]] || continue
   echo "::group::cargo kani --harness ${harness}"
+  qualified_harness="kani_public_harnesses::${harness}"
   args=(
-    -p chio-kernel-core --lib --harness "$harness"
+    -p chio-kernel-core --lib --harness "$qualified_harness" --exact
     --default-unwind 8
   )
   if [[ "$unwinding_checks" != "true" ]]; then
     args+=(--no-unwinding-checks)
   fi
-  cargo kani "${args[@]}"
+  # pipefail preserves a compiler/prover failure even when tee succeeds.
+  cargo kani "${args[@]}" 2>&1 | tee "$result_dir/harness.log"
+  python3 scripts/check-kani-harness-result.py \
+    --harness "$qualified_harness" "$result_dir/harness.log"
   echo "::endgroup::"
   COUNT=$((COUNT + 1))
 done <<< "$HARNESSES"
