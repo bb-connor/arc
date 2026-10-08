@@ -1961,5 +1961,43 @@ class PublisherSharedHeadOriginalRedTests(unittest.TestCase):
         self.assertNotIn(f"ci_run_id={CI_RUN}\n", run.output)
 
 
+LATER_CI_RUN = 202
+
+
+class RevokerFullHistoryOriginalRedTests(unittest.TestCase):
+    def bind(self, event_run: dict, jobs: list[dict]) -> OfflineRun:
+        assert_authoritative_history(self, event_run)
+        return bind_failed_ci(failed_ci_listener_fixture(event_run, jobs), event_run)
+
+    def assert_tombstone_bound(self, run: OfflineRun, reason: str) -> None:
+        self.assertEqual(run.result.returncode, 0, reason)
+        self.assertIn("eligible=true\n", run.output, reason)
+        self.assertIn("create_missing=true\n", run.output)
+        self.assertIn(f"evidence_sha={EVIDENCE}\n", run.output)
+
+    def control(self) -> None:
+        failed = pull_request_ci_run(LATER_CI_RUN, MERGE, conclusion="failure", check_suite_id=404)
+        self.assert_tombstone_bound(self.bind(failed, failed_builder_jobs(LATER_CI_RUN)),
+                                    "a valid-title failed CI run did not bind a tombstone")
+
+    def test_failed_ci_with_a_fallback_title_still_records_a_tombstone(self) -> None:
+        self.control()
+        failed = pull_request_ci_run(LATER_CI_RUN, MERGE, conclusion="failure", check_suite_id=404,
+                                     display_title=FALLBACK_TITLE)
+        run = self.bind(failed, failed_builder_jobs(LATER_CI_RUN))
+        self.assertIn(f"GET repos/{REPOSITORY}/actions/runs/{LATER_CI_RUN}/attempts/1", run.calls)
+        self.assert_tombstone_bound(run, f"authenticated failed CI run {LATER_CI_RUN} on the committed evidence head "
+                                         "recorded no tombstone because its title was the pull request fallback")
+
+    def test_startup_failure_without_jobs_still_records_a_tombstone(self) -> None:
+        self.control()
+        failed = pull_request_ci_run(LATER_CI_RUN, MERGE, conclusion="startup_failure", check_suite_id=404)
+        run = self.bind(failed, [])
+        self.assertIn(f"GET repos/{REPOSITORY}/actions/runs/{LATER_CI_RUN}/attempts/1/jobs?filter=all&per_page=100",
+                      run.calls)
+        self.assert_tombstone_bound(run, f"authenticated startup_failure CI run {LATER_CI_RUN} on the committed "
+                                         "evidence head recorded no tombstone because it ran no jobs")
+
+
 if __name__ == "__main__":
     unittest.main()
