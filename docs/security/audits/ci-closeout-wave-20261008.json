@@ -12,7 +12,7 @@
     "incoming-pr1160-review-20261008:ci-closeout:CLOCK001",
     "incoming-pr1160-review-20261008:ci-closeout:NCD001"
   ],
-  "status": "repairs-and-independent-review-in-progress",
+  "status": "focused-repairs-published-inventory-followup-local",
   "preservation": "All existing requirement objects and source records remain unchanged. Existing failure, cancellation and unqualified states remain separate.",
   "trusted_definition_merge": "5bb4ae6a52f3f6858d0c0cdc6b7e098277b537d8",
   "hosted_failures": [
@@ -54,7 +54,11 @@
       "producer_commit": "7fcd65355c3eb8b4fa5cea53f12f758194424ef4",
       "independent_review_seal_sha256": "a5839736dde117752a74b20e13f5e4862ecc3a49da85f0d78eafee3637f46459",
       "qualified": false,
-      "composed_inventory_commit": "b90834e85d05961f77eac2d14585fe30251fd0d4"
+      "composed_inventory_commit": "b90834e85d05961f77eac2d14585fe30251fd0d4",
+      "portable_followup_commits": [
+        "270b40dc046b8aaa4bda9324f56d0d1dd26691bf",
+        "aebff22265ea9c63d383ee550b84632a05ca12e4"
+      ]
     },
     "NCD001": {
       "commits": [
@@ -75,6 +79,13 @@
         "84c5c4c1f9e3fb190db74722239d14e07dd4cdc9": "67ad2f73f29695f2fd8ed2bac30a58ff7b0d0259"
       },
       "qualified": false
+    },
+    "XTC001": {
+      "commits": [
+        "3f061148c7a255f6a0afcca9be6de09c3a9966e7",
+        "9a9bcf22dd221932a4938f7c7ff91cbb1b078508"
+      ],
+      "qualified": false
     }
   },
   "composed_runtime": {
@@ -84,5 +95,8 @@
     "strict_units_and_tests_exit": 0,
     "root_source_equivalence": "b90834e85d05961f77eac2d14585fe30251fd0d4",
     "whole_candidate_qualified": false
-  }
+  },
+  "published_source": "9a9bcf22dd221932a4938f7c7ff91cbb1b078508",
+  "inventory_followup_source": "aebff22265ea9c63d383ee550b84632a05ca12e4",
+  "working_agreement": "Operator directive relayed via mailbox October8 16:56-17:01 UTC: fix with regression in one commit, focused batch verification, one batch review, push; hosted CI provides full suite. No changed checks or authority."
 }

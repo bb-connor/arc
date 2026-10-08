@@ -170,6 +170,8 @@ jobs:
           run_gate bash ./scripts/tests/check-deception-security.test.sh
           run_gate /bin/bash -p ./scripts/tests/check-temporal-security.test.sh
           run_gate bash ./scripts/tests/check-response-recovery.test.sh
+          run_gate bash scripts/tests/check-keyring-transparency.test.sh
+          run_gate python3 scripts/tests/check-secret-broker-boundary.test.py
           run_gate bash ./scripts/tests/check-cage-enforcement.test.sh
           run_gate python3 ./scripts/check-mcp-admin-credential-contract.py
           run_gate python3 ./scripts/tests/check-mcp-admin-credential-contract.test.py
