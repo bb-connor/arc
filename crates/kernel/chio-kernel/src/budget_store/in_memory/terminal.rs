@@ -1,5 +1,10 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+//! Hold reversal, reduction, settlement and capture, and usage reads for
+//! the in-memory budget store.
+use super::*;
+
 impl InMemoryBudgetStoreInner {
-    fn reverse_charge_cost(
+    pub(super) fn reverse_charge_cost(
         &mut self,
         capability_id: &str,
         grant_index: usize,
@@ -8,7 +13,7 @@ impl InMemoryBudgetStoreInner {
         self.reverse_charge_cost_with_ids(capability_id, grant_index, cost_units, None, None)
     }
 
-    fn reverse_charge_cost_with_ids(
+    pub(super) fn reverse_charge_cost_with_ids(
         &mut self,
         capability_id: &str,
         grant_index: usize,
@@ -26,7 +31,7 @@ impl InMemoryBudgetStoreInner {
         )
     }
 
-    fn reverse_charge_cost_with_ids_and_authority(
+    pub(super) fn reverse_charge_cost_with_ids_and_authority(
         &mut self,
         capability_id: &str,
         grant_index: usize,
@@ -46,8 +51,11 @@ impl InMemoryBudgetStoreInner {
         )
     }
 
-    #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
-    fn reverse_charge_cost_with_expected_state(
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
+    pub(super) fn reverse_charge_cost_with_expected_state(
         &mut self,
         capability_id: &str,
         grant_index: usize,
@@ -81,8 +89,11 @@ impl InMemoryBudgetStoreInner {
         Ok(())
     }
 
-    #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
-    fn reverse_charge_cost_with_mutation(
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
+    pub(super) fn reverse_charge_cost_with_mutation(
         &mut self,
         capability_id: &str,
         grant_index: usize,
@@ -495,7 +506,7 @@ impl InMemoryBudgetStoreInner {
         ))
     }
 
-    fn cancel_captured_before_dispatch(
+    pub(super) fn cancel_captured_before_dispatch(
         &mut self,
         request: &BudgetCancelCapturedBeforeDispatchRequest,
     ) -> Result<(bool, u64, BudgetUsageRecord), BudgetStoreError> {
@@ -525,7 +536,7 @@ impl InMemoryBudgetStoreInner {
         )
     }
 
-    fn reduce_charge_cost(
+    pub(super) fn reduce_charge_cost(
         &mut self,
         capability_id: &str,
         grant_index: usize,
@@ -534,7 +545,7 @@ impl InMemoryBudgetStoreInner {
         self.reduce_charge_cost_with_ids(capability_id, grant_index, cost_units, None, None)
     }
 
-    fn reduce_charge_cost_with_ids(
+    pub(super) fn reduce_charge_cost_with_ids(
         &mut self,
         capability_id: &str,
         grant_index: usize,
@@ -552,7 +563,7 @@ impl InMemoryBudgetStoreInner {
         )
     }
 
-    fn reduce_charge_cost_with_ids_and_authority(
+    pub(super) fn reduce_charge_cost_with_ids_and_authority(
         &mut self,
         capability_id: &str,
         grant_index: usize,
@@ -760,7 +771,7 @@ impl InMemoryBudgetStoreInner {
         Ok(())
     }
 
-    fn settle_charge_cost(
+    pub(super) fn settle_charge_cost(
         &mut self,
         capability_id: &str,
         grant_index: usize,
@@ -777,7 +788,7 @@ impl InMemoryBudgetStoreInner {
         )
     }
 
-    fn settle_charge_cost_with_ids(
+    pub(super) fn settle_charge_cost_with_ids(
         &mut self,
         capability_id: &str,
         grant_index: usize,
@@ -797,8 +808,11 @@ impl InMemoryBudgetStoreInner {
         )
     }
 
-    #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
-    fn settle_charge_cost_with_ids_and_authority(
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
+    pub(super) fn settle_charge_cost_with_ids_and_authority(
         &mut self,
         capability_id: &str,
         grant_index: usize,
@@ -829,8 +843,11 @@ impl InMemoryBudgetStoreInner {
         )
     }
 
-    #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
-    fn settle_charge_cost_with_mutation(
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
+    pub(super) fn settle_charge_cost_with_mutation(
         &mut self,
         capability_id: &str,
         grant_index: usize,
@@ -1043,7 +1060,7 @@ impl InMemoryBudgetStoreInner {
         Ok(())
     }
 
-    fn capture_budget_hold(
+    pub(super) fn capture_budget_hold(
         &mut self,
         request: &BudgetCaptureHoldRequest,
     ) -> Result<(), BudgetStoreError> {
@@ -1061,7 +1078,7 @@ impl InMemoryBudgetStoreInner {
         )
     }
 
-    fn list_usages(
+    pub(super) fn list_usages(
         &self,
         limit: usize,
         capability_id: Option<&str>,
@@ -1083,7 +1100,7 @@ impl InMemoryBudgetStoreInner {
         Ok(records)
     }
 
-    fn get_usage(
+    pub(super) fn get_usage(
         &self,
         capability_id: &str,
         grant_index: usize,
@@ -1094,7 +1111,7 @@ impl InMemoryBudgetStoreInner {
             .cloned())
     }
 
-    fn get_invocation_quota_usage(
+    pub(super) fn get_invocation_quota_usage(
         &self,
         key: &BudgetQuotaKey,
     ) -> Option<BudgetInvocationQuotaUsage> {
@@ -1110,7 +1127,7 @@ impl InMemoryBudgetStoreInner {
             })
     }
 
-    fn get_cumulative_approval_account_usage(
+    pub(super) fn get_cumulative_approval_account_usage(
         &self,
         key: &BudgetCumulativeApprovalAccountKey,
     ) -> Option<BudgetCumulativeApprovalAccountUsage> {
@@ -1129,7 +1146,7 @@ impl InMemoryBudgetStoreInner {
         })
     }
 
-    fn list_mutation_events(
+    pub(super) fn list_mutation_events(
         &self,
         limit: usize,
         capability_id: Option<&str>,

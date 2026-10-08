@@ -224,7 +224,7 @@ mod accounting;
 
 mod admission;
 mod composite;
-include!("in_memory/terminal.rs");
+mod terminal;
 mod trait_impl;
 
 fn hold_is_open(hold: &BudgetHoldState) -> bool {
