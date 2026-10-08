@@ -427,3 +427,274 @@ fn pinned_detector_and_untrusted_receipt_refusals_are_preserved() {
         assert_never_persisted(&runtime.connection, event, label);
     }
 }
+
+struct ReadyReceiptSink;
+
+impl chio_security_types::ports::SecurityReceiptSink for ReadyReceiptSink {
+    fn ensure_receipts_ready(&self) -> PortResult<()> {
+        Ok(())
+    }
+
+    fn sign_and_append(
+        &self,
+        _: &chio_security_types::ports::ReceiptAppendRequest,
+    ) -> PortResult<OpaqueReceiptRef> {
+        Err(PortError::unavailable())
+    }
+}
+
+fn receipt_signer(signer: &Keypair, policy_version: &str) -> TrustedSecurityEventReceiptProducer {
+    TrustedSecurityEventReceiptProducer {
+        tenant_id: tenant(),
+        producer_id: receipt_producer(),
+        signer_key_id: record("receipt-key-v1"),
+        policy_version: record(policy_version),
+        signer_key: signer.public_key(),
+    }
+}
+
+fn pinned_verifier(
+    detector_key: &Keypair,
+    receipt_key: &Keypair,
+    receipt_policy: &str,
+) -> Arc<NativeSecurityEventVerifier> {
+    Arc::new(
+        NativeSecurityEventVerifier::new(
+            Arc::new(FixedClock(10_000)),
+            vec![TrustedSecurityEventProducer {
+                tenant_id: tenant(),
+                producer_id: producer(),
+                producer_key_id: record("detector-key-v1"),
+                policy_version: record(DETECTOR_POLICY),
+                producer_key: detector_key.public_key(),
+            }],
+            vec![receipt_signer(receipt_key, receipt_policy)],
+            60_000,
+            0,
+        )
+        .unwrap_or_else(|error| panic!("verifier: {error}")),
+    )
+}
+
+fn policy_rules() -> Vec<TemporalRule> {
+    vec![
+        tripwire_rule("rule-receipt-projection", RECEIPT_POLICY),
+        tripwire_rule("rule-detector-only", DETECTOR_POLICY),
+    ]
+}
+
+struct ReceiptPinRuntime {
+    ingress: VerifiedSecurityEventIngress,
+    consumer: Arc<ProductionCorrelationConsumer>,
+    drainer: DurableCorrelationIngress,
+}
+
+fn receipt_pin_runtime(
+    store: &Arc<SqliteSecurityStateStore>,
+    verifier: Arc<NativeSecurityEventVerifier>,
+    allow_verified_receipt: bool,
+) -> ReceiptPinRuntime {
+    let ingress = VerifiedSecurityEventIngress::new(Arc::clone(&verifier), Arc::clone(store))
+        .unwrap_or_else(|error| panic!("ingress: {error}"));
+    let correlation = Arc::new(
+        SqliteTemporalCorrelationPort::new(
+            Arc::clone(store),
+            CorrelationPolicy::new(0, 4_096, 8, allow_verified_receipt)
+                .unwrap_or_else(|error| panic!("correlation policy: {error}")),
+            policy_rules(),
+        )
+        .unwrap_or_else(|error| panic!("correlation port: {error}")),
+    );
+    let consumer = Arc::new(
+        ProductionCorrelationConsumer::from_parts(
+            verifier,
+            correlation as Arc<dyn CorrelationPort>,
+            Arc::new(OneFindingAttestor),
+            Arc::new(RecordingPlanner::default()),
+        )
+        .unwrap_or_else(|error| panic!("consumer: {error}")),
+    );
+    let ingress_store: Arc<dyn CorrelationIngressStore> = store.clone();
+    let drainer = DurableCorrelationIngress::new(ingress_store, Arc::clone(&consumer))
+        .unwrap_or_else(|error| panic!("durable ingress: {error}"));
+    ReceiptPinRuntime {
+        ingress,
+        consumer,
+        drainer,
+    }
+}
+
+fn open_policy_store(name: &str) -> (tempfile::TempDir, Arc<SqliteSecurityStateStore>, Connection) {
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let path = directory.path().join(name);
+    let store = Arc::new(
+        SqliteSecurityStateStore::open(&path)
+            .unwrap_or_else(|error| panic!("open security store: {error}")),
+    );
+    let connection =
+        Connection::open(&path).unwrap_or_else(|error| panic!("inspect security store: {error}"));
+    (directory, store, connection)
+}
+
+#[test]
+fn receipt_producer_policy_pin_must_be_correlated_at_construction() {
+    let detector_key = Keypair::from_seed(&[121_u8; 32]);
+    let receipt_key = Keypair::from_seed(&[122_u8; 32]);
+    let construct = |receipt_policy: &str| {
+        let (_directory, store, _connection) = open_policy_store("receipt-policy-coverage.sqlite");
+        let attestor = Arc::new(crate::security::AttestedCorrelationWriter::new(
+            Arc::new(ReadyReceiptSink),
+            Arc::new(TestFindingAuthority::new(&[])),
+            BTreeMap::new(),
+        ));
+        let planner = Arc::new(recovery_planner(
+            Arc::clone(&store),
+            &[],
+            Arc::new(MissingArtifactResponsePolicy),
+            Arc::new(ArtifactEnforcingCoordinator::default()),
+            Arc::new(FixedClock(10_000)),
+        ));
+        ProductionCorrelationConsumer::new(
+            pinned_verifier(&detector_key, &receipt_key, receipt_policy),
+            store,
+            CorrelationPolicy::new(0, 4_096, 8, true)
+                .unwrap_or_else(|error| panic!("correlation policy: {error}")),
+            policy_rules(),
+            attestor,
+            planner,
+        )
+        .map(|_| ())
+    };
+
+    construct(RECEIPT_POLICY)
+        .unwrap_or_else(|error| panic!("receipt producer pinned to a correlated policy: {error}"));
+    for policy in ["policy-uncorrelated", "*"] {
+        let error = rejected(
+            construct(policy),
+            &format!("a receipt producer pinned to {policy} was constructed"),
+        );
+        assert_eq!(error.kind(), PortErrorKind::InvalidData, "{policy}");
+        assert_eq!(error.code().as_str(), "store.invalid_data", "{policy}");
+    }
+}
+
+#[test]
+fn receipt_policy_pin_refuses_admission_and_quarantines_a_durable_row() {
+    let detector_key = Keypair::from_seed(&[121_u8; 32]);
+    let receipt_key = Keypair::from_seed(&[122_u8; 32]);
+    let (_directory, store, connection) = open_policy_store("receipt-policy-repin.sqlite");
+    let durable =
+        projected_receipt_event("policy-pin-durable-receipt", RECEIPT_POLICY, &receipt_key);
+    {
+        let before = receipt_pin_runtime(
+            &store,
+            pinned_verifier(&detector_key, &receipt_key, RECEIPT_POLICY),
+            true,
+        );
+        assert_eq!(
+            before
+                .ingress
+                .verify_and_append(&durable)
+                .unwrap_or_else(|error| panic!("ingest under the original pin: {error}")),
+            EventAppend::Inserted
+        );
+    }
+    let repinned = receipt_pin_runtime(
+        &store,
+        pinned_verifier(&detector_key, &receipt_key, DETECTOR_POLICY),
+        true,
+    );
+    assert!(matches!(
+        repinned.consumer.verify_pending(&durable),
+        Ok(crate::security::event_consumer::ingress::SealedEventDisposition::Rejected(
+            chio_security_types::ports::CorrelationIngressRejection {
+                trust_class: ProducerTrustClass::VerifiedReceipt,
+                reason: chio_security_types::ports::CorrelationIngressRejectionReason::UnconfiguredPolicyVersion,
+                ..
+            }
+        ))
+    ));
+    let fresh = projected_receipt_event("policy-pin-after-repin", RECEIPT_POLICY, &receipt_key);
+    for (path, result) in [
+        (
+            "ingress",
+            repinned.ingress.verify_and_append(&fresh).map(|_| ()),
+        ),
+        ("consume", repinned.drainer.consume(&fresh).map(|_| ())),
+    ] {
+        let error = rejected(
+            result,
+            &format!("an unpinned receipt was admitted through {path}"),
+        );
+        assert_eq!(error.kind(), PortErrorKind::IntegrityFailure, "{path}");
+        assert_eq!(error.code().as_str(), "store.integrity_failure", "{path}");
+    }
+    assert_never_persisted(&connection, &fresh, "receipt outside the current pin");
+
+    let drained = repinned
+        .drainer
+        .drain_pass(16)
+        .unwrap_or_else(|error| panic!("drain after the pin changed: {error}"));
+    assert_eq!((drained.acknowledged, drained.rejected), (0, 1));
+    let rejection: (String, String) = connection
+        .query_row(
+            "SELECT trust_class, reason FROM security_ingress_rejections \
+             WHERE tenant_id = ?1 AND event_id = ?2",
+            [durable.tenant_id.as_str(), durable.event_id.as_str()],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .unwrap_or_else(|error| panic!("rejection row: {error}"));
+    assert_eq!(
+        rejection,
+        (
+            "verified_receipt".to_string(),
+            "unconfigured_policy_version".to_string()
+        )
+    );
+    assert_eq!(
+        event_rows(&connection, "security_correlation_outcomes", &durable),
+        0
+    );
+}
+
+#[test]
+fn allow_verified_receipt_still_governs_a_correctly_pinned_receipt() {
+    let detector_key = Keypair::from_seed(&[121_u8; 32]);
+    let receipt_key = Keypair::from_seed(&[122_u8; 32]);
+    for (allow_verified_receipt, status, suppressed) in [
+        (true, CorrelationStatus::Matched, false),
+        (false, CorrelationStatus::AdvisoryOnly, true),
+    ] {
+        let (_directory, store, _connection) = open_policy_store("receipt-policy-allow.sqlite");
+        let runtime = receipt_pin_runtime(
+            &store,
+            pinned_verifier(&detector_key, &receipt_key, RECEIPT_POLICY),
+            allow_verified_receipt,
+        );
+        let report = runtime
+            .drainer
+            .consume(&projected_receipt_event(
+                "policy-pin-allow-receipt",
+                RECEIPT_POLICY,
+                &receipt_key,
+            ))
+            .unwrap_or_else(|error| panic!("pinned receipt: {error}"));
+        let rules: Vec<_> = report
+            .rules
+            .iter()
+            .map(|rule| {
+                (
+                    rule.rule_id.as_str().to_owned(),
+                    rule.status,
+                    rule.automatic_response_suppressed,
+                )
+            })
+            .collect();
+        assert_eq!(
+            rules,
+            vec![("rule-receipt-projection".to_owned(), status, suppressed)],
+            "allow_verified_receipt = {allow_verified_receipt}"
+        );
+    }
+}
