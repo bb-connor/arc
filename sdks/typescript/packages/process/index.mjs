@@ -138,3 +138,70 @@ export class ProcessClient {
     });
   }
 }
+
+/** Prepare through the trusted host, then invoke with its original signed
+ * envelope. No credential, issuer key, destination selector or HTTP fallback.
+ * The response and receipt return unchanged. */
+export class BrokerProcessClient extends ProcessClient {
+  async invoke(operationKey, serverId, toolName, args, options = {}) {
+    const prepared = await this.prepareInvocation(operationKey, serverId, toolName, args);
+    if (prepared?.schema !== "chio.broker-execute.v1") throw new WorkerError("invalid_preparation");
+    return super.invoke(operationKey, serverId, toolName, prepared, options);
+  }
+}
+
+const BROKER_OUTPUT_FIELDS = ["body", "evidence", "headers", "receipt", "receiptReference", "status"];
+const MAX_BROKER_BODY_BYTES = 2 * 1024 * 1024;
+
+/** Whether syntactically valid JSON text repeats a member name in any object. */
+function hasDuplicateMember(text) {
+  const scopes = [];
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === "{") scopes.push({ names: new Set(), expectName: true });
+    else if (char === "[") scopes.push(null);
+    else if (char === "}" || char === "]") scopes.pop();
+    else if (char === "," && scopes.at(-1)) scopes.at(-1).expectName = true;
+    else if (char === '"') {
+      let end = index + 1;
+      while (text[end] !== '"') end += text[end] === "\\" ? 2 : 1;
+      const scope = scopes.at(-1);
+      if (scope?.expectName) {
+        const name = JSON.parse(text.slice(index, end + 1));
+        if (scope.names.has(name)) return true;
+        scope.names.add(name);
+        scope.expectName = false;
+      }
+      index = end;
+    }
+  }
+  return false;
+}
+
+/** Read bounded application JSON from a broker response. This neither
+ * verifies nor rewrites its evidence. */
+export function decodeBrokerOutput(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value) ||
+      Object.keys(value).sort().join() !== BROKER_OUTPUT_FIELDS.join() || value.status !== 200) {
+    throw new WorkerError("incomplete_broker_response");
+  }
+  const { evidence, body } = value;
+  if (evidence === null || typeof evidence !== "object" || Array.isArray(evidence) ||
+      evidence.schema !== "chio.broker-execution-evidence.v2") {
+    throw new WorkerError("invalid_broker_evidence");
+  }
+  if (!Array.isArray(body) || body.length > MAX_BROKER_BODY_BYTES ||
+      body.some(byte => !Number.isInteger(byte) || byte < 0 || byte > 255)) {
+    throw new WorkerError("invalid_broker_body");
+  }
+  let text;
+  let decoded;
+  try {
+    text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(Uint8Array.from(body));
+    decoded = JSON.parse(text);
+  } catch {
+    throw new WorkerError("invalid_broker_body");
+  }
+  if (hasDuplicateMember(text)) throw new WorkerError("invalid_broker_body");
+  return decoded;
+}

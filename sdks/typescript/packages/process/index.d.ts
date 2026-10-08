@@ -46,3 +46,10 @@ export class ProcessClient {
   readBlob(sha256: string): Promise<Uint8Array>;
   cancel(): Promise<{ cancelled_processes: number }>;
 }
+/** Prepares through the trusted host, then invokes with its original signed
+ * envelope. Preparation failure never dispatches. */
+export class BrokerProcessClient extends ProcessClient {
+  invoke(operationKey: string, serverId: string, toolName: string, args: Json, options?: InvokeOptions): Promise<ToolResult>;
+}
+/** Bounded application JSON from a broker response; evidence is not verified. */
+export function decodeBrokerOutput(value: Json): Json;
