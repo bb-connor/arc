@@ -6,10 +6,12 @@ use std::collections::BTreeMap;
 #[cfg(not(unix))]
 use std::fs::OpenOptions;
 use std::fs::{self, File};
+#[cfg(not(unix))]
 use std::io::{Read, Write};
 #[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
+#[cfg(not(unix))]
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -1311,14 +1313,26 @@ pub fn load_keyring_runtime_from_authority_seed_with_clock(
 }
 
 const AUTHORITY_SEED_HANDOFF_SCHEMA: &str = "chio.authority-seed-handoff.v1";
+
+/// Key material is a regular file, singly linked, with no permission bits
+/// outside 0600. Ownership is not checked.
+#[cfg(unix)]
+const KEY_MATERIAL_POLICY: chio_secure_fs::OwnerPolicy = chio_secure_fs::OwnerPolicy {
+    owner: chio_secure_fs::Owner::Unchecked,
+    forbidden_mode: 0o177,
+    require_single_link: true,
+    reject_acl: false,
+};
+
+#[cfg(unix)]
+type PrivateFileIdentity = chio_secure_fs::FileIdentity;
+
+#[cfg(not(unix))]
 static AUTHORITY_SEED_TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
+#[cfg(not(unix))]
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct PrivateFileIdentity {
-    #[cfg(unix)]
-    device: u64,
-    #[cfg(unix)]
-    inode: u64,
     length: u64,
 }
 
@@ -1558,25 +1572,50 @@ fn write_authority_seed_file_bound(
     atomic_write_private_file(path, contents.as_bytes(), expected_identity).map_err(CliError::Io)
 }
 
+#[cfg(unix)]
 fn read_private_file(
     path: &Path,
     maximum_bytes: usize,
-) -> Result<(Zeroizing<Vec<u8>>, PrivateFileIdentity), std::io::Error> {
+) -> Result<(zeroize::Zeroizing<Vec<u8>>, PrivateFileIdentity), std::io::Error> {
+    chio_secure_fs::read_private_file(path, &KEY_MATERIAL_POLICY, maximum_bytes)
+        .map_err(key_material_error)
+}
+
+/// Restores the key-material wording of each custody refusal.
+#[cfg(unix)]
+fn key_material_error(error: std::io::Error) -> std::io::Error {
+    use chio_secure_fs::Refusal;
+    use std::io::ErrorKind;
+
+    let (kind, message) = match chio_secure_fs::refusal(&error) {
+        Some(Refusal::NotRegularFile) => (
+            ErrorKind::InvalidData,
+            "private key material must be a regular file",
+        ),
+        Some(Refusal::Mode | Refusal::LinkCount) => (
+            ErrorKind::PermissionDenied,
+            "private key material must be singly linked with mode 0600 or stricter",
+        ),
+        Some(Refusal::DestinationExists) => (
+            ErrorKind::AlreadyExists,
+            "private key destination already exists",
+        ),
+        Some(Refusal::DestinationChanged) if error.kind() != ErrorKind::NotFound => (
+            ErrorKind::InvalidData,
+            "private key destination identity changed",
+        ),
+        _ => return error,
+    };
+    std::io::Error::new(kind, message)
+}
+
+#[cfg(not(unix))]
+fn read_private_file(
+    path: &Path,
+    maximum_bytes: usize,
+) -> Result<(zeroize::Zeroizing<Vec<u8>>, PrivateFileIdentity), std::io::Error> {
     let path_metadata = fs::symlink_metadata(path)?;
     validate_private_file_metadata(&path_metadata)?;
-    #[cfg(unix)]
-    let mut file = {
-        use rustix::fs::{open, Mode, OFlags};
-
-        let descriptor = open(
-            path,
-            OFlags::RDONLY | OFlags::CLOEXEC | OFlags::NOFOLLOW,
-            Mode::empty(),
-        )
-        .map_err(|error| std::io::Error::from_raw_os_error(error.raw_os_error()))?;
-        File::from(descriptor)
-    };
-    #[cfg(not(unix))]
     let mut file = OpenOptions::new().read(true).open(path)?;
     let opened_metadata = file.metadata()?;
     validate_private_file_metadata(&opened_metadata)?;
@@ -1630,12 +1669,46 @@ fn load_private_seed_backend(path: &Path) -> Result<chio_core::crypto::Ed25519Ba
     Ok(chio_core::crypto::Ed25519Backend::new(keypair))
 }
 
+#[cfg(unix)]
+fn atomic_write_private_file(
+    path: &Path,
+    bytes: &[u8],
+    expected_identity: Option<&PrivateFileIdentity>,
+) -> Result<PrivateFileIdentity, std::io::Error> {
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    fs::create_dir_all(parent)?;
+    let parent_metadata = fs::symlink_metadata(parent)?;
+    if !parent_metadata.file_type().is_dir() || parent_metadata.file_type().is_symlink() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "private key parent must be a regular directory",
+        ));
+    }
+    let name = path.file_name().ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "private key path must name a file",
+        )
+    })?;
+    let directory = chio_secure_fs::open_directory_nofollow(parent)?;
+    let expect = expected_identity.map_or(chio_secure_fs::Expect::Absent, |identity| {
+        chio_secure_fs::Expect::Identity(*identity)
+    });
+    chio_secure_fs::publish_at(&directory, name, bytes, 0o600, expect, &KEY_MATERIAL_POLICY)
+        .map_err(key_material_error)
+}
+
+#[cfg(not(unix))]
 fn private_file_identity(path: &Path) -> Result<PrivateFileIdentity, std::io::Error> {
     let metadata = fs::symlink_metadata(path)?;
     validate_private_file_metadata(&metadata)?;
     Ok(identity_from_metadata(&metadata))
 }
 
+#[cfg(not(unix))]
 fn validate_private_file_metadata(metadata: &fs::Metadata) -> Result<(), std::io::Error> {
     if !metadata.file_type().is_file() || metadata.file_type().is_symlink() {
         return Err(std::io::Error::new(
@@ -1643,26 +1716,17 @@ fn validate_private_file_metadata(metadata: &fs::Metadata) -> Result<(), std::io
             "private key material must be a regular file",
         ));
     }
-    #[cfg(unix)]
-    if metadata.nlink() != 1 || metadata.mode() & 0o177 != 0 {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::PermissionDenied,
-            "private key material must be singly linked with mode 0600 or stricter",
-        ));
-    }
     Ok(())
 }
 
+#[cfg(not(unix))]
 fn identity_from_metadata(metadata: &fs::Metadata) -> PrivateFileIdentity {
     PrivateFileIdentity {
-        #[cfg(unix)]
-        device: metadata.dev(),
-        #[cfg(unix)]
-        inode: metadata.ino(),
         length: metadata.len(),
     }
 }
 
+#[cfg(not(unix))]
 fn atomic_write_private_file(
     path: &Path,
     bytes: &[u8],
@@ -1688,19 +1752,6 @@ fn atomic_write_private_file(
         let mut name = path.file_name().unwrap_or_default().to_os_string();
         name.push(format!(".{}.{}.tmp", std::process::id(), counter));
         let candidate = parent.join(name);
-        #[cfg(unix)]
-        let opened = {
-            use rustix::fs::{open, Mode, OFlags};
-
-            open(
-                &candidate,
-                OFlags::WRONLY | OFlags::CREATE | OFlags::EXCL | OFlags::CLOEXEC | OFlags::NOFOLLOW,
-                Mode::RUSR | Mode::WUSR,
-            )
-            .map(File::from)
-            .map_err(|error| std::io::Error::from_raw_os_error(error.raw_os_error()))
-        };
-        #[cfg(not(unix))]
         let opened = OpenOptions::new()
             .write(true)
             .create_new(true)
@@ -1738,6 +1789,7 @@ fn atomic_write_private_file(
     result
 }
 
+#[cfg(not(unix))]
 fn validate_destination_identity(
     path: &Path,
     expected_identity: Option<&PrivateFileIdentity>,
@@ -1769,6 +1821,46 @@ fn sync_parent_directory(path: &Path) -> Result<(), std::io::Error> {
 mod tests {
     use super::*;
     use chio_test_support::prelude::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn key_material_custody_keeps_its_identity_rules_and_messages(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use std::os::unix::fs::PermissionsExt;
+
+        let directory = chio_test_support::private_tempdir()?;
+        let path = directory.path().join("authority.seed.chio-keyring-pending");
+
+        let first = atomic_write_private_file(&path, b"first", None)?;
+        let duplicate = atomic_write_private_file(&path, b"second", None)
+            .err()
+            .ok_or("an existing pending seed was replaced")?;
+        let second = atomic_write_private_file(&path, b"second", Some(&first))?;
+        let stale = atomic_write_private_file(&path, b"third", Some(&first))
+            .err()
+            .ok_or("a stale identity replaced the pending seed")?;
+        let (bytes, read_identity) = read_private_file(&path, 64)?;
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o640))?;
+        let broad = read_private_file(&path, 64)
+            .err()
+            .ok_or("group-readable key material was read")?;
+
+        assert_eq!(duplicate.kind(), std::io::ErrorKind::AlreadyExists);
+        assert_eq!(
+            duplicate.to_string(),
+            "private key destination already exists"
+        );
+        assert_eq!(stale.kind(), std::io::ErrorKind::InvalidData);
+        assert_eq!(stale.to_string(), "private key destination identity changed");
+        assert_eq!(bytes.as_slice(), b"second");
+        assert_eq!(read_identity, second);
+        assert_eq!(broad.kind(), std::io::ErrorKind::PermissionDenied);
+        assert_eq!(
+            broad.to_string(),
+            "private key material must be singly linked with mode 0600 or stricter"
+        );
+        Ok(())
+    }
 
     #[test]
     fn keyring_runtime_config_requires_complete_migration_and_service_topology() {
