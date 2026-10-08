@@ -1,6 +1,8 @@
 //! Broker execution selects its own dispatch-committed original. A request ID
 //! is unique only within one authenticated tenant namespace of the store.
 use super::*;
+
+mod selector_controls;
 use crate::authority_ipc::{AuthorityOperation, AuthorityResult, BrokerAuthorityHandler};
 use crate::budget::{ExecutionHoldState, QueryExecutionHoldRequest};
 use crate::ipc_client::{BrokerIpcClientConfig, BrokerPeerIdentity};
@@ -361,6 +363,14 @@ impl DurableStore {
     /// The current owner's native broker route, served by the production
     /// authority handler installed behind the authority RPC server.
     fn native_broker(&self, request_id: &str) -> TestResult<NativeBroker> {
+        self.native_broker_with_selector_probe(request_id, false)
+    }
+
+    fn native_broker_with_selector_probe(
+        &self,
+        request_id: &str,
+        selector_probe: bool,
+    ) -> TestResult<NativeBroker> {
         let authority = SqliteAuthorityStore::open_serving(&self.database, &self.locks)?;
         let mut kernel = self.kernel(&authority)?;
         let native = initialize_native(&authority, self.directory.path())?;
@@ -406,6 +416,17 @@ impl DurableStore {
             "broker-revocation-domain".into(),
             &verifier,
         )?);
+        let selector_controls = if selector_probe {
+            Some(selector_controls::LiveControls::new(
+                &authority,
+                &native,
+                &participant,
+                &verifier,
+                self.directory.path(),
+            )?)
+        } else {
+            None
+        };
         let selected = verifier.binding().clone();
         kernel.set_supplemental_quota_verifier(Arc::new(verifier), selected)?;
         kernel.set_supplemental_admission_participant(
@@ -414,6 +435,7 @@ impl DurableStore {
         )?;
         let probe = Arc::new(BrokerProbe {
             handler: OnceLock::new(),
+            selector_controls,
             reader: BrokerNativeCaptureReader::new(
                 &authority,
                 native.clone(),
@@ -563,10 +585,12 @@ struct Dispatch {
     hold: Option<crate::Result<AuthorityResult>>,
     prepared: crate::Result<AuthorityResult>,
     substituted: crate::Result<AuthorityResult>,
+    selector_report: Option<selector_controls::LiveReport>,
 }
 
 struct BrokerProbe {
     handler: OnceLock<Weak<BrokerKernelAuthorityHandler>>,
+    selector_controls: Option<selector_controls::LiveControls>,
     reader: BrokerNativeCaptureReader,
     participant: Arc<BrokerAdmissionParticipant>,
     store: SqliteAdmissionOperationStore,
@@ -623,6 +647,10 @@ impl BrokerProbe {
         let mut altered = execute.clone();
         altered.proof.body.nonce = "2".repeat(32);
         let substituted = handler.handle(&AuthorityOperation::PrepareExecution(Box::new(altered)));
+        let selector_report = self
+            .selector_controls
+            .as_ref()
+            .map(|controls| controls.observe(&execute));
         Ok(Dispatch {
             operation_id,
             execute,
@@ -631,6 +659,7 @@ impl BrokerProbe {
             hold,
             prepared,
             substituted,
+            selector_report,
         })
     }
 }
