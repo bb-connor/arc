@@ -82,7 +82,7 @@ async fn mcp_reserve_original_definite_alias_refusal_releases_only_its_pending_c
     assert_eq!(calls_after_replay, 1, "replay dispatched the tool again");
     assert_eq!(
         fenced.0,
-        StatusCode::FORBIDDEN,
+        StatusCode::CONFLICT,
         "a delivered but unacknowledged effect lost its durable fence"
     );
     assert_eq!(fixture.calls.load(Ordering::SeqCst), 1);
