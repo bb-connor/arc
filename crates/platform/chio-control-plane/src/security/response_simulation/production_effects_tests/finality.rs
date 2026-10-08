@@ -3,6 +3,8 @@ use rusqlite::types::Value;
 
 use super::*;
 
+mod migration;
+
 const REMOVABLE_KINDS: [ResponseEffectKind; 4] = [
     ResponseEffectKind::SuspendSession,
     ResponseEffectKind::RestrictEgress,
