@@ -215,15 +215,15 @@ fn durable_lineage_revoked(
     revocation_store: &dyn chio_kernel::RevocationStore,
     capability_ids: &[String],
 ) -> bool {
-    capability_ids
-        .iter()
-        .any(|capability_id| match revocation_store.is_revoked(capability_id) {
+    capability_ids.iter().any(
+        |capability_id| match revocation_store.is_revoked(capability_id) {
             Ok(revoked) => revoked,
             Err(error) => {
                 warn!("failed to query durable revocation store: {error}");
                 true
             }
-        })
+        },
+    )
 }
 
 impl ProxyState {
@@ -238,7 +238,10 @@ impl ProxyState {
         if let Some(store) = self.receipt_store.clone() {
             // The health report reads SQLite, so it runs on the blocking pool; a
             // worker that does not complete reports the store unreachable.
-            if !blocking(move || store.is_reachable()).await.unwrap_or(false) {
+            if !blocking(move || store.is_reachable())
+                .await
+                .unwrap_or(false)
+            {
                 return SidecarStatus::Unhealthy;
             }
         }

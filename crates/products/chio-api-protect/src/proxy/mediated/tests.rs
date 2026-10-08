@@ -10,10 +10,10 @@ mod approvals;
 mod authenticated;
 #[path = "tests/authorization.rs"]
 mod authorization;
-#[path = "tests/concurrency.rs"]
-mod concurrency;
 #[path = "../tests/mediated_boundary_tests.rs"]
 mod boundary_tests;
+#[path = "tests/concurrency.rs"]
+mod concurrency;
 #[path = "tests/reconcile_numbers.rs"]
 mod reconcile_numbers;
 #[path = "../tests/subject_identity.rs"]

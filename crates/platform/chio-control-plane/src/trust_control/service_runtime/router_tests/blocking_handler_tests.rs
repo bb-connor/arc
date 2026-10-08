@@ -73,7 +73,7 @@ fn parked_database(
     let database = database.to_path_buf();
     let progressed = Arc::clone(progressed);
     std::thread::spawn(move || {
-        let held = (|| {
+        let held = (|| -> rusqlite::Result<bool> {
             let connection = rusqlite::Connection::open(&database)?;
             connection.execute_batch("BEGIN EXCLUSIVE")?;
             let _ = locked.send(());

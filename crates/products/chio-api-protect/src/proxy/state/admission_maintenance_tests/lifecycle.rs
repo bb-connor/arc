@@ -141,9 +141,8 @@ async fn admission_host_retry_busy_kernel_shutdown_does_not_deadlock() -> TestRe
     // worker, holding its live operation, while maintenance runs.
     let request = fixture.request.clone();
     let in_flight_kernel = Arc::clone(&kernel);
-    let in_flight = tokio::task::spawn_blocking(move || {
-        in_flight_kernel.evaluate_tool_call_blocking(&request)
-    });
+    let in_flight =
+        tokio::task::spawn_blocking(move || in_flight_kernel.evaluate_tool_call_blocking(&request));
     wait_until(|| fixture.trace.gate.entered()).await?;
     let controller = Arc::new(ShutdownController::manual());
     let owner = start(&fixture, controller.clone())?;

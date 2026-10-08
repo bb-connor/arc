@@ -221,13 +221,11 @@ mod tests {
     async fn one_request_id_has_one_flight_and_other_ids_do_not_wait() {
         let flights = RequestFlights::default();
         let owner = flights.enter("id").await.unwrap();
-        let unrelated = tokio::time::timeout(
-            std::time::Duration::from_secs(5),
-            flights.enter("other"),
-        )
-        .await
-        .expect("an unrelated id must not wait for a live flight")
-        .unwrap();
+        let unrelated =
+            tokio::time::timeout(std::time::Duration::from_secs(5), flights.enter("other"))
+                .await
+                .expect("an unrelated id must not wait for a live flight")
+                .unwrap();
         assert!(
             tokio::time::timeout(std::time::Duration::from_millis(50), flights.enter("id"))
                 .await

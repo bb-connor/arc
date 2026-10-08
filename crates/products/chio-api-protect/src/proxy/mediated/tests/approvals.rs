@@ -336,10 +336,7 @@ async fn ap23_signed_approval_survives_restart_and_dispatches_exact_call_once() 
         )?;
     }
     assert_eq!(effects.load(Ordering::SeqCst), 1);
-    let store = state
-        .receipt_store
-        .as_ref()
-        .ok_or("shared receipt sink")?;
+    let store = state.receipt_store.as_ref().ok_or("shared receipt sink")?;
     let bundle = store
         .core
         .build_evidence_export_bundle(&chio_kernel::EvidenceExportQuery::admin_all())?;
@@ -354,7 +351,6 @@ async fn ap23_signed_approval_survives_restart_and_dispatches_exact_call_once() 
         .tool_receipts
         .iter()
         .all(|row| row.receipt.verify_signature().unwrap_or(false)));
-    drop(store);
     drop(state);
     let reopened = harness.open(harness.config.clone()).await?;
     let (status, replay) = post_evaluate(reopened, &body).await;

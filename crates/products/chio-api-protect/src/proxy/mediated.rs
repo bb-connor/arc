@@ -299,6 +299,7 @@ pub(crate) struct SidecarEvaluateToolCallMediatedRequest {
     execution_nonce: Option<SignedExecutionNonce>,
 }
 
+#[allow(clippy::result_large_err)]
 pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
     State(state): State<Arc<ProxyState>>,
     request: Request<Body>,
@@ -571,6 +572,7 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
 /// precede one `/v1/evaluate` reservation. Runs on the blocking pool while the
 /// caller holds the request id's flight; a claim it returns is settled by
 /// [`settle_reservation_claim`] before that flight ends.
+#[allow(clippy::result_large_err)]
 fn claim_for_reservation(
     state: &ProxyState,
     kernel: &ChioKernel,
@@ -658,6 +660,7 @@ fn claim_for_reservation(
 }
 
 /// Release or retain a reservation's request-id claim from the kernel outcome.
+#[allow(clippy::result_large_err)]
 fn settle_reservation_claim(
     state: &ProxyState,
     request_claim: &RequestIdClaim,

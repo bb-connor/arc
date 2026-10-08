@@ -10,14 +10,15 @@ struct GateState {
     entered: bool,
 }
 
-/// Parks kernel revocation lookups for one capability until released.
-struct RevocationGate {
+/// Parks the kernel calls that pass through it for one capability until
+/// released.
+struct Gate {
     capability_id: String,
     state: StdMutex<GateState>,
     changed: Condvar,
 }
 
-impl RevocationGate {
+impl Gate {
     fn new(capability_id: &str) -> Arc<Self> {
         Arc::new(Self {
             capability_id: capability_id.to_owned(),
@@ -37,33 +38,55 @@ impl RevocationGate {
         self.changed.notify_all();
     }
 
+    fn pass(&self, capability_id: &str) {
+        if capability_id != self.capability_id {
+            return;
+        }
+        let mut state = self.state.lock().unwrap();
+        if state.closed {
+            state.entered = true;
+            self.changed.notify_all();
+            while state.closed {
+                state = self.changed.wait(state).unwrap();
+            }
+        }
+    }
+
     async fn wait_entered(&self) {
         let deadline = Instant::now() + Duration::from_secs(5);
         while !self.state.lock().unwrap().entered {
             assert!(
                 Instant::now() < deadline,
-                "the gated kernel call never reached its revocation lookup"
+                "the gated kernel call never reached its gate"
             );
             tokio::time::sleep(Duration::from_millis(5)).await;
         }
     }
 }
 
-impl chio_kernel::RevocationStore for RevocationGate {
-    fn is_revoked(
+/// A pre-invocation guard that parks one capability's evaluation.
+struct GatedGuard(Arc<Gate>);
+
+impl chio_kernel::Guard for GatedGuard {
+    fn name(&self) -> &str {
+        "test-gate"
+    }
+
+    fn evaluate(
         &self,
-        capability_id: &str,
-    ) -> Result<bool, chio_kernel::RevocationStoreError> {
-        if capability_id == self.capability_id {
-            let mut state = self.state.lock().unwrap();
-            if state.closed {
-                state.entered = true;
-                self.changed.notify_all();
-                while state.closed {
-                    state = self.changed.wait(state).unwrap();
-                }
-            }
-        }
+        ctx: &chio_kernel::GuardContext,
+    ) -> Result<chio_kernel::GuardDecision, chio_kernel::KernelError> {
+        self.0.pass(&ctx.request.capability.id);
+        Ok(chio_kernel::GuardDecision::allow())
+    }
+}
+
+/// A revocation store that parks one capability's lookup and revokes nothing.
+struct GatedRevocations(Arc<Gate>);
+
+impl chio_kernel::RevocationStore for GatedRevocations {
+    fn is_revoked(&self, capability_id: &str) -> Result<bool, chio_kernel::RevocationStoreError> {
+        self.0.pass(capability_id);
         Ok(false)
     }
 
@@ -72,18 +95,19 @@ impl chio_kernel::RevocationStore for RevocationGate {
     }
 }
 
-/// Install `gate` as the shared kernel's revocation store before serving.
-fn gated_state(
+/// Configure the fresh state's kernel before it serves anything.
+fn configured_state(
     signer: Keypair,
     budget: Arc<dyn BudgetStore>,
-    gate: &Arc<RevocationGate>,
+    configure: impl FnOnce(&mut ChioKernel),
 ) -> Arc<ProxyState> {
     let mut state = mediated_test_state(signer, budget, Vec::new());
-    Arc::get_mut(&mut state)
-        .and_then(|state| state.mediation_kernel.as_mut())
-        .and_then(Arc::get_mut)
-        .expect("a fresh state owns its kernel")
-        .set_revocation_store_handle(Arc::clone(gate) as Arc<dyn chio_kernel::RevocationStore>);
+    configure(
+        Arc::get_mut(&mut state)
+            .and_then(|state| state.mediation_kernel.as_mut())
+            .and_then(Arc::get_mut)
+            .expect("a fresh state owns its kernel"),
+    );
     state
 }
 
@@ -113,8 +137,9 @@ async fn mediated_slow_kernel_call_does_not_block_an_unrelated_reservation() {
     let issuer = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     let slow = issue_invocation_capability(&issuer, &agent, "cost-srv", "compute", 1);
     let fast = issue_invocation_capability(&issuer, &agent, "cost-srv", "compute", 1);
-    let gate = RevocationGate::new(&slow.id);
-    let state = gated_state(signer, budget, &gate);
+    let gate = Gate::new(&slow.id);
+    let guard = GatedGuard(Arc::clone(&gate));
+    let state = configured_state(signer, budget, |kernel| kernel.add_guard(Box::new(guard)));
     gate.close();
 
     let parked = spawn_evaluate(&state, reserve_body(&slow, "slow-call"));
@@ -127,7 +152,10 @@ async fn mediated_slow_kernel_call_does_not_block_an_unrelated_reservation() {
     .expect("an unrelated reservation must not wait for a parked kernel call");
     assert_eq!(status, StatusCode::OK, "{reply}");
     assert_eq!(reply["status"], "reserved", "{reply}");
-    assert!(!parked.is_finished(), "the slow kernel call is still parked");
+    assert!(
+        !parked.is_finished(),
+        "the slow kernel call is still parked"
+    );
 
     gate.release();
     let (status, reply) = parked.await.unwrap();
@@ -149,7 +177,12 @@ async fn mediated_concurrent_reservations_admit_exactly_the_invocation_budget() 
     let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
 
     let calls: Vec<_> = (0..CALLERS)
-        .map(|caller| spawn_evaluate(&state, reserve_body(&capability, &format!("caller-{caller}"))))
+        .map(|caller| {
+            spawn_evaluate(
+                &state,
+                reserve_body(&capability, &format!("caller-{caller}")),
+            )
+        })
         .collect();
     let mut reserved = 0;
     let mut denied = 0;
@@ -184,8 +217,12 @@ async fn mediated_same_request_id_waits_for_its_in_flight_owner() {
     let issuer = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     let gated = issue_invocation_capability(&issuer, &agent, "cost-srv", "compute", 1);
     let fresh = issue_invocation_capability(&issuer, &agent, "cost-srv", "compute", 1);
-    let gate = RevocationGate::new(&gated.id);
-    let state = gated_state(signer, Arc::clone(&budget), &gate);
+    let gate = Gate::new(&gated.id);
+    let revocations: Arc<dyn chio_kernel::RevocationStore> =
+        Arc::new(GatedRevocations(Arc::clone(&gate)));
+    let state = configured_state(signer, Arc::clone(&budget), |kernel| {
+        kernel.set_revocation_store_handle(revocations)
+    });
     gate.close();
 
     // The id's first owner is parked in the kernel's revocation lookup and is

@@ -217,6 +217,7 @@ pub(crate) struct SubmitApprovalResponse {
     trusted_approvers: Vec<String>,
 }
 
+#[allow(clippy::result_large_err)]
 pub(crate) async fn submit_approval_handler(
     State(state): State<Arc<ProxyState>>,
     request: Request<Body>,
@@ -266,6 +267,7 @@ pub(crate) async fn submit_approval_handler(
 
 /// Bind the exact invocation intent on the shared kernel and retain the pending
 /// approval. Runs on the blocking pool.
+#[allow(clippy::result_large_err)]
 fn retain_submitted_approval(
     state: &ProxyState,
     kernel: &chio_kernel::ChioKernel,
@@ -292,9 +294,11 @@ fn retain_submitted_approval(
         federated_origin_kernel_id: None,
         declassification_grant: None,
     };
-    let intent = kernel.bind_tool_approval_intent(&request).map_err(|error| {
-        approval_error_response(ApprovalHandlerError::Rejected(error.to_string()))
-    })?;
+    let intent = kernel
+        .bind_tool_approval_intent(&request)
+        .map_err(|error| {
+            approval_error_response(ApprovalHandlerError::Rejected(error.to_string()))
+        })?;
     let now = state.clock.seconds().map_err(clock::rejection)?;
     let ttl = if body.ttl_seconds == 0 {
         3600
@@ -369,10 +373,9 @@ async fn require_current_approver(
         .await?
     }
     .ok_or_else(|| ApprovalHandlerError::NotFound(approval_id.into()))?;
-    let kernel = state
-        .mediation_kernel
-        .as_ref()
-        .ok_or_else(|| ApprovalHandlerError::Rejected("approval admission is unavailable".into()))?;
+    let kernel = state.mediation_kernel.as_ref().ok_or_else(|| {
+        ApprovalHandlerError::Rejected("approval admission is unavailable".into())
+    })?;
     let context = pending
         .governed_intent
         .as_ref()
