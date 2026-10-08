@@ -273,3 +273,28 @@ fn corrupt_duplicate_hold_index_never_selects_the_first_valid_original() -> Test
     );
     Ok(())
 }
+
+#[test]
+fn oversized_hold_operation_index_refuses_without_an_original_result() -> TestResult {
+    let fixture = CompletedOriginal::new()?;
+    // Corruption injection: a physical selector ID exceeds the512-byte
+    // persisted identifier bound; the signed original and hold remain intact.
+    let connection = rusqlite::Connection::open(&fixture.store.database)?;
+    assert_eq!(
+        connection.execute(
+            "UPDATE budget_authorization_holds SET operation_id = ?1 WHERE operation_id = ?2",
+            rusqlite::params!["x".repeat(513), fixture.operation.as_str()],
+        )?,
+        1
+    );
+    assert!(matches!(
+        fixture.select(&fixture.digest),
+        Err(chio_kernel::admission_operation::AdmissionOperationStoreError::Invariant(_))
+    ));
+    assert_eq!(fixture.broker.pending_dispatches()?, 0);
+    assert_eq!(
+        request_operations(&fixture.store.database, REQUEST_ID)?,
+        vec![fixture.operation.as_str().to_owned()]
+    );
+    Ok(())
+}
