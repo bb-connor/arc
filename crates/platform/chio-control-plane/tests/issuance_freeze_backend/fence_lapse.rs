@@ -656,7 +656,7 @@ pub(super) fn claim_automatic_preparation(
         | AutomaticResponsePreparationClaimOutcome::Existing(claimed) => claimed,
     };
     assert!(
-        claimed == binding,
+        claimed.as_ref() == &binding,
         "the store claimed a different automatic preparation"
     );
 }
