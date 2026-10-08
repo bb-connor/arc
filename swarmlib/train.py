@@ -3,13 +3,21 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Callable
 
-from . import gitio
+from . import build, ci, claims, clock, gitio, items, msgs
+from .store import Store, SwarmError
 
 PACKAGE_NAME = re.compile(r'^\s*name\s*=\s*"([^"]+)"')
+TRAIN_ROLES = ("integrator", "conductor")
+SEVERITY_ORDER = {s: i for i, s in enumerate(items.SEVERITIES)}
+EXCERPT_CHARS = 4000
+
+Runner = Callable[[list[str], Path, Path], tuple[int, str]]  # (command, cwd, log path) -> (exit code, output)
 
 
 @dataclass
@@ -128,3 +136,158 @@ def compose(repo: Path, workdir: Path, base: str, lanes: list[Lane], *, repo_url
         lane.conflict = gitio.out(workdir, "diff", "--name-only", "--diff-filter=U").split() or ["(merge failed)"]
         gitio.run(workdir, "merge", "--abort", check=False)
     return base_sha
+
+
+@dataclass
+class TrainResult:
+    train_id: str
+    base: str = ""
+    landed: str = ""
+    green: list[str] = field(default_factory=list)
+    red: list[str] = field(default_factory=list)
+    conflicted: list[str] = field(default_factory=list)
+    loose: list[str] = field(default_factory=list)
+    note: str = ""
+
+
+def slot_runner(command: list[str], cwd: Path, log: Path) -> tuple[int, str]:
+    """Run one train command in an integrator build slot, capturing its output."""
+    code = build.run(command, item="train", build_class="integrator", cwd=cwd, log_path=log)
+    return code, log.read_text(errors="replace")
+
+
+def train_commands(crates: list[str]) -> list[tuple[str, list[str]]]:
+    commands = [("check", ["cargo", "check", "--workspace", "--all-targets", "--message-format=json"])]
+    if crates:
+        packages = [arg for crate in crates for arg in ("-p", crate)]
+        commands.append(("clippy", ["cargo", "clippy", "--all-targets", "--message-format=json", *packages,
+                                    "--", "-D", "warnings"]))
+        commands += [(f"test:{crate}", ["cargo", "test", "-p", crate]) for crate in crates]
+    return commands
+
+
+def candidates(store: Store, max_lanes: int) -> list[items.Item]:
+    everything, _ = items.all_items(store)
+    chosen = [i for i in everything if i.status in ("submitted", "ready") and i.meta["branch"]]
+    chosen.sort(key=lambda i: (SEVERITY_ORDER.get(i.meta["severity"], 9), i.meta["wave"], i.id))
+    return chosen[:max_lanes]
+
+
+def _excerpt(texts: list[str]) -> str:
+    joined = "\n\n".join(texts)
+    return joined if len(joined) <= EXCERPT_CHARS else joined[:EXCERPT_CHARS] + "\n..."
+
+
+def _tail(output: str, lines: int = 40) -> str:
+    return "\n".join(output.splitlines()[-lines:])
+
+
+def _move(store: Store, item: items.Item, new_status: str, note: str) -> None:
+    items.check_transition(store, item, new_status)
+    old = item.status
+    item.meta["status"] = new_status
+    item.log(store.agent, f"status {old} -> {new_status}: {note}")
+    if new_status in items.CLOSED:
+        claims.remove(store, item.id)
+
+
+def _record(store: Store, result: TrainResult, lanes: list[Lane], per_lane: dict[str, list[str]], logs: Path) -> None:
+    def mutate() -> bool:
+        now = clock.fmt(clock.now())
+        for lane in lanes:
+            item = items.load(store, lane.item_id)
+            if item.status not in ("submitted", "ready"):
+                continue  # moved while the train ran; leave it alone
+            evidence = {"kind": "check-train", "train": result.train_id, "base": result.base[:12], "at": now,
+                        "logs": str(logs)}
+            if not lane.merged or lane.item_id in per_lane:
+                if lane.merged:
+                    evidence["result"], text = "red", _excerpt(per_lane[lane.item_id])
+                else:
+                    evidence["result"] = "conflict"
+                    text = "Does not merge onto the train base or earlier lanes:\n" + "\n".join(f"- {p}" for p in lane.conflict)
+                item.add_section(f"Check train {result.train_id}", text)
+                _move(store, item, "in-progress", f"check train {result.train_id}: {evidence['result']}")
+                if store.path("agents", f"{lane.owner}.md").exists():
+                    msgs.write(store, lane.owner, "verdict", item.id, f"{item.id} failed check train {result.train_id}",
+                               text[:1500])
+            elif result.loose:
+                evidence["result"] = "unattributed"
+                item.log(store.agent, f"check train {result.train_id}: failures could not be attributed; no change")
+            elif result.landed:
+                evidence["result"] = "landed"
+                _move(store, item, "integrated", f"landed in train {result.train_id} at {result.landed[:12]}")
+            else:
+                evidence["result"] = "green"
+                if item.status == "submitted":
+                    _move(store, item, "ready", f"green in check train {result.train_id}")
+                else:
+                    item.log(store.agent, f"green again in check train {result.train_id}")
+            item.meta["evidence"].append(evidence)
+            items.save(store, item)
+        if result.loose:
+            msgs.write(store, "conductor", "blocker", "", f"check train {result.train_id} could not attribute failures",
+                       "\n".join(result.loose)[:3000])
+        return True
+
+    store.transact(f"check train {result.train_id}", mutate)
+
+
+def run_train(
+    store: Store, *, repo: Path, lanes_dir: Path, repo_url: str, runner: Runner = slot_runner, land: bool = False,
+    ci_runner: ci.Runner | None = None, max_lanes: int | None = None,
+) -> TrainResult:
+    """Compose every submitted or ready lane onto the base, verify once, attribute, and optionally land."""
+    if store.role not in TRAIN_ROLES:
+        raise SwarmError("only the integrator or the conductor runs check trains")
+    if land and store.role != "integrator":
+        raise SwarmError("only the integrator lands a train; run without --land to check")
+    store.sync()
+    config = store.config()
+    base = config["base_branch"]
+    chosen = candidates(store, max_lanes or config["train_max_lanes"])
+    result = TrainResult(train_id=f"T{clock.stamp()}")
+    if not chosen:
+        result.note = "nothing submitted"
+        return result
+    lanes = [Lane(i.id, i.meta["branch"], i.meta["owner"]) for i in chosen]
+    workdir = lanes_dir / f"train-{result.train_id}"
+    logs = Path(os.environ.get("SWARM_LOG_DIR", str(Path.home() / ".swarm-logs"))).expanduser() / "trains" / result.train_id
+    lanes_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        result.base = compose(repo, workdir, base, lanes, repo_url=repo_url, identity=store.agent)
+        gitio.run(workdir, "config", "--worktree", "core.hooksPath", str(store.path("hooks")))
+        merged = [lane for lane in lanes if lane.merged]
+        crates = sorted(set().union(*(lane_crates(workdir, lane) for lane in merged))) if merged else []
+        diags: list[tuple[str, str]] = []
+        crate_failures: dict[str, str] = {}
+        for name, command in train_commands(crates) if merged else []:
+            log = logs / f"{name.replace(':', '-')}.log"
+            code, output = runner(command, workdir, log)
+            if name.startswith("test:"):
+                if code != 0:
+                    crate_failures[name[5:]] = _tail(output)
+                continue
+            found = diagnostics(output, workdir)
+            diags += found
+            if code != 0 and not found:
+                result.loose.append(f"{name} failed with no diagnostics; see {log}")
+        per_lane, loose = attribute(lanes, workdir, diags, crate_failures)
+        result.loose += loose
+        result.red = sorted(per_lane)
+        result.green = [lane.item_id for lane in merged if lane.item_id not in per_lane]
+        result.conflicted = [lane.item_id for lane in lanes if not lane.merged]
+        if land and result.green and not result.red and not result.loose:
+            if ci_runner is not None and ci.busy(ci_runner, base):
+                result.note = "CI is running on the base branch; landing deferred"
+            else:
+                pushed = gitio.run(workdir, *gitio.auth_args(), "push", "--quiet", repo_url, f"HEAD:refs/heads/{base}",
+                                   check=False)
+                if pushed.returncode == 0:
+                    result.landed = gitio.out(workdir, "rev-parse", "HEAD")
+                else:
+                    result.note = f"push refused (base moved?): {pushed.stderr.strip()[:200]}"
+        _record(store, result, lanes, per_lane, logs)
+    finally:
+        gitio.run(repo, "worktree", "remove", "--force", str(workdir), check=False)
+    return result

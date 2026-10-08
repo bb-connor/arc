@@ -249,3 +249,13 @@ class HostSettingsTest(SwarmCase):
             self.assertEqual(env["CARGO_BUILD_JOBS"], "3")
             with mock.patch.dict(os.environ, {"SWARM_BUILD_JOBS": "4"}):
                 self.assertEqual(build.build_env({})["CARGO_BUILD_JOBS"], "4")
+
+
+class RunCaptureTest(SwarmCase):
+    def test_run_in_a_directory_capturing_output_to_a_log(self):
+        log = self.tmp / "logs" / "check.log"
+        with mock.patch.dict(os.environ, {"SWARM_BUILD_CGROUP": "0", "SWARM_BUILD_DISK_FLOOR_GB": "0"}):
+            code = build.run(["sh", "-c", "pwd; echo built; exit 3"], item="T1", build_class="integrator",
+                             cwd=self.tmp, log_path=log)
+        self.assertEqual(code, 3)
+        self.assertEqual(log.read_text().split(), [str(self.tmp.resolve()), "built"])

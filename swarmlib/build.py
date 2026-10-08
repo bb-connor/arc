@@ -122,16 +122,26 @@ def record_wait(slot: int, waited: float, item: str, build_class: str = "coder")
         log.write(json.dumps(entry) + "\n")
 
 
-def run(command: list[str], *, item: str = "", build_class: str = "coder") -> int:
+def run(
+    command: list[str], *, item: str = "", build_class: str = "coder", cwd: Path | None = None,
+    log_path: Path | None = None,
+) -> int:
+    """Run `command` in a slot. With `log_path`, stdout and stderr go to that file."""
     if not command:
         raise ValueError("swarm build needs a command after --")
     if build_class not in CLASSES:
         raise BuildRefused(f"build class must be one of {', '.join(CLASSES)}")
-    check_disk(Path.cwd())
+    check_disk(cwd or Path.cwd())
     fd, slot, waited = acquire(slots_for(build_class, slot_count()))
     record_wait(slot, waited, item, build_class)
     try:
-        return subprocess.call(scope_prefix(build_class) + command, env=build_env(dict(os.environ)))
+        full = scope_prefix(build_class) + command
+        env = build_env(dict(os.environ))
+        if log_path is None:
+            return subprocess.call(full, cwd=cwd, env=env)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(log_path, "w") as log:
+            return subprocess.call(full, cwd=cwd, env=env, stdout=log, stderr=subprocess.STDOUT)
     finally:
         release(fd)
 
