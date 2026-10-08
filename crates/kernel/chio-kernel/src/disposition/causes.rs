@@ -21,6 +21,7 @@ use crate::receipt_store::{
     AdmissionBudgetAuthorizationError, AdmissionPaymentJournalError, ReceiptStoreError,
 };
 use crate::revocation_store::RevocationStoreError;
+use crate::security_admission_operation::AdmissionOperationError as SecurityAdmissionOperationError;
 use crate::supplemental_quota::SupplementalQuotaError;
 use crate::tool_outcome::{ToolOutcomeError, ToolOutcomeStoreError};
 
@@ -113,6 +114,20 @@ impl AdmissionRecoveryPortError {
                 }
                 RemoteRecoveryFailureKind::NotFound => Disposition::Quarantine,
             },
+        }
+    }
+}
+
+impl SecurityAdmissionOperationError {
+    /// How a loop, worker or endpoint handles this failure. A conflict is a
+    /// request or binding already owned by another operation.
+    #[must_use]
+    pub fn disposition(&self) -> Disposition {
+        match self {
+            Self::Unavailable(_) => Disposition::Retry,
+            Self::Clock(_) | Self::Overflow(_) => Disposition::Fatal,
+            Self::UntrustedInput(_) | Self::Conflict(_) => Disposition::Deny,
+            Self::Invalid(_) => Disposition::Quarantine,
         }
     }
 }
@@ -490,6 +505,26 @@ mod tests {
             }
             .disposition(),
             Disposition::Deny
+        );
+    }
+
+    #[test]
+    fn security_operation_store_outages_retry_and_conflicts_deny() {
+        assert_eq!(
+            SecurityAdmissionOperationError::Unavailable("down".into()).disposition(),
+            Disposition::Retry
+        );
+        assert_eq!(
+            SecurityAdmissionOperationError::Conflict("owned".into()).disposition(),
+            Disposition::Deny
+        );
+        assert_eq!(
+            SecurityAdmissionOperationError::Invalid("state".into()).disposition(),
+            Disposition::Quarantine
+        );
+        assert_eq!(
+            SecurityAdmissionOperationError::Overflow("version".into()).disposition(),
+            Disposition::Fatal
         );
     }
 

@@ -922,12 +922,7 @@ impl From<crate::admission_operation::AdmissionOperationError> for KernelError {
 
 impl From<crate::security_admission_operation::AdmissionOperationError> for KernelError {
     fn from(error: crate::security_admission_operation::AdmissionOperationError) -> Self {
-        match error {
-            crate::security_admission_operation::AdmissionOperationError::Conflict(reason) => {
-                Self::Internal(format!("security admission operation conflicted: {reason}"))
-            }
-            error => Self::Internal(format!("security admission operation failed: {error}")),
-        }
+        Self::from(ActiveResponseError::from(error))
     }
 }
 

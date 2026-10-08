@@ -783,12 +783,8 @@ fn publication_stops_at_a_fatal_compensation_inventory_failure() -> TestResult {
         .store(true, Ordering::SeqCst);
 
     let result = harness.publish();
-    let expected = format!(
-        "security admission operation failed: {}",
-        AdmissionOperationError::Unavailable("injected compensation inventory failure".into())
-    );
     assert!(
-        matches!(&result, Err(KernelError::Internal(detail)) if *detail == expected),
+        is_operation_store_outage(&result, "injected compensation inventory failure"),
         "{result:?}"
     );
     assert_eq!(harness.operations.candidate_pages.load(Ordering::SeqCst), 0);
@@ -1061,12 +1057,8 @@ fn publication_stops_at_a_fatal_terminal_receipt_inventory_failure() -> TestResu
         .store(true, Ordering::SeqCst);
 
     let result = harness.publish();
-    let expected = format!(
-        "security admission operation failed: {}",
-        AdmissionOperationError::Unavailable("injected terminal receipt inventory failure".into())
-    );
     assert!(
-        matches!(&result, Err(KernelError::Internal(detail)) if *detail == expected),
+        is_operation_store_outage(&result, "injected terminal receipt inventory failure"),
         "{result:?}"
     );
     assert_eq!(harness.operations.candidate_pages.load(Ordering::SeqCst), 0);
@@ -1097,12 +1089,8 @@ fn publication_keeps_a_receipt_inventory_fault_fatal_beside_a_busy_lease() -> Te
         .store(true, Ordering::SeqCst);
 
     let result = harness.publish();
-    let expected = format!(
-        "security admission operation failed: {}",
-        AdmissionOperationError::Unavailable("injected terminal receipt inventory failure".into())
-    );
     assert!(
-        matches!(&result, Err(KernelError::Internal(detail)) if *detail == expected),
+        is_operation_store_outage(&result, "injected terminal receipt inventory failure"),
         "{result:?}"
     );
     assert_eq!(harness.operations.candidate_pages.load(Ordering::SeqCst), 0);
@@ -1117,6 +1105,16 @@ fn publication_keeps_a_receipt_inventory_fault_fatal_beside_a_busy_lease() -> Te
         unpublished
     );
     Ok(())
+}
+
+/// The security admission operation store reported exactly this outage.
+fn is_operation_store_outage<T>(result: &Result<T, KernelError>, detail: &str) -> bool {
+    matches!(
+        result.as_ref().map_err(KernelError::active_response_failure),
+        Err(Some(crate::ActiveResponseError::Operation(
+            AdmissionOperationError::Unavailable(reported)
+        ))) if reported == detail
+    )
 }
 
 /// The pass reports unfinished outboxes whose first failure is the exact

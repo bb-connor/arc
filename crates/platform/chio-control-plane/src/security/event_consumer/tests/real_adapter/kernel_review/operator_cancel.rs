@@ -680,8 +680,12 @@ fn operator_cancel_propagates_a_reconciliation_store_failure_without_compensatin
         "cancellation did not attempt reconciliation"
     );
     assert!(
-        matches!(&failed, Err(chio_kernel::KernelError::Internal(reason))
-            if reason.contains("injected dispatch commitment CAS failure")),
+        matches!(
+            failed.as_ref().map_err(chio_kernel::KernelError::active_response_failure),
+            Err(Some(chio_kernel::ActiveResponseError::Operation(
+                AdmissionOperationError::Unavailable(reason)
+            ))) if reason == "injected dispatch commitment CAS failure"
+        ),
         "{failed:?}"
     );
     assert_committed_window_retained(&fixture, &id, &operation, &approval);
@@ -866,8 +870,12 @@ fn committed_threshold_approval_retry_propagates_a_reconciliation_store_failure(
         "the retry did not attempt reconciliation"
     );
     assert!(
-        matches!(&failed, Err(chio_kernel::KernelError::Internal(reason))
-            if reason.contains("injected dispatch commitment CAS failure")),
+        matches!(
+            failed.as_ref().map_err(chio_kernel::KernelError::active_response_failure),
+            Err(Some(chio_kernel::ActiveResponseError::Operation(
+                AdmissionOperationError::Unavailable(reason)
+            ))) if reason == "injected dispatch commitment CAS failure"
+        ),
         "{failed:?}"
     );
     assert_committed_window_retained(&fixture, &id, &operation, &approval);

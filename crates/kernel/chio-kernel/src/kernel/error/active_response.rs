@@ -8,6 +8,7 @@
 
 use super::{AdmissionReason, KernelError};
 use crate::disposition::Disposition;
+use crate::security_admission_operation::AdmissionOperationError as SecurityAdmissionOperationError;
 
 /// A governed active-response failure with its typed cause.
 #[derive(Debug, thiserror::Error)]
@@ -40,6 +41,13 @@ pub enum ActiveResponseError {
     /// A store or authority the step needs is not installed.
     #[error("{0}")]
     Unsupported(&'static str),
+    /// The security admission operation store failed.
+    #[error("security admission operation failed: {0}")]
+    Operation(#[source] SecurityAdmissionOperationError),
+    /// The security admission operation store refused a request or binding
+    /// already owned by another operation.
+    #[error("security admission operation conflicted: {0}")]
+    OperationConflict(String),
     /// A cause with no classification of its own.
     #[error("{0}")]
     Dependency(#[source] Box<dyn std::error::Error + Send + Sync>),
@@ -57,7 +65,8 @@ impl ActiveResponseError {
     #[must_use]
     pub fn disposition(&self) -> Disposition {
         match self {
-            Self::Refused(_) => Disposition::Deny,
+            Self::Refused(_) | Self::OperationConflict(_) => Disposition::Deny,
+            Self::Operation(error) => error.disposition(),
             Self::Pending(_) | Self::Unfinished { .. } => Disposition::Retry,
             Self::Record(_) => Disposition::Quarantine,
             Self::Invariant(_) | Self::Unsupported(_) | Self::Dependency(_) => Disposition::Fatal,
@@ -71,6 +80,15 @@ impl ActiveResponseError {
         match self {
             Self::Context { source, .. } => source.root(),
             error => error,
+        }
+    }
+}
+
+impl From<SecurityAdmissionOperationError> for ActiveResponseError {
+    fn from(error: SecurityAdmissionOperationError) -> Self {
+        match error {
+            SecurityAdmissionOperationError::Conflict(reason) => Self::OperationConflict(reason),
+            error => Self::Operation(error),
         }
     }
 }
@@ -160,6 +178,34 @@ mod tests {
         assert_reads_as_internal(
             KernelError::active_response_in("approval lookup failed", std::fmt::Error),
             &format!("approval lookup failed: {}", std::fmt::Error),
+        );
+    }
+
+    #[test]
+    fn security_operation_errors_convert_to_typed_causes_with_unchanged_text() {
+        let failed = SecurityAdmissionOperationError::Unavailable("store down".into());
+        let reason = format!("security admission operation failed: {failed}");
+        let converted = KernelError::from(failed);
+        assert!(matches!(
+            converted.active_response_failure(),
+            Some(ActiveResponseError::Operation(
+                SecurityAdmissionOperationError::Unavailable(detail)
+            )) if detail == "store down"
+        ));
+        assert_eq!(converted.disposition(), Disposition::Retry);
+        assert_reads_as_internal(converted, &reason);
+
+        let conflicted = KernelError::from(SecurityAdmissionOperationError::Conflict(
+            "request_id is owned".into(),
+        ));
+        assert!(matches!(
+            conflicted.active_response_failure(),
+            Some(ActiveResponseError::OperationConflict(reason)) if reason == "request_id is owned"
+        ));
+        assert_eq!(conflicted.disposition(), Disposition::Deny);
+        assert_reads_as_internal(
+            conflicted,
+            "security admission operation conflicted: request_id is owned",
         );
     }
 

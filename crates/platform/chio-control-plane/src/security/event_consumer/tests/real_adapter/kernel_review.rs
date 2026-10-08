@@ -212,13 +212,19 @@ fn transient_anchor_read_cannot_compensate_an_existing_preparation() {
         .test_unwrap()
         .test_unwrap();
     fault.store(true, Ordering::Release);
-    assert!(matches!(
-        fixture
-            .runtime
-            .kernel
-            .prepare_active_response_admission(fixture.native_request()),
-        Err(chio_kernel::KernelError::Internal(_))
-    ));
+    let failed = fixture
+        .runtime
+        .kernel
+        .prepare_active_response_admission(fixture.native_request());
+    assert!(
+        matches!(
+            failed.as_ref().map_err(chio_kernel::KernelError::active_response_failure),
+            Err(Some(chio_kernel::ActiveResponseError::Operation(
+                AdmissionOperationError::Unavailable(reason)
+            ))) if reason == "injected anchor read failure"
+        ),
+        "{failed:?}"
+    );
     assert_retry_preserved(&fixture, &prepared, &operation, &approvals);
 }
 
