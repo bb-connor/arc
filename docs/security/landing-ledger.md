@@ -4,7 +4,7 @@
 
 The [current local repair checkpoint](audits/repair-batch-local-checkpoint-20261008.json) retains 31 exact-source campaigns. Bounded recovery/FX, correlation, overlay rollback, broker selection and runner lifetime repairs have passing local evidence; the whole runner module passes 34 cases. Remote MCP has 191 passes and one new nonce-fixture failure with a test-only correction awaiting recheck. The 16-call participant-history test passes without losing prior custody, while actual production native performance remains unqualified.
 
-Effect plan binding and shared-base composition are integrated. The next regression capture demonstrates missing-authority, removal-finality, same-lineage freeze and a distinct historical capability-set query issue. Their repairs and acceptance remain tracked individually. The ledger now adds EF-REPLAY and preserves all 1,792 previous requirement rows unchanged. Full owning/strict/default/PQ/platform/cold/trusted/hosted qualification and protected landing remain open; no local repair batch has been pushed or merged.
+Effect plan binding and shared-base composition are integrated. The latest regression capture reproduced missing-authority, removal-finality, same-lineage freeze and a distinct historical capability-set query issue. Their repairs and acceptance remain tracked individually. The ledger now adds EF-REPLAY and preserves all 1,792 previous requirement rows unchanged. Full owning/strict/default/PQ/platform/cold/trusted/hosted qualification and protected landing remain open; no local repair batch has been pushed or merged.
 
 Earlier checkpoints below retain their original source and outcomes.
 
