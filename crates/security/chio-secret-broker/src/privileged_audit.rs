@@ -53,6 +53,8 @@ use crate::authority_ipc::{
 };
 use crate::protocol::{BrokerExecuteRequest, MAX_BODY_BYTES, MAX_WIRE_BYTES};
 use crate::provision::AdminAuthorization;
+#[cfg(unix)]
+use crate::BrokerFaultDisposition;
 use crate::{validate_digest, validate_identifier, BrokerError, Result};
 
 #[path = "privileged_audit/audit_input_error.rs"]
@@ -746,23 +748,16 @@ impl BrokerPrivilegedAuditEndpoint {
         // must never take down normal tool traffic.
         let outcome = match accepted.and_then(|stream| self.serve_stream(stream)) {
             Ok(()) => BrokerPrivilegedAuditServeOutcome::EvidenceWritten,
-            Err(error) if error.is_service_fault() => return Err(error),
-            Err(error)
-                if matches!(
-                    &error,
-                    BrokerError::UntrustedInput(_)
-                        | BrokerError::AuditInput(_)
-                        | BrokerError::InvalidRequest(_)
-                        | BrokerError::AuthorizationDenied(_)
-                        | BrokerError::Conflict(_)
-                ) =>
-            {
-                BrokerPrivilegedAuditServeOutcome::ClientFault {
+            Err(error) => match error.disposition() {
+                BrokerFaultDisposition::Fatal => return Err(error),
+                BrokerFaultDisposition::Reject => BrokerPrivilegedAuditServeOutcome::ClientFault {
                     diagnostic_code: error.diagnostic_code(),
+                },
+                BrokerFaultDisposition::Deny | BrokerFaultDisposition::Retry => {
+                    BrokerPrivilegedAuditServeOutcome::SessionFailed {
+                        diagnostic_code: error.diagnostic_code(),
+                    }
                 }
-            }
-            Err(error) => BrokerPrivilegedAuditServeOutcome::SessionFailed {
-                diagnostic_code: error.diagnostic_code(),
             },
         };
         Ok(Some(outcome))

@@ -11,6 +11,11 @@ impl CredentialStoreError {
     pub(super) fn new(source: BlobStoreError) -> Self {
         Self { source }
     }
+
+    #[cfg(test)]
+    pub(crate) fn for_test(source: BlobStoreError) -> Self {
+        Self::new(source)
+    }
 }
 
 impl fmt::Debug for CredentialStoreError {
