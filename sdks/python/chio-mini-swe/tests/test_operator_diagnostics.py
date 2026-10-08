@@ -1,6 +1,5 @@
 import importlib.util
 import json
-import os
 import stat
 import subprocess
 import sys
@@ -242,7 +241,9 @@ def test_native_capture_markers_require_complete_fixed_host_lines(qualifier):
         ("budget_mutation", "sqlite"),
         ("admission_advance", "unavailable"),
     ):
-        typed_marker = marker.replace("commit_runtime_expired", stage).replace("invariant", category)
+        typed_marker = marker.replace("commit_runtime_expired", stage).replace(
+            "invariant", category
+        )
         assert qualifier.native_capture_failures(typed_marker) == [
             {"stage": stage, "category": category}
         ]
@@ -339,12 +340,18 @@ def test_native_capture_fixed_marker_survives_captured_host_stderr_privately(qua
         "WARN chio::native_capture message=native capture refused "
         "native_capture_stage=commit_nonce_expired native_capture_category=invariant\n"
     )
-    script = "import os; os.write(2," + repr((secret + "\n" + marker).encode()) + "); raise SystemExit(1)"
+    script = (
+        "import os; os.write(2,"
+        + repr((secret + "\n" + marker).encode())
+        + "); raise SystemExit(1)"
+    )
     child = subprocess.run([sys.executable, "-c", script], capture_output=True, check=False)
     assert child.returncode == 1 and marker.encode() in child.stderr
     output = tmp_path / "output"
     output.mkdir()
-    failure = subprocess.CalledProcessError(1, ["native-host"], output=child.stdout, stderr=child.stderr)
+    failure = subprocess.CalledProcessError(
+        1, ["native-host"], output=child.stdout, stderr=child.stderr
+    )
     qualifier.save_failure_diagnostics(tmp_path, output, failure)
     private = tmp_path / "native-capture-failures.json"
     assert private.is_file(), "fixed physical capture marker was discarded before private export"
@@ -361,7 +368,9 @@ def test_native_capture_fixed_marker_survives_captured_host_stderr_privately(qua
 
 
 @pytest.mark.parametrize("symlink", [False, True])
-def test_native_capture_private_export_refusal_preserves_original_report(qualifier, tmp_path, symlink):
+def test_native_capture_private_export_refusal_preserves_original_report(
+    qualifier, tmp_path, symlink
+):
     retained = tmp_path / "retained-private"
     retained.write_bytes(b"preserved-private-custody")
     private = tmp_path / "native-capture-failures.json"
@@ -383,5 +392,195 @@ def test_native_capture_private_export_refusal_preserves_original_report(qualifi
     diagnostic = json.loads((output / "operator-failure.json").read_text())
     assert diagnostic["returncode"] == 1 and diagnostic["timed_out"] is False
     assert diagnostic["host_failure_classes"] == [
-        "native_capture_artifact_unavailable", "native_capture_commit_runtime_expired"
+        "native_capture_artifact_unavailable",
+        "native_capture_commit_runtime_expired",
+    ]
+
+
+# Exact lines from the production redaction formatter (chio-cli dispatch tests).
+PHASE_REFUSAL = (
+    "WARN chio::native_capture message=native capture refused "
+    "native_capture_stage={stage} native_capture_category={category}{phase}\n"
+)
+PROFILE_LINE = (
+    "WARN chio::native_capture_profile message=native capture profile "
+    "native_capture_outcome={outcome} native_capture_timeline={timeline} "
+    "native_capture_stages={stages}\n"
+)
+ENTRY_TIMELINE = (
+    "valid_until:10000,retain_decision:8366,retain_entry:9142,capture_decision:9600,"
+    "capture_entry:10003"
+)
+ENTRY_STAGES = "store_callback:12/11,native_evidence:812345/790001,policy_expired:3/3"
+
+
+def refusal_line(stage, category, phase=None):
+    suffix = " native_capture_phase=" + phase if phase else ""
+    return PHASE_REFUSAL.format(stage=stage, category=category, phase=suffix)
+
+
+def profile_line(outcome="refused", timeline=ENTRY_TIMELINE, stages=ENTRY_STAGES):
+    return PROFILE_LINE.format(outcome=outcome, timeline=timeline, stages=stages)
+
+
+ENTRY_PROFILE = {
+    "outcome": "refused",
+    "timeline": {
+        "valid_until": 10000,
+        "retain_decision": 8366,
+        "retain_entry": 9142,
+        "capture_decision": 9600,
+        "capture_entry": 10003,
+    },
+    "stages": [
+        {"stage": "store_callback", "wall_us": 12, "cpu_us": 11},
+        {"stage": "native_evidence", "wall_us": 812345, "cpu_us": 790001},
+        {"stage": "policy_expired", "wall_us": 3, "cpu_us": 3},
+    ],
+}
+
+
+def test_native_capture_phase_and_profile_lines_keep_only_fixed_values(qualifier):
+    for phase in ("capture_entry", "caller_interval", "commit_state", "commit_time"):
+        assert qualifier.native_capture_failures(
+            refusal_line("policy_expired", "invariant", phase)
+        ) == [{"stage": "policy_expired", "category": "invariant", "phase": phase}]
+    assert qualifier.native_capture_profiles(profile_line().encode()) == [ENTRY_PROFILE]
+    assert qualifier.native_capture_profiles(
+        profile_line("captured", "none", "store_callback:0/0")
+    ) == [
+        {
+            "outcome": "captured",
+            "timeline": {},
+            "stages": [{"stage": "store_callback", "wall_us": 0, "cpu_us": 0}],
+        }
+    ]
+    line = refusal_line("policy_expired", "invariant", "capture_entry")
+    for rejected in (
+        refusal_line("policy_expired", "invariant", "private-request-id"),
+        refusal_line("policy_expired", "invariant", "commit"),
+        line[:-1],
+        line[:-1] + " private=credential\n",
+        "worker prefix " + line,
+    ):
+        assert qualifier.native_capture_failures(rejected) == [], rejected
+        assert qualifier.failure_classes(rejected, host=True) == [], rejected
+    for rejected in (
+        profile_line(outcome="private-credential"),
+        profile_line(timeline="valid_until:10000,private_request:5"),
+        profile_line(timeline="retain_entry:5,retain_decision:4"),
+        profile_line(timeline="valid_until:1,valid_until:2"),
+        profile_line(timeline="valid_until:4294967296"),
+        profile_line(timeline="valid_until:12345678901"),
+        profile_line(stages="private_request_id:1/1"),
+        profile_line(stages="store_callback:1"),
+        profile_line(stages="store_callback:4294967296/0"),
+        profile_line(stages=",".join(["commit:1/1"] * 65)),
+        profile_line()[:-1],
+        profile_line()[:-1] + " private=credential\n",
+        "worker prefix " + profile_line(),
+        profile_line().replace("chio::native_capture_profile", "chio::worker"),
+        "x" * 65536 + profile_line(),
+    ):
+        assert qualifier.native_capture_profiles(rejected) == [], rejected
+    assert qualifier.native_capture_profiles(profile_line() * 70) == [ENTRY_PROFILE] * 64
+
+
+def test_native_capture_profiles_from_successful_host_stay_private(qualifier, tmp_path):
+    secret = "private-host-credential-must-not-survive"
+    captured = profile_line(
+        "captured",
+        ENTRY_TIMELINE + ",commit_state:9990,commit_time:9991",
+        "store_callback:12/11,commit:900/40,anchor_sync:5000/30",
+    )
+    payload = (secret + "\n" + captured + profile_line()).encode()
+    script = "import os; os.write(2," + repr(payload) + ")"
+    child = subprocess.run(
+        [sys.executable, "-c", script], capture_output=True, text=True, check=True
+    )
+    assert qualifier.save_native_capture_profiles(tmp_path, child.stderr)
+    private = tmp_path / "native-capture-profiles.json"
+    assert stat.S_IMODE(private.stat().st_mode) == 0o600
+    retained = private.read_text()
+    assert secret not in retained
+    profiles = json.loads(retained)
+    assert profiles["schema"] == "chio.native-capture-profiles.v1"
+    assert [profile["outcome"] for profile in profiles["profiles"]] == ["captured", "refused"]
+    assert profiles["profiles"][0]["timeline"]["commit_time"] == 9991
+    assert profiles["profiles"][0]["stages"][-1] == {
+        "stage": "anchor_sync",
+        "wall_us": 5000,
+        "cpu_us": 30,
+    }
+    assert profiles["profiles"][1] == ENTRY_PROFILE
+    assert qualifier.save_native_capture_profiles(tmp_path / "absent", secret)
+
+
+@pytest.mark.parametrize(
+    ("stage", "category", "phase"),
+    [
+        ("policy_expired", "invariant", "capture_entry"),
+        ("policy_expired", "invariant", "commit_time"),
+        ("budget_mutation", "sqlite", None),
+    ],
+)
+def test_native_capture_phase_and_profile_reach_private_failure_state(
+    qualifier, tmp_path, stage, category, phase
+):
+    secret = "private-host-credential-must-not-survive"
+    stderr = (
+        secret
+        + "\n"
+        + profile_line("captured", "none", "store_callback:1/1,anchor_sync:2/2")
+        + refusal_line(stage, category, phase)
+        + profile_line()
+    )
+    output = tmp_path / "output"
+    output.mkdir()
+    failure = subprocess.CalledProcessError(1, ["native-host", secret], output="", stderr=stderr)
+    qualifier.save_failure_diagnostics(tmp_path, output, failure)
+    failures = json.loads((tmp_path / "native-capture-failures.json").read_text())
+    expected = {"stage": stage, "category": category}
+    if phase:
+        expected["phase"] = phase
+    assert failures["failures"] == [expected]
+    private = tmp_path / "native-capture-profiles.json"
+    assert stat.S_IMODE(private.stat().st_mode) == 0o600
+    profiles = json.loads(private.read_text())["profiles"]
+    assert [profile["outcome"] for profile in profiles] == ["captured", "refused"]
+    assert profiles[1] == ENTRY_PROFILE
+    text = (output / "operator-failure.json").read_text()
+    for withheld in (secret, "timeline", "capture_entry", "commit_time", "wall_us", "9142"):
+        assert withheld not in text
+    assert json.loads(text)["host_failure_classes"] == ["native_capture_" + stage]
+    assert list(output.iterdir()) == [output / "operator-failure.json"]
+
+
+@pytest.mark.parametrize("symlink", [False, True])
+def test_native_capture_profile_export_refusal_preserves_original_report(
+    qualifier, tmp_path, symlink
+):
+    retained = tmp_path / "retained-private"
+    retained.write_bytes(b"preserved-private-custody")
+    private = tmp_path / "native-capture-profiles.json"
+    if symlink:
+        private.symlink_to(retained)
+    else:
+        private.write_bytes(b"preserved-private-custody")
+    output = tmp_path / "output"
+    output.mkdir()
+    marker = refusal_line("policy_expired", "invariant", "commit_state")
+    failure = subprocess.CalledProcessError(
+        1, ["native-host"], output="", stderr=marker + profile_line()
+    )
+    qualifier.save_failure_diagnostics(tmp_path, output, failure)
+    assert private.read_bytes() == b"preserved-private-custody"
+    assert retained.read_bytes() == b"preserved-private-custody"
+    assert json.loads((tmp_path / "native-capture-failures.json").read_text())["failures"] == [
+        {"stage": "policy_expired", "category": "invariant", "phase": "commit_state"}
+    ]
+    diagnostic = json.loads((output / "operator-failure.json").read_text())
+    assert diagnostic["host_failure_classes"] == [
+        "native_capture_policy_expired",
+        "native_capture_profile_unavailable",
     ]

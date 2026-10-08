@@ -40,29 +40,141 @@ NATIVE_DISPATCH_FAULT = re.compile(
     re.MULTILINE,
 )
 NATIVE_CAPTURE_STAGES = (
-    "store_callback", "connection", "transaction_begin", "authority", "preflight_hold",
-    "native_evidence", "native_binding", "native_policy", "native_owner", "budget_selection",
-    "budget_replay", "budget_credentials", "budget_hold", "budget_identity", "budget_revocation",
-    "budget_mutation", "admission_advance", "commit_policy", "commit_clock", "commit_lease_expired",
-    "commit_capability_expired", "commit_runtime_expired", "commit_nonce_expired", "commit_approval",
-    "commit_dpop", "policy_not_yet_valid", "policy_expired", "declassification_not_yet_valid",
-    "declassification_expired", "observation_changed", "commit", "anchor_sync",
+    "store_callback",
+    "connection",
+    "transaction_begin",
+    "authority",
+    "preflight_hold",
+    "native_evidence",
+    "native_binding",
+    "native_policy",
+    "native_owner",
+    "budget_selection",
+    "budget_replay",
+    "budget_credentials",
+    "budget_hold",
+    "budget_identity",
+    "budget_revocation",
+    "budget_mutation",
+    "admission_advance",
+    "commit_policy",
+    "commit_clock",
+    "commit_lease_expired",
+    "commit_capability_expired",
+    "commit_runtime_expired",
+    "commit_nonce_expired",
+    "commit_approval",
+    "commit_dpop",
+    "policy_not_yet_valid",
+    "policy_expired",
+    "declassification_not_yet_valid",
+    "declassification_expired",
+    "observation_changed",
+    "commit",
+    "anchor_sync",
 )
+NATIVE_CAPTURE_PHASES = ("capture_entry", "caller_interval", "commit_state", "commit_time")
 NATIVE_CAPTURE_FAILURE = re.compile(
     r"^warn chio::native_capture message=native capture refused native_capture_stage=("
     + "|".join(NATIVE_CAPTURE_STAGES)
     + r") native_capture_category=(fenced|outcome_unknown|invariant|unavailable|operation"
-    r"|not_found|clock|sqlite|io|overflow)\n",
+    r"|not_found|clock|sqlite|io|overflow)(?: native_capture_phase=("
+    + "|".join(NATIVE_CAPTURE_PHASES)
+    + r"))?\n",
+    re.MULTILINE,
+)
+# Milliseconds after policy preparation, always in this order when present.
+NATIVE_CAPTURE_TIMES = (
+    "valid_until",
+    "retain_decision",
+    "retain_entry",
+    "capture_decision",
+    "capture_entry",
+    "caller_interval",
+    "commit_state",
+    "commit_time",
+)
+NATIVE_CAPTURE_PROFILE = re.compile(
+    r"^warn chio::native_capture_profile message=native capture profile"
+    r" native_capture_outcome=(captured|refused)"
+    r" native_capture_timeline=(none|[a-z_]+:[0-9]{1,10}(?:,[a-z_]+:[0-9]{1,10}){0,7})"
+    r" native_capture_stages=([a-z_]+:[0-9]{1,10}/[0-9]{1,10}"
+    r"(?:,[a-z_]+:[0-9]{1,10}/[0-9]{1,10}){0,63})\n",
     re.MULTILINE,
 )
 
 
-def native_capture_failures(text):
+def bounded_host_text(text):
     if isinstance(text, bytes):
         text = text[:65536].decode("utf-8", errors="replace")
-    text = (text or "")[:65536].lower()
-    pairs = sorted({(match[1], match[2]) for match in NATIVE_CAPTURE_FAILURE.finditer(text)})
-    return [{"stage": stage, "category": category} for stage, category in pairs[:32]]
+    return (text or "")[:65536].lower()
+
+
+def native_capture_failures(text):
+    found = {
+        (match[1], match[2], match[3] or "")
+        for match in NATIVE_CAPTURE_FAILURE.finditer(bounded_host_text(text))
+    }
+    failures = []
+    for stage, category, phase in sorted(found)[:32]:
+        failure = {"stage": stage, "category": category}
+        if phase:
+            failure["phase"] = phase
+        failures.append(failure)
+    return failures
+
+
+def native_capture_profile(match):
+    timeline = {}
+    if match[2] != "none":
+        previous = -1
+        for item in match[2].split(","):
+            name, value = item.split(":")
+            # The fixed order also rejects repeated and unknown names.
+            if name not in NATIVE_CAPTURE_TIMES or NATIVE_CAPTURE_TIMES.index(name) <= previous:
+                return None
+            previous = NATIVE_CAPTURE_TIMES.index(name)
+            timeline[name] = int(value)
+    stages = []
+    for item in match[3].split(","):
+        name, costs = item.split(":")
+        wall, cpu = (int(value) for value in costs.split("/"))
+        if name not in NATIVE_CAPTURE_STAGES:
+            return None
+        stages.append({"stage": name, "wall_us": wall, "cpu_us": cpu})
+    if any(value > 2**32 - 1 for value in timeline.values()) or any(
+        stage["wall_us"] > 2**32 - 1 or stage["cpu_us"] > 2**32 - 1 for stage in stages
+    ):
+        return None
+    return {"outcome": match[1], "timeline": timeline, "stages": stages}
+
+
+def native_capture_profiles(text):
+    profiles = (
+        native_capture_profile(match)
+        for match in NATIVE_CAPTURE_PROFILE.finditer(bounded_host_text(text))
+    )
+    return [profile for profile in profiles if profile is not None][:64]
+
+
+def retain_private_json(path, value):
+    try:
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(descriptor, "w") as retained:
+            json.dump(value, retained)
+            retained.write("\n")
+    except OSError:
+        return False
+    return True
+
+
+def save_native_capture_profiles(root, text):
+    # Fixed per-call phase costs stay in private state, never in published output.
+    profiles = native_capture_profiles(text)
+    return not profiles or retain_private_json(
+        root / "native-capture-profiles.json",
+        {"schema": "chio.native-capture-profiles.v1", "profiles": profiles},
+    )
 
 
 def failure_classes(text, host=False):
@@ -167,20 +279,17 @@ def save_failure_diagnostics(root, output, failure):
         "worker_logs": [],
     }
     fixed_capture = native_capture_failures(failure.stderr)
-    if fixed_capture:
-        try:
-            descriptor = os.open(
-                root / "native-capture-failures.json",
-                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
-                0o600,
-            )
-            with os.fdopen(descriptor, "w") as retained:
-                json.dump({"schema": "chio.native-capture-failures.v1", "failures": fixed_capture}, retained)
-                retained.write("\n")
-        except OSError:
-            diagnostic["host_failure_classes"] = sorted(
-                set(diagnostic["host_failure_classes"]) | {"native_capture_artifact_unavailable"}
-            )
+    if fixed_capture and not retain_private_json(
+        root / "native-capture-failures.json",
+        {"schema": "chio.native-capture-failures.v1", "failures": fixed_capture},
+    ):
+        diagnostic["host_failure_classes"] = sorted(
+            set(diagnostic["host_failure_classes"]) | {"native_capture_artifact_unavailable"}
+        )
+    if not save_native_capture_profiles(root, failure.stderr):
+        diagnostic["host_failure_classes"] = sorted(
+            set(diagnostic["host_failure_classes"]) | {"native_capture_profile_unavailable"}
+        )
     if isinstance(failure, subprocess.CalledProcessError):
         diagnostic["returncode"] = failure.returncode
     for attempt in (1, 2):
@@ -395,19 +504,19 @@ def main():
         (root / "provider.json").write_text(json.dumps(provider))
         services.start(binary)
         try:
-            report = json.loads(
-                subprocess.run(
-                    [str(operator), "run", "--state", str(root / "run")],
-                    cwd=root,
-                    text=True,
-                    capture_output=True,
-                    check=True,
-                    timeout=profile["max_attempts"] * profile["timeout_seconds"] + 60,
-                ).stdout
+            completed = subprocess.run(
+                [str(operator), "run", "--state", str(root / "run")],
+                cwd=root,
+                text=True,
+                capture_output=True,
+                check=True,
+                timeout=profile["max_attempts"] * profile["timeout_seconds"] + 60,
             )
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as failure:
             save_failure_diagnostics(root, args.output, failure)
             raise
+        save_native_capture_profiles(root, completed.stderr)
+        report = json.loads(completed.stdout)
         assert report["complete"] and report["workers"][0]["attempts"] == 1 and len(calls()) == 3
 
         if workspace_fixture:
