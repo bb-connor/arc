@@ -2221,6 +2221,9 @@
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
     "crates/core/chio-core-types/src/canonical.rs::from_str::Deserializer::from_str",
     "crates/core/chio-core-types/src/canonical.rs::write_canonical::custom_deserialize",
     "crates/core/chio-core-types/src/canonical/signed_json.rs::parse::custom_deserialize",
@@ -5571,6 +5574,9 @@
       "try_from::custom_deserialize",
       "try_from::custom_deserialize",
       "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
       "try_from::custom_deserialize"
     ],
     "crates/core/chio-core-types/src/canonical/signed_json.rs": [
@@ -6632,7 +6638,7 @@
             "serde::Deserializer"
           ],
           "checked": true,
-          "instances": 570
+          "instances": 573
         }
       ]
     },
@@ -16450,7 +16456,7 @@
     "crates/economy/chio-settle/src/config.rs::from_path::from_wire#1::decode_signed",
     "crates/economy/chio-settle/src/input.rs::canonical::from_wire#1::decode_canonical",
     "crates/economy/chio-settle/src/input.rs::external_canonical::from_wire#1::canonicalize+decode_signed",
-    "crates/guards/chio-data-guards/src/structured_classification.rs::from_payload::from_wire#1::decode_signed",
+    "crates/guards/chio-data-guards/src/structured_classification.rs::from_payload::from_wire#1::decode_document",
     "crates/guards/chio-external-guards/src/external/input.rs::arguments::from_wire#1::decode_signed",
     "crates/guards/chio-external-guards/src/external/input.rs::response::from_wire#1::decode_external",
     "crates/guards/chio-guard-registry/src/input.rs::external::from_wire#1::decode_external",
