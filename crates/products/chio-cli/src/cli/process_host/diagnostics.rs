@@ -313,7 +313,7 @@ mod private_input_tests {
         }
         assert!(matches!(
             &symlinked,
-            CliError::Io(failure) if failure.kind() == std::io::ErrorKind::FilesystemLoop
+            CliError::Io(failure) if failure.raw_os_error() == Some(libc::ELOOP)
         ));
         Ok(())
     }
