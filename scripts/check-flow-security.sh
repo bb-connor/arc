@@ -251,13 +251,13 @@ run_exact_target --label "security kernel adapters" --expected \
   -- cargo test -p chio-security-kernel --test adapters
 
 run_exact_target --label "durable flow state" --expected \
-  acknowledged_correlation_tombstone_source_binding_corruption_fails_readiness \
+  events_and_overlays::acknowledged_correlation_tombstone_source_binding_corruption_fails_readiness \
   flow_and_scheduler::lineage_fences_are_durable_and_orphans_recover_with_higher_fencing_tokens \
   flow_and_scheduler::concurrent_joins_retain_every_restriction_and_new_sessions_inherit \
-  correlation_ingress_orders_due_event_time_ahead_of_a_future_fifo_prefix \
-  correlation_ingress_pending_snapshot_survives_a_concurrent_acknowledgement \
-  correlation_ingress_upgrades_the_known_legacy_pending_index \
-  correlation_schema_drift_fails_startup \
+  events_and_overlays::correlation_ingress_orders_due_event_time_ahead_of_a_future_fifo_prefix \
+  events_and_overlays::correlation_ingress_pending_snapshot_survives_a_concurrent_acknowledgement \
+  events_and_overlays::correlation_ingress_upgrades_the_known_legacy_pending_index \
+  events_and_overlays::correlation_schema_drift_fails_startup \
   flow_and_scheduler::corrupt_canonical_hash_fails_closed_on_read \
   flow_and_scheduler::egress_dispatch_commitment_is_idempotent_and_immutable \
   flow_and_scheduler::egress_fence_binds_the_canonical_request_hash \
@@ -282,19 +282,19 @@ run_exact_target --label "durable flow state" --expected \
   open_path::a_symlinked_path_is_refused_before_the_target_is_created_or_written \
   open_path::an_aliased_or_irregular_sidecar_is_refused_before_sqlite_opens_it \
   open_path::legacy_world_readable_sidecars_are_private_before_sqlite_opens_them \
-  overlapping_overlay_contributions_are_removed_independently \
-  overlay_effect_identity_cannot_cross_action_boundaries \
+  events_and_overlays::overlapping_overlay_contributions_are_removed_independently \
+  events_and_overlays::overlay_effect_identity_cannot_cross_action_boundaries \
   flow_and_scheduler::response_effect_generation_migration_preserves_existing_intent \
   flow_and_scheduler::response_effect_owner_migration_rejects_unbound_existing_intent \
-  scheduler_and_effect_reads_verify_canonical_hashes \
+  events_and_overlays::scheduler_and_effect_reads_verify_canonical_hashes \
   flow_and_scheduler::scheduler_retry_health_migration_preserves_age_conservatively \
   flow_and_scheduler::scheduler_retry_health_outbox_survives_restart_and_ack_is_idempotent \
   flow_and_scheduler::scheduler_takeover_fences_stale_overlay_mutations \
   database_path_inputs::security_state_rejects_ephemeral_sqlite_paths \
   flow_and_scheduler::session_change_invalidates_same_session_fences_across_lineages \
   flow_and_scheduler::session_taint_is_shared_across_lineages_within_an_epoch \
-  verified_event_capacity_and_rule_index_roll_back_as_one_sqlite_transaction \
-  verified_event_correlation_is_durable_and_advisory_events_remain_segregated \
+  events_and_overlays::verified_event_capacity_and_rule_index_roll_back_as_one_sqlite_transaction \
+  events_and_overlays::verified_event_correlation_is_durable_and_advisory_events_remain_segregated \
   -- cargo test -p chio-store-sqlite --test security_state
 
 run_exact_target --label "native compiled catalog identity" --allow-filtered --expected \

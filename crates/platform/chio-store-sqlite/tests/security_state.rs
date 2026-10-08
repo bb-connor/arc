@@ -1,7 +1,8 @@
 #[path = "security_state_parts/part_01.rs"]
 mod flow_and_scheduler;
 use flow_and_scheduler::*;
-include!("security_state_parts/part_02.rs");
+#[path = "security_state_parts/part_02.rs"]
+mod events_and_overlays;
 
 #[path = "support/security_state_clock.rs"]
 mod clock;

@@ -1,3 +1,8 @@
+//! Scheduler and effect reads, overlay contributions, verified event
+//! correlation and correlation ingress.
+
+use super::*;
+
 #[test]
 fn scheduler_and_effect_reads_verify_canonical_hashes() {
     let directory =
