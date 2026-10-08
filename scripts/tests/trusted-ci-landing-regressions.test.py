@@ -2184,5 +2184,42 @@ class AuditForeignHeadIdentityTests(unittest.TestCase):
                 self.assertNotEqual(audit.result.returncode, 0)
 
 
+def with_contradictory_run_projection(status: str, conclusion: str | None) -> dict:
+    projection = pull_request_ci_run(PRIOR_CI_RUN, PRIOR_MERGE, conclusion=conclusion, check_suite_id=400,
+                                     display_title=FALLBACK_TITLE)
+    projection["status"] = status
+    data = with_listed_pull_request_run(projection)
+    latest = copy.deepcopy(projection)
+    latest.update(status="completed", conclusion="success")
+    data[f"repos/{REPOSITORY}/actions/runs/{PRIOR_CI_RUN}/attempts/1"] = latest
+    return data
+
+
+class AuditHistoryProjectionOriginalRedTests(unittest.TestCase):
+    def test_a_run_projection_that_contradicts_its_successful_latest_attempt_is_not_verified(self) -> None:
+        prefix = f"repos/{REPOSITORY}"
+        healthy, healthy_report = run_logged_audit(snapshot())
+        self.assertEqual(healthy_report.get("status"), "verified", healthy.result.stdout + healthy.result.stderr)
+        for status, conclusion in (("completed", "failure"), ("in_progress", None)):
+            with self.subTest(projection=f"{status}/{conclusion}"):
+                data = with_contradictory_run_projection(status, conclusion)
+                projection = data[f"{prefix}/actions/runs/{PRIOR_CI_RUN}"]
+                latest = data[f"{prefix}/actions/runs/{PRIOR_CI_RUN}/attempts/1"]
+                assert_authoritative_history(self, projection)
+                self.assertEqual(projection["display_title"], FALLBACK_TITLE)
+                self.assertEqual((projection["run_attempt"], projection["status"], projection["conclusion"]),
+                                 (1, status, conclusion))
+                self.assertEqual((latest["run_attempt"], latest["status"], latest["conclusion"]),
+                                 (1, "completed", "success"))
+                run, report = run_logged_audit(data)
+                self.assertIn(f"GET {prefix}/actions/runs/{PRIOR_CI_RUN}", run.calls)
+                self.assertIn(f"GET {prefix}/actions/runs/{PRIOR_CI_RUN}/attempts/1", run.calls)
+                self.assertEqual(report.get("status"), "unverified",
+                                 f"CI run {PRIOR_CI_RUN} on the evidence head reports {status}/{conclusion} while its "
+                                 "latest attempt reports success, and the audit verified the landing")
+                self.assertNotIn("GitHub read failed", report.get("error", ""))
+                self.assertNotEqual(run.result.returncode, 0)
+
+
 if __name__ == "__main__":
     unittest.main()
