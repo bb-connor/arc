@@ -567,6 +567,22 @@ no workload authority is pinned, and an unbound capability is denied once a
 workload authority is pinned. `tests/bindings/vectors/capability/security-binding-v1.json`
 holds positive and negative vectors for these rules.
 
+Denial semantics. A malformed or non-conforming caveat (more than one caveat,
+a caveat of another kind, a detached `sig`, a non-canonical predicate, an
+unknown field, a zero `contextGeneration`, a noncanonical signer key) fails
+capability schema validation with an attenuation violation, so the capability
+is not accepted at all. A well-formed binding that does not match the live
+invocation, the pinned workload identity or the delegation rule above is
+denied before dispatch as a guard denial: the receipt carries the error
+`urn:chio:error:guard:denied` (string code `CHIO-KERNEL-GUARD-DENIED`,
+JSON-RPC code 3100) and the tool is not invoked. The denial reasons are
+`capability security binding does not match the live invocation and pinned
+workload identity`, `security-bound remote capabilities cannot be delegated`,
+`capability carries a workload binding but no workload authority is pinned`
+and `pinned workload authority returned an unbound capability`. A signer key
+spelled with a `0x` prefix or uppercase hex is rejected during validation
+because the comparison against the pinned key is by canonical lowercase hex.
+
 #### Chain-Binding Rule (W1.1)
 
 The `attenuation_proof.parent_scope_hash` field MUST be bound to the token's
