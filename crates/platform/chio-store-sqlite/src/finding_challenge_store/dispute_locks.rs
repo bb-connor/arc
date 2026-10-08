@@ -1,3 +1,7 @@
+//! Dispute bond lock reservation, locking, release and filing closure.
+
+use super::*;
+
 // Dispute lock reservation, bond lock and release, and filing closure.
 
 impl SqliteFindingChallengeStore {
