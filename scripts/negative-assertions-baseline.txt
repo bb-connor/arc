@@ -2,14 +2,6 @@
 # file, enclosing function, condition. Written by
 # scripts/check-negative-assertions.py --ratchet; counts only shrink.
 # expires 2027-01-31
-1	crates/kernel/chio-kernel/src/admission_operation.part3.inc	approval_membership_order_cannot_change_request_binding	AdmissionRequestBindingInput::new(duplicate_parts).is_err()
-1	crates/kernel/chio-kernel/src/admission_operation.part3.inc	approval_membership_order_cannot_change_request_binding	AdmissionRequestBindingInput::new(unordered).is_err()
-1	crates/kernel/chio-kernel/src/admission_operation.part3.inc	budget_hold_lookup_is_exact_and_unique	store .create_prepared(prepared_with_binding( AdmissionOperationKind::ToolDispatch, , Some( ), )) .is_err()
-1	crates/kernel/chio-kernel/src/admission_operation.part3.inc	caller_reservation_capture_has_a_distinct_committed_lifecycle	caller_reserved .transition_checked( AdmissionOperationState::CompensationPending, AdmissionDispatchState::NotStarted, 7, Some( .to_string()), ) .is_err()
-1	crates/kernel/chio-kernel/src/admission_operation.part3.inc	caller_reservation_capture_has_a_distinct_committed_lifecycle	capture_pending .transition_checked( AdmissionOperationState::CallerReserved, AdmissionDispatchState::NotStarted, 7, None, ) .is_err()
-1	crates/kernel/chio-kernel/src/admission_operation.part3.inc	dispatch_commit_precedes_effect_terminal_states	store .compare_and_swap(cas_request( &id, version, 7, AdmissionOperationState::Completed, AdmissionDispatchState::EffectCompleted, 7, None, )) .is_err()
-1	crates/kernel/chio-kernel/src/admission_operation.part3.inc	tool_dispatch_participant_stages_are_linear_and_parseable	budget_authorized .transition_checked( AdmissionOperationState::ApprovalReserved, AdmissionDispatchState::NotStarted, 7, None, ) .is_err()
-1	crates/kernel/chio-kernel/src/admission_operation.part3.inc	tool_dispatch_participant_stages_are_linear_and_parseable	delegated_budget_reserved .transition_checked( AdmissionOperationState::ApprovalReserved, AdmissionDispatchState::NotStarted, 7, None, ) .is_err()
 1	crates/kernel/chio-kernel/src/admission_operation/authority_profile/tests.rs	pinned_executor_is_versioned_and_cannot_be_downgraded_or_null	serde_json::from_value::<AdmissionAuthorityProfileV1>(invalid).is_err()
 1	crates/kernel/chio-kernel/src/admission_operation/authority_profile/tests.rs	pinned_executor_is_versioned_and_cannot_be_downgraded_or_null	serde_json::from_value::<AdmissionAuthorityProfileV1>(missing).is_err()
 1	crates/kernel/chio-kernel/src/admission_operation/authority_profile/tests.rs	profile_codec_checks_schema_fields_and_each_selected_generation	serde_json::from_value::<AdmissionAuthorityProfileV1>(invalid).is_err()

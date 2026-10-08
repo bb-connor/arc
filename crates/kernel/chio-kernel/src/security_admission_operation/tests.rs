@@ -1,5 +1,19 @@
 use super::*;
 
+const UNSORTED_APPROVAL_DIGESTS: &str = "approval token digests must be strictly sorted";
+
+fn assert_invalid_transition(
+    result: Result<AdmissionOperation, AdmissionOperationError>,
+    from: &str,
+    to: &str,
+) {
+    let expected = format!("invalid admission state transition from `{from}` to `{to}`");
+    assert!(
+        matches!(&result, Err(AdmissionOperationError::Invalid(reason)) if *reason == expected),
+        "{result:?}"
+    );
+}
+
 fn cas_request<'a>(
     operation_id: &'a str,
     expected_version: u64,
@@ -103,7 +117,10 @@ fn approval_membership_order_cannot_change_request_binding() {
         right.approval_token_digests()
     );
     assert_eq!(left.derive_hash().unwrap(), right.derive_hash().unwrap());
-    assert!(AdmissionRequestBindingInput::new(unordered).is_err());
+    assert!(matches!(
+        AdmissionRequestBindingInput::new(unordered),
+        Err(AdmissionOperationError::Invalid(reason)) if reason == UNSORTED_APPROVAL_DIGESTS
+    ));
 
     let mut changed_reference_parts = request_binding_parts();
     changed_reference_parts.supplemental_authorization_reference =
@@ -143,7 +160,10 @@ fn approval_membership_order_cannot_change_request_binding() {
     duplicate_parts.supplemental_authorization_reference = None;
     duplicate_parts.supplemental_authorization_digest = None;
     duplicate_parts.execution_nonce_reference = None;
-    assert!(AdmissionRequestBindingInput::new(duplicate_parts).is_err());
+    assert!(matches!(
+        AdmissionRequestBindingInput::new(duplicate_parts),
+        Err(AdmissionOperationError::Invalid(reason)) if reason == UNSORTED_APPROVAL_DIGESTS
+    ));
 }
 
 #[test]
@@ -424,13 +444,15 @@ fn budget_hold_lookup_is_exact_and_unique() {
         Some(operation.clone())
     );
     assert_eq!(store.load_by_budget_hold_id("unknown-hold").unwrap(), None);
-    assert!(store
-        .create_prepared(prepared_with_binding(
+    assert!(matches!(
+        store.create_prepared(prepared_with_binding(
             AdmissionOperationKind::ToolDispatch,
             "request-2",
             Some("hold-1"),
-        ))
-        .is_err());
+        )),
+        Err(AdmissionOperationError::Invalid(reason))
+            if reason == "budget_hold_id `hold-1` is already owned by another admission operation"
+    ));
     assert_eq!(
         store.load_by_budget_hold_id("hold-1").unwrap(),
         Some(operation)
@@ -472,14 +494,16 @@ fn tool_dispatch_participant_stages_are_linear_and_parseable() {
             None,
         )
         .unwrap();
-    assert!(budget_authorized
-        .transition_checked(
+    assert_invalid_transition(
+        budget_authorized.transition_checked(
             AdmissionOperationState::ApprovalReserved,
             AdmissionDispatchState::NotStarted,
             7,
             None,
-        )
-        .is_err());
+        ),
+        "budget_authorized",
+        "approval_reserved",
+    );
 
     let delegated_budget_reserved = budget_authorized
         .transition_checked(
@@ -489,14 +513,16 @@ fn tool_dispatch_participant_stages_are_linear_and_parseable() {
             None,
         )
         .unwrap();
-    assert!(delegated_budget_reserved
-        .transition_checked(
+    assert_invalid_transition(
+        delegated_budget_reserved.transition_checked(
             AdmissionOperationState::ApprovalReserved,
             AdmissionDispatchState::NotStarted,
             7,
             None,
-        )
-        .is_err());
+        ),
+        "delegated_budget_reserved",
+        "approval_reserved",
+    );
 
     let payment_authorized = delegated_budget_reserved
         .transition_checked(
@@ -542,14 +568,16 @@ fn caller_reservation_capture_has_a_distinct_committed_lifecycle() {
             None,
         )
         .unwrap();
-    assert!(capture_pending
-        .transition_checked(
+    assert!(matches!(
+        capture_pending.transition_checked(
             AdmissionOperationState::CallerReserved,
             AdmissionDispatchState::NotStarted,
             7,
             None,
-        )
-        .is_err());
+        ),
+        Err(AdmissionOperationError::Invalid(reason))
+            if reason == "admission state and dispatch state are inconsistent"
+    ));
 
     let caller_reserved = capture_pending
         .transition_checked(
@@ -560,14 +588,16 @@ fn caller_reservation_capture_has_a_distinct_committed_lifecycle() {
         )
         .unwrap();
     assert!(!caller_reserved.state().is_terminal());
-    assert!(caller_reserved
-        .transition_checked(
+    assert_invalid_transition(
+        caller_reserved.transition_checked(
             AdmissionOperationState::CompensationPending,
             AdmissionDispatchState::NotStarted,
             7,
             Some("must not reverse an issued reservation".to_string()),
-        )
-        .is_err());
+        ),
+        "caller_reserved",
+        "compensation_pending",
+    );
     assert!(caller_reserved
         .transition_checked(
             AdmissionOperationState::Completed,
@@ -745,8 +775,8 @@ fn dispatch_commit_precedes_effect_terminal_states() {
         };
         version = applied.version();
     }
-    assert!(store
-        .compare_and_swap(cas_request(
+    assert!(matches!(
+        store.compare_and_swap(cas_request(
             &id,
             version,
             7,
@@ -754,8 +784,10 @@ fn dispatch_commit_precedes_effect_terminal_states() {
             AdmissionDispatchState::EffectCompleted,
             7,
             None,
-        ))
-        .is_err());
+        )),
+        Err(AdmissionOperationError::Invalid(reason))
+            if reason == "compensation, caller-reserved, and terminal admission transitions require an atomic forward action"
+    ));
     let AdmissionOperationCasOutcome::Applied(committed) = store
         .compare_and_swap(cas_request(
             &id,
