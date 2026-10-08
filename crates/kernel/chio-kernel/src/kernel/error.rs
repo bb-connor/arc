@@ -1,5 +1,6 @@
 use super::*;
 
+mod classify;
 mod durable_admission;
 pub use durable_admission::{AdmissionReason, DurableAdmissionError};
 

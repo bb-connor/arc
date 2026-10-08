@@ -167,13 +167,21 @@ impl AdmissionRecoveryError {
         }
     }
 
-    /// How a recovery loop handles this failure. Shared faults are fatal.
+    /// How a loop, worker or endpoint handles this failure. An item failure
+    /// follows its kind and a shared cause follows its own classification.
+    /// The recovery sweep defers only failures that carry a kind; it stops on
+    /// every other failure whatever its disposition.
     #[must_use]
     pub fn disposition(&self) -> Disposition {
-        self.failure_kind().map_or(
-            Disposition::Fatal,
-            AdmissionRecoveryFailureKind::disposition,
-        )
+        match self {
+            Self::Item { kind, .. } | Self::Payment { kind, .. } => kind.disposition(),
+            Self::Port(error) => error.disposition(),
+            Self::Store(error) => error.disposition(),
+            Self::Outcome(error) => error.disposition(),
+            Self::PaymentJournal(error) => error.disposition(),
+            Self::PaymentRecord(error) => error.disposition(),
+            Self::Operation(error) => error.disposition(),
+        }
     }
 }
 

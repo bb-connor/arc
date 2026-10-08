@@ -15,10 +15,12 @@ use crate::admission_operation::{
     AdmissionOperationStoreError,
 };
 use crate::disposition::Disposition;
+use crate::payment::PaymentJournalError;
 use crate::receipt_store::{
     AdmissionBudgetAuthorizationError, AdmissionPaymentJournalError, ReceiptStoreError,
 };
 use crate::revocation_store::RevocationStoreError;
+use crate::supplemental_quota::SupplementalQuotaError;
 use crate::tool_outcome::{ToolOutcomeError, ToolOutcomeStoreError};
 
 /// The reason text of an admission failure: fixed, or naming the retained
@@ -72,6 +74,8 @@ pub enum DurableAdmissionError {
     #[error("{0}")]
     PaymentJournal(#[from] AdmissionPaymentJournalError),
     #[error("{0}")]
+    PaymentRecord(#[from] PaymentJournalError),
+    #[error("{0}")]
     Receipts(#[from] ReceiptStoreError),
     #[error("{0}")]
     Revocation(#[from] RevocationStoreError),
@@ -79,9 +83,17 @@ pub enum DurableAdmissionError {
     ToolOutcome(#[from] ToolOutcomeError),
     #[error("{0}")]
     OutcomeStore(#[from] ToolOutcomeStoreError),
+    #[error("{0}")]
+    Supplemental(#[from] SupplementalQuotaError),
     /// Canonical encoding of a request or record value failed.
     #[error("{0}")]
     Encoding(#[from] chio_core::Error),
+    /// Encoding a record as JSON failed.
+    #[error("{0}")]
+    Json(#[from] serde_json::Error),
+    /// A kernel step the admission depends on failed.
+    #[error("{0}")]
+    Kernel(#[source] Box<KernelError>),
     /// A cause with no classification of its own.
     #[error("{0}")]
     Dependency(#[source] Box<dyn std::error::Error + Send + Sync>),
@@ -115,7 +127,9 @@ impl DurableAdmissionError {
         match self {
             Self::Refused(_) | Self::Conflict(_) => Disposition::Deny,
             Self::Pending(_) => Disposition::Retry,
-            Self::State { .. } | Self::Record(_) | Self::Encoding(_) => Disposition::Quarantine,
+            Self::State { .. } | Self::Record(_) | Self::Encoding(_) | Self::Json(_) => {
+                Disposition::Quarantine
+            }
             Self::Invariant(_)
             | Self::Unsupported(_)
             | Self::Panicked(_)
@@ -125,10 +139,13 @@ impl DurableAdmissionError {
             Self::Capture(error) => error.disposition(),
             Self::BudgetAuthorization(error) => error.disposition(),
             Self::PaymentJournal(error) => error.disposition(),
+            Self::PaymentRecord(error) => error.disposition(),
             Self::Receipts(error) => error.disposition(),
             Self::Revocation(error) => error.disposition(),
             Self::ToolOutcome(error) => error.disposition(),
             Self::OutcomeStore(error) => error.disposition(),
+            Self::Supplemental(error) => error.disposition(),
+            Self::Kernel(error) => error.disposition(),
             Self::Context { source, .. } => source.disposition(),
         }
     }
@@ -140,6 +157,12 @@ impl DurableAdmissionError {
             Self::Context { source, .. } => source.root(),
             error => error,
         }
+    }
+}
+
+impl From<KernelError> for DurableAdmissionError {
+    fn from(error: KernelError) -> Self {
+        Self::Kernel(Box::new(error))
     }
 }
 

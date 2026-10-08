@@ -11,11 +11,14 @@
 use super::Disposition;
 use crate::admission_operation::{
     AdmissionCaptureError, AdmissionOperationError, AdmissionOperationStoreError,
+    AdmissionRecoveryPortError, RemoteRecoveryFailureKind,
 };
+use crate::payment::PaymentJournalError;
 use crate::receipt_store::{
     AdmissionBudgetAuthorizationError, AdmissionPaymentJournalError, ReceiptStoreError,
 };
 use crate::revocation_store::RevocationStoreError;
+use crate::supplemental_quota::SupplementalQuotaError;
 use crate::tool_outcome::{ToolOutcomeError, ToolOutcomeStoreError};
 
 impl AdmissionOperationError {
@@ -91,6 +94,26 @@ impl AdmissionOperationStoreError {
     }
 }
 
+impl AdmissionRecoveryPortError {
+    /// How a loop, worker or endpoint handles this failure. A local store
+    /// error keeps its own classification.
+    #[must_use]
+    pub fn disposition(&self) -> Disposition {
+        match self {
+            Self::Local(error) => error.disposition(),
+            Self::Remote { kind, .. } => match kind {
+                RemoteRecoveryFailureKind::Unavailable
+                | RemoteRecoveryFailureKind::Conflict
+                | RemoteRecoveryFailureKind::OutcomeUnknown => Disposition::Retry,
+                RemoteRecoveryFailureKind::Fenced | RemoteRecoveryFailureKind::Invariant => {
+                    Disposition::Fatal
+                }
+                RemoteRecoveryFailureKind::NotFound => Disposition::Quarantine,
+            },
+        }
+    }
+}
+
 impl AdmissionCaptureError {
     /// How a loop, worker or endpoint handles this failure.
     #[must_use]
@@ -125,6 +148,15 @@ impl AdmissionPaymentJournalError {
             }
             Self::Fenced | Self::Invariant(_) => Disposition::Fatal,
         }
+    }
+}
+
+impl PaymentJournalError {
+    /// A payment journal record that fails validation cannot progress as
+    /// stored.
+    #[must_use]
+    pub fn disposition(&self) -> Disposition {
+        Disposition::Quarantine
     }
 }
 
@@ -168,6 +200,38 @@ impl RevocationStoreError {
             | Self::Io(_)
             | Self::Sync(_)
             | Self::Fenced { .. } => Disposition::Fatal,
+        }
+    }
+}
+
+impl SupplementalQuotaError {
+    /// How a loop, worker or endpoint handles this failure. Only a missing
+    /// verifier is configuration; every other failure refuses the artifact.
+    #[must_use]
+    pub fn disposition(&self) -> Disposition {
+        match self {
+            Self::MissingVerifier => Disposition::Fatal,
+            Self::Canonicalization(_) => Disposition::Quarantine,
+            Self::EmptyAuthorization
+            | Self::UnknownProfile(_)
+            | Self::ProfileNotNegotiated(_)
+            | Self::VerifierRejected(_)
+            | Self::EmptyContextField(_)
+            | Self::ContextMismatch(_)
+            | Self::ArtifactDigestMismatch
+            | Self::RequestBindingMismatch
+            | Self::EmptyClaimField(_)
+            | Self::LimitExceeded { .. }
+            | Self::InvalidSha256Digest(_)
+            | Self::InvalidNegotiatedFeatures(_)
+            | Self::Expired { .. }
+            | Self::EmptyRevocationId
+            | Self::EmptyRevocationSet
+            | Self::DuplicateRevocationId(_)
+            | Self::EmptySupplementalRevocationIds
+            | Self::RevocationIdsNotCanonical
+            | Self::RevocationDigestMismatch
+            | Self::RevocationSetMismatch => Disposition::Deny,
         }
     }
 }
@@ -307,6 +371,46 @@ mod tests {
         assert_eq!(
             AdmissionPaymentJournalError::Fenced.disposition(),
             Disposition::Fatal
+        );
+    }
+
+    #[test]
+    fn recovery_ports_and_supplemental_quota_classify_by_variant() {
+        assert_eq!(
+            AdmissionRecoveryPortError::Local(AdmissionOperationStoreError::Unavailable(
+                "down".into()
+            ))
+            .disposition(),
+            Disposition::Retry
+        );
+        assert_eq!(
+            AdmissionRecoveryPortError::remote(RemoteRecoveryFailureKind::Fenced, std::fmt::Error)
+                .disposition(),
+            Disposition::Fatal
+        );
+        assert_eq!(
+            AdmissionRecoveryPortError::remote(
+                RemoteRecoveryFailureKind::NotFound,
+                std::fmt::Error
+            )
+            .disposition(),
+            Disposition::Quarantine
+        );
+        assert_eq!(
+            SupplementalQuotaError::MissingVerifier.disposition(),
+            Disposition::Fatal
+        );
+        assert_eq!(
+            SupplementalQuotaError::RevocationSetMismatch.disposition(),
+            Disposition::Deny
+        );
+        assert_eq!(
+            SupplementalQuotaError::Expired {
+                expires_at: 1,
+                now: 2
+            }
+            .disposition(),
+            Disposition::Deny
         );
     }
 

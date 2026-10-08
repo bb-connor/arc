@@ -67,3 +67,42 @@ fn authority_refusals_deny_and_an_unavailable_finding_retries() {
         Disposition::Retry
     );
 }
+
+#[test]
+fn the_sweep_agrees_with_the_general_classifier_whenever_it_can_defer() {
+    let deferrable = [
+        item_failure(Kind::ParticipantUnavailable, "participant"),
+        item_failure(Kind::ContractChanged, "contract"),
+        KernelError::GuardDenied("guard refused the output".into()),
+        KernelError::CapabilityRevoked("capability".into()),
+        KernelError::FindingDenied(FindingDenial::new(
+            FindingDenialCode::Unavailable,
+            "status feed down",
+        )),
+        KernelError::FindingDenied(FindingDenial::new(
+            FindingDenialCode::StatusDenied,
+            "retracted",
+        )),
+    ];
+    for error in &deferrable {
+        assert!(classify(error).is_some(), "{error}");
+        assert_eq!(disposition(error), error.disposition(), "{error}");
+    }
+}
+
+#[test]
+fn the_sweep_stops_on_typed_admission_failures_it_cannot_record() {
+    let typed = [
+        KernelError::admission_refused("refused"),
+        KernelError::admission_pending("owned elsewhere"),
+        KernelError::admission(AdmissionOperationStoreError::Unavailable("down".into())),
+        KernelError::AdmissionRecovery(Box::new(AdmissionRecoveryError::Store(
+            AdmissionOperationStoreError::Unavailable("down".into()),
+        ))),
+    ];
+    for error in &typed {
+        assert_eq!(classify(error), None, "{error}");
+        assert_eq!(disposition(error), Disposition::Fatal, "{error}");
+        assert!(error.disposition().is_item_scoped(), "{error}");
+    }
+}
