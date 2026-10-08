@@ -546,6 +546,25 @@ impl FindingRailObserver for FailingRail {
     }
 }
 
+/// Records the thread that settles each rail instruction.
+#[derive(Default)]
+struct ThreadRecordingRail {
+    threads: std::sync::Mutex<Vec<std::thread::ThreadId>>,
+}
+
+impl FindingRailObserver for ThreadRecordingRail {
+    fn dispatch(
+        &self,
+        instruction: &FindingRailInstruction,
+    ) -> Result<FindingRailObservation, String> {
+        self.threads
+            .lock()
+            .map_err(|_| "rail trace lock".to_string())?
+            .push(std::thread::current().id());
+        VenueLedgerRailObserver.dispatch(instruction)
+    }
+}
+
 struct MismatchedRail;
 
 impl FindingRailObserver for MismatchedRail {
@@ -1872,6 +1891,24 @@ async fn assert_activation_rejected(
         "expected {expected_fragment:?} in {text:?}"
     );
     assert_nothing_admitted(stack).await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn finding_activation_runs_store_and_rail_work_off_the_runtime_thread() -> TestResult {
+    let mut stack = provision_stack(LONG_EPOCH_SECS, ADMISSION_EXPIRES_AT)?;
+    stack.seed_market().await?;
+    let rail = Arc::new(ThreadRecordingRail::default());
+    stack.state.finding_rail = Some(rail.clone());
+    let (status, body) = stack.activate().await?;
+    assert_eq!(status, StatusCode::OK, "{}", String::from_utf8_lossy(&body));
+    assert_eq!(json_body(&body)?["outcome"], serde_json::json!("Activated"));
+    // This current-thread runtime polls every handler on the test thread, so
+    // a rail settled anywhere else ran on the blocking pool.
+    let runtime_thread = std::thread::current().id();
+    let threads = rail.threads.lock().map_err(|_| missing("rail trace"))?;
+    assert!(!threads.is_empty(), "activation settles its fee terminals");
+    assert!(threads.iter().all(|thread| *thread != runtime_thread));
     Ok(())
 }
 

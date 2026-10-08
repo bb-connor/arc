@@ -421,85 +421,88 @@ pub(crate) async fn handle_publish_finding(
     headers: HeaderMap,
     raw: String,
 ) -> Response {
-    let clock_now = match unix_timestamp_now() {
-        Ok(now) => now,
-        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
-    };
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
-        return response;
-    }
-    let (_, store) = match finding_market_context(&state) {
-        Ok(context) => context,
-        Err(response) => return response,
-    };
-    let (strict_bytes, finding) = match strict_artifact_ingress::<Finding>(
-        &raw,
-        FINDING_PUBLISH_MAX_BODY_BYTES,
-        FINDING_SCHEMA_JSON,
-        "chio-finding/v1/finding.schema.json",
-    ) {
-        Ok(accepted) => accepted,
-        Err(response) => return response,
-    };
-    if let Err(error) = chio_finding::verify_finding(&finding) {
-        return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
-    }
-    // Both bounds enforce liveness: a correctly signed
-    // but future-issued or expired finding must not become indexable.
-    let now = clock_now;
-    if finding.issued_at > now {
-        return plain_http_error(StatusCode::BAD_REQUEST, "finding is future-issued");
-    }
-    if finding.expires_at <= now {
-        return plain_http_error(StatusCode::BAD_REQUEST, "finding has expired");
-    }
-    // The finding-scoped pricing hint signs `finding:<finding_id>`;
-    // hashing the hint into the finding would be a cycle, so this
-    // projection requires the reference absent.
-    if finding.price_hint_ref.is_some() {
-        return plain_http_error(
-            StatusCode::BAD_REQUEST,
-            "price_hint_ref must be absent for the finding-scoped projection",
-        );
-    }
-    // A deterministic-replay claim publishes only with its recipe
-    // preimage already retained; seller availability cannot control
-    // later adjudication.
-    if finding.guarantee_class == FindingGuaranteeClass::DeterministicReplay {
-        let Some(recipe_sha256) = finding.replay_recipe_sha256.as_deref() else {
-            return plain_http_error(StatusCode::BAD_REQUEST, "replay recipe digest missing");
+    blocking_response(move || {
+        let clock_now = match unix_timestamp_now() {
+            Ok(now) => now,
+            Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
         };
-        if let Err(response) = verify_retained_recipe_closure(&store, recipe_sha256) {
+        if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
             return response;
         }
-    }
-    let artifact_json = match std::str::from_utf8(&strict_bytes) {
-        Ok(text) => text,
-        Err(_) => {
-            return plain_http_error(StatusCode::BAD_REQUEST, "artifact is not UTF-8");
+        let (_, store) = match finding_market_context(&state) {
+            Ok(context) => context,
+            Err(response) => return response,
+        };
+        let (strict_bytes, finding) = match strict_artifact_ingress::<Finding>(
+            &raw,
+            FINDING_PUBLISH_MAX_BODY_BYTES,
+            FINDING_SCHEMA_JSON,
+            "chio-finding/v1/finding.schema.json",
+        ) {
+            Ok(accepted) => accepted,
+            Err(response) => return response,
+        };
+        if let Err(error) = chio_finding::verify_finding(&finding) {
+            return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
         }
-    };
-    let record = FindingRecordInput {
-        finding_id: &finding.finding_id,
-        artifact_json,
-        topic: &finding.descriptor.topic,
-        context_sha256: &finding.descriptor.context_sha256,
-        issued_at: finding.issued_at,
-        expires_at: finding.expires_at,
-    };
-    match store.put_finding(&record, now) {
-        Ok(_) => Json(serde_json::json!({
-            "findingId": finding.finding_id,
-            "artifactSha256": chio_core::sha256_hex(&strict_bytes),
-        }))
-        .into_response(),
-        Err(chio_store_sqlite::FindingMarketStoreError::Conflict(error))
-            if error == "collateral allocation id is bound to different backing" =>
-        {
-            plain_http_error(StatusCode::CONFLICT, &error)
+        // Both bounds enforce liveness: a correctly signed
+        // but future-issued or expired finding must not become indexable.
+        let now = clock_now;
+        if finding.issued_at > now {
+            return plain_http_error(StatusCode::BAD_REQUEST, "finding is future-issued");
         }
-        Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    }
+        if finding.expires_at <= now {
+            return plain_http_error(StatusCode::BAD_REQUEST, "finding has expired");
+        }
+        // The finding-scoped pricing hint signs `finding:<finding_id>`;
+        // hashing the hint into the finding would be a cycle, so this
+        // projection requires the reference absent.
+        if finding.price_hint_ref.is_some() {
+            return plain_http_error(
+                StatusCode::BAD_REQUEST,
+                "price_hint_ref must be absent for the finding-scoped projection",
+            );
+        }
+        // A deterministic-replay claim publishes only with its recipe
+        // preimage already retained; seller availability cannot control
+        // later adjudication.
+        if finding.guarantee_class == FindingGuaranteeClass::DeterministicReplay {
+            let Some(recipe_sha256) = finding.replay_recipe_sha256.as_deref() else {
+                return plain_http_error(StatusCode::BAD_REQUEST, "replay recipe digest missing");
+            };
+            if let Err(response) = verify_retained_recipe_closure(&store, recipe_sha256) {
+                return response;
+            }
+        }
+        let artifact_json = match std::str::from_utf8(&strict_bytes) {
+            Ok(text) => text,
+            Err(_) => {
+                return plain_http_error(StatusCode::BAD_REQUEST, "artifact is not UTF-8");
+            }
+        };
+        let record = FindingRecordInput {
+            finding_id: &finding.finding_id,
+            artifact_json,
+            topic: &finding.descriptor.topic,
+            context_sha256: &finding.descriptor.context_sha256,
+            issued_at: finding.issued_at,
+            expires_at: finding.expires_at,
+        };
+        match store.put_finding(&record, now) {
+            Ok(_) => Json(serde_json::json!({
+                "findingId": finding.finding_id,
+                "artifactSha256": chio_core::sha256_hex(&strict_bytes),
+            }))
+            .into_response(),
+            Err(chio_store_sqlite::FindingMarketStoreError::Conflict(error))
+                if error == "collateral allocation id is bound to different backing" =>
+            {
+                plain_http_error(StatusCode::CONFLICT, &error)
+            }
+            Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        }
+    })
+    .await
 }
 
 /// GET /v1/findings/{finding_id} (public): immutable content-addressed
@@ -508,20 +511,23 @@ pub(crate) async fn handle_get_finding(
     State(state): State<TrustServiceState>,
     AxumPath(finding_id): AxumPath<String>,
 ) -> Response {
-    let (_, store) = match finding_market_context(&state) {
-        Ok(context) => context,
-        Err(response) => return response,
-    };
-    match store.get_finding_bytes(&finding_id) {
-        Ok(Some(bytes)) => (
-            StatusCode::OK,
-            [(axum::http::header::CONTENT_TYPE, "application/json")],
-            bytes,
-        )
-            .into_response(),
-        Ok(None) => plain_http_error(StatusCode::NOT_FOUND, "unknown finding"),
-        Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    }
+    blocking_response(move || {
+        let (_, store) = match finding_market_context(&state) {
+            Ok(context) => context,
+            Err(response) => return response,
+        };
+        match store.get_finding_bytes(&finding_id) {
+            Ok(Some(bytes)) => (
+                StatusCode::OK,
+                [(axum::http::header::CONTENT_TYPE, "application/json")],
+                bytes,
+            )
+                .into_response(),
+            Ok(None) => plain_http_error(StatusCode::NOT_FOUND, "unknown finding"),
+            Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        }
+    })
+    .await
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -539,7 +545,7 @@ pub(crate) async fn handle_search_findings_get(
     State(state): State<TrustServiceState>,
     Query(query): Query<FindingSearchQuery>,
 ) -> Response {
-    run_finding_search(&state, &query)
+    blocking_response(move || run_finding_search(&state, &query)).await
 }
 
 /// POST /v1/findings/search (public).
@@ -547,7 +553,7 @@ pub(crate) async fn handle_search_findings_post(
     State(state): State<TrustServiceState>,
     Json(query): Json<FindingSearchQuery>,
 ) -> Response {
-    run_finding_search(&state, &query)
+    blocking_response(move || run_finding_search(&state, &query)).await
 }
 
 /// POST /v1/findings/recipes (authenticated): digest-addressed retention
@@ -560,62 +566,65 @@ pub(crate) async fn handle_upload_finding_dependency(
     headers: HeaderMap,
     body: axum::body::Bytes,
 ) -> Response {
-    let clock_now = match unix_timestamp_now() {
-        Ok(now) => now,
-        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
-    };
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
-        return response;
-    }
-    let (_, store) = match finding_market_context(&state) {
-        Ok(context) => context,
-        Err(response) => return response,
-    };
-    if body.len() > FINDING_DEPENDENCY_MAX_BODY_BYTES {
-        return plain_http_error(
-            StatusCode::PAYLOAD_TOO_LARGE,
-            "dependency exceeds the ingress size bound",
-        );
-    }
-    let is_recipe = std::str::from_utf8(&body).ok().and_then(|text| {
-        chio_core::canonical::UntrustedJsonText::from_wire((text).as_bytes(), 64 * 1024 * 1024)
-            .and_then(|input| input.decode_signed::<serde_json::Value>())
-            .ok()
-            .map(|value| {
-                value.get("schema").and_then(serde_json::Value::as_str)
-                    == Some(FINDING_REPLAY_RECIPE_INPUT_SCHEMA_V1)
-            })
-    });
-    if is_recipe == Some(true) {
-        let raw = match std::str::from_utf8(&body) {
-            Ok(text) => text,
-            Err(_) => {
-                return plain_http_error(StatusCode::BAD_REQUEST, "recipe is not UTF-8");
-            }
+    blocking_response(move || {
+        let clock_now = match unix_timestamp_now() {
+            Ok(now) => now,
+            Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
         };
-        let (strict_bytes, recipe) = match strict_artifact_ingress::<FindingReplayRecipeInput>(
-            raw,
-            FINDING_DEPENDENCY_MAX_BODY_BYTES,
-            RECIPE_SCHEMA_JSON,
-            "chio-finding/v1/replay-recipe-input.schema.json",
-        ) {
-            Ok(accepted) => accepted,
+        if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+            return response;
+        }
+        let (_, store) = match finding_market_context(&state) {
+            Ok(context) => context,
             Err(response) => return response,
         };
-        if let Err(error) = recipe.validate() {
-            return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
+        if body.len() > FINDING_DEPENDENCY_MAX_BODY_BYTES {
+            return plain_http_error(
+                StatusCode::PAYLOAD_TOO_LARGE,
+                "dependency exceeds the ingress size bound",
+            );
         }
-        let digest = chio_core::sha256_hex(&strict_bytes);
-        return match store.put_recipe_blob(&digest, &strict_bytes, clock_now) {
+        let is_recipe = std::str::from_utf8(&body).ok().and_then(|text| {
+            chio_core::canonical::UntrustedJsonText::from_wire((text).as_bytes(), 64 * 1024 * 1024)
+                .and_then(|input| input.decode_signed::<serde_json::Value>())
+                .ok()
+                .map(|value| {
+                    value.get("schema").and_then(serde_json::Value::as_str)
+                        == Some(FINDING_REPLAY_RECIPE_INPUT_SCHEMA_V1)
+                })
+        });
+        if is_recipe == Some(true) {
+            let raw = match std::str::from_utf8(&body) {
+                Ok(text) => text,
+                Err(_) => {
+                    return plain_http_error(StatusCode::BAD_REQUEST, "recipe is not UTF-8");
+                }
+            };
+            let (strict_bytes, recipe) = match strict_artifact_ingress::<FindingReplayRecipeInput>(
+                raw,
+                FINDING_DEPENDENCY_MAX_BODY_BYTES,
+                RECIPE_SCHEMA_JSON,
+                "chio-finding/v1/replay-recipe-input.schema.json",
+            ) {
+                Ok(accepted) => accepted,
+                Err(response) => return response,
+            };
+            if let Err(error) = recipe.validate() {
+                return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
+            }
+            let digest = chio_core::sha256_hex(&strict_bytes);
+            return match store.put_recipe_blob(&digest, &strict_bytes, clock_now) {
+                Ok(_) => Json(serde_json::json!({ "canonicalSha256": digest })).into_response(),
+                Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+            };
+        }
+        let digest = chio_core::sha256_hex(&body);
+        match store.put_recipe_blob(&digest, &body, clock_now) {
             Ok(_) => Json(serde_json::json!({ "canonicalSha256": digest })).into_response(),
             Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-        };
-    }
-    let digest = chio_core::sha256_hex(&body);
-    match store.put_recipe_blob(&digest, &body, clock_now) {
-        Ok(_) => Json(serde_json::json!({ "canonicalSha256": digest })).into_response(),
-        Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    }
+        }
+    })
+    .await
 }
 
 /// POST /v1/findings/profiles (authenticated): register a
@@ -627,39 +636,42 @@ pub(crate) async fn handle_register_finding_profile(
     headers: HeaderMap,
     raw: String,
 ) -> Response {
-    let clock_now = match unix_timestamp_now() {
-        Ok(now) => now,
-        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
-    };
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
-        return response;
-    }
-    let (config, store) = match finding_market_context(&state) {
-        Ok(context) => context,
-        Err(response) => return response,
-    };
-    let (profile_bytes, request) = match strict_profile_registration_ingress(&raw) {
-        Ok(accepted) => accepted,
-        Err(response) => return response,
-    };
-    let now = clock_now;
-    if let Err(error) = verify_profile_registration_authority(&request, &config, now) {
-        return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
-    }
-    if let Err(error) =
-        chio_finding_verifier::validate_supported_finding_verifier_profile(&request.profile.body)
-    {
-        return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
-    }
-    let digest = chio_core::sha256_hex(&profile_bytes);
-    match store.put_recipe_blob(&digest, &profile_bytes, now) {
-        Ok(_) => Json(serde_json::json!({
-            "profileId": request.profile.body.profile_id,
-            "envelopeSha256": digest,
-        }))
-        .into_response(),
-        Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    }
+    blocking_response(move || {
+        let clock_now = match unix_timestamp_now() {
+            Ok(now) => now,
+            Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+        };
+        if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+            return response;
+        }
+        let (config, store) = match finding_market_context(&state) {
+            Ok(context) => context,
+            Err(response) => return response,
+        };
+        let (profile_bytes, request) = match strict_profile_registration_ingress(&raw) {
+            Ok(accepted) => accepted,
+            Err(response) => return response,
+        };
+        let now = clock_now;
+        if let Err(error) = verify_profile_registration_authority(&request, &config, now) {
+            return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
+        }
+        if let Err(error) = chio_finding_verifier::validate_supported_finding_verifier_profile(
+            &request.profile.body,
+        ) {
+            return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
+        }
+        let digest = chio_core::sha256_hex(&profile_bytes);
+        match store.put_recipe_blob(&digest, &profile_bytes, now) {
+            Ok(_) => Json(serde_json::json!({
+                "profileId": request.profile.body.profile_id,
+                "envelopeSha256": digest,
+            }))
+            .into_response(),
+            Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        }
+    })
+    .await
 }
 
 /// POST /v1/findings/collateral (authenticated): register a live
@@ -670,56 +682,59 @@ pub(crate) async fn handle_register_finding_collateral(
     headers: HeaderMap,
     Json(request): Json<FindingCollateralRegistrationRequest>,
 ) -> Response {
-    let clock_now = match unix_timestamp_now() {
-        Ok(now) => now,
-        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
-    };
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
-        return response;
-    }
-    let (config, store) = match finding_market_context(&state) {
-        Ok(context) => context,
-        Err(response) => return response,
-    };
-    let backing = &request.backing;
-    let now = clock_now;
-    if let Err(error) = verify_collateral_authority_lifecycle(
-        backing,
-        &request.collateral_authority_status,
-        &config,
-        now,
-    ) {
-        return plain_http_error(StatusCode::BAD_REQUEST, &error);
-    }
-    // The allocation backs a finding this venue actually serves.
-    match store.get_finding_bytes(&backing.body.finding_id) {
-        Ok(Some(_)) => {}
-        Ok(None) => return plain_http_error(StatusCode::BAD_REQUEST, "unknown finding"),
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    }
-    let envelope_json = match prepare_collateral_registration(backing) {
-        Ok(json) => json,
-        Err(response) => return response,
-    };
-    match store.register_allocation_idempotent(&envelope_json, &backing.body, now) {
-        Ok(chio_store_sqlite::FindingAllocationRegistrationOutcome::Registered { accepted_at }) => {
-            Json(serde_json::json!({
+    blocking_response(move || {
+        let clock_now = match unix_timestamp_now() {
+            Ok(now) => now,
+            Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+        };
+        if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+            return response;
+        }
+        let (config, store) = match finding_market_context(&state) {
+            Ok(context) => context,
+            Err(response) => return response,
+        };
+        let backing = &request.backing;
+        let now = clock_now;
+        if let Err(error) = verify_collateral_authority_lifecycle(
+            backing,
+            &request.collateral_authority_status,
+            &config,
+            now,
+        ) {
+            return plain_http_error(StatusCode::BAD_REQUEST, &error);
+        }
+        // The allocation backs a finding this venue actually serves.
+        match store.get_finding_bytes(&backing.body.finding_id) {
+            Ok(Some(_)) => {}
+            Ok(None) => return plain_http_error(StatusCode::BAD_REQUEST, "unknown finding"),
+            Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        }
+        let envelope_json = match prepare_collateral_registration(backing) {
+            Ok(json) => json,
+            Err(response) => return response,
+        };
+        match store.register_allocation_idempotent(&envelope_json, &backing.body, now) {
+            Ok(chio_store_sqlite::FindingAllocationRegistrationOutcome::Registered {
+                accepted_at,
+            }) => Json(serde_json::json!({
                 "allocationId": backing.body.allocation_id,
                 "acceptedAt": accepted_at,
                 "exactReplay": false,
             }))
-            .into_response()
+            .into_response(),
+            Ok(chio_store_sqlite::FindingAllocationRegistrationOutcome::ExactReplay {
+                accepted_at,
+            }) => Json(serde_json::json!({
+                "allocationId": backing.body.allocation_id,
+                "acceptedAt": accepted_at,
+                "exactReplay": true,
+            }))
+            .into_response(),
+            Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
         }
-        Ok(chio_store_sqlite::FindingAllocationRegistrationOutcome::ExactReplay {
-            accepted_at,
-        }) => Json(serde_json::json!({
-            "allocationId": backing.body.allocation_id,
-            "acceptedAt": accepted_at,
-            "exactReplay": true,
-        }))
-        .into_response(),
-        Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    }
+    })
+    .await
 }
 
 /// Composite activation request: every envelope the admission binds by
@@ -1089,857 +1104,87 @@ pub(crate) async fn handle_activate_finding(
     headers: HeaderMap,
     Json(request): Json<FindingActivateRequest>,
 ) -> Response {
-    let clock_now = match unix_timestamp_now() {
-        Ok(now) => now,
-        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
-    };
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
-        return response;
-    }
-    let (config, store) = match finding_market_context(&state) {
-        Ok(context) => context,
-        Err(response) => return response,
-    };
-    let purchase_store = match state.joint_authority_store.as_ref() {
-        Some(authority) => authority.finding_purchase_store(),
-        None => {
-            return plain_http_error(
-                StatusCode::CONFLICT,
-                "finding market requires the joint authority store",
-            )
-        }
-    };
-    let admission = &request.admission.body;
-    if admission.finding_id != finding_id {
-        return plain_http_error(StatusCode::BAD_REQUEST, "admission names another finding");
-    }
-    let now = clock_now;
-    let admission_json = match chio_core::canonical_json_bytes(&request.admission)
-        .map_err(|_| ())
-        .and_then(|bytes| String::from_utf8(bytes).map_err(|_| ()))
-    {
-        Ok(json) => json,
-        Err(()) => {
-            return plain_http_error(StatusCode::BAD_REQUEST, "admission failed canonicalization")
-        }
-    };
-
-    // A prepared retry owns the consumed allocation named by these exact
-    // bytes. An activated retry is already complete, including when a
-    // later admission superseded it.
-    let activation_attempt = match store.get_activation_attempt(&admission.admission_id) {
-        Ok(Some(attempt)) => {
-            if attempt.envelope_json != admission_json {
-                return plain_http_error(
-                    StatusCode::BAD_REQUEST,
-                    "admission id is already bound to different activation bytes",
-                );
-            }
-            Some(attempt)
-        }
-        Ok(None) => None,
-        Err(error) => {
-            return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
-        }
-    };
-    let prepared_replay = activation_attempt
-        .as_ref()
-        .is_some_and(|attempt| attempt.state == FindingActivationAttemptState::Prepared);
-    let mut completed_replay = activation_attempt
-        .as_ref()
-        .is_some_and(|attempt| attempt.state == FindingActivationAttemptState::Activated);
-
-    // Exact-replay short circuit: a retry of an already committed
-    // activation must return the stored outcome instead of re-verifying
-    // against the post-commit allocation state. Byte equality on the
-    // canonical envelope is the replay test. Listing pin, signature, and
-    // status checks still run below before the success is returned.
-    match store.get_current_admission(&finding_id) {
-        Ok(Some(snapshot)) if snapshot.admission_id == admission.admission_id => {
-            if admission_json != snapshot.envelope_json {
-                return plain_http_error(
-                    StatusCode::BAD_REQUEST,
-                    "admission id is already bound to different bytes",
-                );
-            }
-            completed_replay = true;
-        }
-        Ok(_) => {}
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    }
-
-    if completed_replay {
-        if let Err(error) = purchase_store.register_community_fund_destination(
-            &admission.backing_allocation_id,
-            &admission.community_fund_destination,
-            now,
-        ) {
-            return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
-        }
-        return Json(serde_json::json!({
-            "admissionId": admission.admission_id,
-            "outcome": "ExactReplay",
-        }))
-        .into_response();
-    }
-
-    // Preparing the exact admission durably records the authorization
-    // decision before any fee can move. An exact retry reuses that bounded
-    // instant for constituent lifecycle validation so a later rotation or
-    // expiry cannot strand a reconciled charge and consumed allocation.
-    let authorization_now = activation_attempt
-        .as_ref()
-        .filter(|attempt| attempt.state == FindingActivationAttemptState::Prepared)
-        .map_or(now, |attempt| attempt.prepared_at);
-    if !config.venue.covers(admission.issued_at) || !config.venue.covers(authorization_now) {
-        return plain_http_error(
-            StatusCode::BAD_REQUEST,
-            "finding venue authority is not live for admission activation",
-        );
-    }
-    if let Err(error) = verify_venue_authority_lifecycle(
-        &request.admission,
-        &request.venue_authority_status,
-        &config,
-        authorization_now,
-    ) {
-        return plain_http_error(StatusCode::BAD_REQUEST, &error);
-    }
-
-    match purchase_store.sales_blocked(&admission.listing_id) {
-        Ok(true) => {
-            if prepared_replay {
-                // The durable prepare owns the pre-fee block decision. The
-                // activated listing will still be blocked from new sales.
-            } else {
-                return plain_http_error(
-                    StatusCode::BAD_REQUEST,
-                    "listing admission is blocked by an enforced penalty",
-                );
-            }
-        }
-        Ok(false) => {}
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    }
-
-    // The published finding is the root of every binding.
-    let artifact_json = match store.get_finding_bytes(&finding_id) {
-        Ok(Some(bytes)) => bytes,
-        Ok(None) => return plain_http_error(StatusCode::NOT_FOUND, "unknown finding"),
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    };
-    let finding: Finding = match chio_core::canonical::UntrustedJsonText::from_wire(
-        artifact_json.as_bytes(),
-        64 * 1024 * 1024,
-    )
-    .and_then(|input| input.decode_signed())
-    {
-        Ok(finding) => finding,
-        Err(_) => {
-            return plain_http_error(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "stored finding failed deserialization",
-            )
-        }
-    };
-    if admission.status_feed_operator_ref != finding.status_feed_ref {
-        return plain_http_error(
-            StatusCode::BAD_REQUEST,
-            "admission status feed does not match the Finding status feed",
-        );
-    }
-    if require_status_feed_through(
-        &config.status_feed_operator,
-        &config.status_feed_service_bond,
-        &finding.status_feed_ref,
-        authorization_now,
-        authorization_now,
-    )
-    .is_err()
-    {
-        return plain_http_error(
-            StatusCode::BAD_REQUEST,
-            "finding status service bond is not live for activation",
-        );
-    }
-    let status_epoch = match finding_status_store(&state).and_then(|store| {
-        store
-            .get_current_epoch(&finding.status_feed_ref)
-            .map_err(|error| plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()))
-    }) {
-        Ok(epoch) => epoch,
-        Err(response) => return response,
-    };
-    if let Err(error) = verify_status_operator_authority_lifecycle(
-        &request.status_operator_authority_status,
-        &config,
-        &finding.status_feed_ref,
-        if prepared_replay || completed_replay {
-            0
-        } else {
-            status_epoch.generated_at
-        },
-        authorization_now,
-        "activation",
-    ) {
-        return plain_http_error(StatusCode::BAD_REQUEST, &error);
-    }
-    if finding.guarantee_class == FindingGuaranteeClass::DeterministicReplay {
-        let Some(recipe_sha256) = finding.replay_recipe_sha256.as_deref() else {
-            return plain_http_error(StatusCode::BAD_REQUEST, "replay recipe digest missing");
+    blocking_response(move || {
+        let clock_now = match unix_timestamp_now() {
+            Ok(now) => now,
+            Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
         };
-        if let Err(response) = verify_retained_recipe_closure(&store, recipe_sha256) {
+        if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
             return response;
         }
-    }
-    let artifact_sha256 = chio_core::sha256_hex(artifact_json.as_bytes());
-    if admission.finding_artifact_sha256 != artifact_sha256 {
-        return plain_http_error(
-            StatusCode::BAD_REQUEST,
-            "admission binds a different finding artifact",
-        );
-    }
-
-    // Listing and pricing-hint exact bindings: a mismatched hint or
-    // metadata binding is rejected.
-    let listing_digest = match canonical_digest_of(&request.listing) {
-        Ok(digest) => digest,
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error),
-    };
-    if listing_digest != admission.listing_envelope_sha256 {
-        return plain_http_error(StatusCode::BAD_REQUEST, "listing envelope digest mismatch");
-    }
-    if let Err(error) =
-        ensure_generic_listing_signed_by_namespace_owner(&request.listing, "finding listing")
-    {
-        return plain_http_error(StatusCode::BAD_REQUEST, &error);
-    }
-    let listing_authority = match config.listing.key() {
-        Ok(key) => key,
-        Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
-        }
-    };
-    if request.listing.signer_key != listing_authority
-        || request.listing.body.namespace_ownership.owner_id != config.listing.authority_id
-    {
-        return plain_http_error(
-            StatusCode::BAD_REQUEST,
-            "finding listing signer does not match the configured listing authority",
-        );
-    }
-    if request.listing.body.published_at > authorization_now {
-        return plain_http_error(
-            StatusCode::BAD_REQUEST,
-            "finding listing was published after the activation clock",
-        );
-    }
-    if !config.listing.covers(request.listing.body.published_at) {
-        return plain_http_error(
-            StatusCode::BAD_REQUEST,
-            "finding listing was published outside the configured listing authority window",
-        );
-    }
-    if !config.listing.covers(authorization_now) {
-        return plain_http_error(
-            StatusCode::BAD_REQUEST,
-            "finding listing authority is not live at activation",
-        );
-    }
-    if request.listing.body.status != GenericListingStatus::Active {
-        return plain_http_error(StatusCode::BAD_REQUEST, "finding listing is not active");
-    }
-    let hint_digest = match canonical_digest_of(&request.pricing_hint) {
-        Ok(digest) => digest,
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error),
-    };
-    if hint_digest != admission.pricing_hint_envelope_sha256 {
-        return plain_http_error(
-            StatusCode::BAD_REQUEST,
-            "pricing hint envelope digest mismatch",
-        );
-    }
-    if let Err(error) = request.pricing_hint.body.validate() {
-        return plain_http_error(StatusCode::BAD_REQUEST, &error);
-    }
-    if !matches!(request.pricing_hint.verify_signature(), Ok(true)) {
-        return plain_http_error(StatusCode::BAD_REQUEST, "pricing hint signature is invalid");
-    }
-    if !request.pricing_hint.body.is_live_at(authorization_now) {
-        return plain_http_error(
-            StatusCode::BAD_REQUEST,
-            "pricing hint is not live at activation",
-        );
-    }
-    if request.pricing_hint.signer_key != listing_authority
-        || request.pricing_hint.body.listing_id != request.listing.body.listing_id
-        || normalize_namespace(&request.pricing_hint.body.namespace)
-            != normalize_namespace(&request.listing.body.namespace)
-        || request.pricing_hint.body.provider_operator_id != admission.publisher_operator_id
-        || request.pricing_hint.body.provider_operator_id
-            != request.listing.body.namespace_ownership.owner_id
-        || request.listing.body.subject.actor_id != admission.server_id
-    {
-        return plain_http_error(
-            StatusCode::BAD_REQUEST,
-            "pricing hint identity does not match the admitted listing",
-        );
-    }
-    if let Err(error) = verify_listing_authority_lifecycle(
-        &request.listing,
-        &request.pricing_hint,
-        &request.listing_authority_status,
-        &config,
-        authorization_now,
-    ) {
-        return plain_http_error(StatusCode::BAD_REQUEST, &error);
-    }
-    if request.pricing_hint.body.capability_scope != admission.capability_scope {
-        return plain_http_error(StatusCode::BAD_REQUEST, "pricing hint scope mismatch");
-    }
-    if request.pricing_hint.body.expires_at < admission.expires_at {
-        return plain_http_error(
-            StatusCode::BAD_REQUEST,
-            "admission outlives the pricing hint",
-        );
-    }
-    let listing_metadata_url = request
-        .listing
-        .body
-        .subject
-        .metadata_url
-        .as_deref()
-        .unwrap_or_default();
-    if listing_metadata_url != admission.metadata_url {
-        return plain_http_error(StatusCode::BAD_REQUEST, "listing metadata url mismatch");
-    }
-    if request.listing.body.listing_id != admission.listing_id {
-        return plain_http_error(StatusCode::BAD_REQUEST, "listing id mismatch");
-    }
-
-    // Seller authorization: the issuer-signed grant that lets this
-    // seller list this exact finding. Required even when issuer and
-    // seller are the same key.
-    let authorization_digest = match canonical_digest_of(&request.seller_authorization) {
-        Ok(digest) => digest,
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error),
-    };
-    if authorization_digest != admission.seller_authorization_envelope_sha256 {
-        return plain_http_error(
-            StatusCode::BAD_REQUEST,
-            "seller authorization envelope digest mismatch",
-        );
-    }
-    if let Err(error) = verify_signed_seller_authorization(&request.seller_authorization) {
-        return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
-    }
-    let authorization = &request.seller_authorization.body;
-    if authorization.issuer != finding.issuer {
-        return plain_http_error(
-            StatusCode::BAD_REQUEST,
-            "seller authorization issuer is not the finding issuer",
-        );
-    }
-    if authorization.seller != request.terms.body.seller {
-        return plain_http_error(
-            StatusCode::BAD_REQUEST,
-            "seller authorization names a different seller than the terms",
-        );
-    }
-    if authorization.finding_id != finding_id
-        || authorization.finding_artifact_sha256 != artifact_sha256
-    {
-        return plain_http_error(
-            StatusCode::BAD_REQUEST,
-            "seller authorization binds a different finding",
-        );
-    }
-    if authorization.listing_id != admission.listing_id {
-        return plain_http_error(
-            StatusCode::BAD_REQUEST,
-            "seller authorization names a different listing",
-        );
-    }
-    if authorization.issued_at > authorization_now || authorization.expires_at <= authorization_now
-    {
-        return plain_http_error(StatusCode::BAD_REQUEST, "seller authorization is not live");
-    }
-    if authorization.provider_server_id != admission.server_id {
-        return plain_http_error(
-            StatusCode::BAD_REQUEST,
-            "seller authorization provider server does not match the admission",
-        );
-    }
-    if let Err(error) = verify_seller_authorization_lifecycle(
-        &request.seller_authorization,
-        &request.seller_authorization_status,
-        &config,
-        authorization_now,
-    ) {
-        return plain_http_error(StatusCode::BAD_REQUEST, &error);
-    }
-    if let FindingPayee::Beneficiary { destination, .. } = &authorization.payee {
-        if destination != &admission.payee_destination {
-            return plain_http_error(
-                StatusCode::BAD_REQUEST,
-                "seller authorization payee does not match the admission",
-            );
-        }
-    }
-
-    // Collateral snapshot for the named allocation.
-    let allocation = match store.get_allocation(&admission.backing_allocation_id) {
-        Ok(Some(snapshot)) => snapshot,
-        Ok(None) => {
-            return plain_http_error(StatusCode::BAD_REQUEST, "unknown collateral allocation")
-        }
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    };
-    let collateral_key = match verify_collateral_authority_lifecycle(
-        &request.backing,
-        &request.collateral_authority_status,
-        &config,
-        authorization_now,
-    ) {
-        Ok(key) => key,
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error),
-    };
-
-    // The retained profile remains an authority-bearing dependency at
-    // activation. Digest-addressed storage proves only byte identity, so
-    // re-run its body validation, governance signature, and liveness
-    // checks before any profile field influences admission.
-    let profile_bytes = match store.get_recipe_blob(&admission.profile_envelope_sha256) {
-        Ok(Some(bytes)) => bytes,
-        Ok(None) => {
-            return plain_http_error(
-                StatusCode::BAD_REQUEST,
-                "verifier profile is not registered with this venue",
-            )
-        }
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    };
-    let profile: SignedFindingChallengeVerifierProfile =
-        match chio_core::canonical::UntrustedJsonText::from_wire(&profile_bytes, 64 * 1024 * 1024)
-            .and_then(|input| input.decode_signed())
-        {
-            Ok(profile) => profile,
-            Err(_) => {
+        let (config, store) = match finding_market_context(&state) {
+            Ok(context) => context,
+            Err(response) => return response,
+        };
+        let purchase_store = match state.joint_authority_store.as_ref() {
+            Some(authority) => authority.finding_purchase_store(),
+            None => {
                 return plain_http_error(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "retained profile failed deserialization",
+                    StatusCode::CONFLICT,
+                    "finding market requires the joint authority store",
                 )
             }
         };
-    if let Err(error) = verify_profile_for_activation(
-        &profile,
-        &admission.profile_envelope_sha256,
-        &request.profile_governance_authority_status,
-        &config,
-        authorization_now,
-    ) {
-        return plain_http_error(StatusCode::BAD_REQUEST, &error);
-    }
-    if let Err(error) = verify_profile_settlement_authorities(&profile, &request.admission, &config)
-    {
-        return plain_http_error(StatusCode::BAD_REQUEST, &error);
-    }
-    let Some(authority_status_resolver) = state.finding_authority_status_resolver.as_deref() else {
-        return plain_http_error(
-            StatusCode::CONFLICT,
-            "finding activation requires the authority-status resolver",
-        );
-    };
-    for policy in [
-        &admission.purchase_authority,
-        &admission.failed_delivery_authority,
-    ] {
-        let authority_status = match authority_status_resolver
-            .resolve(&terminal_authority_pin(policy), authorization_now)
+        let admission = &request.admission.body;
+        if admission.finding_id != finding_id {
+            return plain_http_error(StatusCode::BAD_REQUEST, "admission names another finding");
+        }
+        let now = clock_now;
+        let admission_json = match chio_core::canonical_json_bytes(&request.admission)
+            .map_err(|_| ())
+            .and_then(|bytes| String::from_utf8(bytes).map_err(|_| ()))
         {
-            Ok(status) => status,
-            Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error),
-        };
-        if let Err(error) = verify_terminal_authority_lifecycle(
-            policy,
-            &authority_status,
-            &config,
-            admission.issued_at,
-            authorization_now,
-        ) {
-            return plain_http_error(StatusCode::BAD_REQUEST, &error);
-        }
-    }
-
-    // Pinned keys.
-    let venue_key = match config.venue.key() {
-        Ok(venue) => venue,
-        Err(_) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, "pinned keys invalid")
-        }
-    };
-
-    // The full admission verification: venue pin, liveness, terms and
-    // backing bindings, fiscal gate, sizing inequality, expiry bound.
-    let trusted_signers = match config.fee_schedule_operators() {
-        Ok(signers) => signers,
-        Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
-        }
-    };
-    let gate = match state.fiscal_runtime.as_ref() {
-        Some(_) => {
-            // Fiscal-governed venues verify schedules through the
-            // resolver-driven surface; no resolver is wired into finding
-            // activation yet, so fiscal-governed venues are rejected here.
-            return plain_http_error(
-                StatusCode::CONFLICT,
-                "fiscal-governed finding activation is unavailable: no fee-schedule resolver is wired for this venue",
-            );
-        }
-        None => FindingFeeScheduleGate::Legacy,
-    };
-    if let Err(error) = verify_report_authority_lifecycle(
-        &request.verifier_report,
-        &request.verifier_authority_status,
-        &profile,
-        &finding,
-        &config,
-        authorization_now,
-    ) {
-        return plain_http_error(StatusCode::BAD_REQUEST, &error);
-    }
-    // The report's affirmative bond claim, if any, feeds the admission
-    // seam's report-before-backing ordering check.
-    let report = &request.verifier_report.body;
-    let bond_backing_observed_at = (report.facet_outcome(FindingFacetKind::BondBacking)
-        == Some(FindingFacetOutcome::Verified))
-    .then_some(report.evaluation_time);
-    let admission_context = FindingAdmissionContext {
-        venue_authority: &venue_key,
-        venue_id: &config.venue_id,
-        now: authorization_now,
-        fee_schedule: &request.fee_schedule,
-        fee_schedule_gate: gate,
-        trusted_local_operator_signers: &trusted_signers,
-        seller_authorization: &request.seller_authorization,
-        terms: &request.terms,
-        backing: &request.backing,
-        allocation_snapshot: AdmissionAllocationSnapshot {
-            allocation_id: allocation.backing.allocation_id.clone(),
-            backing_envelope_sha256: allocation.backing_envelope_sha256.clone(),
-            expires_at: allocation.backing.expires_at,
-            status: match allocation.state {
-                FindingAllocationState::Live => FindingAllocationStatus::Available,
-                FindingAllocationState::Consumed => FindingAllocationStatus::Consumed,
-                FindingAllocationState::Expired => FindingAllocationStatus::Expired,
-                FindingAllocationState::Released => FindingAllocationStatus::Released,
-            },
-            active_admission_id: allocation.active_admission_id.clone(),
-            prepared_admission_id: prepared_replay.then(|| admission.admission_id.clone()),
-            accepted_at: allocation.accepted_at,
-        },
-        bond_backing_observed_at,
-        // The HTTP surface gates on the durable sales block above. It
-        // never accepts a caller-supplied penalty evaluation.
-        penalty_gate: FindingAdmissionPenaltyGate::Ungoverned,
-        collateral_authority: &collateral_key,
-        constituent_expiry_bounds: FindingConstituentExpiryBounds {
-            finding: finding.expires_at,
-            listing: request.listing.body.expires_at.unwrap_or(u64::MAX),
-            pricing_hint: request.pricing_hint.body.expires_at,
-            seller_authorization: authorization.expires_at,
-            profile: profile.body.expires_at,
-        },
-    };
-    if let Err(error) =
-        verify_finding_admission_for_activation(&request.admission, &admission_context)
-    {
-        return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
-    }
-
-    // The verifier signer and its current authenticated status were checked
-    // above before the report influenced admission sizing. Continue with its
-    // exact bindings and required-facet policy against the retained profile.
-    let report = &request.verifier_report.body;
-    let report_digest = match canonical_digest_of(&request.verifier_report) {
-        Ok(digest) => digest,
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error),
-    };
-    if report_digest != admission.verifier_report_envelope_sha256
-        || report.report_id != admission.verifier_report_id
-    {
-        return plain_http_error(StatusCode::BAD_REQUEST, "verifier report binding mismatch");
-    }
-    if report.finding_id != finding_id || report.finding_artifact_sha256 != artifact_sha256 {
-        return plain_http_error(
-            StatusCode::BAD_REQUEST,
-            "verifier report binds a different finding",
-        );
-    }
-    if report.verifier_profile_envelope_sha256 != admission.profile_envelope_sha256 {
-        return plain_http_error(StatusCode::BAD_REQUEST, "verifier profile binding mismatch");
-    }
-    if report.verifier_profile_id != profile.body.profile_id {
-        return plain_http_error(StatusCode::BAD_REQUEST, "verifier profile id mismatch");
-    }
-    if report.facet_outcome(FindingFacetKind::BondBacking) == Some(FindingFacetOutcome::Verified) {
-        if report.backing_allocation_id.as_deref() != Some(admission.backing_allocation_id.as_str())
-        {
-            return plain_http_error(
-                StatusCode::BAD_REQUEST,
-                "report bond verdict names another allocation",
-            );
-        }
-        // Mechanical report-before-backing: the allocation must have been
-        // accepted before the report's evaluation time.
-        if allocation.accepted_at >= report.evaluation_time {
-            return plain_http_error(
-                StatusCode::BAD_REQUEST,
-                "report claims bond backing before the allocation existed",
-            );
-        }
-    }
-    if report
-        .facets
-        .iter()
-        .any(|facet| facet.outcome == FindingFacetOutcome::Failed)
-    {
-        return plain_http_error(
-            StatusCode::BAD_REQUEST,
-            "verifier report contains a failed facet; admission denied",
-        );
-    }
-    for facet in required_finding_facets(&finding, &profile.body) {
-        if report.facet_outcome(facet) != Some(FindingFacetOutcome::Verified) {
-            return plain_http_error(
-                StatusCode::BAD_REQUEST,
-                "a required facet is not verified; admission denied",
-            );
-        }
-    }
-
-    // Terms binding for later epoch computation: retain the exact terms
-    // envelope digest-addressed, since the admission binds it.
-    let terms_json = match chio_core::canonical_json_bytes(&request.terms) {
-        Ok(bytes) => bytes,
-        Err(_) => {
-            return plain_http_error(StatusCode::BAD_REQUEST, "terms failed canonicalization")
-        }
-    };
-    let terms_digest = chio_core::sha256_hex(&terms_json);
-    if store
-        .put_recipe_blob(&terms_digest, &terms_json, now)
-        .is_err()
-    {
-        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, "terms retention failed");
-    }
-    let authorization_json = match chio_core::canonical_json_bytes(&request.seller_authorization) {
-        Ok(bytes) => bytes,
-        Err(_) => {
-            return plain_http_error(
-                StatusCode::BAD_REQUEST,
-                "seller authorization failed canonicalization",
-            )
-        }
-    };
-    if store
-        .put_recipe_blob(&authorization_digest, &authorization_json, now)
-        .is_err()
-    {
-        return plain_http_error(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "seller authorization retention failed",
-        );
-    }
-
-    // Validate every fee terminal and install every idempotency fence
-    // before the allocation is prepared. No rail dispatch occurs until
-    // all local fee inputs are known to be internally consistent.
-    let Some(rail) = state.finding_rail.as_ref() else {
-        return plain_http_error(
-            StatusCode::CONFLICT,
-            "no evidenced rail observer is configured",
-        );
-    };
-    let schedule_digest = match signed_fee_schedule_digest(&request.fee_schedule) {
-        Ok(digest) => digest,
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    };
-    let mut charges = Vec::with_capacity(admission.fee_terminals.len());
-    for terminal in &admission.fee_terminals {
-        if terminal.fee_schedule_envelope_sha256 != schedule_digest {
-            return plain_http_error(StatusCode::BAD_REQUEST, "fee terminal schedule mismatch");
-        }
-        // Both fee event kinds restrict to the governance-pinned audit pool.
-        if terminal.pool_principal_id != config.audit_pool.principal_id
-            || terminal.rail_destination != config.audit_pool.rail_destination
-            || terminal.amount.currency != config.audit_pool.currency
-        {
-            return plain_http_error(
-                StatusCode::BAD_REQUEST,
-                "fee terminal does not name the pinned audit pool",
-            );
-        }
-        let expected_amount = match &terminal.event {
-            FindingFeeEvent::Publication => &request.fee_schedule.body.publication_fee,
-            FindingFeeEvent::ParticipationEpoch { .. } => {
-                &request.fee_schedule.body.market_participation_fee
+            Ok(json) => json,
+            Err(()) => {
+                return plain_http_error(StatusCode::BAD_REQUEST, "admission failed canonicalization")
             }
         };
-        if terminal.amount != *expected_amount {
-            return plain_http_error(
-                StatusCode::BAD_REQUEST,
-                "fee terminal amount does not match the schedule",
-            );
-        }
-        let idempotency_key = finding_fee_idempotency_key(
-            &schedule_digest,
-            &terminal.event,
-            &finding_id,
-            &admission.listing_id,
-        );
-        let instruction = FindingRailInstruction {
-            idempotency_key: idempotency_key.clone(),
-            payer: terminal.payer.clone(),
-            amount_units: terminal.amount.units,
-            currency: terminal.amount.currency.clone(),
-            pool_principal_id: terminal.pool_principal_id.clone(),
-            rail_destination: terminal.rail_destination.clone(),
-        };
-        let instruction_sha256 = match canonical_digest_of(&instruction) {
-            Ok(digest) => digest,
-            Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error),
-        };
-        if instruction_sha256 != terminal.instruction_sha256 {
-            return plain_http_error(
-                StatusCode::BAD_REQUEST,
-                "fee terminal instruction commitment mismatch",
-            );
-        }
-        charges.push(PreparedFindingFeeCharge {
-            idempotency_key,
-            instruction,
-            instruction_sha256,
-        });
-    }
-    // Atomically validate live status, fence every fee intent, claim the
-    // allocation, and retain the exact admission before money can move. A
-    // concurrent retraction therefore wins before any financial state opens.
-    // A crash from here onward leaves one replayable prepare record, so a
-    // reconciled charge cannot lose its activation owner.
-    if !prepared_replay
-        && require_status_feed_through(
-            &config.status_feed_operator,
-            &config.status_feed_service_bond,
-            &finding.status_feed_ref,
-            now,
-            now,
-        )
-        .is_err()
-    {
-        return plain_http_error(
-            StatusCode::BAD_REQUEST,
-            "finding status operator or service bond is not live for activation",
-        );
-    }
-    match store.prepare_listing_activation(
-        &admission_json,
-        admission,
-        &finding.status_feed_ref,
-        &config.status_feed_operator.authorization_sha256,
-        request.status_operator_authority_status.body.observed_at,
-        now,
-        config.status_max_epoch_age_secs,
-    ) {
-        Ok(FindingActivationPreparationOutcome::Prepared)
-        | Ok(FindingActivationPreparationOutcome::PendingReplay) => {}
-        Ok(FindingActivationPreparationOutcome::AlreadyActivated) => {
-            return Json(serde_json::json!({
-                "admissionId": admission.admission_id,
-                "outcome": "ExactReplay",
-            }))
-            .into_response();
-        }
-        Ok(FindingActivationPreparationOutcome::Expired) => {
-            return plain_http_error(
-                StatusCode::BAD_REQUEST,
-                "prepared activation expired before completion",
-            );
-        }
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    }
 
-    // Dispatch and reconcile each unsettled terminal. Reconciled intents
-    // from an earlier attempt are never dispatched twice.
-    for (terminal, charge) in admission.fee_terminals.iter().zip(&charges) {
-        let fee_event = match store.get_fee_event(&charge.idempotency_key) {
-            Ok(Some(event)) => event,
-            Ok(None) => {
-                return plain_http_error(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "prepared activation lost its fee intent",
-                )
+        // A prepared retry owns the consumed allocation named by these exact
+        // bytes. An activated retry is already complete, including when a
+        // later admission superseded it.
+        let activation_attempt = match store.get_activation_attempt(&admission.admission_id) {
+            Ok(Some(attempt)) => {
+                if attempt.envelope_json != admission_json {
+                    return plain_http_error(
+                        StatusCode::BAD_REQUEST,
+                        "admission id is already bound to different activation bytes",
+                    );
+                }
+                Some(attempt)
             }
+            Ok(None) => None,
             Err(error) => {
                 return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
             }
         };
-        if fee_event.state == FindingFeeState::Reconciled {
-            continue;
-        }
-        let observation = match rail.dispatch(&charge.instruction) {
-            Ok(observation) => observation,
-            Err(reason) => {
-                // The intent and prepare record stay durable. No admission
-                // becomes active, and an identical retry can resume.
-                let _ = store.mark_fee_failed(&charge.idempotency_key);
-                return plain_http_error(
-                    StatusCode::BAD_GATEWAY,
-                    &format!("rail dispatch failed: {reason}"),
-                );
-            }
-        };
-        if !super::finding_challenge_coordinator::rail_observation_matches(
-            &charge.instruction,
-            &charge.instruction_sha256,
-            &observation,
-        ) {
-            let _ = store.mark_fee_failed(&charge.idempotency_key);
-            return plain_http_error(
-                StatusCode::BAD_GATEWAY,
-                "rail observation does not reconcile to the dispatched instruction",
-            );
-        }
-        let observation_sha256 = match canonical_digest_of(&observation) {
-            Ok(digest) => digest,
-            Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error),
-        };
-        if observation_sha256 != terminal.observation_sha256 {
-            return plain_http_error(
-                StatusCode::BAD_REQUEST,
-                "fee terminal observation commitment mismatch",
-            );
-        }
-        if let Err(error) = store.mark_fee_reconciled(
-            &charge.idempotency_key,
-            &observation_sha256,
-            &terminal.amount,
-            &terminal.rail_destination,
-        ) {
-            return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
-        }
-    }
+        let prepared_replay = activation_attempt
+            .as_ref()
+            .is_some_and(|attempt| attempt.state == FindingActivationAttemptState::Prepared);
+        let mut completed_replay = activation_attempt
+            .as_ref()
+            .is_some_and(|attempt| attempt.state == FindingActivationAttemptState::Activated);
 
-    // Finalization atomically checks every reconciled terminal, inserts
-    // the active admission, supersedes the prior active row, and marks
-    // the durable prepare complete.
-    match store.activate_listing(&admission_json, admission, now) {
-        Ok(FindingActivationOutcome::Expired) => plain_http_error(
-            StatusCode::BAD_REQUEST,
-            "prepared activation expired; collateral was released and matching fees remain credited",
-        ),
-        Ok(outcome) => {
+        // Exact-replay short circuit: a retry of an already committed
+        // activation must return the stored outcome instead of re-verifying
+        // against the post-commit allocation state. Byte equality on the
+        // canonical envelope is the replay test. Listing pin, signature, and
+        // status checks still run below before the success is returned.
+        match store.get_current_admission(&finding_id) {
+            Ok(Some(snapshot)) if snapshot.admission_id == admission.admission_id => {
+                if admission_json != snapshot.envelope_json {
+                    return plain_http_error(
+                        StatusCode::BAD_REQUEST,
+                        "admission id is already bound to different bytes",
+                    );
+                }
+                completed_replay = true;
+            }
+            Ok(_) => {}
+            Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        }
+
+        if completed_replay {
             if let Err(error) = purchase_store.register_community_fund_destination(
                 &admission.backing_allocation_id,
                 &admission.community_fund_destination,
@@ -1947,14 +1192,787 @@ pub(crate) async fn handle_activate_finding(
             ) {
                 return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
             }
-            Json(serde_json::json!({
+            return Json(serde_json::json!({
                 "admissionId": admission.admission_id,
-                "outcome": format!("{outcome:?}"),
+                "outcome": "ExactReplay",
             }))
-            .into_response()
+            .into_response();
         }
-        Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    }
+
+        // Preparing the exact admission durably records the authorization
+        // decision before any fee can move. An exact retry reuses that bounded
+        // instant for constituent lifecycle validation so a later rotation or
+        // expiry cannot strand a reconciled charge and consumed allocation.
+        let authorization_now = activation_attempt
+            .as_ref()
+            .filter(|attempt| attempt.state == FindingActivationAttemptState::Prepared)
+            .map_or(now, |attempt| attempt.prepared_at);
+        if !config.venue.covers(admission.issued_at) || !config.venue.covers(authorization_now) {
+            return plain_http_error(
+                StatusCode::BAD_REQUEST,
+                "finding venue authority is not live for admission activation",
+            );
+        }
+        if let Err(error) = verify_venue_authority_lifecycle(
+            &request.admission,
+            &request.venue_authority_status,
+            &config,
+            authorization_now,
+        ) {
+            return plain_http_error(StatusCode::BAD_REQUEST, &error);
+        }
+
+        match purchase_store.sales_blocked(&admission.listing_id) {
+            Ok(true) => {
+                if prepared_replay {
+                    // The durable prepare owns the pre-fee block decision. The
+                    // activated listing will still be blocked from new sales.
+                } else {
+                    return plain_http_error(
+                        StatusCode::BAD_REQUEST,
+                        "listing admission is blocked by an enforced penalty",
+                    );
+                }
+            }
+            Ok(false) => {}
+            Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        }
+
+        // The published finding is the root of every binding.
+        let artifact_json = match store.get_finding_bytes(&finding_id) {
+            Ok(Some(bytes)) => bytes,
+            Ok(None) => return plain_http_error(StatusCode::NOT_FOUND, "unknown finding"),
+            Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        };
+        let finding: Finding = match chio_core::canonical::UntrustedJsonText::from_wire(
+            artifact_json.as_bytes(),
+            64 * 1024 * 1024,
+        )
+        .and_then(|input| input.decode_signed())
+        {
+            Ok(finding) => finding,
+            Err(_) => {
+                return plain_http_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "stored finding failed deserialization",
+                )
+            }
+        };
+        if admission.status_feed_operator_ref != finding.status_feed_ref {
+            return plain_http_error(
+                StatusCode::BAD_REQUEST,
+                "admission status feed does not match the Finding status feed",
+            );
+        }
+        if require_status_feed_through(
+            &config.status_feed_operator,
+            &config.status_feed_service_bond,
+            &finding.status_feed_ref,
+            authorization_now,
+            authorization_now,
+        )
+        .is_err()
+        {
+            return plain_http_error(
+                StatusCode::BAD_REQUEST,
+                "finding status service bond is not live for activation",
+            );
+        }
+        let status_epoch = match finding_status_store(&state).and_then(|store| {
+            store
+                .get_current_epoch(&finding.status_feed_ref)
+                .map_err(|error| plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()))
+        }) {
+            Ok(epoch) => epoch,
+            Err(response) => return response,
+        };
+        if let Err(error) = verify_status_operator_authority_lifecycle(
+            &request.status_operator_authority_status,
+            &config,
+            &finding.status_feed_ref,
+            if prepared_replay || completed_replay {
+                0
+            } else {
+                status_epoch.generated_at
+            },
+            authorization_now,
+            "activation",
+        ) {
+            return plain_http_error(StatusCode::BAD_REQUEST, &error);
+        }
+        if finding.guarantee_class == FindingGuaranteeClass::DeterministicReplay {
+            let Some(recipe_sha256) = finding.replay_recipe_sha256.as_deref() else {
+                return plain_http_error(StatusCode::BAD_REQUEST, "replay recipe digest missing");
+            };
+            if let Err(response) = verify_retained_recipe_closure(&store, recipe_sha256) {
+                return response;
+            }
+        }
+        let artifact_sha256 = chio_core::sha256_hex(artifact_json.as_bytes());
+        if admission.finding_artifact_sha256 != artifact_sha256 {
+            return plain_http_error(
+                StatusCode::BAD_REQUEST,
+                "admission binds a different finding artifact",
+            );
+        }
+
+        // Listing and pricing-hint exact bindings: a mismatched hint or
+        // metadata binding is rejected.
+        let listing_digest = match canonical_digest_of(&request.listing) {
+            Ok(digest) => digest,
+            Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error),
+        };
+        if listing_digest != admission.listing_envelope_sha256 {
+            return plain_http_error(StatusCode::BAD_REQUEST, "listing envelope digest mismatch");
+        }
+        if let Err(error) =
+            ensure_generic_listing_signed_by_namespace_owner(&request.listing, "finding listing")
+        {
+            return plain_http_error(StatusCode::BAD_REQUEST, &error);
+        }
+        let listing_authority = match config.listing.key() {
+            Ok(key) => key,
+            Err(error) => {
+                return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+            }
+        };
+        if request.listing.signer_key != listing_authority
+            || request.listing.body.namespace_ownership.owner_id != config.listing.authority_id
+        {
+            return plain_http_error(
+                StatusCode::BAD_REQUEST,
+                "finding listing signer does not match the configured listing authority",
+            );
+        }
+        if request.listing.body.published_at > authorization_now {
+            return plain_http_error(
+                StatusCode::BAD_REQUEST,
+                "finding listing was published after the activation clock",
+            );
+        }
+        if !config.listing.covers(request.listing.body.published_at) {
+            return plain_http_error(
+                StatusCode::BAD_REQUEST,
+                "finding listing was published outside the configured listing authority window",
+            );
+        }
+        if !config.listing.covers(authorization_now) {
+            return plain_http_error(
+                StatusCode::BAD_REQUEST,
+                "finding listing authority is not live at activation",
+            );
+        }
+        if request.listing.body.status != GenericListingStatus::Active {
+            return plain_http_error(StatusCode::BAD_REQUEST, "finding listing is not active");
+        }
+        let hint_digest = match canonical_digest_of(&request.pricing_hint) {
+            Ok(digest) => digest,
+            Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error),
+        };
+        if hint_digest != admission.pricing_hint_envelope_sha256 {
+            return plain_http_error(
+                StatusCode::BAD_REQUEST,
+                "pricing hint envelope digest mismatch",
+            );
+        }
+        if let Err(error) = request.pricing_hint.body.validate() {
+            return plain_http_error(StatusCode::BAD_REQUEST, &error);
+        }
+        if !matches!(request.pricing_hint.verify_signature(), Ok(true)) {
+            return plain_http_error(StatusCode::BAD_REQUEST, "pricing hint signature is invalid");
+        }
+        if !request.pricing_hint.body.is_live_at(authorization_now) {
+            return plain_http_error(
+                StatusCode::BAD_REQUEST,
+                "pricing hint is not live at activation",
+            );
+        }
+        if request.pricing_hint.signer_key != listing_authority
+            || request.pricing_hint.body.listing_id != request.listing.body.listing_id
+            || normalize_namespace(&request.pricing_hint.body.namespace)
+                != normalize_namespace(&request.listing.body.namespace)
+            || request.pricing_hint.body.provider_operator_id != admission.publisher_operator_id
+            || request.pricing_hint.body.provider_operator_id
+                != request.listing.body.namespace_ownership.owner_id
+            || request.listing.body.subject.actor_id != admission.server_id
+        {
+            return plain_http_error(
+                StatusCode::BAD_REQUEST,
+                "pricing hint identity does not match the admitted listing",
+            );
+        }
+        if let Err(error) = verify_listing_authority_lifecycle(
+            &request.listing,
+            &request.pricing_hint,
+            &request.listing_authority_status,
+            &config,
+            authorization_now,
+        ) {
+            return plain_http_error(StatusCode::BAD_REQUEST, &error);
+        }
+        if request.pricing_hint.body.capability_scope != admission.capability_scope {
+            return plain_http_error(StatusCode::BAD_REQUEST, "pricing hint scope mismatch");
+        }
+        if request.pricing_hint.body.expires_at < admission.expires_at {
+            return plain_http_error(
+                StatusCode::BAD_REQUEST,
+                "admission outlives the pricing hint",
+            );
+        }
+        let listing_metadata_url = request
+            .listing
+            .body
+            .subject
+            .metadata_url
+            .as_deref()
+            .unwrap_or_default();
+        if listing_metadata_url != admission.metadata_url {
+            return plain_http_error(StatusCode::BAD_REQUEST, "listing metadata url mismatch");
+        }
+        if request.listing.body.listing_id != admission.listing_id {
+            return plain_http_error(StatusCode::BAD_REQUEST, "listing id mismatch");
+        }
+
+        // Seller authorization: the issuer-signed grant that lets this
+        // seller list this exact finding. Required even when issuer and
+        // seller are the same key.
+        let authorization_digest = match canonical_digest_of(&request.seller_authorization) {
+            Ok(digest) => digest,
+            Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error),
+        };
+        if authorization_digest != admission.seller_authorization_envelope_sha256 {
+            return plain_http_error(
+                StatusCode::BAD_REQUEST,
+                "seller authorization envelope digest mismatch",
+            );
+        }
+        if let Err(error) = verify_signed_seller_authorization(&request.seller_authorization) {
+            return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
+        }
+        let authorization = &request.seller_authorization.body;
+        if authorization.issuer != finding.issuer {
+            return plain_http_error(
+                StatusCode::BAD_REQUEST,
+                "seller authorization issuer is not the finding issuer",
+            );
+        }
+        if authorization.seller != request.terms.body.seller {
+            return plain_http_error(
+                StatusCode::BAD_REQUEST,
+                "seller authorization names a different seller than the terms",
+            );
+        }
+        if authorization.finding_id != finding_id
+            || authorization.finding_artifact_sha256 != artifact_sha256
+        {
+            return plain_http_error(
+                StatusCode::BAD_REQUEST,
+                "seller authorization binds a different finding",
+            );
+        }
+        if authorization.listing_id != admission.listing_id {
+            return plain_http_error(
+                StatusCode::BAD_REQUEST,
+                "seller authorization names a different listing",
+            );
+        }
+        if authorization.issued_at > authorization_now || authorization.expires_at <= authorization_now
+        {
+            return plain_http_error(StatusCode::BAD_REQUEST, "seller authorization is not live");
+        }
+        if authorization.provider_server_id != admission.server_id {
+            return plain_http_error(
+                StatusCode::BAD_REQUEST,
+                "seller authorization provider server does not match the admission",
+            );
+        }
+        if let Err(error) = verify_seller_authorization_lifecycle(
+            &request.seller_authorization,
+            &request.seller_authorization_status,
+            &config,
+            authorization_now,
+        ) {
+            return plain_http_error(StatusCode::BAD_REQUEST, &error);
+        }
+        if let FindingPayee::Beneficiary { destination, .. } = &authorization.payee {
+            if destination != &admission.payee_destination {
+                return plain_http_error(
+                    StatusCode::BAD_REQUEST,
+                    "seller authorization payee does not match the admission",
+                );
+            }
+        }
+
+        // Collateral snapshot for the named allocation.
+        let allocation = match store.get_allocation(&admission.backing_allocation_id) {
+            Ok(Some(snapshot)) => snapshot,
+            Ok(None) => {
+                return plain_http_error(StatusCode::BAD_REQUEST, "unknown collateral allocation")
+            }
+            Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        };
+        let collateral_key = match verify_collateral_authority_lifecycle(
+            &request.backing,
+            &request.collateral_authority_status,
+            &config,
+            authorization_now,
+        ) {
+            Ok(key) => key,
+            Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error),
+        };
+
+        // The retained profile remains an authority-bearing dependency at
+        // activation. Digest-addressed storage proves only byte identity, so
+        // re-run its body validation, governance signature, and liveness
+        // checks before any profile field influences admission.
+        let profile_bytes = match store.get_recipe_blob(&admission.profile_envelope_sha256) {
+            Ok(Some(bytes)) => bytes,
+            Ok(None) => {
+                return plain_http_error(
+                    StatusCode::BAD_REQUEST,
+                    "verifier profile is not registered with this venue",
+                )
+            }
+            Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        };
+        let profile: SignedFindingChallengeVerifierProfile =
+            match chio_core::canonical::UntrustedJsonText::from_wire(&profile_bytes, 64 * 1024 * 1024)
+                .and_then(|input| input.decode_signed())
+            {
+                Ok(profile) => profile,
+                Err(_) => {
+                    return plain_http_error(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "retained profile failed deserialization",
+                    )
+                }
+            };
+        if let Err(error) = verify_profile_for_activation(
+            &profile,
+            &admission.profile_envelope_sha256,
+            &request.profile_governance_authority_status,
+            &config,
+            authorization_now,
+        ) {
+            return plain_http_error(StatusCode::BAD_REQUEST, &error);
+        }
+        if let Err(error) = verify_profile_settlement_authorities(&profile, &request.admission, &config)
+        {
+            return plain_http_error(StatusCode::BAD_REQUEST, &error);
+        }
+        let Some(authority_status_resolver) = state.finding_authority_status_resolver.as_deref() else {
+            return plain_http_error(
+                StatusCode::CONFLICT,
+                "finding activation requires the authority-status resolver",
+            );
+        };
+        for policy in [
+            &admission.purchase_authority,
+            &admission.failed_delivery_authority,
+        ] {
+            let authority_status = match authority_status_resolver
+                .resolve(&terminal_authority_pin(policy), authorization_now)
+            {
+                Ok(status) => status,
+                Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error),
+            };
+            if let Err(error) = verify_terminal_authority_lifecycle(
+                policy,
+                &authority_status,
+                &config,
+                admission.issued_at,
+                authorization_now,
+            ) {
+                return plain_http_error(StatusCode::BAD_REQUEST, &error);
+            }
+        }
+
+        // Pinned keys.
+        let venue_key = match config.venue.key() {
+            Ok(venue) => venue,
+            Err(_) => {
+                return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, "pinned keys invalid")
+            }
+        };
+
+        // The full admission verification: venue pin, liveness, terms and
+        // backing bindings, fiscal gate, sizing inequality, expiry bound.
+        let trusted_signers = match config.fee_schedule_operators() {
+            Ok(signers) => signers,
+            Err(error) => {
+                return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+            }
+        };
+        let gate = match state.fiscal_runtime.as_ref() {
+            Some(_) => {
+                // Fiscal-governed venues verify schedules through the
+                // resolver-driven surface; no resolver is wired into finding
+                // activation yet, so fiscal-governed venues are rejected here.
+                return plain_http_error(
+                    StatusCode::CONFLICT,
+                    "fiscal-governed finding activation is unavailable: no fee-schedule resolver is wired for this venue",
+                );
+            }
+            None => FindingFeeScheduleGate::Legacy,
+        };
+        if let Err(error) = verify_report_authority_lifecycle(
+            &request.verifier_report,
+            &request.verifier_authority_status,
+            &profile,
+            &finding,
+            &config,
+            authorization_now,
+        ) {
+            return plain_http_error(StatusCode::BAD_REQUEST, &error);
+        }
+        // The report's affirmative bond claim, if any, feeds the admission
+        // seam's report-before-backing ordering check.
+        let report = &request.verifier_report.body;
+        let bond_backing_observed_at = (report.facet_outcome(FindingFacetKind::BondBacking)
+            == Some(FindingFacetOutcome::Verified))
+        .then_some(report.evaluation_time);
+        let admission_context = FindingAdmissionContext {
+            venue_authority: &venue_key,
+            venue_id: &config.venue_id,
+            now: authorization_now,
+            fee_schedule: &request.fee_schedule,
+            fee_schedule_gate: gate,
+            trusted_local_operator_signers: &trusted_signers,
+            seller_authorization: &request.seller_authorization,
+            terms: &request.terms,
+            backing: &request.backing,
+            allocation_snapshot: AdmissionAllocationSnapshot {
+                allocation_id: allocation.backing.allocation_id.clone(),
+                backing_envelope_sha256: allocation.backing_envelope_sha256.clone(),
+                expires_at: allocation.backing.expires_at,
+                status: match allocation.state {
+                    FindingAllocationState::Live => FindingAllocationStatus::Available,
+                    FindingAllocationState::Consumed => FindingAllocationStatus::Consumed,
+                    FindingAllocationState::Expired => FindingAllocationStatus::Expired,
+                    FindingAllocationState::Released => FindingAllocationStatus::Released,
+                },
+                active_admission_id: allocation.active_admission_id.clone(),
+                prepared_admission_id: prepared_replay.then(|| admission.admission_id.clone()),
+                accepted_at: allocation.accepted_at,
+            },
+            bond_backing_observed_at,
+            // The HTTP surface gates on the durable sales block above. It
+            // never accepts a caller-supplied penalty evaluation.
+            penalty_gate: FindingAdmissionPenaltyGate::Ungoverned,
+            collateral_authority: &collateral_key,
+            constituent_expiry_bounds: FindingConstituentExpiryBounds {
+                finding: finding.expires_at,
+                listing: request.listing.body.expires_at.unwrap_or(u64::MAX),
+                pricing_hint: request.pricing_hint.body.expires_at,
+                seller_authorization: authorization.expires_at,
+                profile: profile.body.expires_at,
+            },
+        };
+        if let Err(error) =
+            verify_finding_admission_for_activation(&request.admission, &admission_context)
+        {
+            return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
+        }
+
+        // The verifier signer and its current authenticated status were checked
+        // above before the report influenced admission sizing. Continue with its
+        // exact bindings and required-facet policy against the retained profile.
+        let report = &request.verifier_report.body;
+        let report_digest = match canonical_digest_of(&request.verifier_report) {
+            Ok(digest) => digest,
+            Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error),
+        };
+        if report_digest != admission.verifier_report_envelope_sha256
+            || report.report_id != admission.verifier_report_id
+        {
+            return plain_http_error(StatusCode::BAD_REQUEST, "verifier report binding mismatch");
+        }
+        if report.finding_id != finding_id || report.finding_artifact_sha256 != artifact_sha256 {
+            return plain_http_error(
+                StatusCode::BAD_REQUEST,
+                "verifier report binds a different finding",
+            );
+        }
+        if report.verifier_profile_envelope_sha256 != admission.profile_envelope_sha256 {
+            return plain_http_error(StatusCode::BAD_REQUEST, "verifier profile binding mismatch");
+        }
+        if report.verifier_profile_id != profile.body.profile_id {
+            return plain_http_error(StatusCode::BAD_REQUEST, "verifier profile id mismatch");
+        }
+        if report.facet_outcome(FindingFacetKind::BondBacking) == Some(FindingFacetOutcome::Verified) {
+            if report.backing_allocation_id.as_deref() != Some(admission.backing_allocation_id.as_str())
+            {
+                return plain_http_error(
+                    StatusCode::BAD_REQUEST,
+                    "report bond verdict names another allocation",
+                );
+            }
+            // Mechanical report-before-backing: the allocation must have been
+            // accepted before the report's evaluation time.
+            if allocation.accepted_at >= report.evaluation_time {
+                return plain_http_error(
+                    StatusCode::BAD_REQUEST,
+                    "report claims bond backing before the allocation existed",
+                );
+            }
+        }
+        if report
+            .facets
+            .iter()
+            .any(|facet| facet.outcome == FindingFacetOutcome::Failed)
+        {
+            return plain_http_error(
+                StatusCode::BAD_REQUEST,
+                "verifier report contains a failed facet; admission denied",
+            );
+        }
+        for facet in required_finding_facets(&finding, &profile.body) {
+            if report.facet_outcome(facet) != Some(FindingFacetOutcome::Verified) {
+                return plain_http_error(
+                    StatusCode::BAD_REQUEST,
+                    "a required facet is not verified; admission denied",
+                );
+            }
+        }
+
+        // Terms binding for later epoch computation: retain the exact terms
+        // envelope digest-addressed, since the admission binds it.
+        let terms_json = match chio_core::canonical_json_bytes(&request.terms) {
+            Ok(bytes) => bytes,
+            Err(_) => {
+                return plain_http_error(StatusCode::BAD_REQUEST, "terms failed canonicalization")
+            }
+        };
+        let terms_digest = chio_core::sha256_hex(&terms_json);
+        if store
+            .put_recipe_blob(&terms_digest, &terms_json, now)
+            .is_err()
+        {
+            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, "terms retention failed");
+        }
+        let authorization_json = match chio_core::canonical_json_bytes(&request.seller_authorization) {
+            Ok(bytes) => bytes,
+            Err(_) => {
+                return plain_http_error(
+                    StatusCode::BAD_REQUEST,
+                    "seller authorization failed canonicalization",
+                )
+            }
+        };
+        if store
+            .put_recipe_blob(&authorization_digest, &authorization_json, now)
+            .is_err()
+        {
+            return plain_http_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "seller authorization retention failed",
+            );
+        }
+
+        // Validate every fee terminal and install every idempotency fence
+        // before the allocation is prepared. No rail dispatch occurs until
+        // all local fee inputs are known to be internally consistent.
+        let Some(rail) = state.finding_rail.as_ref() else {
+            return plain_http_error(
+                StatusCode::CONFLICT,
+                "no evidenced rail observer is configured",
+            );
+        };
+        let schedule_digest = match signed_fee_schedule_digest(&request.fee_schedule) {
+            Ok(digest) => digest,
+            Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        };
+        let mut charges = Vec::with_capacity(admission.fee_terminals.len());
+        for terminal in &admission.fee_terminals {
+            if terminal.fee_schedule_envelope_sha256 != schedule_digest {
+                return plain_http_error(StatusCode::BAD_REQUEST, "fee terminal schedule mismatch");
+            }
+            // Both fee event kinds restrict to the governance-pinned audit pool.
+            if terminal.pool_principal_id != config.audit_pool.principal_id
+                || terminal.rail_destination != config.audit_pool.rail_destination
+                || terminal.amount.currency != config.audit_pool.currency
+            {
+                return plain_http_error(
+                    StatusCode::BAD_REQUEST,
+                    "fee terminal does not name the pinned audit pool",
+                );
+            }
+            let expected_amount = match &terminal.event {
+                FindingFeeEvent::Publication => &request.fee_schedule.body.publication_fee,
+                FindingFeeEvent::ParticipationEpoch { .. } => {
+                    &request.fee_schedule.body.market_participation_fee
+                }
+            };
+            if terminal.amount != *expected_amount {
+                return plain_http_error(
+                    StatusCode::BAD_REQUEST,
+                    "fee terminal amount does not match the schedule",
+                );
+            }
+            let idempotency_key = finding_fee_idempotency_key(
+                &schedule_digest,
+                &terminal.event,
+                &finding_id,
+                &admission.listing_id,
+            );
+            let instruction = FindingRailInstruction {
+                idempotency_key: idempotency_key.clone(),
+                payer: terminal.payer.clone(),
+                amount_units: terminal.amount.units,
+                currency: terminal.amount.currency.clone(),
+                pool_principal_id: terminal.pool_principal_id.clone(),
+                rail_destination: terminal.rail_destination.clone(),
+            };
+            let instruction_sha256 = match canonical_digest_of(&instruction) {
+                Ok(digest) => digest,
+                Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error),
+            };
+            if instruction_sha256 != terminal.instruction_sha256 {
+                return plain_http_error(
+                    StatusCode::BAD_REQUEST,
+                    "fee terminal instruction commitment mismatch",
+                );
+            }
+            charges.push(PreparedFindingFeeCharge {
+                idempotency_key,
+                instruction,
+                instruction_sha256,
+            });
+        }
+        // Atomically validate live status, fence every fee intent, claim the
+        // allocation, and retain the exact admission before money can move. A
+        // concurrent retraction therefore wins before any financial state opens.
+        // A crash from here onward leaves one replayable prepare record, so a
+        // reconciled charge cannot lose its activation owner.
+        if !prepared_replay
+            && require_status_feed_through(
+                &config.status_feed_operator,
+                &config.status_feed_service_bond,
+                &finding.status_feed_ref,
+                now,
+                now,
+            )
+            .is_err()
+        {
+            return plain_http_error(
+                StatusCode::BAD_REQUEST,
+                "finding status operator or service bond is not live for activation",
+            );
+        }
+        match store.prepare_listing_activation(
+            &admission_json,
+            admission,
+            &finding.status_feed_ref,
+            &config.status_feed_operator.authorization_sha256,
+            request.status_operator_authority_status.body.observed_at,
+            now,
+            config.status_max_epoch_age_secs,
+        ) {
+            Ok(FindingActivationPreparationOutcome::Prepared)
+            | Ok(FindingActivationPreparationOutcome::PendingReplay) => {}
+            Ok(FindingActivationPreparationOutcome::AlreadyActivated) => {
+                return Json(serde_json::json!({
+                    "admissionId": admission.admission_id,
+                    "outcome": "ExactReplay",
+                }))
+                .into_response();
+            }
+            Ok(FindingActivationPreparationOutcome::Expired) => {
+                return plain_http_error(
+                    StatusCode::BAD_REQUEST,
+                    "prepared activation expired before completion",
+                );
+            }
+            Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        }
+
+        // Dispatch and reconcile each unsettled terminal. Reconciled intents
+        // from an earlier attempt are never dispatched twice.
+        for (terminal, charge) in admission.fee_terminals.iter().zip(&charges) {
+            let fee_event = match store.get_fee_event(&charge.idempotency_key) {
+                Ok(Some(event)) => event,
+                Ok(None) => {
+                    return plain_http_error(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "prepared activation lost its fee intent",
+                    )
+                }
+                Err(error) => {
+                    return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
+                }
+            };
+            if fee_event.state == FindingFeeState::Reconciled {
+                continue;
+            }
+            let observation = match rail.dispatch(&charge.instruction) {
+                Ok(observation) => observation,
+                Err(reason) => {
+                    // The intent and prepare record stay durable. No admission
+                    // becomes active, and an identical retry can resume.
+                    let _ = store.mark_fee_failed(&charge.idempotency_key);
+                    return plain_http_error(
+                        StatusCode::BAD_GATEWAY,
+                        &format!("rail dispatch failed: {reason}"),
+                    );
+                }
+            };
+            if !super::finding_challenge_coordinator::rail_observation_matches(
+                &charge.instruction,
+                &charge.instruction_sha256,
+                &observation,
+            ) {
+                let _ = store.mark_fee_failed(&charge.idempotency_key);
+                return plain_http_error(
+                    StatusCode::BAD_GATEWAY,
+                    "rail observation does not reconcile to the dispatched instruction",
+                );
+            }
+            let observation_sha256 = match canonical_digest_of(&observation) {
+                Ok(digest) => digest,
+                Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error),
+            };
+            if observation_sha256 != terminal.observation_sha256 {
+                return plain_http_error(
+                    StatusCode::BAD_REQUEST,
+                    "fee terminal observation commitment mismatch",
+                );
+            }
+            if let Err(error) = store.mark_fee_reconciled(
+                &charge.idempotency_key,
+                &observation_sha256,
+                &terminal.amount,
+                &terminal.rail_destination,
+            ) {
+                return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
+            }
+        }
+
+        // Finalization atomically checks every reconciled terminal, inserts
+        // the active admission, supersedes the prior active row, and marks
+        // the durable prepare complete.
+        match store.activate_listing(&admission_json, admission, now) {
+            Ok(FindingActivationOutcome::Expired) => plain_http_error(
+                StatusCode::BAD_REQUEST,
+                "prepared activation expired; collateral was released and matching fees remain credited",
+            ),
+            Ok(outcome) => {
+                if let Err(error) = purchase_store.register_community_fund_destination(
+                    &admission.backing_allocation_id,
+                    &admission.community_fund_destination,
+                    now,
+                ) {
+                    return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
+                }
+                Json(serde_json::json!({
+                    "admissionId": admission.admission_id,
+                    "outcome": format!("{outcome:?}"),
+                }))
+                .into_response()
+            }
+            Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        }
+    })
+    .await
 }
 
 /// Participation renewal request: the exact signed fee schedule the
@@ -1975,246 +1993,259 @@ pub(crate) async fn handle_finding_participation(
     headers: HeaderMap,
     Json(request): Json<FindingParticipationRequest>,
 ) -> Response {
-    let clock_now = match unix_timestamp_now() {
-        Ok(now) => now,
-        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
-    };
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
-        return response;
-    }
-    let (config, store) = match finding_market_context(&state) {
-        Ok(context) => context,
-        Err(response) => return response,
-    };
-    let schedule_digest = match signed_fee_schedule_digest(&request.fee_schedule) {
-        Ok(digest) => digest,
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    };
-    let pending = match store.get_pending_participation_fee_intent(&finding_id, &schedule_digest) {
-        Ok(pending) => pending,
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    };
-    if let Some(pending) = pending {
+    blocking_response(move || {
+        let clock_now = match unix_timestamp_now() {
+            Ok(now) => now,
+            Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+        };
+        if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+            return response;
+        }
+        let (config, store) = match finding_market_context(&state) {
+            Ok(context) => context,
+            Err(response) => return response,
+        };
+        let schedule_digest = match signed_fee_schedule_digest(&request.fee_schedule) {
+            Ok(digest) => digest,
+            Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        };
+        let pending =
+            match store.get_pending_participation_fee_intent(&finding_id, &schedule_digest) {
+                Ok(pending) => pending,
+                Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+            };
+        if let Some(pending) = pending {
+            let Some(rail) = state.finding_rail.as_ref() else {
+                return plain_http_error(
+                    StatusCode::CONFLICT,
+                    "no evidenced rail observer is configured",
+                );
+            };
+            return match reconcile_participation_fee_intent(&store, rail.as_ref(), &pending) {
+                Ok(epoch) => Json(serde_json::json!({
+                    "findingId": finding_id,
+                    "paidThroughEpoch": epoch,
+                }))
+                .into_response(),
+                Err(response) => response,
+            };
+        }
+        let snapshot = match store.get_current_admission(&finding_id) {
+            Ok(Some(snapshot)) => snapshot,
+            Ok(None) => return plain_http_error(StatusCode::NOT_FOUND, "no active admission"),
+            Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        };
+        let admission: SignedFindingAdmission =
+            match chio_core::canonical::UntrustedJsonText::from_wire(
+                snapshot.envelope_json.as_bytes(),
+                64 * 1024 * 1024,
+            )
+            .and_then(|input| input.decode_signed())
+            {
+                Ok(admission) => admission,
+                Err(_) => {
+                    return plain_http_error(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "stored admission failed deserialization",
+                    )
+                }
+            };
+        let now = clock_now;
+        let artifact_json = match store.get_finding_bytes(&finding_id) {
+            Ok(Some(bytes)) => bytes,
+            Ok(None) => return plain_http_error(StatusCode::NOT_FOUND, "unknown finding"),
+            Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        };
+        let finding: Finding = match chio_core::canonical::UntrustedJsonText::from_wire(
+            artifact_json.as_bytes(),
+            64 * 1024 * 1024,
+        )
+        .and_then(|input| input.decode_signed())
+        {
+            Ok(finding) => finding,
+            Err(_) => {
+                return plain_http_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "stored finding failed deserialization",
+                )
+            }
+        };
+        let current_epoch = match live_admission_epoch(&store, &snapshot, &admission, now) {
+            Some(epoch) => epoch,
+            None => {
+                return plain_http_error(
+                    StatusCode::BAD_REQUEST,
+                    "admission is not live for participation renewal",
+                )
+            }
+        };
+        if schedule_digest != admission.body.fee_schedule_envelope_sha256 {
+            return plain_http_error(
+                StatusCode::BAD_REQUEST,
+                "fee schedule does not match the admitted binding",
+            );
+        }
+        let paid_through = match store.paid_through_epoch(
+            &finding_id,
+            &snapshot.listing_id,
+            &admission.body.fee_schedule_envelope_sha256,
+        ) {
+            Ok(Some(epoch)) => epoch,
+            Ok(None) => {
+                return plain_http_error(
+                    StatusCode::BAD_REQUEST,
+                    "no reconciled participation epoch",
+                )
+            }
+            Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        };
+        let next_epoch = match paid_through.checked_add(1) {
+            Some(epoch) => epoch,
+            None => return plain_http_error(StatusCode::BAD_REQUEST, "epoch index overflow"),
+        };
+        if next_epoch > current_epoch {
+            return plain_http_error(
+                StatusCode::BAD_REQUEST,
+                "participation is already paid through the current audit epoch",
+            );
+        }
         let Some(rail) = state.finding_rail.as_ref() else {
             return plain_http_error(
                 StatusCode::CONFLICT,
                 "no evidenced rail observer is configured",
             );
         };
-        return match reconcile_participation_fee_intent(&store, rail.as_ref(), &pending) {
+        let event = FindingFeeEvent::ParticipationEpoch {
+            epoch_index: next_epoch,
+        };
+        let amount = request.fee_schedule.body.market_participation_fee.clone();
+        if amount.currency != config.audit_pool.currency {
+            return plain_http_error(
+                StatusCode::BAD_REQUEST,
+                "participation fee currency does not match the audit pool",
+            );
+        }
+        let idempotency_key = finding_fee_idempotency_key(
+            &schedule_digest,
+            &event,
+            &finding_id,
+            &snapshot.listing_id,
+        );
+        let instruction = FindingRailInstruction {
+            idempotency_key: idempotency_key.clone(),
+            payer: admission.body.publisher_operator_id.clone(),
+            amount_units: amount.units,
+            currency: amount.currency.clone(),
+            pool_principal_id: config.audit_pool.principal_id.clone(),
+            rail_destination: config.audit_pool.rail_destination.clone(),
+        };
+        let instruction_sha256 = match canonical_digest_of(&instruction) {
+            Ok(digest) => digest,
+            Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error),
+        };
+        let intent = FindingFeeIntent {
+            fee_schedule_envelope_sha256: &schedule_digest,
+            event: &event,
+            finding_id: &finding_id,
+            listing_id: &snapshot.listing_id,
+            payer: &admission.body.publisher_operator_id,
+            amount: &amount,
+            pool_principal_id: &config.audit_pool.principal_id,
+            rail_destination: &config.audit_pool.rail_destination,
+            instruction_sha256: &instruction_sha256,
+        };
+        let exact_replay = match store.is_exact_fee_intent_replay(&intent) {
+            Ok(exact_replay) => exact_replay,
+            Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        };
+        if !exact_replay {
+            if let Err(error) = require_status_feed_through(
+                &config.status_feed_operator,
+                &config.status_feed_service_bond,
+                &finding.status_feed_ref,
+                now,
+                now,
+            ) {
+                return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
+            }
+            let status_epoch = match finding_status_store(&state).and_then(|status_store| {
+                status_store
+                    .get_current_epoch(&finding.status_feed_ref)
+                    .map_err(|error| plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()))
+            }) {
+                Ok(epoch) => epoch,
+                Err(response) => return response,
+            };
+            if let Err(error) = verify_status_operator_authority_lifecycle(
+                &request.status_operator_authority_status,
+                &config,
+                &finding.status_feed_ref,
+                status_epoch.generated_at,
+                now,
+                "participation renewal",
+            ) {
+                return plain_http_error(StatusCode::BAD_REQUEST, &error);
+            }
+            let authority_status_resolver = match state.finding_authority_status_resolver.as_deref()
+            {
+                Some(resolver) => resolver,
+                None => {
+                    return plain_http_error(
+                        StatusCode::BAD_REQUEST,
+                        "admission authority status resolver is not configured",
+                    )
+                }
+            };
+            let venue_authority_status = match authority_status_resolver.resolve(&config.venue, now)
+            {
+                Ok(status) => status,
+                Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error),
+            };
+            if let Err(error) = verify_current_admission_authorities(
+                &store,
+                &config,
+                authority_status_resolver,
+                &venue_authority_status,
+                &admission,
+                now,
+            ) {
+                return plain_http_error(StatusCode::BAD_REQUEST, &error);
+            }
+        }
+        let fenced = match store.begin_live_participation_fee_intent(
+            &intent,
+            &FindingParticipationAdmissionFence {
+                admission_id: &snapshot.admission_id,
+                admission_envelope_sha256: &snapshot.envelope_sha256,
+            },
+            &finding.status_feed_ref,
+            &config.status_feed_operator.authorization_sha256,
+            request.status_operator_authority_status.body.observed_at,
+            now,
+            config.status_max_epoch_age_secs,
+        ) {
+            Ok(fenced) if fenced.outcome == FindingFeeIntentOutcome::AlreadyReconciled => {
+                return Json(serde_json::json!({
+                    "findingId": finding_id,
+                    "paidThroughEpoch": next_epoch,
+                }))
+                .into_response();
+            }
+            Ok(fenced) => fenced,
+            Err(error) => {
+                return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
+            }
+        };
+        match reconcile_participation_fee_intent(&store, rail.as_ref(), &fenced.record) {
             Ok(epoch) => Json(serde_json::json!({
                 "findingId": finding_id,
                 "paidThroughEpoch": epoch,
             }))
             .into_response(),
             Err(response) => response,
-        };
-    }
-    let snapshot = match store.get_current_admission(&finding_id) {
-        Ok(Some(snapshot)) => snapshot,
-        Ok(None) => return plain_http_error(StatusCode::NOT_FOUND, "no active admission"),
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    };
-    let admission: SignedFindingAdmission =
-        match chio_core::canonical::UntrustedJsonText::from_wire(
-            snapshot.envelope_json.as_bytes(),
-            64 * 1024 * 1024,
-        )
-        .and_then(|input| input.decode_signed())
-        {
-            Ok(admission) => admission,
-            Err(_) => {
-                return plain_http_error(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "stored admission failed deserialization",
-                )
-            }
-        };
-    let now = clock_now;
-    let artifact_json = match store.get_finding_bytes(&finding_id) {
-        Ok(Some(bytes)) => bytes,
-        Ok(None) => return plain_http_error(StatusCode::NOT_FOUND, "unknown finding"),
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    };
-    let finding: Finding = match chio_core::canonical::UntrustedJsonText::from_wire(
-        artifact_json.as_bytes(),
-        64 * 1024 * 1024,
-    )
-    .and_then(|input| input.decode_signed())
-    {
-        Ok(finding) => finding,
-        Err(_) => {
-            return plain_http_error(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "stored finding failed deserialization",
-            )
         }
-    };
-    let current_epoch = match live_admission_epoch(&store, &snapshot, &admission, now) {
-        Some(epoch) => epoch,
-        None => {
-            return plain_http_error(
-                StatusCode::BAD_REQUEST,
-                "admission is not live for participation renewal",
-            )
-        }
-    };
-    if schedule_digest != admission.body.fee_schedule_envelope_sha256 {
-        return plain_http_error(
-            StatusCode::BAD_REQUEST,
-            "fee schedule does not match the admitted binding",
-        );
-    }
-    let paid_through = match store.paid_through_epoch(
-        &finding_id,
-        &snapshot.listing_id,
-        &admission.body.fee_schedule_envelope_sha256,
-    ) {
-        Ok(Some(epoch)) => epoch,
-        Ok(None) => {
-            return plain_http_error(StatusCode::BAD_REQUEST, "no reconciled participation epoch")
-        }
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    };
-    let next_epoch = match paid_through.checked_add(1) {
-        Some(epoch) => epoch,
-        None => return plain_http_error(StatusCode::BAD_REQUEST, "epoch index overflow"),
-    };
-    if next_epoch > current_epoch {
-        return plain_http_error(
-            StatusCode::BAD_REQUEST,
-            "participation is already paid through the current audit epoch",
-        );
-    }
-    let Some(rail) = state.finding_rail.as_ref() else {
-        return plain_http_error(
-            StatusCode::CONFLICT,
-            "no evidenced rail observer is configured",
-        );
-    };
-    let event = FindingFeeEvent::ParticipationEpoch {
-        epoch_index: next_epoch,
-    };
-    let amount = request.fee_schedule.body.market_participation_fee.clone();
-    if amount.currency != config.audit_pool.currency {
-        return plain_http_error(
-            StatusCode::BAD_REQUEST,
-            "participation fee currency does not match the audit pool",
-        );
-    }
-    let idempotency_key =
-        finding_fee_idempotency_key(&schedule_digest, &event, &finding_id, &snapshot.listing_id);
-    let instruction = FindingRailInstruction {
-        idempotency_key: idempotency_key.clone(),
-        payer: admission.body.publisher_operator_id.clone(),
-        amount_units: amount.units,
-        currency: amount.currency.clone(),
-        pool_principal_id: config.audit_pool.principal_id.clone(),
-        rail_destination: config.audit_pool.rail_destination.clone(),
-    };
-    let instruction_sha256 = match canonical_digest_of(&instruction) {
-        Ok(digest) => digest,
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error),
-    };
-    let intent = FindingFeeIntent {
-        fee_schedule_envelope_sha256: &schedule_digest,
-        event: &event,
-        finding_id: &finding_id,
-        listing_id: &snapshot.listing_id,
-        payer: &admission.body.publisher_operator_id,
-        amount: &amount,
-        pool_principal_id: &config.audit_pool.principal_id,
-        rail_destination: &config.audit_pool.rail_destination,
-        instruction_sha256: &instruction_sha256,
-    };
-    let exact_replay = match store.is_exact_fee_intent_replay(&intent) {
-        Ok(exact_replay) => exact_replay,
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    };
-    if !exact_replay {
-        if let Err(error) = require_status_feed_through(
-            &config.status_feed_operator,
-            &config.status_feed_service_bond,
-            &finding.status_feed_ref,
-            now,
-            now,
-        ) {
-            return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
-        }
-        let status_epoch = match finding_status_store(&state).and_then(|status_store| {
-            status_store
-                .get_current_epoch(&finding.status_feed_ref)
-                .map_err(|error| plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()))
-        }) {
-            Ok(epoch) => epoch,
-            Err(response) => return response,
-        };
-        if let Err(error) = verify_status_operator_authority_lifecycle(
-            &request.status_operator_authority_status,
-            &config,
-            &finding.status_feed_ref,
-            status_epoch.generated_at,
-            now,
-            "participation renewal",
-        ) {
-            return plain_http_error(StatusCode::BAD_REQUEST, &error);
-        }
-        let authority_status_resolver = match state.finding_authority_status_resolver.as_deref() {
-            Some(resolver) => resolver,
-            None => {
-                return plain_http_error(
-                    StatusCode::BAD_REQUEST,
-                    "admission authority status resolver is not configured",
-                )
-            }
-        };
-        let venue_authority_status = match authority_status_resolver.resolve(&config.venue, now) {
-            Ok(status) => status,
-            Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error),
-        };
-        if let Err(error) = verify_current_admission_authorities(
-            &store,
-            &config,
-            authority_status_resolver,
-            &venue_authority_status,
-            &admission,
-            now,
-        ) {
-            return plain_http_error(StatusCode::BAD_REQUEST, &error);
-        }
-    }
-    let fenced = match store.begin_live_participation_fee_intent(
-        &intent,
-        &FindingParticipationAdmissionFence {
-            admission_id: &snapshot.admission_id,
-            admission_envelope_sha256: &snapshot.envelope_sha256,
-        },
-        &finding.status_feed_ref,
-        &config.status_feed_operator.authorization_sha256,
-        request.status_operator_authority_status.body.observed_at,
-        now,
-        config.status_max_epoch_age_secs,
-    ) {
-        Ok(fenced) if fenced.outcome == FindingFeeIntentOutcome::AlreadyReconciled => {
-            return Json(serde_json::json!({
-                "findingId": finding_id,
-                "paidThroughEpoch": next_epoch,
-            }))
-            .into_response();
-        }
-        Ok(fenced) => fenced,
-        Err(error) => {
-            return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
-        }
-    };
-    match reconcile_participation_fee_intent(&store, rail.as_ref(), &fenced.record) {
-        Ok(epoch) => Json(serde_json::json!({
-            "findingId": finding_id,
-            "paidThroughEpoch": epoch,
-        }))
-        .into_response(),
-        Err(response) => response,
-    }
+    })
+    .await
 }
 
 /// GET /v1/findings/{finding_id}/admission (public): serve the CURRENT
@@ -2224,59 +2255,62 @@ pub(crate) async fn handle_get_finding_admission(
     State(state): State<TrustServiceState>,
     AxumPath(finding_id): AxumPath<String>,
 ) -> Response {
-    let clock_now = match unix_timestamp_now() {
-        Ok(now) => now,
-        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
-    };
-    let (config, store) = match finding_market_context(&state) {
-        Ok(context) => context,
-        Err(response) => return response,
-    };
-    let status_store = match finding_status_store(&state) {
-        Ok(store) => store,
-        Err(response) => return response,
-    };
-    let purchase_store = match state.joint_authority_store.as_ref() {
-        Some(authority) => authority.finding_purchase_store(),
-        None => {
-            return plain_http_error(
-                StatusCode::CONFLICT,
-                "finding market requires the joint authority store",
-            )
-        }
-    };
-    let now = clock_now;
-    let status_operator_authority_status = state
-        .finding_authority_status_resolver
-        .as_ref()
-        .and_then(|resolver| {
-            resolver
-                .resolve(&config.status_feed_operator.authority, now)
-                .ok()
-        });
-    let venue_authority_status = state
-        .finding_authority_status_resolver
-        .as_ref()
-        .and_then(|resolver| resolver.resolve(&config.venue, now).ok());
-    let Some(admission) = current_admission_view(
-        &store,
-        &purchase_store,
-        &status_store,
-        &config,
-        state.finding_authority_status_resolver.as_deref(),
-        status_operator_authority_status.as_ref(),
-        venue_authority_status.as_ref(),
-        &finding_id,
-        now,
-    ) else {
-        return plain_http_error(StatusCode::NOT_FOUND, "no current admission");
-    };
-    (
-        StatusCode::OK,
-        [(axum::http::header::CONTENT_TYPE, "application/json")],
-        admission.envelope_json,
-    )
-        .into_response()
+    blocking_response(move || {
+        let clock_now = match unix_timestamp_now() {
+            Ok(now) => now,
+            Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+        };
+        let (config, store) = match finding_market_context(&state) {
+            Ok(context) => context,
+            Err(response) => return response,
+        };
+        let status_store = match finding_status_store(&state) {
+            Ok(store) => store,
+            Err(response) => return response,
+        };
+        let purchase_store = match state.joint_authority_store.as_ref() {
+            Some(authority) => authority.finding_purchase_store(),
+            None => {
+                return plain_http_error(
+                    StatusCode::CONFLICT,
+                    "finding market requires the joint authority store",
+                )
+            }
+        };
+        let now = clock_now;
+        let status_operator_authority_status = state
+            .finding_authority_status_resolver
+            .as_ref()
+            .and_then(|resolver| {
+                resolver
+                    .resolve(&config.status_feed_operator.authority, now)
+                    .ok()
+            });
+        let venue_authority_status = state
+            .finding_authority_status_resolver
+            .as_ref()
+            .and_then(|resolver| resolver.resolve(&config.venue, now).ok());
+        let Some(admission) = current_admission_view(
+            &store,
+            &purchase_store,
+            &status_store,
+            &config,
+            state.finding_authority_status_resolver.as_deref(),
+            status_operator_authority_status.as_ref(),
+            venue_authority_status.as_ref(),
+            &finding_id,
+            now,
+        ) else {
+            return plain_http_error(StatusCode::NOT_FOUND, "no current admission");
+        };
+        (
+            StatusCode::OK,
+            [(axum::http::header::CONTENT_TYPE, "application/json")],
+            admission.envelope_json,
+        )
+            .into_response()
+    })
+    .await
 }
 
 #[path = "finding_handlers/profile_authority.rs"]
