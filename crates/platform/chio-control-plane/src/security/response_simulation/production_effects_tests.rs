@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_kernel::{prepare_response_dispatch, ResponseDispatchPreparationRequest};
@@ -43,10 +42,7 @@ mod finality;
 const TRUSTED_SKEW_MS: u64 = 600_000;
 
 fn wall_now_unix_ms() -> u64 {
-    let elapsed = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_else(|error| panic!("clock before epoch: {error}"));
-    u64::try_from(elapsed.as_millis()).unwrap_or_else(|error| panic!("clock range: {error}"))
+    chio_test_support::clock::unix_millis()
 }
 
 fn tenant() -> TenantId {
