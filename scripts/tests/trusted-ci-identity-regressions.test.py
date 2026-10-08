@@ -105,13 +105,29 @@ def installation_repositories() -> dict:
                                           "repositories": [{"id": int(REPOSITORY_ID), "full_name": REPOSITORY}]}}
 
 
+def with_ci_run_censuses(data: dict) -> dict:
+    """Mirror the recorded ci.yml run listing into the CI run censuses the producers read.
+
+    GitHub lists every ci.yml run under the workflow file name, under its
+    numeric workflow ID and in the repository-wide run listing; the shared
+    fixtures record the file-name listing.
+    """
+    data = dict(data)
+    listing = data.get(f"{PREFIX}/actions/workflows/ci.yml/runs")
+    if listing is not None:
+        data.setdefault(f"{PREFIX}/actions/runs", copy.deepcopy(listing))
+        data.setdefault(f"{PREFIX}/actions/workflows/{CI_WORKFLOW}/runs", copy.deepcopy(listing))
+    return data
+
+
 def run_publisher(data: dict, extra_outputs: dict[str, str] | None = None):
-    """Run the publish-security-contract step for the sealed binding of PR, E, M and S."""
+    """Run the publish-security-contract step for the sealed binding of the candidate identity on E."""
     binding = LANDING.publication_binding()
     outputs = {
         "authorized_source_sha": SOURCE, "ci_aggregate_check_run_id": "505", "ci_run_attempt": "1",
         "ci_run_id": str(CI_RUN), "ci_workflow_id": str(CI_WORKFLOW), "evidence_sha": EVIDENCE,
-        "external_id": LANDING.EXTERNAL_ID, "merge_commit_sha": MERGE, "pr_number": str(PR),
+        "external_id": LANDING.EXTERNAL_ID, "identity_digest": LANDING.IDENTITY_DIGEST,
+        "identity_json": LANDING.IDENTITY_JSON, "merge_commit_sha": MERGE, "pr_number": str(PR),
         "publication_binding_digest": hashlib.sha256(binding.encode()).hexdigest(),
         "publication_binding_json": binding, "security_definition_sha": DEFINITION,
     } | (extra_outputs or {})
@@ -123,17 +139,17 @@ def run_publisher(data: dict, extra_outputs: dict[str, str] | None = None):
     }
     script, environment = render_step(PUBLISHER, context)
     script = without_token_exchange(script, 'repositories="$({')
-    return LANDING.run_offline_step(REFUSAL_TRACE + script, data | installation_repositories(),
+    return LANDING.run_offline_step(REFUSAL_TRACE + script, with_ci_run_censuses(data) | installation_repositories(),
                                     environment | {"installation_token": LANDING.INSTALLATION_TOKEN},
                                     collect=("summary.md",))
 
 
-def run_revoker(data: dict, event_name: str, pr: int = PR):
-    """Run the revoke-security-contract step for a bound denial of the pull request, E, M and S."""
+def run_revoker(data: dict, event_name: str, pr: int = PR, merge: str = MERGE):
+    """Run the revoke-security-contract step for a bound denial of E observed through the pull request."""
     manual = event_name == "workflow_dispatch"
     outputs = {
         "authorized_source_sha": SOURCE, "base_sha": BASE, "create_missing": "true", "evidence_sha": EVIDENCE,
-        "merge_commit_sha": MERGE, "merge_tree_sha": TREE, "pr_number": str(pr),
+        "merge_commit_sha": merge, "merge_tree_sha": TREE, "pr_number": str(pr),
         "reason": "operator-security-revocation" if manual else "ci-regression",
         "security_definition_sha": DEFINITION,
     }
@@ -149,17 +165,22 @@ def run_revoker(data: dict, event_name: str, pr: int = PR):
 
 
 def own_authority() -> dict:
-    """The positive authority the finalizer published for this PR, E, M and S."""
+    """The positive authority the finalizer published on E for this candidate identity."""
     (check,) = LANDING.positive_authority_checks()
     return check
 
 
+def digest_of(identity: dict) -> str:
+    return hashlib.sha256(json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
 def other_identity_authority() -> dict:
-    """A positive authority for the same PR, E and M published under PRIOR_SOURCE, older than any denial."""
+    """A positive authority on E for the same PR whose candidate identity names PRIOR_SOURCE, older than any denial."""
     check = copy.deepcopy(own_authority())
-    external_id = f"arc:{PR}:{EVIDENCE}:{MERGE}:{PRIOR_SOURCE}"
     metadata = json.loads(check["output"]["text"])
     metadata["identity"]["authorized_source_sha"] = PRIOR_SOURCE
+    metadata["identity_digest"] = digest_of(metadata["identity"])
+    external_id = f"chio:v3:{PR}:{EVIDENCE}:{metadata['identity_digest']}"
     check.update(id=603, external_id=external_id, check_suite={"id": 604})
     check["output"] = {"title": "Chio security authority",
                        "summary": f"Dedicated chio-security-authority approval for {external_id}.",
@@ -222,7 +243,7 @@ def run_auditor(data: dict, pr: int = PR, workflow_sha: str = LANDING.PROTECTED)
         raise AssertionError(f"audit job environment changed: {sorted(job['env'])}")
     body = next(step["run"] for step in job["steps"] if "run" in step)
     script = ROOT / "scripts/audit-security-merge-qualification.py"
-    run = LANDING.run_offline_step(body, data, {
+    run = LANDING.run_offline_step(body, with_ci_run_censuses(data), {
         "AUDIT_WORKFLOW_SHA": workflow_sha, "GH_TOKEN": "offline-fixture-token", "PR_NUMBER": str(pr),
         "SECURITY_APP_ID": str(APP_ID), "SECURITY_DEFINITION_SHA": DEFINITION, "PYTHONDONTWRITEBYTECODE": "1",
     }, files={f"authorized-auditor/scripts/{script.name}": script.read_bytes()}, collect=("audit.json",))
@@ -261,6 +282,8 @@ class ForeignIdentityDenialOriginalTests(unittest.TestCase):
     `normalize_bad_ci_namespace` and the revoker's `normalize_namespace` select
     the canonical member by the denial's own external ID; with only another
     identity present both stop before any write and its success stands.
+    Ported to the P6 interfaces in "test(security): port the candidate identity
+    Original and preservation cases to the evidence head".
     """
 
     def assert_denied_in_place(self, run, existing: dict, reason: str) -> None:
@@ -282,8 +305,9 @@ class ForeignIdentityDenialOriginalTests(unittest.TestCase):
         self.assertEqual(projection(stored(control, own)), denied_projection(own))
 
         other = other_identity_authority()
+        prior_identity_digest = digest_of(LANDING.IDENTITY | {"authorized_source_sha": PRIOR_SOURCE})
         self.assertEqual(projection(other), ("Security contract", own["head_sha"], DEDICATED_APP,
-                                             f"arc:{PR}:{EVIDENCE}:{MERGE}:{PRIOR_SOURCE}", "completed", "success",
+                                             f"chio:v3:{PR}:{EVIDENCE}:{prior_identity_digest}", "completed", "success",
                                              other["output"]["text"]))
         run = run_publisher(bad_ci_publication_fixture(other))
         self.assertEqual(run.result.returncode, 1, run.result.stderr)
@@ -316,6 +340,9 @@ class ForeignIdentityDenialOriginalTests(unittest.TestCase):
 
 OTHER_PR, OTHER_MERGE = LANDING.OTHER_PR, LANDING.OTHER_MERGE
 DENIAL_EXTERNAL_ID = f"chio:v3:deny:{EVIDENCE}"
+IDENTITY_MISMATCH = "candidate identity does not match the retained protected landing"
+NAMESPACE_NOT_SINGLETON = "missing or duplicate dedicated authority namespace on E"
+SOURCE_CI_ABSENT = "source CI is absent from the exact authenticated history tuple"
 STRAY_STATUS_ID = 55861913852
 
 
@@ -345,9 +372,10 @@ class DenialMemberPublicationPreservationTests(unittest.TestCase):
     The publisher publishes only into an empty namespace or over its own exact
     success. A denial member in the namespace, the tombstone the revoker creates
     for this candidate or a member carrying the evidence-head deny ID, stops the
-    step with no POST or PATCH and the member unchanged. The current publisher
-    refuses both through its own-exact-success rule; it has no deny-ID rule of
-    its own.
+    step with no POST or PATCH and the member unchanged. The publisher refuses
+    both through its own-exact-success rule; it has no deny-ID rule of its own.
+    Ported to the P6 interfaces in "test(security): port the candidate identity
+    Original and preservation cases to the evidence head".
     """
 
     def assert_refused_unchanged(self, member: dict) -> None:
@@ -379,7 +407,7 @@ class DenialMemberPublicationPreservationTests(unittest.TestCase):
                 (tombstone,) = revocation.data[namespace_store(own_authority())]["check_runs"]
                 self.assertEqual((tombstone["name"], tombstone["app"], tombstone["external_id"], tombstone["status"],
                                   tombstone["conclusion"]),
-                                 ("Security contract", DEDICATED_APP, LANDING.EXTERNAL_ID, "completed", "failure"))
+                                 ("Security contract", DEDICATED_APP, DENIAL_EXTERNAL_ID, "completed", "failure"))
                 self.assert_refused_unchanged(tombstone)
 
     def test_publisher_refuses_an_evidence_head_deny_member(self) -> None:
@@ -393,6 +421,8 @@ class StrayMirrorOnEvidenceHeadPreservationTests(unittest.TestCase):
     `Security mirror / ...` check runs and commit statuses on the evidence head,
     successful, failed or duplicated, neither grant nor withdraw it, and the
     auditor never reads commit statuses.
+    Ported to the P6 interfaces in "test(security): port the candidate identity
+    Original and preservation cases to the evidence head".
     """
 
     @staticmethod
@@ -408,7 +438,7 @@ class StrayMirrorOnEvidenceHeadPreservationTests(unittest.TestCase):
         baseline, baseline_report = run_auditor(LANDING.snapshot())
         self.assertEqual(baseline.result.returncode, 0, baseline.result.stderr)
         self.assertEqual(baseline_report["status"], "verified")
-        self.assertEqual(baseline_report["qualification"]["authority_check_run_ids"], [own_authority()["id"]])
+        self.assertEqual(baseline_report["qualification"]["authority_check_run_id"], own_authority()["id"])
         failed = LANDING.foreign_mirror(EVIDENCE) | {"conclusion": "failure"}
         duplicate = LANDING.foreign_mirror(EVIDENCE) | {"id": 113139755294}
         for label, checks, state in (("success", (LANDING.foreign_mirror(EVIDENCE),), "success"),
@@ -452,9 +482,11 @@ class ForeignPullRequestAuthorityAuditPreservationTests(unittest.TestCase):
     """Preservation (GREEN at b94eb3788e+D, must stay GREEN): C-B1.
 
     Two pull requests share the evidence head. The dedicated authority bound
-    to PR N_a never qualifies the landing of PR N_b. The current auditor reads
-    authority only on the test merges named by N_b's own CI titles and
-    requires the external ID's PR to be N_b.
+    to PR N_a never qualifies the landing of PR N_b. The auditor reads the one
+    dedicated namespace on E, requires its candidate identity to name N_b's
+    landing and requires the external ID's PR to be N_b.
+    Ported to the P6 interfaces in "test(security): port the candidate identity
+    Original and preservation cases to the evidence head".
     """
 
     @staticmethod
@@ -473,26 +505,27 @@ class ForeignPullRequestAuthorityAuditPreservationTests(unittest.TestCase):
         control, control_report = run_auditor(self.sibling_landing())
         self.assertEqual(control.result.returncode, 0, control.result.stderr)
         self.assertEqual(control_report["qualification"]["pr_number"], PR)
-        self.assertEqual(control_report["qualification"]["authority_check_run_ids"], [own_authority()["id"]])
+        self.assertEqual(control_report["qualification"]["authority_check_run_id"], own_authority()["id"])
 
         run, report = run_auditor(self.sibling_landing(), pr=OTHER_PR)
         self.assertIn(f"GET {PREFIX}/pulls/{OTHER_PR}", run.calls)
-        self.assertIn(f"GET {PREFIX}/commits/{OTHER_MERGE}/check-runs?check_name=Security%20contract&app_id={APP_ID}"
+        self.assertIn(f"GET {PREFIX}/commits/{EVIDENCE}/check-runs?check_name=Security%20contract&app_id={APP_ID}"
                       "&filter=all&per_page=100&page=1", run.calls)
         self.assertEqual([call for call in run.calls if f"commits/{MERGE}/check-runs" in call], [])
         self.assertEqual(run.result.returncode, 1)
-        self.assertEqual(report, unverified(OTHER_PR, "no unique authenticated qualification for this protected landing"))
+        self.assertEqual(report, unverified(OTHER_PR, IDENTITY_MISMATCH))
 
     def test_authority_naming_another_pull_request_on_the_sibling_test_merge_is_refused(self) -> None:
         data = self.sibling_landing()
         foreign = copy.deepcopy(own_authority())
-        foreign.update(id=609, head_sha=OTHER_MERGE, external_id=f"arc:{PR}:{EVIDENCE}:{OTHER_MERGE}:{SOURCE}")
         metadata = json.loads(foreign["output"]["text"])
-        metadata["identity"]["merge_commit_sha"] = OTHER_MERGE
+        metadata["identity"]["pr_number"] = str(OTHER_PR)
+        metadata["identity_digest"] = digest_of(metadata["identity"])
+        foreign.update(id=609, external_id=f"chio:v3:{PR}:{EVIDENCE}:{metadata['identity_digest']}")
         foreign["output"]["text"] = json.dumps(metadata)
-        data[f"{PREFIX}/commits/{OTHER_MERGE}/check-runs"] = {"total_count": 1, "check_runs": [foreign]}
+        data[f"{PREFIX}/commits/{EVIDENCE}/check-runs"] = {"total_count": 1, "check_runs": [foreign]}
         run, report = run_auditor(data, pr=OTHER_PR)
-        self.assertIn(f"GET {PREFIX}/commits/{OTHER_MERGE}/check-runs?check_name=Security%20contract&app_id={APP_ID}"
+        self.assertIn(f"GET {PREFIX}/commits/{EVIDENCE}/check-runs?check_name=Security%20contract&app_id={APP_ID}"
                       "&filter=all&per_page=100&page=1", run.calls)
         self.assertEqual(run.result.returncode, 1)
         self.assertEqual(report, unverified(OTHER_PR, "dedicated authority external ID mismatch"))
@@ -504,6 +537,8 @@ class DuplicateOrForgedAuthorityPreservationTests(unittest.TestCase):
     The dedicated namespace qualifies only as an authentic singleton: a
     duplicate App success, or an App success whose metadata names another
     identity, leaves the landing unverified.
+    Ported to the P6 interfaces in "test(security): port the candidate identity
+    Original and preservation cases to the evidence head".
     """
 
     def test_duplicate_or_forged_dedicated_authority_is_not_verified(self) -> None:
@@ -513,8 +548,8 @@ class DuplicateOrForgedAuthorityPreservationTests(unittest.TestCase):
         metadata["identity"]["authorized_source_sha"] = PRIOR_SOURCE
         forged["output"]["text"] = json.dumps(metadata)
         for label, checks, error in (
-                ("duplicate", (own, copy.deepcopy(own) | {"id": 606}), "duplicate dedicated authority namespace"),
-                ("forged metadata", (forged,), "check metadata does not bind the exact PR/S/E/M/CI tuple")):
+                ("duplicate", (own, copy.deepcopy(own) | {"id": 606}), NAMESPACE_NOT_SINGLETON),
+                ("forged metadata", (forged,), "candidate identity digest mismatch")):
             with self.subTest(namespace=label):
                 data = LANDING.snapshot()
                 data[namespace_store(own)] = {"total_count": len(checks), "check_runs": copy.deepcopy(list(checks))}
@@ -535,6 +570,8 @@ class SourceCiIdentityPreservationTests(unittest.TestCase):
     and derives every original check from that attempt's own job inventory;
     the finalizer's CI step requires exactly one job per required name, each
     bound to a check run of the attempt's own suite.
+    Ported to the P6 interfaces in "test(security): port the candidate identity
+    Original and preservation cases to the evidence head".
     """
 
     def test_auditor_refuses_source_ci_identities_that_are_not_the_authenticated_attempt(self) -> None:
@@ -544,12 +581,20 @@ class SourceCiIdentityPreservationTests(unittest.TestCase):
             metadata["source_ci"].update(changes)
             check["output"]["text"] = json.dumps(metadata)
 
+        def sealed_check_ids(data: dict, **changes: str) -> None:
+            check = data[namespace_store(own_authority())]["check_runs"][0]
+            metadata = json.loads(check["output"]["text"])
+            metadata["required_check_run_ids"].update(changes)
+            check["output"]["text"] = json.dumps(metadata)
+
         def other_run(data: dict) -> None:
             another_pull_request_ci_run(data)
             source_ci(data, run_id="202")
 
         def other_workflow(data: dict) -> None:
             source_ci(data, workflow_id=str(LANDING.FINALIZER_WORKFLOW))
+            data[f"{PREFIX}/actions/workflows/{LANDING.FINALIZER_WORKFLOW}/runs"] = {
+                "total_count": 0, "workflow_runs": []}
 
         def missing_job(data: dict) -> None:
             inventory = data[f"{PREFIX}/actions/runs/{CI_RUN}/attempts/1/jobs"]
@@ -560,9 +605,10 @@ class SourceCiIdentityPreservationTests(unittest.TestCase):
             another_pull_request_ci_run(data)
             job = data[f"{PREFIX}/actions/runs/{CI_RUN}/attempts/1/jobs"]["jobs"][0]
             job["check_run_url"] = f"https://api.github.com/{PREFIX}/check-runs/601"
+            sealed_check_ids(data, build="601")
 
         for label, change, error in (
-                ("successful run titled for another pull request", other_run, "source CI is absent from the exact tuple"),
+                ("successful run titled for another pull request", other_run, SOURCE_CI_ABSENT),
                 ("another workflow identity", other_workflow, "historical workflow, title or source mismatch"),
                 ("job inventory without a required job", missing_job, "source CI job is missing or duplicated"),
                 ("check run of another attempt's suite", other_suite_check, "original check is not the exact source CI")):
@@ -590,8 +636,8 @@ class SourceCiIdentityPreservationTests(unittest.TestCase):
         control = authenticate(LANDING.ci_authentication_fixture())
         self.assertEqual(control.result.returncode, 0, control.result.stderr)
         self.assertEqual(control.output, "aggregate_check_run_id=505\nbuild_check_run_id=501\nci_run_attempt=1\n"
-                                         f"ci_run_id={CI_RUN}\ndeny_check_run_id=504\nmsrv_check_run_id=502\n"
-                                         "vet_check_run_id=503\n")
+                                         f"ci_run_id={CI_RUN}\nci_merge_sha={MERGE}\ndeny_check_run_id=504\n"
+                                         "msrv_check_run_id=502\nvet_check_run_id=503\n")
 
         def duplicate_job(data: dict) -> None:
             inventory = data[f"{PREFIX}/actions/runs/{CI_RUN}/attempts/1/jobs"]
@@ -630,54 +676,6 @@ C9_CAPTURE_MERGE, C9_CI_MERGE, C9_PUBLICATION_MERGE = (
     "125f0b53ef97e5dc5e3247d484b5fe53191919ba",
 )
 C9_LANDING = "53cb59e39b46cca3889c4b866db266ba237b1949"
-NO_QUALIFICATION = "no unique authenticated qualification for this protected landing"
-
-
-def c9_landing(ci_merge: str = C9_CI_MERGE) -> dict:
-    """The c9 tuple in the current authority schema.
-
-    The finalizer recorded the capture test merge and published on it; the CI
-    title names `ci_merge`; PR 1160 landed at C9_LANDING.
-    """
-    data = retarget(LANDING.snapshot(), {EVIDENCE: C9_HEAD, BASE: C9_BASE, TREE: C9_TREE,
-                                         LANDING.PROTECTED: C9_LANDING, MERGE: C9_CAPTURE_MERGE})
-    set_ci_title(data, CI_RUN, f"CI N={PR} E={C9_HEAD} B={C9_BASE} M={ci_merge}")
-    for merge in (C9_CI_MERGE, C9_PUBLICATION_MERGE):
-        data[f"{PREFIX}/git/commits/{merge}"] = {
-            "sha": merge, "parents": [{"sha": C9_BASE}, {"sha": C9_HEAD}], "tree": {"sha": C9_TREE}}
-        data[f"{PREFIX}/commits/{merge}/check-runs"] = {"total_count": 0, "check_runs": []}
-        data[f"{PREFIX}/contents/.github/workflows/ci.yml?ref={merge}"] = {"sha": "3" * 40}
-    return data
-
-
-class RegeneratedTupleLegacyAuditPreservationTests(unittest.TestCase):
-    """Preservation (GREEN at b94eb3788e+D, must stay GREEN): the current auditor stays fail-closed on c9.
-
-    A current-schema authority recorded on the capture test merge does not
-    qualify a landing whose CI title names a regenerated test merge with the
-    same parents and tree: the auditor reads authority only on the CI title's
-    test merge.
-    """
-
-    def test_current_schema_authority_on_the_capture_merge_does_not_qualify_a_regenerated_ci_merge(self) -> None:
-        control, control_report = run_auditor(c9_landing(ci_merge=C9_CAPTURE_MERGE), workflow_sha=C9_LANDING)
-        self.assertEqual(control.result.returncode, 0, control.result.stderr)
-        self.assertEqual((control_report["qualification"]["merge_commit_sha"], control_report["protected_merge_commit_sha"],
-                          control_report["protected_parents"], control_report["protected_tree_sha"]),
-                         (C9_CAPTURE_MERGE, C9_LANDING, [C9_BASE, C9_HEAD], C9_TREE))
-        data = c9_landing()
-        for merge in (C9_CAPTURE_MERGE, C9_CI_MERGE, C9_LANDING):
-            self.assertEqual(([parent["sha"] for parent in data[f"{PREFIX}/git/commits/{merge}"]["parents"]],
-                              data[f"{PREFIX}/git/commits/{merge}"]["tree"]["sha"]), ([C9_BASE, C9_HEAD], C9_TREE))
-        run, report = run_auditor(data, workflow_sha=C9_LANDING)
-        self.assertIn(f"GET {PREFIX}/commits/{C9_CI_MERGE}/check-runs?check_name=Security%20contract&app_id={APP_ID}"
-                      "&filter=all&per_page=100&page=1", run.calls)
-        self.assertEqual([call for call in run.calls if f"commits/{C9_CAPTURE_MERGE}/check-runs" in call], [])
-        self.assertEqual(run.result.returncode, 1)
-        self.assertEqual(report, unverified(PR, NO_QUALIFICATION))
-
-
-# Post-change shapes, used only by the prospective cases below.
 BINDING_ARTIFACT_ID = 812
 LEGACY_REFUSAL = "legacy M-keyed authority is not a v3 qualification"
 
@@ -687,10 +685,6 @@ def candidate_identity(pr: int = PR, base: str = C9_BASE, evidence: str = C9_HEA
     return {"schema": "chio.security-candidate-identity.v1", "repository": REPOSITORY, "repository_id": REPOSITORY_ID,
             "pr_number": str(pr), "base_sha": base, "evidence_sha": evidence, "merge_tree_sha": tree,
             "authorized_source_sha": source, "security_definition_sha": DEFINITION}
-
-
-def digest_of(identity: dict) -> str:
-    return hashlib.sha256(json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
 def ci_merge_binding(merge: str = C9_CI_MERGE, pr: int = PR) -> bytes:
@@ -719,16 +713,17 @@ def binding_archive(binding: bytes) -> bytes:
     return buffer.getvalue()
 
 
-def v3_authority(identity: dict, archive: bytes, binding: bytes, *, digest: str | None = None) -> dict:
+def v3_authority(identity: dict, archive: bytes, binding: bytes, *, recorded_ci: str = C9_CI_MERGE,
+                 digest: str | None = None) -> dict:
     identity_digest = digest_of(identity) if digest is None else digest
     external_id = f"chio:v3:{identity['pr_number']}:{identity['evidence_sha']}:{identity_digest}"
     text = {
         "schema": "chio.security-check-authority.v3", "identity": identity, "identity_digest": identity_digest,
-        "merge_observations": {"capture": C9_CAPTURE_MERGE, "ci": C9_CI_MERGE},
+        "merge_observations": {"capture": C9_CAPTURE_MERGE, "ci": recorded_ci},
         "source_ci": {"run_attempt": "1", "run_id": str(CI_RUN), "workflow_id": str(CI_WORKFLOW)},
         "required_check_run_ids": {"build": "501", "deny": "504", "msrv": "502", "vet": "503"},
         "aggregate_check_run_id": "505",
-        "ci_merge_binding": {"artifact_digest": "sha256:" + hashlib.sha256(archive).hexdigest(),
+        "ci_merge_binding": {"artifact_digest": hashlib.sha256(archive).hexdigest(),
                              "artifact_id": str(BINDING_ARTIFACT_ID),
                              "binding_sha256": hashlib.sha256(binding).hexdigest()},
         "publication_binding_digest": "2" * 64,
@@ -744,26 +739,28 @@ def v3_authority(identity: dict, archive: bytes, binding: bytes, *, digest: str 
     }
 
 
-def v3_c9_landing(identity: dict | None = None, binding: bytes | None = None, *, digest: str | None = None,
-                  expired: bool = False) -> dict:
-    """The c9 landing with a v3 authority on E: M_ci != M_cap != M_pub != L, one parent pair and one tree."""
+def c9_landing(ci_merge: str = C9_CI_MERGE, recorded_ci: str = C9_CI_MERGE, identity: dict | None = None,
+               binding: bytes | None = None, *, digest: str | None = None, expired: bool = False) -> dict:
+    """The c9 tuple with a v3 authority on E.
+
+    The finalizer recorded the capture test merge and `recorded_ci` as the CI
+    observation; the CI title and its merge binding name `ci_merge`; PR 1160
+    landed at C9_LANDING with the parents and tree of every test merge.
+    """
     identity = candidate_identity() if identity is None else identity
-    binding = ci_merge_binding() if binding is None else binding
+    binding = ci_merge_binding(ci_merge) if binding is None else binding
     archive = binding_archive(binding)
-    data = c9_landing()
-    data[f"{PREFIX}/commits/{C9_CAPTURE_MERGE}/check-runs"] = {"total_count": 0, "check_runs": []}
-    authority = v3_authority(identity, archive, binding, digest=digest)
+    data = retarget(LANDING.snapshot(), {EVIDENCE: C9_HEAD, BASE: C9_BASE, TREE: C9_TREE, LANDING.PROTECTED: C9_LANDING,
+                                         LANDING.REGENERATED_MERGE: C9_CAPTURE_MERGE, MERGE: C9_CI_MERGE})
+    set_ci_title(data, CI_RUN, f"CI N={PR} E={C9_HEAD} B={C9_BASE} M={ci_merge}")
+    for merge in (C9_CAPTURE_MERGE, C9_CI_MERGE, C9_PUBLICATION_MERGE):
+        data[f"{PREFIX}/git/commits/{merge}"] = {
+            "sha": merge, "parents": [{"sha": C9_BASE}, {"sha": C9_HEAD}], "tree": {"sha": C9_TREE}}
+        data[f"{PREFIX}/commits/{merge}/check-runs"] = {"total_count": 0, "check_runs": []}
+        data[f"{PREFIX}/contents/.github/workflows/ci.yml?ref={merge}"] = {"sha": "3" * 40}
+    authority = v3_authority(identity, archive, binding, recorded_ci=recorded_ci, digest=digest)
     data[f"{PREFIX}/commits/{C9_HEAD}/check-runs"] = {"total_count": 1, "check_runs": [authority]}
     data[f"{PREFIX}/contents/.github/workflows/ci.yml?ref={C9_LANDING}"] = {"sha": "3" * 40}
-    aggregate = {"id": 505, "name": "Security contract", "head_sha": C9_HEAD, "status": "completed",
-                 "conclusion": "success", "app": {"id": 15368, "slug": "github-actions"},
-                 "check_suite": {"id": 401, "head_sha": C9_HEAD}}
-    data[f"{PREFIX}/check-runs/505"] = aggregate
-    inventory = data[f"{PREFIX}/actions/runs/{CI_RUN}/attempts/1/jobs"]
-    inventory["jobs"].append({"id": 705, "name": "Security contract", "run_id": CI_RUN, "head_sha": C9_HEAD,
-                              "status": "completed", "conclusion": "success",
-                              "check_run_url": f"https://api.github.com/{PREFIX}/check-runs/505"})
-    inventory["total_count"] = len(inventory["jobs"])
     data[f"{PREFIX}/actions/artifacts/{BINDING_ARTIFACT_ID}"] = {
         "id": BINDING_ARTIFACT_ID, "name": f"ci-merge-binding-{CI_RUN}-1", "size_in_bytes": len(archive),
         "archive_download_url": f"https://api.github.com/{PREFIX}/actions/artifacts/{BINDING_ARTIFACT_ID}/zip",
@@ -775,6 +772,43 @@ def v3_c9_landing(identity: dict | None = None, binding: bytes | None = None, *,
     data[f"{PREFIX}/actions/artifacts/{BINDING_ARTIFACT_ID}/zip"] = {
         "__binary_base64": base64.b64encode(archive).decode()}
     return data
+
+
+class RegeneratedTupleLegacyAuditPreservationTests(unittest.TestCase):
+    """Preservation (GREEN at b94eb3788e+D, must stay GREEN): the auditor stays fail-closed on c9.
+
+    An authority that recorded the capture test merge as its CI observation
+    does not qualify a landing whose CI title names a regenerated test merge
+    with the same parents and tree: the auditor admits the source CI only
+    through the CI test merge the authority recorded.
+    Ported to the P6 interfaces in "test(security): port the candidate identity
+    Original and preservation cases to the evidence head".
+    """
+
+    def test_current_schema_authority_on_the_capture_merge_does_not_qualify_a_regenerated_ci_merge(self) -> None:
+        control, control_report = run_auditor(c9_landing(ci_merge=C9_CAPTURE_MERGE, recorded_ci=C9_CAPTURE_MERGE),
+                                              workflow_sha=C9_LANDING)
+        self.assertEqual(control.result.returncode, 0, control.result.stderr)
+        self.assertEqual((control_report["qualification"]["merge_observations"],
+                          control_report["protected_merge_commit_sha"], control_report["protected_parents"],
+                          control_report["protected_tree_sha"]),
+                         ({"capture": C9_CAPTURE_MERGE, "ci": C9_CAPTURE_MERGE}, C9_LANDING, [C9_BASE, C9_HEAD], C9_TREE))
+        data = c9_landing(recorded_ci=C9_CAPTURE_MERGE)
+        for merge in (C9_CAPTURE_MERGE, C9_CI_MERGE, C9_LANDING):
+            self.assertEqual(([parent["sha"] for parent in data[f"{PREFIX}/git/commits/{merge}"]["parents"]],
+                              data[f"{PREFIX}/git/commits/{merge}"]["tree"]["sha"]), ([C9_BASE, C9_HEAD], C9_TREE))
+        run, report = run_auditor(data, workflow_sha=C9_LANDING)
+        self.assertIn(f"GET {PREFIX}/commits/{C9_HEAD}/check-runs?check_name=Security%20contract&app_id={APP_ID}"
+                      "&filter=all&per_page=100&page=1", run.calls)
+        self.assertEqual([call for call in run.calls if f"commits/{C9_CAPTURE_MERGE}/check-runs" in call], [])
+        self.assertEqual(run.result.returncode, 1)
+        self.assertEqual(report, unverified(PR, SOURCE_CI_ABSENT))
+
+
+def v3_c9_landing(identity: dict | None = None, binding: bytes | None = None, *, digest: str | None = None,
+                  expired: bool = False) -> dict:
+    """The c9 landing with a v3 authority on E: M_ci != M_cap != M_pub != L, one parent pair and one tree."""
+    return c9_landing(identity=identity, binding=binding, digest=digest, expired=expired)
 
 
 def audit_v3(data: dict, pr: int = PR):
@@ -835,8 +869,16 @@ class CandidateIdentityAuditProspectiveTests(unittest.TestCase):
     @unittest.skip(V3_AUDITOR)
     def test_legacy_external_id_on_the_evidence_head_is_not_a_v3_qualification(self) -> None:
         data = v3_c9_landing()
-        (legacy,) = copy.deepcopy(c9_landing()[f"{PREFIX}/commits/{C9_CAPTURE_MERGE}/check-runs"]["check_runs"])
-        legacy["head_sha"] = C9_HEAD
+        (legacy,) = copy.deepcopy(data[f"{PREFIX}/commits/{C9_HEAD}/check-runs"]["check_runs"])
+        legacy["external_id"] = f"arc:{PR}:{C9_HEAD}:{C9_CAPTURE_MERGE}:{SOURCE}"
+        legacy["output"] = {"title": "Chio security authority",
+                            "summary": f"Dedicated chio-security-authority approval for {legacy['external_id']}.",
+                            "text": json.dumps({
+                                "schema": "chio.security-check-authority.v2",
+                                "identity": {"pr_number": str(PR), "authorized_source_sha": SOURCE,
+                                             "evidence_sha": C9_HEAD, "merge_commit_sha": C9_CAPTURE_MERGE},
+                                "source_ci": {"run_id": str(CI_RUN), "run_attempt": "1", "workflow_id": str(CI_WORKFLOW)},
+                                "publication_binding_digest": "2" * 64})}
         data[f"{PREFIX}/commits/{C9_HEAD}/check-runs"] = {"total_count": 1, "check_runs": [legacy]}
         self.assert_unverified(data, error=LEGACY_REFUSAL)
 
@@ -898,12 +940,15 @@ class SharedHeadDenialProspectiveTests(unittest.TestCase):
                    "(`list_checks`), so a sibling's authority on E is outside every namespace it reads and a missing "
                    "PATCH today would be placement, not the canonical-member rule")
     def test_revocation_for_e_fails_a_sibling_pull_request_authority_on_e(self) -> None:
-        identity = candidate_identity(pr=PR, base=BASE, evidence=EVIDENCE, tree=TREE)
-        sibling = v3_authority(identity, b"", b"") | {"id": 611}
+        sibling = own_authority() | {"id": 611}
         data = with_namespace(LANDING.revoker_fixture(), sibling)
         data[f"{PREFIX}/pulls/{OTHER_PR}"] = LANDING.live_pull_request(number=OTHER_PR, merge=OTHER_MERGE,
                                                                        head_ref="evidence-copy")
-        run = run_revoker(data, "workflow_dispatch", pr=OTHER_PR)
+        data[f"{PREFIX}/git/ref/pull/{OTHER_PR}/merge"] = {"ref": f"refs/pull/{OTHER_PR}/merge",
+                                                          "object": {"type": "commit", "sha": OTHER_MERGE}}
+        data[f"{PREFIX}/git/commits/{OTHER_MERGE}"] = {
+            "sha": OTHER_MERGE, "parents": [{"sha": BASE}, {"sha": EVIDENCE}], "tree": {"sha": TREE}}
+        run = run_revoker(data, "workflow_dispatch", pr=OTHER_PR, merge=OTHER_MERGE)
         self.assertIn(namespace_listing(sibling), run.calls)
         self.assertEqual(LANDING.check_mutations(run), [f"PATCH {PREFIX}/check-runs/{sibling['id']}"])
         self.assertEqual(projection(stored(run, sibling)), denied_projection(sibling))
