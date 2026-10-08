@@ -88,11 +88,11 @@ pub(crate) fn verify_preflight_hold(
     if request.hold_id.as_deref() != Some(identity.hold_id().as_str())
         || request.capability_id != hold.capability_id
         || request.grant_index != hold.grant_index
-        || request
-            .admission_binding
-            .as_ref()
-            .map(|binding| binding.operation_id.as_str())
-            != Some(identity.budget_operation_id().as_str())
+        || request.admission_binding.as_ref().is_none_or(|binding| {
+            binding.operation_id != identity.budget_operation_id().as_str()
+                || binding.authorization_artifact_digests
+                    != hold.admission.authorization_artifact_digests
+        })
     {
         return Err(BudgetStoreError::Invariant(
             "nonce preflight authorization identity changed".into(),
