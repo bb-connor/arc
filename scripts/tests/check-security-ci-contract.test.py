@@ -251,6 +251,28 @@ def swap_named_steps(first: str, second: str) -> Callable[[str], str]:
     return mutate
 
 
+def replace_in_named_shell_function(
+    step: str, function: str, old: str, new: str
+) -> Callable[[str], str]:
+    def mutate(body: str) -> str:
+        start, end = named_step_bounds(body, step)
+        block = body[start:end]
+        matches = list(re.finditer(
+            rf"(?ms)^(?P<indent> +){re.escape(function)}\(\) \{{\n.*?^(?P=indent)\}}",
+            block,
+        ))
+        if len(matches) != 1:
+            raise AssertionError(f"mutation helper is missing or duplicated: {function}")
+        match = matches[0]
+        original = match.group(0)
+        changed = original.replace(old, new, 1)
+        if changed == original:
+            raise AssertionError(f"mutation did not change owning helper: {function}")
+        return body[:start + match.start()] + changed + body[start + match.end():]
+
+    return mutate
+
+
 def assert_rejected(
     label: str,
     workflow_name: str,
@@ -3978,11 +4000,11 @@ assert_rejected(
 )
 for label, workflow_name, job_name, old, new, expected_error in (
     (
-        "publisher changes its M-scoped serialization key",
+        "publisher changes its E-scoped serialization key",
         "enterprise-evidence-finalizer.yml",
         "publish-security-contract",
-        "group: security-check-authority-${{ needs.authorize-security-check-publication.outputs.merge_commit_sha }}",
-        "group: security-check-publisher-${{ needs.authorize-security-check-publication.outputs.merge_commit_sha }}",
+        "group: security-check-authority-${{ needs.authorize-security-check-publication.outputs.evidence_sha }}",
+        "group: security-check-publisher-${{ needs.authorize-security-check-publication.outputs.evidence_sha }}",
         "dedicated Security contract publisher identity changed",
     ),
     (
@@ -4002,10 +4024,10 @@ for label, workflow_name, job_name, old, new, expected_error in (
         "dedicated Security contract publisher identity changed",
     ),
     (
-        "revoker changes its M-scoped serialization key",
+        "revoker changes its E-scoped serialization key",
         "security-contract-revocation.yml",
         "revoke-security-contract",
-        "group: security-check-authority-${{ needs.bind-revocation.outputs.merge_commit_sha }}",
+        "group: security-check-authority-${{ needs.bind-revocation.outputs.evidence_sha }}",
         "group: security-check-revocation-global",
         "security check revocation job identity changed",
     ),
@@ -4037,8 +4059,8 @@ assert_rejected(
     "security-contract-revocation.yml",
     replace_in_named_job(
         "revoke-security-contract",
-        '          echo "Normalized the dedicated Security contract namespace to sticky failure on ${MERGE_COMMIT_SHA}." >> "${GITHUB_STEP_SUMMARY}"\n',
-        '          echo "Normalized the dedicated Security contract namespace to sticky failure on ${MERGE_COMMIT_SHA}." >> "${GITHUB_STEP_SUMMARY}"\n'
+        '          echo "Normalized the dedicated Security contract namespace to sticky failure on ${EVIDENCE_SHA}." >> "${GITHUB_STEP_SUMMARY}"\n',
+        '          echo "Normalized the dedicated Security contract namespace to sticky failure on ${EVIDENCE_SHA}." >> "${GITHUB_STEP_SUMMARY}"\n'
         "      - name: Unsealed postrevocation action\n        run: true\n",
     ),
     "security check revocation step inventory changed",
@@ -4088,18 +4110,18 @@ for label, old, new in (
     ),
     (
         "revocation contract does not fail the authority check",
-        "absent namespace receives an exact completed-failure tombstone.",
+        "absent eligible namespace receives an exact completed-failure tombstone with",
         "deletes each successful run.\n",
     ),
     (
         "revocation contract permits restoration for the same merge",
-        "Never\nrestore authority for the same test merge.",
+        "Never\nrestore authority for the same evidence head `E`.",
         "Authority may be restored for the same test merge.",
     ),
     (
         "revocation contract separates publisher and revoker locks",
         "Publication and revocation use the same non-cancelling maximum-queue\n"
-        "`security-check-authority-<M>` concurrency group.",
+        "`security-check-authority-<E>` concurrency group.",
         "Publication and revocation use separate locks.",
     ),
     (
@@ -4117,7 +4139,7 @@ for label, old, new in (
     ),
     (
         "revoker contract reconciles Actions mirrors before the dedicated namespace",
-        "It paginates the dedicated-App `Security contract` namespace on `M`.",
+        "It paginates the dedicated-App `Security contract` namespace on `E`.",
         "It paginates the four App `15368` mirror namespaces and then the dedicated-App namespace.",
     ),
     (
@@ -4588,8 +4610,8 @@ assert_rejected(
     'enterprise-evidence-finalizer.yml',
     replace_in_named_step(
         'Reconcile exact five-context merge authority',
-        'normalize_bad_ci_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${EXTERNAL_ID}"',
-        'normalize_bad_ci_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${EXTERNAL_ID}"\n            normalize_bad_ci_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / Build, lint, test" "${EXTERNAL_ID}:actions:build"',
+        'normalize_bad_ci_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "chio:v3:deny:${EVIDENCE_SHA}"',
+        'normalize_bad_ci_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "chio:v3:deny:${EVIDENCE_SHA}"\n            normalize_bad_ci_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / Build, lint, test" "${EXTERNAL_ID}:actions:build"',
     ),
     'restores Actions mirror authority',
 )
@@ -4608,7 +4630,7 @@ assert_rejected(
     'enterprise-evidence-finalizer.yml',
     replace_in_named_step(
         'Reconcile exact five-context merge authority',
-        'normalize_bad_ci_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${EXTERNAL_ID}"',
+        'normalize_bad_ci_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "chio:v3:deny:${EVIDENCE_SHA}"',
         'true',
     ),
     'weakens App, main-ref, binding, or check payload authentication',
@@ -4836,8 +4858,8 @@ assert_rejected(
     "enterprise-evidence-finalizer.yml",
     replace_in_named_job(
         "publish-security-contract",
-        '          echo "Dedicated Security contract published for ${MERGE_COMMIT_SHA}; check run ${check_run_id}." >> "${GITHUB_STEP_SUMMARY}"\n',
-        '          echo "Dedicated Security contract published for ${MERGE_COMMIT_SHA}; check run ${check_run_id}." >> "${GITHUB_STEP_SUMMARY}"\n'
+        '          echo "Dedicated Security contract published for ${EVIDENCE_SHA}; check run ${check_run_id}." >> "${GITHUB_STEP_SUMMARY}"\n',
+        '          echo "Dedicated Security contract published for ${EVIDENCE_SHA}; check run ${check_run_id}." >> "${GITHUB_STEP_SUMMARY}"\n'
         "      - name: Unsealed postpublication action\n        run: true\n",
     ),
     "publisher step inventory changed",
@@ -5732,7 +5754,7 @@ assert_auditor_transport_rejected(
 )
 assert_auditor_transport_rejected(
     "auditor restores mirror authority even with a matching code pin",
-    '"missing or duplicate dedicated authority namespace"',
+    '"missing or duplicate dedicated authority namespace on E"',
     '"missing or duplicate Security mirror / authority namespace"',
     "restores Actions mirror authority",
 )
@@ -5914,8 +5936,84 @@ for label, old, new in (
     ("duplicate-head detection is advertised as per-PR enforcement", 'Duplicate-head refusal is detection, not per-pull-request enforcement.', 'Duplicate-head refusal enforces per-pull-request authority.'),
     ("census contract permits incomplete pagination", 'Each census allows at most ten pages of\n100 entries and validates every returned PR number and head SHA.', 'Each census accepts the first available PR page.'),
     ("denial contract inherits main currency", 'E-scope denial path, independent of main currency and duplicate-head detection.', 'denial path, conditional on main currency and duplicate-head detection.'),
-    ("partial v2 auditor is advertised as accepting divergent merge observations", 'The v2 landing auditor remains\nfail-closed (`unverified`) if those merge observations differ.', 'The v2 landing auditor accepts all regenerated merge observations.'),
+    ("v3 auditor is advertised as accepting legacy authority", 'Legacy `arc:` authority is `unverified`, and legacy binding\nor check metadata schemas cannot qualify this v3 candidate.', 'The v2 landing auditor accepts all regenerated merge observations.'),
 ):
     assert_document_rejected(label, replace_once(old, new), "publisher environment provisioning contract changed")
+
+for label, old, new in (
+    ("auditor drops K recomputation", 'digest(value["identity_digest"]) == hashlib.sha256(canonical).hexdigest()', 'True'),
+    ("auditor admits non-ASCII identity strings", 'isinstance(item, str) and item.isascii()', 'isinstance(item, str)'),
+    ("auditor drops exact authority field set", 'set(value) == fields', 'True'),
+    ("auditor changes the candidate identity schema", '"schema": "chio.security-candidate-identity.v1", "repository": repository,', '"schema": "chio.security-candidate-identity.v2", "repository": repository,'),
+    ("auditor skips inventory-to-sealed-ID equality", 'str(identifier) == bound_identifier', 'True'),
+    ("auditor accepts multiple owning jobs", 'len(matching_jobs) == 1', 'len(matching_jobs) >= 1'),
+    ("auditor substitutes the original check App", 'original.get("app", {}).get("id") == 15368', 'original.get("app", {}).get("id") == 15369'),
+    ("auditor skips owning check suite", 'positive_id(original.get("check_suite", {}).get("id")) == check_suite_id', 'True'),
+    ("auditor restores M namespace placement", 'commits/{evidence}/check-runs?check_name=Security%20contract&app_id={app_id}&filter=all', 'commits/{merge}/check-runs?check_name=Security%20contract&app_id={app_id}&filter=all'),
+    ("auditor omits App-bound namespace filter", 'check_name=Security%20contract&app_id={app_id}&filter=all', 'check_name=Security%20contract&filter=all'),
+    ("auditor omits archive digest verification", 'hashlib.sha256(archive).hexdigest() == artifact_binding["artifact_digest"]', 'True'),
+    ("auditor accepts an expired binding artifact", 'artifact.get("expired") is False', 'True'),
+    ("auditor increases archive read bound", 'API_LIMIT = 16 * 1024 * 1024', 'API_LIMIT = 17 * 1024 * 1024'),
+    ("auditor increases binding read bound", 'BINDING_LIMIT = 64 * 1024', 'BINDING_LIMIT = 65 * 1024'),
+    ("auditor increases API deadline", 'deadline = time.monotonic() + 30', 'deadline = time.monotonic() + 31'),
+    ("auditor downloads API output without an incremental bound", 'len(target) <= limit', 'True'),
+    ("auditor permits duplicate ZIP names", 'len(set(names)) == len(names)', 'True'),
+    ("auditor permits ambiguous binding members", 'len(matching) == 1', 'len(matching) >= 1'),
+    ("auditor permits nonregular binding members", 'mode in {0, stat.S_IFREG}', 'True'),
+    ("auditor permits encrypted binding members", 'not member.flag_bits & 1', 'True'),
+    ("auditor omits binding-body digest verification", 'hashlib.sha256(raw).hexdigest() == artifact_binding["binding_sha256"]', 'True'),
+    ("auditor reads the binding without a bound", 'body.read(BINDING_LIMIT + 1)', 'body.read()'),
+    ("auditor drops duplicate-aware binding JSON", 'binding = json.loads(raw, object_pairs_hook=unique_object, parse_constant=invalid_constant)', 'binding = json.loads(raw)'),
+    ("auditor accepts another authenticated CI merge", 'binding.get("merge", {}).get("sha") == merge', 'True'),
+    ("auditor accepts different ordered parents", 'binding.get("merge", {}).get("parents") == [base, evidence]', 'True'),
+    ("auditor accepts a different sealed tree", 'binding.get("merge", {}).get("tree_sha") == tree', 'True'),
+    ("auditor skips the archived binding verification call", 'verify_ci_merge_binding(api, repository, repository_id, pr_number, evidence, base, tree, payload)', 'pass'),
+):
+    assert_auditor_transport_rejected(label, old, new, "trusted landing v3 boundary changed")
+
+for label, replacement in (
+    ("removed", ""),
+    ("commented", "          # run_gate python3 ./scripts/tests/trusted-ci-identity-regressions.test.py\n"),
+    ("soft-failed", "          run_gate python3 ./scripts/tests/trusted-ci-identity-regressions.test.py || true\n"),
+    ("conditional", "          if false; then\n          run_gate python3 ./scripts/tests/trusted-ci-identity-regressions.test.py\n          fi\n"),
+):
+    assert_rejected(
+        f"CI identity-regression enforcement entry {label}", "ci.yml",
+        replace_in_named_step(
+            "Workspace structural gates",
+            "          run_gate python3 ./scripts/tests/trusted-ci-identity-regressions.test.py\n",
+            replacement,
+        ),
+        "identity regression gate is not exact and adjacent",
+    )
+
+for label, step, old, new, error in (
+    ("publisher payload restores M placement", "Reconcile exact five-context merge authority", '--arg head_sha "${EVIDENCE_SHA}"', '--arg head_sha "${MERGE_COMMIT_SHA}"', "dedicated v3 publisher loses I/K, E placement or sealed provenance"),
+    ("publisher lists the negative namespace on M", "Reconcile exact five-context merge authority", 'commits/${EVIDENCE_SHA}/check-runs?app_id=${app_id}', 'commits/${MERGE_COMMIT_SHA}/check-runs?app_id=${app_id}', "dedicated v3 publisher loses I/K, E placement or sealed provenance"),
+    ("publisher drops K recomputation", "Reconcile exact five-context merge authority", 'test "$(printf \'%s\' "${IDENTITY_JSON}" | sha256sum | cut -d\' \' -f1)" = "${IDENTITY_DIGEST}"', 'true', "weakens App, main-ref, binding, or check payload authentication"),
+    ("publisher drops identity-to-candidate equality", "Reconcile exact five-context merge authority", '.identity == $identity and .identity_digest == $digest', 'true', "dedicated v3 publisher loses I/K, E placement or sealed provenance"),
+    ("publisher drops original check ID revalidation", "Reconcile exact five-context merge authority", 'test "${check_id}" = "${expected_check_id}"', 'true', "original CI revalidation loses owning attempt, job, ID or App binding"),
+    ("publisher permits a foreign job check URL", "Reconcile exact five-context merge authority", 'test "${check_url}" = "${check_url_prefix}${check_id}"', 'true', "original CI revalidation loses owning attempt, job, ID or App binding"),
+    ("publisher drops exact source attempt repository ID", "Reconcile exact five-context merge authority", '(.repository.id | tostring) == $repository_id', 'true', "original CI revalidation loses owning attempt, job, ID or App binding"),
+    ("publisher drops exact source attempt head repository ID", "Reconcile exact five-context merge authority", '(.head_repository.id | tostring) == $repository_id', 'true', "original CI revalidation loses owning attempt, job, ID or App binding"),
+    ("publisher permits an unbounded jobs census", "Reconcile exact five-context merge authority", 'test "${page}" -le 10', 'true', "original CI revalidation loses owning attempt, job, ID or App binding"),
+    ("publisher bypasses the job inventory listing ceiling", "Reconcile exact five-context merge authority", 'if test "${page_total}" -ge 1000; then', 'if false; then', "original CI revalidation loses owning attempt, job, ID or App binding"),
+    ("publisher skips original check revalidation before a positive boundary", "Reconcile exact five-context merge authority", '            revalidate_source_ci_checks\n', '            true\n', "retry reconciliation loses recorded authority or failure-only binding"),
+    ("publisher negative member requires matching candidate identity", "Reconcile exact five-context merge authority", 'canonical_check_id="$(jq -r \'.check_runs | sort_by(.id) | .[0].id // empty\' <<< "${namespace}")"', 'canonical_check_id="$(jq -r --arg external_id "${required_external_id}" \'.check_runs | map(select(.external_id == $external_id)) | sort_by(.id) | .[0].id // empty\' <<< "${namespace}")"', "weakens App, main-ref, binding, or check payload authentication"),
+    ("publisher verification re-requires create identity on existing negative member", "Reconcile exact five-context merge authority", '(if $created then .external_id == $external_id else true end)', '.external_id == $external_id', "negative canonical member re-requires a new external identity"),
+):
+    mutate = (
+        replace_in_named_shell_function(step, "revalidate_source_ci_checks", old, new)
+        if label.startswith("publisher drops exact source attempt")
+        else replace_in_named_step(step, old, new)
+    )
+    assert_rejected(label, "enterprise-evidence-finalizer.yml", mutate, error)
+
+for label, old, new, error in (
+    ("revoker negative member requires matching candidate identity", 'canonical_check_id="$(jq -r \'.check_runs | sort_by(.id) | .[0].id // empty\' <<< "${namespace}")"', 'canonical_check_id="$(jq -r --arg external_id "${required_external_id}" \'.check_runs | map(select(.external_id == $external_id)) | sort_by(.id) | .[0].id // empty\' <<< "${namespace}")"', "weakens event, owner, App, binding, or failure verification"),
+    ("revoker verification re-requires create identity on an existing member", 'if test "${namespace_count}" = 0; then', 'if test "${CREATE_MISSING}" = true; then', "negative canonical member re-requires a new external identity"),
+    ("revoker restores M payload placement", '--arg head_sha "${EVIDENCE_SHA}"', '--arg head_sha "${MERGE_COMMIT_SHA}"', "negative canonical member is not the oldest preserved member"),
+):
+    assert_rejected(label, "security-contract-revocation.yml", replace_in_named_step("Revoke exact Actions mirrors and dedicated App namespace", old, new), error)
 
 print("security CI contract rejects trust-boundary and evidence mutations")

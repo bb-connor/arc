@@ -313,7 +313,7 @@ EXPECTED_ADVISORY_ENV = {'CARGO_INCREMENTAL': '0',
  'PROPTEST_CASES': '256',
  'CHIO_CI_RUSTFLAGS': '-D warnings -C link-arg=-Wl,--threads=1'}
 EXPECTED_ADVISORY_JOB_SHA256 = "a518a495aecb5d9eca47d6a5aaa3c3d978f524a5a020f312dbc8a0e24e399ff5"
-EXPECTED_LANDING_AUDITOR_SHA256 = "2f43509c7748feb0b630f5bede3748f0e972bfa8e7848f96c0f487dba00fe95d"
+EXPECTED_LANDING_AUDITOR_SHA256 = "c5e292401e321220bc46d9b6bbba23989349d60874913db98a82a69fdfc76834"
 EXPECTED_WORKFLOW_SYNTAX_CHECKER_SHA256 = "1777d2df48bff8f3269a1da5451572576cadfbbf3b0784dfc16e28137bd13ada"
 EXPECTED_CI_PERMISSIONS = {"contents": "read"}
 EXPECTED_CONTROLLER_EVENTS = {
@@ -467,7 +467,7 @@ EXPECTED_SIGNING_CONCURRENCY = {
     "cancel-in-progress": "true",
 }
 EXPECTED_PUBLISHER_CONCURRENCY = {
-    "group": "security-check-authority-${{ needs.authorize-security-check-publication.outputs.merge_commit_sha }}",
+    "group": "security-check-authority-${{ needs.authorize-security-check-publication.outputs.evidence_sha }}",
     "cancel-in-progress": "false",
     "queue": "max",
 }
@@ -515,7 +515,7 @@ EXPECTED_REVOCATION_EVENTS = {
     },
 }
 EXPECTED_REVOCATION_CONCURRENCY = {
-    "group": "security-check-authority-${{ needs.bind-revocation.outputs.merge_commit_sha }}",
+    "group": "security-check-authority-${{ needs.bind-revocation.outputs.evidence_sha }}",
     "cancel-in-progress": "false",
     "queue": "max",
 }
@@ -692,6 +692,8 @@ EXPECTED_PUBLICATION_AUTHORIZATION_OUTPUTS = {
     "ci_workflow_id": "${{ steps.seal.outputs.ci_workflow_id }}",
     "evidence_sha": "${{ steps.seal.outputs.evidence_sha }}",
     "external_id": "${{ steps.seal.outputs.external_id }}",
+    "identity_digest": "${{ steps.seal.outputs.identity_digest }}",
+    "identity_json": "${{ steps.seal.outputs.identity_json }}",
     "merge_commit_sha": "${{ steps.seal.outputs.merge_commit_sha }}",
     "pr_number": "${{ steps.seal.outputs.pr_number }}",
     "publication_binding_digest": "${{ steps.seal.outputs.publication_binding_digest }}",
@@ -784,6 +786,8 @@ EXPECTED_PUBLISHER_STEP_ENV = {
     "COMMITTED_EVIDENCE_SHA": "${{ vars.CHIO_COMMITTED_LINUX_EVIDENCE_SHA }}",
     "EVIDENCE_SHA": "${{ needs.authorize-security-check-publication.outputs.evidence_sha }}",
     "EXTERNAL_ID": "${{ needs.authorize-security-check-publication.outputs.external_id }}",
+    "IDENTITY_DIGEST": "${{ needs.authorize-security-check-publication.outputs.identity_digest }}",
+    "IDENTITY_JSON": "${{ needs.authorize-security-check-publication.outputs.identity_json }}",
     "FINALIZER_RUN_ATTEMPT": "${{ github.run_attempt }}",
     "FINALIZER_RUN_ID": "${{ github.run_id }}",
     "GH_TOKEN": "${{ github.token }}",
@@ -944,19 +948,19 @@ EXPECTED_TRUST_JOB_DIGESTS = {
     (
         "enterprise evidence finalizer",
         "authorize-security-check-publication",
-    ): "455ecd77612baf4b9e0d55c34922736e77212f6044266699ddc05d3d42aec75f",
+    ): "2abc1d663a6aeb9097055502505d604f9779b9aaf2a400d2a1e80c913b2be28a",
     (
         "enterprise evidence finalizer",
         "publish-security-contract",
-    ): "5865b5c2223a449343ccd91761429b047131cf6866e2564eb7cdbe9aad2cc1cc",
+    ): "baff23811fb2ff0ad224d6d30bf0e697b04aad881a16667a714f6bb69587d8f6",
     (
         "security contract revocation",
         "bind-revocation",
-    ): "cd80a5675806821beca163cc5c336e039aafda2f429ba02550b4686348f9e8a4",
+    ): "e20d210ae2032a9c34fb25d5acc324ef2804a627c129c582d35bf975e2d75440",
     (
         "security contract revocation",
         "revoke-security-contract",
-    ): "64c9810e229489908a6a88e86b10e344a071f2631deac505ebe1b46422e04902",
+    ): "9d5fca1213fe05a50461185dad65152aae77bba5e3143f6e9feb90d1cb86686c",
     (
         "enterprise-hardening",
         "committed-linux-evidence",
@@ -1690,6 +1694,170 @@ def validate_independent_denial_scope(body: str) -> None:
         raise ContractError(contract)
 
 
+def validate_v3_landing_auditor(body: str) -> None:
+    """Retain live v3 integrity predicates independently of the exact source pin."""
+    tree = ast.parse(body)
+    parents = ast_parent_map(tree)
+    functions = {
+        node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)
+    }
+    github = next((node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "GitHub"), None)
+    if github is None:
+        raise ContractError("trusted landing v3 boundary lacks its bounded API reader")
+    functions.update({f"GitHub.{node.name}": node for node in github.body if isinstance(node, ast.FunctionDef)})
+    conditions = (
+        ("metadata", 'set(value) == fields'),
+        ("metadata", 'value.get("schema") == "chio.security-check-authority.v3"'),
+        ("metadata", 'set(identity) == {"schema", "repository", "repository_id", "pr_number", "base_sha", "evidence_sha", "merge_tree_sha", "authorized_source_sha", "security_definition_sha"}'),
+        ("metadata", 'item.isascii()'),
+        ("metadata", 'digest(value["identity_digest"]) == hashlib.sha256(canonical).hexdigest()'),
+        ("metadata", 'len(set(identifiers)) == 5'),
+        ("GitHub.binary", 'len(target) <= limit'),
+        ("GitHub.binary", 'remaining > 0'),
+        ("verify_ci_merge_binding", 'artifact.get("expired") is False'),
+        ("verify_ci_merge_binding", 'artifact.get("digest") == "sha256:" + artifact_binding["artifact_digest"]'),
+        ("verify_ci_merge_binding", '0 < size <= API_LIMIT'),
+        ("verify_ci_merge_binding", 'len(archive) == size'),
+        ("verify_ci_merge_binding", 'hashlib.sha256(archive).hexdigest() == artifact_binding["artifact_digest"]'),
+        ("verify_ci_merge_binding", 'len(set(names)) == len(names)'),
+        ("verify_ci_merge_binding", 'len(matching) == 1'),
+        ("verify_ci_merge_binding", 'mode in {0, stat.S_IFREG}'),
+        ("verify_ci_merge_binding", 'not member.flag_bits & 1'),
+        ("verify_ci_merge_binding", '0 < member.file_size <= BINDING_LIMIT'),
+        ("verify_ci_merge_binding", 'len(raw) <= BINDING_LIMIT'),
+        ("verify_ci_merge_binding", 'hashlib.sha256(raw).hexdigest() == artifact_binding["binding_sha256"]'),
+        ("verify_ci_merge_binding", 'binding.get("merge", {}).get("sha") == merge'),
+        ("verify_ci_merge_binding", 'binding.get("merge", {}).get("parents") == [base, evidence]'),
+        ("verify_ci_merge_binding", 'binding.get("merge", {}).get("tree_sha") == tree'),
+        ("verify_ci_merge_binding", 'binding.get("caller", {}).get("definition_sha") == merge'),
+        ("verify_ci_merge_binding", 'set(binding) == {"schema", "repository", "pull_request_number", "head", "base", "merge", "ci", "caller", "builder"}'),
+        ("audit_qualification", 'len(checks) == 1'),
+        ("audit_qualification", 'authority.get("head_sha") == evidence'),
+        ("audit_qualification", 'identity == {"schema": "chio.security-candidate-identity.v1", "repository": repository, "repository_id": str(repository_id), "pr_number": str(pr_number), "base_sha": base, "evidence_sha": evidence, "merge_tree_sha": tree, "authorized_source_sha": source, "security_definition_sha": security_definition}'),
+        ("audit_qualification", 'len(matching_jobs) == 1'),
+        ("audit_qualification", 'str(identifier) == bound_identifier'),
+        ("audit_qualification", 'original.get("app", {}).get("id") == 15368'),
+        ("audit_qualification", 'positive_id(original.get("check_suite", {}).get("id")) == check_suite_id'),
+        ("audit_qualification", 'finalizer_attempt == 1'),
+        ("audit_qualification", 'dedicated_namespace(api, evidence, app_id) == checks'),
+    )
+    for name, expression in conditions:
+        function = functions.get(name)
+        wanted = stable_ast_dump(ast.parse(expression, mode="eval").body)
+        calls = live_calls(function, "require", parents) if function is not None else []
+        if not any(call.args and any(stable_ast_dump(node) == wanted for node in ast.walk(call.args[0])) for call in calls):
+            raise ContractError(f"trusted landing v3 boundary changed: {name}")
+    assignments = {
+        node.targets[0].id: node.value for node in tree.body
+        if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
+    }
+    metadata = functions.get("metadata")
+    required_fields = ast.parse('{"schema", "identity", "identity_digest", "merge_observations", "source_ci", "required_check_run_ids", "aggregate_check_run_id", "ci_merge_binding", "publication_binding_digest"}', mode="eval").body
+    if metadata is None or not any(
+        isinstance(node, ast.Assign) and len(node.targets) == 1
+        and isinstance(node.targets[0], ast.Name) and node.targets[0].id == "fields"
+        and stable_ast_dump(node.value) == stable_ast_dump(required_fields)
+        for node in metadata.body
+    ):
+        raise ContractError("trusted landing v3 boundary changed: exact authority fields")
+    for name, expected in (("API_LIMIT", "16 * 1024 * 1024"), ("BINDING_LIMIT", "64 * 1024")):
+        if name not in assignments or stable_ast_dump(assignments[name]) != stable_ast_dump(ast.parse(expected, mode="eval").body):
+            raise ContractError("trusted landing v3 boundary changed: exact read limits")
+    code = ast.unparse(tree)
+    for expression in (
+        'canonical = json.dumps(identity, sort_keys=True, separators=(",", ":")).encode("ascii")',
+        'raw = body.read(BINDING_LIMIT + 1)',
+        'binding = json.loads(raw, object_pairs_hook=unique_object, parse_constant=invalid_constant)',
+        'verify_ci_merge_binding(api, repository, repository_id, pr_number, evidence, base, tree, payload)',
+        'checks = api.pages(f"commits/{evidence}/check-runs?check_name=Security%20contract&app_id={app_id}&filter=all", "check_runs")',
+        'deadline = time.monotonic() + 30',
+        'pending.register(process.stdout, selectors.EVENT_READ, (output, API_LIMIT))',
+        'pending.register(process.stderr, selectors.EVENT_READ, (errors, BINDING_LIMIT))',
+    ):
+        if ast.unparse(ast.parse(expression)) not in code:
+            raise ContractError("trusted landing v3 boundary changed: canonical identity, E namespace or bounded binding reader")
+
+
+def validate_v3_publisher(body: str) -> None:
+    forbidden = (
+        "commits/${MERGE_COMMIT_SHA}/check-runs", "arc:${PR_NUMBER}",
+        '--arg head_sha "${MERGE_COMMIT_SHA}"',
+        'schema: "chio.security-check-authority.v2"',
+    )
+    identity_markers = (
+        'test "$(jq -cS . <<< "${IDENTITY_JSON}")" = "${IDENTITY_JSON}"',
+        'test "$(printf \'%s\' "${IDENTITY_JSON}" | sha256sum | cut -d\' \' -f1)" = "${IDENTITY_DIGEST}"',
+        'keys == ["authorized_source_sha", "base_sha", "evidence_sha", "merge_tree_sha", "pr_number", "repository", "repository_id", "schema", "security_definition_sha"]',
+        '.identity == $identity and .identity_digest == $digest',
+        '.identity.repository == .repository and .identity.repository_id == $repository_id',
+        '.identity.pr_number == .pr_number and .identity.base_sha == .base.sha',
+        '.identity.evidence_sha == .evidence_sha and .identity.merge_tree_sha == .merge_tree_sha',
+        '.identity.authorized_source_sha == .authorized_source_sha',
+        '.identity.security_definition_sha == .security_definition_sha',
+        'schema: "chio.security-check-authority.v3", identity, identity_digest',
+        'required_check_run_ids: .ci.required_check_run_ids',
+        'aggregate_check_run_id: .ci.aggregate_check_run_id',
+        'artifact_digest: (.artifact_digest | sub("^sha256:"; "")), binding_sha256',
+        '--arg head_sha "${EVIDENCE_SHA}"',
+    )
+    header = body[:body.index('private_key="${RUNNER_TEMP}/chio-security-authority.pem"')]
+    if (
+        any(marker in body for marker in forbidden)
+        or any(marker not in header for marker in identity_markers[:9])
+        or any(marker not in body for marker in identity_markers[9:])
+    ):
+        raise ContractError("dedicated v3 publisher loses I/K, E placement or sealed provenance")
+    source = shell_function(body, "revalidate_source_ci_checks", "dedicated v3 original CI revalidation")
+    markers = (
+        'actions/runs/${CI_RUN_ID}/attempts/${CI_RUN_ATTEMPT}',
+        '(.id | tostring) == $run_id and (.run_attempt | tostring) == $attempt',
+        '(.workflow_id | tostring) == $workflow_id and .path == ".github/workflows/ci.yml"',
+        '.event == "pull_request" and .head_sha == $head and .display_title == $title',
+        '(.repository.id | tostring) == $repository_id',
+        '(.head_repository.id | tostring) == $repository_id',
+        '.status == "completed" and .conclusion == "success"',
+        'suite_id="$(jq -r \'.check_suite_id\' <<< "${exact_ci}")"',
+        'jobs?filter=all&per_page=100&page=${page}',
+        'test "${page}" -le 10',
+        'if test "${page_total}" -ge 1000; then',
+        'source CI job inventory reaches the 1,000-result listing ceiling',
+        'length <= 100',
+        'test "$(jq -r \'length\' <<< "${jobs}")" = "${total_count}"',
+        'test "$(jq -r \'[.[].id] | unique | length\' <<< "${jobs}")" = "${total_count}"',
+        'for required_key in build msrv vet deny aggregate; do',
+        'test "$(jq -r \'length\' <<< "${matches}")" = 1',
+        '.ci.required_check_run_ids[$key]',
+        '.ci.aggregate_check_run_id',
+        'test "${check_id}" = "${expected_check_id}"',
+        'check_url="$(jq -r \'.check_run_url\' <<< "${required_job}")"',
+        'check_id="${check_url#"${check_url_prefix}"}"',
+        'test "${check_url}" = "${check_url_prefix}${check_id}"',
+        'test "$(jq -r \'.id\' <<< "${required_job}")" = "${check_id}"',
+        'https://api.github.com/repos/${GITHUB_REPOSITORY}/check-runs/${expected_check_id}',
+        '(.app.id | tostring) == "15368" and .app.slug == "github-actions"',
+        '(.check_suite.id | tostring) == $suite and .check_suite.head_sha == $head',
+    )
+    if any(marker not in source for marker in markers):
+        raise ContractError("dedicated v3 original CI revalidation loses owning attempt, job, ID or App binding")
+
+
+def validate_oldest_negative_member(body: str, helper: str) -> None:
+    source = shell_function(body, helper, "E-scoped negative canonical member")
+    oldest = 'canonical_check_id="$(jq -r \'.check_runs | sort_by(.id) | .[0].id // empty\' <<< "${namespace}")"'
+    forbidden = (
+        'commits/${MERGE_COMMIT_SHA}/check-runs', '--arg head_sha "${MERGE_COMMIT_SHA}"',
+        '.head_sha\' <<< "${created}")" = "${MERGE_COMMIT_SHA}"',
+        '.head_sha\' <<< "${updated}")" = "${MERGE_COMMIT_SHA}"',
+    )
+    if oldest not in source or any(marker in source for marker in forbidden):
+        raise ContractError("E-scoped negative canonical member is not the oldest preserved member")
+    if helper == "normalize_bad_ci_namespace":
+        if '(if $created then .external_id == $external_id else true end)' not in source:
+            raise ContractError("E-scoped negative canonical member re-requires a new external identity")
+    elif 'if test "${namespace_count}" = 0; then\n    test "$(jq -r \'.check_runs[0].external_id\' <<< "${verified}")" = "${required_external_id}"' not in source:
+        raise ContractError("E-scoped negative canonical member re-requires a new external identity")
+
+
 def validate_job_digest(
     job_body: dict[str, object], expected_digest: str, contract: str
 ) -> None:
@@ -1878,7 +2046,7 @@ def validate_environment_provisioning_document(root: Path) -> None:
         "environment variable.",
         "Do not create a repository or organization copy of the\n"
         "installation ID or private-key secret.",
-        "Publication is\nidempotent for `(<PR>, <E>, <M>, <S>)`.",
+        "Publication is\nidempotent for the candidate identity `I`.",
         '`ci.yml` run title to be exactly `CI N=<PR> E=<E> B=<base> M=<M_ci>`',
         'signer at `B`, source commit `M_ci`, `refs/pull/<PR>/merge`',
         'revalidates that `refs/heads/main` is still `<base>`, that the live test merge has\n'
@@ -1887,7 +2055,18 @@ def validate_environment_provisioning_document(root: Path) -> None:
         'Duplicate-head refusal is detection, not per-pull-request enforcement.',
         'Each census allows at most ten pages of\n100 entries and validates every returned PR number and head SHA.',
         'E-scope denial path, independent of main currency and duplicate-head detection.',
-        'The v2 landing auditor remains\nfail-closed (`unverified`) if those merge observations differ.',
+        'Legacy `arc:` authority is `unverified`, and legacy binding\nor check metadata schemas cannot qualify this v3 candidate.',
+        'external_id: chio:v3:<PR>:<E>:<K>',
+        'head_sha: E',
+        'nine ASCII string fields:',
+        '`K` is SHA-256 of its canonical sorted compact JSON.',
+        'external ID `chio:v3:deny:<E>` and `chio.security-check-revocation.v2` metadata.',
+        'IDs must equal the sealed v3 IDs.',
+        'API and ZIP reads stop at 16 MiB with a 30-second deadline;',
+        'P6 changes identity and placement.',
+        'the separate P5 repair.',
+        'The shared-E history\nand final-boundary census amendments remain separate H work.',
+        'source changes do not establish hosted qualification or dedicated-App H2 acceptance.',
         "Any prior failure in the dedicated\nApp-and-name namespace is sticky",
         "Labels authorize and describe capture only. Label\nchanges after capture cannot grant, renew, or revoke a published authority.",
         "A trusted default-branch `workflow_run` listener handles bad CI completions and\n"
@@ -1896,19 +2075,9 @@ def validate_environment_provisioning_document(root: Path) -> None:
         "Both paths\nbind the immutable `workflow_run.run_attempt` carried by the event, retrieve the\nexact historical attempt endpoint, and require the returned run and attempt\nidentity to match. They never substitute the mutable current-run projection.",
         "The listener never trusts nested workflow-run pull request metadata.",
         "verifies the signed\nbinding artifact and certificate whenever the builder succeeded.",
-        "advanced from `(base1, M1)` to `(base2, M2)`, it targets only `M1`,",
-        "cannot create a missing namespace,\nand never writes to `M2`.",
-        "For a failed finalizer, it authenticates the exact `N/E/M/S/nonce`\n"
-        "title, historical default-branch workflow blob, bot actors, ordered merge\n"
-        "parents, exact four-job attempt, and capture-owned dispatch intent. Validation,\n"
-        "signing, and publication authorization must have completed successfully, while\n"
-        "the publication job must have started and completed unsuccessfully. The exact\n"
-        "dedicated App success check must carry a `details_url` bound to that failed run\n"
-        "and attempt. Earlier finalizer failures are ineligible because they cannot have\n"
-        "published dedicated authority. Later source or definition rotation does not\n"
-        "erase the authenticated historical failure. The listener can normalize only\n"
-        "preexisting exact authority created by that failed attempt and cannot create a\n"
-        "namespace.",
+        'advanced from `(base1, M1)` to `(base2, M2)`, it may normalize only\npreexisting authority on the recorded evidence head `E`;',
+        'it cannot create a\nmissing namespace. Merge observations do not select the authority head.',
+        'For a failed finalizer, it authenticates the exact `N/E/M/S/nonce`\ntitle, historical default-branch workflow blob, bot actors, exact four-job\nattempt, capture-owned dispatch intent and recorded v3 candidate identity. Validation,\nsigning, and publication authorization must have completed successfully, while\nthe publication job must have started and completed unsuccessfully. The exact\ndedicated App success check must carry a `details_url` bound to that failed run\nand attempt. Earlier finalizer failures are ineligible because they cannot have\npublished dedicated authority. Later source or definition rotation does not\nerase the authenticated historical failure. The listener can normalize only\npreexisting exact authority created by that failed attempt and cannot create a\nnamespace.',
         "First, freeze every future\n"
         "publication by setting `CHIO_COMMITTED_LINUX_EVIDENCE_SHA` to the reserved\n"
         "all-zero SHA.",
@@ -1920,9 +2089,9 @@ def validate_environment_provisioning_document(root: Path) -> None:
         "-f merge_commit_sha='<M>'",
         "The protected manual revoker requires the all-zero freeze, revalidates the\n"
         "requested live `(<PR>, <E>, <M>, <S>)` tuple",
-        "It paginates the dedicated-App `Security contract` namespace on `M`.",
+        "It paginates the dedicated-App `Security contract` namespace on `E`.",
         "normalization is mandatory because a ruleset binds check name and App",
-        "absent namespace receives an exact completed-failure tombstone.",
+        "absent eligible namespace receives an exact completed-failure tombstone with",
         "preserving each external ID\nand source metadata",
         "renamed to a unique failure-only superseded name.",
         "requires one exact failed member per namespace",
@@ -1930,14 +2099,14 @@ def validate_environment_provisioning_document(root: Path) -> None:
         "withdraw or replace the affected source, policy, App, installation, key,\n"
         "environment, or ruleset authority.",
         "A repeated revocation is idempotent. Never\n"
-        "restore authority for the same test merge.",
+        "restore authority for the same evidence head `E`.",
         "Publication and revocation use the same non-cancelling maximum-queue\n"
-        "`security-check-authority-<M>` concurrency group.",
+        "`security-check-authority-<E>` concurrency group.",
         "Both jobs set `queue: max`,\n"
         "so a later authority mutation cannot replace an earlier pending member.",
         "Its success-publication branch\nis POST-only and never updates an existing check.",
         "before every success POST, immediately after every\nsuccess POST, and after the complete set",
-        "After PR or merge-ref drift, the\npublisher branch may normalize existing authority on historical `M` but cannot\ncreate a missing namespace.",
+        "After PR or merge-ref drift, the\npublisher branch may normalize existing authority on `E` but cannot\ncreate a missing namespace.",
         "For every matching run it reads the current\nmaximum attempt, retrieves every exact historical attempt from one through that\nmaximum, and fails closed before GitHub's 1,000-result filtered-search ceiling.",
         "A completed non-success attempt dominates any newer incomplete attempt and\nimmediately selects the failure-only branch.",
         "An incomplete history blocks\npublication when no bad completion exists.",
@@ -1971,6 +2140,8 @@ def validate_environment_provisioning_document(root: Path) -> None:
     )
     if outside_transport not in publisher or "Security mirror /" in publisher.replace(outside_transport, "", 1):
         raise ContractError("publisher environment provisioning contract changed: Actions mirrors restored as authority")
+    if 'This supports the `M` placement' in publisher or 'head_sha: M' in publisher or 'external_id: arc:' in publisher:
+        raise ContractError("publisher environment provisioning contract changed: legacy M identity restored")
     if any(marker not in publisher for marker in publisher_markers):
         raise ContractError("publisher environment provisioning contract changed")
 
@@ -5117,6 +5288,7 @@ def validate(root: Path) -> None:
     auditor = root / "scripts/audit-security-merge-qualification.py"
     if auditor.is_file() and not auditor.is_symlink():
         validate_read_only_landing_auditor(auditor.read_text(encoding="utf-8"))
+        validate_v3_landing_auditor(auditor.read_text(encoding="utf-8"))
     if auditor.is_symlink() or not auditor.is_file() or hashlib.sha256(auditor.read_bytes()).hexdigest() != EXPECTED_LANDING_AUDITOR_SHA256:
         raise ContractError("trusted landing auditor source commitment changed")
 
@@ -7094,10 +7266,16 @@ def validate(root: Path) -> None:
             "controller: {",
             "evidence_sha: $evidence_sha",
             "gate_result_digests: {",
-            'schema: "chio.security-check-publication.v1"',
+            'schema: "chio.security-check-publication.v2"',
+            'schema: "chio.security-candidate-identity.v1"',
+            'identity_digest: $identity_digest',
+            'merge_observations: {capture: $merge_commit_sha, ci: $ci_merge_sha}',
+            'identity_digest="$(printf \'%s\' "${identity_json}" | sha256sum | cut -d\' \' -f1)"',
             "security_definition_sha: $security_definition_sha",
             "publication_binding_digest=\"$(printf '%s' \"${publication_binding}\" | sha256sum | cut -d' ' -f1)\"",
-            'external_id="arc:${PR_NUMBER}:${EVIDENCE_SHA}:${MERGE_COMMIT_SHA}:${AUTHORIZED_SOURCE_SHA}"',
+            'external_id="chio:v3:${PR_NUMBER}:${EVIDENCE_SHA}:${identity_digest}"',
+            'echo "identity_json=${identity_json}"',
+            'echo "identity_digest=${identity_digest}"',
             'echo "merge_commit_sha=${MERGE_COMMIT_SHA}"',
             'echo "publication_binding_json=${publication_binding}"',
         ),
@@ -7153,15 +7331,17 @@ def validate(root: Path) -> None:
             'test "${running_publisher_blob_sha}" = "${authorized_publisher_blob_sha}"',
             'test "${COMMITTED_EVIDENCE_SHA}" = "${EVIDENCE_SHA}"',
             'test "${LIVE_AUTHORIZED_SOURCE_SHA}" = "${AUTHORIZED_SOURCE_SHA}"',
-            'test "${EXTERNAL_ID}" = "arc:${PR_NUMBER}:${EVIDENCE_SHA}:${MERGE_COMMIT_SHA}:${AUTHORIZED_SOURCE_SHA}"',
+            '[[ "${EXTERNAL_ID}" =~ ^chio:v3:${PR_NUMBER}:${EVIDENCE_SHA}:([0-9a-f]{64})$ ]]',
+            'test "${BASH_REMATCH[1]}" = "${IDENTITY_DIGEST}"',
+            'test "$(printf \'%s\' "${IDENTITY_JSON}" | sha256sum | cut -d\' \' -f1)" = "${IDENTITY_DIGEST}"',
             'publication_details_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${FINALIZER_RUN_ID}/attempts/${FINALIZER_RUN_ATTEMPT}"',
             'test "${canonical_binding}" = "${PUBLICATION_BINDING_JSON}"',
             'test "$(printf \'%s\' "${canonical_binding}" | sha256sum | cut -d\' \' -f1)" = "${PUBLICATION_BINDING_DIGEST}"',
-            'test "$(jq -r \'.schema\' <<< "${canonical_binding}")" = "chio.security-check-publication.v1"',
+            'test "$(jq -r \'.schema\' <<< "${canonical_binding}")" = "chio.security-check-publication.v2"',
             'test "$(jq -r \'.repository\' <<< "${canonical_binding}")" = "${GITHUB_REPOSITORY}"',
             'test "$(jq -r \'.pr_number\' <<< "${canonical_binding}")" = "${PR_NUMBER}"',
             'test "$(jq -r \'.evidence_sha\' <<< "${canonical_binding}")" = "${EVIDENCE_SHA}"',
-            'test "$(jq -r \'.merge_commit_sha\' <<< "${canonical_binding}")" = "${MERGE_COMMIT_SHA}"',
+            'test "$(jq -r \'.merge_observations.capture\' <<< "${canonical_binding}")" = "${MERGE_COMMIT_SHA}"',
             'test "$(jq -r \'.authorized_source_sha\' <<< "${canonical_binding}")" = "${AUTHORIZED_SOURCE_SHA}"',
             'test "$(jq -r \'.security_definition_sha\' <<< "${canonical_binding}")" = "${SECURITY_DEFINITION_SHA}"',
             'test "$(jq -r \'.ci.workflow_id\' <<< "${canonical_binding}")" = "${CI_WORKFLOW_ID}"',
@@ -7169,7 +7349,7 @@ def validate(root: Path) -> None:
             'test "$(jq -r \'.ci.run_attempt\' <<< "${canonical_binding}")" = "${CI_RUN_ATTEMPT}"',
             'test "$(jq -r \'.ci.aggregate_check_run_id\' <<< "${canonical_binding}")" = "${CI_AGGREGATE_CHECK_RUN_ID}"',
             '[[ "$(jq -r \'.labels_digest\' <<< "${canonical_binding}")" =~ ^[0-9a-f]{64}$ ]]',
-            '[[ "$(jq -r \'.merge_commit_sha\' <<< "${canonical_binding}")" =~ ^[0-9a-f]{40}$ ]]',
+            '[[ "$(jq -r \'.merge_observations.ci\' <<< "${canonical_binding}")" =~ ^[0-9a-f]{40}$ ]]',
             '[[ "$(jq -r \'.merge_tree_sha\' <<< "${canonical_binding}")" =~ ^[0-9a-f]{40}$ ]]',
             "trap 'unset SECURITY_APP_PRIVATE_KEY_PEM installation_token token_response jwt jwt_header jwt_claims jwt_unsigned jwt_signature;",
             "unset SECURITY_APP_PRIVATE_KEY_PEM",
@@ -7211,7 +7391,7 @@ def validate(root: Path) -> None:
             'test "$(jq -r \'.tree.sha\' <<< "${merge_commit}")" = "$(jq -r \'.merge_tree_sha\' <<< "${canonical_binding}")"',
             "list_namespace_checks()",
             "normalize_bad_ci_namespace()",
-            'canonical_check_id="$(jq -r --arg external_id "${required_external_id}"',
+            'canonical_check_id="$(jq -r \'.check_runs | sort_by(.id) | .[0].id // empty\' <<< "${namespace}")"',
             'target_name="${check_name} / superseded ${existing_check_id}"',
             'test "$(jq -r \'.name\' <<< "${failed_check}")" = "${target_name}"',
             "reconcile_bad_ci()",
@@ -7273,15 +7453,15 @@ def validate(root: Path) -> None:
             'bad_ci_create_missing=false',
             'if test "${bad_ci_create_missing}" = false; then',
             'test "$(jq -r \'.object.sha\' <<< "${live_bad_ci_merge_ref}")" = "${MERGE_COMMIT_SHA}"',
-            'normalize_bad_ci_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${EXTERNAL_ID}"',
+            'normalize_bad_ci_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "chio:v3:deny:${EVIDENCE_SHA}"',
             "publish_success_authority()",
             'reconcile_bad_ci\nif test "${bad_ci_observed}" = false; then',
             "publish_success_authority",
             "else\n  exit 1",
-            'schema: "chio.security-check-authority.v2"',
+            'schema: "chio.security-check-authority.v3"',
             '-H "Authorization: Bearer ${GH_TOKEN}"',
             'authority_created=false\nif test "${existing_authority_match_count}" = "1"; then',
-            "commits/${MERGE_COMMIT_SHA}/check-runs?app_id=${SECURITY_APP_ID}&check_name=Security%20contract&filter=all&per_page=100&page=${page}",
+            'commits/${EVIDENCE_SHA}/check-runs?app_id=${SECURITY_APP_ID}&check_name=Security%20contract&filter=all&per_page=100&page=${page}',
             '[[ "${page_total}" =~ ^[0-9]+$ ]]',
             'test "${page_total}" = "${total_count}"',
             'test "${collected_count}" -le "${total_count}"',
@@ -7303,7 +7483,7 @@ def validate(root: Path) -> None:
             'check_run="$(jq -cS \'.[0]\' <<< "${existing_authority_matches}")"',
             '--arg external_id "${EXTERNAL_ID}"',
             '--arg details_url "${publication_details_url}"',
-            '--arg head_sha "${MERGE_COMMIT_SHA}"',
+            '--arg head_sha "${EVIDENCE_SHA}"',
             'conclusion: "success"',
             "details_url: $details_url",
             "external_id: $external_id",
@@ -7313,7 +7493,7 @@ def validate(root: Path) -> None:
             'status: "completed"',
             '"https://api.github.com/repos/${GITHUB_REPOSITORY}/check-runs"',
             'test "$(jq -r \'.name\' <<< "${check_run}")" = "Security contract"',
-            'test "$(jq -r \'.head_sha\' <<< "${check_run}")" = "${MERGE_COMMIT_SHA}"',
+            'test "$(jq -r \'.head_sha\' <<< "${check_run}")" = "${EVIDENCE_SHA}"',
             'test "$(jq -r \'.status\' <<< "${check_run}")" = "completed"',
             'test "$(jq -r \'.conclusion\' <<< "${check_run}")" = "success"',
             'test "$(jq -r \'.external_id\' <<< "${check_run}")" = "${EXTERNAL_ID}"',
@@ -7321,7 +7501,7 @@ def validate(root: Path) -> None:
             'test "$(jq -r \'.details_url\' <<< "${check_run}")" = "${publication_details_url}"',
             'test "$(jq -r \'.app.id\' <<< "${check_run}")" = "${SECURITY_APP_ID}"',
             'test "$(jq -r \'.name\' <<< "${verified_check}")" = "Security contract"',
-            'test "$(jq -r \'.head_sha\' <<< "${verified_check}")" = "${MERGE_COMMIT_SHA}"',
+            'test "$(jq -r \'.head_sha\' <<< "${verified_check}")" = "${EVIDENCE_SHA}"',
             'test "$(jq -r \'.status\' <<< "${verified_check}")" = "completed"',
             'test "$(jq -r \'.conclusion\' <<< "${verified_check}")" = "success"',
             'test "$(jq -r \'.external_id\' <<< "${verified_check}")" = "${EXTERNAL_ID}"',
@@ -7336,12 +7516,13 @@ def validate(root: Path) -> None:
     failure_start = publisher_run.index("normalize_bad_ci_namespace()")
     reconciliation_start = publisher_run.index("reconcile_bad_ci()")
     retry_start = publisher_run.index("reconcile_bad_authorizing_finalizer()")
+    source_checks_start = publisher_run.index("revalidate_source_ci_checks()")
     guard_start = publisher_run.index("require_publishable_ci()")
     success_start = publisher_run.index("publish_success_authority()")
     branch_start = publisher_run.index(
         'reconcile_bad_ci\nif test "${bad_ci_observed}" = false; then'
     )
-    if not failure_start < reconciliation_start < retry_start < guard_start < success_start < branch_start:
+    if not failure_start < reconciliation_start < retry_start < source_checks_start < guard_start < success_start < branch_start:
         raise ContractError(
             "dedicated Security contract reconciler branch ordering changed"
         )
@@ -7349,9 +7530,11 @@ def validate(root: Path) -> None:
     validate_dedicated_authority_transport(publisher_run, "dedicated Security contract publisher")
     validate_independent_denial_scope(publisher_run)
     validate_shared_evidence_head_census(publisher_run)
+    validate_v3_publisher(publisher_run)
+    validate_oldest_negative_member(publisher_run, "normalize_bad_ci_namespace")
 
     bad_ci_routine = publisher_run[reconciliation_start:retry_start]
-    retry_routine = publisher_run[retry_start:guard_start]
+    retry_routine = publisher_run[retry_start:source_checks_start]
     publication_guard = publisher_run[guard_start:success_start]
     success_routine = publisher_run[success_start:branch_start]
     branch_routine = publisher_run[branch_start:]
@@ -7431,17 +7614,21 @@ def validate(root: Path) -> None:
     def denial_calls(routine: str, call: str) -> list[str]:
         return [line.strip() for line in routine.splitlines() if line.strip().startswith(call + " ")]
 
-    dedicated_denial = '"${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${EXTERNAL_ID}"'
-    for routine, call in ((bad_ci_routine, "normalize_bad_ci_namespace"), (retry_routine, "fail_existing_retry_namespace")):
+    dedicated_denial = '"${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract"'
+    for routine, call, identity in (
+        (bad_ci_routine, "normalize_bad_ci_namespace", '"chio:v3:deny:${EVIDENCE_SHA}"'),
+        (retry_routine, "fail_existing_retry_namespace", '"${EXTERNAL_ID}"'),
+    ):
         calls = denial_calls(routine, call)
-        if calls != [f"{call} {dedicated_denial}"]:
+        if calls != [f"{call} {dedicated_denial} {identity}"]:
             raise ContractError(
                 "dedicated Security contract denial is not the sole authority mutation"
             )
     if (
         publication_guard.strip() != (
             'require_publishable_ci() {\n  reconcile_bad_ci\n  test "${bad_ci_observed}" = false\n'
-            '  reconcile_bad_authorizing_finalizer\n  test "${bad_authorizing_finalizer_observed}" = false\n}'
+            '  reconcile_bad_authorizing_finalizer\n  test "${bad_authorizing_finalizer_observed}" = false\n'
+            '  revalidate_source_ci_checks\n}'
         )
         or "--request POST" in retry_routine
         or retry_routine.count("--request PATCH") != 1
@@ -7455,7 +7642,8 @@ def validate(root: Path) -> None:
         or 'test "${retry_original_blob}" = "${retry_authorized_blob}"' not in retry_routine
         or 'for ((retry_attempt = 1; retry_attempt <= retry_maximum; retry_attempt++)); do' not in retry_routine
         or 'test "${retry_complete}" = true' not in retry_routine
-        or '.schema == "chio.security-check-authority.v2" and .identity == $identity and .source_ci == $source_ci' not in retry_routine
+        or '.schema == "chio.security-check-authority.v3" and .identity == $identity' not in retry_routine
+        or '.source_ci == $source_ci' not in retry_routine
         or 'test "${authorizing_finalizer_id}" = "${FINALIZER_RUN_ID}"' not in retry_routine
         or 'require_authorizing_attempt "${retry_own_current}" 1' not in retry_routine
         or 'retry_own_in_progress=false' not in retry_routine
@@ -7751,7 +7939,7 @@ def validate(root: Path) -> None:
             'test "$(jq -r \'.object.sha\' <<< "${live_merge_ref}")" = "${merge_commit_sha}"',
             'create_missing=true',
             'test "${COMMITTED_EVIDENCE_SHA}" = "${evidence_sha}"',
-            "commits/${merge_commit_sha}/check-runs?filter=all&per_page=100",
+            'commits/${evidence_sha}/check-runs?app_id=${SECURITY_APP_ID}&check_name=Security%20contract&filter=all&per_page=100',
             'echo "eligible=false" >> "${GITHUB_OUTPUT}"',
             'echo "authorized_source_sha=${AUTHORIZED_SOURCE_SHA}"',
             'echo "base_sha=${base_sha}"',
@@ -7858,21 +8046,17 @@ def validate(root: Path) -> None:
             "contents/.github/workflows/enterprise-evidence-finalizer.yml?ref=${historical_security_definition_sha}",
             "contents/.github/workflows/enterprise-evidence-finalizer.yml?ref=${upstream_sha}",
             'test "${running_finalizer_blob_sha}" = "${authorized_finalizer_blob_sha}"',
-            "git/commits/${merge_commit_sha}",
-            'test "$(jq -r \'.parents | length\' <<< "${merge_commit}")" = 2',
-            'test "$(jq -r \'.parents[1].sha\' <<< "${merge_commit}")" = "${evidence_sha}"',
-            'external_id="arc:${pr_number}:${evidence_sha}:${merge_commit_sha}:${authorized_source_sha}"',
-            "commits/${merge_commit_sha}/check-runs?filter=all&per_page=100",
+            'commits/${evidence_sha}/check-runs?app_id=${SECURITY_APP_ID}&check_name=Security%20contract&filter=all&per_page=100',
             'finalizer_details_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${EVENT_RUN_ID}/attempts/${run_attempt}"',
-            '.status == "completed" and .conclusion == "success" and .details_url == $details_url and (.app.id | tostring) == $app_id and .name == "Security contract" and .external_id == $external_id',
-            'relevant_count="$(jq -r --arg app_id "${SECURITY_APP_ID}" --arg details_url "${finalizer_details_url}" --arg external_id "${external_id}" \'[.[] | select(.status == "completed" and .conclusion == "success" and .details_url == $details_url and (.app.id | tostring) == $app_id and .name == "Security contract" and .external_id == $external_id)] | length\' <<< "${existing_checks}")"',
+            '.status == "completed" and .conclusion == "success" and .details_url == $details_url and (.app.id | tostring) == $app_id and .name == "Security contract"',
+            'relevant_count="$(jq -r --arg app_id "${SECURITY_APP_ID}" --arg details_url "${finalizer_details_url}" \'[.[] | select(.status == "completed" and .conclusion == "success" and .details_url == $details_url and (.app.id | tostring) == $app_id and .name == "Security contract")] | length\' <<< "${existing_checks}")"',
             'test "${relevant_count}" -le 1',
             'echo "eligible=false" >> "${GITHUB_OUTPUT}"',
             'echo "create_missing=false"',
             'echo "eligible=true"',
             'echo "reason=finalizer-failure"',
             'test "$(jq -r \'.app.slug\' <<< "${recorded_authority}")" = chio-security-authority',
-            'test "$(jq -r \'.head_sha\' <<< "${recorded_authority}")" = "${merge_commit_sha}"',
+            'test "$(jq -r \'.head_sha\' <<< "${recorded_authority}")" = "${evidence_sha}"',
             "actions/runs/${recorded_ci_id}/attempts/${recorded_ci_attempt}",
             '(.id | tostring) == $source_ci.run_id and (.run_attempt | tostring) == $source_ci.run_attempt and (.workflow_id | tostring) == $source_ci.workflow_id',
             'test "${recorded_blob}" = "${recorded_source_blob}"',
@@ -7956,7 +8140,7 @@ def validate(root: Path) -> None:
             'test "${LIVE_AUTHORIZED_SOURCE_SHA}" = "${AUTHORIZED_SOURCE_SHA}"',
             'test "${SECURITY_APP_ID}" != "15368"',
             '[[ "${CREATE_MISSING}" == true || "${CREATE_MISSING}" == false ]]',
-            'external_id="arc:${PR_NUMBER}:${EVIDENCE_SHA}:${MERGE_COMMIT_SHA}:${AUTHORIZED_SOURCE_SHA}"',
+            'external_id="chio:v3:deny:${EVIDENCE_SHA}"',
             'test "$(jq -cS \'[.parents[].sha]\' <<< "${merge_commit}")" = "[\\"${BASE_SHA}\\",\\"${EVIDENCE_SHA}\\"]"',
             'test "$(jq -r \'.tree.sha\' <<< "${merge_commit}")" = "${MERGE_TREE_SHA}"',
             'if test "${CREATE_MISSING}" = true; then',
@@ -7975,11 +8159,11 @@ def validate(root: Path) -> None:
             "filter=all&per_page=100&page=${page}",
             'test "$(jq -r \'[.[].id] | unique | length\' <<< "${collected}")" = "${total_count}"',
             "normalize_namespace()",
-            'canonical_check_id="$(jq -r --arg external_id "${required_external_id}"',
+            'canonical_check_id="$(jq -r \'.check_runs | sort_by(.id) | .[0].id // empty\' <<< "${namespace}")"',
             'target_name="${check_name} / superseded ${check_run_id}"',
             'test "$(jq -r \'.name\' <<< "${updated}")" = "${target_name}"',
             'if test "${namespace_count}" = "0"; then',
-            'schema: "chio.security-check-revocation.v1"',
+            'schema: "chio.security-check-revocation.v2"',
             'conclusion: "failure"',
             'head_sha: $head_sha',
             'created="$(curl --proto \'=https\' --tlsv1.2 --fail --silent --show-error --request POST',
@@ -7997,6 +8181,7 @@ def validate(root: Path) -> None:
         "security check revocation weakens event, owner, App, binding, or failure verification",
     )
     validate_dedicated_authority_transport(revocation_run, "security check revocation")
+    validate_oldest_negative_member(revocation_run, "normalize_namespace")
 
     for marker, expected_count in (
         ("--request POST", 2),
@@ -8358,6 +8543,7 @@ def validate(root: Path) -> None:
     structural_lines = structural.get("run", "").splitlines()
     landing_gate = "run_gate python3 ./scripts/tests/trusted-ci-landing-regressions.test.py"
     currency_gate = "run_gate python3 ./scripts/tests/trusted-ci-currency-regressions.test.py"
+    identity_gate = "run_gate python3 ./scripts/tests/trusted-ci-identity-regressions.test.py"
     stripped_structural = [line.strip() for line in structural_lines]
     if (
         "if" in structural or "continue-on-error" in structural
@@ -8366,6 +8552,11 @@ def validate(root: Path) -> None:
         or stripped_structural.index(currency_gate) != stripped_structural.index(landing_gate) + 1
     ):
         raise ContractError("required CI currency regression gate is not exact and adjacent")
+    if (
+        stripped_structural.count(identity_gate) != 1
+        or stripped_structural.index(identity_gate) != stripped_structural.index(currency_gate) + 1
+    ):
+        raise ContractError("required CI identity regression gate is not exact and adjacent")
     mapping = named_step(check_job, "Formal traceability gate")
     if mapping.get("run") != "bash scripts/check-mapping.sh":
         raise ContractError("required CI omits the exact formal traceability gate")

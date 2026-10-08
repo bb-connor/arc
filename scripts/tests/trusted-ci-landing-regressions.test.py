@@ -41,7 +41,15 @@ TREE = "0" * 40
 APP_ID = 4398745
 CI_RUN, FINALIZER_RUN = 201, 301
 CI_WORKFLOW, FINALIZER_WORKFLOW = 101, 102
-EXTERNAL_ID = f"arc:{PR}:{EVIDENCE}:{MERGE}:{SOURCE}"
+IDENTITY = {
+    "schema": "chio.security-candidate-identity.v1", "repository": REPOSITORY,
+    "repository_id": "1195888645", "pr_number": str(PR), "base_sha": BASE,
+    "evidence_sha": EVIDENCE, "merge_tree_sha": TREE, "authorized_source_sha": SOURCE,
+    "security_definition_sha": DEFINITION,
+}
+IDENTITY_JSON = json.dumps(IDENTITY, sort_keys=True, separators=(",", ":"))
+IDENTITY_DIGEST = hashlib.sha256(IDENTITY_JSON.encode("ascii")).hexdigest()
+EXTERNAL_ID = f"chio:v3:{PR}:{EVIDENCE}:{IDENTITY_DIGEST}"
 ORDINARY = (
     ("Build, lint, test", "build"),
     ("MSRV build and test", "msrv"),
@@ -95,6 +103,39 @@ class CriticalCiProducerTests(unittest.TestCase):
         )
 
 
+def ci_merge_binding(base: str = BASE, evidence: str = EVIDENCE,
+                     merge: str = MERGE, tree: str = TREE) -> dict:
+    return {
+        "base": {"ref": "main", "repository": REPOSITORY, "repository_id": "1195888645", "sha": base},
+        "builder": {"definition_sha": DEFINITION, "workflow_path": ".github/workflows/enterprise-hardening.yml"},
+        "caller": {"definition_sha": merge, "workflow_path": ".github/workflows/ci.yml",
+                   "workflow_ref": f"{REPOSITORY}/.github/workflows/ci.yml@refs/pull/{PR}/merge"},
+        "ci": {"event": "pull_request", "run_attempt": "1", "run_id": str(CI_RUN),
+               "run_name": f"CI N={PR} E={evidence} B={base} M={merge}", "workflow_id": str(CI_WORKFLOW)},
+        "head": {"ref": HEAD_REF, "repository": REPOSITORY, "repository_id": "1195888645", "sha": evidence},
+        "merge": {"parents": [base, evidence], "ref": f"refs/pull/{PR}/merge", "sha": merge, "tree_sha": tree},
+        "pull_request_number": str(PR),
+        "repository": {"id": "1195888645", "name": REPOSITORY, "owner": "bb-connor",
+                       "owner_id": "20288194", "visibility": "public"},
+        "schema": "https://github.com/bb-connor/arc/attestations/ci-merge-binding/v1",
+    }
+
+
+def ci_binding_artifact(base: str = BASE, evidence: str = EVIDENCE,
+                        merge: str = MERGE, tree: str = TREE) -> tuple[dict, bytes, str]:
+    raw = (json.dumps(ci_merge_binding(base, evidence, merge, tree), sort_keys=True, separators=(",", ":")) + "\n").encode()
+    archive = io.BytesIO()
+    with zipfile.ZipFile(archive, "w") as writer:
+        member = zipfile.ZipInfo("ci-merge-binding.json")
+        member.external_attr, member.compress_type = 0o100444 << 16, zipfile.ZIP_DEFLATED
+        writer.writestr(member, raw)
+    content = archive.getvalue()
+    record = {"id": 812, "name": f"ci-merge-binding-{CI_RUN}-1", "expired": False,
+              "size_in_bytes": len(content), "digest": "sha256:" + hashlib.sha256(content).hexdigest(),
+              "workflow_run": {"id": CI_RUN, "head_sha": evidence}}
+    return record, content, hashlib.sha256(raw).hexdigest()
+
+
 def snapshot() -> dict[str, dict]:
     prefix = f"repos/{REPOSITORY}"
     repository = {"id": 1195888645, "full_name": REPOSITORY}
@@ -103,12 +144,13 @@ def snapshot() -> dict[str, dict]:
         "display_title": f"CI N={PR} E={EVIDENCE} B={BASE} M={MERGE}",
         "name": "CI", "event": "pull_request", "head_sha": EVIDENCE,
         "repository": repository, "head_repository": repository, "run_attempt": 1,
+        "actor": {"login": "bb-connor"}, "triggering_actor": {"login": "bb-connor"},
         "status": "completed", "conclusion": "success", "check_suite_id": 401,
     }
     finalizer = {
         "id": FINALIZER_RUN, "workflow_id": FINALIZER_WORKFLOW,
         "path": ".github/workflows/enterprise-evidence-finalizer.yml",
-        "display_title": f"Enterprise evidence finalizer N={PR} E={EVIDENCE} M={MERGE} S={SOURCE} K={'1' * 64}",
+        "display_title": f"Enterprise evidence finalizer N={PR} E={EVIDENCE} M={REGENERATED_MERGE} S={SOURCE} K={'1' * 64}",
         "event": "workflow_dispatch", "head_sha": DEFINITION, "head_branch": "main",
         "repository": repository, "head_repository": repository, "run_attempt": 1,
         "status": "completed", "conclusion": "success",
@@ -116,8 +158,7 @@ def snapshot() -> dict[str, dict]:
         "triggering_actor": {"login": "github-actions[bot]"},
         "created_at": "2026-10-06T00:00:00Z", "updated_at": "2026-10-06T00:05:00Z",
     }
-    identity = {"pr_number": str(PR), "authorized_source_sha": SOURCE,
-                "evidence_sha": EVIDENCE, "merge_commit_sha": MERGE}
+    identity = copy.deepcopy(IDENTITY)
     source_ci = {"run_id": str(CI_RUN), "run_attempt": "1", "workflow_id": str(CI_WORKFLOW)}
     checks, jobs = [], []
     data = {
@@ -134,6 +175,10 @@ def snapshot() -> dict[str, dict]:
         },
         f"{prefix}/git/commits/{MERGE}": {
             "sha": MERGE, "parents": [{"sha": BASE}, {"sha": EVIDENCE}],
+            "tree": {"sha": TREE},
+        },
+        f"{prefix}/git/commits/{REGENERATED_MERGE}": {
+            "sha": REGENERATED_MERGE, "parents": [{"sha": BASE}, {"sha": EVIDENCE}],
             "tree": {"sha": TREE},
         },
         f"{prefix}/git/ref/heads/main": {"ref": "refs/heads/main", "object": {"type": "commit", "sha": PROTECTED}},
@@ -159,20 +204,38 @@ def snapshot() -> dict[str, dict]:
         }
         data[f"{prefix}/check-runs/{original['id']}"] = original
         jobs.append({
-            "id": 700 + offset, "name": name, "run_id": CI_RUN, "head_sha": EVIDENCE,
+            "id": 500 + offset, "name": name, "run_id": CI_RUN, "head_sha": EVIDENCE,
             "status": "completed", "conclusion": "success",
             "check_run_url": f"https://api.github.com/{prefix}/check-runs/{original['id']}",
         })
+    aggregate = {"id": 505, "name": "Security contract", "head_sha": EVIDENCE,
+                 "status": "completed", "conclusion": "success",
+                 "app": {"id": 15368, "slug": "github-actions"},
+                 "check_suite": {"id": 401, "head_sha": EVIDENCE}}
+    data[f"{prefix}/check-runs/505"] = aggregate
+    jobs.append({"id": 505, "name": "Security contract", "run_id": CI_RUN, "head_sha": EVIDENCE,
+                 "status": "completed", "conclusion": "success",
+                 "check_run_url": f"https://api.github.com/{prefix}/check-runs/505"})
+    artifact, archive, binding_digest = ci_binding_artifact()
+    data[f"{prefix}/actions/artifacts/812"] = artifact
+    data[f"{prefix}/actions/artifacts/812/zip"] = {"__binary_base64": base64.b64encode(archive).decode()}
     checks.append({
-        "id": 605, "name": "Security contract", "head_sha": MERGE,
+        "id": 605, "name": "Security contract", "head_sha": EVIDENCE,
         "status": "completed", "conclusion": "success", "external_id": EXTERNAL_ID,
         "app": {"id": APP_ID, "slug": "chio-security-authority"},
         "details_url": f"https://github.com/{REPOSITORY}/actions/runs/{FINALIZER_RUN}/attempts/1",
         "completed_at": "2026-10-06T00:06:00Z",
-        "output": {"text": json.dumps({"schema": "chio.security-check-authority.v2", "identity": identity,
-                    "source_ci": source_ci, "publication_binding_digest": "2" * 64})},
+        "output": {"text": json.dumps({"schema": "chio.security-check-authority.v3", "identity": identity,
+                    "identity_digest": IDENTITY_DIGEST,
+                    "merge_observations": {"capture": REGENERATED_MERGE, "ci": MERGE},
+                    "source_ci": source_ci, "publication_binding_digest": "2" * 64,
+                    "required_check_run_ids": {"build": "501", "msrv": "502", "vet": "503", "deny": "504"},
+                    "aggregate_check_run_id": "505",
+                    "ci_merge_binding": {"artifact_id": "812", "artifact_digest": artifact["digest"].removeprefix("sha256:"),
+                                         "binding_sha256": binding_digest}})},
     })
-    data[f"{prefix}/commits/{MERGE}/check-runs"] = {"total_count": len(checks), "check_runs": checks}
+    data[f"{prefix}/commits/{EVIDENCE}/check-runs"] = {"total_count": len(checks), "check_runs": checks}
+    data[f"{prefix}/commits/{PROTECTED}/pulls"] = [copy.deepcopy(data[f"{prefix}/pulls/{PR}"])]
     data[f"{prefix}/actions/runs/{CI_RUN}/attempts/1/jobs"] = {"total_count": len(jobs), "jobs": jobs}
     finalizer_jobs = [
         {"id": 800 + offset, "name": name, "run_id": FINALIZER_RUN, "head_sha": DEFINITION,
@@ -183,7 +246,7 @@ def snapshot() -> dict[str, dict]:
         ))
     ]
     data[f"{prefix}/actions/runs/{FINALIZER_RUN}/attempts/1/jobs"] = {"total_count": 4, "jobs": finalizer_jobs}
-    for ref in (SOURCE, EVIDENCE, MERGE):
+    for ref in (SOURCE, EVIDENCE, MERGE, PROTECTED):
         data[f"{prefix}/contents/.github/workflows/ci.yml?ref={ref}"] = {"sha": "3" * 40}
     for ref in (DEFINITION, PROTECTED):
         data[f"{prefix}/contents/.github/workflows/admin-override-audit.yml?ref={ref}"] = {"sha": "4" * 40}
@@ -314,7 +377,7 @@ class RecordedQualificationAuditTests(unittest.TestCase):
                 elif change == 'ci_head': ci['head_sha'] = SOURCE
                 elif change == 'ci_attempt': ci['run_attempt'] = 2
                 else:
-                    authority = data[f'{prefix}/commits/{MERGE}/check-runs']['check_runs'][-1]
+                    authority = data[f'{prefix}/commits/{EVIDENCE}/check-runs']['check_runs'][-1]
                     authority['details_url'] = authority['details_url'].replace(f'/runs/{FINALIZER_RUN}/', '/runs/302/')
                 result, report, _ = run_audit(data)
                 self.assertNotEqual(result.returncode, 0, report)
@@ -400,7 +463,8 @@ class RecordedQualificationAuditTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(comments, "", "authentic M qualification was falsely reported as override")
         self.assertEqual(report.get("status"), "verified")
-        self.assertEqual(report["qualification"]["merge_commit_sha"], MERGE)
+        self.assertEqual(report["qualification"]["identity_digest"], IDENTITY_DIGEST)
+        self.assertEqual(report["qualification"]["merge_observations"]["capture"], REGENERATED_MERGE)
         self.assertEqual(report["protected_merge_commit_sha"], PROTECTED)
 
     def test_ordinary_main_ci_title_cannot_invent_foundation_qualification(self) -> None:
@@ -420,7 +484,7 @@ class RecordedQualificationAuditTests(unittest.TestCase):
 
     def test_wrong_app_never_substitutes_for_security_authority(self) -> None:
         data = snapshot()
-        data[f"repos/{REPOSITORY}/commits/{MERGE}/check-runs"]["check_runs"][-1]["app"] = {
+        data[f"repos/{REPOSITORY}/commits/{EVIDENCE}/check-runs"]["check_runs"][-1]["app"] = {
             "id": 15368, "slug": "github-actions"
         }
         result, report, _ = run_audit(data)
@@ -459,10 +523,10 @@ class RecordedQualificationAuditTests(unittest.TestCase):
                       "late", "duplicate", "wrong-metadata", "invalid-json"):
             with self.subTest(mutation=label):
                 data = snapshot()
-                namespace = data[f"repos/{REPOSITORY}/commits/{MERGE}/check-runs"]
+                namespace = data[f"repos/{REPOSITORY}/commits/{EVIDENCE}/check-runs"]
                 check = namespace["check_runs"][-1]
                 if label == "wrong-external-id":
-                    check["external_id"] = check["external_id"].replace(SOURCE, "1" * 40)
+                    check["external_id"] = check["external_id"].replace(IDENTITY_DIGEST, "1" * 64)
                 elif label == "wrong-slug":
                     check["app"]["slug"] = "other-authority"
                 elif label in ("failure", "neutral", "null"):
@@ -496,7 +560,7 @@ class RecordedQualificationAuditTests(unittest.TestCase):
                 elif label == "failed-finalizer":
                     data[f"{prefix}/actions/runs/{FINALIZER_RUN}/attempts/1/jobs"]["jobs"][-1]["conclusion"] = "failure"
                 else:
-                    check = data[f"{prefix}/commits/{MERGE}/check-runs"]["check_runs"][0]
+                    check = data[f"{prefix}/commits/{EVIDENCE}/check-runs"]["check_runs"][0]
                     metadata = json.loads(check["output"]["text"])
                     metadata["source_ci"]["run_id"] = "202"
                     check["output"]["text"] = json.dumps(metadata)
@@ -510,7 +574,7 @@ class RecordedQualificationAuditTests(unittest.TestCase):
                 data = snapshot()
                 prefix = f"repos/{REPOSITORY}"
                 if label == "missing-page":
-                    data[f"{prefix}/commits/{MERGE}/check-runs"]["total_count"] += 1
+                    data[f"{prefix}/commits/{EVIDENCE}/check-runs"]["total_count"] += 1
                 elif label == "ci-definition":
                     data[f"{prefix}/contents/.github/workflows/ci.yml?ref={EVIDENCE}"]["sha"] = "0" * 40
                 elif label == "auditor-definition":
@@ -778,7 +842,7 @@ class PlatformShapedFinalizerBinderTests(unittest.TestCase):
                   'authorized_source_sha': SOURCE, 'capture_run_attempt': '1', 'capture_run_id': '401',
                   'default_commit_sha': DEFINITION, 'dispatch_job_key': 'dispatch-trusted-finalizer',
                   'dispatch_nonce': '1' * 64, 'finalizer_run_attempt': '1', 'finalizer_run_id': str(FINALIZER_RUN),
-                  'merge_commit_sha': MERGE, 'pr_number': str(PR), 'source_sha': EVIDENCE, 'security_definition_sha': DEFINITION}
+                  'merge_commit_sha': REGENERATED_MERGE, 'pr_number': str(PR), 'source_sha': EVIDENCE, 'security_definition_sha': DEFINITION}
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, 'w') as archive:
             info = zipfile.ZipInfo('finalizer-dispatch-intent.json')
@@ -916,7 +980,7 @@ p=pathlib.Path(os.environ['API_FIXTURE']);data=json.loads(p.read_text())
 method=args[args.index('--request')+1] if '--request' in args else 'GET'
 if method=='PATCH':
     payload=json.loads(args[args.index('--data-binary')+1]);check_id=int(key.rsplit('/',1)[1])
-    checks=data['repos/'+os.environ['GITHUB_REPOSITORY']+'/commits/'+os.environ['MERGE_COMMIT_SHA']+'/check-runs']['check_runs']
+    checks=[c for key,store in data.items() if key.startswith('repos/'+os.environ['GITHUB_REPOSITORY']+'/commits/') and key.endswith('/check-runs') for c in store['check_runs']]
     result=next(c for c in checks if c['id']==check_id);result.update(payload)
     p.write_text(json.dumps(data))
 elif method!='GET':
@@ -953,24 +1017,25 @@ class AuthorizingFinalizerRetryTests(unittest.TestCase):
             gh.write_text(FAKE_GH)
             gh.chmod(0o755)
             output = root / 'output'
-            checks = data[f'repos/{REPOSITORY}/commits/{MERGE}/check-runs']['check_runs']
+            checks = data[f'repos/{REPOSITORY}/commits/{EVIDENCE}/check-runs']['check_runs']
             result = subprocess.run(['bash', '-c', 'set -euo pipefail\n' + fragment], capture_output=True, text=True, check=False,
                                     env=os.environ | {'PATH': str(root) + os.pathsep + os.environ['PATH'],
                                                       'API_FIXTURE': str(fixture), 'GITHUB_REPOSITORY': REPOSITORY,
                                                       'GITHUB_OUTPUT': str(output), 'SECURITY_APP_ID': str(APP_ID),
+                                                      'REPOSITORY_ID': '1195888645',
                                                       'SECURITY_DEFINITION_SHA': DEFINITION, 'historical_security_definition_sha': DEFINITION,
                                                       'upstream_sha': DEFINITION, 'EVENT_RUN_ID': str(FINALIZER_RUN),
                                                       'failed_finalizer_attempt': '2', 'run_attempt': '1',
                                                       'existing_checks': json.dumps(checks), 'external_id': EXTERNAL_ID,
                                                       'finalizer_details_url': f'https://github.com/{REPOSITORY}/actions/runs/{FINALIZER_RUN}/attempts/1',
                                                       'authorized_source_sha': SOURCE, 'evidence_sha': EVIDENCE,
-                                                      'merge_commit_sha': MERGE, 'base_sha': BASE, 'merge_tree_sha': TREE,
+                                                      'merge_commit_sha': REGENERATED_MERGE, 'base_sha': BASE, 'merge_tree_sha': TREE,
                                                       'pr_number': str(PR)})
             return result, output.read_text() if output.exists() else ''
 
     def test_listener_retry_rejects_substituted_recorded_source_ci(self) -> None:
         data = snapshot()
-        authority = data[f'repos/{REPOSITORY}/commits/{MERGE}/check-runs']['check_runs'][-1]
+        authority = data[f'repos/{REPOSITORY}/commits/{EVIDENCE}/check-runs']['check_runs'][-1]
         text = json.loads(authority['output']['text'])
         text['source_ci']['run_id'] = '999'
         authority['output']['text'] = json.dumps(text)
@@ -981,9 +1046,9 @@ class AuthorizingFinalizerRetryTests(unittest.TestCase):
         for mutation in ('app_slug', 'head'):
             with self.subTest(mutation=mutation):
                 data = snapshot()
-                authority = data[f'repos/{REPOSITORY}/commits/{MERGE}/check-runs']['check_runs'][-1]
+                authority = data[f'repos/{REPOSITORY}/commits/{EVIDENCE}/check-runs']['check_runs'][-1]
                 if mutation == 'app_slug': authority['app']['slug'] = 'untrusted-app'
-                else: authority['head_sha'] = EVIDENCE
+                else: authority['head_sha'] = MERGE
                 result, output = self.run_listener_binding(data)
                 self.assertTrue(result.returncode != 0 or 'eligible=false' in output, result.stdout + output)
 
@@ -995,7 +1060,7 @@ class AuthorizingFinalizerRetryTests(unittest.TestCase):
 
     def test_listener_unbound_sibling_cannot_invent_existing_app_anchor(self) -> None:
         data = snapshot()
-        authority = data[f'repos/{REPOSITORY}/commits/{MERGE}/check-runs']['check_runs'][-1]
+        authority = data[f'repos/{REPOSITORY}/commits/{EVIDENCE}/check-runs']['check_runs'][-1]
         authority['details_url'] = f'https://github.com/{REPOSITORY}/actions/runs/302/attempts/1'
         result, output = self.run_listener_binding(data)
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -1025,14 +1090,18 @@ class AuthorizingFinalizerRetryTests(unittest.TestCase):
                                     capture_output=True, text=True, check=False,
                                     env=os.environ | {'PATH': str(root) + os.pathsep + os.environ['PATH'],
                                                       'API_FIXTURE': str(fixture), 'GITHUB_REPOSITORY': REPOSITORY,
+                                                      'GITHUB_REPOSITORY_OWNER': 'bb-connor',
+                                                      'REPOSITORY_ID': '1195888645',
                                                       'AUTHORIZED_SOURCE_SHA': SOURCE, 'EVIDENCE_SHA': EVIDENCE,
-                                                      'MERGE_COMMIT_SHA': MERGE, 'PR_NUMBER': str(PR),
+                                                      'MERGE_COMMIT_SHA': REGENERATED_MERGE, 'PR_NUMBER': str(PR),
+                                                      'CI_MERGE_SHA': MERGE, 'IDENTITY_JSON': IDENTITY_JSON,
+                                                      'IDENTITY_DIGEST': IDENTITY_DIGEST,
                                                       'SECURITY_APP_ID': str(APP_ID), 'SECURITY_DEFINITION_SHA': DEFINITION,
                                                       'CI_RUN_ID': str(CI_RUN), 'CI_RUN_ATTEMPT': '1', 'CI_WORKFLOW_ID': str(CI_WORKFLOW),
                                                       'FINALIZER_RUN_ID': str(own_run), 'FINALIZER_RUN_ATTEMPT': str(own_attempt),
                                                       'PUBLICATION_BINDING_DIGEST': '2' * 64,
                                                       'publication_details_url': f'https://github.com/{REPOSITORY}/actions/runs/{own_run}/attempts/{own_attempt}',
-                                                      'canonical_binding': json.dumps({'ci': {'required_check_run_ids': {suffix: str(501 + offset) for offset, (_, suffix) in enumerate(ORDINARY)}}}),
+                                                      'canonical_binding': publication_binding(merge=REGENERATED_MERGE),
                                                       'EXTERNAL_ID': EXTERNAL_ID, 'GH_TOKEN': 'test-read-only',
                                                       'installation_token': 'test-no-real-secret', 'GITHUB_STEP_SUMMARY': str(root / 'summary')})
             return result, json.loads(fixture.read_text())
@@ -1047,11 +1116,11 @@ class AuthorizingFinalizerRetryTests(unittest.TestCase):
                 data[prefix], data[prefix + '/attempts/2'] = retry, copy.deepcopy(retry)
                 result, observed = self.run_publisher_guard(data)
                 self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-                checks = observed[f'repos/{REPOSITORY}/commits/{MERGE}/check-runs']['check_runs']
+                checks = observed[f'repos/{REPOSITORY}/commits/{EVIDENCE}/check-runs']['check_runs']
                 self.assertEqual(len(checks), 1)
                 self.assertTrue(all(c['conclusion'] == 'failure' for c in checks), result.stderr)
-                self.assertEqual([c['external_id'] for c in checks], [c['external_id'] for c in snapshot()[f'repos/{REPOSITORY}/commits/{MERGE}/check-runs']['check_runs']])
-                self.assertEqual([c['output']['text'] for c in checks], [c['output']['text'] for c in snapshot()[f'repos/{REPOSITORY}/commits/{MERGE}/check-runs']['check_runs']])
+                self.assertEqual([c['external_id'] for c in checks], [c['external_id'] for c in snapshot()[f'repos/{REPOSITORY}/commits/{EVIDENCE}/check-runs']['check_runs']])
+                self.assertEqual([c['output']['text'] for c in checks], [c['output']['text'] for c in snapshot()[f'repos/{REPOSITORY}/commits/{EVIDENCE}/check-runs']['check_runs']])
 
     def test_publisher_unbound_sibling_failure_cannot_withdraw_authority(self) -> None:
         data = snapshot()
@@ -1061,7 +1130,7 @@ class AuthorizingFinalizerRetryTests(unittest.TestCase):
         data[f'repos/{REPOSITORY}/actions/workflows/enterprise-evidence-finalizer.yml/runs']['workflow_runs'].append(sibling)
         result, observed = self.run_publisher_guard(data)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(observed[f'repos/{REPOSITORY}/commits/{MERGE}/check-runs'], data[f'repos/{REPOSITORY}/commits/{MERGE}/check-runs'])
+        self.assertEqual(observed[f'repos/{REPOSITORY}/commits/{EVIDENCE}/check-runs'], data[f'repos/{REPOSITORY}/commits/{EVIDENCE}/check-runs'])
 
     def test_publisher_later_success_cannot_restore_bad_authorizing_history(self) -> None:
         data = snapshot()
@@ -1073,14 +1142,14 @@ class AuthorizingFinalizerRetryTests(unittest.TestCase):
         data[prefix], data[prefix + '/attempts/2'], data[prefix + '/attempts/3'] = latest, bad, copy.deepcopy(latest)
         result, observed = self.run_publisher_guard(data)
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertTrue(all(c['conclusion'] == 'failure' for c in observed[f'repos/{REPOSITORY}/commits/{MERGE}/check-runs']['check_runs']))
+        self.assertTrue(all(c['conclusion'] == 'failure' for c in observed[f'repos/{REPOSITORY}/commits/{EVIDENCE}/check-runs']['check_runs']))
 
     def test_publisher_missing_app_anchor_cannot_create_retry_authority(self) -> None:
         data = snapshot()
-        data[f'repos/{REPOSITORY}/commits/{MERGE}/check-runs'] = {'total_count': 0, 'check_runs': []}
+        data[f'repos/{REPOSITORY}/commits/{EVIDENCE}/check-runs'] = {'total_count': 0, 'check_runs': []}
         result, observed = self.run_publisher_guard(data)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(observed[f'repos/{REPOSITORY}/commits/{MERGE}/check-runs']['check_runs'], [])
+        self.assertEqual(observed[f'repos/{REPOSITORY}/commits/{EVIDENCE}/check-runs']['check_runs'], [])
 
     def test_initial_own_publication_can_finish_before_workflow_completion(self) -> None:
         data = snapshot()
@@ -1091,7 +1160,7 @@ class AuthorizingFinalizerRetryTests(unittest.TestCase):
         jobs[-1].update(status='in_progress', conclusion=None)
         result, observed = self.run_publisher_guard(data, own_run=FINALIZER_RUN)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(observed[f'repos/{REPOSITORY}/commits/{MERGE}/check-runs'], data[f'repos/{REPOSITORY}/commits/{MERGE}/check-runs'])
+        self.assertEqual(observed[f'repos/{REPOSITORY}/commits/{EVIDENCE}/check-runs'], data[f'repos/{REPOSITORY}/commits/{EVIDENCE}/check-runs'])
 
     def test_publisher_rejects_untrusted_retry_binding_without_mutating_checks(self) -> None:
         for mutation in ('source_ci', 'original_actor', 'original_job', 'first_attempt_url', 'retry_head'):
@@ -1101,7 +1170,7 @@ class AuthorizingFinalizerRetryTests(unittest.TestCase):
                 retry = copy.deepcopy(data[prefix + '/attempts/1'])
                 retry.update(run_attempt=2, conclusion='failure')
                 data[prefix], data[prefix + '/attempts/2'] = retry, copy.deepcopy(retry)
-                authority = data[f'repos/{REPOSITORY}/commits/{MERGE}/check-runs']['check_runs'][-1]
+                authority = data[f'repos/{REPOSITORY}/commits/{EVIDENCE}/check-runs']['check_runs'][-1]
                 if mutation == 'source_ci':
                     metadata = json.loads(authority['output']['text'])
                     metadata['source_ci']['run_id'] = '999'
@@ -1112,14 +1181,14 @@ class AuthorizingFinalizerRetryTests(unittest.TestCase):
                 else: data[prefix + '/attempts/2']['head_sha'] = SOURCE
                 result, observed = self.run_publisher_guard(data)
                 self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-                self.assertEqual(observed[f'repos/{REPOSITORY}/commits/{MERGE}/check-runs'], data[f'repos/{REPOSITORY}/commits/{MERGE}/check-runs'])
+                self.assertEqual(observed[f'repos/{REPOSITORY}/commits/{EVIDENCE}/check-runs'], data[f'repos/{REPOSITORY}/commits/{EVIDENCE}/check-runs'])
 
     def test_publisher_existing_failure_never_returns_success_or_changes_metadata(self) -> None:
         data = snapshot()
-        data[f'repos/{REPOSITORY}/commits/{MERGE}/check-runs']['check_runs'][-1]['conclusion'] = 'failure'
+        data[f'repos/{REPOSITORY}/commits/{EVIDENCE}/check-runs']['check_runs'][-1]['conclusion'] = 'failure'
         result, observed = self.run_publisher_guard(data)
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(observed[f'repos/{REPOSITORY}/commits/{MERGE}/check-runs'], data[f'repos/{REPOSITORY}/commits/{MERGE}/check-runs'])
+        self.assertEqual(observed[f'repos/{REPOSITORY}/commits/{EVIDENCE}/check-runs'], data[f'repos/{REPOSITORY}/commits/{EVIDENCE}/check-runs'])
 
     def own_healthy_retry(self, attempt: int = 2) -> dict:
         data = snapshot()
@@ -1142,7 +1211,7 @@ class AuthorizingFinalizerRetryTests(unittest.TestCase):
 
     def test_full_healthy_retry_preserves_positive_metadata_and_first_attempt_provenance_bytes(self) -> None:
         data = self.own_healthy_retry()
-        checks = data[f'repos/{REPOSITORY}/commits/{MERGE}/check-runs']['check_runs']
+        checks = data[f'repos/{REPOSITORY}/commits/{EVIDENCE}/check-runs']['check_runs']
         for check in checks:
             check['details_url'] = f'https://github.com/{REPOSITORY}/actions/runs/{FINALIZER_RUN}/attempts/1'
             if check['name'] == 'Security contract':
@@ -1163,7 +1232,7 @@ class AuthorizingFinalizerRetryTests(unittest.TestCase):
         data[prefix + '/attempts/2'] = bad
         result, observed = self.run_publisher_guard(data, own_run=FINALIZER_RUN, own_attempt=3)
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertTrue(all(c['conclusion'] == 'failure' for c in observed[f'repos/{REPOSITORY}/commits/{MERGE}/check-runs']['check_runs']))
+        self.assertTrue(all(c['conclusion'] == 'failure' for c in observed[f'repos/{REPOSITORY}/commits/{EVIDENCE}/check-runs']['check_runs']))
 
     def test_in_progress_peer_or_unproven_own_retry_cannot_pass(self) -> None:
         for mutation in ('peer', 'attempt', 'predecessor', 'job_head', 'job_run', 'job_title'):
@@ -1410,6 +1479,9 @@ def add_ci_runs(data: dict, *runs: dict) -> None:
 
 
 def publication_binding(base: str = BASE, evidence: str = EVIDENCE, merge: str = MERGE, tree: str = TREE) -> str:
+    artifact, _, binding_sha256 = ci_binding_artifact(base, evidence, MERGE, tree)
+    identity = IDENTITY | {"base_sha": base, "evidence_sha": evidence, "merge_tree_sha": tree}
+    identity_json = json.dumps(identity, sort_keys=True, separators=(",", ":"))
     binding = {
         "artifact": {"digest": "sha256:" + "6" * 64, "id": "811", "name": f"enterprise-linux-capture-{evidence}-401-1",
                      "size": "4096"},
@@ -1417,8 +1489,8 @@ def publication_binding(base: str = BASE, evidence: str = EVIDENCE, merge: str =
         "capture": {"actor": "github-actions[bot]", "definition_blob": "6" * 40, "issued_at_unix_ms": "1791244860000",
                     "job_id": "821", "run_attempt": "1", "run_id": "401", "workflow_id": "105"},
         "ci": {"aggregate_check_run_id": "505",
-               "merge_binding": {"artifact_digest": "sha256:" + "7" * 64, "artifact_id": "812",
-                                 "attestation_bundle_sha256": "8" * 64, "binding_sha256": "9" * 64},
+               "merge_binding": {"artifact_digest": artifact["digest"], "artifact_id": "812",
+                                 "attestation_bundle_sha256": "8" * 64, "binding_sha256": binding_sha256},
                "required_check_run_ids": {"build": "501", "deny": "504", "msrv": "502", "vet": "503"},
                "run_attempt": "1", "run_id": str(CI_RUN), "workflow_id": str(CI_WORKFLOW)},
         "committed_binding_digest": "a" * 64, "configuration_digest": "b" * 64,
@@ -1429,9 +1501,11 @@ def publication_binding(base: str = BASE, evidence: str = EVIDENCE, merge: str =
             "broker_boundary", "cage_enforcement", "committed_adversarial_evidence", "key_log_transparency",
             "linux_adversarial_controls", "migration_state_store", "runner_contract")},
         "inventory_digest": "d" * 64, "labels_digest": hashlib.sha256(b"[]").hexdigest(),
-        "merge_commit_sha": merge, "merge_tree_sha": tree, "pr_number": str(PR), "repository": REPOSITORY,
+        "merge_observations": {"capture": merge, "ci": MERGE}, "identity": identity,
+        "identity_digest": hashlib.sha256(identity_json.encode("ascii")).hexdigest(),
+        "merge_tree_sha": tree, "pr_number": str(PR), "repository": REPOSITORY,
         "runner": {"arch": "X64", "labels_digest": "e" * 64, "name": "GitHub Actions 7", "os": "Linux"},
-        "schema": "chio.security-check-publication.v1", "security_definition_sha": DEFINITION,
+        "schema": "chio.security-check-publication.v2", "security_definition_sha": DEFINITION,
     }
     return json.dumps(binding, sort_keys=True, separators=(",", ":"))
 
@@ -1445,6 +1519,35 @@ def checks_on(data: dict, name: str, app_id: int, conclusion: str) -> list[dict]
 
 def security_contract_failures(data: dict) -> list[dict]:
     return checks_on(data, "Security contract", APP_ID, "failure")
+
+
+def dedicated_failures_on_e(data: dict) -> list[dict]:
+    failures = []
+    for check in security_contract_failures(data):
+        if check["head_sha"] != EVIDENCE or check["app"].get("slug") != "chio-security-authority":
+            continue
+        try:
+            text = json.loads(check["output"]["text"])
+            if check.get("external_id") == f"chio:v3:deny:{EVIDENCE}":
+                valid = (text["schema"] == "chio.security-check-revocation.v2"
+                         and text["evidence_sha"] == EVIDENCE)
+            else:
+                identity = text["identity"]
+                if (set(identity) != set(IDENTITY)
+                        or not all(isinstance(value, str) and value.isascii() for value in identity.values())
+                        or identity["schema"] != "chio.security-candidate-identity.v1"
+                        or identity["evidence_sha"] != EVIDENCE):
+                    continue
+                canonical = json.dumps(identity, sort_keys=True, separators=(",", ":")).encode("ascii")
+                digest = hashlib.sha256(canonical).hexdigest()
+                valid = (text["schema"] == "chio.security-check-authority.v3"
+                         and text["identity_digest"] == digest
+                         and check.get("external_id") == f"chio:v3:{identity['pr_number']}:{EVIDENCE}:{digest}")
+            if valid:
+                failures.append(check)
+        except (KeyError, TypeError, ValueError):
+            continue
+    return failures
 
 
 def publisher_body() -> str:
@@ -1461,6 +1564,7 @@ def publisher_environment() -> dict[str, str]:
     return {
         "AUTHORIZED_SOURCE_SHA": SOURCE, "CI_RUN_ATTEMPT": "1", "CI_RUN_ID": str(CI_RUN),
         "CI_WORKFLOW_ID": str(CI_WORKFLOW), "EVIDENCE_SHA": EVIDENCE, "EXTERNAL_ID": EXTERNAL_ID,
+        "CI_MERGE_SHA": MERGE, "IDENTITY_JSON": IDENTITY_JSON, "IDENTITY_DIGEST": IDENTITY_DIGEST,
         "GH_TOKEN": ACTIONS_TOKEN, "MERGE_COMMIT_SHA": MERGE, "PR_NUMBER": str(PR), "REPOSITORY_ID": "1195888645",
         "SECURITY_APP_ID": str(APP_ID), "SECURITY_DEFINITION_SHA": DEFINITION,
         "installation_token": INSTALLATION_TOKEN, "canonical_binding": publication_binding(),
@@ -1485,9 +1589,9 @@ def reconcile_bad_ci_then_publish(data: dict) -> OfflineRun:
 
 
 def bad_ci_fixture(*extra_runs: dict, mirrors: tuple[dict, ...] = ()) -> dict:
-    data = live_tuple()
+    data = ci_authentication_fixture()
     add_ci_runs(data, pull_request_ci_run(CI_RUN, MERGE), *extra_runs)
-    data[f"repos/{REPOSITORY}/commits/{MERGE}/check-runs"] = {"total_count": len(mirrors), "check_runs": list(mirrors)}
+    data[f"repos/{REPOSITORY}/commits/{EVIDENCE}/check-runs"] = {"total_count": len(mirrors), "check_runs": list(mirrors)}
     return data
 
 
@@ -1516,7 +1620,7 @@ def ci_authentication_fixture(live_merge: str = MERGE) -> dict:
                      "conclusion": "success", "check_run_url": f"https://api.github.com/{prefix}/check-runs/{identifier}"})
         data[f"{prefix}/check-runs/{identifier}"] = {
             "id": identifier, "name": name, "head_sha": EVIDENCE, "status": "completed", "conclusion": "success",
-            "check_suite": {"id": 401}, "app": {"id": 15368, "slug": "github-actions"}}
+            "check_suite": {"id": 401, "head_sha": EVIDENCE}, "app": {"id": 15368, "slug": "github-actions"}}
     data[f"{prefix}/actions/runs/{CI_RUN}/attempts/1/jobs"] = {"total_count": len(jobs), "jobs": jobs}
     return data
 
@@ -1563,20 +1667,26 @@ class PublisherEvidenceHeadOriginalRedTests(unittest.TestCase):
         self.assertNotEqual(current.result.returncode, 0)
         self.assertNotIn(PUBLICATION_PROBE, current.result.stdout)
         self.assertEqual(len(security_contract_failures(current.data)), 1, current.result.stderr)
+        self.assertEqual(len(dedicated_failures_on_e(current.data)), 1, current.result.stderr)
         prior = reconcile_bad_ci_then_publish(bad_ci_fixture(prior_failed_ci_run(PRIOR_MERGE)))
         self.assertIn(f"GET repos/{REPOSITORY}/{CI_HISTORY_QUERY}", prior.calls)
         self.assertNotIn(PUBLICATION_PROBE, prior.result.stdout,
                          f"failed CI run {PRIOR_CI_RUN} on the same evidence head under a prior test merge did not block publication")
         self.assertNotEqual(prior.result.returncode, 0)
         self.assertEqual(len(security_contract_failures(prior.data)), 1, prior.result.stderr)
+        self.assertEqual(len(dedicated_failures_on_e(prior.data)), 1, prior.result.stderr)
 
     def test_foreign_mirror_cannot_block_the_bad_ci_security_contract_tombstone(self) -> None:
         clean = reconcile_bad_ci_then_publish(bad_ci_fixture(prior_failed_ci_run(MERGE)))
         self.assertEqual(len(security_contract_failures(clean.data)), 1, clean.result.stderr)
+        self.assertEqual(len(dedicated_failures_on_e(clean.data)), 1, clean.result.stderr)
         polluted = reconcile_bad_ci_then_publish(bad_ci_fixture(prior_failed_ci_run(MERGE), mirrors=(foreign_mirror(MERGE),)))
         self.assertFalse(any("Security%20mirror" in call for call in polluted.calls), polluted.calls)
         self.assertNotIn(PUBLICATION_PROBE, polluted.result.stdout)
         self.assertEqual(len(security_contract_failures(polluted.data)), 1,
+                         "a foreign Actions mirror without the required external id stopped bad-CI revocation "
+                         "before the Security contract tombstone")
+        self.assertEqual(len(dedicated_failures_on_e(polluted.data)), 1,
                          "a foreign Actions mirror without the required external id stopped bad-CI revocation "
                          "before the Security contract tombstone")
         self.assertTrue(any(check["id"] == 113139755293 for key, store in polluted.data.items()
@@ -1665,7 +1775,7 @@ def revoker_fixture(live_merge: str = MERGE, mirrors: tuple[dict, ...] = ()) -> 
     prefix = f"repos/{REPOSITORY}"
     data = live_tuple(live_merge=live_merge)
     data[f"{prefix}/contents/.github/workflows/security-contract-revocation.yml?ref={DEFINITION}"] = {"sha": REVOKER_BLOB}
-    data[f"{prefix}/commits/{MERGE}/check-runs"] = {"total_count": len(mirrors), "check_runs": list(mirrors)}
+    data[f"{prefix}/commits/{EVIDENCE}/check-runs"] = {"total_count": len(mirrors), "check_runs": list(mirrors)}
     return data
 
 
@@ -1740,13 +1850,17 @@ class RevokerEvidenceHeadOriginalRedTests(unittest.TestCase):
                 clean = revoke_five_contexts(revoker_fixture(), event_name)
                 self.assertEqual(clean.result.returncode, 0, clean.result.stderr)
                 self.assertEqual(len(security_contract_failures(clean.data)), 1)
+                self.assertEqual(len(dedicated_failures_on_e(clean.data)), 1)
                 polluted = revoke_five_contexts(revoker_fixture(mirrors=(foreign_mirror(MERGE),)), event_name)
                 self.assertFalse(any("Security%20mirror" in call for call in polluted.calls), polluted.calls)
                 self.assertEqual(len(security_contract_failures(polluted.data)), 1,
                                  "a foreign Actions mirror without the required external id stopped revocation "
                                  "before the Security contract tombstone")
+                self.assertEqual(len(dedicated_failures_on_e(polluted.data)), 1,
+                                 "a foreign Actions mirror without the required external id stopped revocation "
+                                 "before the Security contract tombstone")
                 self.assertTrue(any(check["id"] == 113139755293 for check in
-                                    polluted.data[f"repos/{REPOSITORY}/commits/{MERGE}/check-runs"]["check_runs"]))
+                                    polluted.data[f"repos/{REPOSITORY}/commits/{EVIDENCE}/check-runs"]["check_runs"]))
 
     def test_manual_revocation_survives_same_parent_tree_merge_regeneration(self) -> None:
         prefix = f"repos/{REPOSITORY}"
@@ -1909,6 +2023,7 @@ class PublisherFullHistoryOriginalRedTests(unittest.TestCase):
         self.assertNotIn(PUBLICATION_PROBE, run.result.stdout, reason)
         self.assertNotEqual(run.result.returncode, 0)
         self.assertEqual(len(security_contract_failures(run.data)), 1, run.result.stderr)
+        self.assertEqual(len(dedicated_failures_on_e(run.data)), 1, run.result.stderr)
 
     def test_failed_ci_with_a_fallback_title_blocks_publication_for_the_same_evidence(self) -> None:
         self.assert_refused_with_tombstone(
@@ -1939,7 +2054,7 @@ def foreign_head_ci_run(run_id: int = FOREIGN_CI_RUN, conclusion: str | None = "
 def ci_history_fixture(*runs: dict) -> dict:
     data = live_tuple()
     add_ci_runs(data, *runs)
-    data[f"repos/{REPOSITORY}/commits/{MERGE}/check-runs"] = {"total_count": 0, "check_runs": []}
+    data[f"repos/{REPOSITORY}/commits/{EVIDENCE}/check-runs"] = {"total_count": 0, "check_runs": []}
     return data
 
 
@@ -1971,6 +2086,7 @@ class PublisherForeignHeadIdentityOriginalRedTests(unittest.TestCase):
         self.assertNotIn(PUBLICATION_PROBE, run.result.stdout, reason)
         self.assertNotEqual(run.result.returncode, 0)
         self.assertEqual(security_contract_failures(run.data), [])
+        self.assertEqual(dedicated_failures_on_e(run.data), [])
         self.assertEqual(check_mutations(run), [])
 
     def test_fully_identified_foreign_head_run_stays_outside_the_evidence_history(self) -> None:
@@ -1984,6 +2100,7 @@ class PublisherForeignHeadIdentityOriginalRedTests(unittest.TestCase):
         self.assertEqual(run.result.returncode, 0, run.result.stderr)
         self.assertIn(PUBLICATION_PROBE, run.result.stdout)
         self.assertEqual(security_contract_failures(run.data), [])
+        self.assertEqual(dedicated_failures_on_e(run.data), [])
         self.assertEqual(check_mutations(run), [])
         self.assertFalse(any(call.startswith(f"GET repos/{REPOSITORY}/actions/runs/{FOREIGN_CI_RUN}")
                              for call in run.calls))
@@ -2020,15 +2137,16 @@ class PublisherForeignHeadIdentityOriginalRedTests(unittest.TestCase):
                 self.assertNotIn(PUBLICATION_PROBE, run.result.stdout)
                 self.assertNotEqual(run.result.returncode, 0)
                 self.assertEqual(len(security_contract_failures(run.data)), 1, run.result.stderr)
+                self.assertEqual(len(dedicated_failures_on_e(run.data)), 1, run.result.stderr)
                 created = sorted((check for key, store in run.data.items()
                                   if key.startswith(f"repos/{REPOSITORY}/commits/") and key.endswith("/check-runs")
                                   for check in store["check_runs"]), key=lambda check: check["id"])
                 denial = created[0]
                 self.assertEqual((denial["name"], denial["app"], denial["head_sha"], denial["external_id"],
                                   denial["status"], denial["conclusion"]),
-                                 ("Security contract", {"id": APP_ID, "slug": "chio-security-authority"}, MERGE,
-                                  EXTERNAL_ID, "completed", "failure"))
-                self.assertEqual({check["head_sha"] for check in created}, {MERGE})
+                                 ("Security contract", {"id": APP_ID, "slug": "chio-security-authority"}, EVIDENCE,
+                                  f"chio:v3:deny:{EVIDENCE}", "completed", "failure"))
+                self.assertEqual({check["head_sha"] for check in created}, {EVIDENCE})
                 self.assertEqual(check_mutations(run)[0], f"POST repos/{REPOSITORY}/check-runs")
 
 
@@ -2265,26 +2383,25 @@ class AuditSiblingMarkedMergedOriginalRedTests(unittest.TestCase):
 
 
 def positive_authority_checks() -> tuple[dict, ...]:
-    return tuple(copy.deepcopy(snapshot()[f"repos/{REPOSITORY}/commits/{MERGE}/check-runs"]["check_runs"]))
+    return tuple(copy.deepcopy(snapshot()[f"repos/{REPOSITORY}/commits/{EVIDENCE}/check-runs"]["check_runs"]))
 
 
 class SecurityContractDenialPreservationTests(unittest.TestCase):
     def assert_exact_denial(self, run: OfflineRun, existing: tuple[dict, ...]) -> None:
         prefix = f"repos/{REPOSITORY}"
         self.assertEqual([key for key in run.data if key.startswith(f"{prefix}/commits/") and key.endswith("/check-runs")
-                          and run.data[key]["check_runs"]], [f"{prefix}/commits/{MERGE}/check-runs"])
-        checks = {check["id"]: check for check in run.data[f"{prefix}/commits/{MERGE}/check-runs"]["check_runs"]}
+                          and run.data[key]["check_runs"]], [f"{prefix}/commits/{EVIDENCE}/check-runs"])
+        checks = {check["id"]: check for check in run.data[f"{prefix}/commits/{EVIDENCE}/check-runs"]["check_runs"]}
         self.assertEqual(sorted(checks), sorted(check["id"] for check in existing))
         authority = next(check for check in existing if check["name"] == "Security contract")
         denied = checks[authority["id"]]
         self.assertEqual((denied["name"], denied["head_sha"], denied["app"], denied["external_id"], denied["status"],
                           denied["conclusion"]),
-                         ("Security contract", MERGE, {"id": APP_ID, "slug": "chio-security-authority"}, EXTERNAL_ID,
+                         ("Security contract", EVIDENCE, {"id": APP_ID, "slug": "chio-security-authority"}, EXTERNAL_ID,
                           "completed", "failure"))
         self.assertEqual(denied["output"]["text"], authority["output"]["text"])
         metadata = json.loads(denied["output"]["text"])
-        self.assertEqual(metadata["identity"], {"pr_number": str(PR), "authorized_source_sha": SOURCE,
-                                                "evidence_sha": EVIDENCE, "merge_commit_sha": MERGE})
+        self.assertEqual(metadata["identity"], IDENTITY)
         self.assertEqual(len(existing), 1)
         self.assertFalse(any("Security%20mirror" in call for call in run.calls), run.calls)
         writes = check_mutations(run)
@@ -2311,8 +2428,8 @@ class SecurityContractDenialPreservationTests(unittest.TestCase):
                                   for check in store["check_runs"]), key=lambda check: check["id"])
                 self.assertEqual([(check["name"], check["head_sha"], check["app"], check["external_id"],
                                    check["status"], check["conclusion"]) for check in created],
-                                 [("Security contract", MERGE, {"id": APP_ID, "slug": "chio-security-authority"},
-                                   EXTERNAL_ID, "completed", "failure")])
+                                 [("Security contract", EVIDENCE, {"id": APP_ID, "slug": "chio-security-authority"},
+                                   f"chio:v3:deny:{EVIDENCE}", "completed", "failure")])
                 self.assertEqual(check_mutations(run), [f"POST {prefix}/check-runs"])
                 self.assertFalse(any("Security%20mirror" in call for call in run.calls), run.calls)
 
@@ -2349,7 +2466,7 @@ class DedicatedAuthorityOriginalTests(unittest.TestCase):
 
     def test_only_dedicated_authority_and_original_ci_jobs_qualify(self):
         data = snapshot()
-        key = f'repos/{REPOSITORY}/commits/{MERGE}/check-runs'
+        key = f'repos/{REPOSITORY}/commits/{EVIDENCE}/check-runs'
         authority = [c for c in data[key]['check_runs'] if c['name'] == 'Security contract']
         self.assertEqual(len(authority), 1)
         data[key] = dict(total_count=1, check_runs=authority)
@@ -2362,10 +2479,10 @@ class DedicatedAuthorityOriginalTests(unittest.TestCase):
         for conclusion, count in [('success', 1), ('failure', 1), ('success', 2)]:
             with self.subTest(conclusion=conclusion, count=count):
                 data = snapshot()
-                key = f'repos/{REPOSITORY}/commits/{MERGE}/check-runs'
+                key = f'repos/{REPOSITORY}/commits/{EVIDENCE}/check-runs'
                 authority = [c for c in data[key]['check_runs'] if c['name'] == 'Security contract']
                 stray = dict(id=999, name='Security mirror / Build, lint, test',
-                             head_sha=MERGE, status='completed', conclusion=conclusion,
+                             head_sha=EVIDENCE, status='completed', conclusion=conclusion,
                              app=dict(id=15368, slug='github-actions'),
                              external_id='unrelated-actions-check', output=dict(text='untrusted'))
                 mirrors = [copy.deepcopy(stray) | {'id': 999 + offset} for offset in range(count)]

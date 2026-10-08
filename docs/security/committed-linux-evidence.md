@@ -246,14 +246,14 @@ ordered parents `<base>, E` and tree `T`, and that no other pull request has hea
 `E`. A regenerated test merge with the same parents and tree changes nothing.
 Duplicate-head refusal is detection, not per-pull-request enforcement.
 It mints the dedicated App token
-and posts only the dedicated authority context on `M`:
+and posts only the dedicated authority context on evidence head `E`:
 
 ```text
 name: Security contract
-head_sha: M
+head_sha: E
 status: completed
 conclusion: success
-external_id: arc:<PR>:<E>:<M>:<S>
+external_id: chio:v3:<PR>:<E>:<K>
 app.slug: chio-security-authority
 ```
 
@@ -265,18 +265,30 @@ refuses positive publication. Unreadable, malformed or truncated censuses also
 refuse. Negative CI or authorizing-finalizer evidence retains its authenticated
 E-scope denial path, independent of main currency and duplicate-head detection.
 
-The captured merge object `M` remains authenticated and readable. At this P4
-boundary, the dedicated v2 authority still names that captured merge, while CI
-authentication and its attestation bind `M_ci`. The v2 landing auditor remains
-fail-closed (`unverified`) if those merge observations differ. Stable content
-identity and final head placement require the separate P6 repair and acceptance.
+The candidate identity `I` is `chio.security-candidate-identity.v1` with exactly
+nine ASCII string fields: `schema`, `repository`, `repository_id`, `pr_number`,
+`base_sha`, `evidence_sha`, `merge_tree_sha`, `authorized_source_sha` and
+`security_definition_sha`. `K` is SHA-256 of its canonical sorted compact JSON.
+The publisher and auditor independently recompute `K` and bind every identity
+field to the authorized candidate and retained landing. The captured and CI
+merge SHAs are separate `merge_observations`, rather than identity fields.
+
+The publication binding is `chio.security-check-publication.v2`. Its strict
+`chio.security-check-authority.v3` text carries `I`, `K`, both merge observations,
+the exact source CI attempt, four required original check IDs, the Actions
+aggregate ID, and the CI binding artifact ID and archive/body digests. IDs alone
+grant no authority: before every positive boundary the publisher re-reads the
+exact source attempt, its complete unique job inventory and the repository-bound
+check URLs, and authenticates each original check's name, E, success, Actions App
+and exact check suite. Legacy `arc:` authority is `unverified`, and legacy binding
+or check metadata schemas cannot qualify this v3 candidate.
 
 The publisher rejects App ID `15368`, the wrong App slug, owner, installation,
 repository inventory, permissions, source or evidence variable, workflow ref,
 publication binding, payload head, and response attribution.
 
 Publication is
-idempotent for `(<PR>, <E>, <M>, <S>)`. Any prior failure in the dedicated
+idempotent for the candidate identity `I`. Any prior failure in the dedicated
 App-and-name namespace is sticky; the publisher never creates a later
 success in that namespace. Labels authorize and describe capture only. Label
 changes after capture cannot grant, renew, or revoke a published authority.
@@ -301,14 +313,15 @@ proves the ordered parents and tree of `M` directly, and verifies the signed
 binding artifact and certificate whenever the builder succeeded. If the live
 pull request still has the same base, head, and explicit merge ref, it requires
 `CHIO_COMMITTED_LINUX_EVIDENCE_SHA=E` and may create missing tombstones. If the
-pull request advanced from `(base1, M1)` to `(base2, M2)`, it targets only `M1`,
-may normalize preexisting authority there, cannot create a missing namespace,
-and never writes to `M2`. Under the shared non-cancelling
-`security-check-authority-<M>` lock, it proves every affected namespace is a
+pull request advanced from `(base1, M1)` to `(base2, M2)`, it may normalize only
+preexisting authority on the recorded evidence head `E`; it cannot create a
+missing namespace. Merge observations do not select the authority head.
+Under the shared non-cancelling
+`security-check-authority-<E>` lock, it proves every affected namespace is a
 singleton completed failure while preserving existing external IDs and source
 metadata. For a failed finalizer, it authenticates the exact `N/E/M/S/nonce`
-title, historical default-branch workflow blob, bot actors, ordered merge
-parents, exact four-job attempt, and capture-owned dispatch intent. Validation,
+title, historical default-branch workflow blob, bot actors, exact four-job
+attempt, capture-owned dispatch intent and recorded v3 candidate identity. Validation,
 signing, and publication authorization must have completed successfully, while
 the publication job must have started and completed unsuccessfully. The exact
 dedicated App success check must carry a `details_url` bound to that failed run
@@ -321,11 +334,11 @@ namespace.
 A failed retry of an already authorizing finalizer run retains the binding from
 that run's immutable successful first attempt. The listener proves the original
 four successful jobs and capture-owned intent, then authenticates the existing
-dedicated App check's exact external ID, first-attempt details URL, v2 metadata,
-source CI attempt, and identical `ci.yml` blobs at `S`, `E`, and `M`. A later
+dedicated App check's exact external ID, first-attempt details URL, v3 metadata,
+source CI attempt, and identical `ci.yml` blobs at `S` and `E`. A later
 attempt cannot create authority or restore a failure. The publisher scans every
 attempt of this recorded authorizing run before each success boundary and uses
-only failure PATCH operations on the existing five namespaces when it finds an
+only failure PATCH operations on the existing dedicated namespace when it finds an
 authenticated bad completion. A failed sibling without that App binding is
 ineligible; its title alone grants no withdrawal authority. The current initial
 publisher may finish while its own first attempt is in progress, after proving
@@ -363,23 +376,24 @@ gh workflow run security-contract-revocation.yml \
 The protected manual revoker requires the all-zero freeze, revalidates the
 requested live `(<PR>, <E>, <M>, <S>)` tuple, and mints the same
 Checks-write-only App token.
-It paginates the dedicated-App `Security contract` namespace on `M`. An
-absent namespace receives an exact completed-failure tombstone. Existing
+It paginates the dedicated-App `Security contract` namespace on `E`. An
+absent eligible namespace receives an exact completed-failure tombstone with
+external ID `chio:v3:deny:<E>` and `chio.security-check-revocation.v2` metadata. Existing
 members are updated to `conclusion: failure` while preserving each external ID
-and source metadata. If duplicates exist, the oldest member carrying the
-required external ID remains under the protected name and every other member
+and source metadata. If duplicates exist, the oldest member remains under the
+protected name regardless of its candidate identity, and every other member
 is renamed to a unique failure-only superseded name. The revoker then re-queries
-and requires one exact failed member per namespace. A missing required external
-ID fails closed. This
+and requires one exact failed member per namespace. The create identity is
+required only for a newly created tombstone. This
 normalization is mandatory because a ruleset binds check name and App, not
 external ID. Third,
 withdraw or replace the affected source, policy, App, installation, key,
 environment, or ruleset authority. A repeated revocation is idempotent. Never
-restore authority for the same test merge. Produce a new reviewed source,
-evidence commit, or merge commit, then publish a new tuple.
+restore authority for the same evidence head `E`. Produce a new reviewed
+evidence head before publishing a new candidate identity.
 
 Publication and revocation use the same non-cancelling maximum-queue
-`security-check-authority-<M>` concurrency group. Both jobs set `queue: max`,
+`security-check-authority-<E>` concurrency group. Both jobs set `queue: max`,
 so a later authority mutation cannot replace an earlier pending member.
 Publication rejects any
 existing failed or duplicate namespace member. Its success-publication branch
@@ -414,7 +428,7 @@ its separate late-CI branch creates missing failure tombstones or
 updates existing members only toward completed failure while preserving
 external IDs and source metadata. It normalizes only the dedicated-App
 `Security contract` namespace. After PR or merge-ref drift, the
-publisher branch may normalize existing authority on historical `M` but cannot
+publisher branch may normalize existing authority on `E` but cannot
 create a missing namespace. Every serialized ordering converges to a failed
 authority tombstone that publication cannot
 restore. This is deliberately conservative: any completed non-success CI
@@ -430,8 +444,14 @@ with their original conclusion and JUnit artifact; they do not publish or revoke
 security authority. Every critical CI dependency and exact-success assertion
 remains mandatory. A cancelled critical run remains failure-authoritative for
 its evidence head, so the publisher refuses every later tuple on the same `E`.
-The listener's writes for an obsolete tuple still reach only its historical `M`,
+The listener's writes for an obsolete tuple still reach only its evidence head `E`,
 subject to the existing no-create rule.
+
+P6 changes identity and placement. The inherited listener/manual eligibility
+still has PR and merge-observation checks; removing those dependencies for
+authenticated E-scoped negatives is the separate P5 repair. The shared-E history
+and final-boundary census amendments remain separate H work. These partial
+source changes do not establish hosted qualification or dedicated-App H2 acceptance.
 
 The post-merge audit first requires every attempt of every `ci.yml`
 `pull_request` run whose API head is `E`, for any pull request, base, test merge,
@@ -441,26 +461,40 @@ A run whose head is another
 repository is outside this history only when that identity is complete and
 distinct; any other run without a proven same-repository identity leaves the
 landing unverified. Only then does a run title select the positive source. The
-audit reads the recorded qualification on test merge `M`, authenticates
-the dedicated App-and-name namespace and its `arc:<PR>:<E>:<M>:<S>` source identity,
-and binds the exact CI and finalizer attempts. It verifies the four original CI
-check runs through the exact source attempt's jobs: job name, run/head, successful
+audit reads the singleton dedicated App-and-name qualification on `E`, authenticates
+its strict v3 `I` and recomputed `K`, and binds the exact CI and finalizer attempts.
+The retained protected merge's ordered parents and tree must equal `I.base_sha`,
+`E` and `I.merge_tree_sha`; historical `M_ci` must retain those parents and tree.
+It verifies the four original CI checks plus the Actions aggregate through the
+exact source attempt's jobs: job name, run/head, successful
 completion, repository-bound check URL, original check ID/name/head, Actions App
-ID and slug, and the exact source check-suite ID/head must agree. Its authority
+ID and slug, and the exact source check-suite ID/head must agree. Those inventory
+IDs must equal the sealed v3 IDs. The recorded binding artifact must be unexpired,
+owned by the exact CI run and E, and match its API and downloaded SHA-256 digests.
+API and ZIP reads stop at 16 MiB with a 30-second deadline; the unique regular,
+unencrypted `ci-merge-binding.json` member is bounded to 64 KiB and its body digest
+and duplicate-aware JSON tuple must match `M_ci`, N, base, E, tree and exact CI
+attempt. The auditor relies on the App-authenticated historical finalizer's
+signature verification and does not repeat Sigstore verification. Its authority
 stability re-list includes only the dedicated check; unrelated checks and commit
 statuses cannot supply or revoke authority. It then proves the actual main
-merge has ordered parents `<base>, E` and the same tree as `M`. It does not expect
+merge has ordered parents `<base>, E` and the sealed tree `T`. It requires identical
+`ci.yml` blobs at S, E and the retained landing L. It does not expect
 mirror checks on the new main merge commit, and an ordinary Actions aggregate
 named `Security contract` cannot substitute for dedicated-App authority. The
 auditor runs from the authorized trusted definition. A failed audit is an
 unverified landing diagnosis; administrator bypass attribution requires separate
 external evidence. Manual audit dispatch requires an explicit merged PR number.
 
-GitHub documents required-check evaluation on a test merge when that commit has
-status checks. The retained Actions transport experiments do not qualify the
-dedicated App or the proposed dedicated-App-context ruleset. Current `M` placement
-is a partial implementation state; final head placement and per-PR enforcement
-require their separate reviewed acceptance.
+The associated-PR signal `commits/L/pulls` must contain the audited PR and no
+other PR recorded as merged by L. The output labels this attribution as observed,
+not enforcement. An unavailable or expired retained artifact yields `unverified`.
+
+The 2026-10-08 scratch Actions transport observations refused X on M and accepted
+X on E. They do not qualify the dedicated App Y or the proposed ruleset. Y on E
+still requires H2 acceptance through an actual protected `PUT pulls/N/merge`, a
+main transition and retained rule suites. UI state cannot establish that result.
+Per-PR enforcement remains a separate acceptance obligation.
 See [GitHub required-check troubleshooting](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks).
 
 The last observed production ruleset (`main-required-checks`, ID `22033486`,
@@ -477,7 +511,7 @@ Before adoption, land and review the complete trusted-definition prerequisite on
 main, rotate its immutable definition and caller pins together, and run the real
 dedicated-App-context required-check acceptance experiment. Candidate-only changes do
 not replace a default-branch `workflow_run` listener. Require the exact dedicated
-App-bound context on current `M`, verify the ruleset reports their integration
+App-bound context on current `E`, verify the ruleset reports their integration
 IDs and strict policy with no bypass actors, and retain the protected merge's
 parents and tree as acceptance evidence. Keep missing, pending, failed and
 unavailable observations explicit. Do not disable a required context to land.
@@ -485,11 +519,12 @@ unavailable observations explicit. Do not disable a required context to land.
 Apply a branch ruleset with no bypass actors. Replace only the numeric
 `CHIO_SECURITY_APP_ID` shell value below with the live App ID; do not use
 `15368` for it. The payload pins the authority check to the dedicated App. The dedicated
-context remains on `M` at this partial implementation boundary; the source CI
+context is on `E`; the source CI
 workflow run and its four original job Check Runs are authenticated on `E`.
 The original CI requirements remain in `main-required-checks` (22033486).
-Stable content identity, head placement and per-PR enforcement remain separate
-F077 acceptance obligations; this payload is not a live settings change:
+The v3 identity and head placement are source changes. Per-PR enforcement and
+dedicated-App H2 acceptance remain separate F077 obligations; this payload is not
+a live settings change:
 
 ```bash
 test "${CHIO_SECURITY_APP_ID:?set the dedicated App ID}" -gt 0

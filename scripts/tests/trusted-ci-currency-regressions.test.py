@@ -858,13 +858,13 @@ def bad_ci_tuple(*, main_advanced: bool = False, open_sibling: bool = False,
         data[f"{PREFIX}/pulls"].append(copy.deepcopy(sibling))
         data[f"{PREFIX}/commits/{LANDING.EVIDENCE}/pulls"].append(copy.deepcopy(sibling))
     if existing is not None:
-        data[f"{PREFIX}/commits/{LANDING.MERGE}/check-runs"] = {"total_count": len(existing),
+        data[f"{PREFIX}/commits/{LANDING.EVIDENCE}/check-runs"] = {"total_count": len(existing),
                                                                "check_runs": copy.deepcopy(existing)}
     return data
 
 
-DENIAL_IDENTITY = ("Security contract", LANDING.MERGE, {"id": LANDING.APP_ID, "slug": "chio-security-authority"},
-                   LANDING.EXTERNAL_ID, "completed", "failure")
+DENIAL_IDENTITY = ("Security contract", LANDING.EVIDENCE, {"id": LANDING.APP_ID, "slug": "chio-security-authority"},
+                   f"chio:v3:deny:{LANDING.EVIDENCE}", "completed", "failure")
 
 
 def denial_identity(check: dict) -> tuple:
@@ -876,18 +876,21 @@ class BadCiDenialCurrencyPreservationTests(unittest.TestCase):
 
     Currency gates positive publication only. The publisher's bad-CI branch
     (`reconcile_bad_ci`, `normalize_bad_ci_namespace`) creates the dedicated
-    Security contract tombstone on M when main has advanced past B or another
+    Security contract tombstone on E when main has advanced past B or another
     pull request shares E, keeps an existing tombstone exactly as it is, and
     denies an existing success in place.
     """
 
-    def assert_denied(self, run) -> list[dict]:
+    def assert_denied(self, run, existing: dict | None = None) -> list[dict]:
         self.assertIn(CI_HISTORY_GET, run.calls)
         self.assertNotIn("unprovided API", run.result.stderr)
         dedicated = [check for key, store in run.data.items() if key.startswith(f"{PREFIX}/commits/")
                      and key.endswith("/check-runs") for check in store["check_runs"]
                      if check["app"]["id"] == LANDING.APP_ID]
-        self.assertEqual([denial_identity(check) for check in dedicated], [DENIAL_IDENTITY], run.result.stderr)
+        expected = DENIAL_IDENTITY if existing is None else (
+            existing["name"], LANDING.EVIDENCE, existing["app"], existing["external_id"], "completed", "failure")
+        self.assertEqual([denial_identity(check) for check in dedicated], [expected], run.result.stderr)
+        self.assertEqual(LANDING.dedicated_failures_on_e(run.data), dedicated, run.result.stderr)
         self.assertEqual(run.result.returncode, 1, run.result.stderr)
         return dedicated
 
@@ -898,6 +901,7 @@ class BadCiDenialCurrencyPreservationTests(unittest.TestCase):
             with self.subTest(live_state=label):
                 data = bad_ci_tuple(**changes)
                 self.assertEqual(LANDING.security_contract_failures(data), [])
+                self.assertEqual(LANDING.dedicated_failures_on_e(data), [])
                 run = publish_without_stubs(data)
                 denial = self.assert_denied(run)[0]
                 self.assertEqual(LANDING.check_mutations(run)[0], f"POST {PREFIX}/check-runs")
@@ -916,7 +920,7 @@ class BadCiDenialCurrencyPreservationTests(unittest.TestCase):
                 data = bad_ci_tuple(main_advanced=True, existing=existing)
                 self.assertEqual(data[f"{PREFIX}/git/ref/heads/main"]["object"]["sha"], LANDING.ADVANCED_MAIN)
                 run = publish_without_stubs(data)
-                denial = self.assert_denied(run)[0]
+                denial = self.assert_denied(run, existing[0])[0]
                 self.assertEqual((denial["id"], denial["output"]["text"]), (existing[0]["id"], existing[0]["output"]["text"]))
                 in_place = f"PATCH {PREFIX}/check-runs/{existing[0]['id']}"
                 if label == "existing tombstone":
