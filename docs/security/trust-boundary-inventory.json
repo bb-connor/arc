@@ -2292,6 +2292,7 @@
     "crates/platform/chio-commerce-order/src/input.rs::project::from_value",
     "crates/platform/chio-control-plane/src/enterprise_federation.rs::serialize::custom_deserialize",
     "crates/platform/chio-control-plane/src/fiscal_state_anchor.rs::compare_and_swap::from_slice",
+    "crates/platform/chio-control-plane/src/keyring_runtime.rs::serialize::custom_deserialize",
     "crates/platform/chio-control-plane/src/reputation.rs::load_passport_verifier_policy::from_value",
     "crates/platform/chio-control-plane/src/reputation.rs::load_passport_verifier_policy::from_value",
     "crates/platform/chio-control-plane/src/security/adapters/native_evidence.rs::extract_active_defense_body::from_value",
@@ -4937,7 +4938,8 @@
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs::deserialize::from_slice": "Lexical census alias for the Shape read inside initialize_request_shape. The fixed Source witness requires the original 8 MiB wire bound, object gate, borrowed RawValue method and ignored-value id presence; no full DOM is built. A classified initialize body can only return an immediate refusal before session resolution. Every nonclassification falls through to the same original body through accounted inbox decode; parsing grants no authority.",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs::deserialize::from_str": "Lexical census alias for the bounded method conversion inside initialize_request_shape: borrow the original RawValue and require its wire length <=62 before decoding a small Cow string. The only successful classification is initialize id presence for immediate refusal; nonmatches/malformed values keep the original accounted decode. No positive request admission or authority is created.",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs::initialize_request_shape::custom_deserialize": "Lexical enclosing-function alias for nested Present::deserialize. IgnoredAny discards one id value and records presence only, including null; it does not build a Value document or interpret id authority. The containing reject-only helper and immediate-refusal caller are pinned by the finite Source witness.",
-    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials/completed_result.rs::verified_receipt::from_value": "Typed receipt projection from bounded MCP worker values. Verify the pinned kernel signature, exact call identity and parameter binding, and signed output hash before rebuilding delivery. Optional nonce metadata uses the shared duplicate-aware signed reader with a 64 KiB ceiling, then verifies schema/domain, binding, signature and the signed receipt-time window; it grants no fresh execution authority."
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials/completed_result.rs::verified_receipt::from_value": "Typed receipt projection from bounded MCP worker values. Verify the pinned kernel signature, exact call identity and parameter binding, and signed output hash before rebuilding delivery. Optional nonce metadata uses the shared duplicate-aware signed reader with a 64 KiB ceiling, then verifies schema/domain, binding, signature and the signed receipt-time window; it grants no fresh execution authority.",
+    "crates/platform/chio-control-plane/src/keyring_runtime.rs::serialize::custom_deserialize": "AuthoritySeedHex field deserializer only wraps the already decoded seed string in Zeroizing storage. The handoff is read from an owner-only private file capped at 1 KiB through UntrustedJsonText::from_wire and decode_signed, and the seed must still bind to the pinned authority public key. No authority token is constructed here."
   },
   "proofs": [
     {
@@ -6618,6 +6620,12 @@
     ],
     "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials/completed_result.rs": [
       "verified_receipt::from_value"
+    ],
+    "crates/platform/chio-control-plane/src/keyring_runtime.rs": [
+      "serialize::custom_deserialize"
+    ],
+    "crates/core/chio-core-types/src/crypto/trusted_key.rs": [
+      "serialize::custom_deserialize"
     ]
   },
   "decoder_file_contracts": {
@@ -11527,6 +11535,38 @@
           ],
           "apis": [
             "serde_json::from_value"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/platform/chio-control-plane/src/keyring_runtime.rs": {
+      "kind": "typed-field-deserializer",
+      "contract": "AuthoritySeedHex field deserializer only wraps the already decoded seed string in Zeroizing storage. The handoff is read from an owner-only private file capped at 1 KiB through UntrustedJsonText::from_wire and decode_signed, and the seed must still bind to the pinned authority public key. No authority token is constructed here.",
+      "readers": [
+        {
+          "reader": "deserialize",
+          "decoders": [
+            "custom_deserialize"
+          ],
+          "apis": [
+            "serde::Deserializer"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/core/chio-core-types/src/crypto/trusted_key.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "TrustedPublicKey deserializes through PublicKey's validated key decoder and then refuses weak (small-order) Ed25519 keys, including the classical half of a hybrid key; no original JSON text entry point.",
+      "readers": [
+        {
+          "reader": "deserialize",
+          "decoders": [
+            "custom_deserialize"
+          ],
+          "apis": [
+            "serde::Deserializer"
           ],
           "checked": true
         }
