@@ -391,6 +391,21 @@ deferred. Passing `--control-url` fails with:
 requires local --receipt-db; remote receipt write operations are not supported in this release
 ```
 
+### Native Security Journal Capacity
+
+Each native security authority keeps an append-only journal in the admission
+database. The kernel checkpoints it automatically before native evaluations,
+so the active segment normally holds only a few calls' events. The hard cap is
+65,536 events or 64 MiB per authority since the latest checkpoint. Reaching it
+denies every native-security call for that authority with
+`combined native journal exceeds bounds` until a checkpoint runs. Checkpoints
+retain folded history, so the admission database grows with native traffic.
+
+Limits, the failure signal, and the explicit recovery checkpoint are in
+[native-security-journal-checkpoints.md](../security/native-security-journal-checkpoints.md).
+Monitor admission database free space, and page on any
+`combined native journal exceeds bounds` denial.
+
 ### Launch And Partner Evidence Handoff
 
 Before promoting a candidate outside the operator boundary, archive and attach:
@@ -567,6 +582,9 @@ Rollback is a full binary-and-state rollback to the last known good backup.
 - Authority rotation or trust drift: check `/v1/authority`
 - Remote runtime lifecycle/auth failures: check `/admin/health`,
   `/admin/sessions`, and `/admin/sessions/{session_id}/trust`
+- Native-security denials reading `combined native journal exceeds bounds`:
+  automatic journal checkpoints stopped; follow
+  [native-security-journal-checkpoints.md](../security/native-security-journal-checkpoints.md)
 - Receipt/export gaps: check `/v1/reports/operator`,
   `/v1/federation/evidence-shares`, and the dashboard summary panels
 

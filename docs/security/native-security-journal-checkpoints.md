@@ -2,6 +2,29 @@
 
 Native security mutations retain an append-only history of flow joins, egress decisions, output joins and nonce-preflight joins. One authority's active journal segment admits at most 65,536 events and 67,108,864 bytes (64 MiB). Reaching either limit denies the new mutation and rolls its transaction back. The operation and its original native binding remain available for retry.
 
+## Operator limits
+
+| Limit | Value | Scope |
+|-------|-------|-------|
+| Active journal segment | 65,536 events or 67,108,864 bytes (64 MiB), whichever is reached first | One security authority, summed across the four journal families, counting only events after the latest checkpoint |
+| Current native rows | 65,536 rows | All security authorities in one admission store |
+| Native initializations | 16 | One admission store |
+| Automatic checkpoint cadence | 20 or more events since the latest checkpoint | One security authority |
+
+The kernel checkpoints automatically. Before each native evaluation it calls `checkpoint_native_security_history_if_due` for the selected authority, which folds the active segment once it holds 20 or more events. A completed native call appends about five events, so under normal operation the active segment holds the suffix of at most four completed calls and stays far below the cap. A segment that approaches the cap means automatic maintenance is not running or is failing, and should be treated as an incident before the cap is reached.
+
+At the cap, every native-security mutation for that authority is denied with:
+
+```text
+admission operation invariant failed: native security state: combined native journal exceeds bounds
+```
+
+The mutation's transaction rolls back and the operation stays retryable. Recover by running the explicit checkpoint below from the serving host, then retry the denied operation. Raising the cap, deleting journal rows or restarting from empty native state is not a recovery path; see the integrity rules at the end of this page.
+
+Checkpoints fold events but never erase them. Snapshots and folded journals stay on disk, so the admission database grows with native traffic for the lifetime of the store. Size its volume for retained history and alert on free space, not on the journal cap.
+
+## Explicit checkpoint
+
 Admission schema 36 adds `SqliteAdmissionOperationStore::checkpoint_security_participant_history`. Invoke this explicit maintenance method from the already serving, trusted host using its selected initialization and current serving fence. It can run before the segment reaches capacity, or after a cap denial has rolled back. Retry the same denied operation afterward under its actual current recovery lease.
 
 ```rust
