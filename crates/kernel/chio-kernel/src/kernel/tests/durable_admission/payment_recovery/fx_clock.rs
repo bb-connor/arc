@@ -4,6 +4,7 @@
 //! or the oracle moves it. Each quote read takes `ORACLE_IO_SECS` of trusted
 //! time, so every freshness comparison is between exact instants.
 use super::*;
+use crate::tool_outcome::ResolvedToolOutcomeV1;
 use chio_security_types::clock::{Clock, ClockError, ClockReading, MonotonicInstant, UnixMillis};
 use serde_json::{json, Value};
 use std::error::Error;
