@@ -270,6 +270,7 @@ impl RetainedToolAdmissionRequestV1 {
         )
     }
 
+    #[cfg(test)]
     pub(crate) fn from_admission_with_profile(
         request: &ToolCallRequest,
         matching_grants: &[MatchingGrant<'_>],

@@ -67,6 +67,41 @@ preparation, Store's 1,908 passes with five declared ignored cases, and the stri
 remain preserved. These Source39 observations do not qualify later source bytes
 or replace later source/profile-bound Linux acceptance.
 
+### Current callback ownership and constructor repair
+
+The maintained workspace now selects an unpublished rusqlite 0.39.0 path
+package. It preserves the published source and MIT license, and converts scalar,
+aggregate and window function names before transferring callback ownership to
+SQLite. Conversion errors and panics therefore drop the Rust captures. An
+independent Source review approved this narrow ownership repair. Real GNU/Linux
+controls recorded nine conversion-cleanup failures in the original code, then
+31 passes with window functions and 20 with the workspace feature set in the
+repair. These runs used the real library and bundled SQLite 3.51.3 with an
+isolated control manifest. They do not qualify every upstream feature or target.
+
+The unused retained-request profile constructor is now test-only. Independent
+Source review confirmed its actual callers. The current maintained code
+composition compiled all five owning library test targets on GNU/Linux with
+Rust 1.95 and PQ enabled for the kernel, store and control plane. Its manifest is
+`de67c1ddfd12b9a6883fed15c3751d5afc0b9242be9f5fa31b1f99d4f82e061c`.
+Ten exact kernel request, authority-profile and caller-custody controls passed.
+The default kernel library also passed strict Clippy with warnings denied.
+The unchanged five executable images were separately preserved and hashed.
+
+The first metadata attempt refused an uncached Android dependency before
+compilation. A separately recorded GNU-targeted resolution passed with the same
+source and lockfile. After successful compilation, the initial image-preservation
+attempt exceeded its existing evidence directory's bound. Its refusal and
+partial images remain retained; the separate owned preservation passed within
+the unchanged limits. The first owning-test selector inventory also refused
+before execution; its successor matched and executed all ten exact source names.
+These records are under
+`target/recovery-pr/current-review-followup/rusqlite-current-workspace-composition/`.
+The earlier hosted constructor failures still require checks on the resulting
+commit. The Process read-source failure and Kani compiler failure remain open.
+No full owning-suite, funded Native, current historical-authority or P5/P6
+qualification follows from these scoped results.
+
 ### Current Linux compilation and targeted controls
 
 The October 8 native GNU/Linux build compiled the five library test targets for
