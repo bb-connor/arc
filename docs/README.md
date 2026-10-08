@@ -32,8 +32,8 @@ separate live contracts from reference material and historical roadmaps.
 
 ## Install and distribution
 
-- [Desktop operator program](superpowers/specs/2026-10-07-desktop-integration/README.md) - one shared operator projection, existing runtime owners, qualification gates and platform annexes; planning only
-- [Omarchy annex](superpowers/specs/2026-10-07-omarchy-integration/README.md) - QML presentation, service lifecycle, packaging and platform acceptance
+- [Native host integration program](superpowers/specs/2026-10-07-desktop-integration/README.md) - kernel capabilities, native owners, independent application/harness consumers and platform qualification; planning only
+- [Linux and Omarchy annex](superpowers/specs/2026-10-07-omarchy-integration/README.md) - native Linux services, optional Omarchy presentation, lifecycle and installed acceptance
 
 - [Install guide](install/README.md) - how to obtain and run Chio
 - [Binary Distribution](install/BINARY_DISTRIBUTION.md) - prebuilt binary channels
