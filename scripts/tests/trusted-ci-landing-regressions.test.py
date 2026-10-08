@@ -1789,5 +1789,56 @@ class RevokerEvidenceHeadOriginalRedTests(unittest.TestCase):
         self.assertIn(f"evidence_sha={EVIDENCE}\n", run.output)
 
 
+def run_logged_audit(data: dict) -> tuple[OfflineRun, dict]:
+    audit = workflow("admin-override-audit.yml")["jobs"]["audit"]
+    body = next(step["run"] for step in audit["steps"] if "run" in step)
+    script = ROOT / "scripts/audit-security-merge-qualification.py"
+    run = run_offline_step(body, data, {
+        "CHECK_SHA": PROTECTED, "PR_NUMBER": str(PR), "SECURITY_APP_ID": str(APP_ID),
+        "SECURITY_DEFINITION_SHA": DEFINITION, "AUDIT_WORKFLOW_SHA": PROTECTED,
+        "GH_TOKEN": "offline-fixture-token", "PYTHONDONTWRITEBYTECODE": "1",
+    }, files={f"authorized-auditor/scripts/{script.name}": script.read_bytes()}, collect=("audit.json",))
+    return run, json.loads(run.collected.get("audit.json", "{}"))
+
+
+def with_failed_ci_run(run_id: int, display_title: str, title_base: str = BASE, title_merge: str = MERGE) -> dict:
+    data = snapshot()
+    prefix = f"repos/{REPOSITORY}"
+    failed = copy.deepcopy(data[f"{prefix}/actions/runs/{CI_RUN}"])
+    failed.update(id=run_id, display_title=display_title, conclusion="failure", check_suite_id=2 * run_id)
+    listing = data[f"{prefix}/actions/runs"]
+    listing["workflow_runs"].append(failed)
+    listing["total_count"] += 1
+    data[f"{prefix}/actions/runs/{run_id}"] = copy.deepcopy(failed)
+    data[f"{prefix}/actions/runs/{run_id}/attempts/1"] = copy.deepcopy(failed)
+    data[f"{prefix}/actions/runs/{run_id}/attempts/1/jobs"] = {"total_count": 1, "jobs": [
+        {"id": 2 * run_id + 1, "name": "Build, lint, test", "run_id": run_id, "head_sha": EVIDENCE,
+         "status": "completed", "conclusion": "failure"}]}
+    if title_merge != MERGE:
+        data[f"{prefix}/git/commits/{title_merge}"] = {
+            "sha": title_merge, "parents": [{"sha": title_base}, {"sha": EVIDENCE}], "tree": {"sha": TREE}}
+        data[f"{prefix}/commits/{title_merge}/check-runs"] = {"total_count": 0, "check_runs": []}
+        data[f"{prefix}/contents/.github/workflows/ci.yml?ref={title_merge}"] = {"sha": "3" * 40}
+    return data
+
+
+class AuditEvidenceHeadOriginalRedTests(unittest.TestCase):
+    def test_a_reopened_qualification_cannot_hide_failed_ci_for_the_same_evidence(self) -> None:
+        discovery = f"GET repos/{REPOSITORY}/actions/runs?event=pull_request&head_sha={EVIDENCE}&per_page=100&page=1"
+        healthy, healthy_report = run_logged_audit(snapshot())
+        self.assertEqual(healthy_report.get("status"), "verified", healthy.result.stdout + healthy.result.stderr)
+        same, same_report = run_logged_audit(with_failed_ci_run(
+            PRIOR_CI_RUN, f"CI N={PR} E={EVIDENCE} B={BASE} M={MERGE}"))
+        self.assertEqual(same_report.get("status"), "unverified")
+        self.assertNotIn("GitHub read failed", same_report.get("error", ""))
+        run, report = run_logged_audit(with_failed_ci_run(
+            PRIOR_CI_RUN, f"CI N={PR} E={EVIDENCE} B={BASE} M={PRIOR_MERGE}", title_merge=PRIOR_MERGE))
+        self.assertIn(discovery, run.calls)
+        self.assertEqual(report.get("status"), "unverified",
+                         f"a qualification on a new test merge hid failed CI run {PRIOR_CI_RUN} for the same evidence head")
+        self.assertNotIn("GitHub read failed", report.get("error", ""))
+        self.assertNotEqual(run.result.returncode, 0)
+
+
 if __name__ == "__main__":
     unittest.main()
