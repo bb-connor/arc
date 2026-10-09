@@ -63,7 +63,10 @@ fn json_swarm_store_refuses_unverified_bundles() -> Result<(), Box<dyn Error>> {
 #[test]
 fn sqlite_swarm_store_refuses_unverified_bundles() -> Result<(), Box<dyn Error>> {
     let directory = tempfile::tempdir()?;
-    let store = SqliteRuntimeOrchestrationStore::open(directory.path().join("swarm.sqlite3"))?;
+    let store = SqliteRuntimeOrchestrationStore::open_with_clock(
+        directory.path().join("swarm.sqlite3"),
+        chio_test_support::clock::clock(),
+    )?;
     refuses_unverified_then_stores_authentic(
         |bundle, keys| store.insert_swarm_authority_bundle(bundle, keys),
         |graph_id| store.swarm_authority_bundle(graph_id),
@@ -74,7 +77,8 @@ fn sqlite_swarm_store_refuses_unverified_bundles() -> Result<(), Box<dyn Error>>
 fn sqlite_authentic_swarm_bundle_displaces_stored_squat() -> Result<(), Box<dyn Error>> {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("swarm.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     let authentic = swarm_authority_bundle_fixture()?;
     let trusted = swarm_fixture_trusted_keys(&authentic)?;
     let forged = forged_squat(&authentic);
