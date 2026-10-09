@@ -312,6 +312,7 @@ pub fn decrypt_blob(tenant_key: &TenantKey, blob: &EncryptedBlob) -> Result<Vec<
         .map_err(|_| DecryptError::AuthenticationFailed)
 }
 
+/// Decrypt `blob`, requiring that `aad` matches the value it was sealed with.
 pub fn decrypt_blob_with_aad(
     tenant_key: &TenantKey,
     blob: &EncryptedBlob,
@@ -333,6 +334,12 @@ fn try_encrypt_blob(tenant_key: &TenantKey, plaintext: &[u8]) -> Result<Encrypte
     try_encrypt_blob_with_aad(tenant_key, plaintext, &[])
 }
 
+/// Encrypt `plaintext` bound to `aad`. The AEAD failure carries no detail so
+/// it cannot leak key or plaintext material.
+#[allow(
+    clippy::result_unit_err,
+    reason = "An AEAD encryption failure intentionally carries no detail."
+)]
 pub fn try_encrypt_blob_with_aad(
     tenant_key: &TenantKey,
     plaintext: &[u8],

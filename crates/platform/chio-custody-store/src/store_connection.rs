@@ -225,6 +225,8 @@ impl std::fmt::Debug for StoreConnection {
 #[cfg(any(test, feature = "test-support"))]
 #[allow(
     clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
     reason = "Test and proof fixtures deliberately fail on violated setup invariants."
 )]
 pub mod test_support {
