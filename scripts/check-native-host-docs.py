@@ -322,18 +322,24 @@ RETIRED_INVENTORY_START = "**Stale surfaces on main to fix (U3):**"
 def strip_retired_inventory(text: str) -> str:
     """Blank the stale-surface inventory block, keeping line numbers.
 
-    The block runs from its marker line to the next bold paragraph or heading.
+    Require one exact marker and a following bold paragraph or heading. Use
+    the same ATX/Setext heading syntax as the link checker, including Markdown
+    indentation. An absent, ambiguous or unterminated block exempts nothing.
     """
-    out, inside = [], False
-    for line in text.split("\n"):
-        if line.startswith(RETIRED_INVENTORY_START):
-            inside = True
-            out.append("")
-            continue
-        if inside and (line.startswith("**") or line.startswith("#")):
-            inside = False
-        out.append("" if inside else line)
-    return "\n".join(out)
+    lines = text.split("\n")
+    starts = [i for i, line in enumerate(lines) if line == RETIRED_INVENTORY_START]
+    if len(starts) != 1:
+        return text
+    start = starts[0]
+    for end in range(start + 1, len(lines)):
+        line = lines[end]
+        pair = "\n".join(lines[end:end + 2])
+        if (HEADING.fullmatch(line)
+                or SETEXT.fullmatch(pair)
+                or re.match(r"^ {0,3}(?:\*\*|__)\S", line)):
+            lines[start:end] = [""] * (end - start)
+            return "\n".join(lines)
+    return text
 
 
 def check_retired(layout: Layout) -> list[str]:

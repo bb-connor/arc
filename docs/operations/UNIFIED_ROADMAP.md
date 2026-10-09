@@ -520,10 +520,10 @@ Chio Computer (#1199) is the developer face of the substrate lanes. A developer 
   It depends on WORK-W2, REC, COOP-3, SHARE-2, KERN-5 and G3.
   - **Exit:** G4's complete run executes as the Computer proposal's Application A.
 - **COMP-5: installed surface.** The SDK and CLI from installed packages, through WORK-W3, shipped in the preview (REL-1).
-  - **Exit (gates G5):** the hero runs from installed packages, outside the source checkout, on the release G5 uses.
-- **COMP-6: dogfood.** After COMP-3, #1197's development swarm runs its lanes as Computer forks, and its merge gate becomes an expected-base apply with exported evidence. This is same-domain, so it never counts toward independence.
+  - **Exit (gates G5):** the full hero runs from installed packages, outside the source checkout, on the release G5 uses. Application A's lost-reply and source-conflict cases pass on that release.
+- **COMP-6: dogfood.** After the COMP-2 and COMP-3 exits pass, #1197's development swarm runs its lanes as Computer forks, and its merge gate becomes an expected-base apply with exported evidence. This is same-domain, so it never counts toward independence.
   - **Exit:** Chio's own merges land through Computer.
-- **COMP-7: second-application reuse (required; never gates G5).** Application C (versioned data curation) runs on the installed Computer-0 surface. It depends on COMP-5 only. It can start as soon as that surface exists, so a second consumer finds API problems before outside teams do. Its final evidence is recorded on the release G5 uses. It may run internally and never substitutes for G5's outside-team runs. COMP-6 is not a prerequisite. Application B (confined work beside private data) remains optional stretch scope.
+- **COMP-7: second-application reuse (required; never gates G5).** Application C (versioned data curation) runs on the installed Computer-0 surface. It depends on the completed COMP-5 Exit, which proves the full installed hero, including managed branches, accepted work and lost-reply recovery. Package installation alone does not satisfy this prerequisite. It can run before G5, so a second consumer finds API problems before outside teams do. Its final evidence is recorded on the release G5 uses. It may run internally and never substitutes for G5's outside-team runs. COMP-6 is not a prerequisite. Application B (confined work beside private data) remains optional stretch scope.
   - **Exit:** Application C produces an accepted, sealed CSV/JSON dataset revision, releases its governed diff and publishes by expected-base apply. A source-conflict drill refuses stale publication and a lost-reply drill recovers the original operation. Record installed package identities and reuse evidence outside the source checkout. The application reuses the same owners and adds no custom signing, retry, verifier service or consumption ledger; domain predicates and transformations remain application code.
 
 ## 5. Gates
@@ -540,7 +540,7 @@ Gate 0 ─┬─ REL-1,REL-2 + KERN-1,KERN-2,KERN-6 + OUT-2 ──────> 
         └─ COOP-4 + COMP-5 ──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-KERN-3a has its own capability/process closure and process-exit evidence for G3. KERN-3b qualifies graph/delegation closure after WORK-W1 and before COMP-3/G4; it does not gate G3. Required second-application reuse is COMP-7. It depends on COMP-5, may finish before or after G5, and never gates G5.
+KERN-3a has its own capability/process closure and process-exit evidence for G3. KERN-3b qualifies graph/delegation closure after WORK-W1 and before COMP-3/G4; it does not gate G3. Required second-application reuse is COMP-7. It depends on the completed COMP-5 Exit, may finish before or after G5, and never gates G5.
 
 WORK, REC, COOP-3, KERN-3b, KERN-4 and COMP-1 to COMP-4 join at G4. G4's complete run needs co-signed work, lost-reply recovery, the HOST-M3 door and the Computer-0 hero that executes it. COOP-4 and COMP-5 join at G5 directly. G4 verifies evidence against pinned partner keys (COOP-1). COOP-4's checkpoint compatibility and edge audit serve outside counterparties. COMP-5 puts the hero into the installed release that outside teams run.
 
@@ -684,8 +684,8 @@ None of these depend on #1160.
 | #1171 | Rebase and merge this PR (owner decision 2026-10-09: it lands by merging the PR, not by importing the draft elsewhere). Submit the -00 if U8 says so. Federation material goes to companion drafts later. |
 | #1164 | Close. Salvage its MCP adoption, activation and preview-distribution machinery into Lane REL, and its worktree and patch-review machinery into COMP-2. |
 | #1200 | This amendment. Merge it with a merge commit, before #1199. Preserve the exact #1200 commit recorded in #1199's `research/source-evidence.json` as a reachable ancestor of main. If another merge strategy is used, re-pin and revalidate #1199's evidence against the resulting main before it lands. |
-| #1199 | Land revision 5 as the Computer design (Lane COMP; D21 to D23), with explicit Computer-0 prerequisites and acceptance profiles. Merge it after #1200, or re-pin its roadmap evidence to main once #1200 lands. |
-| #1197 | Internal development tooling. COMP-6 runs its lanes on Computer after COMP-3. |
+| #1199 | Land revision 5 as the Computer design (Lane COMP; D21 to D23), with explicit Computer-0 prerequisites and acceptance profiles. Merge it after #1200. A merge commit preserves the pinned ancestor without a further re-pin; re-pin and revalidate if the merge strategy or intended evidence baseline changes. |
+| #1197 | Internal development tooling. COMP-6 runs its lanes on Computer after COMP-2 and COMP-3. |
 | #1161, #1159, #1158 | Close as contained in #1173. #1161's peer transport is example-only and does not satisfy STRAT-F15. |
 | #1162 | Archive its evidence and `examples/repair-machine-proof`, then close. Its outcome-continuation code, carried in #1173, needs a slice or a drop (D19). |
 | #1163 | Decide whether the paper's bilateral-admission benchmark must be regenerated, then close. |

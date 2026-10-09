@@ -138,6 +138,28 @@ new_fixture roadmap-after-inventory
 printf '\n**Stale surfaces on main to fix (U3):**\n\n- **README.md**: "only protocol".\n\n**How to describe payments.** Agents that pay each other.\n' >>"$fixture/docs/operations/UNIFIED_ROADMAP.md"
 expect "roadmap inventory ends at the next bold paragraph" 1 "retired-phrases: docs/operations/UNIFIED_ROADMAP.md: contains 'Agents that pay each other' (count 1)" -- --scope program
 
+# Valid Markdown boundaries must not extend the historical exception over
+# active copy. Test both permitted indentation and both Setext underline kinds.
+for boundary in '## Active positioning' '   ## Active positioning' \
+  '  **Active positioning.**' ' __Active positioning.__' \
+  $'Active positioning\n------------------' $'  Active positioning\n  =================='; do
+  new_fixture roadmap-markdown-boundary
+  printf '\n**Stale surfaces on main to fix (U3):**\n\n- Historical "only protocol" quote.\n\n%s\n\nThe kernel your agents answer to.\n' "$boundary" \
+    >>"$fixture/docs/operations/UNIFIED_ROADMAP.md"
+  expect "roadmap boundary: ${boundary//$'\n'/ /}" 1 "retired-phrases: docs/operations/UNIFIED_ROADMAP.md: contains 'The kernel your agents answer to' (count 1)" -- --scope program
+done
+
+# A malformed or unbounded exception must not silently hide copy.
+for inventory in \
+  $'**Renamed inventory:**\n\n- "only protocol".\n\n## Next' \
+  $'**Stale surfaces on main to fix (U3):** extra text\n\n- "only protocol".\n\n## Next' \
+  $'**Stale surfaces on main to fix (U3):**\n\n- "only protocol".' \
+  $'**Stale surfaces on main to fix (U3):**\n\n- "only protocol".\n\n**Stale surfaces on main to fix (U3):**\n\n## Next'; do
+  new_fixture roadmap-invalid-inventory
+  printf '\n%s\n' "$inventory" >>"$fixture/docs/operations/UNIFIED_ROADMAP.md"
+  expect "invalid roadmap inventory remains checked" 1 "retired-phrases: docs/operations/UNIFIED_ROADMAP.md: contains 'only protocol' (count 1)" -- --scope program
+done
+
 # A retired phrase in Markdown is found even when wrapped across lines.
 new_fixture markdown-retired
 printf '\n<strong>The kernel your agents\nanswer to.</strong>\n' >>"$fixture/README.md"
