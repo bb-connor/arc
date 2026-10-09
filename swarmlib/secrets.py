@@ -26,3 +26,21 @@ def scan(text: str) -> list[tuple[str, int]]:
             if pattern.search(line):
                 hits.append((kind, number))
     return hits
+
+
+def redact(text: str) -> str:
+    """Replace every credential-shaped match with [redacted]."""
+    for _kind, pattern in PATTERNS:
+        text = pattern.sub("[redacted]", text)
+    return text
+
+
+def redact_obj(value):
+    """redact() applied to every string inside nested dicts and lists."""
+    if isinstance(value, str):
+        return redact(value)
+    if isinstance(value, dict):
+        return {key: redact_obj(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [redact_obj(item) for item in value]
+    return value

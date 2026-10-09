@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
+import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
-from . import agents, board, build, ci, claims, clock, gitio, items, lifecycle, merge, metrics, msgs, reviews, secrets, train, worktree
+from . import agents, board, build, ci, claims, clock, gitio, items, lifecycle, merge, metrics, msgs, reviews, secrets, train, watch, worktree
 from .store import Store, SwarmError, halt, record, resume, set_config
 
 
@@ -268,6 +271,36 @@ def cmd_check_train(store: Store, a: argparse.Namespace) -> int:
     return 1 if result.loose else 0
 
 
+def cmd_watch(store: Store, a: argparse.Namespace) -> int:
+    home = Path.home()
+    if a.snapshot:
+        print(json.dumps(watch.snapshot(home=home, minutes=a.minutes, keep=a.keep)))
+        return 0
+    hosts = [h for h in (a.hosts or os.environ.get("SWARM_WATCH_HOSTS") or "local").split(",") if h]
+
+    def frame() -> str:
+        snaps = watch.gather(hosts, local=lambda: watch.snapshot(home=home, minutes=a.minutes, keep=a.keep),
+                             minutes=a.minutes, keep=a.keep)
+        try:
+            summary = watch.store_summary(store)
+        except (SwarmError, gitio.GitError, OSError) as err:
+            summary = {"items": {f"(store unavailable: {err})": 0}, "claims": [], "messages": []}
+        width = shutil.get_terminal_size((160, 40)).columns
+        return watch.render(snaps, summary, now=clock.now(), width=width, agent=a.agent or "", actions=a.keep,
+                            minutes=a.minutes)
+
+    if a.once:
+        print(frame())
+        return 0
+    try:
+        while True:
+            text = frame()
+            print("\033[H\033[2J" + text, flush=True)
+            time.sleep(a.interval)
+    except KeyboardInterrupt:
+        return 0
+
+
 def cmd_scan(store: Store, a: argparse.Namespace) -> int:
     dirty = False
     for name in a.files:
@@ -460,6 +493,16 @@ def parser() -> argparse.ArgumentParser:
     s.add_argument("--allow-red", action="store_true", help="land even though CI on the base is red (the train fixes it)")
     s.add_argument("--local", action="store_true", help="run here even if config train_host names another host")
     s.set_defaults(fn=cmd_check_train)
+
+    s = sub.add_parser("watch", help="read-only live view of hosts, build slots, agent sessions and the store")
+    s.add_argument("--hosts", help="comma-separated ssh hosts; 'local' is this machine (default $SWARM_WATCH_HOSTS)")
+    s.add_argument("--agent", help="zoom into sessions whose label, id, cwd or model contains this text")
+    s.add_argument("--minutes", type=float, default=30, help="show sessions active within this many minutes")
+    s.add_argument("--keep", type=int, default=3, help="recent actions per session")
+    s.add_argument("--interval", type=float, default=15, help="seconds between refreshes")
+    s.add_argument("--once", action="store_true", help="print one frame and exit")
+    s.add_argument("--snapshot", action="store_true", help="print this host's JSON snapshot (used over ssh)")
+    s.set_defaults(fn=cmd_watch)
 
     s = sub.add_parser("scan", help="check files for credential-shaped strings")
     s.add_argument("files", nargs="+")

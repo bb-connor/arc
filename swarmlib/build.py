@@ -11,6 +11,7 @@ import fcntl
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import time
@@ -41,10 +42,27 @@ def setting(name: str, default: str) -> str:
     return os.environ.get(name) or host_settings().get(name) or default
 
 
-def slot_dir() -> Path:
+def slot_dir(create: bool = True) -> Path:
     path = Path(os.environ.get("SWARM_BUILD_DIR", str(Path.home() / ".swarm-build"))).expanduser()
-    path.mkdir(parents=True, exist_ok=True)
+    if create:
+        path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def _describe(command: list[str], item: str, build_class: str, cwd: Path | None) -> dict:
+    """Who is building what, for `swarm watch`. Stored in the slot's lock file while it is held."""
+    return {"pid": os.getpid(), "item": item, "class": build_class, "agent": os.environ.get("SWARM_AGENT", ""),
+            "command": shlex.join(command)[:300], "cwd": str(cwd or Path.cwd()), "started": clock.fmt(clock.now())}
+
+
+def _note(fd: int, record: dict | None) -> None:
+    """Best effort: a build never fails because its watch record could not be written."""
+    try:
+        os.ftruncate(fd, 0)
+        if record is not None:
+            os.pwrite(fd, json.dumps(record).encode(), 0)
+    except OSError:
+        pass
 
 
 def slot_count() -> int:
@@ -137,8 +155,18 @@ def run(
     if build_class not in CLASSES:
         raise BuildRefused(f"build class must be one of {', '.join(CLASSES)}")
     check_disk(cwd or Path.cwd())
-    fd, slot, waited = acquire(slots_for(build_class, slot_count()))
+    description = _describe(command, item, build_class, cwd)
+    waiting = slot_dir() / f"wait-{os.getpid()}.json"
+    try:
+        waiting.write_text(json.dumps(description))
+    except OSError:
+        pass
+    try:
+        fd, slot, waited = acquire(slots_for(build_class, slot_count()))
+    finally:
+        waiting.unlink(missing_ok=True)
     record_wait(slot, waited, item, build_class)
+    _note(fd, {**description, "started": clock.fmt(clock.now())})
     try:
         full = scope_prefix(build_class) + command
         env = build_env(dict(os.environ))
@@ -148,6 +176,7 @@ def run(
         with open(log_path, "w") as log:
             return subprocess.call(full, cwd=cwd, env=env, stdout=log, stderr=subprocess.STDOUT)
     finally:
+        _note(fd, None)
         release(fd)
 
 
