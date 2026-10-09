@@ -38,6 +38,24 @@ struct StableSecurityContextV1 {
 }
 
 impl AdmissionSecurityBindingV1 {
+    /// Compare historical stable identity using the original requirements.
+    /// This neither consults current policy nor authenticates fresh authority.
+    pub(crate) fn validate_historical_context(
+        &self,
+        context: Option<&SecurityInvocationContext>,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        let candidate = Self::from_trusted_selection(
+            context,
+            self.pre_dispatch_required,
+            self.pre_dispatch_hook_installed,
+            self.native_authority.clone(),
+        )?;
+        if candidate.as_ref() != Some(self) {
+            return Err(invalid("historical security context changed"));
+        }
+        Ok(())
+    }
+
     pub(crate) fn matches_requirements(
         &self,
         required: bool,

@@ -168,6 +168,75 @@ impl core::fmt::Debug for ConfinedReturnDeliveryInput<'_> {
 }
 
 pub trait AdmissionOperationStore: Send + Sync {
+    /// Preserve every registered Native/Process original debt under one actual
+    /// Native writer scope through the real Process commit and readback. The
+    /// configured adapter accepts only the genuine closed Process producer.
+    fn commit_original_process_current_write(
+        &self,
+        _provider: &dyn crate::native_finishing::NativeProcessCurrentWriteProvider,
+        _issuer: &crate::native_finishing::NativeProcessBankProofIssuer<'_>,
+        _fence: &StoreMutationFence,
+        _now: u64,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "original Process current writer preservation is unsupported".into(),
+        ))
+    }
+
+    /// The physical owner publishes a complete before-effect Prepared account.
+    /// Returned Process source DATA grants neither enrollment nor capture.
+    fn prepare_original_native_finishing(
+        &self,
+        _original: &crate::native_finishing::NativeInitialFinishingAuthority<'_>,
+        _provider: Option<&dyn crate::native_finishing::NativeProcessFinishingSourceProvider>,
+    ) -> Result<
+        crate::native_finishing::OriginalNativeFinishingPreparationData,
+        AdmissionOperationStoreError,
+    > {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "original native finishing account preparation is unsupported".into(),
+        ))
+    }
+
+    /// Runs after Native Prepared COMMIT under the same held mutation guard.
+    /// The concrete adapter obtains its affine proof from the scoped issuer
+    /// only after verifying the original publication and complete bank.
+    fn enroll_original_native_finishing_process(
+        &self,
+        _provider: &dyn crate::native_finishing::NativeProcessFinishingSourceProvider,
+        _authority: &crate::native_finishing::NativeInitialFinishingAuthority<'_>,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "original native finishing Process enrollment is unsupported".into(),
+        ))
+    }
+
+    /// Restore the actual earlier enrollment on strict nonce replay. The
+    /// current invocation must match the original retained call and signed
+    /// nonce; no new Source, quote, account, or participant write is permitted.
+    fn restore_original_native_finishing_process(
+        &self,
+        _provider: &dyn crate::native_finishing::NativeProcessFinishingSourceProvider,
+        _original_account_digest: &str,
+        _authority: &crate::native_finishing::NativeInitialFinishingAuthority<'_>,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "original native finishing Process restoration is unsupported".into(),
+        ))
+    }
+
+    /// Authenticate the actual Process receipt and publish Confirmed. Success
+    /// does not replace the actual purpose loan checked by nonce/capture writers.
+    fn confirm_original_native_finishing(
+        &self,
+        _original: &crate::native_finishing::NativeInitialFinishingAuthority<'_>,
+        _provider: Option<&dyn crate::native_finishing::NativeProcessFinishingSourceProvider>,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "original native finishing account confirmation is unsupported".into(),
+        ))
+    }
+
     // Target-only additive methods for the existing AdmissionOperationStore trait.
     // They use the actual Kernel-configured qualified store and default refuse.
     fn verify_original_process_return_enrollment(

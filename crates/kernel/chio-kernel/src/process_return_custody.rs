@@ -2,6 +2,9 @@
 use crate::admission_operation::{AdmissionOperationStoreError, StoreMutationFence};
 use serde::{Deserialize, Serialize};
 
+mod bank;
+pub use bank::*;
+
 pub const PROCESS_RETURN_SOURCE_SCHEMA: &str = "chio.process-native-return-source.v1";
 pub const PROCESS_RETURN_FUNDING_SCHEMA: &str = "chio.process-native-return-funding.v1";
 pub const PROCESS_RETURN_CAPTURE_SCHEMA: &str = "chio.process-native-return-capture.v1";
@@ -17,8 +20,9 @@ const MAX_SEQUENCE: u64 = 9_007_199_254_740_991;
 
 /// A sequence is meaningful only under its producing journal domain. Native
 /// bank slot counters cannot be substituted for an authority-global receipt.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub enum NativeReturnSequenceDomainDataV1 {
+    #[default]
     #[serde(rename = "chio.authority-global-commit.v1")]
     AuthorityGlobalCommit,
 }
@@ -80,6 +84,13 @@ pub struct ProcessReturnFundingDataV1 {
     pub original_role_map_digest: String,
     pub physical_recipe_digest: String,
     pub process_future_transactions_digest: String,
+    // Preserve the exact pre-publication v1 encoding when reading legacy DATA.
+    // Such DATA can never satisfy the scoped bank's publication requirement.
+    #[serde(
+        default,
+        skip_serializing_if = "ProcessNativeAccountPublicationDataV1::is_absent"
+    )]
+    pub original_native_publication: ProcessNativeAccountPublicationDataV1,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -164,6 +175,15 @@ pub struct ProcessOriginalNonceCustodyDataV1 {
 /// capture and matched Process reservation in a current fenced transaction.
 /// All default paths refuse. Public DATA never supplies a success shortcut.
 pub trait NativeProcessReturnCustodyPort: Send + Sync {
+    fn verify_original_process_return_inventory(
+        &self,
+        _inventory: &ProcessReturnInventoryDataV1,
+        _fence: &StoreMutationFence,
+        _now: u64,
+    ) -> Result<ProcessReturnBankReadbackDataV1, AdmissionOperationStoreError> {
+        Err(unavailable())
+    }
+
     fn verify_original_process_nonce_custody(
         &self,
         _source: &ProcessReturnSourceDataV1,
@@ -430,6 +450,14 @@ impl core::fmt::Debug for ReconciledProcessNativeReturn {
     }
 }
 
+/// Validate and encode a Process description as DATA only. This does not
+/// authenticate the journal, allocate funding or construct a capture proof.
+pub fn canonical_process_return_source_data(
+    source: &ProcessReturnSourceDataV1,
+) -> Result<Vec<u8>, AdmissionOperationStoreError> {
+    encode_source(source)
+}
+
 fn encode_source(
     source: &ProcessReturnSourceDataV1,
 ) -> Result<Vec<u8>, AdmissionOperationStoreError> {
@@ -566,6 +594,14 @@ fn validate_funding(
     if funding.process_account_digest != process_return_account_intent_digest(source, funding)? {
         return Err(unavailable());
     }
+    if !funding.original_native_publication.is_absent() {
+        funding.original_native_publication.validate()?;
+        if funding.original_native_publication.global_commit_sequence
+            != funding.native_account_sequence
+        {
+            return Err(unavailable());
+        }
+    }
     bounded_bytes(funding, MAX_PROCESS_RETURN_FUNDING_BYTES)?;
     Ok(())
 }
@@ -674,4 +710,13 @@ fn unavailable() -> AdmissionOperationStoreError {
     AdmissionOperationStoreError::Unavailable(
         "original funded Process return custody unavailable".into(),
     )
+}
+
+/// Structural DATA validation only. The actual Native owner authenticates
+/// publication history independently before any loan is issued.
+pub fn validate_process_return_funding_data(
+    source: &ProcessReturnSourceDataV1,
+    funding: &ProcessReturnFundingDataV1,
+) -> Result<(), AdmissionOperationStoreError> {
+    validate_funding(source, &encode_source(source)?, funding)
 }

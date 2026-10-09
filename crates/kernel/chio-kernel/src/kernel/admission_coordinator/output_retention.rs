@@ -204,3 +204,24 @@ impl ChioKernel {
         })
     }
 }
+
+impl ChioKernel {
+    pub(super) fn durable_post_return_plan_for_original(
+        &self,
+        original: Option<&RetainedToolAdmissionRequestV1>,
+    ) -> Result<DurablePostReturnPlan, KernelError> {
+        let Some(original) = original else {
+            return self.durable_post_return_plan();
+        };
+        if original.native_output_retention().is_none() {
+            return self.durable_post_return_plan();
+        }
+        original
+            .validate_bounded_native_materializer()
+            .map_err(durable_store_error)?;
+        Ok(DurablePostReturnPlan {
+            hook_identities: Vec::new(),
+            frozen_steps: original.post_return_steps().to_vec(),
+        })
+    }
+}

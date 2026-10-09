@@ -1,3 +1,5 @@
+#[path = "admission_coordinator/native_finishing.rs"]
+mod native_finishing;
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
@@ -29,6 +31,9 @@ pub(in crate::kernel) use compensated_denial::ConfirmedPreDispatchCompensation;
 #[path = "admission_coordinator/execution_nonce.rs"]
 mod execution_nonce;
 pub(crate) use execution_nonce::require_live_nonce;
+#[path = "admission_coordinator/process_nonce_context.rs"]
+mod process_nonce_context;
+pub use process_nonce_context::OriginalProcessNonceContext;
 #[path = "admission_coordinator/federation_context.rs"]
 mod federation_context;
 use federation_context::FrozenFederationContext;
@@ -761,14 +766,16 @@ impl ChioKernel {
             || nonce_participant
             || requires_authority_admission)
             .then_some(authority_profile);
-        let immutable_request_hash = immutable_tool_admission_request_hash(
-            request,
-            matching_grants,
-            &post_return_plan,
-            security_binding.as_ref(),
-            authority_profile.as_ref(),
-            native_output_retention,
-        )?;
+        let immutable_request_hash =
+            crate::admission_operation::immutable_tool_request_hash_with_original_semantics(
+                request,
+                matching_grants,
+                &post_return_plan.frozen_steps,
+                security_binding.as_ref(),
+                authority_profile.as_ref(),
+                native_output_retention,
+            )
+            .map_err(durable_store_error)?;
         let action =
             ToolCallAction::from_parameters(request.arguments.clone()).map_err(|error| {
                 KernelError::DurableAdmission(format!(
@@ -846,20 +853,18 @@ impl ChioKernel {
                     "operation already has a live evaluation or recovery owner".into(),
                 )
             })?;
-        let retained_request = authority_profile
-            .as_ref()
-            .map(|profile| {
-                crate::admission_operation::RetainedToolAdmissionRequestV1::from_admission_with_output_retention(
-                    request,
-                    matching_grants,
-                    &post_return_plan.frozen_steps,
-                    security_binding.as_ref(),
-                    profile,
-                    native_output_retention,
-                )
-            })
-            .transpose()
-            .map_err(durable_store_error)?;
+        let retained_request = authority_profile.as_ref().map(|profile| {
+            crate::admission_operation::RetainedToolAdmissionRequestV1::from_admission_with_original_semantics(
+                request,
+                matching_grants,
+                &post_return_plan.frozen_steps,
+                security_binding.as_ref(),
+                Some(profile),
+                native_output_retention,
+            )
+        })
+        .transpose()
+        .map_err(durable_store_error)?;
         let mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
         let begun = match retained_request.as_ref() {

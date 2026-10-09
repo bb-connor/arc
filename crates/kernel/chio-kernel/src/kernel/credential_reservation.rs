@@ -14,6 +14,17 @@ pub use native_dispatch::VerifiedNativeDispatchCredentials;
 use preparation::CredentialPreparationInput;
 pub(crate) use preparation::PreparedDispatchCredentials;
 
+/// Immutable inputs for one selected-grant admission before budget mutation.
+pub(crate) struct PreBudgetAdmissionContext<'request, 'security, 'metadata> {
+    pub(crate) request: &'request ToolCallRequest,
+    pub(crate) security_context: Option<&'security SecurityInvocationContext>,
+    pub(crate) metadata: Option<&'metadata serde_json::Value>,
+    pub(crate) now: u64,
+    pub(crate) now_unix_ms: u64,
+    pub(crate) grant_index: usize,
+    pub(crate) dpop_required: bool,
+}
+
 fn run_credential_store_operation<T>(
     reservation_id: &str,
     operation_name: &'static str,
