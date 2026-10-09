@@ -320,6 +320,74 @@ fn pre_dispatch_compensation_runs_when_its_kernel_clock_sample_fails() -> TestRe
     Ok(())
 }
 
+/// One clock for the kernel and its durable runtime, as in production.
+struct SharedOutageClock {
+    inner: Arc<dyn chio_security_types::clock::Clock>,
+    down: std::sync::atomic::AtomicBool,
+}
+
+impl chio_security_types::clock::Clock for SharedOutageClock {
+    fn read(
+        &self,
+    ) -> Result<chio_security_types::clock::ClockReading, chio_security_types::clock::ClockError>
+    {
+        if self.down.load(Ordering::SeqCst) {
+            Err(chio_security_types::clock::ClockError::Unavailable)
+        } else {
+            self.inner.read()
+        }
+    }
+}
+
+#[test]
+fn pre_dispatch_compensation_refuses_when_kernel_and_runtime_clocks_both_fail() -> TestResult {
+    let (mut kernel, request, store, invocations) =
+        durable_admission_fixture("review-compensation-no-clock");
+    let clock = Arc::new(SharedOutageClock {
+        inner: chio_test_support::clock::clock(),
+        down: std::sync::atomic::AtomicBool::new(false),
+    });
+    kernel.clock = clock.clone();
+    kernel.set_durable_admission_store(store.clone(), store.clone(), admission_test_fence())?;
+    let matching = resolve_required_matching_grants(
+        &request.capability,
+        &request.tool_name,
+        &request.server_id,
+        &request.arguments,
+        request.model_metadata.as_ref(),
+    )?;
+    let _admission = kernel
+        .begin_durable_tool_admission(&request, &matching, current_unix_timestamp_ms())?
+        .ok_or("durable admission")?;
+    let original = store.operation();
+    assert!(!original.state().is_terminal());
+
+    clock.down.store(true, Ordering::SeqCst);
+    let refused =
+        kernel.compensate_durable_admission_after_pre_dispatch_cleanup(Some(&original), None, None);
+    assert!(
+        matches!(
+            refused,
+            Err(KernelError::Clock(
+                chio_security_types::clock::ClockError::Unavailable
+            ))
+        ),
+        "{refused:?}"
+    );
+    // A zero floor authorizes nothing: no lease, projection or state change.
+    assert_eq!(store.operation(), original);
+
+    // The operation stays on its recovery path once trusted time returns.
+    clock.down.store(false, Ordering::SeqCst);
+    kernel.compensate_durable_admission_after_pre_dispatch_cleanup(Some(&original), None, None)?;
+    assert_eq!(
+        store.operation().state(),
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+    Ok(())
+}
+
 fn prepared_active_response(
     kernel: &ChioKernel,
     authority: &str,
