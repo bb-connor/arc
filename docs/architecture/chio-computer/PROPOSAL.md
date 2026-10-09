@@ -304,7 +304,8 @@ incremental delivery to the roadmap's COMP rungs and lists the adverse cases.
 - It includes a dynamic helper, a lost reply and a source apply conflict.
 - It exercises both leaf kinds.
 - Application C (versioned data curation) is the required second application.
-  Its required reuse evidence closes I6/COMP-7 after G5. It reuses the same
+  Its required reuse evidence closes I6/COMP-7, which depends on COMP-5 and
+  never gates G5. It reuses the same
   contracts without custom signing, retry, verifier service or ledger code.
   Application B (confined work beside private data) remains optional stretch
   scope.
@@ -334,7 +335,9 @@ Claims carry the preview label until their COMP rung and gate pass.
 - splits capability/process closure and process exit into KERN-3a for G3, and
   graph/delegation closure into KERN-3b after WORK-W1 and before COMP-3/G4;
 - keeps the installed hero at I5/COMP-5 and assigns required Application C reuse
-  evidence to I6/COMP-7 after G5, independently of COMP-6 dogfood;
+  evidence to I6/COMP-7, independently of COMP-6 dogfood. A same-day follow-up
+  makes COMP-7 depend on COMP-5 rather than G5: it can start early, records its
+  final evidence on the G5 release and never gates G5;
 - uses qualified WORK identifiers at the imported closure boundaries;
 - covers repeated occurrences in both `a & a` and `a | a` in C3-02;
 - preserves requester/executor qualification and clarifies G5's ProgramLeaf
