@@ -21,6 +21,11 @@ mod invocation_capture;
 mod native_capture_checkpoint;
 mod nested_flow_evaluation;
 mod nested_flow_grant_selection;
+#[expect(
+    dead_code,
+    reason = "the evaluation cores take custody of their admitted resources next"
+)]
+pub(super) mod pre_dispatch_custody;
 mod return_recording;
 #[cfg(feature = "admission-test-support")]
 use native_capture_checkpoint::{NativeCaptureCheckpointContext, NativeCaptureCheckpointOutcome};

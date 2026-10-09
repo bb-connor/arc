@@ -140,13 +140,13 @@ pub(crate) struct OrdinaryRecoveryFinalization<'a> {
     pub(crate) security_context: Option<&'a SecurityInvocationContext>,
 }
 
-struct CleanupReleaseOutcome {
-    metadata: Option<serde_json::Value>,
-    confirmed: bool,
+pub(super) struct CleanupReleaseOutcome {
+    pub(super) metadata: Option<serde_json::Value>,
+    pub(super) confirmed: bool,
 }
 
 #[derive(Clone, Copy)]
-enum PreDispatchCleanupOutcome {
+pub(super) enum PreDispatchCleanupOutcome {
     Denied,
     Cancelled,
 }
@@ -365,7 +365,7 @@ impl ChioKernel {
         )
     }
 
-    fn release_budget_lease_with_evidence(
+    pub(super) fn release_budget_lease_with_evidence(
         &self,
         cap: &CapabilityToken,
         lease_acquired: bool,
@@ -568,7 +568,7 @@ impl ChioKernel {
         )
     }
 
-    fn build_pre_dispatch_cleanup_response(
+    pub(super) fn build_pre_dispatch_cleanup_response(
         &self,
         denial: PreDispatchCleanupDeny<'_>,
         credential_disposition: PaymentCredentialDisposition,
