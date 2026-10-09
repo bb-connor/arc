@@ -53,8 +53,8 @@ pub(super) enum WalkError {
     Regressed(String),
     #[error("receipt query snapshot quota of {quota_bytes} bytes is exhausted ({used_bytes} bytes used)")]
     Capacity { quota_bytes: u64, used_bytes: u64 },
-    #[error("claim receipt log entry {entry_seq} holds {bytes} bytes, above the per-row limit")]
-    RowCap { entry_seq: i64, bytes: u64 },
+    #[error("{what} holds {bytes} bytes, above the per-row limit")]
+    RowCap { what: String, bytes: u64 },
     #[error("walker step exhausted its SQL work budget")]
     WalkerBudget,
     #[error("walker step was refused by a busy store: {0}")]
@@ -345,7 +345,9 @@ fn read_claim_range(
 ) -> Result<Vec<ClaimRow>, CopyError> {
     let step_rows = i64::try_from(limits.step_rows.max(1)).unwrap_or(i64::MAX);
     let mut sizes = connection.prepare_cached(
-        "SELECT entry_seq, length(CAST(raw_json AS BLOB)) FROM claim_receipt_log_entries
+        "SELECT entry_seq, length(CAST(raw_json AS BLOB)) + length(CAST(receipt_id AS BLOB))
+                + length(CAST(receipt_kind AS BLOB))
+         FROM claim_receipt_log_entries
          WHERE entry_seq >= ?1 AND entry_seq <= ?2 ORDER BY entry_seq LIMIT ?3",
     )?;
     let mut last = None;
@@ -364,7 +366,7 @@ fn read_claim_range(
         let length = u64::try_from(length).unwrap_or(0);
         if length > limits.max_receipt_bytes {
             return Err(CopyError::Walk(WalkError::RowCap {
-                entry_seq,
+                what: format!("claim receipt log entry {entry_seq}"),
                 bytes: length,
             }));
         }
@@ -564,6 +566,19 @@ fn check_sources_in(
                 {
                     return Err(drift(row.entry_seq));
                 }
+                let attribution =
+                    crate::receipt_store::support::extract_receipt_attribution(receipt);
+                if attribution.subject_key.is_none() || attribution.issuer_key.is_none() {
+                    let bytes = lineage_row_bytes(live, &receipt.capability_id)
+                        .map_err(CopyError::Store)?;
+                    if let Some(bytes) = bytes.filter(|bytes| *bytes > ctx.limits.max_receipt_bytes)
+                    {
+                        return Err(CopyError::Walk(WalkError::RowCap {
+                            what: format!("capability lineage {}", receipt.capability_id),
+                            bytes,
+                        }));
+                    }
+                }
                 let projection =
                     SignedToolProjection::derive(receipt, live).map_err(CopyError::Store)?;
                 let statement = match (archived, archive_statements.as_mut()) {
@@ -630,14 +645,17 @@ fn check_sources_in(
 
 /// Copy up to `checkpoint_page` persisted checkpoint rows starting at `start`
 /// and ending at most at `end`, with the archive rows of those at or below the
-/// watermark, in one short read transaction.
+/// watermark, in one short read transaction. Every row's variable-length
+/// fields are measured before any is allocated: a row over the per-row limit
+/// is a typed resource outcome, and the page stops before its byte budget is
+/// exceeded (it always carries its first row).
 pub(super) fn copy_checkpoints(
     ctx: &WalkContext<'_>,
     start: i64,
     end: i64,
 ) -> Result<Vec<(PersistedCheckpointRow, Option<PersistedCheckpointRow>)>, WalkError> {
     ctx.check_cancel()?;
-    let last =
+    let page_end =
         end.min(start.saturating_add(
             i64::try_from(ctx.limits.checkpoint_page.max(1)).unwrap_or(i64::MAX) - 1,
         ));
@@ -646,13 +664,12 @@ pub(super) fn copy_checkpoints(
         .transaction()
         .map_err(|error| classify(sql(error), None))?;
     let guard = StepGuard::install(&live_tx, ctx.limits.sql_steps, ctx.cancel)?;
-    let rows =
-        load_checkpoint_rows(&live_tx, start, last).map_err(|error| guard.classify(error))?;
     let watermark = watermark_i64(&live_tx).map_err(|error| guard.classify(error))?;
-    let mut copied = Vec::with_capacity(rows.len());
-    let needs_archive = rows
+    let sizes = checkpoint_row_sizes(&live_tx, start, page_end, false)
+        .map_err(|error| guard.classify(error))?;
+    let needs_archive = sizes
         .iter()
-        .any(|row| i64::try_from(row.batch_end_seq).unwrap_or(i64::MAX) <= watermark);
+        .any(|(_, batch_end, _)| *batch_end <= watermark);
     let archive = if needs_archive {
         let archive = open_archive(&live_tx, ctx.limits.busy_timeout)
             .map_err(|error| guard.classify(error))?;
@@ -663,6 +680,51 @@ pub(super) fn copy_checkpoints(
     } else {
         None
     };
+    let _archive_guard = archive
+        .as_ref()
+        .map(|archive| StepGuard::install(archive, ctx.limits.sql_steps, ctx.cancel))
+        .transpose()?;
+    let mut last = None;
+    let mut bytes = 0_u64;
+    for (expected, (seq, batch_end, length)) in (start..).zip(sizes.iter().copied()) {
+        if seq != expected {
+            return Err(WalkError::Integrity(format!(
+                "checkpoint chain has a gap: expected seq {expected}, found {seq}"
+            )));
+        }
+        let mut row_bytes = length;
+        if length > ctx.limits.max_receipt_bytes {
+            return Err(WalkError::RowCap {
+                what: format!("checkpoint {seq}"),
+                bytes: length,
+            });
+        }
+        if let (Some(archive), true) = (archive.as_ref(), batch_end <= watermark) {
+            let archived = checkpoint_row_sizes(archive, seq, seq, true)
+                .map_err(|error| classify(error, None))?
+                .first()
+                .map_or(0, |(_, _, length)| *length);
+            if archived > ctx.limits.max_receipt_bytes {
+                return Err(WalkError::RowCap {
+                    what: format!("archived checkpoint {seq}"),
+                    bytes: archived,
+                });
+            }
+            row_bytes = row_bytes.saturating_add(archived);
+        }
+        if last.is_some() && bytes.saturating_add(row_bytes) > ctx.limits.step_bytes {
+            break;
+        }
+        bytes = bytes.saturating_add(row_bytes);
+        last = Some(seq);
+    }
+    let Some(last) = last else {
+        return Err(WalkError::Integrity(format!(
+            "checkpoint chain has a gap: expected seq {start}"
+        )));
+    };
+    let rows =
+        load_checkpoint_rows(&live_tx, start, last).map_err(|error| guard.classify(error))?;
     let reader = match archive.as_ref() {
         Some(archive) => Some(
             ArchiveCheckpointReader::new(archive)
@@ -670,6 +732,7 @@ pub(super) fn copy_checkpoints(
         ),
         None => None,
     };
+    let mut copied = Vec::with_capacity(rows.len());
     for (expected, row) in (start..=last).zip(rows) {
         if i64::try_from(row.checkpoint_seq).unwrap_or(-1) != expected {
             return Err(WalkError::Integrity(format!(
@@ -695,6 +758,7 @@ pub(super) fn copy_checkpoints(
         };
         copied.push((row, archived));
     }
+    drop(_archive_guard);
     if let Some(archive) = archive.as_ref() {
         let _ = archive.execute_batch("COMMIT");
     }
@@ -708,6 +772,45 @@ pub(super) fn copy_checkpoints(
         )));
     }
     Ok(copied)
+}
+
+/// `(checkpoint_seq, batch_end_seq, bytes of every variable-length column)`
+/// for a checkpoint range, read without allocating any of those columns.
+fn checkpoint_row_sizes(
+    connection: &Connection,
+    start: i64,
+    end: i64,
+    tolerate_legacy_layout: bool,
+) -> Result<Vec<(i64, i64, u64)>, ReceiptStoreError> {
+    let has_predecessor: bool = if tolerate_legacy_layout {
+        connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM pragma_table_info('kernel_checkpoints') WHERE name = 'previous_checkpoint_sha256')",
+            [],
+            |row| row.get(0),
+        )?
+    } else {
+        true
+    };
+    let predecessor = if has_predecessor {
+        "COALESCE(length(CAST(previous_checkpoint_sha256 AS BLOB)), 0)"
+    } else {
+        "0"
+    };
+    let mut statement = connection.prepare(&format!(
+        "SELECT checkpoint_seq, batch_end_seq,
+                length(CAST(merkle_root AS BLOB)) + length(CAST(statement_json AS BLOB))
+                + length(CAST(signature AS BLOB)) + length(CAST(kernel_key AS BLOB)) + {predecessor}
+         FROM kernel_checkpoints WHERE checkpoint_seq >= ?1 AND checkpoint_seq <= ?2
+         ORDER BY checkpoint_seq ASC"
+    ))?;
+    let rows = statement.query_map(params![start, end], |row| {
+        Ok((
+            row.get::<_, i64>(0)?,
+            row.get::<_, i64>(1)?,
+            u64::try_from(row.get::<_, i64>(2)?).unwrap_or(u64::MAX),
+        ))
+    })?;
+    Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
 }
 
 fn load_checkpoint_rows(
@@ -1077,28 +1180,86 @@ pub(super) fn verify_source_bijection(
     Ok(())
 }
 
-/// Read the persisted rowid range of capability lineage for subject refresh.
+/// Read capability lineage rows above `after` for subject refresh, measuring
+/// each row's identifier and subject before allocating them.
 pub(super) fn copy_lineage(
     ctx: &WalkContext<'_>,
     after: i64,
     through: i64,
     limit: i64,
 ) -> Result<Vec<(i64, String, String)>, WalkError> {
-    let connection = live_connection(ctx)?;
-    let guard = StepGuard::install(&connection, ctx.limits.sql_steps, ctx.cancel)?;
-    let rows = (|| -> Result<Vec<(i64, String, String)>, ReceiptStoreError> {
-        let mut statement = connection.prepare_cached(
-            "SELECT rowid, capability_id, subject_key FROM capability_lineage
-             WHERE rowid > ?1 AND rowid <= ?2 ORDER BY rowid LIMIT ?3",
+    let mut connection = live_connection(ctx)?;
+    let transaction = connection
+        .transaction()
+        .map_err(|error| classify(sql(error), None))?;
+    let guard = StepGuard::install(&transaction, ctx.limits.sql_steps, ctx.cancel)?;
+    let sizes = (|| -> Result<Vec<(i64, u64)>, ReceiptStoreError> {
+        let mut statement = transaction.prepare_cached(
+            "SELECT rowid, length(CAST(capability_id AS BLOB)) + length(CAST(subject_key AS BLOB))
+             FROM capability_lineage WHERE rowid > ?1 AND rowid <= ?2 ORDER BY rowid LIMIT ?3",
         )?;
         let rows = statement.query_map(params![after, through, limit], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                u64::try_from(row.get::<_, i64>(1)?).unwrap_or(u64::MAX),
+            ))
+        })?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    })()
+    .map_err(|error| guard.classify(error))?;
+    let mut last = None;
+    let mut bytes = 0_u64;
+    for (rowid, length) in sizes {
+        if length > ctx.limits.max_receipt_bytes {
+            return Err(WalkError::RowCap {
+                what: format!("capability lineage rowid {rowid}"),
+                bytes: length,
+            });
+        }
+        if last.is_some() && bytes.saturating_add(length) > ctx.limits.step_bytes {
+            break;
+        }
+        bytes = bytes.saturating_add(length);
+        last = Some(rowid);
+    }
+    let Some(last) = last else {
+        return Ok(Vec::new());
+    };
+    let rows = (|| -> Result<Vec<(i64, String, String)>, ReceiptStoreError> {
+        let mut statement = transaction.prepare_cached(
+            "SELECT rowid, capability_id, subject_key FROM capability_lineage
+             WHERE rowid > ?1 AND rowid <= ?2 ORDER BY rowid",
+        )?;
+        let rows = statement.query_map(params![after, last], |row| {
             Ok((row.get(0)?, row.get(1)?, row.get(2)?))
         })?;
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
     })()
     .map_err(|error| guard.classify(error));
     drop(guard);
+    let _ = transaction.commit();
     rows
+}
+
+/// Bytes of every variable-length column of the lineage row a missing-
+/// attribution projection would load, measured without allocating them.
+fn lineage_row_bytes(
+    connection: &Connection,
+    capability_id: &str,
+) -> Result<Option<u64>, ReceiptStoreError> {
+    let bytes: Option<i64> = connection
+        .prepare_cached(
+            "SELECT length(CAST(capability_id AS BLOB)) + length(CAST(subject_key AS BLOB))
+                    + length(CAST(issuer_key AS BLOB)) + length(CAST(grants_json AS BLOB))
+                    + COALESCE(length(CAST(parent_capability_id AS BLOB)), 0)
+                    + COALESCE(length(CAST(federated_parent_capability_id AS BLOB)), 0)
+                    + COALESCE(length(CAST(provenance AS BLOB)), 0)
+                    + COALESCE(length(CAST(signed_capability_json AS BLOB)), 0)
+             FROM capability_lineage WHERE capability_id = ?1",
+        )?
+        .query_row([capability_id], |row| row.get(0))
+        .optional()?;
+    Ok(bytes.map(|bytes| u64::try_from(bytes).unwrap_or(u64::MAX)))
 }
 
 /// Fold copied entries into tool rows, cursors and pending leaves.

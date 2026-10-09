@@ -177,10 +177,12 @@ fn copy_rows(
             (true, Some(archive)) => archive,
             _ => live,
         };
-        let found: Option<(String, i64)> = source
+        // The kind is compared in SQL and the payload measured before either
+        // is allocated.
+        let found: Option<(bool, i64)> = source
             .prepare_cached(
-                "SELECT receipt_kind, length(CAST(raw_json AS BLOB)) FROM claim_receipt_log_entries
-                 WHERE entry_seq = ?1",
+                "SELECT receipt_kind = 'tool_receipt', length(CAST(raw_json AS BLOB))
+                 FROM claim_receipt_log_entries WHERE entry_seq = ?1",
             )
             .and_then(|mut statement| {
                 statement
@@ -188,11 +190,11 @@ fn copy_rows(
                     .optional()
             })
             .map_err(|error| FetchError::Store(error.into()))?;
-        let Some((kind, length)) = found else {
+        let Some((tool, length)) = found else {
             return Ok(Copied::Missing(row.entry_seq));
         };
         let length = u64::try_from(length).unwrap_or(u64::MAX);
-        if kind != "tool_receipt" || length > limits.max_receipt_bytes {
+        if !tool || length > limits.max_receipt_bytes {
             return Err(FetchError::Mismatch(format!(
                 "claim entry {} no longer holds the receipt the snapshot authenticated",
                 row.entry_seq
