@@ -1,4 +1,5 @@
 //! A2A-specific GenAI OTel span helpers.
+
 pub use chio_kernel::otel::{
     build_gen_ai_tool_call_span, GenAiToolCallSpan, GenAiToolCallSpanInput, OtelAttribute,
     ATTR_CHIO_AGENT_ID, ATTR_CHIO_KERNEL_ID, ATTR_CHIO_RECEIPT_ID, ATTR_CHIO_SERVER_ID,

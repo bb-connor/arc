@@ -1,4 +1,5 @@
 //! Typed receipt rejection causes with redacted public formatting.
+
 /// The authorization field that could not be linked to an audit entry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReceiptBinding {

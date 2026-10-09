@@ -6,6 +6,7 @@
 //! The shared recorder/renderer/counter logic lives in `chio-edge-metrics`.
 //! This module owns the A2A edge's own counter instance and re-exports the
 //! edge-facing surface so callers keep using `crate::metrics::*`.
+
 use chio_edge_metrics::ReceiptWriteCounters;
 use chio_kernel::{ReceiptWriterLiveness, Verdict};
 

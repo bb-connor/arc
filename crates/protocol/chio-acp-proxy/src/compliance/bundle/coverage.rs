@@ -1,4 +1,5 @@
 //! The certificate describes a supplied set or a signed retained snapshot reference.
+
 use super::{ComplianceBundleError, ComplianceReceiptEntry};
 use chio_core::crypto::PublicKey;
 use serde::{Deserialize, Serialize};

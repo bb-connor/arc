@@ -229,4 +229,5 @@ mod tests {
 }
 
 #[cfg(test)]
+#[path = "input_document_tests.rs"]
 mod document_tests;
