@@ -353,7 +353,7 @@ This is #1174's bug-fix lane, promoted to a preview gate. It runs on post-#1160 
 - **KERN-4: the session door.** KSPEC-05 Part A (KDEF-D3, D4, N26), because doors serve over `chio mcp serve-http`.
   - KDEF-N30 is already fixed on #1160: the GET stream subscribes before it snapshots the replay window.
   - KDEF-D3 changed shape on #1160: a lagged consumer now closes the session and reports an uncertain effect instead of hanging. Part A re-checks it against that behaviour.
-  - **Exit:** Part A's acceptance cases pass on `chio mcp serve-http`: each response is delivered exactly once, a lagged consumer never hangs, a stale cursor after a restore is refused, and subscriptions survive restarts.
+  - **Exit:** Part A's acceptance cases pass on `chio mcp serve-http`: responses route without loss on live streams and eligible retries replay by request identity without redispatching the effect (with KSPEC-05 section 4.6's disconnect exceptions), a lagged consumer never hangs, a stale cursor after a restore is refused, and subscriptions survive restarts.
 - **KERN-5: isolation evidence.** KSPEC-07 steps 1 and 2, plus `AgentHostBwrap` and `Seatbelt` backend kinds, before any HOST-M2 isolation claim.
   - First amend KSPEC-07 to add those kinds. Its closed `ConfinementBackendKind` (`LinuxCage`, `FirecrackerGuest`, `ProcessContainer`) exists only in the spec text, not in code, and #1177's PROGRAM-MAP already asks for this one amendment.
   - **Exit:** the amended backend kinds exist in code, and a receipt renders as confined only when a verified `FullyEnforced` launch record is bound at dispatch; every other native effect renders "unconfined".
