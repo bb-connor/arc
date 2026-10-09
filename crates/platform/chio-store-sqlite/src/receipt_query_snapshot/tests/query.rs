@@ -9,7 +9,7 @@ use chio_kernel::ReceiptStoreError;
 use super::super::db::{ProjectedToolRow, SnapshotBatch, SnapshotDb, SnapshotDbError};
 use super::super::pass::build_snapshot;
 use super::super::query::select;
-use super::support::{context, limits, per_call, target, Fixture};
+use super::support::{context, limits, per_call, target, Fixture, Spec};
 
 const STEPS: u64 = 10_000_000;
 
@@ -106,6 +106,77 @@ fn snapshot_selection_matches_the_per_call_path() {
             (seqs, selection.total_count, next),
             expected,
             "query {query:?}"
+        );
+    }
+}
+
+#[test]
+fn time_bounds_at_the_top_of_the_timestamp_range_match_the_per_call_path() {
+    let max = u64::try_from(i64::MAX).unwrap();
+    let final_hour = max - max % 3_600;
+    let edges = [final_hour - 1, final_hour, max - 1, max];
+    let fixture = Fixture::new(4);
+    fixture.append_varied(0..4);
+    for (index, timestamp) in edges.into_iter().enumerate() {
+        for tenant in ["tenant-a", "tenant-b"] {
+            let mut spec = Spec::new(format!("rcpt-edge-{index}-{tenant}"), timestamp);
+            spec.tenant = Some(tenant.into());
+            fixture.append(&spec);
+        }
+    }
+    let cancel = Arc::new(AtomicBool::new(false));
+    let ctx = context(&fixture.store, &cancel, limits());
+    let (db, _) = build_snapshot(&ctx, target(&ctx), 64 * 1024 * 1024, &mut |_, _| {}).unwrap();
+
+    let bounds = [
+        None,
+        Some(final_hour - 1),
+        Some(final_hour),
+        Some(max - 1),
+        Some(max),
+    ];
+    let scopes = [
+        ReceiptQuery::default().local_operator_admin(),
+        ReceiptQuery::default().authenticated_tenant("tenant-a"),
+    ];
+    for scope in &scopes {
+        for since in bounds {
+            for until in bounds {
+                let query = ReceiptQuery {
+                    limit: 200,
+                    since,
+                    until,
+                    ..scope.clone()
+                };
+                let expected = per_call(&fixture.store, &query);
+                let selection = select(&db, &query, STEPS).unwrap();
+                let seqs: Vec<u64> = selection.rows.iter().map(|row| row.seq).collect();
+                let next = (seqs.len() == selection.limit)
+                    .then(|| seqs.last().copied())
+                    .flatten();
+                assert_eq!(
+                    (seqs, selection.total_count, next),
+                    expected,
+                    "since {since:?} until {until:?} as {:?}",
+                    scope.read_context
+                );
+            }
+        }
+    }
+    // A receipt stamped at the last representable second is selected and
+    // counted from that second on, for the admin and for its tenant.
+    for (scope, expected) in scopes.iter().zip([2, 1]) {
+        let query = ReceiptQuery {
+            limit: 200,
+            since: Some(max),
+            ..scope.clone()
+        };
+        let selection = select(&db, &query, STEPS).unwrap();
+        assert_eq!(
+            (selection.rows.len(), selection.total_count),
+            (expected, u64::try_from(expected).unwrap()),
+            "since the last second as {:?}",
+            scope.read_context
         );
     }
 }

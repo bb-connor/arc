@@ -413,15 +413,17 @@ fn time_window(
             boundaries.push((since, until));
         }
         _ => {
-            if let (Some(since), Some(low)) = (since, low_hour) {
-                let hour_end = low
-                    .saturating_add(1)
-                    .saturating_mul(SECONDS_PER_HOUR)
-                    .saturating_sub(1);
+            // Each boundary hour is measured from its bound, so it saturates
+            // only where the hour itself runs past the i64 range: the final
+            // hour ends at i64::MAX and the first starts at i64::MIN.
+            if let Some(since) = since {
+                let hour_end =
+                    since.saturating_add(SECONDS_PER_HOUR - 1 - since.rem_euclid(SECONDS_PER_HOUR));
                 boundaries.push((since, until.map_or(hour_end, |until| until.min(hour_end))));
             }
-            if let (Some(until), Some(high)) = (until, high_hour) {
-                boundaries.push((high.saturating_mul(SECONDS_PER_HOUR), until));
+            if let Some(until) = until {
+                let hour_start = until.saturating_sub(until.rem_euclid(SECONDS_PER_HOUR));
+                boundaries.push((hour_start, until));
             }
         }
     }
