@@ -33,6 +33,8 @@ mod cluster_and_reports_tests {
     mod authority_replication;
     #[path = "authority_sync_isolation.rs"]
     mod authority_sync_isolation;
+    #[path = "leader_forward_admission.rs"]
+    mod leader_forward_admission;
 
     #[path = "config.rs"]
     mod config;
@@ -90,6 +92,7 @@ mod cluster_and_reports_tests {
             )),
             cluster,
             cluster_progress,
+            leader_forward_lane: Arc::new(tokio::sync::Semaphore::new(LEADER_FORWARD_PERMITS)),
             finding_rail: None,
             finding_purchase_executor: None,
             finding_purchase_execution_lane: Arc::new(tokio::sync::Semaphore::new(1)),

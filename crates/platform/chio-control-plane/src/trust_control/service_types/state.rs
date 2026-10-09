@@ -36,6 +36,10 @@ pub(crate) struct TrustServiceState {
     /// exactly when `cluster` is `Some`. A budget-write handler parks on this
     /// watch instead of driving its own inline sync.
     pub(crate) cluster_progress: Option<Arc<ClusterProgress>>,
+    /// Non-queued permits for blocking forwards of writes to the cluster
+    /// leader. A forward acquires one only when it will contact a remote
+    /// leader, and holds it until its blocking transport call has ended.
+    pub(crate) leader_forward_lane: Arc<tokio::sync::Semaphore>,
     /// Evidenced rail seam for finding-market fee collection;
     /// `None` fails activation closed.
     pub(crate) finding_rail: Option<Arc<dyn super::super::finding_handlers::FindingRailObserver>>,

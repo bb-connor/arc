@@ -624,6 +624,7 @@ fn market_state(
         )),
         cluster: None,
         cluster_progress: None,
+        leader_forward_lane: Arc::new(tokio::sync::Semaphore::new(1)),
         finding_rail: Some(rail),
         finding_purchase_executor: None,
         finding_purchase_execution_lane: Arc::new(tokio::sync::Semaphore::new(1)),

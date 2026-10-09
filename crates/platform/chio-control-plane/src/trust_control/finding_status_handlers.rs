@@ -974,6 +974,7 @@ fn service_state(
         federation_admission_rate_limiter: Arc::default(),
         cluster: None,
         cluster_progress: None,
+        leader_forward_lane: Arc::new(tokio::sync::Semaphore::new(1)),
         finding_rail: None,
         finding_purchase_executor: None,
         finding_purchase_execution_lane: Arc::new(tokio::sync::Semaphore::new(1)),

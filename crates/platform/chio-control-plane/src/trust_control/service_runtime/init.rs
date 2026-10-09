@@ -1,4 +1,5 @@
 use super::super::cluster::{build_cluster_state, run_cluster_sync_loop};
+use super::super::report_rendering::LEADER_FORWARD_PERMITS;
 use super::super::*;
 use super::router;
 use chio_http_serve::{
@@ -240,6 +241,7 @@ async fn serve_async_inner(
         federation_admission_rate_limiter,
         cluster,
         cluster_progress,
+        leader_forward_lane: Arc::new(tokio::sync::Semaphore::new(LEADER_FORWARD_PERMITS)),
         finding_rail,
         finding_purchase_executor,
         finding_purchase_execution_lane: Arc::new(tokio::sync::Semaphore::new(1)),

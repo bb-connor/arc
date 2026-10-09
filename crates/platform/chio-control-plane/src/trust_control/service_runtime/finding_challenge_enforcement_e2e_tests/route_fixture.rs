@@ -60,6 +60,7 @@ pub(super) fn challenge_route_state(
         )),
         cluster: None,
         cluster_progress: None,
+        leader_forward_lane: Arc::new(tokio::sync::Semaphore::new(1)),
         finding_rail: Some(deployment.rail.clone()),
         finding_purchase_executor: None,
         finding_purchase_execution_lane: Arc::new(tokio::sync::Semaphore::new(1)),
