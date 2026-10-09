@@ -1094,7 +1094,7 @@
   },
   "acp_receipt_clock_review_2026_09_29": {
     "owner": "crates/protocol/chio-acp-proxy/src/clock.rs",
-    "tests": "crates/protocol/chio-acp-proxy/src/tests/attestation_clock.rs",
+    "tests": "crates/protocol/chio-acp-proxy/src/tests/attestation_and_telemetry_tests/clock.rs",
     "restart_contract": "New owners reject persisted future audit/authorization time; this does not claim a durable global wall-clock high-water store."
   },
   "scope_evidence": "docs/security/clock-scope-evidence-2026-10-02.json",
