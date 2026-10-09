@@ -75,6 +75,7 @@ pub use projection::*;
 pub use remote_projection::*;
 #[cfg(test)]
 pub(crate) use retained_request::immutable_tool_request_hash;
+pub(crate) use retained_request::immutable_tool_request_hash_with_original_semantics;
 pub(crate) use retained_request::immutable_tool_request_hash_with_output_retention;
 #[cfg(test)]
 pub(crate) use retained_request::immutable_tool_request_hash_with_profile;

@@ -36,6 +36,8 @@ mod native_acquisition;
 mod native_dispatch_ledger;
 #[path = "durable_admission/native_egress.rs"]
 mod native_egress;
+#[path = "durable_admission/native_finishing_eligibility.rs"]
+mod native_finishing_eligibility;
 #[path = "durable_admission/operation_store.rs"]
 mod operation_store;
 #[path = "durable_admission/receipt_projection.rs"]

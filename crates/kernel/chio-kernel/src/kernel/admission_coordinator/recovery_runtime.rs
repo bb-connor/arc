@@ -609,14 +609,16 @@ impl ChioKernel {
         let plan = self.durable_post_return_plan_for_fresh_native_profile(
             self.native_output_retention.as_deref(),
         )?;
-        let immutable = immutable_tool_admission_request_hash(
-            request,
-            &grants,
-            &plan,
-            Some(&security),
-            Some(&profile),
-            self.native_output_retention.as_deref(),
-        )?;
+        let immutable =
+            crate::admission_operation::immutable_tool_request_hash_with_original_semantics(
+                request,
+                &grants,
+                &plan.frozen_steps,
+                Some(&security),
+                Some(&profile),
+                self.native_output_retention.as_deref(),
+            )
+            .map_err(durable_store_error)?;
         let nonce = self.durable_nonce_participant_required(
             &runtime.store.admission_projection_capabilities(),
         )?;

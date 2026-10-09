@@ -89,6 +89,8 @@ pub mod governed_approval_replay;
 #[cfg(not(loom))]
 pub mod memory_provenance;
 #[cfg(not(loom))]
+pub mod native_finishing;
+#[cfg(not(loom))]
 pub mod observability;
 #[cfg(not(loom))]
 pub mod operator_report;
@@ -698,6 +700,8 @@ pub use kernel::DurableFinalizationCutpointHook;
 pub use kernel::NativeSecurityEgressCheckpointHook;
 #[cfg(not(loom))]
 pub use kernel::NativeSecurityOutputJoinAuthority;
+#[cfg(not(loom))]
+pub use kernel::OriginalProcessNonceContext;
 #[cfg(not(loom))]
 pub use kernel::VerifiedNativeDispatchCredentials;
 #[cfg(all(not(loom), feature = "admission-test-support"))]

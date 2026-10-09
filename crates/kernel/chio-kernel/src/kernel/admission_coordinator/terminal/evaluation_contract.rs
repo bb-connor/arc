@@ -22,7 +22,8 @@ impl ChioKernel {
             request.model_metadata.as_ref(),
         )
         .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-        let plan = self.durable_post_return_plan()?;
+        let plan =
+            self.durable_post_return_plan_for_original(admission.original_retained_request())?;
         // Raw outcome context is committed historical data for finalization,
         // never a source of authority for a new invocation or redispatch.
         let security_binding = match self.captured_recovery_deployment(&admission.operation)? {
@@ -59,19 +60,26 @@ impl ChioKernel {
             }
             None => self.admission_security_binding(raw.security_invocation_context())?,
         };
-        let recovered_request_hash = immutable_tool_admission_request_hash(
-            request,
-            &matching_grants,
-            &plan,
-            security_binding.as_ref(),
-            admission
-                .retained_request
-                .as_ref()
-                .and_then(|original| original.authority_profile()),
-            admission
-                .original_retained_request()
-                .and_then(|original| original.native_output_retention()),
-        )?;
+        let recovered_request_hash = match admission.original_retained_request() {
+            Some(original) => original
+                .immutable_hash_for_original_plan(
+                    request,
+                    &matching_grants,
+                    &plan.frozen_steps,
+                    security_binding.as_ref(),
+                    original.authority_profile(),
+                    original.native_output_retention(),
+                )
+                .map_err(durable_store_error)?,
+            None => immutable_tool_admission_request_hash(
+                request,
+                &matching_grants,
+                &plan,
+                security_binding.as_ref(),
+                None,
+                None,
+            )?,
+        };
         if &recovered_request_hash != admission.operation.binding().immutable_request_hash() {
             return Err(KernelError::DurableAdmission(
                 "recovered post-return plan does not match durable admission".to_owned(),

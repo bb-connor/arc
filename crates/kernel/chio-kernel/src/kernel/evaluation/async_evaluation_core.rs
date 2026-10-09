@@ -3,7 +3,14 @@ use super::caller_execution::CallerReservation;
 use super::evaluation_helpers::{OrdinaryRecoveryFinalization, PreDispatchCleanupDeny};
 use super::invocation_capture::NonDurableInvocationCapture;
 use super::*;
+use crate::kernel::credential_reservation::PreBudgetAdmissionContext;
 use crate::{finding_denial::denied_metadata, kernel::dispatch::dispatch_admission_error_reason};
+
+/// Session identity and filesystem scope borrowed for one evaluation.
+pub(super) struct SessionEvaluationContext<'roots, 'session> {
+    pub(super) filesystem_roots: Option<&'roots [String]>,
+    pub(super) session_id: Option<&'session SessionId>,
+}
 
 impl ChioKernel {
     pub(super) async fn evaluate_tool_call_async_with_session_context_scoped(
@@ -15,6 +22,35 @@ impl ChioKernel {
         security_context: Option<&SecurityInvocationContext>,
         disposition: EvaluationDisposition,
     ) -> Result<ToolCallResponse, KernelError> {
+        self.evaluate_tool_call_async_with_session_context_scoped_finishing(
+            request,
+            SessionEvaluationContext {
+                filesystem_roots: session_filesystem_roots,
+                session_id,
+            },
+            extra_metadata,
+            security_context,
+            disposition,
+            None,
+        )
+        .await
+    }
+
+    pub(super) async fn evaluate_tool_call_async_with_session_context_scoped_finishing(
+        &self,
+        request: &ToolCallRequest,
+        session: SessionEvaluationContext<'_, '_>,
+        extra_metadata: Option<serde_json::Value>,
+        security_context: Option<&SecurityInvocationContext>,
+        disposition: EvaluationDisposition,
+        finishing_provider: Option<
+            &dyn crate::native_finishing::NativeProcessFinishingSourceProvider,
+        >,
+    ) -> Result<ToolCallResponse, KernelError> {
+        let SessionEvaluationContext {
+            filesystem_roots: session_filesystem_roots,
+            session_id,
+        } = session;
         let EvaluationDisposition {
             preflight_hold: preflight_disposition,
             dispatch: dispatch_mode,
@@ -514,14 +550,17 @@ impl ChioKernel {
                     continue;
                 }
             };
-            let runtime_admission = self.run_pre_budget_admission(
-                request,
-                security_context,
-                extra_metadata.as_ref(),
-                now,
-                now_unix_ms,
-                matching.index,
-                dpop_required,
+            let runtime_admission = self.run_pre_budget_admission_with_native_finishing_provider(
+                finishing_provider,
+                PreBudgetAdmissionContext {
+                    request,
+                    security_context,
+                    metadata: extra_metadata.as_ref(),
+                    now,
+                    now_unix_ms,
+                    grant_index: matching.index,
+                    dpop_required,
+                },
                 durable_admission.as_mut(),
             );
             let runtime_metadata =

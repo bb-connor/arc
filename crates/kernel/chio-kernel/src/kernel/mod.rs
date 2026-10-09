@@ -24,6 +24,7 @@ mod active_response_proof;
 mod admission_cleanup;
 #[path = "admission_coordinator.rs"]
 mod admission_coordinator;
+pub use admission_coordinator::OriginalProcessNonceContext;
 mod admission_terminal_receipt;
 mod approval_cleanup;
 mod credential_reservation;
