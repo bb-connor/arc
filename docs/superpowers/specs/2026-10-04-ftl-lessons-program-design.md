@@ -33,7 +33,7 @@ The unified roadmap (`docs/operations/UNIFIED_ROADMAP.md`, PR #1196) gives every
 | KSPEC-04 | Authority-space teardown | `2026-10-04-authority-space-teardown-design.md` | Phases 1 and 2 are UR-KERN-3, with KDEF-D6 and D5; phases 3 and 4 follow the success test |
 | KSPEC-05 | Unified event queue | `2026-10-04-unified-event-queue-design.md` | Part A is UR-KERN-4 (KDEF-D3, D4, N26, N30); Part B follows the success test |
 | KSPEC-06 | Opaque adapter context | `2026-10-04-opaque-adapter-context-design.md` | No KERNEL rung; KDEF-D8 stays in this program's bug-fix lane (section 6) |
-| KSPEC-07 | Isolation and confinement evidence | `2026-10-04-microkernel-isolation-backend-design.md` | Steps 1 and 2 are UR-KERN-5, with `AgentHostBwrap` and `Seatbelt` backend kinds |
+| KSPEC-07 | Isolation and confinement evidence | `2026-10-04-microkernel-isolation-backend-design.md` | Steps 1 and 2 are UR-KERN-5. The roadmap's `AgentHostBwrap` and `Seatbelt` kinds are not yet in KSPEC-07's closed `ConfinementBackendKind`; a KSPEC-07 amendment must add them (KSPEC-07 open decision 8) before UR-KERN-5 can claim them |
 | KSPEC-08 | Durable stop epoch | `2026-10-04-durable-stop-epoch-design.md` | Phases 0 and 1 are UR-KERN-1 (AC6; KDEF-D2, N22, N23); phases 2 to 7 follow the success test |
 | KSPEC-09 | Pure admission machine | `2026-10-04-pure-admission-machine-design.md` | Keystone, after the success test (its M20 delta lands earlier, with UR-KERN-2) |
 | KSPEC-10 | Crossing primitive | `2026-10-04-crossing-primitive-design.md` | Keystone, after the success test |
@@ -51,6 +51,13 @@ UR-KERN-6 holds the gates: KDEF-GT1 (one whole hosted CI run passes), KDEF-N4 (t
 - reframes the north-star research document as historical, with its section 2 as a kernel technical target under the approved north star.
 
 The KDEF rows are unchanged; they are re-verified after #1160 merges.
+
+**Review round 35 (cross-vendor review and review bots, 2026-10-09).** Fixes verified against `main`, M: and `spec/PROTOCOL.md`:
+- spec 6 rule 10 compares the receipt tenant through the kernel's local-system projection, and projects pending approval from the signed `threshold_approval` metadata (PROTOCOL 6.1 has no pending decision);
+- spec 9 M11 makes every refused check-only read `Reusable`, records open decision 7 (overload receipts) as decided, and adds M11b, the UR-D2 signer-rotation rule, which leaves the deliver-or-withhold sub-question to UR-CT-SETTLE and fails closed until then (section 5a);
+- spec 8 splits running from stopped rollovers in its failure table, limits durable replay to durable operations, and defines the `StopEpochPublication` message with UR-CT-CROSS owning its HTTPS binding;
+- spec 11 authenticates bootstrap trust assertions and keeps kernel-session remedies to I19's closed classes;
+- the KSPEC-07 row no longer claims backend kinds that spec 7 cannot represent (spec 7 open decision 8).
 
 **Revision 4, adversarial review (2026-10-05).** Specs 9 and 10 were reviewed first, then specs 3, 5 and 8, the three that carry live defects. Each review read the spec against M:, V: and W: code and against its siblings. Every Blocker and Major was applied, and each spec records its dispositions in a `## Review disposition` table.
 - **Spec 9 (machine)**, revision 3. Latches have three scopes. A new `NonDurable` class covers `Monetary` and development `Off` modes. Post-effect step and receipt-append events let the machine own the receipt decision. Driver-drop rules (M17), trailing hint groups (M18) and twelve theorems are added.
@@ -381,7 +388,7 @@ The owner recorded decisions UR-D1 to UR-D7 on 2026-10-09 (roadmap section 8). T
 | Decision | Ruling | Effect here |
 |---|---|---|
 | UR-D1, settlement composition | Adopt this program's decision 4 on #1160's paged startup sweep, frozen as UR-CT-SETTLE | Decision 4, with spec 9 M7a, M7b, M11a and R-9-05, is the settlement composition rule. Its text is unchanged |
-| UR-D2, signer rotation | Sign with the current key and bind the original identity, uniformly across finalization, release and waiver | No spec here sets a rotation rule of its own. Spec 9's finalization, release and waiver paths (M7a, M7b, M11a) take the rule from UR-CT-SETTLE, which also settles whether a finalization under a rotated signer may deliver output or only withhold it |
+| UR-D2, signer rotation | Sign with the current key and bind the original identity, uniformly across finalization, release and waiver | Spec 9 M11b states the rule for finalization, release completion (M7a), waiver completion (M7b) and M11a's terminal: sign with the current receipt signer, carry the operation's frozen `FrozenReceiptSigningIdentityV1` unchanged as `chio_runtime.original_signer`, and verify the current key against the serving authority's signer history and the frozen crypto floor. UR-CT-SETTLE adopts it. Whether a finalization under a rotated signer may deliver output stays open inside UR-CT-SETTLE, as the ruling records. Until it is settled, M11b fails closed: the finalization delivers nothing and the output stays in release custody, which keeps M:'s deferral |
 | UR-D3, schema allocation | Versions are allocated in landing order under the ledger lock, with symbolic names on branches | Spec 8 (S34), spec 10 (section 15) and spec 11 (section 4.1) name no new version number. Each bump takes its number through the lock when it lands |
 | UR-D4, cross-org transport | HTTPS with mTLS or signed bodies by default; iroh stays an optional lane with self-hosted relays | Spec 4 section 10 and spec 8 S22 publish over the default transport, and iroh lane b is an option a deployment enables. The ruling also sets the direction for KDEF-N10, whose row is re-verified after #1160 merges |
 | UR-D5 to UR-D7 | An unpaid `Agreement` variant in `chio.work.v1`; DPoP for federated grants at the door; `bb-connor/arc` as the development repo with `backbay-labs/chio` as its mirror | No spec here constrains these. Spec 2's recovery actors keep direct tokens without DPoP: they are local operator tokens, not federated grants |

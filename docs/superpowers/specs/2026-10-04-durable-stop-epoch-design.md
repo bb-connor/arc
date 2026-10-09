@@ -542,7 +542,9 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
     - **Client-visible result.** A request whose output is withheld completes with `OutputWithheld { operation_id, reason: KernelStopped { scope, observed } | StoreUnavailable | AuthoritySpaceClosed | Revoked | InsufficientIntegrity, retry: AfterResume | AfterStoreRecovery | Never, effect_executed: bool }`. `AfterStoreRecovery` is the transient condition for a reusable check-only read whose release met `StoreUnavailable` (spec 9 M19). The client retries after a backoff once the store is healthy, with no stop involved:
       - on JSON-RPC surfaces, an error with code `output_withheld` and data `{ operation_id, scope, observed, retry, effect_executed }`;
       - on the process ABI, `invoke` returns status `withheld` with the same fields.
-      - **`retry: AfterResume`** applies to durable operations (the output stays in release custody) and to check-only reads (no effect, so a retry is safe). After resume, a replay with the same request id (or the same process operation key) returns the released output through the bound durable result. A surface without that replay path delivers the outcome only through the terminal receipt and is named in the claim limit.
+      - **`retry: AfterResume`** applies to durable operations and to check-only reads, with different meanings:
+        - **Durable operations.** The output stays in release custody. After resume, a replay with the same request id (or the same process operation key) returns the released output through the bound durable result. A surface without that replay path delivers the outcome only through the terminal receipt and is named in the claim limit.
+        - **Check-only reads.** The read writes no operation row and keeps no output custody, so the withheld bytes were dropped (spec 9 M11, spec 10 X16). The refusal is `Reusable`, and a retry with the same request id after resume is a fresh evaluation and a fresh read: safe, because the read has no effect, but its value may differ from the withheld one. No replay of the original result is promised, and a client must not treat the new value as the original observation.
       - **`retry: Never`, with `effect_executed: true`,** applies to a `NonDurable` side-effecting call whose release a stop refused (spec 9's `NonDurable` class, spec 10 X13c). Its effect has already run, and no custody holds the output or a replay key, so a retry after resume would dispatch the effect again (spec 5 confirms that a non-durable retry redispatches). The client must treat the call as executed with its output lost.
 - **S15. Stop refusals per path.** `KernelStopped` is a temporary refusal. It never writes a deny tombstone, and it burns a request id only where M: does today.
 
@@ -753,6 +755,9 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
 ## 12. Federation
 
 - **S22. Informational publication.** A serving authority may publish its kernel-scope `chio.stop-epoch.v1` artifacts to treaty peers over the default cross-org transport: HTTPS with mTLS or signed bodies (owner decision UR-D4, contract UR-CT-CROSS). Peers verify an artifact against the receipt-signer keys in the serving authority's partner card (UR-CT-COOP). A deployment that enables the optional iroh lane, with self-hosted relays, may also publish over iroh lane b.
+    - **One message on either transport.** A publication is one `StopEpochPublication` message: the publishing `authority_id` and a bounded, ordered list (at most 64) of complete signed `chio.stop-epoch.v1` artifacts from that authority's kernel scope. The same message kind is carried by the HTTPS default and by lane b.
+    - **Division with UR-CT-CROSS.** This spec owns the message and the receiver rules below. UR-CT-CROSS (roadmap Gate 0, PR #1196, frozen by UR-D4) owns the HTTPS binding: the endpoint, the mTLS or signed-body authentication, the envelope and its replay protection. Spec 8 registers `StopEpochPublication` as a message kind in that contract and defines no second HTTPS protocol. Phase 7 therefore starts only after UR-CT-CROSS is frozen (section 16).
+    - **Receiver rules, independent of transport.** Transport authentication never substitutes for artifact verification. The receiver checks each artifact's signature against the partner card's receipt-signer keys for `authority_id`, and checks that its body names that authority and the kernel scope. It keeps, per `(authority_id, scope)`, the highest verified `StopEpochId`. A duplicate, an artifact at or below the kept position, an unknown schema, a bad signature or a foreign authority is discarded without changing state. A malformed message is rejected whole.
     - Lane b carries only `RevocationGossipBatch` and catch-up today, verified against pinned revocation-oracle signer keys (V: `crates/trust/chio-federation-transport-iroh/src/lanes/revocation.rs:1-30`). Publication over lane b therefore needs:
       - a new message kind, `StopEpochPublication`;
       - a signer-directory entry for the serving authority's receipt signer.
@@ -914,7 +919,8 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
 | `Reconcile` cannot commit | Retried with backoff in the priority lane; the entry stays; resume and relax refuse with `StopIntentPending`; the status route reports `stop_reconcile_pending` (S25a) |
 | A progress-only stop note or observation row is lost | The stopper set is unchanged, because it reads only chain records (S19a). A lost observation only restarts a cooldown (S19) |
 | Origin response at the shard's position with a different head digest | Fork (for example, a whole-volume restore at the origin): the shard latches the kernel scope `Stopped`, goes `not_ready { stop_origin_forked }`, and never renews. Operator reconciliation clears it (S37) |
-| Artifact signing fails for a rollover or migration record | The record stays committed and enforced. The obligation is retried and re-driven at boot. The status route reports `evidence_pending`, and resume and relax refuse with `StopEvidencePending` until it is signed (S38) |
+| Artifact signing fails for a running rollover (a `Rollover` that restates `Running`) | The appending transaction rolls back, so no unsigned record joins a running chain. The writer retries with backoff; the previous generation's `rollover_margin` keeps appends possible, and a stop can still take the last slot (S6, S38) |
+| Artifact signing fails for a stopped rollover, a reconcile or a migration record | The record stays committed and enforced, because the scope stays `Stopped` while its evidence is pending. The obligation is retried and re-driven at boot. The status route reports `evidence_pending`, and resume and relax refuse with `StopEvidencePending` until it is signed (S38) |
 | Artifact signing fails for a stop or restrict | The stop stays committed and enforced, and the route returns `stop_durable` with `evidence: pending`. The obligation is retried, and re-driven at boot. Resume and relax refuse with `StopEvidencePending` (S38) |
 | Artifact signing fails or times out for a resume or relax | The transaction rolls back, and the head stays `Stopped`. The route returns `ResumeRefused { EvidenceUnavailable }` (S38) |
 | Database-only restore behind the stop | Anchor refuses; not ready (S34) |
@@ -929,7 +935,7 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
   - The status response shape and readiness states (additive fields).
   - The deny reason `kernel_stopped`, the `chio_runtime.stop` receipt metadata, and the `output_withheld` result (S14).
 - **Process ABI.** The `withheld` status on `invoke` (S14) and the control socket DTOs (S30). Both are additive.
-- **Federation.** Lane b `StopEpochPublication` and the signer-directory entry (S22).
+- **Federation.** The `StopEpochPublication` message (S22), registered as a UR-CT-CROSS message kind for the HTTPS default and added to lane b for the optional iroh lane, plus lane b's signer-directory entry.
 - **Ledger.** EV11 acceptance evidence is listed in section 17. AC6 closes before this design (section 16), and S4 and S25 preserve its ordering rule.
 - **Native wire.** Verdicts and receipt kinds are unchanged.
 
@@ -966,7 +972,7 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
 4. **Phase 4, tenant scope** (S33).
 5. **Phase 5, recovery scope** (S5, S32). This is a trivial merge, because the template has no production caller.
 6. **Phase 6, evidence and hints.** Signed artifacts, trace, SIEM, deny receipt metadata, `withheld` results everywhere, and spec 5 Part B hints (section 11).
-7. **Phase 7, federation** (S22).
+7. **Phase 7, federation** (S22). It starts only after UR-CT-CROSS is frozen, because the HTTPS binding of `StopEpochPublication` is defined there.
 8. **Sharding** only together with spec 10 section 10 (S37).
 
 Every phase ships behind `durable-stop` until its conformance scenarios pass. Hardening gate GT1 applies: no EV11 claim until the phase 1 scenarios run in hosted CI.
@@ -989,7 +995,8 @@ Every phase ships behind `durable-stop` until its conformance scenarios pass. Ha
   - A serving shard partitioned from the origin, then a kernel stop at the origin: within `shard_origin_lease` the shard refuses `Deny` crossings and reports `stop_origin_stale`. After it reconnects, it serves again only once its replica holds the stop (S37).
   - **Replayed freshness evidence (Codex round 8).** Capture a pre-stop origin response and a pre-stop fan-out heartbeat. Commit a kernel stop at the origin, cut the shard's polls, and replay both repeatedly. Neither renews the lease. The lease expires no later than `shard_origin_lease` after the shard's last fresh poll was sent, and the shard reports `stop_origin_stale`. Responses with a consumed nonce, an unknown nonce, another shard's id, a bad signature, or a head behind the last accepted head never renew. The last of these latches with `stop_origin_regressed`. A response delayed past its poll extends the lease only to `sent_at + shard_origin_lease` (S37).
   - **Legacy migration (Codex round 9).** Seed a W: store with `semantic-stop:{scope} = true`, then upgrade and start. The scope's first record is a `Migration` at `(1, 1)`, `Stopped`, with empty `contributors`, `authorizer: LegacySemanticStop` and the fixed reason commitment. Recovery crossings for the scope deny from the first request. A verifier refuses a `Migration` record at `(1, 2)`, in a kernel scope, or after a `Stop`. A legacy `false` writes nothing.
-  - **Unsigned rollover or migration blocks resume (Codex round 9).** Make the signer fail during an automatic rollover, and separately during a migration. Each record commits with a pending obligation. A resume refuses with `StopEvidencePending` until reconciliation signs it, across the generation boundary.
+  - **Unsigned rollover or migration blocks resume (Codex round 9).** Make the signer fail during an automatic rollover of a stopped scope, and separately during a migration. Each record commits with a pending obligation. A resume refuses with `StopEvidencePending` until reconciliation signs it, across the generation boundary.
+  - **Running rollover never commits unsigned (S38).** Make the signer fail during an automatic rollover of a running scope. The appending transaction rolls back, the head stays the previous generation's signed `Running` record, and the writer retries. Meanwhile a stop still commits into the reserved last slot. Once the signer recovers, the rollover commits together with its signed artifact, and no record of the running chain is ever unsigned.
   - **Equal-position origin fork (Codex round 9).** A shard replica holds a `Running` record at `(1, 7)`. Restore the origin's whole volume from a snapshot and append a different `Stopped` record at `(1, 7)`. The shard's next challenge response carries a matching position, a fresh nonce and a valid signature, but a different `origin_head_digest`. The shard latches with `stop_origin_forked`, refuses `Deny` and `Withhold` crossings, and never renews.
   - **Rollover representability (Codex round 8).** An automatic rollover produces a record with empty `contributors`, `satisfies_intent: None`, `authorizer: ChainRollover { serving_owner, writer_epoch }`, `requested_via: SystemRollover`, and the fixed reason commitment, which verifies. A verifier rejects four records: a `Rollover` with a contributor; a `Rollover` whose reason commitment, state or `expected_epoch` does not restate the previous generation's final record; a `Stop` with authorizer `ChainRollover`; and a `Stop` whose authorizer differs from `contributors[0]` (S2 field rules).
 - **Crash injection** (store test hooks).
@@ -1022,7 +1029,7 @@ Every phase ships behind `durable-stop` until its conformance scenarios pass. Ha
   - slow path with a begin row refused by a stop: compensated, `Terminal`; the retry returns the bound compensated result;
   - parked operation during a stop: no stop receipt; after resume it proceeds, and its terminal receipt is `Terminal`;
   - durable post-effect release during a stop: output withheld with no stop receipt; released after resume, terminal receipt `Terminal`;
-  - check-only read withheld: `Reusable`, `retry: AfterResume`;
+  - check-only read withheld: `Reusable`, `retry: AfterResume`; the retry after resume performs a fresh read, and when the underlying value changed during the stop it returns the new value, never the withheld bytes;
   - `NonDurable` effect withheld: `Terminal`, `retry: Never`;
   - caller metadata carrying `chio_runtime` is rejected before evaluation.
 - **Failure injection.**
@@ -1036,6 +1043,7 @@ Every phase ships behind `durable-stop` until its conformance scenarios pass. Ha
   - A resume clears them all.
   - The api-protect proxy path denies while stopped (S24, S11).
   - A remote edge past `stop_head_max_staleness` fails closed.
+- **Federation publication (S22).** One `StopEpochPublication` delivered over the HTTPS binding and over lane b yields the same peer state. A bad signature, a foreign authority, an unknown schema, a duplicate or an artifact at or below the kept position changes no peer state, and a message over the bound is rejected whole. A valid publication never stops the peer.
 - **Paths.**
   - A two-commit read refused at the outcome commit writes a return record, is never re-dispatched, and returns `output_withheld` (S14).
   - A caller report during a stop is persisted; its release is withheld; after resume it is released (S27).
@@ -1329,3 +1337,11 @@ Where the analogy breaks:
 | Review | Issue | Disposition | Contract |
 |---|---|---|---|
 | 4198091687 (spec 8 side) | Register both reservation branches | Fixed. The RecoveryControl table and S13 distinguish allocation deny from exact authenticated readback allow. Both stop tiers and the generated census use that verified classifier | Section 7; S13; spec 1 R5b |
+
+### PR #1174 review round 35 (cross-vendor review and review bots)
+
+| Review | Issue | Disposition | Contract |
+|---|---|---|---|
+| CV-4 | The failure table permitted an unsigned running head | Fixed. The rollover row is split: a running rollover rolls back and retries (S38), and only a stopped rollover, reconcile or migration commits with pending evidence. A new test covers the running case | Section 14; section 17 |
+| 4226929195 | Check-only `AfterResume` promised durable replay | Fixed. `AfterResume` is split by class: durable operations replay the released output from custody; a check-only read has no row or custody, so a retry is a fresh read whose value may differ, and no replay is promised (spec 9 M11, spec 10 X16) | S14; section 17 |
+| 4226832958 | The default HTTPS publication path had no contract | Fixed. S22 defines the transport-neutral `StopEpochPublication` message and its receiver rules, which never rely on transport authentication. UR-CT-CROSS (roadmap Gate 0, PR #1196, frozen by owner decision UR-D4) owns the HTTPS endpoint, authentication and envelope; this spec registers the message kind there instead of defining a second HTTPS protocol, and phase 7 waits for that contract | S22; sections 15, 16 and 17 |

@@ -389,18 +389,38 @@ Today the influence of a context reflects only P4 artifact traffic. The main inj
    - **Unclassified.** Any other contribution, including any the host cannot attribute, joins with `unknown = true`.
 
    ```rust
-   /// Operator-signed; recorded with the context-creation record. A digest alone never confers trust.
+   /// The assertable bootstrap contributions of I7a, closed. Inherited parent state is never asserted.
+   #[serde(rename_all = "snake_case")]
+   pub enum BootstrapKind { TaskInput, BootstrapJson, Seed, Checkpoint, ControlMetadata } // closed
+
+   /// The signed body. A digest alone never confers trust, and the body alone is never accepted.
+   #[serde(deny_unknown_fields)]
    pub struct BootstrapTrustAssertionV1 {
        pub schema: String,                                     // "chio.bootstrap-trust-assertion.v1"
        pub deployment_binding: Digest,                         // IntegrityDeploymentBindingV1 (I5)
+       pub deployment_generation: DeploymentGeneration,        // roster and policy generation it was signed under (I15a)
        pub run_plan: Digest,                                   // the run plan the context launches under
-       pub contributions: BoundedList<(BootstrapKind, Digest), 16>, // exactly which contributions, by kind and digest
-       pub signer: PrincipalId,                                // on the deployment's integrity roster (I21)
+       pub contributions: BoundedList<(BootstrapKind, Digest), 16>, // exactly which contributions, by kind and digest; non-empty, no repeated pair
+       pub signer: IntegrityAuthorityId,                       // the integrity-roster entry that signs (I15a, I21)
        pub expires_at: UnixSeconds,
+   }
+
+   /// The only accepted form; recorded with the context-creation record.
+   #[serde(deny_unknown_fields)]
+   pub struct SignedBootstrapTrustAssertionV1 {
+       pub body: BootstrapTrustAssertionV1,
+       pub signer_key: PublicKey,   // the key the integrity roster binds to body.signer
+       pub signature: Signature,    // over SHA-256("chio.bootstrap-trust-assertion.v1\0" || canonical_json(body))
    }
    ```
 
-   - An assertion applies only to the named deployment, the named run plan and the exact contribution digests, before `expires_at`. It is verified at scope creation and recorded with the context-creation record.
+   - **Verification.** At scope creation, in the writer transaction that writes the context-creation record, an assertion is accepted only when every check passes:
+     - it decodes as `SignedBootstrapTrustAssertionV1`, with no unknown field and a known `BootstrapKind` in every entry, and `schema` is exactly `chio.bootstrap-trust-assertion.v1`;
+     - `body.signer` is on the deployment's integrity roster at the current deployment generation, and `body.deployment_generation` is that generation (I15a's roster rule; the roster is configured only through the P6 signed policy owner);
+     - `signer_key` is the key the roster binds to `body.signer`, and `signature` verifies under it over the domain-separated canonical body;
+     - `deployment_binding` and `run_plan` name this context's, each covered contribution's digest matches, and authority time is before `expires_at`.
+   - **Rejection fails closed.** An unsigned, malformed, unverifiable or off-roster assertion is rejected and confers nothing. Each contribution it named is classified by the next rule below, as if no assertion existed: `External` when pinned, otherwise `unknown`. The rejection is recorded with the context-creation record. A fabricated assertion therefore never makes attacker-controlled bootstrap bytes `Trusted`.
+   - An assertion applies only to the named deployment, the named run plan and the exact contribution digests, before `expires_at`. The accepted signed assertion is recorded with the context-creation record.
    - A context therefore starts trusted only when its profile is qualified and every bootstrap contribution is inherited from a trusted parent or covered by an assertion.
    - **Owner's question on bootstrap authority, answered.** Pinning is a reproducibility mechanism only. Trust in bootstrap material is an explicit decision: the authorizer is an integrity-roster principal, the scope is (deployment, run plan, contribution kind and digest), and the evidence is the signed assertion. Without it, pinned material is `External`.
 8. **I8. Confined returns are bounded, not cleared.** A P5 return joins `ExternalBounded { max_bits }` into the parent, where `max_bits` is the capacity of its return contract (section 10). It does not copy the observation's full influence as `External`, which is today's `returns.rs:383` behavior. The original influence is retained, because the return's observation id binds the child's influence `commitment` (I4a), so the parent's set hash covers it. History is not reduced (SEC-05).
@@ -663,7 +683,8 @@ pub enum ConfinedReturnTypeV1 {
 
 - **Process workers.** These are any framework running as a Chio process (LangGraph, AI SDK, mini-SWE, coding-agent plugins). They get the full guarantee when the verified worker profile is `container` with pinned inputs, or `split_domain` (I7; spec 7 rule 6.3.5). The guarantee does not depend on the framework's language or interpreter.
 - **Kernel sessions through MCP edges or the sidecar.** These start at `unknown`, because the client's model context includes inputs the kernel never saw.
-  - Integrity-gated grants deny there, with `InsufficientIntegrity` and remedy class "run as a mediated process".
+  - Integrity-gated grants deny there, with `InsufficientIntegrity`. The `integrity_fault` block carries only I19's declared wire classes, chosen from the grant's own requirement: `[IntegrityEndorsement]` for `Trusted` or `ProviderOnly`, and `[IntegrityEndorsement, QuarantinedContinuation]` for `BoundedExternal`. `IntegrityRemedyClass` stays closed.
+  - "Run the agent as a mediated process" is operator and integrator guidance in documentation, not a remedy class. It is never encoded in the fault block, so the block stays configuration-blind (I19, spec 2 A5).
   - Grants without the constraint behave as today.
   - A deployment cannot declare an MCP client "trusted", because the kernel cannot verify complete mediation (open decision 3).
 - **Hosted sessions** follow the kernel-session rule.
@@ -732,6 +753,7 @@ pub enum ConfinedReturnTypeV1 {
 | Bootstrap contribution pinned but not covered by a trust assertion | Joins `External`; a `Trusted` requirement denies (I7a) |
 | Bootstrap contribution that cannot be classified | Joins `unknown`; every requirement denies (I7a) |
 | Bootstrap trust assertion expired, for another run plan or deployment, or a digest mismatch | Assertion ignored; the contribution is `External` (I7a) |
+| Bootstrap trust assertion unsigned, malformed (an unknown field or `BootstrapKind`), with a bad signature, or signed by a key the integrity roster does not bind to its signer at the current generation | Rejected and recorded; it confers nothing, and each named contribution is classified as if no assertion existed (`External` when pinned, otherwise `unknown`) (I7a) |
 | Endorsement `influence_basis` stale (context gained influence since) | The endorsement does not apply; deny (I15a) |
 | Endorsement's continuation already consumed (reuse) | Deny; the first admission's consumption stands (I15a) |
 | Endorsement for a different action, request or namespace | Deny (I15a) |
@@ -760,6 +782,7 @@ pub enum ConfinedReturnTypeV1 {
   - `chio.integrity-fault.v1`;
   - `chio.influence-state.v1`;
   - `chio.integrity-deployment-binding.v1`;
+  - `chio.bootstrap-trust-assertion.v1`, the body and its signed envelope with the closed `BootstrapKind` vocabulary (I7a);
   - `chio.confined-return-type.v1`;
   - `chio.action-selection-contract.v1`.
 - Changes to W: closed enums: `ExplanationFactKind::Integrity`, the `QuarantinedContinuation` template, `InfluenceOriginV1` and `EndorsementSourceV1`. The enum changes are additive.
@@ -806,7 +829,7 @@ GT1 applies: no guarantee is claimed until the conformance scenarios run in host
   - The operator binding is voided by a manifest change.
   - Attested mailbox inheritance.
   - Initial influence per verified worker profile. Each permitted unverified fallback starts at `unknown`. A worker attribution or available-record mismatch refuses context creation without inserting an initial observation, even when the first action has no integrity requirement (spec 7 rule 6.3.5).
-  - Bootstrap classification (I7a): inherited, asserted, pinned without assertion (`External`), and unclassified (`unknown`). Assertions that are expired, for another run plan or deployment, or carry a mismatched digest are ignored.
+  - Bootstrap classification (I7a): inherited, asserted, pinned without assertion (`External`), and unclassified (`unknown`). Assertions that are expired, for another run plan or deployment, or carry a mismatched digest are ignored. An unsigned body, an assertion with an unknown field or `BootstrapKind`, a bad signature, a signer off the integrity roster, or a `signer_key` the roster does not bind to the named signer is rejected, and the covered contribution stays `External` (pinned) or `unknown`. A fabricated assertion that names a roster principal but is signed by another key never yields `Trusted`.
   - **Lossless inheritance (I7a).** A parent holds `External`, `ModelProvider { p1 }`, `ModelProvider { p2 }`, and two distinct `ExternalBounded` observations of 3 and 5 bits. A child with disjoint keys and no other bootstrap contributions inherits re-keyed observations, and its `origins`, `bounded_bits_total = 8` and `unknown` equal the parent's. Each requirement the parent fails, the child fails too: `Trusted`, `ProviderOnly({p1})` and `BoundedExternal { 7 }`. A child sharing the parent's lineage does not re-key reachable rows, and its bit total stays 8. Re-running creation changes nothing. A parent above 4,096 rows refuses child creation.
   - Typed return capacity and projection rejection. Capacity unit tests (I23): `Boolean` gives 1; `Enum` with 3 variants gives 2; `Integer { 0, 255 }` gives 8; a single-value type gives 0; `Identifier { 1, 44, 65 chars }` gives 266, and `Identifier { 44, 44, 65 chars }` gives 265. Each is computed by `bit_length(N - 1)` and compared with a big-integer reference. `Integer { i64::MIN, i64::MAX }` gives 64 without overflow.
   - Load-time validation (I23). Each of these is rejected at policy load, and no capacity is computed for it:
@@ -1010,3 +1033,10 @@ Open decisions:
 - into a cage, for the quarantine.
 
 The analogy holds for where enforcement happens. It does not transfer guarantees. CaMeL's and FIDES's results come from their own dataflow models and evaluations. Chio's guarantee is only the property in section 11, argued from its own mechanisms. A quarantine return under `BoundedExternal` is an allowance that can still select an action.
+
+### PR #1174 review round 35 (cross-vendor review and review bots)
+
+| Review | Issue | Disposition | Contract |
+|---|---|---|---|
+| CV-6 | MCP-session guidance named an undeclared remedy class | Fixed. Kernel-session denials carry only I19's declared classes, chosen from the requirement. "Run the agent as a mediated process" stays as documentation guidance, never encoded in the block | Section 12 |
+| 4226832972 | Bootstrap trust assertions were not authenticated | Fixed. `BootstrapKind` is a closed vocabulary; `SignedBootstrapTrustAssertionV1` carries the signer key and a domain-separated signature; verification checks the integrity roster at the current generation, the bound key, the signature, scope and expiry. Unsigned, malformed or off-roster assertions are rejected and confer nothing. The schema is listed | I7a; sections 15, 16 and 18 |

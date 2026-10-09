@@ -586,6 +586,7 @@ Rollback of steps 1-5 stops emitting the new evidence. It never relaxes cage-onl
 5. **Microkernel scope.** Pin a future backend to FTL, or open it to any capability guest that meets Q1-Q13?
 6. **Confined export authority.** Should the P5 export be a new `RecoveryPermission` (for example `confined.export`), or ride the existing review read? The review read already carries review-custody semantics. A separate permission keeps exporting distinct from approving.
 7. **Merge of the cage changes.** W:'s P5 adds cage APIs: `ObservedCageExit`, `enforce_deadline`, `try_wait_verified`, `base_plan_digest`, and `base_profile_digest`, in W:`crates/security/chio-cage/src/launch.rs`. It also edits `chio-cage` internals (`lib_parts/part_01.rs`, `launch/linux_parts/part_01_sections/bootstrap.inc`, `launch/linux_parts/part_02.rs`). W:'s base `f25cd61f4` predates M:'s split into `chio-cage`, `chio-cage-plan`, and `chio-cage-init`. Who ports these APIs into the split crates, and in which order relative to the M:/V: union?
+8. **Agent-host backends for UR-KERN-5.** The roadmap's UR-KERN-5 also names `AgentHostBwrap` (the Linux bubblewrap restricted launcher for HOST-M2 harnesses) and `Seatbelt` (the macOS sandbox that the Seatbelt-only harnesses use). Neither is designed here: `ConfinementBackendKind` stays closed at three variants, and rollout steps 1 and 2 cover the adapted-server binding and the process-container record. Adding them is an additive amendment to this spec that must land before UR-KERN-5 claims them: one variant each, a section 5.2 column (native record, evidence observer, surface statuses), a qualification predicate, schema vectors, and unit and conformance tests. Until it lands, neither kind is representable, and no isolation claim may cite either.
 
 Refinements to the review directives, recorded with evidence:
 - The directive "map `ConfinementRecord` into `RuntimeAssuranceBacking`" is kept, but the record cannot be mapped directly. The facet only accepts a signed runtime-attestation envelope plus a signed appraisal from pinned authorities (V:`verify.rs:1481-1515`). Section 7 therefore wraps the record set in that envelope.
@@ -661,3 +662,9 @@ Where the analogy maps and breaks:
 - FTL's container boundary separates tenants on one kernel. In a VM-per-tool-server deployment, the VMM provides tenant separation and that boundary is unused.
 - FTL's handle table is the workload's complete authority only once ambient creation (Q1) is removed.
 - Recovery P5 is the anti-`lx`. The observing code holds zero authority: no credential, socket, broker, tool, or model. It has one framed channel in (`CHIOCF1`) and one bounded, host-recomputed value out. It is FTL's "container with no Net or Console handle" done right, with a mediated return added. FTL's flaw is ambient `NetCreate`/`ConsoleOpen` (Q1). P5's pinned plan forbids every ambient route before launch (W:`confinement/execution.rs:46-77`).
+
+### PR #1174 review round 35 (cross-vendor review and review bots)
+
+| Review | Issue | Disposition | Contract |
+|---|---|---|---|
+| 4226832969 (spec 7 side) | UR-KERN-5 named backend kinds this spec cannot represent | Fixed. Open decision 8 records that `AgentHostBwrap` and `Seatbelt` need an additive amendment (variants, section 5.2 columns, qualification predicate, vectors and tests) before UR-KERN-5 claims them; `ConfinementBackendKind` stays closed until then | Section 14 open decision 8 |
