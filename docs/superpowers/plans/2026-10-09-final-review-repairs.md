@@ -61,7 +61,12 @@ KANI-PROOF-QUAL remains OPEN/UNPROVED under the recorded owner amendment.
    at 30 seconds and grows to one hour across repeated failed builds. Other
    resource refusals retain the existing fixed retry interval capped at 30 seconds. An explicit owner-only quota
    increase wakes recovery and is applied by the walker; request traffic cannot
-   raise it. The existing CLI startup setting remains the deployment budget.
+   raise it. The existing CLI startup setting remains the persisted deployment budget.
+   FINAL-F04-OPERATOR adds an admin-authenticated node-local HTTP recovery entry
+   point: explicit runtime quota increase and immediate resource retry without
+   restart, bounded before work begins, no forced healthy rebuild. Its response
+   acknowledges scheduling rather than completed readiness. Deterministic wake
+   and cancellation controls supplement the original component evidence.
 6. Run focused snapshot and HTTP tests, owning strict Clippy, format and boundary
    scanners. Retain all failures; do not amend baselines to waive them.
 
@@ -95,7 +100,11 @@ reserved completion must cover parked approvals. Lineage, principal, epoch and
 declassification authority cannot be forgotten to reclaim capacity. Any cold
 state must authenticate current versions and absence, preserve cross-tier
 transition uniqueness, prevent stale resurrection and avoid full-history work
-on startup or admission. This architecture remains under design review.
+on startup or admission. Owner decision0020 moves authenticated cold state to SEC-1160-COLDSTATE, an
+OPEN P1 that blocks G5 outside-team preview. The bounded repair set remains
+required before foundation landing. Preserve the65,536 current-row ceiling,
+count declassification state, and document measured thresholds and exact refusal
+from the final source. No unbounded-capacity claim follows from landing.
 
 **F02 legacy-file boundary:** New per-record terminal headroom does not establish
 guaranteed revocation for an older file already at the read cap. Retain genuine
