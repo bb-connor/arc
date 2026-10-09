@@ -7,6 +7,28 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Remaining capacity acceptance (October 9)
+
+The ledger now contains **1,864 requirements** with matching current states.
+All 1,862 earlier requirement objects and source records are preserved; changed
+current states are archived before replacement.
+
+The [capacity checkpoint](audits/final-capacity-acceptance-20261009.json) records
+F01's retained-authority design boundary and F02's legacy full-file limitation.
+It adds **FINAL-F12**, a confirmed kernel-path second-lineage denial (Original
+0 passed, 1 failed), and **FINAL-F13**, source-confirmed registry stale writes
+that can overwrite revocation (runtime reproduction remains pending). Both are
+assigned to Claude for separate repair commits and remain open.
+
+Public health now exposes only configured/state. The [privacy and recovery
+audit](audits/receipt-public-health-privacy-qualification-20261009.json) records
+Original disclosure failure, 14 passing HTTP controls, strict owning lint and
+formatting at `c2c37c36c9`. The actual quota test recovers HTTP reads after an
+owner-controlled increase and still refuses altered selected receipt data.
+
+Export and cluster repairs are still undergoing focused validation. No new
+candidate has been pushed, hosted qualification is open, and #1160 is unmerged.
+
 ## Final review repair ledger (October 9)
 
 The authoritative ledger now contains **1,862 requirements** and matching current
