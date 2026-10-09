@@ -22,6 +22,10 @@ use super::verify::{
     verify_signed_certification_check,
 };
 
+#[cfg(test)]
+#[path = "registry/revocation_capacity.rs"]
+pub(crate) mod revocation_capacity;
+
 impl Default for CertificationRegistry {
     fn default() -> Self {
         Self {
@@ -55,9 +59,23 @@ impl CertificationRegistry {
         }
     }
 
+    /// Persists the registry while keeping room for every entry it holds to
+    /// be revoked, so a revocation of any admitted entry always persists.
     pub(crate) fn save(&self, path: &Path) -> Result<(), CliError> {
         ensure_parent_dir(path)?;
-        crate::signed_input::write_bounded_json(path, self)
+        crate::signed_input::write_bounded_json_reserving(path, self, self.revocation_reserve()?)
+    }
+
+    /// Bytes the entries may still grow by through revocation: the sum of each
+    /// entry's growth to its largest revoked form.
+    fn revocation_reserve(&self) -> Result<usize, CliError> {
+        let mut reserved = 0usize;
+        for entry in self.artifacts.values() {
+            let largest = largest_revoked_entry(entry)?;
+            reserved =
+                reserved.saturating_add(crate::signed_input::revocation_headroom(entry, &largest)?);
+        }
+        Ok(reserved)
     }
 
     pub(crate) fn get(&self, artifact_id: &str) -> Option<&CertificationRegistryEntry> {
@@ -167,6 +185,9 @@ impl CertificationRegistry {
                 "certification artifact `{artifact_id}` was not found"
             )));
         };
+        if let Some(reason) = reason {
+            crate::signed_input::check_revocation_text("revocation reason", reason)?;
+        }
         let revoked_at = match revoked_at {
             Some(at) => at,
             None => unix_now()?,
@@ -187,10 +208,20 @@ impl CertificationRegistry {
                 "certification artifact `{artifact_id}` was not found"
             )));
         };
+        // A resolved-revoked note becomes the revocation reason, so it carries
+        // the reason bound; load refuses a zero dispute time.
+        if let Some(note) = request.note.as_deref() {
+            crate::signed_input::check_revocation_text("dispute note", note)?;
+        }
         let updated_at = match request.updated_at {
             Some(at) => at,
             None => unix_now()?,
         };
+        if updated_at == 0 {
+            return Err(CliError::attest_error(
+                "certification dispute updated_at must be nonzero",
+            ));
+        }
         let dispute = CertificationDisputeRecord {
             state: request.state,
             updated_at,
@@ -378,4 +409,21 @@ impl CertificationRegistry {
             errors: Vec::new(),
         })
     }
+}
+
+/// `entry` with every field a revocation writes set to the larger, by JSON
+/// encoding, of its current value and the largest value a revocation may
+/// write. Revoking `entry` any number of times leaves it no larger than this
+/// form, and never makes this form larger.
+fn largest_revoked_entry(
+    entry: &CertificationRegistryEntry,
+) -> Result<CertificationRegistryEntry, CliError> {
+    use crate::signed_input::{encoded_len, largest_revocation_reason};
+    let mut largest = entry.clone();
+    if encoded_len(&entry.status)? < encoded_len(&CertificationRegistryState::Revoked)? {
+        largest.status = CertificationRegistryState::Revoked;
+    }
+    largest.revoked_at = Some(u64::MAX);
+    largest.revoked_reason = Some(largest_revocation_reason(entry.revoked_reason.as_deref())?);
+    Ok(largest)
 }

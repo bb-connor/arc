@@ -941,3 +941,6 @@ mod receipt_query_snapshot_tests;
 
 #[path = "router_tests/evidence_snapshot_export_tests.rs"]
 mod evidence_snapshot_export_tests;
+
+#[path = "router_tests/registry_revocation_capacity.rs"]
+mod registry_revocation_capacity;

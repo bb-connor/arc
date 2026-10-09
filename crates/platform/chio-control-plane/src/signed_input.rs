@@ -62,20 +62,110 @@ pub(crate) fn write_bounded_json_with_limit<T: Serialize>(
     value: &T,
     limit: usize,
 ) -> Result<(), CliError> {
+    match encode_within(value, limit)? {
+        Some(bytes) => replace_file(path, &bytes),
+        None => Err(CliError::policy_constraint_error(format!(
+            "registry file would exceed the {limit} byte limit; the existing file was left unchanged"
+        ))),
+    }
+}
+
+/// Compact JSON of `value`, or `None` when it is longer than `limit` bytes.
+fn encode_within<T: Serialize>(value: &T, limit: usize) -> Result<Option<Vec<u8>>, CliError> {
     let mut buffer = LimitedBuffer {
         bytes: Vec::new(),
         limit,
         overflowed: false,
     };
-    if let Err(error) = serde_json::to_writer(&mut buffer, value) {
-        if buffer.overflowed {
-            return Err(CliError::policy_constraint_error(format!(
-                "registry file would exceed the {limit} byte limit; the existing file was left unchanged"
-            )));
-        }
-        return Err(error.into());
+    match serde_json::to_writer(&mut buffer, value) {
+        Ok(()) => Ok(Some(buffer.bytes)),
+        Err(_) if buffer.overflowed => Ok(None),
+        Err(error) => Err(error.into()),
     }
-    replace_file(path, &buffer.bytes)
+}
+
+/// Largest JSON-escaped length of operator text a revocation stores: a
+/// revocation reason, or a dispute note that becomes one. For text without
+/// quotes, backslashes or control characters it is the byte length.
+pub(crate) const REVOCATION_REASON_LIMIT_BYTES: usize = 256;
+
+/// Refuses operator text stored by a revocation whose JSON-escaped length
+/// exceeds [`REVOCATION_REASON_LIMIT_BYTES`]; `field` names it in the error.
+pub(crate) fn check_revocation_text(field: &str, text: &str) -> Result<(), CliError> {
+    if escaped_len(text)? > REVOCATION_REASON_LIMIT_BYTES {
+        return Err(CliError::policy_error(format!(
+            "{field} must be at most {REVOCATION_REASON_LIMIT_BYTES} bytes once JSON-escaped"
+        )));
+    }
+    Ok(())
+}
+
+/// The larger, by JSON encoding, of `current` and a reason of exactly
+/// [`REVOCATION_REASON_LIMIT_BYTES`]: the longest reason a revocation can
+/// leave on a record that holds `current`.
+pub(crate) fn largest_revocation_reason(current: Option<&str>) -> Result<String, CliError> {
+    match current {
+        Some(current) if escaped_len(current)? > REVOCATION_REASON_LIMIT_BYTES => {
+            Ok(current.to_string())
+        }
+        _ => Ok("x".repeat(REVOCATION_REASON_LIMIT_BYTES)),
+    }
+}
+
+/// Bytes `record` grows by when it takes `largest`, its largest revoked form.
+pub(crate) fn revocation_headroom<T: Serialize>(
+    record: &T,
+    largest: &T,
+) -> Result<usize, CliError> {
+    Ok(encoded_len(largest)?.saturating_sub(encoded_len(record)?))
+}
+
+/// Writes `value` as compact JSON, keeping `reserved` bytes of the read cap
+/// free for revocations of the records it holds. A revocation never grows a
+/// record past its reserved headroom, so a registry admitted here stays
+/// writable for every revocation of its records. The destination is
+/// untouched when the write is refused.
+pub(crate) fn write_bounded_json_reserving<T: Serialize>(
+    path: &Path,
+    value: &T,
+    reserved: usize,
+) -> Result<(), CliError> {
+    let encoded = match MAX_SIGNED_FILE_BYTES.checked_sub(reserved) {
+        Some(limit) => encode_within(value, limit)?,
+        None => None,
+    };
+    match encoded {
+        Some(bytes) => replace_file(path, &bytes),
+        None => Err(CliError::policy_constraint_error(format!(
+            "registry file would exceed the {MAX_SIGNED_FILE_BYTES} byte limit once {reserved} bytes are kept for revoking its records; the existing file was left unchanged"
+        ))),
+    }
+}
+
+/// Counts serializer output without retaining it.
+struct ByteCounter(usize);
+
+impl std::io::Write for ByteCounter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.0 = self.0.saturating_add(buf.len());
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+/// Length of the compact JSON encoding of `value`.
+pub(crate) fn encoded_len<T: Serialize + ?Sized>(value: &T) -> Result<usize, CliError> {
+    let mut counter = ByteCounter(0);
+    serde_json::to_writer(&mut counter, value)?;
+    Ok(counter.0)
+}
+
+/// JSON-escaped length of `text`, without the enclosing quotes.
+fn escaped_len(text: &str) -> Result<usize, CliError> {
+    Ok(encoded_len(text)?.saturating_sub(2))
 }
 
 /// Points in `replace_file_with` where a failure can be injected.

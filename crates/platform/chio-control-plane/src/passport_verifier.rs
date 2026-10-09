@@ -30,6 +30,10 @@ mod signed_readback_tests;
 #[path = "passport_verifier/tests/bounded_persistence.rs"]
 mod bounded_persistence_tests;
 
+#[cfg(test)]
+#[path = "passport_verifier/tests/revocation_capacity.rs"]
+pub(crate) mod revocation_capacity_tests;
+
 const VERIFIER_POLICY_REGISTRY_VERSION: &str = "chio.passport-verifier-policies.v1";
 const PASSPORT_STATUS_REGISTRY_VERSION: &str = "chio.passport-status-registry.v1";
 const PASSPORT_ISSUANCE_REGISTRY_VERSION: &str = "chio.passport-issuance-offers.v1";
@@ -255,11 +259,25 @@ impl PassportStatusRegistry {
         }
     }
 
+    /// Persists the registry while keeping room for every record it holds to
+    /// be revoked, so a revocation of any admitted record always persists.
     pub fn save(&self, path: &Path) -> Result<(), CliError> {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
-        crate::signed_input::write_bounded_json(path, self)
+        crate::signed_input::write_bounded_json_reserving(path, self, self.revocation_reserve()?)
+    }
+
+    /// Bytes the records may still grow by through revocation: the sum of each
+    /// record's growth to its largest revoked form.
+    fn revocation_reserve(&self) -> Result<usize, CliError> {
+        let mut reserved = 0usize;
+        for record in self.passports.values() {
+            let largest = largest_revoked_lifecycle_record(record)?;
+            reserved = reserved
+                .saturating_add(crate::signed_input::revocation_headroom(record, &largest)?);
+        }
+        Ok(reserved)
     }
 
     pub fn get(&self, passport_id: &str) -> Option<&PassportLifecycleRecord> {
@@ -279,17 +297,6 @@ impl PassportStatusRegistry {
             return Ok(existing.clone());
         }
 
-        for existing in self.passports.values_mut() {
-            if existing.subject == verification.subject
-                && existing.issuers == verification.issuers
-                && existing.status == PassportLifecycleState::Active
-            {
-                existing.status = PassportLifecycleState::Superseded;
-                existing.superseded_by = Some(verification.passport_id.clone());
-                existing.updated_at = published_at;
-            }
-        }
-
         let record = PassportLifecycleRecord {
             passport_id: verification.passport_id.clone(),
             subject: verification.subject.clone(),
@@ -304,6 +311,19 @@ impl PassportStatusRegistry {
             distribution,
             valid_until: verification.valid_until.clone(),
         };
+        // Load refuses an invalid record, so one is never admitted.
+        verify_passport_lifecycle_record(&record)?;
+
+        for existing in self.passports.values_mut() {
+            if existing.subject == verification.subject
+                && existing.issuers == verification.issuers
+                && existing.status == PassportLifecycleState::Active
+            {
+                existing.status = PassportLifecycleState::Superseded;
+                existing.superseded_by = Some(verification.passport_id.clone());
+                existing.updated_at = published_at;
+            }
+        }
         self.passports
             .insert(verification.passport_id, record.clone());
         Ok(record)
@@ -375,10 +395,26 @@ impl PassportStatusRegistry {
                 "passport `{passport_id}` was not found in the lifecycle registry"
             )));
         };
+        // The reason bound is the one the save reserve accounts for; a blank
+        // reason or a time before publication would make load refuse the file.
+        if let Some(reason) = reason {
+            crate::signed_input::check_revocation_text("revocation reason", reason)?;
+            if reason.trim().is_empty() {
+                return Err(CliError::policy_error(
+                    "revocation reason must not be blank when present",
+                ));
+            }
+        }
         let revoked_at = match revoked_at {
             Some(at) => at,
             None => unix_timestamp_now()?,
         };
+        if revoked_at < entry.published_at {
+            return Err(CliError::policy_error(format!(
+                "passport `{passport_id}` cannot be revoked at {revoked_at}, before its publication at {}",
+                entry.published_at
+            )));
+        }
         entry.status = PassportLifecycleState::Revoked;
         entry.revoked_at = Some(revoked_at);
         entry.updated_at = revoked_at;
@@ -1486,6 +1522,24 @@ fn verify_passport_lifecycle_record(record: &PassportLifecycleRecord) -> Result<
     record
         .validate()
         .map_err(|error| CliError::policy_error(error.to_string()))
+}
+
+/// `record` with every field a revocation writes set to the larger, by JSON
+/// encoding, of its current value and the largest value a revocation may
+/// write. Revoking `record` any number of times leaves it no larger than
+/// this form, and never makes this form larger.
+fn largest_revoked_lifecycle_record(
+    record: &PassportLifecycleRecord,
+) -> Result<PassportLifecycleRecord, CliError> {
+    use crate::signed_input::{encoded_len, largest_revocation_reason};
+    let mut largest = record.clone();
+    if encoded_len(&record.status)? < encoded_len(&PassportLifecycleState::Revoked)? {
+        largest.status = PassportLifecycleState::Revoked;
+    }
+    largest.updated_at = u64::MAX;
+    largest.revoked_at = Some(u64::MAX);
+    largest.revoked_reason = Some(largest_revocation_reason(record.revoked_reason.as_deref())?);
+    Ok(largest)
 }
 
 fn passport_lifecycle_resolution_from_record(
