@@ -75,9 +75,9 @@ async fn shutdown_during_a_parked_tick_waits_for_its_commit_and_starts_no_furthe
     .unwrap_or_else(|_| panic!("tick did not park"));
 
     let mut shutdown = Box::pin(handle.shutdown());
-    let _elapsed = tokio::time::timeout(Duration::from_millis(50), &mut shutdown)
-        .await
-        .unwrap_err();
+    if let Ok(early) = tokio::time::timeout(Duration::from_millis(50), &mut shutdown).await {
+        panic!("shutdown finished while the tick was parked: {early:?}");
+    }
     assert!(!port.committed.load(Ordering::Acquire));
     assert_eq!(port.shutdown_calls.load(Ordering::Acquire), 0);
 

@@ -4,6 +4,7 @@ use super::{
     ResponseWorkerJoinOwnership, ResponseWorkerStartupGuard, ResponseWorkerThreadCompletion,
     ResponseWorkerTickError, VecDeque, WorkerPhase,
 };
+use std::collections::HashSet;
 #[cfg(test)]
 use std::sync::atomic::AtomicBool;
 
@@ -21,6 +22,7 @@ pub(super) struct ResponseWorkerJoinJob {
 
 pub(super) struct ResponseWorkerReaperState {
     join_owners: usize,
+    exited: HashSet<std::thread::ThreadId>,
     jobs: VecDeque<ResponseWorkerJoinJob>,
     reaper: Option<std::thread::JoinHandle<()>>,
 }
@@ -42,6 +44,7 @@ impl ResponseWorkerReaperRegistry {
         Self {
             state: Mutex::new(ResponseWorkerReaperState {
                 join_owners: 0,
+                exited: HashSet::new(),
                 jobs: VecDeque::new(),
                 reaper: None,
             }),
@@ -111,7 +114,7 @@ impl ResponseWorkerReaperRegistry {
                 );
             }
         }
-        self.wake.notify_one();
+        self.wake.notify_all();
         if let Err(error) = self.ensure_service() {
             tracing::error!(
                 error = %error,
@@ -121,12 +124,21 @@ impl ResponseWorkerReaperRegistry {
         }
     }
 
-    /// Sleeps until a job is queued, then takes the oldest. Joining it then
-    /// blocks on the worker thread itself, so nothing here polls.
+    /// Takes any job whose thread has finished or announced its exit, in any
+    /// order, and sleeps on the condvar otherwise. A parked worker never holds
+    /// back one that has ended. An announced thread is on its last
+    /// instructions, so joining it blocks only briefly.
     fn take_next_job(&self) -> ResponseWorkerJoinJob {
         let mut state = self.lock_state();
         loop {
-            if let Some(job) = state.jobs.pop_front() {
+            let ready = {
+                let exited = &state.exited;
+                state.jobs.iter().position(|job| {
+                    job.join.is_finished() || exited.contains(&job.join.thread().id())
+                })
+            };
+            if let Some(job) = ready.and_then(|index| state.jobs.remove(index)) {
+                state.exited.remove(&job.join.thread().id());
                 return job;
             }
             state = match self.wake.wait(state) {
@@ -136,6 +148,16 @@ impl ResponseWorkerReaperRegistry {
             #[cfg(test)]
             self.idle_wakeups.fetch_add(1, Ordering::AcqRel);
         }
+    }
+
+    /// A worker thread announces its exit as its last act.
+    pub(super) fn note_thread_exit(&self, thread: std::thread::ThreadId) {
+        self.lock_state().exited.insert(thread);
+        self.wake.notify_all();
+    }
+
+    fn forget_thread_exit(&self, thread: std::thread::ThreadId) {
+        self.lock_state().exited.remove(&thread);
     }
 
     fn run(self: Arc<Self>) {
@@ -235,7 +257,12 @@ pub(super) fn join_response_worker_thread(
     join: std::thread::JoinHandle<Result<(), ResponseWorkerTickError>>,
     worker: &ProductionResponseWorker,
 ) -> Result<(), ResponseWorkerTickError> {
-    let result = match join.join() {
+    let thread = join.thread().id();
+    let joined = join.join();
+    if let Some(registry) = RESPONSE_WORKER_REAPER_REGISTRY.get() {
+        registry.forget_thread_exit(thread);
+    }
+    let result = match joined {
         Ok(result) => result,
         Err(_) => match worker.complete_shutdown_after_loop() {
             Ok(()) => Err(worker_task_crash_error()),
@@ -280,6 +307,9 @@ impl Drop for ResponseWorkerThreadCompletion {
             WorkerPhase::Failed("response worker thread exited without a final phase".to_string()),
         );
         let _ = self.completion.send_replace(true);
+        if let Some(registry) = RESPONSE_WORKER_REAPER_REGISTRY.get() {
+            registry.note_thread_exit(std::thread::current().id());
+        }
     }
 }
 
@@ -436,6 +466,10 @@ mod reaper_spawn_failure_retains_join_ownership_for_later_recovery;
 #[cfg(test)]
 #[path = "tests/reaper_blocks_on_the_worker_join_without_polling.rs"]
 mod reaper_blocks_on_the_worker_join_without_polling;
+
+#[cfg(test)]
+#[path = "tests/a_parked_worker_does_not_hold_back_the_reaping_of_a_finished_one.rs"]
+mod a_parked_worker_does_not_hold_back_the_reaping_of_a_finished_one;
 
 #[cfg(test)]
 #[path = "tests/join_registry_reservations_bound_retained_worker_growth.rs"]

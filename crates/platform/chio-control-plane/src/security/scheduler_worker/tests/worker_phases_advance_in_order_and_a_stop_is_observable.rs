@@ -76,9 +76,9 @@ async fn worker_phases_advance_in_order_and_a_stop_is_observable() {
     .unwrap_or_else(|_| panic!("periodic tick did not start"));
 
     let mut shutdown = Box::pin(handle.shutdown());
-    let _elapsed = tokio::time::timeout(Duration::from_millis(20), &mut shutdown)
-        .await
-        .unwrap_err();
+    if let Ok(early) = tokio::time::timeout(Duration::from_millis(20), &mut shutdown).await {
+        panic!("shutdown finished while the tick was parked: {early:?}");
+    }
     assert_eq!(*phase.borrow_and_update(), WorkerPhase::Stopping);
 
     port.release();

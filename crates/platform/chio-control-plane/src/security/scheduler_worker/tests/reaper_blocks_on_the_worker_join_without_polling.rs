@@ -14,9 +14,12 @@ fn reaper_blocks_on_the_worker_join_without_polling() {
     );
     let (release, parked) = std::sync::mpsc::channel::<()>();
     let worker_for_thread = Arc::clone(&worker);
+    let registry_for_thread = Arc::clone(&registry);
     let join = std::thread::spawn(move || {
         let _ = parked.recv();
-        worker_for_thread.complete_shutdown_after_loop()
+        let result = worker_for_thread.complete_shutdown_after_loop();
+        registry_for_thread.note_thread_exit(std::thread::current().id());
+        result
     });
 
     permit.transfer(join, Arc::clone(&worker));
