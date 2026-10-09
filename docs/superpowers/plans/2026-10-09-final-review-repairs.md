@@ -1,6 +1,6 @@
 # Final foundation review repairs
 
-**Objective:** Repair FINAL-F01 through FINAL-F12 from the independent review of
+**Objective:** Repair FINAL-F01 through FINAL-F13 from the independent review of
 candidate `63ae9a4f5c`, preserving receipt and authority integrity. Publish only
 after the repaired candidate has local acceptance and independent delta review.
 
@@ -21,6 +21,7 @@ KANI-PROOF-QUAL remains OPEN/UNPROVED under the recorded owner amendment.
 | F05-F08 | Root | Reconcile current acceptance with the owner proof amendment and completed capacity evidence, explicitly distinguish encoding noncollision from SHA assumptions, account for duplicate review IDs, and remove internal host aliases. Preserve historical source/evidence hashes and prior states. |
 | F09 | Root | Public health uses nonblocking, process-owned telemetry. It never takes receipt admission or the snapshot database lock, and exposes only configured/state. Detailed observations remain in the trusted owner API. Authenticated reads keep their original integrity checks. |
 | F10 | Cluster helper | Public forwarding has an independent bounded lane; cancellation retains its permit until work terminates. Authenticated forwarding retains its own capacity. |
+| F13 | Claude | Registry transactions cannot lose terminal revocations or use stale capacity accounting under concurrent writers. Inventory handler and CLI mutation entry points before implementation. |
 | F12 | Claude | A principal can refresh a new lineage before its first join; inconsistent materialized state still refuses. Deliver independently of capacity work. |
 | F11 | Cluster helper | Explicit bounded issue-time tolerance does not weaken expiry, signatures, epochs or replay. A stale replicated authority refuses trust reads and reports degraded health until verified synchronization recovers. |
 

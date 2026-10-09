@@ -54,6 +54,24 @@
         "Separate source-bound repair, kernel-path GREEN and inconsistent missing-epoch negative controls.",
         "Owning tests and strict lint, composed validation and independent candidate review."
       ]
+    },
+    {
+      "id": "FINAL-F13",
+      "priority": "P1",
+      "status": "source-confirmed-original-runtime-pending",
+      "requirement": "Concurrent passport/certification publication, dispute or revocation cannot overwrite successful terminal revocation; capacity decisions use the same current transaction.",
+      "reviewed_source": "c2c37c36c98e2bebad8deb6ebdfb589255acb8d3",
+      "source_paths": [
+        "crates/platform/chio-control-plane/src/trust_control/passport_handlers.rs",
+        "crates/platform/chio-control-plane/src/trust_control/certification_handlers.rs",
+        "crates/platform/chio-control-plane/src/trust_control/config_and_public.rs"
+      ],
+      "observation": "The mutation handlers load, modify and replace registry files without a shared transaction or stale-write check. A later stale publisher can overwrite a successful revocation. This is source triage, not a completed runtime test.",
+      "remaining_acceptance": [
+        "Inventory all persistence mutation entry points, including CLI and separate processes, before choosing the transaction boundary.",
+        "Deterministic overlapping Original control, repaired terminal-state and capacity controls, owning strict lint and composition.",
+        "Bounded admission and cancellation-safe lock lifetime; a replaceable inode or path alias cannot bypass exclusion."
+      ]
     }
   ],
   "qualification_boundary": "This checkpoint records open acceptance and a genuine Original failure. It does not establish a runtime repair, full candidate approval, hosted success or merge. KANI-PROOF-QUAL remains OPEN/UNPROVED under the owner amendment; no proof campaign was run."
