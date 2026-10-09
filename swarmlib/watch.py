@@ -159,7 +159,11 @@ def _codex_call(payload: dict) -> str:
 
 
 def _content_text(content) -> str:
-    texts = [c.get("text", "") for c in content or [] if isinstance(c, dict)]
+    parts = [c for c in content or [] if isinstance(c, dict)]
+    texts = [c.get("text", "") for c in parts]
+    if any(c.get("type") == "encrypted_content" for c in parts):  # Codex inter-agent payloads: only the header is plain
+        match = re.search(r"^Message Type:\s*(\S+)", "\n".join(texts), re.M)
+        return f"{match.group(1).replace('_', ' ').lower() if match else 'message'} (encrypted)"
     text = _first_line(" ".join(texts))
     return "(encrypted)" if ENCRYPTED.match(text) else text
 
@@ -434,9 +438,10 @@ def _host_lines(snap: dict, *, agent: str, actions: int) -> list[str]:
         busy = slots.get("holders", [])
         lines.append(f"builds  {len(busy)}/{slots.get('count', '?')} slots busy x {slots.get('jobs', '?')} jobs"
                      f"  queue {len(slots.get('waiting', []))}")
-        for holder in busy:
+        for holder in busy:  # builds started over ssh carry no agent or item; their directory names the lane
+            what = holder.get("item") or os.path.basename(str(holder.get("cwd", "")).rstrip("/")) or "-"
             lines.append(f"  slot {holder['slot']}  {holder.get('class', '')}  {holder.get('agent', '') or '-'}  "
-                         f"{holder.get('item', '') or '-'}  {ago(holder.get('age_s', 0))}  {holder.get('command', '')}")
+                         f"{what}  {ago(holder.get('age_s', 0))}  {holder.get('command', '')}")
         for waiter in slots.get("waiting", []):
             lines.append(f"  queued  {waiter.get('class', '')}  {waiter.get('agent', '') or '-'}  "
                          f"{waiter.get('item', '') or '-'}  {ago(waiter.get('age_s', 0))}  {waiter.get('command', '')}")

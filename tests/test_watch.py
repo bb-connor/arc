@@ -57,6 +57,10 @@ CODEX_SUB = [
     {"timestamp": "2026-10-09T02:43:00Z", "type": "response_item", "payload": {
         "type": "agent_message", "author": "/root", "recipient": "/root/kani_final_delta_review",
         "content": [{"type": "input_text", "text": "Re-run the seal harness with the patched encoder."}]}},
+    {"timestamp": "2026-10-09T02:43:30Z", "type": "response_item", "payload": {
+        "type": "agent_message", "author": "/root", "recipient": "/root/kani_final_delta_review",
+        "content": [{"type": "input_text", "text": "Message Type: NEW_TASK\nTask name: /root/kani\nSender: /root\nPayload:\n"},
+                    {"type": "encrypted_content", "encrypted_content": "gAAAAABqyFbOGGfWizhQKqNHfw2Ey5JNBx9XuqgOG9g"}]}},
     {"timestamp": "2026-10-09T02:44:00Z", "type": "event_msg", "payload": {
         "type": "token_count", "rate_limits": {"primary": {"used_percent": 43.0, "window_minutes": 300}}}},
     {"timestamp": "2026-10-09T02:45:00Z", "type": "event_msg", "payload": {
@@ -104,7 +108,7 @@ class TranscriptTest(unittest.TestCase):
 
     def test_codex_child_agent_shows_nickname_commands_and_rate_limit(self):
         path = jsonl(self.home / ".codex/sessions/2026/10/08/rollout-x-T2.jsonl", CODEX_SUB)
-        session = watch.codex_session(path, keep=5)
+        session = watch.codex_session(path, keep=6)
         self.assertEqual((session.vendor, session.id, session.parent), ("codex", "T2", "T1"))
         self.assertEqual(session.label, "Pauli /root/kani_final_delta_review")
         self.assertEqual(session.model, "gpt-6.1-sol")
@@ -112,6 +116,7 @@ class TranscriptTest(unittest.TestCase):
             '02:41 exec: cargo kani -p chio-kernel --harness "seal"',
             "02:42 send_message -> /root: (encrypted)",
             "02:43 /root -> /root/kani_final_delta_review: Re-run the seal harness with the patched encoder.",
+            "02:43 /root -> /root/kani_final_delta_review: new task (encrypted)",
             "02:45 turn done: Seal harness passes.",
         ])
         self.assertEqual(session.note, "rate limit 43% of 300m")
@@ -196,7 +201,9 @@ def sample_snapshot(host="ws2"):
         "stats": {"load": [16.2, 15.7, 11.6], "cpus": 48, "mem_free_gb": 116.0, "disk_free_gb": 405.0},
         "slots": {"count": 8, "jobs": 6, "holders": [
             {"slot": 0, "item": "train", "agent": "codex-ws2-integrator", "class": "integrator",
-             "command": "cargo check --workspace", "age_s": 300}],
+             "command": "cargo check --workspace", "age_s": 300},
+            {"slot": 5, "item": "", "agent": "", "class": "coder", "cwd": "/home/ubuntu/lanes/claude-hammer-arch-args",
+             "command": "cargo test -p chio-store-sqlite", "age_s": 25}],
             "waiting": [{"item": "F9", "agent": "a", "class": "coder", "command": "cargo test", "age_s": 60}]},
         "processes": [{"vendor": "claude", "pid": 1, "elapsed_s": 100, "args": "claude"},
                       {"vendor": "codex", "pid": 2, "elapsed_s": 100, "args": "codex"},
@@ -226,6 +233,7 @@ class RenderTest(unittest.TestCase):
         self.assertIn("ws2 (ws2-box)  load 16.2/48  mem 116 GB free  disk 405 GB free", text)
         self.assertIn("slot 0  integrator  codex-ws2-integrator  train  5m  cargo check --workspace", text)
         self.assertIn("queue 1", text)
+        self.assertIn("slot 5  coder  -  claude-hammer-arch-args  25s  cargo test -p chio-store-sqlite", text)
         self.assertIn("claude 1, codex 2", text)
         self.assertIn("to-claude.md  2026-10-09T00:54:42Z codex rulings: - Read it.", text)
         self.assertIn("claude  Workstation continuity  claude-opus-5-5  5s ago  2 background agents", text)
