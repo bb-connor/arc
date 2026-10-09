@@ -542,10 +542,9 @@ pub(crate) fn verify_all(tx: &Connection) -> Result<(), AdmissionOperationStoreE
         return Ok(());
     }
     let mut previous = "0".repeat(64);
-    let mut expected = 1;
     let mut high_water = 0;
     let mut statement=tx.prepare("SELECT sequence,record_key,record_version,record_digest,previous_digest,event_digest,observed_at FROM main.admission_operation_recovery_events ORDER BY sequence").map_err(sqlite_error)?;
-    let rows = statement
+    let mut rows = statement
         .query_map([], |row| {
             Ok((
                 row.get::<_, i64>(0)?,
@@ -558,7 +557,7 @@ pub(crate) fn verify_all(tx: &Connection) -> Result<(), AdmissionOperationStoreE
             ))
         })
         .map_err(sqlite_error)?;
-    for row in rows {
+    rows.try_fold(1_u64, |expected, row| {
         let (sequence, key, version, digest, parent, event, observed) =
             row.map_err(sqlite_error)?;
         let observed = stored_u64(observed, "recovery observed time")?;
@@ -573,8 +572,9 @@ pub(crate) fn verify_all(tx: &Connection) -> Result<(), AdmissionOperationStoreE
         }
         high_water = observed;
         previous = event;
-        expected += 1;
-    }
+        Ok::<_, AdmissionOperationStoreError>(expected + 1)
+    })?;
+    drop(rows);
     let invalid:bool=tx.query_row("SELECT EXISTS(SELECT 1 FROM main.admission_operation_recovery_records r WHERE (SELECT count(*) FROM main.admission_operation_recovery_events e WHERE e.record_key=r.record_key)<>r.version OR (SELECT max(record_version) FROM main.admission_operation_recovery_events e WHERE e.record_key=r.record_key)<>r.version) OR EXISTS(SELECT 1 FROM main.admission_operation_recovery_events e WHERE NOT EXISTS(SELECT 1 FROM main.admission_operation_recovery_records r WHERE r.record_key=e.record_key))",[],|row|row.get(0)).map_err(sqlite_error)?;
     if invalid {
         return Err(invariant("recovery history coverage is incomplete"));

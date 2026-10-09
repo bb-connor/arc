@@ -9,7 +9,7 @@ pub(super) fn verify_predecessor(
     connection: &Connection,
     version: i32,
 ) -> Result<(), AdmissionOperationStoreError> {
-    if !matches!(version, 35 | 36 | 37) {
+    if !matches!(version, 35..=37) {
         return Ok(());
     }
     verify_admission_operation_schema(connection, version)?;

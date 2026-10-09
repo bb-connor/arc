@@ -539,8 +539,7 @@ impl SqliteAdmissionOperationStore {
             .as_ref()
             .ok_or_else(|| refused("return admission"))?
             .admitted
-            .state
-            .clone();
+            .state;
         self.commit_write(tx)?;
         self.sync_after_write(&connection)?;
         Ok(acknowledged)

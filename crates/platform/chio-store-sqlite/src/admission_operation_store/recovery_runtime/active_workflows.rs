@@ -552,14 +552,13 @@ fn require_terminal_retirement(
     physical: &RecoveryWorkflowRecordV1,
     expected: &ProjectionDigest,
 ) -> Result<(), AdmissionOperationStoreError> {
-    if super::super::historical_holds::effective(tx, physical)?.is_some() {
-        if super::super::historical_holds::blocks_original_private_settlement(tx, physical)?
-            || !super::super::terminal_custody::private_settlement_committed(tx, physical)?
-        {
-            return Err(invariant(
-                "captured terminal retirement retains its historical hold",
-            ));
-        }
+    if super::super::historical_holds::effective(tx, physical)?.is_some()
+        && (super::super::historical_holds::blocks_original_private_settlement(tx, physical)?
+            || !super::super::terminal_custody::private_settlement_committed(tx, physical)?)
+    {
+        return Err(invariant(
+            "captured terminal retirement retains its historical hold",
+        ));
     }
     auxiliary_captured_terminal(tx, physical)?
         .ok_or_else(|| invariant("retired captured workflow lost terminal custody"))?;

@@ -16,50 +16,56 @@ const MAX_IMAGE_BYTES: usize = 8 * 1024 * 1024;
 #[derive(Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum FlowTable {
-    SecurityFlowContexts,
-    SecurityFlowSequences,
-    SecurityIsolationEpochs,
-    SecurityLineageFlowState,
-    SecurityPrincipalFlowState,
-    SecuritySessionFlowState,
-    SecuritySessionMemberships,
-    SecurityTransitions,
+    #[serde(rename = "security_flow_contexts")]
+    FlowContexts,
+    #[serde(rename = "security_flow_sequences")]
+    FlowSequences,
+    #[serde(rename = "security_isolation_epochs")]
+    IsolationEpochs,
+    #[serde(rename = "security_lineage_flow_state")]
+    LineageFlowState,
+    #[serde(rename = "security_principal_flow_state")]
+    PrincipalFlowState,
+    #[serde(rename = "security_session_flow_state")]
+    SessionFlowState,
+    #[serde(rename = "security_session_memberships")]
+    SessionMemberships,
+    #[serde(rename = "security_transitions")]
+    Transitions,
 }
 
 impl FlowTable {
     fn parse(value: &str) -> Result<Self, AdmissionOperationStoreError> {
         match value {
-            "security_flow_contexts" => Ok(Self::SecurityFlowContexts),
-            "security_flow_sequences" => Ok(Self::SecurityFlowSequences),
-            "security_isolation_epochs" => Ok(Self::SecurityIsolationEpochs),
-            "security_lineage_flow_state" => Ok(Self::SecurityLineageFlowState),
-            "security_principal_flow_state" => Ok(Self::SecurityPrincipalFlowState),
-            "security_session_flow_state" => Ok(Self::SecuritySessionFlowState),
-            "security_session_memberships" => Ok(Self::SecuritySessionMemberships),
-            "security_transitions" => Ok(Self::SecurityTransitions),
+            "security_flow_contexts" => Ok(Self::FlowContexts),
+            "security_flow_sequences" => Ok(Self::FlowSequences),
+            "security_isolation_epochs" => Ok(Self::IsolationEpochs),
+            "security_lineage_flow_state" => Ok(Self::LineageFlowState),
+            "security_principal_flow_state" => Ok(Self::PrincipalFlowState),
+            "security_session_flow_state" => Ok(Self::SessionFlowState),
+            "security_session_memberships" => Ok(Self::SessionMemberships),
+            "security_transitions" => Ok(Self::Transitions),
             _ => Err(invalid()),
         }
     }
 
     fn name(self) -> &'static str {
         match self {
-            Self::SecurityFlowContexts => "security_flow_contexts",
-            Self::SecurityFlowSequences => "security_flow_sequences",
-            Self::SecurityIsolationEpochs => "security_isolation_epochs",
-            Self::SecurityLineageFlowState => "security_lineage_flow_state",
-            Self::SecurityPrincipalFlowState => "security_principal_flow_state",
-            Self::SecuritySessionFlowState => "security_session_flow_state",
-            Self::SecuritySessionMemberships => "security_session_memberships",
-            Self::SecurityTransitions => "security_transitions",
+            Self::FlowContexts => "security_flow_contexts",
+            Self::FlowSequences => "security_flow_sequences",
+            Self::IsolationEpochs => "security_isolation_epochs",
+            Self::LineageFlowState => "security_lineage_flow_state",
+            Self::PrincipalFlowState => "security_principal_flow_state",
+            Self::SessionFlowState => "security_session_flow_state",
+            Self::SessionMemberships => "security_session_memberships",
+            Self::Transitions => "security_transitions",
         }
     }
 
     fn carries_label(self) -> bool {
         matches!(
             self,
-            Self::SecurityLineageFlowState
-                | Self::SecurityPrincipalFlowState
-                | Self::SecuritySessionFlowState
+            Self::LineageFlowState | Self::PrincipalFlowState | Self::SessionFlowState
         )
     }
 }
