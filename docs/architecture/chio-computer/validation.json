@@ -1,13 +1,29 @@
 {
   "schema": "chio.computer.design-check.v1",
-  "python_examples_syntax_checked": 3,
+  "design_revision": 2,
+  "document_sha256": {
+    "01-ENVIRONMENTS.md": "de2c8b06502b4d6155b6d8c923c7764fa535419989660c8101a195d969be6e1a",
+    "02-RESOURCE-BRANCHES.md": "b23900896752d7ba01b7adbbd7e9980606eb64b8aa6a582c73f4379c476a3801",
+    "03-PROGRAMS.md": "63321c2219e68711380b310eb62cf46bf4aeadbc8503e635bd690ff1e27fa994",
+    "04-EXECUTION-BINDINGS.md": "56d89656e86aae29340e2909ab2c48fedce138de73b1def73a5b472d8369efca",
+    "05-EXECUTION-AND-APPLY.md": "b3227d196202d7e5312e79652778478444fe64bad285b313dae8a929d0be25c1",
+    "ACCEPTANCE.md": "9b9fe264b281ac547af3f5ffa0d30e757d6be253a848b71db5bb5b3b01d68590",
+    "CODEBASE-COVERAGE.md": "13ef653a41f5fd878d9e84dea3b6f30e59f189e9577329c02de38fb70dec0c1d",
+    "PROPOSAL.md": "060710228b09956ff8c6d6130d9eb0e1abe6f79c7ff216e1a104e54ddf9ea402",
+    "ROADMAP-CROSSWALK.md": "79e00585f54de4eb1a9b9890476a0c9c818128a78f2cd52a55828093362b4371"
+  },
+  "validator_sha256": "3bc644d29e473159d7bfb40a4dbbe014da35b10f917909354155429735bd7f9c",
+  "source_evidence_sha256": "fe3e38c4a42fa633fc2f5864609e5504fe7207461c65c5a07d2212af4d52a05d",
+  "python_examples_syntax_checked": 2,
   "operator_precedence_checked": true,
-  "source_files_recorded": 39,
-  "all_recorded_sources_match_view_head": true,
-  "no_em_dashes": true,
+  "local_links_checked": 28,
+  "pinned_source_links_checked": 192,
+  "source_records": 274,
+  "source_objects_hash_and_line_count_checked": 292,
+  "distinct_crate_manifests": 158,
+  "crate_groups": 12,
+  "proposed_acceptance_cases": 37,
   "runtime_tests_run": false,
   "api_implemented": false,
-  "recorded_source_hashes_rechecked": true,
-  "no_trailing_whitespace": true,
-  "hosted_source_commit_hashes_rechecked": true
+  "errors": []
 }
