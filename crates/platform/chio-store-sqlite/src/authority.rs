@@ -10,6 +10,7 @@ use chio_core::capability::{
     token::{CapabilityToken, CapabilityTokenBody},
 };
 use chio_core::crypto::{Keypair, PublicKey, Signature};
+use chio_kernel::authority::replication::AuthorityEnvelopeClockPolicy;
 use chio_kernel::{
     ensure_capability_issuance_supported, AuthoritySnapshot, AuthorityStatus, AuthorityStoreError,
     AuthorityTrustedKeySnapshot, CapabilityAuthority, KernelError,
@@ -23,13 +24,16 @@ mod lifecycle;
 mod read_only;
 mod replication;
 use boundaries::*;
-pub use read_only::{AuthorityInspectionError, SqliteAuthorityInspection};
+pub use read_only::{
+    AuthorityInspectionError, AuthorityVerificationStatus, SqliteAuthorityInspection,
+};
 
 #[cfg(test)]
 mod transaction_tests;
 
 pub struct SqliteCapabilityAuthority {
     clock: crate::store_clock::StoreClock,
+    replication_clock_policy: AuthorityEnvelopeClockPolicy,
     custody: custody::AuthorityCustody,
     cached_public_key: Mutex<PublicKey>,
 }
@@ -63,6 +67,20 @@ impl SqliteCapabilityAuthority {
     pub fn open_with_clock(
         path: impl AsRef<Path>,
         clock: std::sync::Arc<dyn chio_security_types::clock::Clock>,
+    ) -> Result<Self, AuthorityStoreError> {
+        Self::open_with_clock_and_replication_policy(
+            path,
+            clock,
+            AuthorityEnvelopeClockPolicy::default(),
+        )
+    }
+
+    /// Configure a bounded peer skew without relaxing local signing time or
+    /// the persisted local clock floor. Existing opens remain strict by default.
+    pub fn open_with_clock_and_replication_policy(
+        path: impl AsRef<Path>,
+        clock: std::sync::Arc<dyn chio_security_types::clock::Clock>,
+        replication_clock_policy: AuthorityEnvelopeClockPolicy,
     ) -> Result<Self, AuthorityStoreError> {
         let custody = custody::AuthorityCustody::prepare(path.as_ref())?;
 
@@ -125,11 +143,16 @@ impl SqliteCapabilityAuthority {
                 "authority head is absent from persisted issuer history; restore an authenticated backup before reopening".into(),
             ));
         }
-        lifecycle::observe_time(&transaction, bootstrap_time)?;
+        replication::observe_replication_time(
+            &transaction,
+            bootstrap_time,
+            replication_clock_policy,
+        )?;
         custody.validate(&transaction)?;
         transaction.commit()?;
         Ok(Self {
             clock,
+            replication_clock_policy,
             custody,
             cached_public_key: Mutex::new(status.public_key),
         })
@@ -139,7 +162,7 @@ impl SqliteCapabilityAuthority {
         let mut connection = Self::open_connection(&self.custody)?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let now = self.clock.unix_millis()?;
-        lifecycle::observe_time(&transaction, now)?;
+        replication::observe_replication_time(&transaction, now, self.replication_clock_policy)?;
         let snapshot = replication::read_snapshot(&transaction)?;
         let mut status = Self::read_status_from_connection(&transaction)?;
         status.trusted_public_keys = lifecycle::live_public_keys(&snapshot, now.as_secs())?;

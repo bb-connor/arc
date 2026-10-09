@@ -50,13 +50,16 @@ mod cluster_and_reports_tests {
         revocation_db_path: Option<PathBuf>,
         budget_db_path: Option<PathBuf>,
     ) -> TrustServiceState {
+        let finding_challenge_clock: Arc<dyn chio_security_types::clock::Clock> =
+            Arc::new(chio_security_types::clock::SystemClock);
         let mut config = base_config();
         config.advertise_url = Some(advertise_url.to_string());
         config.peer_urls = peer_urls.iter().map(|value| value.to_string()).collect();
         config.receipt_db_path = receipt_db_path;
         config.revocation_db_path = revocation_db_path;
         config.budget_db_path = budget_db_path;
-        let cluster = build_cluster_state(&config, config.listen).test_unwrap();
+        let cluster = build_cluster_state(&config, config.listen, finding_challenge_clock.clone())
+            .test_unwrap();
         let cluster_progress = cluster.as_ref().map(|_| Arc::new(ClusterProgress::new()));
         let budget_store = config
             .budget_db_path
@@ -76,7 +79,7 @@ mod cluster_and_reports_tests {
             service_runtime::open_service_receipt_store(config.receipt_db_path.as_deref())
                 .test_unwrap();
         let state = TrustServiceState {
-            finding_challenge_clock: Arc::new(chio_security_types::clock::SystemClock),
+            finding_challenge_clock,
             config,
             authority_keyring: None,
             authority_keyring_seed_path: None,
@@ -96,6 +99,7 @@ mod cluster_and_reports_tests {
             cluster,
             cluster_progress,
             leader_forward_lane: Arc::new(tokio::sync::Semaphore::new(LEADER_FORWARD_PERMITS)),
+            authority_health_lane: Arc::new(tokio::sync::Semaphore::new(1)),
             public_passport_challenge_lane: Arc::new(tokio::sync::Semaphore::new(
                 crate::trust_control::report_rendering::PUBLIC_PASSPORT_CHALLENGE_PERMITS,
             )),
@@ -206,25 +210,31 @@ mod cluster_and_reports_tests {
         invalid.peer_urls = vec!["http://127.0.0.1:3300".to_string()];
         invalid.authority_seed_path = Some(unique_temp_path("authority", "seed"));
 
-        let error = build_cluster_state(&invalid, invalid.listen).test_unwrap_err();
+        let error =
+            build_cluster_state(&invalid, invalid.listen, chio_test_support::clock::clock())
+                .test_unwrap_err();
         assert!(error
             .to_string()
             .contains("--authority-db instead of --authority-seed-file"));
 
-        assert!(
-            build_cluster_state(&base_config(), "127.0.0.1:0".parse().test_unwrap())
-                .test_unwrap()
-                .is_none()
-        );
+        assert!(build_cluster_state(
+            &base_config(),
+            "127.0.0.1:0".parse().test_unwrap(),
+            chio_test_support::clock::clock()
+        )
+        .test_unwrap()
+        .is_none());
 
         let mut standalone_advertised = base_config();
         standalone_advertised.allow_local_peer_urls = false;
         standalone_advertised.advertise_url = Some("http://127.0.0.1:3200/".to_string());
-        assert!(
-            build_cluster_state(&standalone_advertised, standalone_advertised.listen)
-                .test_unwrap()
-                .is_none()
-        );
+        assert!(build_cluster_state(
+            &standalone_advertised,
+            standalone_advertised.listen,
+            chio_test_support::clock::clock()
+        )
+        .test_unwrap()
+        .is_none());
 
         let mut config = base_config();
         config.advertise_url = Some("http://127.0.0.1:3200/".to_string());
@@ -234,9 +244,10 @@ mod cluster_and_reports_tests {
             "http://127.0.0.1:3300".to_string(),
         ];
 
-        let cluster = build_cluster_state(&config, config.listen)
-            .test_unwrap()
-            .test_unwrap();
+        let cluster =
+            build_cluster_state(&config, config.listen, chio_test_support::clock::clock())
+                .test_unwrap()
+                .test_unwrap();
         let guard = cluster.lock().test_unwrap();
         assert_eq!(guard.self_url, "http://127.0.0.1:3200");
         assert_eq!(guard.peers.len(), 1);
@@ -1744,8 +1755,12 @@ mod cluster_and_reports_tests {
         zero_cluster_interval.advertise_url = Some("http://127.0.0.1:3200".to_string());
         zero_cluster_interval.peer_urls = vec!["http://127.0.0.1:3300".to_string()];
         zero_cluster_interval.cluster_sync_interval = Duration::ZERO;
-        let error = build_cluster_state(&zero_cluster_interval, zero_cluster_interval.listen)
-            .test_unwrap_err();
+        let error = build_cluster_state(
+            &zero_cluster_interval,
+            zero_cluster_interval.listen,
+            chio_test_support::clock::clock(),
+        )
+        .test_unwrap_err();
         assert!(error
             .to_string()
             .contains("cluster sync interval must be non-zero"));

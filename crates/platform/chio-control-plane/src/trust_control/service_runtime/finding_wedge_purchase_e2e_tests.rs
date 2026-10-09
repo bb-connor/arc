@@ -591,6 +591,7 @@ fn market_state(
         certification_public_metadata_ttl_seconds: 300,
         peer_urls: Vec::new(),
         cluster_sync_interval: std::time::Duration::from_millis(25),
+        authority_replication_max_future_skew_seconds: 0,
         roster_policy: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         finding_market: Some(config),
@@ -616,6 +617,7 @@ fn market_state(
         cluster: None,
         cluster_progress: None,
         leader_forward_lane: Arc::new(tokio::sync::Semaphore::new(1)),
+        authority_health_lane: Arc::new(tokio::sync::Semaphore::new(1)),
         public_passport_challenge_lane: Arc::new(tokio::sync::Semaphore::new(
             crate::trust_control::report_rendering::PUBLIC_PASSPORT_CHALLENGE_PERMITS,
         )),

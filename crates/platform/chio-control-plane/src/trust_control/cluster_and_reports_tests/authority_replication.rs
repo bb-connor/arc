@@ -90,7 +90,7 @@ pub(super) fn pull_snapshot(
     .test_unwrap();
     let result = sync_peer_authority(state, &client);
     peer.join().test_unwrap();
-    result
+    result.map(|_| ())
 }
 
 #[test]

@@ -46,6 +46,7 @@ pub(crate) fn dispatch_trust(
                 peer_urls,
                 allow_local_peer_urls,
                 cluster_sync_interval_ms,
+                authority_replication_max_future_skew_seconds,
                 policy,
                 enterprise_providers_file,
                 federation_policies_file,
@@ -102,6 +103,7 @@ pub(crate) fn dispatch_trust(
                 certification_public_metadata_ttl_seconds,
                 &peer_urls,
                 cluster_sync_interval_ms,
+                authority_replication_max_future_skew_seconds,
                 roster_policy_file.as_deref(),
             ),
             TrustCommands::Provider { command } => match command {

@@ -121,6 +121,7 @@ fn test_config(joint_authority_db_path: PathBuf) -> TrustServiceConfig {
         certification_public_metadata_ttl_seconds: 300,
         peer_urls: Vec::new(),
         cluster_sync_interval: Duration::from_millis(25),
+        authority_replication_max_future_skew_seconds: 0,
         roster_policy: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         finding_market: None,

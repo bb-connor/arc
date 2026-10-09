@@ -38,9 +38,15 @@ pub(crate) async fn handle_internal_authority_snapshot(
         return response;
     }
     if let Some(path) = state.config.authority_db_path.as_deref() {
-        let authority = match SqliteCapabilityAuthority::open_with_clock(
+        let authority = match SqliteCapabilityAuthority::open_with_clock_and_replication_policy(
             path,
             state.finding_challenge_clock.clone(),
+            match state.config.authority_replication_clock_policy() {
+                Ok(policy) => policy,
+                Err(error) => {
+                    return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string())
+                }
+            },
         ) {
             Ok(authority) => authority,
             Err(error) => {
@@ -121,9 +127,18 @@ fn export_signed_authority(
     state: &TrustServiceState,
     path: &Path,
 ) -> Option<AuthoritySnapshotView> {
-    let exported =
-        SqliteCapabilityAuthority::open_with_clock(path, state.finding_challenge_clock.clone())
-            .and_then(|authority| authority.signed_snapshot());
+    let exported = state
+        .config
+        .authority_replication_clock_policy()
+        .and_then(|policy| {
+            SqliteCapabilityAuthority::open_with_clock_and_replication_policy(
+                path,
+                state.finding_challenge_clock.clone(),
+                policy,
+            )
+            .map_err(CliError::from)
+        })
+        .and_then(|authority| authority.signed_snapshot().map_err(CliError::from));
     match exported {
         Ok(envelope) => Some(envelope),
         Err(error) => {
@@ -494,8 +509,12 @@ fn import_snapshot_authority(
     else {
         return Ok(());
     };
-    SqliteCapabilityAuthority::open_with_clock(path, state.finding_challenge_clock.clone())?
-        .apply_signed_snapshot(&envelope)?;
+    SqliteCapabilityAuthority::open_with_clock_and_replication_policy(
+        path,
+        state.finding_challenge_clock.clone(),
+        state.config.authority_replication_clock_policy()?,
+    )?
+    .apply_signed_snapshot(&envelope)?;
     Ok(())
 }
 
@@ -609,9 +628,12 @@ fn seed_cluster_authority_from_snapshot(
 
     let snapshot_leader = authority_lease.map(|lease| lease.leader_url.clone());
     if let Some(path) = state.config.authority_db_path.as_deref() {
-        let authority =
-            SqliteCapabilityAuthority::open_with_clock(path, state.finding_challenge_clock.clone())
-                .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+        let authority = SqliteCapabilityAuthority::open_with_clock_and_replication_policy(
+            path,
+            state.finding_challenge_clock.clone(),
+            state.config.authority_replication_clock_policy()?,
+        )
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
         authority
             .seed_cluster_fence(snapshot_leader.as_deref(), snapshot_term)
             .map_err(|error| CliError::cli_other_error(error.to_string()))?;

@@ -1599,6 +1599,7 @@ mod underwriting_and_support_tests {
             certification_public_metadata_ttl_seconds: 900,
             peer_urls: Vec::new(),
             cluster_sync_interval: Duration::from_millis(200),
+            authority_replication_max_future_skew_seconds: 0,
             roster_policy: None,
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
             finding_market: None,

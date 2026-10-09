@@ -212,6 +212,45 @@ mod cli_env_tests {
     }
 
     #[test]
+    fn final_f11_authority_replication_skew_cli_is_explicit_and_bounded() {
+        let default = parse_cli(["chio", "trust", "serve", "--service-token", "test-token"])
+            .unwrap_or_else(|error| panic!("parse default authority skew: {error}"));
+        assert!(matches!(
+            default.command,
+            Commands::Trust {
+                command: TrustCommands::Serve {
+                    authority_replication_max_future_skew_seconds: 0,
+                    ..
+                }
+            }
+        ));
+        for skew in ["0", "1", "60"] {
+            assert!(parse_cli([
+                "chio",
+                "trust",
+                "serve",
+                "--service-token",
+                "test-token",
+                "--authority-replication-max-future-skew-seconds",
+                skew,
+            ])
+            .is_ok());
+        }
+        for skew in ["61", "18446744073709551615"] {
+            assert!(parse_cli([
+                "chio",
+                "trust",
+                "serve",
+                "--service-token",
+                "test-token",
+                "--authority-replication-max-future-skew-seconds",
+                skew,
+            ])
+            .is_err());
+        }
+    }
+
+    #[test]
     fn receipt_retention_cli_accepts_explicit_policy_on_both_launchers() {
         for prefix in [
             vec!["chio", "start"],

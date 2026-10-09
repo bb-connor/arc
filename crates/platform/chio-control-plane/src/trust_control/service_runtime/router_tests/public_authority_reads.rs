@@ -195,7 +195,7 @@ fn unrefused(call: &PublicCall, status: StatusCode, body: &[u8]) -> Option<Strin
             status == StatusCode::NOT_FOUND || status == StatusCode::CONFLICT
         }
         Surface::Health => {
-            status == StatusCode::OK
+            status == StatusCode::SERVICE_UNAVAILABLE
                 && health_authority(body).is_ok_and(|authority| {
                     authority["configured"] == serde_json::Value::Bool(true)
                         && (authority["available"] == serde_json::Value::Bool(false)
@@ -624,9 +624,9 @@ async fn public_routes_refuse_absent_authority_with_a_typed_message() -> TestRes
     assert!(String::from_utf8_lossy(&body)
         .contains("requires a configured authority whose database its owner has initialized"));
     let (status, body) = fixture.get(HEALTH_PATH).await?;
-    assert_eq!(status, StatusCode::OK);
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
     let health: serde_json::Value = serde_json::from_slice(&body)?;
-    assert_eq!(health["ok"], serde_json::Value::Bool(true));
+    assert_eq!(health["ok"], serde_json::Value::Bool(false));
     assert_eq!(
         health["authority"],
         serde_json::json!({

@@ -6,7 +6,9 @@ use chio_kernel::AuthorityStoreError;
 use chio_security_types::clock::{Clock, FixedClock};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-const IMPORTER_URL: &str = "http://127.0.0.1:3300";
+// Sort after every loopback exporter so the importing follower consistently
+// recognizes the exporter as its elected leader.
+const IMPORTER_URL: &str = "http://127.0.0.2:3300";
 const REVOKED: &str = "cap-revoked-before-authority-sync";
 const REVOKED_LATER: &str = "cap-revoked-while-authority-is-held";
 const UNPINNED: &str = "authority replication requires an out-of-band pinned anchor";
@@ -14,6 +16,9 @@ const OUTSIDE_FRESHNESS: &str = "authority envelope outside freshness window";
 const NO_LIVE_ENVELOPE: &str = "follower has no authenticated live envelope to relay";
 const RELAY_REGRESSES: &str = "authority envelope replay regresses issuance time";
 const UNPINNED_STARTUP: &str = "clustered trust control requires an out-of-band pinned authority replication anchor in --authority-db; initialize it on the signing custodian with `chio federation authority replication-init` and pin it on every follower with `chio federation authority replication-pin` before starting";
+
+#[path = "authority_clock_contract.rs"]
+mod authority_clock_contract;
 
 /// Holds one numbered authority-snapshot request inside the exporter until
 /// the test releases it, so the importer is observable mid-round.
@@ -48,6 +53,7 @@ impl AuthorityGate {
 struct ServedPeer {
     url: String,
     gate: Option<Arc<AuthorityGate>>,
+    snapshot_unavailable: Arc<std::sync::atomic::AtomicBool>,
     shutdown: Option<tokio::sync::oneshot::Sender<()>>,
     server: Option<std::thread::JoinHandle<()>>,
 }
@@ -67,6 +73,18 @@ impl ServedPeer {
     ) -> Self {
         use axum::routing::get;
         let held_gate = gate.clone();
+        let snapshot_unavailable = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let served_snapshot_unavailable = snapshot_unavailable.clone();
+        let cluster_snapshot = move |state: State<TrustServiceState>, headers: HeaderMap| {
+            let unavailable = served_snapshot_unavailable.clone();
+            async move {
+                if unavailable.load(Ordering::SeqCst) {
+                    plain_http_error(StatusCode::SERVICE_UNAVAILABLE, "snapshot unavailable")
+                } else {
+                    handle_internal_cluster_snapshot(state, headers).await
+                }
+            }
+        };
         let gated_authority_snapshot =
             move |state: State<TrustServiceState>, headers: HeaderMap| {
                 let gate = gate.clone();
@@ -82,10 +100,7 @@ impl ServedPeer {
                 INTERNAL_CLUSTER_STATUS_PATH,
                 get(handle_internal_cluster_status),
             )
-            .route(
-                INTERNAL_CLUSTER_SNAPSHOT_PATH,
-                get(handle_internal_cluster_snapshot),
-            )
+            .route(INTERNAL_CLUSTER_SNAPSHOT_PATH, get(cluster_snapshot))
             .route(
                 INTERNAL_AUTHORITY_SNAPSHOT_PATH,
                 get(gated_authority_snapshot),
@@ -115,6 +130,7 @@ impl ServedPeer {
         Self {
             url,
             gate: held_gate,
+            snapshot_unavailable,
             shutdown: Some(shutdown),
             server: Some(server),
         }
@@ -518,7 +534,8 @@ fn clustered_startup_refuses_an_unpinned_authority_database() {
     config.peer_urls = vec!["https://node-b".to_string()];
     config.authority_db_path = Some(authority_db_path.clone());
 
-    let error = build_cluster_state(&config, config.listen).test_unwrap_err();
+    let error = build_cluster_state(&config, config.listen, chio_test_support::clock::clock())
+        .test_unwrap_err();
     assert_eq!(
         error.to_string(),
         CliError::cli_other_error(UNPINNED_STARTUP).to_string()
@@ -527,15 +544,95 @@ fn clustered_startup_refuses_an_unpinned_authority_database() {
     // A single node replicates no signed authority, so it needs no anchor.
     let mut standalone = config.clone();
     standalone.peer_urls.clear();
-    assert!(build_cluster_state(&standalone, standalone.listen)
-        .test_unwrap()
-        .is_none());
+    assert!(build_cluster_state(
+        &standalone,
+        standalone.listen,
+        chio_test_support::clock::clock()
+    )
+    .test_unwrap()
+    .is_none());
 
     SqliteCapabilityAuthority::open(&authority_db_path)
         .test_unwrap()
         .initialize_replication("startup-pin")
         .test_unwrap();
-    assert!(build_cluster_state(&config, config.listen)
-        .test_unwrap()
-        .is_some());
+    assert!(
+        build_cluster_state(&config, config.listen, chio_test_support::clock::clock())
+            .test_unwrap()
+            .is_some()
+    );
+}
+
+#[test]
+fn final_f11_refused_authority_is_degraded_until_a_signed_import_recovers() {
+    let mut pair = replication_pair(AuthorityFault::LaggingImporterClock);
+    assert!(sync_peer(&pair.importer, &pair.exporter.url).is_err());
+    assert!(importer_revoked(&pair), "revocations must keep progressing");
+    assert!(peer_view(&pair, |peer| peer.health.is_reachable()));
+    assert_eq!(peer_view(&pair, |peer| peer.health.label()), "degraded");
+    update_peer_success(&pair.importer, &pair.exporter.url);
+    update_peer_reachable(&pair.importer, &pair.exporter.url);
+    assert_eq!(peer_view(&pair, |peer| peer.health.label()), "degraded");
+
+    pair.importer.finding_challenge_clock = fixed_clock(pair.provisioned_at + 120);
+    sync_peer(&pair.importer, &pair.exporter.url).test_unwrap();
+    assert_eq!(peer_view(&pair, |peer| peer.health.label()), "healthy");
+    assert_eq!(peer_view(&pair, |peer| peer.authority_error.clone()), None);
+}
+
+fn workload_headers() -> HeaderMap {
+    let mut headers = HeaderMap::new();
+    headers.insert(AUTHORIZATION, "Bearer token".parse().test_unwrap());
+    headers
+}
+
+#[tokio::test]
+async fn final_f11_follower_does_not_serve_issuer_trust_after_envelope_expiry() {
+    let mut pair = replication_pair(AuthorityFault::LaggingImporterClock);
+    pair.importer.finding_challenge_clock = fixed_clock(pair.provisioned_at + 300);
+    let response = handle_authority_status(State(pair.importer), workload_headers()).await;
+    assert_eq!(
+        response.status(),
+        StatusCode::SERVICE_UNAVAILABLE,
+        "follower served trusted issuer keys at its signed envelope's exclusive expiry"
+    );
+}
+
+#[tokio::test]
+async fn final_f11_known_stale_follower_refuses_authority_reads_and_reports_health() {
+    use tower::ServiceExt;
+
+    let pair = replication_pair(AuthorityFault::LaggingImporterClock);
+    let custodian = SqliteCapabilityAuthority::open_with_clock(
+        pair._directory.path().join("exporter-authority.sqlite3"),
+        fixed_clock(pair.provisioned_at + 60),
+    )
+    .test_unwrap();
+    let compromised = custodian.status().test_unwrap().public_key;
+    custodian.rotate().test_unwrap();
+    custodian.revoke_issuer(&compromised).test_unwrap();
+    assert!(sync_peer(&pair.importer, &pair.exporter.url).is_err());
+    assert!(importer_revoked(&pair));
+    let response = handle_authority_status(State(pair.importer.clone()), workload_headers()).await;
+    let health = crate::trust_control::trust_control_health::install_health_routes(Router::new())
+        .with_state(pair.importer.clone())
+        .oneshot(
+            axum::http::Request::builder()
+                .uri(HEALTH_PATH)
+                .body(axum::body::Body::empty())
+                .test_unwrap(),
+        )
+        .await
+        .test_unwrap();
+    let health: Value =
+        serde_json::from_slice(&to_bytes(health.into_body(), 64 * 1024).await.test_unwrap())
+            .test_unwrap();
+    assert_eq!(
+        response.status(),
+        StatusCode::SERVICE_UNAVAILABLE,
+        "a follower whose elected leader's authority import was refused served the old issuer"
+    );
+    assert_eq!(health["authority"]["available"], false);
+    assert_eq!(health["cluster"]["degradedPeers"], 1);
+    assert_eq!(health["cluster"]["healthyPeers"], 0);
 }

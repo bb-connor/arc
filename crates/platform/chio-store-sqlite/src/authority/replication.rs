@@ -118,7 +118,7 @@ impl SqliteCapabilityAuthority {
         let mut replication = require_replication(&transaction)?;
         let current = read_snapshot(&transaction)?;
         let now = self.clock.unix_millis()?;
-        super::lifecycle::observe_time(&transaction, now)?;
+        observe_replication_time(&transaction, now, self.replication_clock_policy)?;
         check_clock(&replication, now)?;
         let signer = Self::read_keypair_from_connection(&transaction)?;
         let snapshot = if signer.public_key().to_hex() == current.public_key_hex {
@@ -134,11 +134,12 @@ impl SqliteCapabilityAuthority {
                 .clone()
                 .ok_or_else(|| refused("follower has no authenticated live envelope to relay"))?
         };
-        snapshot.verify(
+        snapshot.verify_with_clock_policy(
             &replication.anchor,
             &current,
             &replication.commitment,
             now.as_secs(),
+            self.replication_clock_policy,
         )?;
         replication.latest = Some(snapshot.clone());
         replication.observed_ms = now.get();
@@ -156,13 +157,14 @@ impl SqliteCapabilityAuthority {
         let mut replication = require_replication(&transaction)?;
         let current = read_snapshot(&transaction)?;
         let now = self.clock.unix_millis()?;
-        super::lifecycle::observe_time(&transaction, now)?;
+        observe_replication_time(&transaction, now, self.replication_clock_policy)?;
         check_clock(&replication, now)?;
-        let proof = snapshot.verify(
+        let proof = snapshot.verify_with_clock_policy(
             &replication.anchor,
             &current,
             &replication.commitment,
             now.as_secs(),
+            self.replication_clock_policy,
         )?;
         if replication
             .latest
@@ -186,6 +188,69 @@ impl SqliteCapabilityAuthority {
         self.update_cached_public_key(status.public_key);
         Ok(changed)
     }
+}
+
+/// An admitted future remote transition is signed evidence, not a future local
+/// clock sample. Authenticate it before allowing a policy-aware reopen/read.
+/// Local observed time and a locally owned signing head retain strict floors.
+pub(super) fn validate_replication_time_floor(
+    connection: &Connection,
+    now: UnixMillis,
+    clock_policy: AuthorityEnvelopeClockPolicy,
+) -> Result<(), AuthorityStoreError> {
+    let (observed, changed) = super::lifecycle::persisted_time_floor(connection)?;
+    if now.get() < observed {
+        return Err(ClockError::WallClockRegression.into());
+    }
+    if now.as_secs() < changed {
+        let current = read_snapshot(connection)?;
+        if SqliteCapabilityAuthority::read_keypair_from_connection(connection)?
+            .public_key()
+            .to_hex()
+            == current.public_key_hex
+        {
+            return Err(ClockError::WallClockRegression.into());
+        }
+        verify_live_envelope(connection, &current, now, clock_policy)?;
+    }
+    Ok(())
+}
+
+pub(super) fn observe_replication_time(
+    connection: &Connection,
+    now: UnixMillis,
+    clock_policy: AuthorityEnvelopeClockPolicy,
+) -> Result<(), AuthorityStoreError> {
+    validate_replication_time_floor(connection, now, clock_policy)?;
+    super::lifecycle::persist_observed_time(connection, now)
+}
+
+/// Verification readers may expose a remote head only while the last accepted
+/// envelope authenticates that exact persisted state and remains unexpired.
+pub(super) fn verify_live_envelope(
+    connection: &Connection,
+    current: &AuthoritySnapshot,
+    now: UnixMillis,
+    clock_policy: AuthorityEnvelopeClockPolicy,
+) -> Result<String, AuthorityStoreError> {
+    let replication = require_replication(connection)?;
+    check_clock(&replication, now)?;
+    let envelope = replication.latest.as_ref().ok_or_else(|| {
+        refused("follower has no authenticated live envelope for authority verification")
+    })?;
+    if envelope.snapshot != *current {
+        return Err(refused(
+            "persisted authority differs from authenticated live envelope",
+        ));
+    }
+    envelope.verify_with_clock_policy(
+        &replication.anchor,
+        current,
+        &replication.commitment,
+        now.as_secs(),
+        clock_policy,
+    )?;
+    envelope.envelope_digest()
 }
 
 pub(super) fn record_lifecycle_change(

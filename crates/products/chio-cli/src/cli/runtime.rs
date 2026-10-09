@@ -1557,6 +1557,7 @@ pub(crate) fn cmd_trust_serve(
     certification_public_metadata_ttl_seconds: u64,
     peer_urls: &[String],
     cluster_sync_interval_ms: u64,
+    authority_replication_max_future_skew_seconds: u64,
     roster_policy_file: Option<&Path>,
 ) -> Result<(), CliError> {
     // Validate identity before CLI-side key creation or policy/store work.
@@ -1649,6 +1650,7 @@ pub(crate) fn cmd_trust_serve(
         certification_public_metadata_ttl_seconds,
         peer_urls: peer_urls.to_vec(),
         cluster_sync_interval: std::time::Duration::from_millis(cluster_sync_interval_ms.max(50)),
+        authority_replication_max_future_skew_seconds,
         roster_policy,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         // The finding surfaces stay at 409 until an operator-supplied

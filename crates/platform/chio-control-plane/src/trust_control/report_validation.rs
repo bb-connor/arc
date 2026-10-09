@@ -1,4 +1,6 @@
-use super::cluster::cluster_authority_lease_view;
+use super::cluster::{
+    cluster_authority_lease_view, cluster_authority_read_role, ClusterAuthorityReadRole,
+};
 use super::*;
 
 pub(crate) fn budget_visibility_matches(
@@ -691,6 +693,54 @@ pub(crate) fn load_authority_status_for_state(
     state: &TrustServiceState,
 ) -> Result<TrustAuthorityStatus, Response> {
     let Some(keyring) = state.authority_keyring.as_ref() else {
+        if let Some(path) = state.config.authority_db_path.as_deref() {
+            let unavailable = || {
+                plain_http_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "authority replication from the elected leader is unresolved",
+                )
+            };
+            let role = if state.cluster.is_some() {
+                Some(cluster_authority_read_role(state).ok_or_else(unavailable)?)
+            } else {
+                None
+            };
+            let verification = if matches!(
+                &role,
+                Some(ClusterAuthorityReadRole::ConfirmedFollower { .. })
+            ) {
+                public_replicated_authority_verification_status(
+                    path,
+                    &state.config,
+                    &state.finding_challenge_clock,
+                )
+            } else {
+                public_authority_verification_status(
+                    path,
+                    &state.config,
+                    &state.finding_challenge_clock,
+                )
+            }
+            .map_err(|error| {
+                plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string())
+            })?;
+            if let Some(ClusterAuthorityReadRole::ConfirmedFollower { envelope_digest }) =
+                role.as_ref()
+            {
+                if !verification.matches_imported_envelope(envelope_digest) {
+                    return Err(unavailable());
+                }
+            }
+            if matches!(&role, Some(ClusterAuthorityReadRole::ElectedLeader))
+                && !verification.holds_current_signing_custody
+            {
+                return Err(unavailable());
+            }
+            return Ok(authority_status_response(
+                "sqlite".to_string(),
+                verification.status,
+            ));
+        }
         return load_authority_status(&state.config);
     };
     let status = keyring.authority_status().map_err(|_| {

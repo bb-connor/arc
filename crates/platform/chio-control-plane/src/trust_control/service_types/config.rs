@@ -102,6 +102,9 @@ pub struct TrustServiceConfig {
     pub certification_public_metadata_ttl_seconds: u64,
     pub peer_urls: Vec<String>,
     pub cluster_sync_interval: Duration,
+    /// Explicit future-issue skew for signed authority replication (0 to 60
+    /// seconds). Expiry and local clock floors receive no tolerance.
+    pub authority_replication_max_future_skew_seconds: u64,
     pub roster_policy: Option<RosterPolicy>,
     /// Process memory budget for the trust control service. Its
     /// `admission_key_cap` bounds the federation admission rate limiter, so
@@ -117,10 +120,20 @@ pub struct TrustServiceConfig {
 const MIN_RECEIPT_QUERY_SNAPSHOT_QUOTA_BYTES: u64 = 1024 * 1024;
 
 impl TrustServiceConfig {
+    pub(crate) fn authority_replication_clock_policy(
+        &self,
+    ) -> Result<chio_kernel::authority::replication::AuthorityEnvelopeClockPolicy, CliError> {
+        chio_kernel::authority::replication::AuthorityEnvelopeClockPolicy::new(
+            self.authority_replication_max_future_skew_seconds,
+        )
+        .map_err(CliError::from)
+    }
+
     pub fn validate(&self) -> Result<(), CliError> {
         self.transport
             .validate(self.listen)
             .map_err(std::io::Error::other)?;
+        self.authority_replication_clock_policy()?;
         if self.receipt_query_snapshot_quota_bytes < MIN_RECEIPT_QUERY_SNAPSHOT_QUOTA_BYTES {
             return Err(CliError::cli_other_error(format!(
                 "--receipt-query-snapshot-quota-bytes must be at least {MIN_RECEIPT_QUERY_SNAPSHOT_QUOTA_BYTES} bytes (1 MiB)"
@@ -335,6 +348,7 @@ mod service_config_tests {
             certification_public_metadata_ttl_seconds: PUBLIC_DISCOVERY_TTL_SECS,
             peer_urls: Vec::new(),
             cluster_sync_interval: Duration::from_millis(25),
+            authority_replication_max_future_skew_seconds: 0,
             roster_policy: None,
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
             finding_market: None,

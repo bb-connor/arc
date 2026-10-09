@@ -40,7 +40,24 @@ impl From<chio_security_types::clock::ClockError> for AuthorityInspectionError {
 /// Read-only view of an authority database that its writable owner provisioned.
 pub struct SqliteAuthorityInspection {
     clock: StoreClock,
+    replication_clock_policy: AuthorityEnvelopeClockPolicy,
     custody: custody::AuthorityCustody,
+}
+
+/// Live verification state together with whether this node holds the head's
+/// signing custody. Followers require a fresh authenticated envelope.
+pub struct AuthorityVerificationStatus {
+    pub status: AuthorityStatus,
+    pub holds_current_signing_custody: bool,
+    verified_envelope_digest: Option<String>,
+}
+
+impl AuthorityVerificationStatus {
+    /// Match a successful import against the envelope authenticated in the
+    /// same read transaction as this status. No digest is added to HTTP status.
+    pub fn matches_imported_envelope(&self, expected_digest: &str) -> bool {
+        self.verified_envelope_digest.as_deref() == Some(expected_digest)
+    }
 }
 
 impl SqliteAuthorityInspection {
@@ -50,10 +67,23 @@ impl SqliteAuthorityInspection {
         path: impl AsRef<Path>,
         clock: Arc<dyn Clock>,
     ) -> Result<Self, AuthorityInspectionError> {
+        Self::open_existing_with_clock_and_replication_policy(
+            path,
+            clock,
+            AuthorityEnvelopeClockPolicy::default(),
+        )
+    }
+
+    pub fn open_existing_with_clock_and_replication_policy(
+        path: impl AsRef<Path>,
+        clock: Arc<dyn Clock>,
+        replication_clock_policy: AuthorityEnvelopeClockPolicy,
+    ) -> Result<Self, AuthorityInspectionError> {
         let custody = custody::AuthorityCustody::inspect_existing(path.as_ref())?
             .ok_or(AuthorityInspectionError::Uninitialized)?;
         let inspection = Self {
             clock: StoreClock::new(clock),
+            replication_clock_policy,
             custody,
         };
         inspection.read(|_, _| Ok(()))?;
@@ -67,6 +97,55 @@ impl SqliteAuthorityInspection {
             let mut status = SqliteCapabilityAuthority::read_status_from_connection(connection)?;
             status.trusted_public_keys = lifecycle::live_public_keys(&snapshot, now.as_secs())?;
             Ok(status)
+        })
+    }
+
+    /// Current issuer trust for admission. Historical inspection remains
+    /// available through `status`, but cannot assert a follower's liveness.
+    pub fn verification_status(
+        &self,
+    ) -> Result<AuthorityVerificationStatus, AuthorityInspectionError> {
+        self.read_verification_status(false)
+    }
+
+    /// Verification state authenticated by an unexpired replication envelope,
+    /// including when this database still holds the head's local signing seed.
+    /// Signing custody alone cannot establish the node's consensus role.
+    pub fn replicated_verification_status(
+        &self,
+    ) -> Result<AuthorityVerificationStatus, AuthorityInspectionError> {
+        self.read_verification_status(true)
+    }
+
+    fn read_verification_status(
+        &self,
+        require_live_envelope: bool,
+    ) -> Result<AuthorityVerificationStatus, AuthorityInspectionError> {
+        self.read(|connection, now| {
+            let snapshot = replication::read_snapshot(connection)?;
+            let holds_current_signing_custody =
+                SqliteCapabilityAuthority::read_keypair_from_connection(connection)?
+                    .public_key()
+                    .to_hex()
+                    == snapshot.public_key_hex;
+            let verified_envelope_digest =
+                if require_live_envelope || !holds_current_signing_custody {
+                    Some(replication::verify_live_envelope(
+                        connection,
+                        &snapshot,
+                        now,
+                        self.replication_clock_policy,
+                    )?)
+                } else {
+                    None
+                };
+            let mut status = SqliteCapabilityAuthority::read_status_from_connection(connection)?;
+            status.trusted_public_keys = lifecycle::live_public_keys(&snapshot, now.as_secs())?;
+            Ok(AuthorityVerificationStatus {
+                status,
+                holds_current_signing_custody,
+                verified_envelope_digest,
+            })
         })
     }
 
@@ -87,7 +166,11 @@ impl SqliteAuthorityInspection {
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
         validate_existing_schema(&transaction)?;
         let now = self.clock.unix_millis()?;
-        lifecycle::validate_time_floor(&transaction, now)?;
+        replication::validate_replication_time_floor(
+            &transaction,
+            now,
+            self.replication_clock_policy,
+        )?;
         let head = SqliteCapabilityAuthority::read_status_from_connection(&transaction)?;
         if !head.trusted_public_keys.contains(&head.public_key) {
             return Err(AuthorityStoreError::Schema(

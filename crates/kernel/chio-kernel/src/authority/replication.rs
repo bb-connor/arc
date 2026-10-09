@@ -7,12 +7,47 @@ use super::lifecycle::{
 use super::{AuthoritySnapshot, AuthorityStoreError, AuthorityTrustedKeySnapshot};
 use chio_core::canonical::CanonicalBytes;
 use chio_core::crypto::{sha256_hex, Keypair, PublicKey, Signature, SigningAlgorithm};
+use chio_security_types::clock::{validate_future_skew, UnixMillis};
 use serde::{Deserialize, Serialize};
 
 pub const MAX_AUTHORITY_CHAIN: usize = 1024;
 pub const MAX_AUTHORITY_KEYS: usize = 4096;
 pub const MAX_AUTHORITY_WIRE_BYTES: usize = 4 * 1024 * 1024;
 pub const AUTHORITY_ENVELOPE_LIFETIME_SECONDS: u64 = 300;
+/// Future issue skew cannot exceed the authenticated cluster peer's minute
+/// window. It is opt-in and never extends an envelope's signed expiry.
+pub const MAX_AUTHORITY_ENVELOPE_FUTURE_SKEW_SECONDS: u64 = 60;
+
+/// Receiver-owned policy for future-issued authority envelopes. The default
+/// keeps strict zero skew; callers must explicitly configure any tolerance.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct AuthorityEnvelopeClockPolicy {
+    maximum_future_skew_ms: u64,
+}
+
+impl AuthorityEnvelopeClockPolicy {
+    pub fn new(maximum_future_skew_seconds: u64) -> Result<Self, AuthorityStoreError> {
+        if maximum_future_skew_seconds > MAX_AUTHORITY_ENVELOPE_FUTURE_SKEW_SECONDS {
+            return Err(refused("authority envelope future skew exceeds 60 seconds"));
+        }
+        let maximum_future_skew_ms = maximum_future_skew_seconds
+            .checked_mul(1_000)
+            .ok_or_else(|| refused("authority envelope future skew overflow"))?;
+        Ok(Self {
+            maximum_future_skew_ms,
+        })
+    }
+
+    fn validate_issue_time(self, issued_at: u64, now: u64) -> Result<(), AuthorityStoreError> {
+        let outside = || refused("authority envelope outside freshness window");
+        validate_future_skew(
+            UnixMillis::from_secs(issued_at).map_err(|_| outside())?,
+            UnixMillis::from_secs(now).map_err(|_| outside())?,
+            self.maximum_future_skew_ms,
+        )
+        .map_err(|_| outside())
+    }
+}
 const LEGACY_ANCHOR_SCHEMA: &str = "chio.authority-replication-anchor.v1";
 const ANCHOR_SCHEMA: &str = "chio.authority-replication-anchor.v2";
 const LEGACY_TRANSITION_SCHEMA: &str = "chio.authority-rotation.v1";
@@ -316,6 +351,12 @@ impl SignedAuthoritySnapshot {
         })
     }
 
+    /// Canonical identity of the complete typed envelope, including freshness
+    /// times, transition proofs and signature. Callers authenticate it first.
+    pub fn envelope_digest(&self) -> Result<String, AuthorityStoreError> {
+        digest(self)
+    }
+
     /// The expected state and commitment come from the receiver's transaction.
     /// Returning success authorizes only this exact snapshot, never extra keys.
     pub fn verify(
@@ -324,6 +365,25 @@ impl SignedAuthoritySnapshot {
         current: &AuthoritySnapshot,
         current_commitment: &str,
         now: u64,
+    ) -> Result<&AuthoritySnapshotProof, AuthorityStoreError> {
+        self.verify_with_clock_policy(
+            anchor,
+            current,
+            current_commitment,
+            now,
+            AuthorityEnvelopeClockPolicy::default(),
+        )
+    }
+
+    /// Future issuance alone receives the receiver's configured tolerance.
+    /// Expiry, lifetime, chain, domain and replay checks stay strict.
+    pub fn verify_with_clock_policy(
+        &self,
+        anchor: &AuthorityReplicationAnchor,
+        current: &AuthoritySnapshot,
+        current_commitment: &str,
+        now: u64,
+        clock_policy: AuthorityEnvelopeClockPolicy,
     ) -> Result<&AuthoritySnapshotProof, AuthorityStoreError> {
         let proof = self
             .proof
@@ -343,8 +403,8 @@ impl SignedAuthoritySnapshot {
         {
             return Err(refused("authority envelope domain mismatch"));
         }
-        if proof.issued_at > now
-            || proof.expires_at <= now
+        clock_policy.validate_issue_time(proof.issued_at, now)?;
+        if proof.expires_at <= now
             || proof.expires_at <= proof.issued_at
             || proof.expires_at - proof.issued_at > AUTHORITY_ENVELOPE_LIFETIME_SECONDS
             || proof.issued_at < self.snapshot.rotated_at
@@ -387,6 +447,9 @@ impl SignedAuthoritySnapshot {
         Ok(proof)
     }
 }
+
+#[cfg(test)]
+mod clock_policy_tests;
 
 pub fn validate_state(state: &AuthoritySnapshot) -> Result<(), AuthorityStoreError> {
     canonical_key(&state.public_key_hex)?;

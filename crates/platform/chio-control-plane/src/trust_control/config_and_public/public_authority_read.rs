@@ -7,7 +7,9 @@
 
 use super::*;
 use chio_security_types::clock::Clock;
-use chio_store_sqlite::authority::{AuthorityInspectionError, SqliteAuthorityInspection};
+use chio_store_sqlite::authority::{
+    AuthorityInspectionError, AuthorityVerificationStatus, SqliteAuthorityInspection,
+};
 
 const UNINITIALIZED_AUTHORITY_DB: &str =
     "public authority inspection requires a configured authority whose database its owner has initialized";
@@ -26,8 +28,33 @@ fn inspection_error(error: AuthorityInspectionError) -> CliError {
 fn inspect_authority_db(
     path: &Path,
     clock: &Arc<dyn Clock>,
+    config: &TrustServiceConfig,
 ) -> Result<SqliteAuthorityInspection, CliError> {
-    SqliteAuthorityInspection::open_existing_with_clock(path, Arc::clone(clock))
+    SqliteAuthorityInspection::open_existing_with_clock_and_replication_policy(
+        path,
+        Arc::clone(clock),
+        config.authority_replication_clock_policy()?,
+    )
+    .map_err(inspection_error)
+}
+
+pub(crate) fn public_authority_verification_status(
+    path: &Path,
+    config: &TrustServiceConfig,
+    clock: &Arc<dyn Clock>,
+) -> Result<AuthorityVerificationStatus, CliError> {
+    inspect_authority_db(path, clock, config)?
+        .verification_status()
+        .map_err(inspection_error)
+}
+
+pub(crate) fn public_replicated_authority_verification_status(
+    path: &Path,
+    config: &TrustServiceConfig,
+    clock: &Arc<dyn Clock>,
+) -> Result<AuthorityVerificationStatus, CliError> {
+    inspect_authority_db(path, clock, config)?
+        .replicated_verification_status()
         .map_err(inspection_error)
 }
 
@@ -39,9 +66,7 @@ pub(crate) fn public_authority_status(
 ) -> Result<TrustAuthorityStatus, CliError> {
     match config.authority_db_path.as_deref() {
         Some(path) => {
-            let status = inspect_authority_db(path, clock)?
-                .status()
-                .map_err(inspection_error)?;
+            let status = public_authority_verification_status(path, config, clock)?.status;
             Ok(authority_status_response("sqlite".to_string(), status))
         }
         // Without a database the shared status reader only reads an existing seed.
@@ -63,7 +88,7 @@ pub(crate) fn resolve_public_authority_signing_key(
     clock: &Arc<dyn Clock>,
 ) -> Result<Keypair, CliError> {
     if let Some(path) = config.authority_db_path.as_deref() {
-        return inspect_authority_db(path, clock)?
+        return inspect_authority_db(path, clock, config)?
             .local_keypair()
             .map_err(inspection_error);
     }

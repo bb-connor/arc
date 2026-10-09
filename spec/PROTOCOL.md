@@ -2994,6 +2994,36 @@ Federation and certification administration includes:
 The health contract is additive JSON and currently includes authority, store,
 receipt query snapshot, federation, and cluster summaries rather than a single
 opaque boolean.
+Configured authority that is absent, unreadable or stale makes `/health` return
+HTTP 503 with `ok: false` and `authority.available: false`. Authority health
+inspection is read-only and uses independent, non-queued blocking admission.
+It never provisions authority storage, consumes an authenticated request
+permit or releases a live blocking inspection's permit on caller cancellation.
+
+Signed authority replication admits no future issue skew by default. The
+receiver may explicitly configure
+`--authority-replication-max-future-skew-seconds` from 0 through 60 seconds.
+This tolerance applies only to signed envelope issuance. Signed expiry remains
+exclusive, local clock floors remain strict, and future issuer activation does
+not become effective early. An importing follower serves issuer trust only
+while its exact stored envelope is unexpired and this process has successfully
+imported authority from the currently elected leader in the current election
+term. Restart, partition or a failed authority synchronization requires another
+authenticated import. Clustered trust reads require current quorum. Only the
+currently elected leader with local signing custody may serve directly from
+its local authority state; a former custodian still holding an old seed must
+satisfy follower confirmation and envelope freshness. `/v1/authority` and
+public trust-bearing JWKS, verifier
+metadata and OID4VP verification reads fail closed until that import succeeds.
+Confirmation also binds the complete canonical signed envelope, including
+freshness times and signature. It cannot be renewed by locally re-signing an
+old head. A public trust read uses the same authenticated authority view for
+admission and response construction; an unconfirmed concurrent update cannot
+be substituted into the admitted response. This binding is process state and
+adds no field to the public wire contract.
+An authority refusal reports a degraded reachable peer, preserving independent
+revocation, budget and quorum progress.
+
 `/v1/reports/operator` now also carries settlement backlog visibility and
 explicit multi-dimensional budget profiles. Budget utilization rows expose
 named `dimensions.invocations` and `dimensions.money` usage blocks, while

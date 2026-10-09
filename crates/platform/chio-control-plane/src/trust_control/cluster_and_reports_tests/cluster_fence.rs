@@ -17,7 +17,7 @@ fn build_cluster_state_seeds_persisted_authority_fence_term() {
     config.peer_urls = vec!["https://node-b".to_string()];
     config.authority_db_path = Some(authority_db_path.clone());
 
-    let cluster = build_cluster_state(&config, config.listen)
+    let cluster = build_cluster_state(&config, config.listen, chio_test_support::clock::clock())
         .test_unwrap()
         .test_unwrap();
     let guard = cluster.lock().test_unwrap();
@@ -44,7 +44,7 @@ fn build_cluster_state_discards_persisted_authority_fence_for_unknown_leader() {
     config.peer_urls = vec!["https://node-b".to_string()];
     config.authority_db_path = Some(authority_db_path.clone());
 
-    let cluster = build_cluster_state(&config, config.listen)
+    let cluster = build_cluster_state(&config, config.listen, chio_test_support::clock::clock())
         .test_unwrap()
         .test_unwrap();
     let guard = cluster.lock().test_unwrap();
@@ -75,7 +75,7 @@ fn build_cluster_state_discards_persisted_authority_fence_after_rotation() {
     config.peer_urls = vec!["https://node-b".to_string()];
     config.authority_db_path = Some(authority_db_path.clone());
 
-    let cluster = build_cluster_state(&config, config.listen)
+    let cluster = build_cluster_state(&config, config.listen, chio_test_support::clock::clock())
         .test_unwrap()
         .test_unwrap();
     let guard = cluster.lock().test_unwrap();

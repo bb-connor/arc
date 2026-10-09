@@ -14,6 +14,34 @@ integration surface. `chio-cli`, `chio-wall`, and `chio-mercury` build their
 `chio` binaries on it; `chio-mcp-remote` and `chio-hosted-mcp` re-export its
 `CliError` and `JwtProviderProfile`.
 
+Signed authority replication defaults to zero future issue skew. Operators
+with a measured receiver clock lag can explicitly set
+`chio trust serve --authority-replication-max-future-skew-seconds 1`
+(or `TrustServiceConfig::authority_replication_max_future_skew_seconds`). The
+configured bound is 0 to 60 seconds. It applies only to signed envelope issue
+times, never to expiry, local clock regression or issuer activation deadlines.
+Followers refuse authority verification reads when their authenticated
+envelope expires or an authority import from the elected leader is unresolved.
+The successful import must belong to the current process and the current
+election term; restart, leader changes and failed synchronization require
+another authenticated import before a follower serves issuer trust.
+Clustered trust reads also require quorum. Local signing custody permits
+direct trust serving only on the currently elected leader; a former custodian
+must satisfy follower confirmation and envelope freshness like every peer.
+Confirmation binds the exact imported signed envelope, including its issue and
+expiry times and signature. Locally re-signing an old head cannot renew that
+confirmation. Public trust documents and verification use the same admitted
+authority view throughout a read.
+Public JWKS, verifier metadata/discovery and OID4VP issuer verification use
+the same freshness contract and the bounded public passport admission lane.
+Health then reports unavailable authority with HTTP 503 and degraded peer
+counts; independent revocation and budget replication continue. A successful
+signed authority import restores the health state.
+Health also returns HTTP 503 when configured authority storage is absent or
+unreadable. Its independent single-permit inspection lane never provisions
+authority storage or occupies authenticated request admission; a cancelled
+request retains its permit until the blocking inspection finishes.
+
 ## Responsibilities
 
 - Build a `ChioKernel` from a `LoadedPolicy` and wire local (SQLite) or remote

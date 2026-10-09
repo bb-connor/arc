@@ -137,6 +137,7 @@ fn state_with(config: TrustServiceConfig, clock: Arc<dyn Clock>) -> TrustService
         cluster: None,
         cluster_progress: None,
         leader_forward_lane: Arc::new(tokio::sync::Semaphore::new(1)),
+        authority_health_lane: Arc::new(tokio::sync::Semaphore::new(1)),
         public_passport_challenge_lane: Arc::new(tokio::sync::Semaphore::new(
             crate::trust_control::report_rendering::PUBLIC_PASSPORT_CHALLENGE_PERMITS,
         )),
@@ -189,6 +190,7 @@ fn config_with(
         certification_public_metadata_ttl_seconds: 300,
         peer_urls: Vec::new(),
         cluster_sync_interval: Duration::from_millis(200),
+        authority_replication_max_future_skew_seconds: 0,
         roster_policy: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         finding_market: None,

@@ -19,23 +19,51 @@ async fn handle_health(State(state): State<TrustServiceState>) -> Response {
         Ok(snapshot) => snapshot,
         Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string()),
     };
-    Json(json!({
-        "ok": true,
-        "leaderUrl": leader_url.clone(),
-        "selfUrl": self_url.clone(),
-        "clustered": state.cluster.is_some(),
-        "authority": trust_authority_health_snapshot(&state),
-        "stores": trust_store_health_snapshot(&state.config),
-        "receiptQuerySnapshot": super::receipt_query_service::health(&state).await,
-        "federation": federation,
-        "cluster": trust_cluster_health_snapshot(&state, consensus, leader_url, self_url),
-    }))
-    .into_response()
+    let authority = trust_authority_health_snapshot(&state).await;
+    let ready = authority.get("configured").and_then(Value::as_bool) == Some(false)
+        || authority.get("available").and_then(Value::as_bool) == Some(true);
+    let status = if ready {
+        StatusCode::OK
+    } else {
+        StatusCode::SERVICE_UNAVAILABLE
+    };
+    (
+        status,
+        Json(json!({
+            "ok": ready,
+            "leaderUrl": leader_url.clone(),
+            "selfUrl": self_url.clone(),
+            "clustered": state.cluster.is_some(),
+            "authority": authority,
+            "stores": trust_store_health_snapshot(&state.config),
+            "receiptQuerySnapshot": super::receipt_query_service::health(&state).await,
+            "federation": federation,
+            "cluster": trust_cluster_health_snapshot(&state, consensus, leader_url, self_url),
+        })),
+    )
+        .into_response()
 }
 
-fn trust_authority_health_snapshot(state: &TrustServiceState) -> Value {
+/// Public health inspection has its own non-queued blocking admission. A slow
+/// database or bounded signature-chain verification never occupies an async
+/// worker or an authenticated read/write permit.
+async fn trust_authority_health_snapshot(state: &TrustServiceState) -> Value {
+    let Ok(permit) = Arc::clone(&state.authority_health_lane).try_acquire_owned() else {
+        return unavailable_authority_health_snapshot(state);
+    };
+    let inspected_state = state.clone();
+    tokio::task::spawn_blocking(move || {
+        let snapshot = trust_authority_health_snapshot_blocking(&inspected_state);
+        drop(permit);
+        snapshot
+    })
+    .await
+    .unwrap_or_else(|_| unavailable_authority_health_snapshot(state))
+}
+
+fn authority_backend_hint(state: &TrustServiceState) -> Option<&'static str> {
     let config = &state.config;
-    let backend_hint = if config.authority_db_path.is_some() {
+    if config.authority_db_path.is_some() {
         Some("sqlite")
     } else if state.authority_keyring.is_some() {
         Some("enterprise_keyring")
@@ -43,35 +71,44 @@ fn trust_authority_health_snapshot(state: &TrustServiceState) -> Value {
         Some("seed_file")
     } else {
         None
-    };
-    // Health is unauthenticated: database status is inspected without provisioning
-    // or writing it. Keyring and seed status keep the owner's read-only path.
-    let status = if state.authority_keyring.is_none() && config.authority_db_path.is_some() {
-        public_authority_status(config, &state.finding_challenge_clock).map_err(|_| ())
-    } else {
-        load_authority_status_for_state(state).map_err(|_| ())
-    };
+    }
+}
+
+fn unavailable_authority_health_snapshot(state: &TrustServiceState) -> Value {
+    let backend = authority_backend_hint(state);
+    json!({
+        "configured": backend.is_some(),
+        "available": false,
+        "backend": backend,
+        "publicKey": Value::Null,
+        "generation": Value::Null,
+        "rotatedAt": Value::Null,
+        "appliesToFutureSessionsOnly": true,
+        "trustedKeyCount": 0,
+    })
+}
+
+fn trust_authority_health_snapshot_blocking(state: &TrustServiceState) -> Value {
+    // The state reader uses existing-only SQLite inspection and refuses stale
+    // follower envelopes. Health never provisions or writes authority storage.
+    let status = load_authority_status_for_state(state).map_err(|_| ());
     match status {
-        Ok(status) => json!({
-            "configured": status.configured,
-            "available": true,
-            "backend": status.backend,
-            "publicKey": status.public_key,
-            "generation": status.generation,
-            "rotatedAt": status.rotated_at,
-            "appliesToFutureSessionsOnly": status.applies_to_future_sessions_only,
-            "trustedKeyCount": status.trusted_public_keys.len(),
-        }),
-        Err(()) => json!({
-            "configured": backend_hint.is_some(),
-            "available": false,
-            "backend": backend_hint,
-            "publicKey": Value::Null,
-            "generation": Value::Null,
-            "rotatedAt": Value::Null,
-            "appliesToFutureSessionsOnly": true,
-            "trustedKeyCount": 0,
-        }),
+        Ok(status)
+            if !status.configured
+                || (status.public_key.is_some() && !status.trusted_public_keys.is_empty()) =>
+        {
+            json!({
+                "configured": status.configured,
+                "available": true,
+                "backend": status.backend,
+                "publicKey": status.public_key,
+                "generation": status.generation,
+                "rotatedAt": status.rotated_at,
+                "appliesToFutureSessionsOnly": status.applies_to_future_sessions_only,
+                "trustedKeyCount": status.trusted_public_keys.len(),
+            })
+        }
+        Ok(_) | Err(()) => unavailable_authority_health_snapshot(state),
     }
 }
 
@@ -429,6 +466,7 @@ fn trust_cluster_health_snapshot(
         return json!({
             "peerCount": 0,
             "healthyPeers": 0,
+            "degradedPeers": 0,
             "unhealthyPeers": 0,
             "unknownPeers": 0,
             "partitionedPeers": 0,
@@ -449,6 +487,7 @@ fn trust_cluster_health_snapshot(
     };
 
     let mut healthy = 0usize;
+    let mut degraded = 0usize;
     let mut unhealthy = 0usize;
     let mut unknown = 0usize;
     let mut partitioned = 0usize;
@@ -456,6 +495,7 @@ fn trust_cluster_health_snapshot(
     for peer in peers.values() {
         match peer.health {
             PeerHealth::Healthy => healthy += 1,
+            PeerHealth::Degraded => degraded += 1,
             PeerHealth::Unhealthy => unhealthy += 1,
             PeerHealth::Unknown => unknown += 1,
         }
@@ -479,6 +519,7 @@ fn trust_cluster_health_snapshot(
     json!({
         "peerCount": peers.len(),
         "healthyPeers": healthy,
+        "degradedPeers": degraded,
         "unhealthyPeers": unhealthy,
         "unknownPeers": unknown,
         "partitionedPeers": partitioned,

@@ -12,7 +12,8 @@ pub(crate) use generic_listing::{
     public_generic_registry_publisher,
 };
 pub(crate) use public_authority_read::{
-    public_authority_status, public_passport_credential_issuer,
+    public_authority_status, public_authority_verification_status,
+    public_passport_credential_issuer, public_replicated_authority_verification_status,
     resolve_public_oid4vp_verifier_trusted_public_keys,
 };
 use public_authority_read::{
@@ -877,7 +878,7 @@ pub(crate) fn authority_status_for_config(
     }
 }
 
-fn trusted_public_keys_from_status(
+pub(crate) fn trusted_public_keys_from_status(
     status: &TrustAuthorityStatus,
 ) -> Result<Vec<PublicKey>, CliError> {
     if !status.configured {
@@ -890,10 +891,14 @@ fn trusted_public_keys_from_status(
         .iter()
         .map(|value| PublicKey::from_hex(value))
         .collect::<Result<Vec<_>, _>>()?;
-    if let Some(current) = status.public_key.as_deref() {
-        let current = PublicKey::from_hex(current)?;
-        if !trusted.iter().any(|public_key| public_key == &current) {
-            trusted.push(current);
+    // A lifecycle projection's live list is authoritative. Its head may be a
+    // future successor that has not acquired verification authority yet.
+    if status.issuer_state.is_none() {
+        if let Some(current) = status.public_key.as_deref() {
+            let current = PublicKey::from_hex(current)?;
+            if !trusted.iter().any(|public_key| public_key == &current) {
+                trusted.push(current);
+            }
         }
     }
     if trusted.is_empty() {
@@ -915,7 +920,27 @@ pub(crate) fn build_oid4vp_verifier_metadata(
         )
     })?;
     let status = public_authority_status(config, clock)?;
-    let trusted_public_keys = trusted_public_keys_from_status(&status)?;
+    oid4vp_verifier_metadata_from_status(advertise_url, &status)
+}
+
+pub(crate) fn build_oid4vp_verifier_metadata_from_status(
+    config: &TrustServiceConfig,
+    status: &TrustAuthorityStatus,
+) -> Result<Oid4vpVerifierMetadata, CliError> {
+    let advertise_url = config.advertise_url.as_deref().ok_or_else(|| {
+        CliError::cli_other_error(
+            "OID4VP verifier metadata requires --advertise-url on the trust-control service"
+                .to_string(),
+        )
+    })?;
+    oid4vp_verifier_metadata_from_status(advertise_url, status)
+}
+
+fn oid4vp_verifier_metadata_from_status(
+    advertise_url: &str,
+    status: &TrustAuthorityStatus,
+) -> Result<Oid4vpVerifierMetadata, CliError> {
+    let trusted_public_keys = trusted_public_keys_from_status(status)?;
     let metadata = Oid4vpVerifierMetadata {
         verifier_id: advertise_url.to_string(),
         client_id: advertise_url.to_string(),
@@ -951,6 +976,20 @@ pub(crate) fn build_oid4vp_verifier_jwks(
     })?;
     let trusted_public_keys = resolve_public_oid4vp_verifier_trusted_public_keys(config, clock)?;
     build_portable_jwks(advertise_url, &trusted_public_keys)
+        .map_err(|error| CliError::cli_other_error(error.to_string()))
+}
+
+pub(crate) fn build_oid4vp_verifier_jwks_from_status(
+    config: &TrustServiceConfig,
+    status: &TrustAuthorityStatus,
+) -> Result<PortableJwkSet, CliError> {
+    let advertise_url = config.advertise_url.as_deref().ok_or_else(|| {
+        CliError::cli_other_error(
+            "OID4VP verifier jwks requires --advertise-url on the trust-control service"
+                .to_string(),
+        )
+    })?;
+    build_portable_jwks(advertise_url, &trusted_public_keys_from_status(status)?)
         .map_err(|error| CliError::cli_other_error(error.to_string()))
 }
 
@@ -1017,8 +1056,19 @@ pub(crate) fn build_public_verifier_discovery(
     config: &TrustServiceConfig,
     clock: &Arc<dyn Clock>,
 ) -> Result<SignedPublicVerifierDiscovery, CliError> {
+    build_public_verifier_discovery_with_status(config, clock, None)
+}
+
+pub(crate) fn build_public_verifier_discovery_with_status(
+    config: &TrustServiceConfig,
+    clock: &Arc<dyn Clock>,
+    status: Option<&TrustAuthorityStatus>,
+) -> Result<SignedPublicVerifierDiscovery, CliError> {
     let signing_key = resolve_public_authority_signing_key(config, clock)?;
-    let metadata = build_oid4vp_verifier_metadata(config, clock)?;
+    let metadata = match status {
+        Some(status) => build_oid4vp_verifier_metadata_from_status(config, status)?,
+        None => build_oid4vp_verifier_metadata(config, clock)?,
+    };
     let now = now_unix_secs()?;
     let metadata_sha256 = sha256_hex(&canonical_json_bytes(&metadata)?);
     create_signed_public_verifier_discovery(
@@ -1026,7 +1076,10 @@ pub(crate) fn build_public_verifier_discovery(
         chio_credentials::SignedPublicVerifierDiscoveryInput {
             discovery_id: format!("verifier-discovery:{}", metadata.verifier_id),
             verifier: metadata.verifier_id.clone(),
-            version: public_discovery_version(config, clock)?,
+            version: match status {
+                Some(status) => status.generation.unwrap_or(1).max(1),
+                None => public_discovery_version(config, clock)?,
+            },
             published_at: now,
             expires_at: now.saturating_add(PUBLIC_DISCOVERY_TTL_SECS),
             metadata_url: format!("{}{OID4VP_VERIFIER_METADATA_PATH}", metadata.verifier_id),
@@ -1043,9 +1096,17 @@ pub(crate) fn build_public_discovery_transparency(
     config: &TrustServiceConfig,
     clock: &Arc<dyn Clock>,
 ) -> Result<SignedPublicDiscoveryTransparency, CliError> {
+    build_public_discovery_transparency_with_status(config, clock, None)
+}
+
+pub(crate) fn build_public_discovery_transparency_with_status(
+    config: &TrustServiceConfig,
+    clock: &Arc<dyn Clock>,
+    status: Option<&TrustAuthorityStatus>,
+) -> Result<SignedPublicDiscoveryTransparency, CliError> {
     let signing_key = resolve_public_authority_signing_key(config, clock)?;
     let issuer = build_public_issuer_discovery(config, clock)?;
-    let verifier = build_public_verifier_discovery(config, clock)?;
+    let verifier = build_public_verifier_discovery_with_status(config, clock, status)?;
     let now = now_unix_secs()?;
     let publisher = config.advertise_url.as_deref().ok_or_else(|| {
         CliError::cli_other_error(
@@ -1076,7 +1137,10 @@ pub(crate) fn build_public_discovery_transparency(
         chio_credentials::SignedPublicDiscoveryTransparencyInput {
             transparency_id: format!("public-discovery-transparency:{publisher}"),
             publisher: publisher.to_string(),
-            version: public_discovery_version(config, clock)?,
+            version: match status {
+                Some(status) => status.generation.unwrap_or(1).max(1),
+                None => public_discovery_version(config, clock)?,
+            },
             published_at: now,
             expires_at: now.saturating_add(PUBLIC_DISCOVERY_TTL_SECS),
             entries,
@@ -1530,6 +1594,7 @@ mod config_and_public_tests {
             certification_public_metadata_ttl_seconds: 900,
             peer_urls: Vec::new(),
             cluster_sync_interval: Duration::from_millis(200),
+            authority_replication_max_future_skew_seconds: 0,
             roster_policy: None,
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
             finding_market: None,

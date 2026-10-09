@@ -1,4 +1,5 @@
 use super::*;
+use chio_kernel::authority::replication::AuthorityEnvelopeClockPolicy;
 use chio_security_types::clock::{Clock, ClockReading, FixedClock};
 use std::sync::{
     atomic::{AtomicU64, Ordering},
@@ -290,5 +291,133 @@ fn failed_head_or_replay_write_rolls_back_import_and_rotation() -> TestResult {
     assert!(source.rotate().is_err());
     assert_eq!(image(&source)?, before);
     assert!(follower.apply_signed_snapshot(&snapshot)?);
+    Ok(())
+}
+
+#[test]
+fn final_f11_configured_skew_imports_revocation_and_survives_relay_and_restart() -> TestResult {
+    let root = chio_test_support::private_tempdir()?;
+    let source_time = clock();
+    let follower_time = clock();
+    let source = SqliteCapabilityAuthority::open_with_clock(
+        root.path().join("source.db"),
+        source_time.clone(),
+    )?;
+    let follower_path = root.path().join("follower.db");
+    let follower =
+        SqliteCapabilityAuthority::open_with_clock(&follower_path, follower_time.clone())?;
+    let anchor = source.initialize_replication("skewed-authority")?;
+    follower.pin_replication_anchor(&anchor)?;
+    let compromised = source.status()?.public_key;
+    source_time.0.store(101_000, Ordering::SeqCst);
+    source.rotate()?;
+    source.revoke_issuer(&compromised)?;
+    let signed = source.signed_snapshot()?;
+    let policy = AuthorityEnvelopeClockPolicy::new(1)?;
+    let follower = SqliteCapabilityAuthority::open_with_clock_and_replication_policy(
+        &follower_path,
+        follower_time.clone(),
+        policy,
+    )?;
+    assert!(follower.apply_signed_snapshot(&signed)?);
+    assert!(!follower.apply_signed_snapshot(&signed)?);
+    assert_eq!(follower.snapshot()?, source.snapshot()?);
+    assert_eq!(follower.signed_snapshot()?, signed);
+    assert!(follower.current_keypair().is_err());
+    assert!(follower.rotate().is_err());
+
+    // The admitted remote transition must not advance the local clock floor
+    // to the signer's clock, or this same-clock restart would be refused.
+    let reopened = SqliteCapabilityAuthority::open_with_clock_and_replication_policy(
+        &follower_path,
+        follower_time.clone(),
+        policy,
+    )?;
+    assert_eq!(reopened.snapshot()?, source.snapshot()?);
+    assert!(!reopened.apply_signed_snapshot(&signed)?);
+    let inspection = crate::authority::SqliteAuthorityInspection::open_existing_with_clock_and_replication_policy(
+        &follower_path, follower_time.clone(), policy,
+    )?;
+    let verification = inspection.verification_status()?;
+    assert!(!verification.holds_current_signing_custody);
+    assert!(!verification
+        .status
+        .trusted_public_keys
+        .contains(&compromised));
+    assert!(
+        verification.status.trusted_public_keys.is_empty(),
+        "skew admission must not give the future-activated successor early issuer authority"
+    );
+    follower_time.0.store(101_000, Ordering::SeqCst);
+    assert_eq!(
+        inspection.verification_status()?.status.trusted_public_keys,
+        vec![source.status()?.public_key]
+    );
+    Ok(())
+}
+
+#[test]
+fn final_f11_zero_skew_refuses_future_envelopes_without_mutating_authority() -> TestResult {
+    let root = chio_test_support::private_tempdir()?;
+    let source_time = clock();
+    let follower_time = clock();
+    let source = SqliteCapabilityAuthority::open_with_clock(
+        root.path().join("source.db"),
+        source_time.clone(),
+    )?;
+    let follower =
+        SqliteCapabilityAuthority::open_with_clock(root.path().join("follower.db"), follower_time)?;
+    follower.pin_replication_anchor(&source.initialize_replication("strict-authority")?)?;
+    source_time.0.store(101_000, Ordering::SeqCst);
+    let signed = source.signed_snapshot()?;
+    let before = image(&follower)?;
+    assert!(follower.apply_signed_snapshot(&signed).is_err());
+    assert_eq!(image(&follower)?, before);
+    Ok(())
+}
+
+#[test]
+fn final_f11_skew_does_not_extend_expiry_or_allow_local_clock_regression() -> TestResult {
+    let root = chio_test_support::private_tempdir()?;
+    let source_time = clock();
+    let follower_time = clock();
+    let source = SqliteCapabilityAuthority::open_with_clock(
+        root.path().join("source.db"),
+        source_time.clone(),
+    )?;
+    let follower_path = root.path().join("follower.db");
+    let policy = AuthorityEnvelopeClockPolicy::new(1)?;
+    let follower = SqliteCapabilityAuthority::open_with_clock_and_replication_policy(
+        &follower_path,
+        follower_time.clone(),
+        policy,
+    )?;
+    follower.pin_replication_anchor(&source.initialize_replication("expiry-authority")?)?;
+    source_time.0.store(101_000, Ordering::SeqCst);
+    let signed = source.signed_snapshot()?;
+    assert!(!follower.apply_signed_snapshot(&signed)?);
+    follower_time.0.store(401_000, Ordering::SeqCst);
+    let before = image(&follower)?;
+    assert!(follower.apply_signed_snapshot(&signed).is_err());
+    assert!(follower.signed_snapshot().is_err());
+    assert_eq!(image(&follower)?, before);
+    let inspection = crate::authority::SqliteAuthorityInspection::open_existing_with_clock_and_replication_policy(
+        &follower_path, follower_time.clone(), policy,
+    )?;
+    assert!(inspection.verification_status().is_err());
+
+    // Returning to an earlier local reading stays forbidden even though the
+    // configured peer skew would permit a future signed observation.
+    follower_time.0.store(99_999, Ordering::SeqCst);
+    assert!(follower.apply_signed_snapshot(&signed).is_err());
+    assert!(
+        SqliteCapabilityAuthority::open_with_clock_and_replication_policy(
+            &follower_path,
+            follower_time,
+            policy,
+        )
+        .is_err()
+    );
+    assert_eq!(image(&follower)?, before);
     Ok(())
 }

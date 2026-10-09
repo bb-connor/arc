@@ -180,7 +180,9 @@ async fn serve_async_inner(
             ))
         })?
         .map(Arc::new);
-    let cluster = build_cluster_state(&config, local_addr)?;
+    let finding_challenge_clock: Arc<dyn chio_security_types::clock::Clock> =
+        Arc::new(chio_security_types::clock::SystemClock);
+    let cluster = build_cluster_state(&config, local_addr, finding_challenge_clock.clone())?;
     let receipt_store = match anchored_receipt_store {
         Some(store) => Some(store),
         None => {
@@ -224,7 +226,7 @@ async fn serve_async_inner(
     ));
     let cluster_progress = cluster.as_ref().map(|_| Arc::new(ClusterProgress::new()));
     let state = TrustServiceState {
-        finding_challenge_clock: Arc::new(chio_security_types::clock::SystemClock),
+        finding_challenge_clock,
         config,
         authority_keyring,
         authority_keyring_seed_path,
@@ -242,6 +244,7 @@ async fn serve_async_inner(
         cluster,
         cluster_progress,
         leader_forward_lane: Arc::new(tokio::sync::Semaphore::new(LEADER_FORWARD_PERMITS)),
+        authority_health_lane: Arc::new(tokio::sync::Semaphore::new(1)),
         public_passport_challenge_lane: Arc::new(tokio::sync::Semaphore::new(
             PUBLIC_PASSPORT_CHALLENGE_PERMITS,
         )),
@@ -538,6 +541,7 @@ mod windows_authority_tests {
             certification_public_metadata_ttl_seconds: 300,
             peer_urls: Vec::new(),
             cluster_sync_interval: Duration::from_millis(25),
+            authority_replication_max_future_skew_seconds: 0,
             roster_policy: None,
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
             finding_market: None,

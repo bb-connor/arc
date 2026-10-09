@@ -437,7 +437,16 @@ pub(crate) fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(),
     // the witness set. The advertised heads are captured in `peer_status` and
     // recorded only in `finalize_peer_sync_round`, after the pull round.
     if peer_should_force_snapshot(state, peer_url) {
-        let snapshot = client.cluster_snapshot()?;
+        let snapshot = match client.cluster_snapshot() {
+            Ok(snapshot) => snapshot,
+            Err(error) => {
+                // Status proved transport reachability, but this failed round
+                // cannot renew issuer trust from an earlier authority import.
+                // Keep independent quorum eligibility and clear that trust.
+                update_peer_authority_error(state, peer_url, error.to_string());
+                return Err(error);
+            }
+        };
         let snapshot_contract = match revocation_peer_contract(&snapshot.replication) {
             Ok(contract) => contract,
             Err(error) => {
@@ -516,7 +525,7 @@ pub(crate) fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(),
         delta_records,
     );
     // Lane 3: signed authority replicates last, after finalization, so a refused
-    // envelope (no pinned anchor, a local clock behind the signer, a relayed
+    // envelope (no pinned anchor, clock skew beyond the configured bound, a relayed
     // envelope older than the one held) can never starve revocation propagation
     // or ack finalization. The refusal stays the peer's reported error, through
     // later stream finalizations, until an authority import from it succeeds.
@@ -524,9 +533,24 @@ pub(crate) fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(),
     if peer_was_demoted(state, peer_url) {
         return Ok(());
     }
+    // Bind successful issuer-trust confirmation to the elected leader and
+    // term observed before fetching the envelope. A leadership change during
+    // the fetch or later makes this confirmation unusable for read admission.
+    let confirmation = cluster_consensus_view(state).and_then(|view| {
+        view.leader_url
+            .filter(|leader| view.has_quorum && leader == peer_url)
+            .map(|leader_url| (leader_url, view.election_term))
+    });
     match sync_peer_authority(state, &client) {
-        Ok(()) => {
-            clear_peer_authority_error(state, peer_url);
+        Ok(envelope_digest) => {
+            let confirmation = confirmation.zip(envelope_digest).map(
+                |((leader_url, election_term), envelope_digest)| AuthorityImportConfirmation {
+                    leader_url,
+                    election_term,
+                    envelope_digest,
+                },
+            );
+            clear_peer_authority_error(state, peer_url, confirmation);
             Ok(())
         }
         Err(error) => {
@@ -659,15 +683,18 @@ pub(crate) fn route_pull(
 pub(crate) fn sync_peer_authority(
     state: &TrustServiceState,
     client: &TrustControlClient,
-) -> Result<(), CliError> {
+) -> Result<Option<String>, CliError> {
     let Some(path) = state.config.authority_db_path.as_deref() else {
-        return Ok(());
+        return Ok(None);
     };
-    let authority =
-        SqliteCapabilityAuthority::open_with_clock(path, state.finding_challenge_clock.clone())?;
+    let authority = SqliteCapabilityAuthority::open_with_clock_and_replication_policy(
+        path,
+        state.finding_challenge_clock.clone(),
+        state.config.authority_replication_clock_policy()?,
+    )?;
     let snapshot = client.authority_snapshot()?;
     authority.apply_signed_snapshot(&snapshot)?;
-    Ok(())
+    Ok(Some(snapshot.envelope_digest()?))
 }
 
 fn sync_peer_revocations(

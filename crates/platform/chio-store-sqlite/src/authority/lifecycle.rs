@@ -11,6 +11,13 @@ pub(super) fn observe_time(
     now: UnixMillis,
 ) -> Result<(), AuthorityStoreError> {
     validate_time_floor(connection, now)?;
+    persist_observed_time(connection, now)
+}
+
+pub(super) fn persist_observed_time(
+    connection: &Connection,
+    now: UnixMillis,
+) -> Result<(), AuthorityStoreError> {
     connection.execute(
         "UPDATE authority_state SET observed_ms = ?1 WHERE singleton_id = 1",
         [authority_sqlite_integer(
@@ -27,17 +34,25 @@ pub(super) fn validate_time_floor(
     connection: &Connection,
     now: UnixMillis,
 ) -> Result<(), AuthorityStoreError> {
+    let (observed, changed) = persisted_time_floor(connection)?;
+    if now.get() < observed || now.as_secs() < changed {
+        return Err(ClockError::WallClockRegression.into());
+    }
+    Ok(())
+}
+
+pub(super) fn persisted_time_floor(
+    connection: &Connection,
+) -> Result<(u64, u64), AuthorityStoreError> {
     let (observed, changed): (i64, i64) = connection.query_row(
         "SELECT observed_ms, rotated_at FROM authority_state WHERE singleton_id = 1",
         [],
         |row| Ok((row.get(0)?, row.get(1)?)),
     )?;
-    if now.get() < authority_unsigned(observed, "authority clock floor")?
-        || now.as_secs() < authority_unsigned(changed, "authority transition time")?
-    {
-        return Err(ClockError::WallClockRegression.into());
-    }
-    Ok(())
+    Ok((
+        authority_unsigned(observed, "authority clock floor")?,
+        authority_unsigned(changed, "authority transition time")?,
+    ))
 }
 
 pub(super) fn live_public_keys(

@@ -128,6 +128,7 @@ const UNPINNED_CLUSTER_AUTHORITY: &str = "clustered trust control requires an ou
 pub(crate) fn build_cluster_state(
     config: &TrustServiceConfig,
     local_addr: SocketAddr,
+    clock: Arc<dyn chio_security_types::clock::Clock>,
 ) -> Result<Option<Arc<Mutex<ClusterRuntimeState>>>, CliError> {
     config.validate()?;
     if !config.peer_urls.is_empty() && config.authority_seed_path.is_some() {
@@ -161,7 +162,11 @@ pub(crate) fn build_cluster_state(
     let mut persisted_term = 0u64;
     let mut persisted_leader_url = None;
     if let Some(path) = config.authority_db_path.as_deref() {
-        let authority = SqliteCapabilityAuthority::open(path)?;
+        let authority = SqliteCapabilityAuthority::open_with_clock_and_replication_policy(
+            path,
+            clock,
+            config.authority_replication_clock_policy()?,
+        )?;
         // Clustered authority replicates only as envelopes verified against an
         // anchor provisioned out of band. Without one every authority sync is
         // refused, so the node must not start.
@@ -323,6 +328,39 @@ pub(crate) fn budget_authority_guarantee_level(
 
 pub(crate) fn cluster_consensus_view(state: &TrustServiceState) -> Option<ClusterConsensusView> {
     cluster_consensus_and_authority_lease_view(state).map(|(consensus, _)| consensus)
+}
+
+#[derive(Clone)]
+pub(crate) enum ClusterAuthorityReadRole {
+    ElectedLeader,
+    ConfirmedFollower { envelope_digest: String },
+}
+
+/// Sample quorum, leadership and peer confirmation together. A local signing
+/// seed does not participate in deciding the consensus role.
+pub(crate) fn cluster_authority_read_role(
+    state: &TrustServiceState,
+) -> Option<ClusterAuthorityReadRole> {
+    let cluster = state.cluster.as_ref()?;
+    let mut guard = cluster.lock().ok()?;
+    let view = compute_cluster_consensus_locked(&mut guard);
+    if !view.has_quorum {
+        return None;
+    }
+    let leader = view.leader_url?;
+    if leader == view.self_url {
+        return Some(ClusterAuthorityReadRole::ElectedLeader);
+    }
+    let peer = guard.peers.get(&leader)?;
+    if peer.authority_error.is_some() || !peer.health.is_reachable() || peer.partitioned {
+        return None;
+    }
+    let confirmation = peer.authority_import_confirmation.as_ref()?;
+    (confirmation.leader_url == leader && confirmation.election_term == view.election_term).then(
+        || ClusterAuthorityReadRole::ConfirmedFollower {
+            envelope_digest: confirmation.envelope_digest.clone(),
+        },
+    )
 }
 
 pub(crate) fn cluster_consensus_and_authority_lease_view(

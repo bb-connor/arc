@@ -73,6 +73,10 @@ pub(crate) enum TrustCommands {
         #[arg(long, default_value_t = 500)]
         cluster_sync_interval_ms: u64,
 
+        /// Explicit future issue skew for authority replication; expiry remains strict.
+        #[arg(long, default_value_t = 0, value_parser = clap::value_parser!(u64).range(0..=60))]
+        authority_replication_max_future_skew_seconds: u64,
+
         /// Optional policy file whose reputation issuance extension is enforced by the service.
         #[arg(long)]
         policy: Option<PathBuf>,

@@ -11,6 +11,10 @@ use super::report_validation::{
 };
 use super::*;
 
+#[path = "passport_handlers/public_authority_trust.rs"]
+mod public_authority_trust;
+use public_authority_trust::{public_oid4vp_trusted_keys, run_public_authority_trust_read};
+
 pub(crate) async fn handle_passport_issuer_metadata(
     State(state): State<TrustServiceState>,
 ) -> Response {
@@ -32,48 +36,82 @@ pub(crate) async fn handle_public_passport_issuer_discovery(
 pub(crate) async fn handle_public_passport_verifier_discovery(
     State(state): State<TrustServiceState>,
 ) -> Response {
-    match build_public_verifier_discovery(&state.config, &state.finding_challenge_clock) {
-        Ok(document) => Json(document).into_response(),
-        Err(error) => public_discovery_error_response(&error),
-    }
+    run_public_authority_trust_read(&state, |state, status| {
+        match build_public_verifier_discovery_with_status(
+            &state.config,
+            &state.finding_challenge_clock,
+            status,
+        ) {
+            Ok(document) => Json(document).into_response(),
+            Err(error) => public_discovery_error_response(&error),
+        }
+    })
+    .await
 }
 
 pub(crate) async fn handle_public_passport_discovery_transparency(
     State(state): State<TrustServiceState>,
 ) -> Response {
-    match build_public_discovery_transparency(&state.config, &state.finding_challenge_clock) {
-        Ok(document) => Json(document).into_response(),
-        Err(error) => public_discovery_error_response(&error),
-    }
+    run_public_authority_trust_read(&state, |state, status| {
+        let document = match status {
+            Some(status) => build_public_discovery_transparency_with_status(
+                &state.config,
+                &state.finding_challenge_clock,
+                Some(status),
+            ),
+            None => {
+                build_public_discovery_transparency(&state.config, &state.finding_challenge_clock)
+            }
+        };
+        match document {
+            Ok(document) => Json(document).into_response(),
+            Err(error) => public_discovery_error_response(&error),
+        }
+    })
+    .await
 }
 
 pub(crate) async fn handle_oid4vp_verifier_metadata(
     State(state): State<TrustServiceState>,
 ) -> Response {
-    match build_oid4vp_verifier_metadata(&state.config, &state.finding_challenge_clock) {
-        Ok(metadata) => Json(metadata).into_response(),
-        Err(error) => plain_http_error(StatusCode::CONFLICT, &error.to_string()),
-    }
+    run_public_authority_trust_read(&state, |state, status| {
+        let metadata = match status {
+            Some(status) => build_oid4vp_verifier_metadata_from_status(&state.config, status),
+            None => build_oid4vp_verifier_metadata(&state.config, &state.finding_challenge_clock),
+        };
+        match metadata {
+            Ok(metadata) => Json(metadata).into_response(),
+            Err(error) => plain_http_error(StatusCode::CONFLICT, &error.to_string()),
+        }
+    })
+    .await
 }
 
 pub(crate) async fn handle_passport_issuer_jwks(
     State(state): State<TrustServiceState>,
 ) -> Response {
-    match build_oid4vp_verifier_jwks(&state.config, &state.finding_challenge_clock) {
-        Ok(jwks) => Json(jwks).into_response(),
-        Err(error) => {
-            let message = error.to_string();
-            let status = if message.contains("configured authority")
-                || message.contains("did not publish any signing keys")
-                || message.contains("--authority-seed-file or --authority-db")
-            {
-                StatusCode::NOT_FOUND
-            } else {
-                StatusCode::CONFLICT
-            };
-            plain_http_error(status, &message)
+    run_public_authority_trust_read(&state, |state, status| {
+        let jwks = match status {
+            Some(status) => build_oid4vp_verifier_jwks_from_status(&state.config, status),
+            None => build_oid4vp_verifier_jwks(&state.config, &state.finding_challenge_clock),
+        };
+        match jwks {
+            Ok(jwks) => Json(jwks).into_response(),
+            Err(error) => {
+                let message = error.to_string();
+                let status = if message.contains("configured authority")
+                    || message.contains("did not publish any signing keys")
+                    || message.contains("--authority-seed-file or --authority-db")
+                {
+                    StatusCode::NOT_FOUND
+                } else {
+                    StatusCode::CONFLICT
+                };
+                plain_http_error(status, &message)
+            }
         }
-    }
+    })
+    .await
 }
 
 pub(crate) fn public_discovery_error_response(error: &CliError) -> Response {
@@ -951,6 +989,17 @@ pub(crate) async fn handle_public_get_oid4vp_request(
     State(state): State<TrustServiceState>,
     AxumPath(request_id): AxumPath<String>,
 ) -> Response {
+    run_public_authority_trust_read(&state, move |state, status| {
+        get_public_oid4vp_request(state, request_id, status)
+    })
+    .await
+}
+
+fn get_public_oid4vp_request(
+    state: &TrustServiceState,
+    request_id: String,
+    admitted_status: Option<&TrustAuthorityStatus>,
+) -> Response {
     let clock_now = match unix_timestamp_now() {
         Ok(now) => now,
         Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
@@ -970,10 +1019,14 @@ pub(crate) async fn handle_public_get_oid4vp_request(
         }
         Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
     };
-    let trusted_public_keys = match resolve_public_oid4vp_verifier_trusted_public_keys(
-        &state.config,
-        &state.finding_challenge_clock,
-    ) {
+    let keys = match admitted_status {
+        Some(status) => trusted_public_keys_from_status(status),
+        None => resolve_public_oid4vp_verifier_trusted_public_keys(
+            &state.config,
+            &state.finding_challenge_clock,
+        ),
+    };
+    let trusted_public_keys = match keys {
         Ok(keys) => keys,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
@@ -1078,30 +1131,38 @@ pub(crate) async fn handle_public_submit_oid4vp_response(
     // Trust is decided before any network I/O: our own advertised issuer uses
     // local keys, every other issuer must be in the verifier request's signed
     // issuer allowlist, and an empty allowlist trusts only the local issuer.
-    let issuer_public_keys = match plan_portable_issuer_keys(
-        &state.config,
-        &credential.issuer,
-        &requested_issuer_allowlist,
-        &state.finding_challenge_clock,
-    ) {
-        Ok(PortableIssuerResolution::Local(keys)) => keys,
-        Ok(PortableIssuerResolution::Untrusted) => {
-            return plain_http_error(
-                StatusCode::FORBIDDEN,
-                "portable credential issuer is not trusted by the verifier request",
-            );
-        }
-        Ok(PortableIssuerResolution::Remote(fetch)) => {
-            match run_portable_issuer_fetch(move || fetch.resolve()).await {
-                Ok(Ok(keys)) => keys,
-                Ok(Err(error)) => {
-                    return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string())
-                }
-                Err(refusal) => return refusal.into_response(plain_http_error),
+    let issuer_public_keys =
+        if state.config.advertise_url.as_deref() == Some(credential.issuer.as_str()) {
+            match public_oid4vp_trusted_keys(&state).await {
+                Ok(keys) => keys,
+                Err(response) => return response,
             }
-        }
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    };
+        } else {
+            match plan_portable_issuer_keys(
+                &state.config,
+                &credential.issuer,
+                &requested_issuer_allowlist,
+                &state.finding_challenge_clock,
+            ) {
+                Ok(PortableIssuerResolution::Local(keys)) => keys,
+                Ok(PortableIssuerResolution::Untrusted) => {
+                    return plain_http_error(
+                        StatusCode::FORBIDDEN,
+                        "portable credential issuer is not trusted by the verifier request",
+                    );
+                }
+                Ok(PortableIssuerResolution::Remote(fetch)) => {
+                    match run_portable_issuer_fetch(move || fetch.resolve()).await {
+                        Ok(Ok(keys)) => keys,
+                        Ok(Err(error)) => {
+                            return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string())
+                        }
+                        Err(refusal) => return refusal.into_response(plain_http_error),
+                    }
+                }
+                Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+            }
+        };
     // Refresh trusted time after the issuer-key wait and verify the signed
     // response against it. This yields the passport identity used to plan the
     // lifecycle resolution; it runs before the signed lifecycle URL is fetched.

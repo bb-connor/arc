@@ -40,10 +40,12 @@ pub(crate) struct TrustServiceState {
     /// leader. A forward acquires one only when it will contact a remote
     /// leader, and holds it until its blocking transport call has ended.
     pub(crate) leader_forward_lane: Arc<tokio::sync::Semaphore>,
-    /// Independent admission for public holder submissions. Local verification
-    /// and leader forwarding share this lane and hold permits through blocking
-    /// completion even when their request future is cancelled.
+    /// Independent admission for public holder submissions and issuer-trust
+    /// reads. Local verification and public leader forwarding share this lane
+    /// and hold permits through blocking completion even on caller cancellation.
     pub(crate) public_passport_challenge_lane: Arc<tokio::sync::Semaphore>,
+    /// Independent non-queued admission for public authority health inspection.
+    pub(crate) authority_health_lane: Arc<tokio::sync::Semaphore>,
     /// Evidenced rail seam for finding-market fee collection;
     /// `None` fails activation closed.
     pub(crate) finding_rail: Option<Arc<dyn super::super::finding_handlers::FindingRailObserver>>,
@@ -284,6 +286,16 @@ pub(crate) struct PeerSyncState {
     /// The peer's unresolved signed-authority refusal. Stream success never
     /// clears it; only an authority import from this peer does.
     pub(crate) authority_error: Option<String>,
+    /// This process imported a signed authority envelope from this peer. Bare
+    /// reachability and stream success cannot attest follower issuer freshness.
+    pub(crate) authority_import_confirmation: Option<AuthorityImportConfirmation>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct AuthorityImportConfirmation {
+    pub(crate) leader_url: String,
+    pub(crate) election_term: u64,
+    pub(crate) envelope_digest: String,
 }
 
 /// One subject's in-window attempt timestamps together with the window (in
@@ -456,6 +468,9 @@ impl FederationAdmissionRateLimiter {
 pub(crate) enum PeerHealth {
     Unknown,
     Healthy,
+    /// Transport and independent streams can progress, while authority import
+    /// remains unresolved. This is reachable but never reported as healthy.
+    Degraded,
     Unhealthy,
 }
 
@@ -505,19 +520,29 @@ impl Default for PeerSyncState {
             last_snapshot_at: None,
             force_snapshot: true,
             authority_error: None,
+            authority_import_confirmation: None,
         }
     }
 }
 
 impl PeerHealth {
     pub(crate) fn is_reachable(&self) -> bool {
-        matches!(self, Self::Healthy)
+        matches!(self, Self::Healthy | Self::Degraded)
+    }
+
+    pub(crate) fn reachable_with_authority_error(error: &Option<String>) -> Self {
+        if error.is_some() {
+            Self::Degraded
+        } else {
+            Self::Healthy
+        }
     }
 
     pub(crate) fn label(&self) -> &'static str {
         match self {
             Self::Unknown => "unknown",
             Self::Healthy => "healthy",
+            Self::Degraded => "degraded",
             Self::Unhealthy => "unhealthy",
         }
     }
