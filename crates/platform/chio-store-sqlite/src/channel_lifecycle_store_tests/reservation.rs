@@ -868,15 +868,17 @@ fn stage_and_anchor_with_claimant(
 ) -> TestResult<AdmissionOperationV1> {
     let operation = begin_and_authorize_budget(fixture, flow)?;
     let stage_lease = claim(fixture, &operation, claimant, 1_601, 1_650)?;
-    fixture.store.stage_channel_reservation(
-        &flow.advance,
-        &operation,
-        &stage_lease,
-        &flow.replay_bytes,
-        &flow.authority_pins,
-        &fixture.fence,
-        STAGE_AT,
-    )?;
+    fixture
+        .store
+        .stage_channel_reservation(ChannelReservationStage {
+            advance: &flow.advance,
+            operation: &operation,
+            recovery_lease: &stage_lease,
+            replay_bytes: &flow.replay_bytes,
+            expected_authority_pins: &flow.authority_pins,
+            fence: &fixture.fence,
+            trusted_now_unix_ms: STAGE_AT,
+        })?;
     fixture.store.record_channel_anchor_advanced(
         operation.binding().operation_id(),
         &flow.advance,

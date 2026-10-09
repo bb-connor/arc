@@ -280,7 +280,6 @@ fn debit_at(
     )
 }
 
-#[allow(clippy::too_many_arguments)]
 fn debit_at_with_status(
     ledger: &SqliteFindingPoolLedger,
     fixture: &PoolFixture,

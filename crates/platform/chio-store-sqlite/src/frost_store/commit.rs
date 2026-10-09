@@ -177,10 +177,6 @@ pub(super) fn verify_projection_commit_chains(
     Ok(())
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-)]
 fn projection_commit_digest(
     key: &str,
     sequence: u64,

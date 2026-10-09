@@ -77,10 +77,6 @@ struct ChannelReservationParticipantCommitment<'a> {
     ready_effect_head_digest: &'a str,
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-)]
 pub(super) fn channel_reservation_participant_digest(
     prepared: &ChannelPreparedAdmissionRecordV1,
     reservation_digest: &str,
@@ -111,26 +107,42 @@ pub(super) fn channel_reservation_participant_digest(
         .map_err(|error| invalid(error.to_string()))
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-)]
+/// Parameters of `insert_pending_reservation_tx`.
+pub(super) struct PendingReservationInsert<'a> {
+    pub(super) prepared: &'a ChannelPreparedAdmissionRecordV1,
+    pub(super) reservation: &'a SignedChannelReservationV1,
+    pub(super) reservation_digest: &'a str,
+    pub(super) reservation_json: &'a [u8],
+    pub(super) authority_pins_digest: &'a str,
+    pub(super) authority_pins_json: &'a [u8],
+    pub(super) replay_bytes: &'a [u8],
+    pub(super) replay_protocol_digest: &'a str,
+    pub(super) replay_content_digest: &'a str,
+    pub(super) economic_stage: &'a EconomicStateStageRecord,
+    pub(super) ready_effect_head_digest: &'a str,
+    pub(super) fence: &'a StoreMutationFence,
+    pub(super) trusted_now_unix_ms: u64,
+}
+
 pub(super) fn insert_pending_reservation_tx(
     transaction: &Transaction<'_>,
-    prepared: &ChannelPreparedAdmissionRecordV1,
-    reservation: &SignedChannelReservationV1,
-    reservation_digest: &str,
-    reservation_json: &[u8],
-    authority_pins_digest: &str,
-    authority_pins_json: &[u8],
-    replay_bytes: &[u8],
-    replay_protocol_digest: &str,
-    replay_content_digest: &str,
-    economic_stage: &EconomicStateStageRecord,
-    ready_effect_head_digest: &str,
-    fence: &StoreMutationFence,
-    trusted_now_unix_ms: u64,
+    params: PendingReservationInsert<'_>,
 ) -> Result<(), ChannelLifecycleStoreError> {
+    let PendingReservationInsert {
+        prepared,
+        reservation,
+        reservation_digest,
+        reservation_json,
+        authority_pins_digest,
+        authority_pins_json,
+        replay_bytes,
+        replay_protocol_digest,
+        replay_content_digest,
+        economic_stage,
+        ready_effect_head_digest,
+        fence,
+        trusted_now_unix_ms,
+    } = params;
     let descriptor = economic_stage
         .descriptor()
         .ok_or_else(|| invalid("channel economic stage lost its replay descriptor"))?;

@@ -405,31 +405,35 @@ pub(super) fn qualify_release_execution(
         economic_effect_slot_from_head(release_head).map_err(|error| invalid(error.to_string()))?;
     qualify_effect_binding(
         candidate,
-        root_operation,
-        root_head,
-        &root_slot,
-        &candidate.root_effect_slot_id,
-        &candidate.root_effect_scope_id,
-        &candidate.root_effect_kind,
-        &candidate.root_idempotency_key,
-        &candidate.root_call_digest,
-        &candidate.root_resource_head_digest,
-        EconomicEffectStateV1::Completed,
-        fence,
+        EffectBindingQualification {
+            operation: root_operation,
+            head: root_head,
+            slot: &root_slot,
+            slot_id: &candidate.root_effect_slot_id,
+            scope_id: &candidate.root_effect_scope_id,
+            effect_kind: &candidate.root_effect_kind,
+            idempotency_key: &candidate.root_idempotency_key,
+            call_digest: &candidate.root_call_digest,
+            resource_head_digest: &candidate.root_resource_head_digest,
+            expected_state: EconomicEffectStateV1::Completed,
+            fence,
+        },
     )?;
     qualify_effect_binding(
         candidate,
-        release_operation,
-        release_head,
-        &release_slot,
-        &candidate.release_effect_slot_id,
-        &candidate.release_effect_scope_id,
-        &candidate.release_effect_kind,
-        &candidate.release_idempotency_key,
-        &candidate.release_call_digest,
-        &candidate.release_resource_head_digest,
-        EconomicEffectStateV1::DispatchCommitted,
-        fence,
+        EffectBindingQualification {
+            operation: release_operation,
+            head: release_head,
+            slot: &release_slot,
+            slot_id: &candidate.release_effect_slot_id,
+            scope_id: &candidate.release_effect_scope_id,
+            effect_kind: &candidate.release_effect_kind,
+            idempotency_key: &candidate.release_idempotency_key,
+            call_digest: &candidate.release_call_digest,
+            resource_head_digest: &candidate.release_resource_head_digest,
+            expected_state: EconomicEffectStateV1::DispatchCommitted,
+            fence,
+        },
     )?;
     qualify_root_publication_result(candidate, root_head, &root_slot)
 }
@@ -454,24 +458,38 @@ pub(super) fn qualify_governed_operation(
     Ok(())
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-)]
+/// Parameters of `qualify_effect_binding`.
+pub(super) struct EffectBindingQualification<'a> {
+    pub(super) operation: &'a AdmissionOperationV1,
+    pub(super) head: &'a EconomicResourceHeadV1,
+    pub(super) slot: &'a EconomicEffectSlotV1,
+    pub(super) slot_id: &'a str,
+    pub(super) scope_id: &'a str,
+    pub(super) effect_kind: &'a str,
+    pub(super) idempotency_key: &'a str,
+    pub(super) call_digest: &'a str,
+    pub(super) resource_head_digest: &'a str,
+    pub(super) expected_state: EconomicEffectStateV1,
+    pub(super) fence: &'a StoreMutationFence,
+}
+
 pub(super) fn qualify_effect_binding(
     candidate: &ChannelReleasePublisherCandidate,
-    operation: &AdmissionOperationV1,
-    head: &EconomicResourceHeadV1,
-    slot: &EconomicEffectSlotV1,
-    slot_id: &str,
-    scope_id: &str,
-    effect_kind: &str,
-    idempotency_key: &str,
-    call_digest: &str,
-    resource_head_digest: &str,
-    expected_state: EconomicEffectStateV1,
-    fence: &StoreMutationFence,
+    params: EffectBindingQualification<'_>,
 ) -> Result<(), ChannelReleasePublisherError> {
+    let EffectBindingQualification {
+        operation,
+        head,
+        slot,
+        slot_id,
+        scope_id,
+        effect_kind,
+        idempotency_key,
+        call_digest,
+        resource_head_digest,
+        expected_state,
+        fence,
+    } = params;
     let binding = operation.binding();
     let handoff_version_matches = if expected_state == EconomicEffectStateV1::Completed {
         slot.admission_handoff.operation_version.checked_add(1) == Some(operation.version())

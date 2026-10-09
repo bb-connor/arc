@@ -241,6 +241,17 @@ struct StoredPreparedPlan {
     created_at_unix_ms: u64,
 }
 
+/// Parameters of `stage_channel_reservation`.
+pub(crate) struct ChannelReservationStage<'a> {
+    pub(crate) advance: &'a VerifiedEconomicStateBatchAdvance,
+    pub(crate) operation: &'a AdmissionOperationV1,
+    pub(crate) recovery_lease: &'a AdmissionRecoveryLease,
+    pub(crate) replay_bytes: &'a [u8],
+    pub(crate) expected_authority_pins: &'a ChannelTransitionReplayAuthorityPinsV1,
+    pub(crate) fence: &'a StoreMutationFence,
+    pub(crate) trusted_now_unix_ms: u64,
+}
+
 impl SqliteChannelLifecycleStore {
     pub(crate) fn open_alongside(
         connection: Arc<StoreConnection>,
@@ -316,20 +327,19 @@ impl SqliteChannelLifecycleStore {
         Ok(record)
     }
 
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-    )]
-    pub fn stage_channel_reservation(
+    pub(crate) fn stage_channel_reservation(
         &self,
-        advance: &VerifiedEconomicStateBatchAdvance,
-        operation: &AdmissionOperationV1,
-        recovery_lease: &AdmissionRecoveryLease,
-        replay_bytes: &[u8],
-        expected_authority_pins: &ChannelTransitionReplayAuthorityPinsV1,
-        fence: &StoreMutationFence,
-        trusted_now_unix_ms: u64,
+        params: ChannelReservationStage<'_>,
     ) -> Result<ChannelReservationStageRecordV1, ChannelLifecycleStoreError> {
+        let ChannelReservationStage {
+            advance,
+            operation,
+            recovery_lease,
+            replay_bytes,
+            expected_authority_pins,
+            fence,
+            trusted_now_unix_ms,
+        } = params;
         if fence != &self.serving_owner.fence || recovery_lease.store_fence() != fence {
             return Err(ChannelLifecycleStoreError::Fenced);
         }
@@ -471,19 +481,21 @@ impl SqliteChannelLifecycleStore {
         )?;
         insert_pending_reservation_tx(
             &transaction,
-            &prepared,
-            reservation,
-            &reservation_digest,
-            &reservation_json,
-            &authority_pins_digest,
-            &authority_pins_json,
-            replay_bytes,
-            &replay_protocol_digest,
-            &replay_content_digest,
-            &economic_stage,
-            &ready_effect_head_digest,
-            fence,
-            trusted_now_unix_ms,
+            PendingReservationInsert {
+                prepared: &prepared,
+                reservation,
+                reservation_digest: &reservation_digest,
+                reservation_json: &reservation_json,
+                authority_pins_digest: &authority_pins_digest,
+                authority_pins_json: &authority_pins_json,
+                replay_bytes,
+                replay_protocol_digest: &replay_protocol_digest,
+                replay_content_digest: &replay_content_digest,
+                economic_stage: &economic_stage,
+                ready_effect_head_digest: &ready_effect_head_digest,
+                fence,
+                trusted_now_unix_ms,
+            },
         )?;
         crate::admission_operation_store::append_participant_update_tx(
             &transaction,
@@ -538,10 +550,6 @@ impl SqliteChannelLifecycleStore {
         Ok(record)
     }
 
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-    )]
     pub fn record_channel_anchor_advanced(
         &self,
         operation_id: &AdmissionOperationId,

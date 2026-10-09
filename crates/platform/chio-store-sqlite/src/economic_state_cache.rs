@@ -709,10 +709,6 @@ fn validate_stage_options(
     Ok(())
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-)]
 pub(crate) fn stage_channel_batch_in_transaction(
     transaction: &Transaction<'_>,
     advance: &VerifiedEconomicStateBatchAdvance,
