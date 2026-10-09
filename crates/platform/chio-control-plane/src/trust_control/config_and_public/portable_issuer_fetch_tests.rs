@@ -139,8 +139,13 @@ fn loopback_fetch_agent(addr: std::net::SocketAddr) -> Agent {
 fn empty_allowlist_refuses_remote_issuer_without_network() {
     let config = empty_config();
     let allowed = BTreeSet::new();
-    let resolution =
-        plan_portable_issuer_keys(&config, "https://issuer.example", &allowed).test_unwrap();
+    let resolution = plan_portable_issuer_keys(
+        &config,
+        "https://issuer.example",
+        &allowed,
+        &chio_test_support::clock::clock(),
+    )
+    .test_unwrap();
     assert!(matches!(resolution, PortableIssuerResolution::Untrusted));
 }
 
@@ -148,8 +153,13 @@ fn empty_allowlist_refuses_remote_issuer_without_network() {
 fn non_allowlisted_issuer_is_untrusted() {
     let config = empty_config();
     let allowed = BTreeSet::from(["https://good.example".to_string()]);
-    let resolution =
-        plan_portable_issuer_keys(&config, "https://evil.example", &allowed).test_unwrap();
+    let resolution = plan_portable_issuer_keys(
+        &config,
+        "https://evil.example",
+        &allowed,
+        &chio_test_support::clock::clock(),
+    )
+    .test_unwrap();
     assert!(matches!(resolution, PortableIssuerResolution::Untrusted));
 }
 
@@ -157,8 +167,13 @@ fn non_allowlisted_issuer_is_untrusted() {
 fn allowlisted_https_issuer_plans_a_strict_remote_fetch() {
     let config = empty_config();
     let allowed = BTreeSet::from(["https://good.example".to_string()]);
-    let resolution =
-        plan_portable_issuer_keys(&config, "https://good.example", &allowed).test_unwrap();
+    let resolution = plan_portable_issuer_keys(
+        &config,
+        "https://good.example",
+        &allowed,
+        &chio_test_support::clock::clock(),
+    )
+    .test_unwrap();
     let PortableIssuerResolution::Remote(fetch) = resolution else {
         panic!("allowlisted https issuer must plan a remote fetch");
     };
@@ -174,8 +189,13 @@ fn allowlisted_https_issuer_plans_a_strict_remote_fetch() {
 fn http_allowlisted_issuer_is_refused_before_any_fetch() {
     let config = empty_config();
     let allowed = BTreeSet::from(["http://good.example".to_string()]);
-    let error =
-        plan_portable_issuer_keys(&config, "http://good.example", &allowed).test_unwrap_err();
+    let error = plan_portable_issuer_keys(
+        &config,
+        "http://good.example",
+        &allowed,
+        &chio_test_support::clock::clock(),
+    )
+    .test_unwrap_err();
     assert!(error.to_string().to_lowercase().contains("scheme"));
 }
 
@@ -183,9 +203,13 @@ fn http_allowlisted_issuer_is_refused_before_any_fetch() {
 fn pin_checked_addrs_refuses_private_resolution() {
     let config = empty_config();
     let allowed = BTreeSet::from(["https://good.example".to_string()]);
-    let PortableIssuerResolution::Remote(fetch) =
-        plan_portable_issuer_keys(&config, "https://good.example", &allowed).test_unwrap()
-    else {
+    let PortableIssuerResolution::Remote(fetch) = plan_portable_issuer_keys(
+        &config,
+        "https://good.example",
+        &allowed,
+        &chio_test_support::clock::clock(),
+    )
+    .test_unwrap() else {
         panic!("expected a remote fetch plan");
     };
     let url = Url::parse(&fetch.jwks_url).test_unwrap();
@@ -199,9 +223,13 @@ fn pin_checked_addrs_refuses_private_resolution() {
 fn dns_resolution_is_pinned_to_the_checked_addresses_once() {
     let config = empty_config();
     let allowed = BTreeSet::from(["https://good.example".to_string()]);
-    let PortableIssuerResolution::Remote(fetch) =
-        plan_portable_issuer_keys(&config, "https://good.example", &allowed).test_unwrap()
-    else {
+    let PortableIssuerResolution::Remote(fetch) = plan_portable_issuer_keys(
+        &config,
+        "https://good.example",
+        &allowed,
+        &chio_test_support::clock::clock(),
+    )
+    .test_unwrap() else {
         panic!("expected a remote fetch plan");
     };
     let url = Url::parse(&fetch.jwks_url).test_unwrap();
@@ -473,11 +501,23 @@ fn allowlisted_remote_issuer_verifies_end_to_end() {
         .cloned()
         .collect();
     assert!(matches!(
-        plan_portable_issuer_keys(&config, &credential.issuer, &allowed).test_unwrap(),
+        plan_portable_issuer_keys(
+            &config,
+            &credential.issuer,
+            &allowed,
+            &chio_test_support::clock::clock()
+        )
+        .test_unwrap(),
         PortableIssuerResolution::Remote(_)
     ));
     assert!(matches!(
-        plan_portable_issuer_keys(&config, &credential.issuer, &BTreeSet::new()).test_unwrap(),
+        plan_portable_issuer_keys(
+            &config,
+            &credential.issuer,
+            &BTreeSet::new(),
+            &chio_test_support::clock::clock()
+        )
+        .test_unwrap(),
         PortableIssuerResolution::Untrusted
     ));
 

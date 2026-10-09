@@ -143,10 +143,11 @@ pub(crate) fn plan_portable_issuer_keys(
     config: &TrustServiceConfig,
     issuer: &str,
     allowed_issuers: &BTreeSet<String>,
+    clock: &Arc<dyn chio_security_types::clock::Clock>,
 ) -> Result<PortableIssuerResolution, CliError> {
     if config.advertise_url.as_deref() == Some(issuer) {
         return Ok(PortableIssuerResolution::Local(
-            resolve_oid4vp_verifier_trusted_public_keys(config)?,
+            resolve_public_oid4vp_verifier_trusted_public_keys(config, clock)?,
         ));
     }
     if !allowed_issuers.contains(issuer) {

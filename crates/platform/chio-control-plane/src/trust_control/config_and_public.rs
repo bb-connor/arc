@@ -904,12 +904,6 @@ fn trusted_public_keys_from_status(
     Ok(trusted)
 }
 
-pub(crate) fn resolve_oid4vp_verifier_trusted_public_keys(
-    config: &TrustServiceConfig,
-) -> Result<Vec<PublicKey>, CliError> {
-    trusted_public_keys_from_status(&authority_status_for_config(config)?)
-}
-
 pub(crate) fn build_oid4vp_verifier_metadata(
     config: &TrustServiceConfig,
     clock: &Arc<dyn Clock>,

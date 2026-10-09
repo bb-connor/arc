@@ -1098,6 +1098,7 @@ pub(crate) async fn handle_public_submit_oid4vp_response(
         &state.config,
         &credential.issuer,
         &requested_issuer_allowlist,
+        &state.finding_challenge_clock,
     ) {
         Ok(PortableIssuerResolution::Local(keys)) => keys,
         Ok(PortableIssuerResolution::Untrusted) => {

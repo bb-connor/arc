@@ -470,3 +470,80 @@ async fn public_direct_post_refuses_credential_expired_during_the_wait() {
         "a credential expired during the wait must not consume the request"
     );
 }
+
+#[cfg(target_os = "linux")]
+#[tokio::test]
+async fn public_direct_post_reads_the_local_authority_database_without_writing() {
+    let now = BASE_UNIX_SECS;
+    let advertise_url = "https://verifier.example";
+    let dir = chio_test_support::private_tempdir().test_unwrap();
+    let authority_db = dir.path().join("authority.sqlite3");
+    let authority = chio_store_sqlite::SqliteCapabilityAuthority::open_with_clock(
+        &authority_db,
+        chio_test_support::clock::clock(),
+    )
+    .test_unwrap()
+    .local_keypair()
+    .test_unwrap();
+    let mut config = config_with(
+        advertise_url,
+        &dir.path().join("unused.seed"),
+        &dir.path().join("verifier.sqlite3"),
+    );
+    config.authority_seed_path = None;
+    config.authority_db_path = Some(authority_db.clone());
+
+    let subject = Keypair::generate();
+    let passport = build_passport(&subject, now);
+    let envelope = issue_chio_passport_sd_jwt_vc(&passport, advertise_url, &authority, now, None)
+        .test_unwrap();
+    let request = register_request(&config, Vec::new(), now);
+    let response_jwt =
+        respond_to_oid4vp_request(&subject, &envelope.compact, &request, now).test_unwrap();
+
+    let witness = rusqlite::Connection::open_with_flags(
+        &authority_db,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )
+    .test_unwrap();
+    let data_version = |witness: &rusqlite::Connection| -> i64 {
+        witness
+            .query_row("PRAGMA data_version", [], |row| row.get(0))
+            .test_unwrap()
+    };
+    let observed_ms = |witness: &rusqlite::Connection| -> i64 {
+        witness
+            .query_row(
+                "SELECT observed_ms FROM authority_state WHERE singleton_id = 1",
+                [],
+                |row| row.get(0),
+            )
+            .test_unwrap()
+    };
+    let version = data_version(&witness);
+    let floor = observed_ms(&witness);
+
+    let response = handle_public_submit_oid4vp_response(
+        State(state_with(config, Arc::new(FixedClock::new(now)))),
+        Form(Oid4vpDirectPostForm {
+            response: response_jwt,
+        }),
+    )
+    .await;
+    let (status, body) = response_parts(response).await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "local issuance must verify, body: {body}"
+    );
+    assert_eq!(
+        data_version(&witness),
+        version,
+        "the public direct post committed an authority write"
+    );
+    assert_eq!(
+        observed_ms(&witness),
+        floor,
+        "the public direct post advanced the authority clock floor"
+    );
+}
