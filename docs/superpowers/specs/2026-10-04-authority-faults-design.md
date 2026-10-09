@@ -17,7 +17,7 @@
 - Related:
   - W: `docs/architecture/recoverable-agent-runtime/02-rust-design.md`, `03-recovery-protocol.md`, `08-protocol-operations.md`, and `implementation/p1`, `p2`, `p3` `OPERATIONS.md`.
   - V: `2026-10-02-dynamic-delegation-design.md` (D1), `2026-10-03-work-runtime-design.md`, `2026-10-03-work-owner-services-design.md`.
-  - M: `docs/security/threshold-approval-collection.md` (AP2/AP3), `2026-10-02-issuer-lifecycle-approval-authority-design.md`, and `crates/security/chio-security-kernel` (freeze, suspension).
+  - M: `2026-10-02-issuer-lifecycle-approval-authority-design.md`, `crates/security/chio-security-kernel` (freeze, suspension), and `docs/security/threshold-approval-collection.md` (AP2/AP3).
   - `spec/PROTOCOL.md` sections 5, 6 and 8.
 - Citation convention:
   - M: = `origin/integration/process-security-m4` @ `19df31ad9`.
@@ -55,7 +55,7 @@ From round 1 of the PR #1174 review (dispositions at the end of this spec):
   - `ExplanationRemedyKind` is closed at four variants (W: `chio-security-types/src/recovery/explanation/registry.rs:6-11`).
   - An unsatisfied `ExplanationFactKind::Capability` short-circuits to `BlockedByCapability` (W: `chio-recovery/src/evaluation.rs:195-206`).
   - This spec adds `Authority` as the only kind that may address a capability fact, and a new assessment `RequiresAuthority`.
-- **Linked workflow, not capability swap.** The store pins every action to the seed's capability (W: `.../recovery/issuance.rs:76-81`). An `Authority` remedy therefore creates a new recovery workflow whose seed carries the new capability and whose record names its predecessor.
+- **Linked workflow, not capability swap.** The store pins each action to the seed's capability (W: `.../recovery/issuance.rs:76-81`). An `Authority` remedy therefore creates a new recovery workflow whose seed carries the new capability and whose record names its predecessor.
 - **Offer chain renamed to implemented types.** The signed `RemedyOfferV1` is doc-only. The implemented chain is: template, `ActionIntentV1`, derived `OfferDigest`, approval intent, then grant v2.
 - **Operator-mediated resolution.** Recovery actors must hold direct, undelegated tokens (W: `chio-kernel/src/recovery/ports.rs:193-212`). A delegator produces the new delegation out of band, and an operator-assigned actor drives the linked workflow.
 - **Obligations stay information-flow only.** Authority evidence lives in the prerequisite step, not in a new `AuthorityObligationV1` variant (section 6.2, open decision 3).
@@ -103,7 +103,7 @@ The kernel never mints authority. Its only "kernel tier" resolution is materiali
 | Remedy kinds are closed: `ExistingDestination`, `ExactApproval`, `Transformation`, `Prerequisite` | W: `chio-security-types/src/recovery/explanation/registry.rs:6-11` |
 | An unsatisfied capability fact short-circuits to `BlockedByCapability`. The assessments are `FeasibleUnderSnapshot`, `RequiresExactApproval`, `RequiresTransformation`, `RequiresPrerequisite`, `NeedsFreshEvidence`, `BlockedByCapability`, `UnknownOutcome`, `NoRegisteredRemedy`, `SearchBoundReached` | W: `chio-recovery/src/evaluation.rs:195-206`; W: `.../explanation/result.rs:5-15` |
 | Templates are closed with one variant, `SupportTicketPublicIssue`. Commands are seven variants: `CreateWorkflow`, `InspectWorkflow`, `SelectOffer`, `SubmitApproval`, `ResumeWorkflow`, `CancelWorkflow`, `ReportDecision` | W: `chio-security-types/src/recovery/commands.rs:12-14`, `:26-58` |
-| Every action is pinned to the seed's capability id and body digest | W: `chio-store-sqlite/src/admission_operation_store/recovery/issuance.rs:76-81` |
+| Each action is pinned to the seed's capability id and body digest | W: `chio-store-sqlite/src/admission_operation_store/recovery/issuance.rs:76-81` |
 | Every workflow has one verified original and one owner. Creation resolves the seed's request id to a retained `ToolDispatch` in `CompensatedBeforeDispatch` with no dispatch commitment, canonically equal retained request material, and the deployment's native security context and authority; it then verifies the unchanged first-attempt process request through `RecoveryProcessOriginPort`. The claim is keyed by the original operation across every tenant and process scope, and only an identical `(scope, workflow_id, continuation_id, origin)` claim is accepted. Issuance and fresh-basis validation re-verify it, and issuance requires `action.origin == record.origin` | W: `.../recovery/origins.rs:14-24`, `:61-92`, `:94-129`, `:131-164`; `commands.rs:87-94`, `:150`; `issuance.rs:37-40`; `validation.rs:293`; W: `chio-kernel/src/recovery/ports.rs:52-62`; W: `chio-kernel/src/admission_operation/retained_request.rs:379-393` |
 | The offer is a derived digest: `OfferDigest = H("chio.recovery.offer.v1", (intent, basis, scope))`. No signed `RemedyOfferV1` exists in code (doc-only, R: `03-recovery-protocol.md:55`) | W: `chio-control-plane/src/recovery/materialize.rs:303-306` |
 | `AuthorizationRequirementsV1` obligations are information-flow only: `OwnerRelease`, `CompartmentRelease`, `UserAcceptance`, `IntegrityEndorsement` | W: `chio-security-types/src/recovery/authorization.rs:40-45`, `:49-63` |
@@ -294,7 +294,7 @@ capability_unsatisfied ->
 4. **Binding matches the derived identity.** The store recomputes, from the record alone, the successor creation key for `(predecessor_workflow, successor_ordinal)`, then the workflow id, continuation id and request id by W:'s existing rules, and the request namespace digest and argument digest. When D1 is not installed, it compares them field by field with the seed capability's `RecoveryContinuationBinding`. Any mismatch refuses `CreateWorkflow` with `binding_mismatch`. The ordinal must be the next unused one for the predecessor and within `max_successors_per_predecessor`. Ordinals are never reused, matching W:'s rule that closed identities are retained and never recycled (W: `commands.rs:95-97`).
 
 **Execution.** After creation, the workflow follows the ordinary recovery path, with one exception for origin ownership:
-- the store pin (`issuance.rs:76-81`) binds every action to the new capability;
+- the store pin (`issuance.rs:76-81`) binds each action to the new capability;
 - `ActionIntentV1`, `OfferDigest`, the approval intent and grant v2 work unchanged;
 - every point where W: calls `origins::verify` (issuance, fresh basis, capture) calls `origins::verify_linked` for this template instead, which revalidates the predecessor's original and the successor's chain link (section 6.10 O6). Each action's `origin` still equals the record's, as `issuance.rs:38-40` requires;
 - `reserve_recovery_call` reserves one slot;

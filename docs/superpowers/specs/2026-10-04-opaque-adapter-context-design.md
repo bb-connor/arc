@@ -72,7 +72,7 @@ No new opaque bytes field is added. A genuinely opaque `AdapterContext` is defer
 ### 2.1 Where adapter state lives today
 
 - **The MCP edge owns its kernel in-process.** `ChioMcpEdge` holds `kernel: ChioKernel` plus deferred tasks in a `BTreeMap` (`crates/protocol/chio-mcp-edge/src/runtime.rs:133-153`), bounded by `MAX_DEFERRED_MCP_TASKS` (`runtime.rs:100`).
-- **The A2A and ACP edges are in-process too.** They keep deferred tasks in in-process maps (`crates/protocol/chio-a2a-edge/src/edge.rs:15-24`, `crates/protocol/chio-acp-edge/src/edge.rs:17-23`) and take `kernel: &ChioKernel` on every call (for example `chio-a2a-edge/src/edge.rs:368`, `chio-acp-edge/src/edge.rs:237`).
+- **The A2A and ACP-Client edges are in-process too.** They keep deferred tasks in in-process maps (`crates/protocol/chio-a2a-edge/src/edge.rs:15-24`, `crates/protocol/chio-acp-edge/src/edge.rs:17-23`) and take `kernel: &ChioKernel` on every call (for example `chio-a2a-edge/src/edge.rs:368`, `chio-acp-edge/src/edge.rs:237`).
 - **The kernel itself is stateful per session.** It keeps sessions in a `DashMap<SessionId, Arc<Session>>` and fails `UnknownSession` without one (`crates/kernel/chio-kernel/src/request_matching.rs:12-20`).
 - **Hosted remote MCP already persists durable session state.**
   - Active and terminal records live in `RemoteSessionLedger` (`crates/protocol/chio-mcp-remote/src/remote_mcp/session_core.rs:255-260`).

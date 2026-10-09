@@ -46,7 +46,7 @@ Citations:
 - **Layered registry.** Revision 1 covered only `ChioKernel`. Section 4 now registers L0-L3 and component op enums under one rule set, plus R11 (semantics default to native tools) and R12 (higher layers declare the L0 ops they drive).
 - **L0 re-based on the M ∪ V surface** (230 names). Two new ops: `CallerExecution` and `ExportExecutionEvidence`. Classified: boot signing seams, delegated-work install, test-only hooks, payment release-authority stores.
 - **chio-process trust inputs** (`ProcessRegistry::caller`, subject seeds) are in the TCB. Verifiers and W2 owner services are components.
-- **R13:** no network I/O implementations in the kernel crate (the kernel compiles `ureq` x402, ACP and webhook clients).
+- **R13:** no network I/O implementations in the kernel crate (the kernel compiles `ureq` x402, ACP-Commerce and webhook clients).
 - **Gates reuse M: tooling.** The closure gate extends H11 `check-dependency-budget.py`. The census follows `check-trust-boundaries.py`. Allowlists live in the Mechanism D gate. H8 is the signature layer. GT1 is a named blocker.
 - **Corrected:** alloy already reaches the kernel through `chio-settle` default `web3` and through `chio-core` to `chio-web3`.
 - **Dropped:** new `[[component]]` ceilings, `ci-gates/tcb.toml`, and the claim that no public-API snapshot tooling exists.
@@ -54,7 +54,7 @@ Citations:
 ## 1. Decision summary
 
 FTL's kernel answers a closed, numbered set of system calls and bounces everything else to a per-tenant library. Chio's shipped baseline has this shape at several layers:
-- **L0, in-process kernel.** It handles no dialects. No MCP, A2A, ACP, OpenAPI or provider adapter crate is in `chio-kernel`'s normal closure.
+- **L0, in-process kernel.** It handles no dialects. No MCP, A2A, ACP-Client, OpenAPI or provider adapter crate is in `chio-kernel`'s normal closure.
 - **L1, agent process.** A six-op worker protocol with no administrative operations. New semantics arrive as native tools behind `invoke`.
 - **L2, work (assumed shipped).** One closed multiplexed envelope over the worker credential, with "no second worker listener".
 - **L3, recovery (implemented in W:).** Seven closed host commands, three endpoints and a closed permission vocabulary, all host-held. Workers cannot drive them.
@@ -289,7 +289,7 @@ Rules:
 
 9. **R9. No live trust mutation outside the op set.** A `&self` method that mutates trust configuration must be an op entry point, or move to `boot`. `UpdateLiveTrust` exists only for `set_capability_trust_root` and `set_federation_local_kernel_id` (open decision 3).
 10. **R10. No new handle exports.** The four existing ones are migrated in phase 2.
-11. **R13. No network client implementations in `chio-kernel`.** `custody` and `fact_source` implementations that perform network I/O live outside the kernel crate, which holds only their traits. Today the kernel compiles `ureq` clients for x402, ACP and approval webhooks (section 2). Phase 2 moves them, for example to a payment-adapter crate and the approval-channel owner, and drops `ureq` from the closure.
+11. **R13. No network client implementations in `chio-kernel`.** `custody` and `fact_source` implementations that perform network I/O live outside the kernel crate, which holds only their traits. Today the kernel compiles `ureq` clients for x402, ACP-Commerce and approval webhooks (section 2). Phase 2 moves them, for example to a payment-adapter crate and the approval-channel owner, and drops `ureq` from the closure.
 
 ### P6 component operations (W:)
 
