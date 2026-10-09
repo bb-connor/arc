@@ -20,7 +20,7 @@ The live inventory and effective scoped dispositions are:
 | Follow-up findings first observed in uninstalled candidates | 13 | Not combined | Not combined |
 | Provenance prerequisite, excluded from implementation findings | 1 | Not applicable | Not applicable |
 
-The 122 scoped dispositions include 41 historical closures whose current source
+The 122 scoped dispositions include 37 historical closures whose current source
 applicability still needs review. They are not 122 current-source approvals.
 `counts.current_acceptance` separates these dispositions from current applicability.
 
@@ -43,12 +43,12 @@ The current status counts are:
 | Status | Records | Meaning |
 | --- | ---: | --- |
 | `open` | 228 | No complete independent disposition is recorded. |
-| `needs_revalidation` | 41 | Historical closure remains, but cited source or document pins differ without an accepted current continuity review. |
-| `recorded_scoped_closed` | 81 | Historical or additive accepted scoped disposition currently applies, with the limits stated per record. |
+| `needs_revalidation` | 37 | Historical closure remains, but cited source or document pins differ without an accepted current continuity review. |
+| `recorded_scoped_closed` | 85 | Historical or additive accepted scoped disposition currently applies, with the limits stated per record. |
 | `candidate_only` | 44 | The defective candidate was uninstalled when found; corrected successors may have separate evidence. |
 | `prerequisite_only` | 1 | Provenance work, not a proved implementation defect. |
 
-The 41 remaining revalidation flags are part of the original 117 historical scoped
+The 37 remaining revalidation flags are part of the original 117 historical scoped
 closures. They are not added to the 228 currently open findings. No finding is declared
 regressed merely because its bytes changed, and no matching pin constitutes a
 new behavioral test. The initial audit flagged 48 closures. An independent
@@ -102,6 +102,14 @@ native-prerequisite and qualification gates remain open. The same review records
 the independently approved required-CI routing repair and its queued hosted run.
 `continuation.working_queue` holds the dependency-ordered execution queue within
 this existing register.
+
+The [priority source validation](reviews/priority-source-validation.md) restores
+four historical P1 closures after applicable current controls and independent
+specification and quality reviews. It also records 30 installed verifier
+regressions and all 159 owning tests passing in both Python modes. These results
+leave all 16 open P1 records and their native/primary acceptance obligations open.
+There are now 29 canonical and eight additional revalidation flags; historical
+dispositions, changed pins and prior reasons remain preserved.
 
 ## Candidate follow-ups
 

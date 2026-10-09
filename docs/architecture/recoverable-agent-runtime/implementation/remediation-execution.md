@@ -102,7 +102,7 @@ for its original import/cwd scope on the disclosed supported Python 3.12 profile
 literal catalogue command equality remains false. The original failed run and
 historical reports remain intact. Original comment continuity also restores
 `SOURCE-HYGIENE-SUPPORT-03` without build or dependency acceptance. The live
-register has 395 records, with 81 currently scoped closed, 228 open and 41 needing
+register has 395 records, with 85 currently scoped closed, 228 open and 37 needing
 revalidation; 44 candidate-only records and one prerequisite remain separate.
 
 The [checkpoint source retirement repair](reviews/checkpoint-source-retirement.md)
@@ -112,6 +112,12 @@ broader module and strict lints retain their gates. The required CI workflow now
 includes the exact integration base, but queued hosted work provides no passing
 qualification. Native lifecycle completion remains the next substantive exit;
 the previously parked dependency remains stopped.
+
+The [priority source validation](reviews/priority-source-validation.md) restores
+four historical P1 scoped closures on current source and installs 30 maintained
+verifier regressions after independent reviews. All 159 owning verifier tests
+pass in each Python mode. The 16 open P1 records retain their native/primary
+acceptance requirements; no production or phase qualification follows.
 
 The [SF-R02 model-response parser packet](reviews/model-response-parsing.md)
 records the four original mock-only controls on unchanged maintained source.
