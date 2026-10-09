@@ -1,0 +1,1 @@
+//! Receipt query snapshot tests.

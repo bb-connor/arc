@@ -3199,6 +3199,7 @@ fn receipt_store_error_snapshot(error: &ReceiptStoreError) -> ReceiptStoreError 
         ReceiptStoreError::RetentionTenantScopeUnsupported => {
             ReceiptStoreError::RetentionTenantScopeUnsupported
         }
+        ReceiptStoreError::QuerySnapshot(error) => ReceiptStoreError::QuerySnapshot(error.clone()),
         ReceiptStoreError::WriterDead {
             restarts,
             last_error,
@@ -3258,6 +3259,8 @@ mod append;
 mod bootstrap;
 use append::{append_chio_receipt_tx, append_chio_receipt_tx_with_insert_status};
 mod chaos_test_hooks;
+#[path = "receipt_store/query_snapshot_access.rs"]
+mod query_snapshot_access;
 #[path = "receipt_store/retained_read.rs"]
 pub(crate) mod retained_read;
 #[path = "receipt_store/session_certificate_read.rs"]

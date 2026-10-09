@@ -39,26 +39,10 @@ pub(super) fn validate(
         "SELECT source_seq, receipt_id, receipt_kind, raw_json, entry_seq
          FROM claim_receipt_log_entries WHERE entry_seq <= ?1 ORDER BY entry_seq",
     )?;
-    let mut tools = archive.prepare(
-        "SELECT COUNT(*) = 1 AND COALESCE(MIN(r.receipt_id = ?2 AND r.raw_json = ?3
-           AND r.timestamp = ?4 AND r.capability_id = ?5
-           AND r.tool_server = ?6 AND r.tool_name = ?7 AND r.decision_kind = ?8
-           AND r.tenant_id IS ?9 AND r.cost_currency IS ?10
-           AND r.cost_charged_be IS ?11 AND r.attempted_cost_be IS ?12
-           AND COALESCE(r.subject_key, cl.subject_key) IS ?13
-           AND COALESCE(r.issuer_key, cl.issuer_key) IS ?14
-           AND r.grant_index IS ?15 AND r.policy_hash = ?16 AND r.content_hash = ?17), 0)
-         FROM chio_tool_receipts r
-         LEFT JOIN capability_lineage cl ON cl.capability_id = r.capability_id
-         WHERE r.seq = ?1",
-    )?;
-    let mut children = archive.prepare(
-        "SELECT COUNT(*) = 1 AND COALESCE(MIN(receipt_id = ?2 AND raw_json = ?3 AND timestamp = ?4
-           AND session_id = ?5 AND parent_request_id = ?6 AND request_id = ?7
-           AND operation_kind = ?8 AND terminal_state = ?9
-           AND policy_hash = ?10 AND outcome_hash = ?11), 0)
-         FROM chio_child_receipts WHERE seq = ?1",
-    )?;
+    let mut tools =
+        archive.prepare(crate::receipt_query_snapshot::project::TOOL_SOURCE_PROJECTION_SQL)?;
+    let mut children =
+        archive.prepare(crate::receipt_query_snapshot::project::CHILD_SOURCE_PROJECTION_SQL)?;
     let rows = claims.query_map([sqlite_i64(watermark, "retained watermark")?], |row| {
         Ok((
             row.get::<_, i64>(0)?,
@@ -89,48 +73,14 @@ pub(super) fn validate(
                 if receipt.id != id {
                     return Err(drift());
                 }
-                let cost = receipt_cost_projection(&receipt)?;
-                let attribution = extract_receipt_attribution(&receipt);
                 // Unsigned archive lineage must not grant a different subject
-                // filter. Use the validated lineage from the pinned live store
-                // only when the signed receipt has no explicit attribution.
-                let lineage =
-                    if attribution.subject_key.is_none() || attribution.issuer_key.is_none() {
-                        SqliteReceiptStore::get_lineage_on_connection(live, &receipt.capability_id)
-                            .map_err(super::super::support::capability_lineage_store_error)?
-                    } else {
-                        None
-                    };
-                let subject = attribution
-                    .subject_key
-                    .as_deref()
-                    .or_else(|| lineage.as_ref().map(|value| value.subject_key.as_str()));
-                let issuer = attribution
-                    .issuer_key
-                    .as_deref()
-                    .or_else(|| lineage.as_ref().map(|value| value.issuer_key.as_str()));
-                tools.query_row(
-                    params![
-                        source_seq,
-                        id,
-                        raw,
-                        sqlite_i64(receipt.timestamp, "retained receipt timestamp")?,
-                        receipt.capability_id,
-                        receipt.tool_server,
-                        receipt.tool_name,
-                        receipt_decision_kind(&receipt),
-                        receipt.tenant_id,
-                        cost.currency,
-                        cost.charged,
-                        cost.attempted,
-                        subject,
-                        issuer,
-                        attribution.grant_index.map(i64::from),
-                        receipt.policy_hash,
-                        receipt.content_hash
-                    ],
-                    |row| row.get::<_, bool>(0),
+                // filter. The shared rule falls back to validated lineage from
+                // the pinned live store only when the signed receipt has no
+                // explicit attribution.
+                crate::receipt_query_snapshot::project::SignedToolProjection::derive(
+                    &receipt, live,
                 )?
+                .source_matches(&mut tools, source_seq, &raw)?
             }
             "child_receipt" => {
                 if source_seq > child_ceiling
@@ -146,21 +96,11 @@ pub(super) fn validate(
                 if receipt.id != id {
                     return Err(drift());
                 }
-                children.query_row(
-                    params![
-                        source_seq,
-                        id,
-                        raw,
-                        sqlite_i64(receipt.timestamp, "retained child timestamp")?,
-                        receipt.session_id.as_str(),
-                        receipt.parent_request_id.as_str(),
-                        receipt.request_id.as_str(),
-                        receipt.operation_kind.as_str(),
-                        terminal_state_kind(&receipt.terminal_state),
-                        receipt.policy_hash,
-                        receipt.outcome_hash
-                    ],
-                    |row| row.get::<_, bool>(0),
+                crate::receipt_query_snapshot::project::child_source_matches(
+                    &mut children,
+                    source_seq,
+                    &raw,
+                    &receipt,
                 )?
             }
             _ => return Err(drift()),
