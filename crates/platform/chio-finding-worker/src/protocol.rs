@@ -677,18 +677,31 @@ pub struct FindingWorkerAttestedResult {
 
 pub type SignedFindingWorkerResult = SignedExportEnvelope<FindingWorkerAttestedResult>;
 
+/// Parameters of `from_guest`.
+pub(crate) struct GuestCompletion {
+    pub(crate) result: FindingWorkerResult,
+    pub(crate) worker_binary_sha256: String,
+    pub(crate) firecracker_sha256: String,
+    pub(crate) jailer_sha256: String,
+    pub(crate) kernel_sha256: String,
+    pub(crate) rootfs_sha256: String,
+    pub(crate) completed_at_unix_secs: u64,
+}
+
 impl FindingWorkerAttestedResult {
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn from_guest(
         request: &FindingWorkerRequest,
-        result: FindingWorkerResult,
-        worker_binary_sha256: String,
-        firecracker_sha256: String,
-        jailer_sha256: String,
-        kernel_sha256: String,
-        rootfs_sha256: String,
-        completed_at_unix_secs: u64,
+        params: GuestCompletion,
     ) -> Result<Self, &'static str> {
+        let GuestCompletion {
+            result,
+            worker_binary_sha256,
+            firecracker_sha256,
+            jailer_sha256,
+            kernel_sha256,
+            rootfs_sha256,
+            completed_at_unix_secs,
+        } = params;
         result.validate_for(request)?;
         let guest_result_sha256 =
             sha256_hex(&canonical_json_bytes(&result).map_err(|_| "result_encoding_invalid")?);
@@ -1137,13 +1150,15 @@ mod tests {
             let signer = Ed25519Backend::generate();
             let body = FindingWorkerAttestedResult::from_guest(
                 &request,
-                guest,
-                "4".repeat(64),
-                "5".repeat(64),
-                "6".repeat(64),
-                "7".repeat(64),
-                "8".repeat(64),
-                10,
+                GuestCompletion {
+                    result: guest,
+                    worker_binary_sha256: "4".repeat(64),
+                    firecracker_sha256: "5".repeat(64),
+                    jailer_sha256: "6".repeat(64),
+                    kernel_sha256: "7".repeat(64),
+                    rootfs_sha256: "8".repeat(64),
+                    completed_at_unix_secs: 10,
+                },
             );
             assert!(body.is_ok());
             if let Ok(body) = body {

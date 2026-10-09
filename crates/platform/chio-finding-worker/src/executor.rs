@@ -29,7 +29,7 @@ use crate::protocol::{
     authorized_attempt_limit, sign_attested_result, verify_attested_result,
     FindingWorkerAttestedResult, FindingWorkerExitClassification, FindingWorkerInputDescriptor,
     FindingWorkerInputEnd, FindingWorkerInputKind, FindingWorkerRequest,
-    FindingWorkerResourceLimits, FindingWorkerResourceUsage, FindingWorkerResult,
+    FindingWorkerResourceLimits, FindingWorkerResourceUsage, FindingWorkerResult, GuestCompletion,
     FINDING_WORKER_INPUT_END_SCHEMA, FINDING_WORKER_INPUT_SCHEMA,
 };
 
@@ -451,13 +451,15 @@ impl FirecrackerExecutor {
         let guest_classification = guest.classification;
         let body = FindingWorkerAttestedResult::from_guest(
             &request,
-            guest,
-            self.inner.config.worker_binary_sha256.clone(),
-            self.inner.config.firecracker_sha256.clone(),
-            self.inner.config.jailer_sha256.clone(),
-            self.inner.config.kernel_sha256.clone(),
-            self.inner.config.rootfs_sha256.clone(),
-            completed_at,
+            GuestCompletion {
+                result: guest,
+                worker_binary_sha256: self.inner.config.worker_binary_sha256.clone(),
+                firecracker_sha256: self.inner.config.firecracker_sha256.clone(),
+                jailer_sha256: self.inner.config.jailer_sha256.clone(),
+                kernel_sha256: self.inner.config.kernel_sha256.clone(),
+                rootfs_sha256: self.inner.config.rootfs_sha256.clone(),
+                completed_at_unix_secs: completed_at,
+            },
         )
         .map_err(|_| WorkerExecutionError::Protocol)?;
         let signer = Arc::clone(&self.inner.signer);
