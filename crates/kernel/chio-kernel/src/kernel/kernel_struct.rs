@@ -607,6 +607,8 @@ pub struct ChioKernel {
     pub(super) receipt_mirror_gauge: chio_bounded::SizeGauge,
     pub(super) child_receipt_mirror_gauge: chio_bounded::SizeGauge,
     pub(super) receipt_store: Option<Arc<dyn ReceiptStore>>,
+    pub(super) native_receipt_store_registration:
+        Option<crate::receipt_store::NativeReceiptStoreRegistration>,
     pub(super) receipt_store_write_lock: Mutex<()>,
     /// Retention maintenance worker, spawned at store attach when
     /// `config.retention_config` is `Some`. Owns a dedicated OS thread that

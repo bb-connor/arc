@@ -305,6 +305,7 @@ impl ChioKernel {
             receipt_mirror_gauge,
             child_receipt_mirror_gauge,
             receipt_store: None,
+            native_receipt_store_registration: None,
             receipt_store_write_lock: Mutex::new(()),
             retention_maintenance: None,
             payment_adapter: None,
@@ -831,6 +832,18 @@ impl ChioKernel {
         self.try_set_receipt_store_handle(receipt_store)
     }
 
+    /// Install one owned receipt sink with trustworthy concrete identity for
+    /// optional Native owner discovery. Failed installation retains the
+    /// existing sink and registration; ordinary successful setters clear it.
+    pub fn set_native_receipt_store(
+        &mut self,
+        registration: crate::receipt_store::NativeReceiptStoreRegistration,
+    ) -> Result<(), KernelError> {
+        self.try_set_receipt_store_handle(registration.receipt_store_handle())?;
+        self.native_receipt_store_registration = Some(registration);
+        Ok(())
+    }
+
     pub fn try_set_receipt_store_handle(
         &mut self,
         receipt_store: Arc<dyn ReceiptStore>,
@@ -949,6 +962,7 @@ impl ChioKernel {
                 ));
         }
         self.receipt_store = Some(receipt_store);
+        self.native_receipt_store_registration = None;
         Ok(())
     }
 

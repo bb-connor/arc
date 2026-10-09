@@ -84,7 +84,8 @@ pub struct NativeInitialFinishingAuthority<'call> {
     trusted_now_unix_ms: u64,
     phase: NativeInitialFinishingPhase,
     bank_issuer: NativeProcessBankProofIssuer<'call>,
-    configured_receipt_store: Option<&'call dyn crate::ReceiptStore>,
+    configured_receipt_registration:
+        Option<&'call crate::receipt_store::NativeReceiptStoreRegistration>,
 }
 
 impl core::fmt::Debug for NativeInitialFinishingAuthority<'_> {
@@ -169,22 +170,26 @@ impl<'call> NativeInitialFinishingAuthority<'call> {
             trusted_now_unix_ms,
             phase,
             bank_issuer,
-            configured_receipt_store: None,
+            configured_receipt_registration: None,
         })
     }
 
     /// Only the original Kernel callback can attach its actual configured sink.
     /// This borrow conveys identity, never a Source, account or purpose Loan.
-    pub(crate) fn with_configured_receipt_store(
+    pub(crate) fn with_configured_receipt_registration(
         mut self,
-        store: &'call dyn crate::ReceiptStore,
+        registration: &'call crate::receipt_store::NativeReceiptStoreRegistration,
     ) -> Self {
-        self.configured_receipt_store = Some(store);
+        self.configured_receipt_registration = Some(registration);
         self
     }
 
-    pub fn configured_receipt_store(&self) -> Option<&dyn crate::ReceiptStore> {
-        self.configured_receipt_store
+    /// Concrete sink identity captured at opt-in owned registration. Ordinary
+    /// sink installation leaves this absent and grants no Native receipt owner.
+    pub fn configured_receipt_registration(
+        &self,
+    ) -> Option<&crate::receipt_store::NativeReceiptStoreRegistration> {
+        self.configured_receipt_registration
     }
 
     pub fn process_bank_issuer(&self) -> &NativeProcessBankProofIssuer<'call> {
