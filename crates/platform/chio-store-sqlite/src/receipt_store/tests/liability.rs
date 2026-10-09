@@ -269,26 +269,26 @@ fn liability_claim_lifecycle_persists_package_through_payout_receipt() {
                 chio_kernel::CreditFacilityLifecycleState::Active,
                 None,
             );
-            let bond = signed_credit_bond_fixture(
+            let bond = signed_credit_bond_fixture(CreditBondFixture {
                 subject_key,
-                "cfd-claim-1",
-                "bond-claim-1",
-                1_700_000_200,
-                far_future,
-                chio_kernel::CreditBondDisposition::Lock,
-                chio_kernel::CreditBondLifecycleState::Active,
-                None,
-            );
-            let loss_event = signed_credit_loss_lifecycle_fixture(
+                facility_id: "cfd-claim-1",
+                bond_id: "bond-claim-1",
+                issued_at: 1_700_000_200,
+                expires_at: far_future,
+                disposition: chio_kernel::CreditBondDisposition::Lock,
+                lifecycle_state: chio_kernel::CreditBondLifecycleState::Active,
+                supersedes_bond_id: None,
+            });
+            let loss_event = signed_credit_loss_lifecycle_fixture(CreditLossLifecycleFixture {
                 subject_key,
-                "cfd-claim-1",
-                "bond-claim-1",
-                "loss-claim-1",
-                1_700_000_300,
-                chio_kernel::CreditLossLifecycleEventKind::Delinquency,
-                chio_kernel::CreditBondLifecycleState::Impaired,
-                usd(5_000),
-            );
+                facility_id: "cfd-claim-1",
+                bond_id: "bond-claim-1",
+                event_id: "loss-claim-1",
+                issued_at: 1_700_000_300,
+                event_kind: chio_kernel::CreditLossLifecycleEventKind::Delinquency,
+                projected_bond_lifecycle_state: chio_kernel::CreditBondLifecycleState::Impaired,
+                event_amount: usd(5_000),
+            });
 
             store.record_liability_provider(&provider).test_unwrap();
             store

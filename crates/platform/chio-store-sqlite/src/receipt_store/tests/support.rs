@@ -1207,20 +1207,31 @@ pub(super) fn signed_credit_facility_fixture(
     })
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-)]
+/// Parameters of `signed_underwriting_decision_fixture`.
+pub(super) struct UnderwritingDecisionFixture<'a> {
+    pub(super) subject_key: &'a str,
+    pub(super) decision_id: &'a str,
+    pub(super) issued_at: u64,
+    pub(super) outcome: chio_kernel::UnderwritingDecisionOutcome,
+    pub(super) review_state: chio_kernel::UnderwritingReviewState,
+    pub(super) lifecycle_state: chio_kernel::UnderwritingDecisionLifecycleState,
+    pub(super) supersedes_decision_id: Option<&'a str>,
+    pub(super) quoted_amount: Option<MonetaryAmount>,
+}
+
 pub(super) fn signed_underwriting_decision_fixture(
-    subject_key: &str,
-    decision_id: &str,
-    issued_at: u64,
-    outcome: chio_kernel::UnderwritingDecisionOutcome,
-    review_state: chio_kernel::UnderwritingReviewState,
-    lifecycle_state: chio_kernel::UnderwritingDecisionLifecycleState,
-    supersedes_decision_id: Option<&str>,
-    quoted_amount: Option<MonetaryAmount>,
+    params: UnderwritingDecisionFixture<'_>,
 ) -> chio_kernel::SignedUnderwritingDecision {
+    let UnderwritingDecisionFixture {
+        subject_key,
+        decision_id,
+        issued_at,
+        outcome,
+        review_state,
+        lifecycle_state,
+        supersedes_decision_id,
+        quoted_amount,
+    } = params;
     let (budget_action, ceiling_factor) = match outcome {
         chio_kernel::UnderwritingDecisionOutcome::Approve
         | chio_kernel::UnderwritingDecisionOutcome::StepUp => {
@@ -1276,20 +1287,31 @@ pub(super) fn signed_underwriting_decision_fixture(
     })
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-)]
+/// Parameters of `signed_credit_bond_fixture`.
+pub(super) struct CreditBondFixture<'a> {
+    pub(super) subject_key: &'a str,
+    pub(super) facility_id: &'a str,
+    pub(super) bond_id: &'a str,
+    pub(super) issued_at: u64,
+    pub(super) expires_at: u64,
+    pub(super) disposition: chio_kernel::CreditBondDisposition,
+    pub(super) lifecycle_state: chio_kernel::CreditBondLifecycleState,
+    pub(super) supersedes_bond_id: Option<&'a str>,
+}
+
 pub(super) fn signed_credit_bond_fixture(
-    subject_key: &str,
-    facility_id: &str,
-    bond_id: &str,
-    issued_at: u64,
-    expires_at: u64,
-    disposition: chio_kernel::CreditBondDisposition,
-    lifecycle_state: chio_kernel::CreditBondLifecycleState,
-    supersedes_bond_id: Option<&str>,
+    params: CreditBondFixture<'_>,
 ) -> chio_kernel::SignedCreditBond {
+    let CreditBondFixture {
+        subject_key,
+        facility_id,
+        bond_id,
+        issued_at,
+        expires_at,
+        disposition,
+        lifecycle_state,
+        supersedes_bond_id,
+    } = params;
     sign_export(chio_kernel::CreditBondArtifact {
         schema: chio_kernel::CREDIT_BOND_ARTIFACT_SCHEMA.to_string(),
         bond_id: bond_id.to_string(),
@@ -1340,20 +1362,31 @@ pub(super) fn signed_credit_bond_fixture(
     })
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-)]
+/// Parameters of `signed_credit_loss_lifecycle_fixture`.
+pub(super) struct CreditLossLifecycleFixture<'a> {
+    pub(super) subject_key: &'a str,
+    pub(super) facility_id: &'a str,
+    pub(super) bond_id: &'a str,
+    pub(super) event_id: &'a str,
+    pub(super) issued_at: u64,
+    pub(super) event_kind: chio_kernel::CreditLossLifecycleEventKind,
+    pub(super) projected_bond_lifecycle_state: chio_kernel::CreditBondLifecycleState,
+    pub(super) event_amount: MonetaryAmount,
+}
+
 pub(super) fn signed_credit_loss_lifecycle_fixture(
-    subject_key: &str,
-    facility_id: &str,
-    bond_id: &str,
-    event_id: &str,
-    issued_at: u64,
-    event_kind: chio_kernel::CreditLossLifecycleEventKind,
-    projected_bond_lifecycle_state: chio_kernel::CreditBondLifecycleState,
-    event_amount: MonetaryAmount,
+    params: CreditLossLifecycleFixture<'_>,
 ) -> chio_kernel::SignedCreditLossLifecycle {
+    let CreditLossLifecycleFixture {
+        subject_key,
+        facility_id,
+        bond_id,
+        event_id,
+        issued_at,
+        event_kind,
+        projected_bond_lifecycle_state,
+        event_amount,
+    } = params;
     sign_export(chio_kernel::CreditLossLifecycleArtifact {
         schema: chio_kernel::CREDIT_LOSS_LIFECYCLE_ARTIFACT_SCHEMA.to_string(),
         event_id: event_id.to_string(),

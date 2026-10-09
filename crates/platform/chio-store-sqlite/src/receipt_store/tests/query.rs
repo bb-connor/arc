@@ -985,16 +985,16 @@ fn economic_completion_flow_report_bundles_receipts_underwriting_and_credit_arti
         .record_credit_facility(&sample_credit_facility(subject_key))
         .test_unwrap();
     store
-        .record_credit_bond(&signed_credit_bond_fixture(
+        .record_credit_bond(&signed_credit_bond_fixture(CreditBondFixture {
             subject_key,
-            "cfd-1",
-            "cbd-1",
-            1_700_000_200,
-            1_700_086_600,
-            chio_kernel::CreditBondDisposition::Hold,
-            chio_kernel::CreditBondLifecycleState::Active,
-            None,
-        ))
+            facility_id: "cfd-1",
+            bond_id: "cbd-1",
+            issued_at: 1_700_000_200,
+            expires_at: 1_700_086_600,
+            disposition: chio_kernel::CreditBondDisposition::Hold,
+            lifecycle_state: chio_kernel::CreditBondLifecycleState::Active,
+            supersedes_bond_id: None,
+        }))
         .test_unwrap();
 
     let report = store

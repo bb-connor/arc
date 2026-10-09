@@ -126,6 +126,15 @@ struct CoordinatorRecordPreimage<'a> {
     updated_at_unix_ms: u64,
 }
 
+/// Parameters of `claim_and_reconcile_existing`.
+struct CoordinatorLeaseClaim<'a> {
+    worker_id: &'a str,
+    lease_id: &'a str,
+    lease_ttl_ms: u64,
+    fence: &'a StoreMutationFence,
+    trusted_now_unix_ms: u64,
+}
+
 impl SqliteFrostStore {
     pub fn claim_coordinator_session(
         &self,
@@ -170,11 +179,13 @@ impl SqliteFrostStore {
             return self.claim_and_reconcile_existing(
                 stored,
                 request,
-                worker_id,
-                lease_id,
-                lease_ttl_ms,
-                fence,
-                trusted_now_unix_ms,
+                CoordinatorLeaseClaim {
+                    worker_id,
+                    lease_id,
+                    lease_ttl_ms,
+                    fence,
+                    trusted_now_unix_ms,
+                },
             );
         }
 
@@ -251,11 +262,13 @@ impl SqliteFrostStore {
             return self.claim_and_reconcile_existing(
                 existing,
                 request,
-                worker_id,
-                lease_id,
-                lease_ttl_ms,
-                fence,
-                trusted_now_unix_ms,
+                CoordinatorLeaseClaim {
+                    worker_id,
+                    lease_id,
+                    lease_ttl_ms,
+                    fence,
+                    trusted_now_unix_ms,
+                },
             );
         }
         insert_coordinator(&transaction, &stored)?;
@@ -680,20 +693,19 @@ impl SqliteFrostStore {
         Ok(public_lease(&stored))
     }
 
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-    )]
     fn claim_and_reconcile_existing(
         &self,
         stored: StoredCoordinator,
         request: &FrostCoordinatorSessionRequest<'_>,
-        worker_id: &str,
-        lease_id: &str,
-        lease_ttl_ms: u64,
-        fence: &StoreMutationFence,
-        trusted_now_unix_ms: u64,
+        params: CoordinatorLeaseClaim<'_>,
     ) -> Result<FrostCoordinatorLease, FrostStoreError> {
+        let CoordinatorLeaseClaim {
+            worker_id,
+            lease_id,
+            lease_ttl_ms,
+            fence,
+            trusted_now_unix_ms,
+        } = params;
         let lease = self.claim_existing_lease(
             stored,
             worker_id,

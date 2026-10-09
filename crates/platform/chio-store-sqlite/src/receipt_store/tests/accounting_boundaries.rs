@@ -58,16 +58,16 @@ fn underwriting_refuses_premium_overflow_within_one_currency() -> TestResult {
     // Each persisted INTEGER is representable; their report total is not.
     let largest_stored = i64::MAX as u64;
     for (index, units) in [largest_stored, largest_stored, 2].into_iter().enumerate() {
-        let decision = signed_underwriting_decision_fixture(
-            "premium-subject",
-            &format!("premium-{index}"),
-            1_700_000_100 + index as u64,
-            chio_kernel::UnderwritingDecisionOutcome::ReduceCeiling,
-            chio_kernel::UnderwritingReviewState::Approved,
-            chio_kernel::UnderwritingDecisionLifecycleState::Active,
-            None,
-            Some(usd(units)),
-        );
+        let decision = signed_underwriting_decision_fixture(UnderwritingDecisionFixture {
+            subject_key: "premium-subject",
+            decision_id: &format!("premium-{index}"),
+            issued_at: 1_700_000_100 + index as u64,
+            outcome: chio_kernel::UnderwritingDecisionOutcome::ReduceCeiling,
+            review_state: chio_kernel::UnderwritingReviewState::Approved,
+            lifecycle_state: chio_kernel::UnderwritingDecisionLifecycleState::Active,
+            supersedes_decision_id: None,
+            quoted_amount: Some(usd(units)),
+        });
         store.record_underwriting_decision(&decision)?;
         if index == 0 {
             assert_eq!(

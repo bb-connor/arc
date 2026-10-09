@@ -1,16 +1,16 @@
 use super::support::*;
 
 fn underwriting_fixture() -> SignedUnderwritingDecision {
-    signed_underwriting_decision_fixture(
-        "signed-readback-subject",
-        "signed-readback-decision",
-        1_700_000_100,
-        chio_kernel::UnderwritingDecisionOutcome::ReduceCeiling,
-        chio_kernel::UnderwritingReviewState::Approved,
-        chio_kernel::UnderwritingDecisionLifecycleState::Active,
-        None,
-        Some(usd(500)),
-    )
+    signed_underwriting_decision_fixture(UnderwritingDecisionFixture {
+        subject_key: "signed-readback-subject",
+        decision_id: "signed-readback-decision",
+        issued_at: 1_700_000_100,
+        outcome: chio_kernel::UnderwritingDecisionOutcome::ReduceCeiling,
+        review_state: chio_kernel::UnderwritingReviewState::Approved,
+        lifecycle_state: chio_kernel::UnderwritingDecisionLifecycleState::Active,
+        supersedes_decision_id: None,
+        quoted_amount: Some(usd(500)),
+    })
 }
 
 fn replace_raw(store: &SqliteReceiptStore, table: &str, raw: &str) {

@@ -7,36 +7,36 @@ fn underwriting_decision_report_tracks_supersession_and_appeal_filters() {
     let mut store = SqliteReceiptStore::open(&path).test_unwrap();
     let subject_key = "subject-underwriting";
 
-    let initial = signed_underwriting_decision_fixture(
+    let initial = signed_underwriting_decision_fixture(UnderwritingDecisionFixture {
         subject_key,
-        "uwd-report-1",
-        1_700_000_100,
-        chio_kernel::UnderwritingDecisionOutcome::Approve,
-        chio_kernel::UnderwritingReviewState::Approved,
-        chio_kernel::UnderwritingDecisionLifecycleState::Active,
-        None,
-        Some(usd(500)),
-    );
-    let replacement = signed_underwriting_decision_fixture(
+        decision_id: "uwd-report-1",
+        issued_at: 1_700_000_100,
+        outcome: chio_kernel::UnderwritingDecisionOutcome::Approve,
+        review_state: chio_kernel::UnderwritingReviewState::Approved,
+        lifecycle_state: chio_kernel::UnderwritingDecisionLifecycleState::Active,
+        supersedes_decision_id: None,
+        quoted_amount: Some(usd(500)),
+    });
+    let replacement = signed_underwriting_decision_fixture(UnderwritingDecisionFixture {
         subject_key,
-        "uwd-report-2",
-        1_700_000_200,
-        chio_kernel::UnderwritingDecisionOutcome::ReduceCeiling,
-        chio_kernel::UnderwritingReviewState::Approved,
-        chio_kernel::UnderwritingDecisionLifecycleState::Active,
-        Some("uwd-report-1"),
-        Some(usd(300)),
-    );
-    let denied = signed_underwriting_decision_fixture(
+        decision_id: "uwd-report-2",
+        issued_at: 1_700_000_200,
+        outcome: chio_kernel::UnderwritingDecisionOutcome::ReduceCeiling,
+        review_state: chio_kernel::UnderwritingReviewState::Approved,
+        lifecycle_state: chio_kernel::UnderwritingDecisionLifecycleState::Active,
+        supersedes_decision_id: Some("uwd-report-1"),
+        quoted_amount: Some(usd(300)),
+    });
+    let denied = signed_underwriting_decision_fixture(UnderwritingDecisionFixture {
         subject_key,
-        "uwd-report-3",
-        1_700_000_150,
-        chio_kernel::UnderwritingDecisionOutcome::Deny,
-        chio_kernel::UnderwritingReviewState::Denied,
-        chio_kernel::UnderwritingDecisionLifecycleState::Active,
-        None,
-        None,
-    );
+        decision_id: "uwd-report-3",
+        issued_at: 1_700_000_150,
+        outcome: chio_kernel::UnderwritingDecisionOutcome::Deny,
+        review_state: chio_kernel::UnderwritingReviewState::Denied,
+        lifecycle_state: chio_kernel::UnderwritingDecisionLifecycleState::Active,
+        supersedes_decision_id: None,
+        quoted_amount: None,
+    });
 
     store.record_underwriting_decision(&initial).test_unwrap();
     store
