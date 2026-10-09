@@ -5,8 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import subprocess
-import time
+from owned_native_process import owned_native_process
 from campaign_baseline import SupervisorSession
 from campaign_runner import graph_trial, crew_trial, public_task
 from chio_sdk.recovery_host import RecoveryHostSession
@@ -52,17 +51,13 @@ def main():
                     directory = args.evidence/f"{host}-{workflow}-{arm}"
                     directory.mkdir(mode=0o700)
                     (directory/"configuration.json").write_text(json.dumps({"workflow":workflow,"case":"authorized"}))
-                    log = (directory/"native.log").open("wb")
                     env = native_environment("CHIO_RECOVERY_CAMPAIGN_EXCHANGE", directory)
                     if capture is not None:env = capture.runtime_environment("native-host-library",env)
-                    try:
-                        process = subprocess.Popen(["cargo","test","--offline","--locked","-p","chio-control-plane","--lib",
+                    with owned_native_process(["cargo","test","--offline","--locked","-p","chio-control-plane","--lib",
                             "live_comparative_native_host","--","--ignored","--test-threads=1"],cwd=args.checkout,
-                            env=env,stdout=log,stderr=subprocess.STDOUT)
-                    except BaseException:
-                        log.close()
-                        raise
-                    try:
+                            env=env,log_path=directory/"native.log",finish_path=directory/"finish",
+                            grace_seconds=120) as native_process:
+                        process, log = native_process.process, native_process.log
                         endpoint = wait_endpoint(directory/"ready", process, 240)
                         descriptor = (directory/"authority-contract.json").read_bytes()
                         digest = hashlib.sha256(descriptor).hexdigest()
@@ -79,8 +74,7 @@ def main():
                         require(output["category"] == "complete" and session.attempts == model.calls == 1,
                                 "preflight_model_free_completion")
                         require(not network_attempts, "preflight_provider_requests")
-                        (directory/"finish").touch()
-                        status = process.wait(timeout=120)
+                        status = native_process.finish()
                         require(status == 0, "preflight_native_execution")
                         facts = json.loads((directory/"native-evidence.json").read_bytes())
                         if capture is not None:
@@ -97,11 +91,7 @@ def main():
                             "provider_requests":len(network_attempts), "network_attempts":network_attempts,
                             "scripted_external_input":True,"model_frames":model.attempts,
                             "authority_policy":digest})
-                        print("Actual model-free preflight passed",host,workflow,arm,flush=True)
-                    finally:
-                        (directory/"finish").touch()
-                        if process.poll() is None: process.wait(timeout=120)
-                        log.close()
+                    print("Actual model-free preflight passed",host,workflow,arm,flush=True)
         require(len(results) == 8, "preflight_denominator")
         (args.evidence/"result.json").write_text(json.dumps({"cases":results,"passed":True,
             "mode":"model-free-native-preflight",

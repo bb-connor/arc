@@ -5,10 +5,10 @@ import asyncio
 import json
 import os
 from pathlib import Path
-import subprocess
 import time
 from typing import TypedDict
 import httpx
+from owned_native_process import owned_native_process
 from qualification_runtime import disable_telemetry, native_environment, require, wait_endpoint
 
 disable_telemetry()
@@ -35,6 +35,14 @@ class NativeTrace(httpx.AsyncBaseTransport):
         await self._http.aclose()
 
 
+def require_complete_projection(outcome):
+    require(set(outcome) == {"category", "command_id", "workflow_id", "effect", "control", "release"},
+            "host_projection")
+    require(outcome["category"] == "complete" and outcome["effect"] == "complete"
+            and outcome["control"] == "active" and outcome["release"] == "released",
+            "host_projection")
+
+
 async def graph_case(session, revoked):
     from langgraph.graph import END, START, StateGraph
     from langgraph.checkpoint.memory import InMemorySaver
@@ -52,10 +60,11 @@ async def graph_case(session, revoked):
     replay = await app.ainvoke({"choice":"resume"}, config)
     require(first["recovery"] == replay["recovery"], "host_replay")
     require(first["recovery"]["category"] == "complete", "host_completion")
-    require(set(first["recovery"]) == {"category", "command_id", "workflow_id"}, "host_projection")
+    require_complete_projection(first["recovery"])
     await revoked()
     refused = await app.ainvoke({"choice":"resume"}, config)
-    require(refused["recovery"] == {"category":"refused"}, "host_revoked")
+    require(refused["recovery"] == {"category":"refused", "error_code":"recovery.authority_denied"},
+            "host_revoked")
     for snapshot in app.get_state_history(config):
         require("canary" not in json.dumps(snapshot.values), "host_checkpoint_exposure")
         require("capability" not in json.dumps(snapshot.values), "host_checkpoint_exposure")
@@ -100,26 +109,22 @@ def main():
     for framework in ["langgraph", "crewai"]:
         exchange = args.evidence / framework
         exchange.mkdir(mode=0o700, parents=True, exist_ok=False)
-        log = (exchange / "native-host.log").open("wb")
         environment = native_environment("CHIO_RECOVERY_HOST_EXCHANGE", exchange)
         environment["CARGO_INCREMENTAL"] = "0"
-        try:
-            process = subprocess.Popen(["cargo", "test", "--offline", "--locked", "-p", "chio-control-plane", "--lib",
+        with owned_native_process(["cargo", "test", "--offline", "--locked", "-p", "chio-control-plane", "--lib",
                 "native_framework_qualification_host", "--", "--ignored", "--nocapture", "--test-threads=1"],
-                cwd=args.checkout, env=environment, stdout=log, stderr=subprocess.STDOUT)
-        except BaseException:
-            log.close()
-            raise
-        def wait(name):
-            deadline = time.monotonic() + 180
-            while time.monotonic() < deadline:
-                if (exchange/name).is_file():
-                    return
-                if process.poll() is not None:
-                    raise RuntimeError("native framework fixture terminated")
-                time.sleep(0.05)
-            raise TimeoutError("native fixture phase deadline")
-        try:
+                cwd=args.checkout, env=environment, log_path=exchange/"native-host.log",
+                finish_path=exchange/"finish", grace_seconds=90) as native_process:
+            process = native_process.process
+            def wait(name):
+                deadline = time.monotonic() + 180
+                while time.monotonic() < deadline:
+                    if (exchange/name).is_file():
+                        return
+                    if process.poll() is not None:
+                        raise RuntimeError("native framework fixture terminated")
+                    time.sleep(0.05)
+                raise TimeoutError("native fixture phase deadline")
             endpoint = wait_endpoint(exchange/"ready", process, 180, fixed_port=20096)
             session = RecoveryHostSession(endpoint, (exchange/"capability.json").read_text(),
                 {"resume":(exchange/"command.json").read_bytes()}, max_tool_actions=3, timeout_seconds=120,
@@ -135,23 +140,19 @@ def main():
                 first = crew_action(session)
                 replay = crew_action(session)
                 require(first == replay and first["category"] == "complete", "host_replay")
+                require_complete_projection(first)
                 revoke()
                 refused = crew_action(session)
-                require(refused == {"category":"refused"}, "host_revoked")
+                require(refused == {"category":"refused", "error_code":"recovery.authority_denied"},
+                        "host_revoked")
                 outputs = {"first":first, "replay":replay, "revoked":refused}
             require(session.attempts == 3, "host_tool_budget")
-            (exchange/"finish").touch()
-            status = process.wait(timeout=90)
+            status = native_process.finish()
             require(status == 0, "host_native_execution")
             native = json.loads((exchange/"native-evidence.json").read_bytes())
             require(native["workload_effects"] == 1 and native["effects"] == 2 and native["revoked"] is True,
                     "host_native_facts")
             results.append({"framework":framework, "outputs":outputs, "native":native, "tool_actions":session.attempts})
-        finally:
-            if process.poll() is None:
-                (exchange/"finish").touch()
-                process.wait(timeout=30)
-            log.close()
     (args.evidence/"result.json").write_text(json.dumps({"passed":True, "cases":results}, indent=2)+"\n")
     print("Actual LangGraph/CrewAI native benign, identical replay and revoked replay passed")
 
