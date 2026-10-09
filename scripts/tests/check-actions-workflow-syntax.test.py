@@ -10,7 +10,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[2]
 ACTIONLINT = os.environ.get("ACTIONLINT_BIN", "actionlint")
 WORKFLOW = """name: Queue syntax fixture
@@ -30,6 +29,17 @@ jobs:
       group: security-check-authority-${{ needs.authorize-security-check-publication.outputs.evidence_sha }}
       cancel-in-progress: false
       queue: max
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo fixture
+"""
+
+LANE_WORKFLOW = """name: Lane cache fixture
+on:
+  workflow_dispatch:
+cache-mode: read
+jobs:
+  test:
     runs-on: ubuntu-latest
     steps:
       - run: echo fixture
@@ -69,6 +79,34 @@ class QueueSyntaxCompatibilityTests(unittest.TestCase):
 
     def test_every_generic_syntax_error_keeps_its_failure(self) -> None:
         result = self.run_validator(WORKFLOW.replace("runs-on: ubuntu-latest", "unknown-job-key: ubuntu-latest", 1))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unknown-job-key", result.stdout + result.stderr)
+
+    def test_lane_read_only_cache_is_checked_before_linting_remaining_syntax(self) -> None:
+        result = self.run_validator(LANE_WORKFLOW, "lane-test.yml")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("read-only cache contracts verified: 1", result.stdout)
+
+    def test_lane_cache_authority_cannot_be_removed_or_overridden(self) -> None:
+        for label, text, name in (
+            ("missing", LANE_WORKFLOW.replace("cache-mode: read\n", ""), "lane-test.yml"),
+            ("write", LANE_WORKFLOW.replace("cache-mode: read", "cache-mode: write"), "lane-test.yml"),
+            ("write-only", LANE_WORKFLOW.replace("cache-mode: read", "cache-mode: write-only"), "lane-test.yml"),
+            ("expression", LANE_WORKFLOW.replace("cache-mode: read", "cache-mode: ${{ github.ref }}"), "lane-test.yml"),
+            ("duplicate", LANE_WORKFLOW.replace("cache-mode: read", "cache-mode: read\ncache-mode: write"), "lane-test.yml"),
+            ("job-override", LANE_WORKFLOW.replace("  test:\n", "  test:\n    cache-mode: write\n"), "lane-test.yml"),
+            ("foreign", LANE_WORKFLOW, "foreign.yml"),
+            ("alias", LANE_WORKFLOW.replace("name: Lane cache fixture", "name: &cache read").replace("cache-mode: read", "cache-mode: *cache"), "lane-test.yml"),
+        ):
+            with self.subTest(mutation=label):
+                result = self.run_validator(text, name)
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_lane_cache_compatibility_retains_other_syntax_errors(self) -> None:
+        result = self.run_validator(
+            LANE_WORKFLOW.replace("runs-on: ubuntu-latest", "unknown-job-key: ubuntu-latest"),
+            "lane-test.yml",
+        )
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("unknown-job-key", result.stdout + result.stderr)
 

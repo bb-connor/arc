@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate known authority queues, then lint every remaining workflow byte."""
+"""Validate known authority extensions, then lint remaining workflow syntax."""
 
 from __future__ import annotations
 
@@ -11,7 +11,6 @@ import sys
 from pathlib import Path
 
 import yaml
-
 
 SPEC = importlib.util.spec_from_file_location(
     "trusted_queue_contract", Path(__file__).with_name("check-security-ci-contract.py")
@@ -34,7 +33,7 @@ def mapping(node: yaml.Node) -> dict[str, yaml.Node]:
     return result
 
 
-def normalize_known_queues(name: str, text: str) -> tuple[str, list[dict]]:
+def normalize_known_extensions(name: str, text: str) -> tuple[str, list[dict]]:
     tree = yaml.compose(text, Loader=yaml.BaseLoader)
     removed: set[int] = set()
     proofs: list[dict] = []
@@ -46,6 +45,21 @@ def normalize_known_queues(name: str, text: str) -> tuple[str, list[dict]]:
         ancestors = ancestors | {id(node)}
         if isinstance(node, yaml.MappingNode):
             fields = mapping(node)
+            if "cache-mode" in fields:
+                # GitHub enforces this permission at the cache service. Keep
+                # the exact lane contract while older actionlint parsers catch
+                # every other syntax error. Job overrides are not permitted.
+                # https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#cache-mode
+                mode = fields["cache-mode"]
+                if name != "lane-test.yml" or path:
+                    raise CONTRACT.ContractError("cache compatibility is restricted to the lane workflow root")
+                if not isinstance(mode, yaml.ScalarNode) or mode.value != "read":
+                    raise CONTRACT.ContractError("lane workflow requires literal read-only cache authority")
+                line = mode.start_mark.line
+                if mode.end_mark.line != line or not re.fullmatch(r"cache-mode:\s*read\s*(?:#.*)?\n?", lines[line]):
+                    raise CONTRACT.ContractError("unrecognized cache-mode source representation")
+                removed.add(line)
+                proofs.append({"workflow": name, "cache-mode": "read"})
             if path and path[-1] == "concurrency" and "queue" in fields:
                 if len(path) != 3 or path[0] != "jobs":
                     raise CONTRACT.ContractError("queue compatibility is restricted to exact authority jobs")
@@ -70,6 +84,8 @@ def normalize_known_queues(name: str, text: str) -> tuple[str, list[dict]]:
     if tree is None:
         raise CONTRACT.ContractError("empty workflow")
     visit(tree, (), set())
+    if name == "lane-test.yml" and not any("cache-mode" in proof for proof in proofs):
+        raise CONTRACT.ContractError("lane workflow requires explicit read-only cache authority")
     return "".join(line for index, line in enumerate(lines) if index not in removed), proofs
 
 
@@ -83,14 +99,16 @@ def main() -> int:
     directory = root / ".github/workflows"
     files = args.files or sorted((*directory.glob("*.yml"), *directory.glob("*.yaml")))
     count = 0
+    cache_count = 0
     result_code = 0
     try:
         for source in files:
             source = source if source.is_absolute() else root / source
             if source.is_symlink() or not source.is_file() or source.parent.resolve() != directory.resolve():
                 raise CONTRACT.ContractError("workflow source is not an exact regular repository file")
-            text, proofs = normalize_known_queues(source.name, source.read_text(encoding="utf-8"))
-            count += len(proofs)
+            text, proofs = normalize_known_extensions(source.name, source.read_text(encoding="utf-8"))
+            count += sum("concurrency" in proof for proof in proofs)
+            cache_count += sum("cache-mode" in proof for proof in proofs)
             command = [args.actionlint, "-stdin-filename", str(source.relative_to(root))]
             config = root / ".github/actionlint.yaml"
             if config.is_file():
@@ -104,7 +122,8 @@ def main() -> int:
     except (CONTRACT.ContractError, OSError, ValueError, yaml.YAMLError, subprocess.TimeoutExpired) as error:
         print(f"workflow syntax validation failed: {error}", file=sys.stderr)
         return 1
-    print(f"queue contracts verified: {count}; remaining workflow syntax exit: {result_code}; "
+    print(f"queue contracts verified: {count}; read-only cache contracts verified: {cache_count}; "
+          f"remaining workflow syntax exit: {result_code}; "
           "hosted workflow acceptance remains unverified")
     return result_code
 
