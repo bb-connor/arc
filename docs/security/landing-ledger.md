@@ -9,34 +9,41 @@ a later requirement state or establish current candidate qualification.
 
 ## Current composed snapshot checkpoint (October 9)
 
-The canonical ledger contains **1,834 requirements**. Every prior requirement
-object remains preserved. The [public-route findings](../reviews/2026-10-09-pr1160-public-route-findings.md)
-and [independent snapshot composition review](../reviews/2026-10-09-pr1160-snapshot-composition-review.md)
-record the newly discovered obligations separately from the original review.
+The canonical ledger contains **1,835 requirements**, each represented in
+`current_requirement_states`. All prior requirement objects remain preserved.
+Five existing CI closeout entries were copied into the previously incomplete
+current view without changing their evidence or qualification status.
 
-The isolated stage includes the issuer trust/SSRF, public-worker and receipt
-response-finalization repairs. The finalization repair at `f9faea6937` has
-three genuine original failures, 45 composed HTTP/issuer/forward controls,
-103 snapshot controls, strict control-plane/CLI/store Clippy, six static gates,
-and independent source review. Five store tests are explicitly ignored in that
-focused run (four capacity campaigns and one existing helper). The earlier full
-control-plane run was cancelled after 456 observed passes to prioritize repair
-feedback; it is not a completed owning-suite pass.
+The isolated stage at `17c89ed9bd` includes the issuer trust/SSRF, public-worker,
+response-finalization and authority read-only repairs. The [authority qualification
+record](audits/authority-readonly-local-qualification-20261009.json) binds the
+61 public-route, 38 authority-store and 43 CLI controls, strict three-owner
+Clippy and six static gates to their source. One existing CLI test remains
+explicitly ignored. Both independent authority reviews are retained. Public readers no longer provision or write authority state;
+trusted CLI startup provisions its configured database once. This does not
+harden the unchanged seed-only status reader or qualify other platforms.
 
-**Landing blockers remain:** authority read-write amplification (P1), publication
-of extension rows before their covering checkpoint authenticates (P1), lineage
-refresh provenance validation (P2), and the original-domain real-SHA proof.
-The specified C20 invalidation/rebuild count campaign also remains required.
-The JSON current-state view records each repair, evidence and remaining check.
-Source and the published PR have not been advanced by this checkpoint.
+The [checkpoint-publication review](../reviews/2026-10-09-pr1160-checkpoint-publication-review.md)
+accepts the separately tested staging-race repair, while identifying a remaining
+P1: an unauthenticated end column can hide a committed covering checkpoint.
+Its service regression and repair remain assigned to the checkpoint lane.
+Lineage provenance validation, the C20 invalidation/rebuild count campaign,
+affected capacity renewal and the original-domain real-SHA proof also remain
+required. Source and the published PR have not advanced at this checkpoint.
 
-[Exact capacity measurements](audits/receipt-snapshot-capacity-20261009.json)
-bind to production source `f24a5240e6`: one million signed Linux receipts and
-ten million synthetic projection rows passed their distinct campaigns. Each
-signed build authenticated one million signatures with zero count mismatches.
-Rotation started during the contended build and finished after it. RSS does
-not isolate walker allocations. Later integrity repairs need affected renewal;
-these measurements do not qualify the final candidate or imply unlimited quota.
+[Earlier capacity measurements](audits/receipt-snapshot-capacity-20261009.json)
+remain bound to source `f24a5240e6`: one million signed Linux receipts and ten
+million synthetic projection rows passed distinct campaigns. Each signed build
+authenticated one million signatures with zero count mismatches. Rotation
+started during the contended build and finished afterward; RSS does not isolate
+walker allocations. Later integrity repairs require affected renewal.
+
+The earlier full control-plane runs remain incomplete: one was deliberately
+cancelled after 456 observed passes, and the producer run was interrupted by
+provider preemption after 1,299 observed passes. Neither is a completed owning
+suite. The provider also interrupted an OID lint run; the new local strict run
+is separately recorded. No candidate, hosted, native-product, release or merge
+qualification is inferred from these focused results.
 
 ## Current landing repair wave (October 9)
 
