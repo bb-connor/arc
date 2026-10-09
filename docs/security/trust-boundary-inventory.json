@@ -3334,13 +3334,13 @@
     {
       "path": "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/project.rs",
       "owner": "schema",
-      "sha256": "545b01564c6624d18ef822267d4761dd820bf9f8770e40595bedd235395334be",
+      "sha256": "e6f002e4eb6c6ec374771266f6987cbbb616debd56111cb4af85b12ad3cd208a",
       "tables": [
         "chio_tool_receipts"
       ],
-      "sql": "SELECT COUNT(*) = 1 AND COALESCE(MIN(r.receipt_id = ?2 AND r.raw_json = ?3 AND r.timestamp = ?4 AND r.capability_id = ?5 AND r.tool_server = ?6 AND r.tool_name = ?7 AND r.decision_kind = ?8 AND r.tenant_id IS ?9 AND r.cost_currency IS ?10 AND r.cost_charged_be IS ?11 AND r.attempted_cost_be IS ?12 AND COALESCE(r.subject_key, cl.subject_key) IS ?13 AND COALESCE(r.issuer_key, cl.issuer_key) IS ?14 AND r.grant_index IS ?15 AND r.policy_hash = ?16 AND r.content_hash = ?17), 0) FROM chio_tool_receipts r LEFT JOIN capability_lineage cl ON cl.capability_id = r.capability_id WHERE r.seq = ?1",
+      "sql": "SELECT COUNT(*) = 1 AND COALESCE(MIN(r.receipt_id = ?2 AND r.raw_json = ?3 AND r.timestamp = ?4 AND r.capability_id = ?5 AND r.tool_server = ?6 AND r.tool_name = ?7 AND r.decision_kind = ?8 AND r.tenant_id IS ?9 AND r.cost_currency IS ?10 AND r.cost_charged_be IS ?11 AND r.attempted_cost_be IS ?12 AND (COALESCE(r.subject_key, cl.subject_key) IS ?13 OR (?18 AND r.subject_key IS NULL AND cl.capability_id IS NULL)) AND (COALESCE(r.issuer_key, cl.issuer_key) IS ?14 OR (?19 AND r.issuer_key IS NULL AND cl.capability_id IS NULL)) AND r.grant_index IS ?15 AND r.policy_hash = ?16 AND r.content_hash = ?17), 0) FROM chio_tool_receipts r LEFT JOIN capability_lineage cl ON cl.capability_id = r.capability_id WHERE r.seq = ?1",
       "principal": "receipt-read-adapter",
-      "contract": "Shared source-projection rule moved from retained_projection::validate: exactly one source row at the authenticated cursor must equal the signed projection. Returns a boolean only. Internal receipt query snapshot authentication. These statements run inside the snapshot walker or its source checks, return booleans, counts or claim rows for authentication only, and never select a tenant's rows for a response. Snapshot reads derive the optional tenant solely from effective_read_scope and verify signed tenant, signature and the owned RFC 6962 leaf of every returned receipt; see docs/superpowers/specs/2026-10-09-authenticated-receipt-query-snapshots-design.md."
+      "contract": "Shared source-projection rule moved from retained_projection::validate: exactly one source row at the authenticated cursor must equal the signed projection; an archived row may record no unsigned lineage subject or issuer where current lineage supplies one, and any value it records must equal the projection. Returns a boolean only. Internal receipt query snapshot authentication. These statements run inside the snapshot walker or its source checks, return booleans, counts or claim rows for authentication only, and never select a tenant's rows for a response. Snapshot reads derive the optional tenant solely from effective_read_scope and verify signed tenant, signature and the owned RFC 6962 leaf of every returned receipt; see docs/superpowers/specs/2026-10-09-authenticated-receipt-query-snapshots-design.md."
     },
     {
       "path": "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/walk.rs",
@@ -3858,6 +3858,17 @@
       "sql": "SELECT EXISTS(SELECT 1 FROM chio_tool_receipts WHERE seq = ?1)",
       "principal": "receipt-read-adapter",
       "contract": "Internal pinned retained-snapshot integrity check before any tenant/admin read or export. Source sequences must be unique within the committed prefix, within the trusted live allocator and absent from live rows. Count every archived source and lineage candidate before comparing signed projections. These queries return booleans/counts only, never receipt data or read scope; outer adapters still enforce effective authenticated tenant or explicit admin authority. See RV1 in docs/reviews/2026-10-03-security-p0-p1-review.md."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/retained_read.rs",
+      "owner": "add_unrecorded_attribution",
+      "sha256": "6eaf3670e48f2fbe9c4e173d5662ab5fb0a478797ad15134fefe67f3bfe60d0e",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT DISTINCT r.capability_id FROM chio_tool_receipts r LEFT JOIN capability_lineage cl ON cl.capability_id = r.capability_id WHERE r.subject_key IS NULL AND cl.capability_id IS NULL AND EXISTS (SELECT 1 FROM claim_receipt_log_entries e WHERE e.receipt_kind = 'tool_receipt' AND e.source_seq = r.seq AND e.receipt_id = r.receipt_id AND e.entry_seq <= ?1)",
+      "principal": "receipt-read-adapter",
+      "contract": "Discovers, on the pinned authenticated archive snapshot and within the live watermark, the capability ids of committed archived tool rows that recorded no subject attribution. It returns ids only and selects no row for a response; the per-chunk archived query that follows applies the caller's tenant predicate from effective_read_scope, and every row served is decoded, signature verified and tenant checked before it is returned."
     },
     {
       "path": "crates/platform/chio-store-sqlite/src/receipt_store/retained_read.rs",

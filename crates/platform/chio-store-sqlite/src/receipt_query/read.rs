@@ -4,9 +4,27 @@ use chio_kernel::receipt_query::{ReceiptQuery, ReceiptQueryResult, MAX_QUERY_LIM
 use chio_kernel::{ReceiptStoreError, StoredToolReceipt};
 use rusqlite::{params, Connection};
 
+/// Subject filter over the attribution a row's own store recorded.
+const RECORDED_ATTRIBUTION: &str = "(?9 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?9)";
+
+/// Subject filter over archived rows that recorded no attribution, of the
+/// capabilities whose current lineage carries the subject, bound as a JSON
+/// array in ?14. Disjoint from [`RECORDED_ATTRIBUTION`].
+const UNRECORDED_ATTRIBUTION: &str = "(?9 IS NOT NULL AND r.subject_key IS NULL
+    AND cl.capability_id IS NULL
+    AND r.capability_id IN (SELECT value FROM json_each(?14)))";
+
 pub(crate) fn receipt_query_sql(
     query: &ReceiptQuery,
     tenant_fragment: &str,
+) -> Result<(String, String), ReceiptStoreError> {
+    receipt_query_sql_for(query, tenant_fragment, RECORDED_ATTRIBUTION)
+}
+
+fn receipt_query_sql_for(
+    query: &ReceiptQuery,
+    tenant_fragment: &str,
+    subject_fragment: &str,
 ) -> Result<(String, String), ReceiptStoreError> {
     let currency = query
         .validated_cost_currency()
@@ -40,7 +58,7 @@ pub(crate) fn receipt_query_sql(
           AND (?5 IS NULL OR r.timestamp >= ?5)
           AND (?6 IS NULL OR r.timestamp <= ?6)
           {cost_fragment}
-          AND (?9 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?9)
+          AND {subject_fragment}
           AND {tenant_fragment}
     "#
     );
@@ -250,4 +268,98 @@ pub(crate) fn query_receipts_on_connection(
         next_cursor,
         snapshot: None,
     })
+}
+
+/// Archived rows `query` selects through the current lineage of their
+/// capability: rows that recorded no attribution, of the capabilities in
+/// `capabilities`, a JSON array the caller bounds. Returns the rows after the
+/// cursor, at most one page of `(seq, raw_json)` in seq order, and the
+/// uncursored count. The caller verifies every row it keeps.
+pub(crate) fn unrecorded_attribution_rows(
+    archive: &Connection,
+    query: &ReceiptQuery,
+    archived_through: u64,
+    capabilities: &str,
+) -> Result<(Vec<(u64, String)>, u64), ReceiptStoreError> {
+    let limit = query.limit.clamp(1, MAX_QUERY_LIMIT);
+    let read_scope = query
+        .effective_read_scope()
+        .map_err(ReceiptStoreError::from)?;
+    let tenant_fragment = match read_scope.tenant.as_deref() {
+        None => "(?12 IS NULL)",
+        Some(_) => "(r.tenant_id = ?12)",
+    };
+    let prefix_fragment = format!(
+        "{tenant_fragment} AND EXISTS (SELECT 1 FROM claim_receipt_log_entries e WHERE e.receipt_kind = 'tool_receipt' AND e.source_seq = r.seq AND e.receipt_id = r.receipt_id AND e.entry_seq <= {archived_through})"
+    );
+    let (data_sql, count_sql) =
+        receipt_query_sql_for(query, &prefix_fragment, UNRECORDED_ATTRIBUTION)?;
+    let since = query
+        .since
+        .map(crate::integer::checked::<_, i64>)
+        .transpose()?;
+    let until = query
+        .until
+        .map(crate::integer::checked::<_, i64>)
+        .transpose()?;
+    let min_cost = query.min_cost.map(|value| value.to_be_bytes().to_vec());
+    let max_cost = query.max_cost.map(|value| value.to_be_bytes().to_vec());
+    let tenant = read_scope.tenant.as_deref();
+    let total_count: u64 = archive
+        .query_row(
+            &count_sql,
+            params![
+                query.capability_id.as_deref(),
+                query.tool_server.as_deref(),
+                query.tool_name.as_deref(),
+                query.outcome.as_deref(),
+                since,
+                until,
+                min_cost,
+                max_cost,
+                query.agent_subject.as_deref(),
+                // ?10, ?11 unused in count_sql; bound to keep ?12 stable.
+                None::<i64>,
+                0i64,
+                tenant,
+                query.cost_currency.as_deref(),
+                capabilities,
+            ],
+            |row| row.get::<_, i64>(0),
+        )
+        .map(|n| u64::try_from(n.max(0)).unwrap_or_default())?;
+    // A cursor beyond every representable seq selects no row.
+    let cursor = match query.cursor {
+        None => None,
+        Some(cursor) => match i64::try_from(cursor) {
+            Ok(cursor) => Some(cursor),
+            Err(_) => return Ok((Vec::new(), total_count)),
+        },
+    };
+    let mut statement = archive.prepare(&data_sql)?;
+    let rows = statement.query_map(
+        params![
+            query.capability_id.as_deref(),
+            query.tool_server.as_deref(),
+            query.tool_name.as_deref(),
+            query.outcome.as_deref(),
+            since,
+            until,
+            min_cost,
+            max_cost,
+            query.agent_subject.as_deref(),
+            cursor,
+            crate::integer::checked::<_, i64>(limit)?,
+            tenant,
+            query.cost_currency.as_deref(),
+            capabilities,
+        ],
+        |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
+    )?;
+    let mut selected = Vec::new();
+    for row in rows {
+        let (seq, raw_json) = row?;
+        selected.push((u64::try_from(seq.max(0)).unwrap_or_default(), raw_json));
+    }
+    Ok((selected, total_count))
 }

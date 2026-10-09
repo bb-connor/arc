@@ -1,8 +1,8 @@
 #[path = "receipt_query/read.rs"]
 mod read;
-pub(crate) use read::query_receipts_on_connection;
 #[cfg(test)]
 pub(crate) use read::receipt_query_sql;
+pub(crate) use read::{query_receipts_on_connection, unrecorded_attribution_rows};
 
 use chio_kernel::receipt_query::{ReceiptQuery, ReceiptQueryResult};
 use chio_kernel::ReceiptStoreError;

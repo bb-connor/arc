@@ -5,6 +5,8 @@ mod build;
 mod capacity;
 #[path = "tests/count_parity_sequence.rs"]
 mod count_parity_sequence;
+#[path = "tests/late_lineage.rs"]
+mod late_lineage;
 #[path = "tests/lineage.rs"]
 mod lineage;
 #[path = "tests/memory.rs"]

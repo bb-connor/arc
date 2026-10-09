@@ -15,14 +15,22 @@ use crate::receipt_store::SqliteReceiptStore;
 
 /// Exact source-row comparison for a tool receipt. Parameters are bound by
 /// [`SignedToolProjection::source_matches`].
+///
+/// A subject or issuer the receipt does not sign comes from capability
+/// lineage. An archived row records the lineage that existed when it was
+/// archived, and lineage only gains rows, so such a value may be recorded
+/// nowhere in the archive (?18, ?19) while current lineage supplies it. Any
+/// value the archive does record must equal the projection.
 pub(crate) const TOOL_SOURCE_PROJECTION_SQL: &str =
     "SELECT COUNT(*) = 1 AND COALESCE(MIN(r.receipt_id = ?2 AND r.raw_json = ?3
        AND r.timestamp = ?4 AND r.capability_id = ?5
        AND r.tool_server = ?6 AND r.tool_name = ?7 AND r.decision_kind = ?8
        AND r.tenant_id IS ?9 AND r.cost_currency IS ?10
        AND r.cost_charged_be IS ?11 AND r.attempted_cost_be IS ?12
-       AND COALESCE(r.subject_key, cl.subject_key) IS ?13
-       AND COALESCE(r.issuer_key, cl.issuer_key) IS ?14
+       AND (COALESCE(r.subject_key, cl.subject_key) IS ?13
+            OR (?18 AND r.subject_key IS NULL AND cl.capability_id IS NULL))
+       AND (COALESCE(r.issuer_key, cl.issuer_key) IS ?14
+            OR (?19 AND r.issuer_key IS NULL AND cl.capability_id IS NULL))
        AND r.grant_index IS ?15 AND r.policy_hash = ?16 AND r.content_hash = ?17), 0)
      FROM chio_tool_receipts r
      LEFT JOIN capability_lineage cl ON cl.capability_id = r.capability_id
@@ -54,6 +62,7 @@ pub(crate) struct SignedToolProjection {
     pub(crate) subject: Option<String>,
     pub(crate) subject_signed: bool,
     pub(crate) issuer: Option<String>,
+    pub(crate) issuer_signed: bool,
     pub(crate) grant_index: Option<u32>,
     pub(crate) policy_hash: String,
     pub(crate) content_hash: String,
@@ -75,6 +84,7 @@ impl SignedToolProjection {
             None
         };
         let subject_signed = attribution.subject_key.is_some();
+        let issuer_signed = attribution.issuer_key.is_some();
         let subject = attribution
             .subject_key
             .or_else(|| lineage_row.as_ref().map(|row| row.subject_key.clone()));
@@ -95,6 +105,7 @@ impl SignedToolProjection {
             subject,
             subject_signed,
             issuer,
+            issuer_signed,
             grant_index: attribution.grant_index,
             policy_hash: receipt.policy_hash.clone(),
             content_hash: receipt.content_hash.clone(),
@@ -103,12 +114,14 @@ impl SignedToolProjection {
 
     /// True when exactly one source row at `source_seq` carries `raw_json` and
     /// columns equal to this projection. `statement` is
-    /// [`TOOL_SOURCE_PROJECTION_SQL`] prepared on the connection holding the row.
+    /// [`TOOL_SOURCE_PROJECTION_SQL`] prepared on the connection holding the row;
+    /// `archived` when that is a retention archive.
     pub(crate) fn source_matches(
         &self,
         statement: &mut Statement<'_>,
         source_seq: i64,
         raw_json: &str,
+        archived: bool,
     ) -> Result<bool, ReceiptStoreError> {
         Ok(statement.query_row(
             params![
@@ -128,7 +141,9 @@ impl SignedToolProjection {
                 self.issuer,
                 self.grant_index.map(i64::from),
                 self.policy_hash,
-                self.content_hash
+                self.content_hash,
+                archived && !self.subject_signed,
+                archived && !self.issuer_signed
             ],
             |row| row.get::<_, bool>(0),
         )?)

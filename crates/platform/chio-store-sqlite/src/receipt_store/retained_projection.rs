@@ -80,7 +80,7 @@ pub(super) fn validate(
                 crate::receipt_query_snapshot::project::SignedToolProjection::derive(
                     &receipt, live,
                 )?
-                .source_matches(&mut tools, source_seq, &raw)?
+                .source_matches(&mut tools, source_seq, &raw, true)?
             }
             "child_receipt" => {
                 if source_seq > child_ceiling

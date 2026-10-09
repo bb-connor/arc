@@ -655,7 +655,7 @@ fn check_sources_in(
                     (false, _) => &mut live_tools,
                 };
                 if !projection
-                    .source_matches(statement, row.source_seq, &row.raw_json)
+                    .source_matches(statement, row.source_seq, &row.raw_json, archived)
                     .map_err(CopyError::Store)?
                 {
                     return Err(drift(row.entry_seq));

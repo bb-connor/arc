@@ -8,6 +8,22 @@ use super::support::{
 };
 use super::*;
 
+/// Capabilities bound per query when a subject filter attributes archived
+/// rows that recorded no attribution through current lineage.
+const UNRECORDED_CAPABILITY_CHUNK: usize = 256;
+
+#[cfg(test)]
+thread_local! {
+    /// Current lineage rows the unrecorded-attribution fallback read on this
+    /// thread.
+    static UNRECORDED_LINEAGE_READS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(crate) fn unrecorded_lineage_reads_for_test() -> u64 {
+    UNRECORDED_LINEAGE_READS.with(std::cell::Cell::get)
+}
+
 pub(crate) struct RetainedSnapshot<'a> {
     pub(crate) live: &'a Connection,
     pub(crate) archive: Option<&'a Connection>,
@@ -145,6 +161,9 @@ impl RetainedSnapshot<'_> {
                     ReceiptStoreError::Conflict("retained receipt count overflow".into())
                 })?;
             page.receipts.extend(archived.receipts);
+            if let Some(subject) = query.agent_subject.as_deref() {
+                self.add_unrecorded_attribution(archive, query, subject, &mut page)?;
+            }
             page.receipts.sort_by_key(|row| row.seq);
         }
         let limit = query.limit.clamp(1, MAX_QUERY_LIMIT);
@@ -155,6 +174,96 @@ impl RetainedSnapshot<'_> {
             None
         };
         Ok(page)
+    }
+
+    /// Add the archived rows that recorded no attribution and whose
+    /// capability's current lineage carries `subject`. Only capabilities of
+    /// such committed archived rows are considered, streamed from the pinned
+    /// archive, and each one's lineage is read from the pinned live snapshot
+    /// through the canonical local reader, the row authenticating those
+    /// archived receipts already read. Matching capabilities are bound in
+    /// bounded chunks, each chunk's count is added, at most one page of
+    /// candidates is kept between chunks, and only candidates that reach the
+    /// page are verified.
+    fn add_unrecorded_attribution(
+        &self,
+        archive: &Connection,
+        query: &ReceiptQuery,
+        subject: &str,
+        page: &mut ReceiptQueryResult,
+    ) -> Result<(), ReceiptStoreError> {
+        let limit = query.limit.clamp(1, MAX_QUERY_LIMIT);
+        let mut unrecorded = archive.prepare(
+            "SELECT DISTINCT r.capability_id FROM chio_tool_receipts r
+             LEFT JOIN capability_lineage cl ON cl.capability_id = r.capability_id
+             WHERE r.subject_key IS NULL AND cl.capability_id IS NULL
+               AND EXISTS (SELECT 1 FROM claim_receipt_log_entries e
+                   WHERE e.receipt_kind = 'tool_receipt' AND e.source_seq = r.seq
+                     AND e.receipt_id = r.receipt_id AND e.entry_seq <= ?1)",
+        )?;
+        let mut capabilities =
+            unrecorded.query([sqlite_i64(self.watermark, "retained watermark")?])?;
+        let mut chunk: Vec<String> = Vec::new();
+        let mut candidates: Vec<(u64, String)> = Vec::new();
+        let mut exhausted = false;
+        while !exhausted {
+            match capabilities.next()? {
+                Some(row) => {
+                    let capability: String = row.get(0)?;
+                    #[cfg(test)]
+                    UNRECORDED_LINEAGE_READS.with(|reads| reads.set(reads.get() + 1));
+                    let lineage =
+                        SqliteReceiptStore::get_lineage_on_connection(self.live, &capability)
+                            .map_err(
+                                crate::receipt_store::support::capability_lineage_store_error,
+                            )?;
+                    if lineage.is_some_and(|lineage| lineage.subject_key == subject) {
+                        chunk.push(capability);
+                    }
+                }
+                None => exhausted = true,
+            }
+            let full = chunk.len() == UNRECORDED_CAPABILITY_CHUNK;
+            if !full && (chunk.is_empty() || !exhausted) {
+                continue;
+            }
+            let bound = serde_json::to_string(&chunk)?;
+            chunk.clear();
+            let (rows, count) = crate::receipt_query::unrecorded_attribution_rows(
+                archive,
+                query,
+                self.watermark,
+                &bound,
+            )?;
+            page.total_count = page.total_count.checked_add(count).ok_or_else(|| {
+                ReceiptStoreError::Conflict("retained receipt count overflow".into())
+            })?;
+            candidates.extend(rows);
+            candidates.sort_by_key(|(seq, _)| *seq);
+            candidates.truncate(limit);
+        }
+        let mut seqs: Vec<u64> = page.receipts.iter().map(|row| row.seq).collect();
+        seqs.extend(candidates.iter().map(|(seq, _)| *seq));
+        seqs.sort_unstable();
+        let last_kept = seqs.get(limit - 1).copied().unwrap_or(u64::MAX);
+        let tenant = query.effective_read_scope()?.tenant;
+        for (seq, raw_json) in candidates {
+            if seq > last_kept {
+                continue;
+            }
+            let receipt =
+                decode_verified_chio_receipt(&raw_json, "persisted tool receipt", Some(seq))?;
+            if tenant
+                .as_deref()
+                .is_some_and(|tenant| receipt.tenant_id.as_deref() != Some(tenant))
+            {
+                return Err(
+                    chio_kernel::receipt_query::ReceiptReadError::TenantProjectionMismatch.into(),
+                );
+            }
+            page.receipts.push(StoredToolReceipt { seq, receipt });
+        }
+        Ok(())
     }
 
     pub(crate) fn claim_seq(&self, receipt_id: &str) -> Result<u64, ReceiptStoreError> {
