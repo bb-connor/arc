@@ -14,6 +14,10 @@ publish = false
 [package.metadata.chio]
 public_entrypoint = true
 
+[lib]
+name = "chio_cli"
+path = "src/lib.rs"
+
 [[bin]]
 name = "chio"
 path = "src/bin/chio.rs"

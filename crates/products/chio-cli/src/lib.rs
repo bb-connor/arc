@@ -14,6 +14,9 @@
 //   Wrap an MCP server subprocess with the Chio kernel and expose an
 //   MCP-compatible edge over stdio for stock MCP clients.
 
+#![allow(clippy::large_enum_variant, clippy::too_many_arguments)]
+#![cfg_attr(test, allow(clippy::expect_used, clippy::unwrap_used))]
+
 mod active_defense_migration;
 mod active_response_authority;
 mod admin;
@@ -41,17 +44,19 @@ mod supervise;
 // through `cli.rs`. The `pub use` re-exports keep `crate::CliError`, `crate::policy`, and the sibling
 // control-plane modules reachable from the standalone `src/*.rs` command
 // modules.
-pub use chio_control_plane::{
-    authority_public_key_from_seed_file, build_kernel, certify, configure_budget_store,
-    configure_capability_authority, configure_receipt_store, configure_revocation_store,
-    durable_admission_sidecar_path, enterprise_federation, evidence_export, federation_policy,
-    issuance, issue_default_capabilities, load_existing_authority_keypair,
-    load_or_create_authority_keypair, open_durable_admission_runtime, passport_verifier, policy,
-    reputation, require_control_token, rotate_authority_keypair, scim_lifecycle, trust_control,
-    validate_distinct_database_paths, validate_durable_admission_participant_paths, CliError,
-    DurableAdmissionRuntime,
+#[cfg(test)]
+pub(crate) use chio_control_plane::{
+    authority_public_key_from_seed_file, rotate_authority_keypair,
 };
-pub use chio_mcp_remote as remote_mcp;
+pub(crate) use chio_control_plane::{
+    build_kernel, certify, configure_budget_store, configure_capability_authority,
+    configure_receipt_store, configure_revocation_store, enterprise_federation, evidence_export,
+    federation_policy, issuance, issue_default_capabilities, load_existing_authority_keypair,
+    load_or_create_authority_keypair, open_durable_admission_runtime, passport_verifier, policy,
+    reputation, require_control_token, trust_control, validate_distinct_database_paths,
+    validate_durable_admission_participant_paths, CliError, DurableAdmissionRuntime,
+};
+pub(crate) use chio_mcp_remote as remote_mcp;
 
 use std::fs;
 use std::io::Write;
@@ -120,7 +125,11 @@ pub(crate) use cli::types::{
     FindingChallengeClassArg, FindingCommands, FindingOperatorCommands, FindingPackageCommands,
 };
 
-fn main() {
+/// Runs the `chio` command-line interface to completion.
+///
+/// Parses the process arguments, dispatches the selected command and exits
+/// the process with its status.
+pub fn run() {
     #[cfg(not(windows))]
     cli::dispatch::run();
 
@@ -150,6 +159,7 @@ fn main() {
 pub(crate) use cli::conformance::{cmd_conformance_fetch_peers, cmd_conformance_run};
 pub(crate) use cli::mcp::{cmd_mcp_governed_sim, cmd_mcp_wrap, GovernedSimArgs, McpWrapArgs};
 pub(crate) use cli::replay::{cmd_replay, load_trusted_kernel_pubkey};
+
 pub(crate) use cli::runtime::{
     cmd_api_protect, cmd_check, cmd_mcp_serve, cmd_mcp_serve_http, cmd_run, cmd_start,
     cmd_trust_revoke, cmd_trust_serve, cmd_trust_status, load_roster_policy,
