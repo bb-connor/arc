@@ -2,6 +2,7 @@
 
 use std::ops::ControlFlow;
 
+use super::evaluation_helpers::PreDispatchCleanupDeny;
 use super::*;
 
 /// Inputs to nested-flow grant selection: the matching grants in specificity
@@ -201,29 +202,21 @@ impl ChioKernel {
                         now_unix_ms,
                     ) {
                         let msg = error.to_string();
-                        let reverse =
-                            self.reverse_pre_execution_budget_mutation(cap, mutation.as_ref())?;
-                        let (runtime_admission_metadata, runtime_release_confirmed) = self
-                            .release_runtime_admission_reservations_for_pre_dispatch_denial(
-                                durable_operation(durable_admission.as_ref()),
-                                &runtime_reservation,
-                                runtime_admission_metadata,
-                            );
-                        if runtime_release_confirmed {
-                            self.compensate_durable_admission_after_pre_dispatch_cleanup(
-                                durable_operation(durable_admission.as_ref()),
-                                reverse.as_ref(),
-                                None,
-                            )?;
-                        }
                         return self
-                            .build_deny_response_with_metadata(
+                            .build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
                                 request,
-                                &msg,
-                                now,
-                                Some(grant_index),
+                                reason: &msg,
+                                timestamp: now,
+                                matched_grant_index: grant_index,
+                                cap,
+                                budget_mutation: mutation.as_ref(),
+                                payment_authorization: None,
+                                durable_operation: durable_operation(durable_admission.as_ref()),
                                 runtime_admission_metadata,
-                            )
+                                runtime_reservation: &runtime_reservation,
+                                verified_payee_binding: None,
+                                budget_lease_acquired: false,
+                            })
                             .map(ControlFlow::Break);
                     }
                     selected = Some((
