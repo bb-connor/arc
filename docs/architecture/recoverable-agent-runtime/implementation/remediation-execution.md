@@ -63,6 +63,12 @@ SPEC_PASS and independent QUALITY_PASS. Alias, naming, portable lock, offline
 fixture library and resolved-boundary checks retain their recorded scopes.
 Historical pins and evidence remain intact. `H-SDK-01`, source-fixture cleanup
 and metadata work remain pending; no runtime or hosted qualification is added.
+The [coverage locator continuity review](reviews/coverage-locator-continuity.md)
+restores the original source-locator closures of `C1-08`, `E-knowledge-15` and
+`G-product-07` after SPEC_PASS and independent QUALITY_PASS. All 243 pointers and
+14 historical input pins retain their mappings and evidence. The 108 references
+in the changed containing test file still resolve; no behavior or test execution
+is credited. Fixture, SDK and campaign repair acceptance remains separate.
 The candidate also passed all 19 budget-source, atomic ledger and provisioning
 controls after repairing its fixtures and actual owning connection profile.
 The [Kernel foundation successor](reviews/kernel-foundation.md) has independent
