@@ -304,9 +304,9 @@ incremental delivery to the roadmap's COMP rungs and lists the adverse cases.
 - It includes a dynamic helper, a lost reply and a source apply conflict.
 - It exercises both leaf kinds.
 - Application C (versioned data curation) is the required second application.
-  Its required reuse evidence closes I6/COMP-7, which depends on COMP-5 and
-  never gates G5. It reuses the same
-  contracts without custom signing, retry, verifier service or ledger code.
+  Its required reuse evidence closes I6/COMP-7, which depends on the completed
+  COMP-5 Exit and never gates G5. It reuses the same contracts without custom
+  signing, retry, verifier service or ledger code.
   Application B (confined work beside private data) remains optional stretch
   scope.
 
@@ -337,14 +337,21 @@ Claims carry the preview label until their COMP rung and gate pass.
 - keeps the installed hero at I5/COMP-5 and assigns required Application C reuse
   evidence to I6/COMP-7, independently of COMP-6 dogfood. A same-day follow-up
   makes COMP-7 depend on COMP-5 rather than G5: it can start early, records its
-  final evidence on the G5 release and never gates G5;
+  final evidence on the G5 release and never gates G5. Its prerequisite is the
+  completed COMP-5 Exit, including the full hero and negative cases, not package
+  installation alone. COMP-6 requires both COMP-2 and COMP-3;
 - uses qualified WORK identifiers at the imported closure boundaries;
 - covers repeated occurrences in both `a & a` and `a | a` in C3-02;
 - preserves requester/executor qualification and clarifies G5's ProgramLeaf
   coverage across qualifying runs;
 - refreshes the pinned roadmap evidence and merge guidance. The roadmap PR's
   native-host document checker now includes UNIFIED_ROADMAP.md, with regression
-  cases for that coverage; milestone/dependency consistency is reviewed manually.
+  cases for that coverage; milestone/dependency consistency is reviewed manually;
+- validates each canonical commit even for empty evidence views, records the
+  #1171 publication source, and disables Git lazy fetching on every probe;
+- covers absent promised blobs and commits with real partial-clone regressions,
+  and bounds the roadmap copy exception at indented ATX/Setext headings and bold
+  paragraphs, with malformed exceptions failing closed.
 
 **Revision 4** applies the review corrections:
 
@@ -412,12 +419,15 @@ snapshots remain historical; they do not determine today's hosted
 qualification.
 
 [validation.json](validation.json) records reproducible documentation checks.
-With Python 3.11 or later, run
+With Python 3.11 or later and Git supporting `--no-lazy-fetch`, run
 `python3 docs/architecture/chio-computer/validate.py` from the repository root.
 It verifies the document set, operator precedence and every canonical pinned
 source object. Required published objects must be fetched beforehand; missing
-objects fail validation. A verified hosted equivalent replaces an unpublished
-local head deterministically. Run validator regressions with
+objects fail validation. Every selected commit is checked even if its view has
+no source records. All Git probes disable lazy fetching, so a partial clone
+cannot fetch missing objects during validation. Older Git versions that do not
+support the option fail closed. A verified hosted equivalent replaces an
+unpublished local head deterministically. Run validator regressions with
 `python3 -m unittest discover -s docs/architecture/chio-computer -p 'test_validate.py'`.
 These checks perform no runtime
 qualification. Folding its generic checks into a repository-wide documents gate
@@ -426,8 +436,9 @@ is a follow-up, once the public-copy gate exists (roadmap OUT-2).
 **Merge order.** The research evidence pins the exact #1200 commit recorded in
 `research/source-evidence.json` and the [crosswalk](ROADMAP-CROSSWALK.md). Merge
 #1200 with a merge commit before this PR, so that commit stays reachable from
-main. Otherwise, re-pin and revalidate that evidence view against main once
-#1200 lands; the validator fails when a pinned published object is missing.
+main. Retaining that ancestor needs no additional re-pin to main. If the merge
+strategy or intended evidence baseline changes, re-pin and revalidate the view
+after #1200 lands; the validator fails when a pinned published object is missing.
 
 The evidence includes divergent PR heads. Implementation must:
 

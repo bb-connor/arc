@@ -3,6 +3,7 @@
 
 Run from any directory. Pinned Git objects must already be available locally;
 this checker performs no network access and executes no proposed examples.
+Requires Git with --no-lazy-fetch support; older versions fail closed.
 """
 
 import ast
@@ -17,6 +18,14 @@ from pathlib import Path
 CONTRACT_CASE_COUNTS = {1: 6, 2: 9, 3: 11, 4: 15, 5: 11}
 
 
+def local_git(root, *args):
+    """Read local objects only, even in a partial clone with promised objects."""
+    return subprocess.run(
+        ["git", "--no-lazy-fetch", *args],
+        cwd=root, capture_output=True, check=False,
+    )
+
+
 def validate_sources(evidence, root, pinned_links=()):
     """Check mandatory canonical sources, independently of incidental Git objects."""
     errors = []
@@ -25,6 +34,7 @@ def validate_sources(evidence, root, pinned_links=()):
     known = set()
     manifests = {}
     missing_commits = set()
+    checked_commits = set()
     for view in evidence["views"].values():
         head = view["head"]
         hosted = view.get("hosted_source_commit")
@@ -34,6 +44,15 @@ def validate_sources(evidence, root, pinned_links=()):
             commits = (hosted,)
         else:
             commits = tuple(sorted({head, hosted} - {None}))
+        # A published view remains a required pin even if it has no records.
+        # Probe each selected commit once, without permitting a promisor fetch.
+        for commit in commits:
+            if commit in checked_commits:
+                continue
+            checked_commits.add(commit)
+            if local_git(root, "cat-file", "-e", f"{commit}^{{commit}}").returncode:
+                missing_commits.add(commit)
+                errors.append(f"Missing pinned Git object {commit}; fetch it before checking")
         for record in view["sources"]:
             records += 1
             if record.get("inspection") == "manifest_inventory":
@@ -42,20 +61,9 @@ def validate_sources(evidence, root, pinned_links=()):
                 known.add((commit, record["path"]))
                 if commit in missing_commits:
                     continue
-                result = subprocess.run(
-                    ["git", "show", f"{commit}:{record['path']}"],
-                    cwd=root, capture_output=True, check=False,
-                )
+                result = local_git(root, "show", f"{commit}:{record['path']}")
                 if result.returncode:
-                    exists = subprocess.run(
-                        ["git", "cat-file", "-e", f"{commit}^{{commit}}"],
-                        cwd=root, capture_output=True, check=False,
-                    )
-                    if exists.returncode:
-                        missing_commits.add(commit)
-                        errors.append(f"Missing pinned Git object {commit}; fetch it before checking")
-                    else:
-                        errors.append(f"Missing source {commit}:{record['path']}")
+                    errors.append(f"Missing source {commit}:{record['path']}")
                     continue
                 checks += 1
                 data = result.stdout
