@@ -222,8 +222,7 @@ pub use request_digest::broker_request_digest;
 
 mod wire;
 use failure::{
-    execution_failure_after_capture_release, failure_receipt_key_digest, ExecutionFailure,
-    ExecutionResult, FailureOrigin, FailureProjection,
+    failure_receipt_key_digest, ExecutionFailure, ExecutionResult, FailureOrigin, FailureProjection,
 };
 use request_digest::{attempt_operation_gate_index, FAILURE_RECEIPT_REQUEST_DOMAIN};
 use wire::read_bounded_sensitive_frame;

@@ -47,21 +47,6 @@ impl From<BrokerError> for ExecutionFailure {
 
 pub(super) type ExecutionResult<T> = std::result::Result<T, ExecutionFailure>;
 
-pub(super) fn execution_failure_after_capture_release(
-    error: BrokerError,
-    released: Result<bool>,
-) -> ExecutionFailure {
-    let projection = released
-        .ok()
-        .filter(|released| *released)
-        .map(|_| FailureProjection {
-            stage: BrokerFailureStage::Capture,
-            outcome: failure_outcome_before_dispatch(&error),
-            dispatch_knowledge: BrokerDispatchKnowledge::NotCommitted,
-        });
-    ExecutionFailure { error, projection }
-}
-
 pub(super) fn validate_execution_projection_for_attempt(
     attempt: &AttemptRecord,
     projection: FailureProjection,

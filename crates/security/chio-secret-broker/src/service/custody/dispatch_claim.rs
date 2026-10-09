@@ -8,9 +8,10 @@
 
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
+use super::super::failure::failure_outcome_before_dispatch;
 use super::super::{
-    execution_failure_after_capture_release, AttemptState, AttemptStore, AttemptTransitionEvidence,
-    BrokerError, ExecutionFailure, ExecutionResult, FailureProjection, Result,
+    AttemptState, AttemptStore, AttemptTransitionEvidence, BrokerDispatchKnowledge, BrokerError,
+    BrokerFailureStage, ExecutionFailure, ExecutionResult, FailureProjection, Result,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -81,12 +82,19 @@ impl<'s> ClaimedCapture<'s> {
         })
     }
 
-    /// Refuses dispatch and releases the claim. The failure keeps its
-    /// capture-stage projection only when the release is confirmed.
+    /// Refuses dispatch and releases the claim. The failure carries a
+    /// capture-stage projection only when the release is confirmed; otherwise
+    /// its terminal is derived from the journal, which refuses one while the
+    /// claim is live.
     pub(in super::super) fn refuse(mut self, error: BrokerError) -> ExecutionFailure {
-        let released = self.release();
+        let released = matches!(self.release(), Ok(true));
         self.stage = ClaimStage::Settled;
-        execution_failure_after_capture_release(error, released)
+        let projection = released.then(|| FailureProjection {
+            stage: BrokerFailureStage::Capture,
+            outcome: failure_outcome_before_dispatch(&error),
+            dispatch_knowledge: BrokerDispatchKnowledge::NotCommitted,
+        });
+        ExecutionFailure { error, projection }
     }
 
     /// Runs `dispatch`, which must end by committing through the point it is
