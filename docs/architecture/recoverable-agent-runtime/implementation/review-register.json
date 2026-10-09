@@ -58,14 +58,14 @@
     "qualified": 0,
     "current_status": {
       "candidate_only": 44,
-      "needs_revalidation": 41,
+      "needs_revalidation": 37,
       "open": 228,
       "prerequisite_only": 1,
-      "recorded_scoped_closed": 81
+      "recorded_scoped_closed": 85
     },
     "needs_revalidation_by_category": {
-      "additional": 10,
-      "canonical": 31
+      "additional": 8,
+      "canonical": 29
     },
     "severity_by_category": {
       "canonical": {
@@ -126,8 +126,8 @@
       },
       "maintained_or_executed_support": 350,
       "scoped_dispositions": 122,
-      "currently_applicable_scoped_closed": 81,
-      "historical_scoped_needing_revalidation": 41,
+      "currently_applicable_scoped_closed": 85,
+      "historical_scoped_needing_revalidation": 37,
       "open": 228,
       "qualified": 0
     }
@@ -1659,8 +1659,30 @@
           "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/storage.rs"
         ]
       },
-      "current_status": "needs_revalidation",
-      "current_reason": "Recorded closure is preserved; a cited source or document pin differs. Review continuity and relevant controls on the integrated candidate. A hash difference is not a demonstrated regression."
+      "current_status": "recorded_scoped_closed",
+      "current_reason": "Original scoped closure applies to the reviewed current source after independent specification and quality approval. Current acceptance and source continuity are recorded in current_review; historical pins and remaining obligations are preserved. No broader qualification follows.",
+      "current_review": {
+        "at_utc": "2026-10-09T22:36:11.154851+00:00",
+        "previous_status": "needs_revalidation",
+        "previous_reason": "Recorded closure is preserved; a cited source or document pin differs. Review continuity and relevant controls on the integrated candidate. A hash difference is not a demonstrated regression.",
+        "review_ref": "docs/architecture/recoverable-agent-runtime/implementation/reviews/priority-source-validation.md",
+        "review_sha256": "cea812999789c6b35a9c8b450918ac3438d3e8c89ce19c7ae1a857134e4055ba",
+        "scope": "Entire original namespace/CAS/immutable history/pin/exact restore finding; source continuity plus ordinary local owning regressions, qualified=false.",
+        "source_head_at_review": "398990f6963657b99554fe0fbab2065aa27d4606",
+        "spec_review": {
+          "path": "target/recovery-pr/current-review-followup/priority-remediation-20261009/closure-review/spec-review.json",
+          "sha256": "8d9daebbc4d6e1b0abbb028d3b35652eabe867addd79caf89697f35cfa66fa8c"
+        },
+        "quality_review": {
+          "path": "target/recovery-pr/current-review-followup/priority-remediation-20261009/closure-review/quality-review.json",
+          "sha256": "b3402e03318e017c5bfd52cdf98d2f294f58f571175e154e5d81a5e0f3312fa5"
+        },
+        "spec_verdict": "SPEC_PASS",
+        "quality_verdict": "QUALITY_PASS",
+        "source_continuity_ref": "target/recovery-pr/current-review-followup/priority-remediation-20261009/closure-review/spec-review.json#/pin_continuity/checkpoint",
+        "historical_disposition_and_pin_check_preserved": true,
+        "qualified": false
+      }
     },
     {
       "key": "E-knowledge-02",
@@ -2997,8 +3019,30 @@
           "docs/architecture/recoverable-agent-runtime/implementation/STATUS.md"
         ]
       },
-      "current_status": "needs_revalidation",
-      "current_reason": "Recorded closure is preserved; a cited source or document pin differs. Review continuity and relevant controls on the integrated candidate. A hash difference is not a demonstrated regression."
+      "current_status": "recorded_scoped_closed",
+      "current_reason": "Original scoped closure applies to the reviewed current source after independent specification and quality approval. Current acceptance and source continuity are recorded in current_review; historical pins and remaining obligations are preserved. No broader qualification follows.",
+      "current_review": {
+        "at_utc": "2026-10-09T22:36:11.154851+00:00",
+        "previous_status": "needs_revalidation",
+        "previous_reason": "Recorded closure is preserved; a cited source or document pin differs. Review continuity and relevant controls on the integrated candidate. A hash difference is not a demonstrated regression.",
+        "review_ref": "docs/architecture/recoverable-agent-runtime/implementation/reviews/priority-source-validation.md",
+        "review_sha256": "cea812999789c6b35a9c8b450918ac3438d3e8c89ce19c7ae1a857134e4055ba",
+        "scope": "Source/prose correction only. No execution or qualification campaign is required to establish truthful active prose.",
+        "source_head_at_review": "398990f6963657b99554fe0fbab2065aa27d4606",
+        "spec_review": {
+          "path": "target/recovery-pr/current-review-followup/priority-remediation-20261009/closure-review/spec-review.json",
+          "sha256": "8d9daebbc4d6e1b0abbb028d3b35652eabe867addd79caf89697f35cfa66fa8c"
+        },
+        "quality_review": {
+          "path": "target/recovery-pr/current-review-followup/priority-remediation-20261009/closure-review/quality-review.json",
+          "sha256": "b3402e03318e017c5bfd52cdf98d2f294f58f571175e154e5d81a5e0f3312fa5"
+        },
+        "spec_verdict": "SPEC_PASS",
+        "quality_verdict": "QUALITY_PASS",
+        "source_continuity_ref": "target/recovery-pr/current-review-followup/priority-remediation-20261009/closure-review/spec-review.json#/pin_continuity/qualification_prose",
+        "historical_disposition_and_pin_check_preserved": true,
+        "qualified": false
+      }
     },
     {
       "key": "I-evidence-qualification-02",
@@ -8214,8 +8258,30 @@
           "crates/platform/chio-store-sqlite/src/admission_operation_store/schema/physical_write_catalog.rs"
         ]
       },
-      "current_status": "needs_revalidation",
-      "current_reason": "Recorded source or local closure remains historical; a cited accepted/current source pin differs. Review continuity and relevant controls on the integrated candidate without inferring a regression."
+      "current_status": "recorded_scoped_closed",
+      "current_reason": "Original scoped closure applies to the reviewed current source after independent specification and quality approval. Current acceptance and source continuity are recorded in current_review; historical pins and remaining obligations are preserved. No broader qualification follows.",
+      "current_review": {
+        "at_utc": "2026-10-09T22:36:11.154851+00:00",
+        "previous_status": "needs_revalidation",
+        "previous_reason": "Recorded source or local closure remains historical; a cited accepted/current source pin differs. Review continuity and relevant controls on the integrated candidate without inferring a regression.",
+        "review_ref": "docs/architecture/recoverable-agent-runtime/implementation/reviews/priority-source-validation.md",
+        "review_sha256": "cea812999789c6b35a9c8b450918ac3438d3e8c89ce19c7ae1a857134e4055ba",
+        "scope": "Connection fence plus main-qualified four-table source/accounting reads, ordinary local owning regression only; no native bank or full pricing qualification.",
+        "source_head_at_review": "398990f6963657b99554fe0fbab2065aa27d4606",
+        "spec_review": {
+          "path": "target/recovery-pr/current-review-followup/priority-remediation-20261009/closure-review/spec-review.json",
+          "sha256": "8d9daebbc4d6e1b0abbb028d3b35652eabe867addd79caf89697f35cfa66fa8c"
+        },
+        "quality_review": {
+          "path": "target/recovery-pr/current-review-followup/priority-remediation-20261009/closure-review/quality-review.json",
+          "sha256": "b3402e03318e017c5bfd52cdf98d2f294f58f571175e154e5d81a5e0f3312fa5"
+        },
+        "spec_verdict": "SPEC_PASS",
+        "quality_verdict": "QUALITY_PASS",
+        "source_continuity_ref": "target/recovery-pr/current-review-followup/priority-remediation-20261009/closure-review/spec-review.json#/pin_continuity/temporary_namespace",
+        "historical_disposition_and_pin_check_preserved": true,
+        "qualified": false
+      }
     },
     {
       "key": "PHYSICAL-ACCOUNTING-TEMP-SHADOW-01",
@@ -8245,8 +8311,30 @@
           "crates/platform/chio-store-sqlite/src/admission_operation_store/schema/physical_write_catalog.rs"
         ]
       },
-      "current_status": "needs_revalidation",
-      "current_reason": "Recorded source or local closure remains historical; a cited accepted/current source pin differs. Review continuity and relevant controls on the integrated candidate without inferring a regression."
+      "current_status": "recorded_scoped_closed",
+      "current_reason": "Original scoped closure applies to the reviewed current source after independent specification and quality approval. Current acceptance and source continuity are recorded in current_review; historical pins and remaining obligations are preserved. No broader qualification follows.",
+      "current_review": {
+        "at_utc": "2026-10-09T22:36:11.154851+00:00",
+        "previous_status": "needs_revalidation",
+        "previous_reason": "Recorded source or local closure remains historical; a cited accepted/current source pin differs. Review continuity and relevant controls on the integrated candidate without inferring a regression.",
+        "review_ref": "docs/architecture/recoverable-agent-runtime/implementation/reviews/priority-source-validation.md",
+        "review_sha256": "cea812999789c6b35a9c8b450918ac3438d3e8c89ce19c7ae1a857134e4055ba",
+        "scope": "TEMP table/view refusal for the four protected accounting/source names; source continuity plus ordinary local owning regression only.",
+        "source_head_at_review": "398990f6963657b99554fe0fbab2065aa27d4606",
+        "spec_review": {
+          "path": "target/recovery-pr/current-review-followup/priority-remediation-20261009/closure-review/spec-review.json",
+          "sha256": "8d9daebbc4d6e1b0abbb028d3b35652eabe867addd79caf89697f35cfa66fa8c"
+        },
+        "quality_review": {
+          "path": "target/recovery-pr/current-review-followup/priority-remediation-20261009/closure-review/quality-review.json",
+          "sha256": "b3402e03318e017c5bfd52cdf98d2f294f58f571175e154e5d81a5e0f3312fa5"
+        },
+        "spec_verdict": "SPEC_PASS",
+        "quality_verdict": "QUALITY_PASS",
+        "source_continuity_ref": "target/recovery-pr/current-review-followup/priority-remediation-20261009/closure-review/spec-review.json#/pin_continuity/temporary_namespace",
+        "historical_disposition_and_pin_check_preserved": true,
+        "qualified": false
+      }
     },
     {
       "key": "COMPILER-SCOPE-DEPENDENCY-CLOSURE-01",
@@ -10424,6 +10512,56 @@
       "commit": "f7ed089c5b9506a58b314a5de6efe1c4ad1f76a0",
       "scope": "Required CI includes the exact stacked integration base; direct FIPS routing remains complementary. Both source reviews and local workflow checks pass. Required workflow exists for that commit, with 23 queued and two skipped jobs at readback. No hosted pass or finding closure follows.",
       "evidence_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/ci-readiness/publication.json",
+      "current_status_changes": false,
+      "counts_changed": false,
+      "qualified": false
+    },
+    {
+      "at_utc": "2026-10-09T22:36:11.154851+00:00",
+      "findings": [
+        "E-knowledge-01",
+        "I-evidence-qualification-01",
+        "PHYSICAL-ACCOUNTING-TEMP-SHADOW-01",
+        "PHYSICAL-CATALOG-TEMP-TRIGGER-01"
+      ],
+      "review": "docs/architecture/recoverable-agent-runtime/implementation/reviews/priority-source-validation.md",
+      "review_sha256": "cea812999789c6b35a9c8b450918ac3438d3e8c89ce19c7ae1a857134e4055ba",
+      "scope": "Restore only four historical P1 scoped closures after current source continuity, applicable owning controls and separate specification and quality reviews. No open P1 record closes, and historical dispositions remain unchanged.",
+      "spec_review": {
+        "path": "target/recovery-pr/current-review-followup/priority-remediation-20261009/closure-review/spec-review.json",
+        "sha256": "8d9daebbc4d6e1b0abbb028d3b35652eabe867addd79caf89697f35cfa66fa8c"
+      },
+      "quality_review": {
+        "path": "target/recovery-pr/current-review-followup/priority-remediation-20261009/closure-review/quality-review.json",
+        "sha256": "b3402e03318e017c5bfd52cdf98d2f294f58f571175e154e5d81a5e0f3312fa5"
+      },
+      "current_status_changes": true,
+      "counts_changed": true,
+      "qualified": false
+    },
+    {
+      "at_utc": "2026-10-09T22:36:11.154851+00:00",
+      "findings": [],
+      "review": "docs/architecture/recoverable-agent-runtime/implementation/reviews/priority-source-validation.md",
+      "review_sha256": "cea812999789c6b35a9c8b450918ac3438d3e8c89ce19c7ae1a857134e4055ba",
+      "commit": "50e8a530b6a238de552cfe996d0a8328ac197440",
+      "scope": "Install 30 maintained verifier regressions. All 159 owning tests pass in normal and optimized Python; 30 new tests pass in an isolated six-file copy. Production verifier and recorder remain unchanged. Original tool-event provenance and its limits are preserved. Finite tests do not close native or primary qualification obligations.",
+      "spec_review": {
+        "path": "target/recovery-pr/current-review-followup/priority-remediation-20261009/qualification-regressions/spec-review.json",
+        "sha256": "52876b8c3efc3ca7b7375d1d0490bbe26c0e777d61f72651c7ec9c428db83e99"
+      },
+      "quality_review": {
+        "path": "target/recovery-pr/current-review-followup/priority-remediation-20261009/qualification-regressions/quality-review.json",
+        "sha256": "af385e89d3bf6c100b514a015de1494aa321ca1c3962bddf381b6fdd6ebc939d"
+      },
+      "installation": {
+        "path": "target/recovery-pr/current-review-followup/priority-remediation-20261009/qualification-regressions/installation.json",
+        "sha256": "15470ad9f35b4b17b2abd5618f3efad89103f54da779f866bba74acec21ec767"
+      },
+      "validation_evidence": {
+        "path": "target/recovery-pr/current-review-followup/priority-remediation-20261009/qualification-regressions/validation-evidence.json",
+        "sha256": "dbb2e3b47deb445ac0031ec9c3051f3ac6215b95c66e05b88cae2465caa3c0e7"
+      },
       "current_status_changes": false,
       "counts_changed": false,
       "qualified": false
