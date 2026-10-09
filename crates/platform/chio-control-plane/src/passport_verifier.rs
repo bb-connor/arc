@@ -26,6 +26,10 @@ use crate::CliError;
 #[path = "passport_verifier/tests/signed_readback.rs"]
 mod signed_readback_tests;
 
+#[cfg(test)]
+#[path = "passport_verifier/tests/bounded_persistence.rs"]
+mod bounded_persistence_tests;
+
 const VERIFIER_POLICY_REGISTRY_VERSION: &str = "chio.passport-verifier-policies.v1";
 const PASSPORT_STATUS_REGISTRY_VERSION: &str = "chio.passport-status-registry.v1";
 const PASSPORT_ISSUANCE_REGISTRY_VERSION: &str = "chio.passport-issuance-offers.v1";
@@ -98,8 +102,7 @@ impl VerifierPolicyRegistry {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
-        fs::write(path, serde_json::to_vec_pretty(self)?)?;
-        Ok(())
+        crate::signed_input::write_bounded_json(path, self)
     }
 
     pub fn get(&self, policy_id: &str) -> Option<&SignedPassportVerifierPolicy> {
@@ -256,8 +259,7 @@ impl PassportStatusRegistry {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
-        fs::write(path, serde_json::to_vec_pretty(self)?)?;
-        Ok(())
+        crate::signed_input::write_bounded_json(path, self)
     }
 
     pub fn get(&self, passport_id: &str) -> Option<&PassportLifecycleRecord> {
@@ -465,8 +467,34 @@ impl PassportIssuanceOfferRegistry {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
-        fs::write(path, serde_json::to_vec_pretty(self)?)?;
-        Ok(())
+        crate::signed_input::write_bounded_json(path, self)
+    }
+
+    /// Persists after an issuance, refusing to fill the reserve that live
+    /// redemptions need.
+    pub fn save_for_issuance(&self, path: &Path) -> Result<(), CliError> {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        crate::signed_input::write_bounded_json_with_limit(
+            path,
+            self,
+            crate::signed_input::MAX_SIGNED_FILE_BYTES
+                - crate::signed_input::ISSUANCE_RESERVE_BYTES,
+        )
+    }
+
+    /// Removes offers that can never be redeemed again: fully redeemed,
+    /// already expired, or past their own expiry at `now`.
+    pub fn prune_dead(&mut self, now: u64) -> usize {
+        let before = self.offers.len();
+        self.offers.retain(|_, record| {
+            !matches!(
+                record.state,
+                PassportIssuanceOfferState::CredentialIssued | PassportIssuanceOfferState::Expired
+            ) && !passport_issuance_offer_expired(record, now)
+        });
+        before - self.offers.len()
     }
 
     pub fn issue_offer(
@@ -482,6 +510,7 @@ impl PassportIssuanceOfferRegistry {
                 "passport issuance offers require ttl_secs greater than zero".to_string(),
             ));
         }
+        self.prune_dead(now);
         let credential_configuration_id = credential_configuration_id
             .unwrap_or(CHIO_PASSPORT_OID4VCI_CREDENTIAL_CONFIGURATION_ID);
         metadata

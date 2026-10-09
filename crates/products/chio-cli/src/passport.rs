@@ -1066,7 +1066,7 @@ pub(crate) fn cmd_passport_issuance_offer_create(
             ttl_secs,
             unix_now()?,
         )?;
-        registry.save(path)?;
+        registry.save_for_issuance(path)?;
         record
     };
 

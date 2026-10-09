@@ -174,7 +174,7 @@ pub(crate) async fn handle_create_passport_issuance_offer(
         Ok(record) => record,
         Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
     };
-    if let Err(error) = registry.save(&path) {
+    if let Err(error) = registry.save_for_issuance(&path) {
         return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
     }
     Json(record).into_response()
@@ -200,6 +200,7 @@ pub(crate) async fn handle_redeem_passport_issuance_token(
         Ok(response) => response,
         Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
     };
+    registry.prune_dead(clock_now);
     if let Err(error) = registry.save(&path) {
         return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
     }
@@ -268,6 +269,7 @@ pub(crate) async fn handle_redeem_passport_issuance_credential(
         }
         Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
     };
+    registry.prune_dead(clock_now);
     if let Err(error) = registry.save(&path) {
         return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
     }

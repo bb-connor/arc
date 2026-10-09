@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::fs;
 use std::path::Path;
 
 use crate::CliError;
@@ -58,8 +57,7 @@ impl CertificationRegistry {
 
     pub(crate) fn save(&self, path: &Path) -> Result<(), CliError> {
         ensure_parent_dir(path)?;
-        fs::write(path, serde_json::to_vec_pretty(self)?)?;
-        Ok(())
+        crate::signed_input::write_bounded_json(path, self)
     }
 
     pub(crate) fn get(&self, artifact_id: &str) -> Option<&CertificationRegistryEntry> {
