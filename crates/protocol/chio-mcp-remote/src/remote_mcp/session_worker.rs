@@ -72,3 +72,37 @@ pub(super) async fn close(state: &RemoteAppState, session: &Arc<RemoteSession>) 
         }
     }
 }
+
+/// Waits for the next event of one admitted request. The route is lossless, so
+/// a response already queued when the actor exits is still delivered. Session
+/// notifications arrive from the loss-tolerant observer; request-correlated
+/// observer copies are ignored because the route carries them.
+pub(super) async fn receive_request_event(
+    session: &RemoteSession,
+    routed: &mut RequestEvents,
+    observer: &mut broadcast::Receiver<RemoteSessionEvent>,
+) -> Result<RemoteSessionEvent, RequestEventsError> {
+    let mut exited = session.worker_serving_closed.subscribe();
+    let mut observer_open = true;
+    loop {
+        if *exited.borrow_and_update() {
+            return routed.try_recv();
+        }
+        tokio::select! {
+            biased;
+            _ = exited.changed() => return routed.try_recv(),
+            event = observer.recv(), if observer_open => match event {
+                Ok(event) if event.kind != RemoteSessionEventKind::RequestCorrelated => {
+                    return Ok(event);
+                }
+                Ok(_) => {}
+                Err(broadcast::error::RecvError::Lagged(skipped)) => {
+                    warn!(skipped, session_id = %session.session_id,
+                        "remote request observer lagged; session notifications were skipped");
+                }
+                Err(broadcast::error::RecvError::Closed) => observer_open = false,
+            },
+            event = routed.recv() => return event,
+        }
+    }
+}

@@ -68,6 +68,7 @@ impl RemoteSession {
         })
     }
 
+    #[cfg(test)]
     pub(super) fn send(&self, message: Value) -> Result<(), CliError> {
         {
             let mut lifecycle = self.lifecycle.lock().map_err(|_| ClockError::Unavailable)?;
@@ -149,6 +150,30 @@ impl RemoteSession {
 
     pub(super) fn subscribe(&self) -> broadcast::Receiver<RemoteSessionEvent> {
         self.event_tx.subscribe()
+    }
+
+    pub(super) fn register_request(
+        &self,
+        generation: McpRequestGeneration,
+    ) -> Result<RequestEvents, NotEnqueued> {
+        self.event_tx
+            .register_request(generation)
+            .map_err(|error| NotEnqueued(error.into()))
+    }
+
+    /// Admits `message` and registers its lossless route before enqueue.
+    pub(super) fn send_routed(&self, message: Value) -> Result<RequestEvents, CliError> {
+        {
+            let mut lifecycle = self.lifecycle.lock().map_err(|_| ClockError::Unavailable)?;
+            self.check_enqueue_lifecycle(&message, &mut lifecycle)?;
+        }
+        let message = self.input_tx.account(message)?;
+        let events = self
+            .register_request(message.request_generation())
+            .map_err(NotEnqueued::into_error)?;
+        self.send_accounted(message)
+            .map_err(NotEnqueued::into_error)?;
+        Ok(events)
     }
 
     pub(super) fn next_stream_event_id(&self) -> Result<String, ClockError> {

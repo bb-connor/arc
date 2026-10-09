@@ -3,7 +3,7 @@
 use super::*;
 
 pub(super) struct BroadcastJsonRpcWriter {
-    event_tx: broadcast::Sender<RemoteSessionEvent>,
+    event_tx: SessionEventBus,
     retained_notification_events: Arc<StdMutex<VecDeque<RetainedRemoteSessionEvent>>>,
     next_event_id: Arc<AtomicU64>,
     session_id: String,
@@ -13,7 +13,7 @@ pub(super) struct BroadcastJsonRpcWriter {
 
 impl BroadcastJsonRpcWriter {
     pub(super) fn new(
-        event_tx: broadcast::Sender<RemoteSessionEvent>,
+        event_tx: SessionEventBus,
         retained_notification_events: Arc<StdMutex<VecDeque<RetainedRemoteSessionEvent>>>,
         next_event_id: Arc<AtomicU64>,
         session_id: String,

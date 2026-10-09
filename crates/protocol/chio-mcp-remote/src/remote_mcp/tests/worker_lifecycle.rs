@@ -1,5 +1,6 @@
 //! Actual HTTP waits must terminate when their owning worker or response is lost.
 use super::*;
+use crate::session_core_events::RequestRouteError;
 use axum::body::{Body, HttpBody};
 use std::future::Future;
 use std::io::Write as _;
@@ -501,7 +502,7 @@ async fn controlled_session(
 ) -> (Arc<RemoteSession>, McpInboxReceiver) {
     let clock = fixture.state.factory.config.clock.clone();
     let (input_tx, input_rx) = mcp_inbox();
-    let (event_tx, _) = broadcast::channel(event_capacity);
+    let event_tx = SessionEventBus::new(event_capacity);
     let mut headers = HeaderMap::new();
     headers.insert(
         AUTHORIZATION,
@@ -549,9 +550,16 @@ async fn controlled_session(
 }
 
 #[tokio::test]
-async fn lagged_post_response_fails_closed_without_reinvocation() {
+async fn request_response_survives_observer_broadcast_overflow() {
     let fixture = fixture(0, None);
-    let (session, input_rx) = controlled_session(&fixture, "lost-response-session", 8).await;
+    let (session, input_rx) = controlled_session(&fixture, "lagged-observer-session", 8).await;
+    let mut output = BroadcastJsonRpcWriter::new(
+        session.event_tx.clone(),
+        session.retained_notification_events.clone(),
+        session.next_event_id.clone(),
+        session.session_id.clone(),
+        session.input_tx.response_context(),
+    );
     let response = post(
         &fixture,
         Some(&session.session_id),
@@ -559,35 +567,57 @@ async fn lagged_post_response_fails_closed_without_reinvocation() {
     )
     .await;
     assert_eq!(response.status(), StatusCode::OK);
-    assert_eq!(input_rx.try_recv().unwrap().unwrap().value()["id"], 77);
-    session
-        .event_tx
-        .send(RemoteSessionEvent {
-            seq: 1,
-            event_id: "lost-response-session:1".into(),
-            kind: RemoteSessionEventKind::RequestCorrelated,
-            request_generation: None,
-            message: json!({"jsonrpc":"2.0","id":77,"result":{}}),
-        })
-        .unwrap();
-    for sequence in 2..=18 {
-        session.event_tx.send(RemoteSessionEvent {
-            seq: sequence, event_id: format!("lost-response-session:{sequence}"),
-            kind: RemoteSessionEventKind::Notification,
-            request_generation: None,
-            message: json!({"jsonrpc":"2.0","method":"notifications/message","params":{"sequence":sequence}}),
-        }).unwrap();
+    let request = input_rx.try_recv().unwrap().unwrap();
+    assert_eq!(request.value()["id"], 77);
+    let _scope = input_rx.enter_response_scope(&request).unwrap();
+    // Far more events than the broadcast capacity while the request waits.
+    for sequence in 0..64 {
+        publish(
+            &mut output,
+            &json!({"jsonrpc":"2.0","method":"notifications/message","params":{"sequence":sequence}}),
+        );
     }
+    publish(
+        &mut output,
+        &json!({"jsonrpc":"2.0","id":77,"result":{"answer":"exact"}}),
+    );
     let bytes = tokio::time::timeout(WAIT, axum::body::to_bytes(response.into_body(), 64 * 1024))
         .await
-        .expect("lost terminal response left the POST waiting forever")
+        .expect("request response was not delivered")
         .unwrap();
-    let wire = std::str::from_utf8(&bytes).unwrap();
-    assert!(wire.contains("\"error\""));
-    assert!(!wire.contains("\"result\""));
-    assert!(!session.has_active_request_stream());
+    let delivered = sse_messages(&bytes);
+    assert!(
+        delivered
+            .iter()
+            .any(|message| *message == json!({"jsonrpc":"2.0","id":77,"result":{"answer":"exact"}})),
+        "exact response missing from {delivered:?}"
+    );
+    assert!(!delivered
+        .iter()
+        .any(|message| message.get("error").is_some()));
     assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
     fixture.state.sessions.shutdown_all_active().await.unwrap();
+}
+
+#[tokio::test]
+async fn duplicate_request_route_is_refused_and_dropped_route_is_released() {
+    let fixture = fixture(0, None);
+    let (session, input_rx) = controlled_session(&fixture, "route-session", 8).await;
+    let message = session
+        .input_tx
+        .account(json!({"jsonrpc":"2.0","id":1,"method":"ping"}))
+        .unwrap();
+    let generation = message.request_generation();
+    let first = session.event_tx.register_request(generation).unwrap();
+    assert_eq!(
+        session.event_tx.register_request(generation).err(),
+        Some(RequestRouteError::Duplicate)
+    );
+    drop(first);
+    let again = session.event_tx.register_request(generation).unwrap();
+    drop(again);
+    drop(message);
+    drop(input_rx);
 }
 
 #[tokio::test]

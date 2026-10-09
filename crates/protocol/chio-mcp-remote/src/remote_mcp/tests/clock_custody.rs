@@ -104,7 +104,7 @@ fn exhausted_counters_fail_without_wrapping() {
 
 fn session_init(clock: RemoteClock) -> RemoteSessionInit {
     let (input_tx, _input_rx) = mcp_inbox();
-    let (event_tx, _) = broadcast::channel(8);
+    let event_tx = SessionEventBus::new(8);
     RemoteSessionInit {
         clock,
         session_id: "clock-session".into(),

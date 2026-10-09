@@ -636,7 +636,7 @@ struct RemoteSession {
     initialize_params: StdMutex<Option<Value>>,
     lifecycle: StdMutex<RemoteSessionLifecycleSnapshot>,
     input_tx: McpInboxSender,
-    event_tx: broadcast::Sender<RemoteSessionEvent>,
+    event_tx: SessionEventBus,
     retained_notification_events: Arc<StdMutex<VecDeque<RetainedRemoteSessionEvent>>>,
     active_request_stream: Arc<Mutex<()>>,
     worker_serving_closed: tokio::sync::watch::Sender<bool>,
@@ -680,7 +680,7 @@ struct RemoteSessionInit {
     initialize_params: Option<Value>,
     lifecycle_snapshot: Option<RemoteSessionLifecycleSnapshot>,
     input_tx: McpInboxSender,
-    event_tx: broadcast::Sender<RemoteSessionEvent>,
+    event_tx: SessionEventBus,
     retained_notification_events: Arc<StdMutex<VecDeque<RetainedRemoteSessionEvent>>>,
     next_event_id: Arc<AtomicU64>,
     session_db_path: Option<PathBuf>,
@@ -1028,6 +1028,9 @@ struct RemoteSessionCapability {
 
 #[path = "session_core/authority_mode.rs"]
 mod session_core_authority_mode;
+#[path = "session_core/events.rs"]
+mod session_core_events;
+use session_core_events::{RequestEvents, RequestEventsError, SessionEventBus};
 #[path = "session_core/factory.rs"]
 mod session_core_factory;
 #[path = "session_core/ledger.rs"]

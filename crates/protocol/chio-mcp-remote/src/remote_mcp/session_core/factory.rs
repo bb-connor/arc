@@ -463,7 +463,7 @@ impl RemoteSessionFactory {
         let approval_redemption =
             remote_mcp_approvals::ApprovalRedemption::new(&self.config, kernel_kp.public_key())?;
         let (input_tx, input_rx) = mcp_inbox();
-        let (event_tx, _) = broadcast::channel::<RemoteSessionEvent>(256);
+        let event_tx = SessionEventBus::new(256);
         let retained_notification_events =
             Arc::new(StdMutex::new(VecDeque::<RetainedRemoteSessionEvent>::new()));
         let next_event_id = Arc::new(AtomicU64::new(0));
@@ -681,7 +681,7 @@ impl RemoteSessionFactory {
         let approval_redemption =
             remote_mcp_approvals::ApprovalRedemption::new(&self.config, kernel_kp.public_key())?;
         let (input_tx, input_rx) = mcp_inbox();
-        let (event_tx, _) = broadcast::channel::<RemoteSessionEvent>(256);
+        let event_tx = SessionEventBus::new(256);
         let retained_notification_events =
             Arc::new(StdMutex::new(VecDeque::<RetainedRemoteSessionEvent>::new()));
         let next_event_id = Arc::new(AtomicU64::new(0));

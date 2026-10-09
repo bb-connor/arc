@@ -504,7 +504,12 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
     // a previous owner while this POST waited are never delivered on it.
     let request_generation = message.request_generation();
     let mut event_rx = session.subscribe();
-    if let Err(error) = session.send_accounted(message) {
+    let enqueued = session
+        .register_request(request_generation)
+        .and_then(|events| session.send_accounted(message).map(|()| events));
+    let mut request_events = match enqueued {
+        Ok(events) => events,
+        Err(error) => {
         if let Some(call) = credential_call.as_ref() {
             if let Err(response) = remote_mcp_session_credentials::rollback_not_enqueued_call(
                 &state, call, &error,
@@ -514,7 +519,8 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
         }
         drop(stream_lock);
         return remote_session_send_error(error.into_error());
-    }
+        }
+    };
 
     let session_for_stream = session.clone();
     let stream = stream! {
@@ -527,14 +533,8 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
         );
 
         loop {
-            match session_worker::receive(&session_for_stream, &mut event_rx).await {
+            match session_worker::receive_request_event(&session_for_stream, &mut request_events, &mut event_rx).await {
                 Ok(event) => {
-                    // HTTP ownership can change while an older actor request is
-                    // still running. Its origin survives disconnect and id reuse.
-                    if event.kind == RemoteSessionEventKind::RequestCorrelated
-                        && event.request_generation != Some(request_generation) {
-                        continue;
-                    }
                     let mut outgoing = event.message.clone();
                     if is_terminal_response_for_request(&event.message, &request_id) {
                         if let Some(call) = credential_call.as_ref() {
@@ -569,15 +569,7 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
                         break;
                     }
                 }
-                Err(broadcast::error::RecvError::Lagged(skipped)) => {
-                    warn!(skipped, session_id = %session_for_stream.session_id, "remote SSE consumer lagged behind session output");
-                    session_worker::close(&state, &session_for_stream).await;
-                    let failure = json!({"jsonrpc":"2.0","id":request_id,
-                        "error":{"code":-32603,"message":"session response was lost; effect is uncertain"}});
-                    yield Ok(Event::default().data(failure.to_string()));
-                    break;
-                }
-                Err(broadcast::error::RecvError::Closed) => {
+                Err(RequestEventsError::Closed) => {
                     session_worker::close(&state, &session_for_stream).await;
                     let failure = json!({"jsonrpc":"2.0","id":request_id,
                         "error":{"code":-32603,"message":"session worker stopped; effect is uncertain"}});
@@ -623,13 +615,16 @@ async fn handle_initialize_post(
 
     let request_id = message.get("id").cloned().unwrap_or(Value::Null);
     let mut event_rx = session.subscribe();
-    if let Err(error) = session.send(message) {
-        return remote_session_send_error(error);
-    }
+    let mut request_events = match session.send_routed(message) {
+        Ok(events) => events,
+        Err(error) => return remote_session_send_error(error),
+    };
 
     let mut buffered_events = Vec::new();
     loop {
-        match session_worker::receive(&session, &mut event_rx).await {
+        match session_worker::receive_request_event(&session, &mut request_events, &mut event_rx)
+            .await
+        {
             Ok(event) => {
                 let is_terminal = is_terminal_response_for_request(&event.message, &request_id);
                 let is_success = is_successful_initialize_response(&event.message, &request_id);
@@ -664,19 +659,7 @@ async fn handle_initialize_post(
                     );
                 }
             }
-            Err(broadcast::error::RecvError::Lagged(skipped)) => {
-                warn!(
-                    skipped,
-                    session_id = %session.session_id,
-                    "remote initialize SSE consumer lagged behind session output"
-                );
-                session_worker::close(&state, &session).await;
-                return plain_http_error(
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    "remote MCP initialize response was lost",
-                );
-            }
-            Err(broadcast::error::RecvError::Closed) => {
+            Err(RequestEventsError::Closed) => {
                 session_worker::close(&state, &session).await;
                 return plain_http_error(
                     StatusCode::INTERNAL_SERVER_ERROR,

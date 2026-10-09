@@ -104,7 +104,7 @@ mod tests {
         // owning send, which is the definite failed-send case the HTTP rollback
         // consumes, rather than a decode refusal before call reservation.
         let message = input_tx.account(request.clone())?;
-        let (event_tx, _) = broadcast::channel(8);
+        let event_tx = SessionEventBus::new(8);
         let session = RemoteSession::new(RemoteSessionInit {
             clock: RemoteClock::default(),
             session_id: credential.session_id.clone(),

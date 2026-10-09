@@ -1061,7 +1061,7 @@ fn malformed_terminal_state_blocks_active_replay_fail_closed() {
 #[test]
 fn restored_ready_session_preserves_lifecycle_and_requires_store_lease() {
     let (input_tx, _input_rx) = mcp_inbox();
-    let (event_tx, _) = broadcast::channel::<RemoteSessionEvent>(8);
+    let event_tx = SessionEventBus::new(8);
     let retained_notification_events =
         Arc::new(StdMutex::new(VecDeque::<RetainedRemoteSessionEvent>::new()));
     let next_event_id = Arc::new(AtomicU64::new(0));

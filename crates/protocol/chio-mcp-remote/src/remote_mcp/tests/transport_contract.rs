@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn standalone_server_request_is_retained_for_get_without_post_ownership() {
-    let (sender, _) = broadcast::channel(8);
+    let sender = SessionEventBus::new(8);
     let (inbox, _receiver) = mcp_inbox();
     let retained = Arc::new(StdMutex::new(VecDeque::new()));
     let writer = BroadcastJsonRpcWriter::new(
@@ -26,7 +26,7 @@ fn standalone_server_request_is_retained_for_get_without_post_ownership() {
 
 #[test]
 fn sampling_and_terminal_reply_keep_the_actual_post_owner_and_skip_get_replay() {
-    let (sender, _) = broadcast::channel(8);
+    let sender = SessionEventBus::new(8);
     let retained = Arc::new(StdMutex::new(VecDeque::new()));
     let (inbox, receiver) = mcp_inbox();
     let request = inbox
