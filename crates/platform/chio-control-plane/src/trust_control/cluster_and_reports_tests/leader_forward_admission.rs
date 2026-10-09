@@ -14,8 +14,8 @@ const LEADER_BODY: &str = r#"{"forwardedTo":"leader"}"#;
 /// lowest-URL election and this node forwards.
 const FOLLOWER_URL: &str = "http://127.0.0.2:1";
 
-/// A leader that reads each forwarded request in full and withholds every
-/// response until the test releases it.
+/// A leader that reads each forwarded request in full and withholds the
+/// response to every held request until the test releases it.
 struct PausedLeader {
     url: String,
     release: std::sync::mpsc::Sender<()>,
@@ -24,27 +24,44 @@ struct PausedLeader {
 
 impl PausedLeader {
     fn start(requests: usize) -> (Self, tokio::sync::mpsc::UnboundedReceiver<()>) {
-        Self::serve(TcpListener::bind("127.0.0.1:0").test_unwrap(), requests)
+        Self::start_holding(requests, hold_every_request)
     }
 
-    /// Accepts exactly `requests` connections. Each delivery on the returned
+    fn start_holding(
+        requests: usize,
+        hold: fn(&str) -> bool,
+    ) -> (Self, tokio::sync::mpsc::UnboundedReceiver<()>) {
+        Self::serve(
+            TcpListener::bind("127.0.0.1:0").test_unwrap(),
+            requests,
+            hold,
+        )
+    }
+
+    /// Holds `requests` requests whose request line `hold` accepts, answering
+    /// any other request at once with 404. Each delivery on the returned
     /// receiver means one complete request is held at the leader.
     fn serve(
         listener: TcpListener,
         requests: usize,
+        hold: fn(&str) -> bool,
     ) -> (Self, tokio::sync::mpsc::UnboundedReceiver<()>) {
         let url = loopback_url(&listener);
         let (received_tx, received) = tokio::sync::mpsc::unbounded_channel();
         let (release, released) = std::sync::mpsc::channel::<()>();
         let server = std::thread::spawn(move || {
             let mut held = Vec::with_capacity(requests);
-            for _ in 0..requests {
+            while held.len() < requests {
                 let Ok((stream, _)) = listener.accept() else {
                     return;
                 };
-                let Ok(stream) = read_request(stream) else {
+                let Ok((request_line, stream)) = read_request(stream) else {
                     return;
                 };
+                if !hold(&request_line) {
+                    respond(stream, "404 Not Found", r#"{"error":"not held"}"#);
+                    continue;
+                }
                 held.push(stream);
                 if received_tx.send(()).is_err() {
                     return;
@@ -54,7 +71,7 @@ impl PausedLeader {
                 return;
             }
             for stream in held {
-                respond(stream);
+                respond(stream, "200 OK", LEADER_BODY);
             }
         });
         (
@@ -77,8 +94,21 @@ fn loopback_url(listener: &TcpListener) -> String {
     format!("http://{}", listener.local_addr().test_unwrap())
 }
 
-fn read_request(stream: TcpStream) -> std::io::Result<TcpStream> {
+fn hold_every_request(_request_line: &str) -> bool {
+    true
+}
+
+fn hold_writes(request_line: &str) -> bool {
+    request_line.starts_with("POST ")
+}
+
+/// Reads one request in full and returns its request line.
+fn read_request(stream: TcpStream) -> std::io::Result<(String, TcpStream)> {
     let mut reader = BufReader::new(stream);
+    let mut request_line = String::new();
+    if reader.read_line(&mut request_line)? == 0 {
+        return Err(std::io::ErrorKind::UnexpectedEof.into());
+    }
     let mut content_length = 0usize;
     loop {
         let mut line = String::new();
@@ -97,13 +127,13 @@ fn read_request(stream: TcpStream) -> std::io::Result<TcpStream> {
     }
     let mut body = vec![0; content_length];
     reader.read_exact(&mut body)?;
-    Ok(reader.into_inner())
+    Ok((request_line, reader.into_inner()))
 }
 
-fn respond(mut stream: TcpStream) {
+fn respond(mut stream: TcpStream, status: &str, body: &str) {
     let response = format!(
-        "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{LEADER_BODY}",
-        LEADER_BODY.len()
+        "HTTP/1.1 {status}\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+        body.len()
     );
     if stream.write_all(response.as_bytes()).is_ok() {
         let _ = stream.flush();
@@ -184,20 +214,17 @@ async fn leader_forward_leaves_the_async_worker_free_while_the_leader_withholds_
 const AT_CAPACITY: &str = "cluster leader forwarding is at capacity for trust-control writes";
 const AUTHORITY_AT_CAPACITY: &str = "cluster leader forwarding is at capacity for authority writes";
 
-async fn assert_same_error(refusal: Response, expected: Response) {
-    assert_eq!(refusal.status(), StatusCode::SERVICE_UNAVAILABLE);
-    assert_eq!(refusal.status(), expected.status());
+async fn assert_same_response(actual: Response, expected: Response) {
+    assert_eq!(actual.status(), expected.status());
     assert_eq!(
-        refusal.headers().get(CONTENT_TYPE),
+        actual.headers().get(CONTENT_TYPE),
         expected.headers().get(CONTENT_TYPE)
     );
-    let refusal = to_bytes(refusal.into_body(), usize::MAX)
-        .await
-        .test_unwrap();
+    let actual = to_bytes(actual.into_body(), usize::MAX).await.test_unwrap();
     let expected = to_bytes(expected.into_body(), usize::MAX)
         .await
         .test_unwrap();
-    assert_eq!(refusal, expected);
+    assert_eq!(actual, expected);
 }
 
 /// Every forward kind against `state`, each polled exactly once. A forward
@@ -239,22 +266,22 @@ async fn next_leader_forward_is_refused_at_once_while_paused_forwards_hold_every
 
     update_peer_reachable(&state, &leader.url);
     let [post, authority, scim_post, scim_delete] = forwards_polled_once(&state);
-    assert_same_error(
+    assert_same_response(
         post.test_unwrap_err(),
         plain_http_error(StatusCode::SERVICE_UNAVAILABLE, AT_CAPACITY),
     )
     .await;
-    assert_same_error(
+    assert_same_response(
         authority.test_unwrap_err(),
         plain_http_error(StatusCode::SERVICE_UNAVAILABLE, AUTHORITY_AT_CAPACITY),
     )
     .await;
-    assert_same_error(
+    assert_same_response(
         scim_post.test_unwrap_err(),
         scim_error_response(StatusCode::SERVICE_UNAVAILABLE, AT_CAPACITY),
     )
     .await;
-    assert_same_error(
+    assert_same_response(
         scim_delete.test_unwrap_err(),
         scim_error_response(StatusCode::SERVICE_UNAVAILABLE, AT_CAPACITY),
     )
@@ -297,7 +324,7 @@ async fn cancelled_leader_forward_keeps_its_permit_until_the_transport_ends() {
         .now_or_never()
         .test_unwrap()
         .test_unwrap_err();
-    assert_same_error(
+    assert_same_response(
         refused,
         plain_http_error(StatusCode::SERVICE_UNAVAILABLE, AT_CAPACITY),
     )
@@ -342,7 +369,7 @@ async fn leader_forward_retry_readmits_under_one_permit_after_a_failed_attempt()
     let [refusing, serving] = listeners;
     let refusing_url = loopback_url(&refusing);
     drop(refusing);
-    let (leader, mut received) = PausedLeader::serve(serving, 1);
+    let (leader, mut received) = PausedLeader::serve(serving, 1, hold_every_request);
     let mut state = state_with_cluster(
         FOLLOWER_URL,
         &[&refusing_url, &leader.url],
@@ -376,4 +403,132 @@ async fn leader_forward_retry_readmits_under_one_permit_after_a_failed_attempt()
         json!({ "forwardedTo": "leader" })
     );
     assert_eq!(lane.available_permits(), 1);
+}
+
+/// Forwards whose returned response this node builds from the leader's JSON.
+#[derive(Clone, Copy, Debug)]
+enum FinalizedForward {
+    Authority,
+    ScimPost,
+    ScimDelete,
+}
+
+impl FinalizedForward {
+    const ALL: [Self; 3] = [Self::Authority, Self::ScimPost, Self::ScimDelete];
+
+    /// The authority forward reads the leader's status before its write, so
+    /// only the write is held.
+    fn held_requests(self) -> fn(&str) -> bool {
+        match self {
+            Self::Authority => hold_writes,
+            Self::ScimPost | Self::ScimDelete => hold_every_request,
+        }
+    }
+
+    async fn forward(self, state: &TrustServiceState) -> Result<Option<Response>, Response> {
+        let body = json!({ "write": format!("{self:?}") });
+        match self {
+            Self::Authority => forward_authority_post_to_leader(state, FORWARD_PATH, &body).await,
+            Self::ScimPost => forward_scim_post_to_leader(state, FORWARD_PATH, &body).await,
+            Self::ScimDelete => forward_scim_delete_to_leader(state, FORWARD_PATH).await,
+        }
+    }
+
+    fn finalized(self) -> Response {
+        let leader = json!({ "forwardedTo": "leader" });
+        match self {
+            Self::Authority => Json(leader).into_response(),
+            Self::ScimPost => scim_json_response(StatusCode::CREATED, &leader),
+            Self::ScimDelete => scim_json_response(StatusCode::OK, &leader),
+        }
+    }
+
+    fn at_capacity(self) -> Response {
+        match self {
+            Self::Authority => {
+                plain_http_error(StatusCode::SERVICE_UNAVAILABLE, AUTHORITY_AT_CAPACITY)
+            }
+            Self::ScimPost | Self::ScimDelete => {
+                scim_error_response(StatusCode::SERVICE_UNAVAILABLE, AT_CAPACITY)
+            }
+        }
+    }
+}
+
+/// Starts `kind` against a leader that holds its write, on a one-permit lane,
+/// and returns once the write is held.
+async fn held_finalized_forward(
+    kind: FinalizedForward,
+) -> (
+    PausedLeader,
+    TrustServiceState,
+    Arc<tokio::sync::Semaphore>,
+    tokio::task::JoinHandle<Result<Option<Response>, Response>>,
+) {
+    let (leader, mut received) = PausedLeader::start_holding(1, kind.held_requests());
+    let mut state = follower_of(&leader.url);
+    let lane = Arc::new(tokio::sync::Semaphore::new(1));
+    state.leader_forward_lane = Arc::clone(&lane);
+    let forward = tokio::spawn({
+        let state = state.clone();
+        async move { kind.forward(&state).await }
+    });
+    await_requests(&mut received, 1).await;
+    assert_eq!(lane.available_permits(), 0, "{kind:?}");
+    (leader, state, lane, forward)
+}
+
+async fn assert_refused_at_once(
+    kind: FinalizedForward,
+    state: &TrustServiceState,
+    leader_url: &str,
+) {
+    update_peer_reachable(state, leader_url);
+    let refused = kind
+        .forward(state)
+        .now_or_never()
+        .test_unwrap()
+        .test_unwrap_err();
+    assert_same_response(refused, kind.at_capacity()).await;
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn finalized_leader_forwards_return_the_built_response_under_their_permit() {
+    for kind in FinalizedForward::ALL {
+        let (leader, state, lane, forward) = held_finalized_forward(kind).await;
+        assert_refused_at_once(kind, &state, &leader.url).await;
+
+        leader.release();
+        let response = tokio::time::timeout(HANG_GUARD, forward)
+            .await
+            .test_unwrap()
+            .test_unwrap()
+            .test_unwrap()
+            .test_unwrap();
+        assert_same_response(response, kind.finalized()).await;
+        assert_eq!(lane.available_permits(), 1, "{kind:?}");
+    }
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn cancelled_finalized_leader_forwards_keep_their_permit_until_the_response_is_built() {
+    for kind in FinalizedForward::ALL {
+        let (leader, state, lane, forward) = held_finalized_forward(kind).await;
+        forward.abort();
+        let cancelled = tokio::time::timeout(HANG_GUARD, forward)
+            .await
+            .test_unwrap()
+            .test_unwrap_err();
+        assert!(cancelled.is_cancelled(), "{kind:?}");
+        assert_eq!(lane.available_permits(), 0, "{kind:?}");
+        assert_refused_at_once(kind, &state, &leader.url).await;
+
+        leader.release();
+        let returned = tokio::time::timeout(HANG_GUARD, Arc::clone(&lane).acquire_owned())
+            .await
+            .test_unwrap()
+            .test_unwrap();
+        drop(returned);
+        assert_eq!(lane.available_permits(), 1, "{kind:?}");
+    }
 }

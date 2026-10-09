@@ -206,9 +206,8 @@ fn forwarded_control_response(response: ureq::Response) -> Result<Response, CliE
     })
 }
 
-/// Leader forwards admitted at once. 64 exceeds the one forward per async
-/// worker that inline forwarding sustained, while pinning at most one eighth
-/// of Tokio's default 512-thread blocking pool.
+/// Leader forwards admitted at once on one node: an explicit resource bound,
+/// one eighth of Tokio's default 512-thread blocking pool.
 pub(crate) const LEADER_FORWARD_PERMITS: usize = 64;
 
 /// Why a leader forward attempt produced no transport outcome.
@@ -239,8 +238,8 @@ impl LeaderForwardRefusal {
 /// Admission never waits: without a free permit the attempt is refused before
 /// any network I/O. The permit moves into the blocking closure and is released
 /// only when that closure returns, after the leader's response is read in
-/// full, so a request future dropped mid-forward keeps its permit until the
-/// transport call has actually ended.
+/// full and the forwarded response is built, so a request future dropped
+/// mid-forward keeps its permit until that work has actually ended.
 async fn run_leader_forward<T>(
     state: &TrustServiceState,
     forward: impl FnOnce() -> T + Send + 'static,
@@ -457,10 +456,10 @@ pub(crate) async fn forward_authority_post_to_leader<B: Serialize>(
                         &target,
                         authority_term,
                     );
-                    (
-                        client.post_internal_json::<_, Value>(&request_path, &json, Some(term)),
-                        term,
-                    )
+                    let forwarded = client
+                        .post_internal_json::<_, Value>(&request_path, &json, Some(term))
+                        .map(|value| Json(value).into_response());
+                    (forwarded, term)
                 })
                 .await
                 .map_err(|refusal| refusal.into_response("authority writes", plain_http_error))?
@@ -469,7 +468,7 @@ pub(crate) async fn forward_authority_post_to_leader<B: Serialize>(
         };
         authority_term = attempt_term;
         match attempt {
-            Ok(value) => return Ok(Some(Json(value).into_response())),
+            Ok(response) => return Ok(Some(response)),
             Err(error) => {
                 update_peer_failure(state, &leader_url, error.to_string());
                 let Some(next_consensus) = cluster_consensus_view(state) else {
@@ -579,7 +578,9 @@ pub(crate) async fn forward_scim_post_to_leader<B: Serialize>(
             Ok(json) => {
                 let request_path = path.to_owned();
                 run_leader_forward(state, move || {
-                    client.post_json::<_, Value>(&request_path, &json)
+                    client
+                        .post_json::<_, Value>(&request_path, &json)
+                        .map(|value| scim_json_response(StatusCode::CREATED, &value))
                 })
                 .await
                 .map_err(|refusal| {
@@ -589,7 +590,7 @@ pub(crate) async fn forward_scim_post_to_leader<B: Serialize>(
             Err(error) => Err(error),
         };
         match attempt {
-            Ok(value) => return Ok(Some(scim_json_response(StatusCode::CREATED, &value))),
+            Ok(response) => return Ok(Some(response)),
             Err(error) => {
                 update_peer_failure(state, &leader_url, error.to_string());
                 let Some(next_consensus) = cluster_consensus_view(state) else {
@@ -660,13 +661,15 @@ pub(crate) async fn forward_scim_delete_to_leader(
                     scim_error_response(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
                 })?;
         let request_path = path.to_owned();
-        let attempt = run_leader_forward(state, move || client.delete_json::<Value>(&request_path))
-            .await
-            .map_err(|refusal| {
-                refusal.into_response("trust-control writes", scim_error_response)
-            })?;
+        let attempt = run_leader_forward(state, move || {
+            client
+                .delete_json::<Value>(&request_path)
+                .map(|value| scim_json_response(StatusCode::OK, &value))
+        })
+        .await
+        .map_err(|refusal| refusal.into_response("trust-control writes", scim_error_response))?;
         match attempt {
-            Ok(value) => return Ok(Some(scim_json_response(StatusCode::OK, &value))),
+            Ok(response) => return Ok(Some(response)),
             Err(error) => {
                 update_peer_failure(state, &leader_url, error.to_string());
                 let Some(next_consensus) = cluster_consensus_view(state) else {
