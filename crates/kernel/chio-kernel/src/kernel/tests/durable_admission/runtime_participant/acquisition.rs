@@ -324,3 +324,74 @@ fn runtime_claim_lost_ack_and_callback_panics_deny_without_losing_recovery() {
         exercise(mode, false);
     }
 }
+
+#[test]
+fn exhausted_budget_keeps_its_signed_denial_when_runtime_release_is_unconfirmed() {
+    for nested in [false, true] {
+        exhausted_budget_with_unconfirmed_runtime_release(nested);
+    }
+}
+
+fn exhausted_budget_with_unconfirmed_runtime_release(nested: bool) {
+    let mut grant = make_grant("durable-server", "mutate");
+    grant.max_invocations = Some(1);
+    let (mut kernel, request, store, invocations) =
+        durable_admission_fixture_with_grants("runtime-release-exhausted", vec![grant]);
+    kernel.set_runtime_admission_hook(Arc::new(ClaimingVerifier(
+        RuntimeParticipantAuthorityBindingV1::new(
+            AdmissionIdentifier::try_new("runtime", "test-runtime").expect("runtime"),
+            AdmissionIdentifier::try_new("source", "test-source").expect("source"),
+        ),
+    )));
+    *store.runtime_recovery.0.lock().expect("fixture") = RecoveryState {
+        enabled: true,
+        history: Some(vec![]),
+        claim_mode: ClaimMode::Normal,
+        release_mode: ReleaseMode::NoOp,
+        ..RecoveryState::default()
+    };
+    assert!(kernel
+        .budget_store
+        .try_increment(&request.capability.id, 0, Some(1))
+        .expect("consume the only invocation"));
+    let response = if nested {
+        let session = kernel
+            .open_session(request.agent_id.clone(), Vec::new())
+            .expect("session");
+        kernel.activate_session(&session).expect("active session");
+        let parent = make_operation_context(&session, "exhausted-parent", &request.agent_id);
+        kernel
+            .begin_session_request(&parent, OperationKind::ToolCall, true)
+            .expect("parent request");
+        kernel.evaluate_tool_call_with_nested_flow_client(
+            &parent,
+            &request,
+            &mut NoopNestedFlowClient,
+            None,
+        )
+    } else {
+        kernel.evaluate_tool_call_blocking(&request)
+    };
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+    let response = response.expect("signed budget denial");
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert!(response.receipt.verify_signature().expect("signature"));
+    assert!(
+        response
+            .reason
+            .as_deref()
+            .is_some_and(|reason| reason.contains("budget")),
+        "{response:?}"
+    );
+    let metadata = response.receipt.metadata.as_ref().expect("metadata");
+    assert_eq!(metadata["chio_runtime"]["reservation_release_failed"], true);
+    assert_eq!(metadata["chio_runtime"]["reservation_retained"], true);
+    // The unreleased participant keeps the operation on its recovery path.
+    assert!(!store.operation().state().is_terminal());
+    let state = store.runtime_recovery.0.lock().expect("fixture");
+    assert_eq!(state.release_calls, 1);
+    assert_eq!(
+        state.history.as_ref().expect("history")[0].disposition,
+        RuntimeParticipantDisposition::ReservedBeforeDispatch
+    );
+}
