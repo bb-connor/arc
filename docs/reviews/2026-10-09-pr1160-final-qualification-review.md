@@ -10,6 +10,28 @@ The sections retain the original findings. The later disposition below binds
 the observer repair to its completed local evidence; it does not replace the
 failed predecessor results.
 
+## Current proof acceptance amendment (October 9, 19:16:57Z)
+
+The owner permits #1160 to land with **KANI-PROOF-QUAL open and unproved**.
+P1 **KANI-ATTEST-DECOMP** in the swarm store owns a feasible postmerge
+decomposition. No new proof campaigns are authorized for this landing.
+The original mandatory-domain and guard findings below remain historical;
+the guard repair still needs composition checks, while the unfinished proof is
+now an explicitly accepted landing residual, never a passed obligation.
+
+Noncollision remains the separately approved SHA-256 assumption. The concrete
+attestation harness also lacks a complete real-SHA determinism, upper-half
+padding and context-binding result over all 256 seeds and 32 root positions.
+Neither is relabeled proved. The complete source and completion cover remain
+pinned. CI reports the one named residual as OPEN/UNPROVED and excludes it from
+execution and passed totals; other proof enrollment remains enforced.
+
+**No release claim, including D8 previews under ADR-0011, may state or rely on
+this unproved obligation.** Existing tests and bounded evidence retain their
+recorded scope. All failed, resource-refused and interrupted runs remain
+preserved in [the source-bound residual audit](../security/audits/kani-open-residual-20261009.json).
+Independent review, exact protected checks and normal protected merge remain.
+
 ## V25-ARCHIVE-LATE-LINEAGE: P1, required before landing
 
 Adding valid capability lineage after legacy unsigned-subject receipts have

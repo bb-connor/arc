@@ -3364,6 +3364,7 @@ dependencies = [
 name = "chio-core-types"
 version = "0.1.0"
 dependencies = [
+ "ascii",
  "aws-lc-rs",
  "chio-security-types",
  "chio-spec-codegen",

@@ -68,7 +68,7 @@ EXPECTED_CA_PACKAGE_SHA256 = (
     "a8ad8f04dfba1a2897388c4b420b698bf1ecd870be10f0127134a567d5e59896"
 )
 EXPECTED_CARGO_LOCK_SHA256 = (
-    "0e6ae4b7b18a1f12c00e3a616fff12f61cc10d2158fc140032c5aa5bca8193fb"
+    "15d0f0e0d009460e3ee8cfc41a38dec9b5ec0716656a3bcb503eaa42aed1b99f"
 )
 EXPECTED_RUST_TOOLCHAIN_SHA256 = (
     "24ef3b9d3edbd850aa386cb0a98e10450b0030991a4537cb359f54d49dbbb33a"
@@ -1097,6 +1097,9 @@ EXPECTED_CAPTURE_BUILD_RUN = (
     "cargo build -p chio-control-plane --bin chio-enterprise-evidence"
 )
 EXPECTED_KANI_ENROLLMENT_RUN = r"""
+python3 scripts/check-kani-crypto-scope.py
+python3 scripts/tests/check-kani-crypto-scope.test.py
+python3 scripts/tests/kani-open-residual.test.py
 python3 scripts/check-kani-public-harnesses.py
 python3 scripts/tests/check-kani-public-harnesses.test.py
 """.strip()

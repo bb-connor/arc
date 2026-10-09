@@ -7,6 +7,30 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Current landing acceptance amendment (October 9, 19:16:57Z)
+
+**KANI-PROOF-QUAL remains OPEN/UNPROVED.** The owner's recorded decision permits
+#1160 landing with that explicit residual. P1 **KANI-ATTEST-DECOMP** in the swarm
+store owns postmerge decomposition; no new proof campaigns are authorized for
+#1160. The [residual audit](audits/kani-open-residual-20261009.json) preserves
+source pins, the decision, prior failures and the CI reporting contract.
+
+The full-domain attestation encoding/noncollision obligation is unproved.
+The separate explicit SHA-256 assumption does not establish the unfinished
+concrete determinism, zero-padding or context-wrapper binding proof either.
+All 256 key seeds, 32 root positions, three real SHA calls, assertions and the
+completion cover remain in source. CI reports the one named residual as
+OPEN/UNPROVED, never executes or counts it as passed, and enforces other proof
+checks. **No release claim, including D8 previews under ADR-0011, may state or
+rely on this unproved obligation.** Existing tests and bounded evidence retain
+their original scope; failed runs remain failed.
+
+This amendment supersedes the prelanding proof-completion requirement in the
+dated checkpoints below. It does not supersede domain-guard repair, independent
+review, the four exact protected hosted checks, or normal protected merge.
+Claude's postmerge changes remain on their separate branches. The candidate is
+not yet hosted-qualified or merged, and no release is authorized.
+
 ## Current final qualification obligations (October 9)
 
 The canonical ledger contains **1,839 requirements** and the same number of

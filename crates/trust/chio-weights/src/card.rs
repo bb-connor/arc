@@ -30,7 +30,6 @@ use std::collections::BTreeSet;
 
 use chrono::{DateTime, Utc};
 use serde::{de, Deserialize, Deserializer, Serialize};
-use sha2::{Digest, Sha256};
 
 use crate::error::WeightsError;
 
@@ -273,8 +272,7 @@ impl ModelCard {
 /// weights blob.
 #[must_use]
 pub fn weights_hash_of(bytes: &[u8]) -> String {
-    let digest = Sha256::digest(bytes);
-    hex::encode(digest)
+    chio_core_types::crypto::sha256_hex(bytes)
 }
 
 #[inline]

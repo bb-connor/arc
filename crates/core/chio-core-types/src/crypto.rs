@@ -55,6 +55,7 @@ use crate::canonical::{CanonicalBytes, CanonicalJsonWitness};
 use crate::error::{Error, Result};
 
 mod ed25519_verification;
+mod encoding;
 mod wire;
 
 /// Shared canonical JSON bytes suitable for signing and verification.
@@ -556,12 +557,14 @@ impl PublicKey {
     #[must_use]
     pub fn to_hex(&self) -> String {
         match &self.material {
-            PublicKeyMaterial::Ed25519 { verifying_key } => hex::encode(verifying_key.to_bytes()),
+            PublicKeyMaterial::Ed25519 { verifying_key } => {
+                encoding::prefixed_hex("", verifying_key.as_bytes())
+            }
             PublicKeyMaterial::P256 { encoded_point } => {
-                format!("p256:{}", hex::encode(encoded_point))
+                encoding::prefixed_hex("p256:", encoded_point)
             }
             PublicKeyMaterial::P384 { encoded_point } => {
-                format!("p384:{}", hex::encode(encoded_point))
+                encoding::prefixed_hex("p384:", encoded_point)
             }
             PublicKeyMaterial::Hybrid {
                 classical,
@@ -571,10 +574,36 @@ impl PublicKey {
                 format!(
                     "hybrid:{}:{}:{}",
                     classical.to_hex(),
-                    hex::encode(pq),
+                    encoding::prefixed_hex("", pq),
                     alg_set
                 )
             }
+        }
+    }
+
+    /// Lend the exact [`Self::to_hex`] wire bytes to a synchronous consumer.
+    ///
+    /// P-256 uses a fixed stack buffer; other key families keep their established
+    /// rendering. The consumer cannot retain a borrow of the temporary buffer.
+    pub fn with_hex_bytes<R>(&self, consume: impl FnOnce(&[u8]) -> R) -> R {
+        if let PublicKeyMaterial::P256 { encoded_point } = &self.material {
+            let mut encoded = [ascii::AsciiChar::Null; 135];
+            if encoding::fill_prefixed_hex("p256:", encoded_point, &mut encoded).is_some() {
+                let text: &ascii::AsciiStr = encoded.as_slice().into();
+                return consume(text.as_bytes());
+            }
+            #[cfg(kani)]
+            panic!("bounded P-256 hex encoding must succeed");
+        }
+        // Prove that the bounded P-256 fixture never needs compatibility
+        // rendering. Every other algorithm must fail this additional Kani
+        // obligation; production retains its established rendering below.
+        #[cfg(kani)]
+        panic!("bounded hex-byte consumer must use P-256");
+        #[cfg(not(kani))]
+        {
+            let encoded = self.to_hex();
+            consume(encoded.as_bytes())
         }
     }
 
@@ -1283,7 +1312,7 @@ fn validate_mldsa65_signature_len(bytes: &[u8]) -> Result<()> {
 pub fn sha256_hex(data: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(data);
-    hex::encode(hasher.finalize())
+    encoding::prefixed_hex("", &hasher.finalize())
 }
 
 /// Serialize a value to canonical JSON bytes (RFC 8785 / JCS).

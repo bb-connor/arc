@@ -49,6 +49,8 @@ dudect-bencher = { version = "0.7", optional = true }
 
 [features]
 default = ["std", "revocation-view"]
+# Model-checking opt-in for the real portable hash backend, including on x86.
+kani = ["chio-core-types/kani"]
 std = ["chio-security-types/std", "chio-core-types/std", "serde/std", "serde_json/std"]
 # Enables the `revocation_view` module: an arc-swap-backed read-only
 # snapshot of the revocation oracle's most recent signed epoch root that

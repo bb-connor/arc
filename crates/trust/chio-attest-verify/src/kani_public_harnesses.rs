@@ -24,7 +24,7 @@
 //!
 //! # Honesty boundary: what "model" harnesses actually prove
 //!
-//! - The `public_expect_report_data_determinism_under_input_change`
+//! - The `public_expect_report_data_determinism_and_binding`
 //!   harness exercises a real production `pub fn`
 //!   (`expect_report_data`); a regression in the production function
 //!   is caught by Kani.
@@ -45,6 +45,29 @@
 //! - These return-value models retain their owned error results without
 //!   running destructors. Error cleanup, including unrelated nested error
 //!   variants, is outside the modeled quote acceptance contract.
+//! - The report-data harness exercises real portable SHA-256 for every
+//!   original symbolic key seed and root-byte position. Forgetting its key
+//!   excludes deallocation, not any input or binding check.
+//!
+//! # Bounds
+//!
+//! The report-data harness ends in its exact-named `kani::cover!`, so
+//! a run that cuts the success path cannot report its assertions as
+//! proved. With unwinding checks enabled a loop running `k` times needs
+//! bound `k + 1`. `expect_report_data` hashes `p256:` plus the 130-char
+//! hex key (135 bytes) and then the 32-byte root: 167 bytes, two full
+//! blocks in `update` and one padded block in `finalize`. The checked
+//! compatibility assertion requires this unchanged P256 fixture to use
+//! the stack renderer; a non-P256 key fails that additional obligation.
+//! This harness does not establish arbitrary-algorithm renderer behavior.
+//! Its standalone encoding/SHA profile requests no owned-renderer selector.
+//! Loops: the
+//! 135-byte typed ASCII buffer initialization (136), the 65-byte
+//! hex input walk (66), `GenericArray::<u8, U64>::default` (65),
+//! the padding zero fill after position 39 (25), `soft::compress` word
+//! load (17) and block loop (3), output words (9), the 32-byte output
+//! defaults (33), the harness's 32-byte padding scan (33), and `memcmp`
+//! over 64 equal bytes (65) or 32 bytes (33).
 //!
 //! Negative-conformance regression coverage for the three modelled
 //! verify_quote impls (live runtime, not model):
@@ -76,29 +99,22 @@ use crate::AttestError;
 /// crates' Kani modules share key construction conventions. The fixture
 /// is a pure constructor over a u8 seed and contains no
 /// nondeterministic clocks or system calls; safe to drive symbolically.
-fn public_key(seed: u8) -> PublicKey {
+pub(super) fn public_key(seed: u8) -> PublicKey {
     let mut bytes = [seed; 65];
     bytes[0] = 0x04;
     PublicKey::from_p256_sec1(&bytes)
         .unwrap_or_else(|_| unreachable!("deterministic P-256 key fixture is well-formed"))
 }
 
-/// Real public surface exercised symbolically: a one-byte flip in the
-/// receipt root MUST change the entire 64-byte report-data slot, and
-/// re-running with identical inputs MUST produce byte-identical
-/// outputs. Together these arms pin the binding determinism property
-/// every TEE backend's `verify_quote` consumes when it byte-compares
-/// the observed `report_data` against `expected_report_data`.
-///
-/// Production entry: `chio_attest_verify::expect_report_data`
-/// (`pub fn` in `crates/trust/chio-attest-verify/src/quote.rs`,
-/// re-exported via `crates/trust/chio-attest-verify/src/lib.rs`).
+/// Real SHA-256 determinism, zero padding and context-wrapper equivalence
+/// for every original symbolic key seed and receipt-root position. Digest
+/// noncollision relies on ASSUME-SHA256; its original harness is unproved research.
+/// Production entries: `expect_report_data` and `QuoteVerificationContext::expected_report_data`.
 #[kani::proof]
-#[kani::unwind(8)]
-pub fn public_expect_report_data_determinism_under_input_change() {
-    // Symbolic axes. The kernel public key seed and the receipt-root
-    // byte index / value are bounded to u8, matching the
-    // `chio-kernel-core` Kani convention.
+#[kani::solver(kissat)]
+#[kani::unwind(136)]
+pub fn public_expect_report_data_determinism_and_binding() {
+    // Preserve both symbolic axes: kernel-key seed and receipt-root index.
     let kernel_seed = kani::any::<u8>();
     let mut receipt_root = [0u8; 32];
     let flip_index = kani::any::<u8>();
@@ -123,22 +139,18 @@ pub fn public_expect_report_data_determinism_under_input_change() {
         assert_eq!(*byte, 0);
     }
 
-    // (3) Tampering. Flipping a single byte in the receipt root MUST
-    // change the digest half (bytes 0..32) of the slot. We compare
-    // against a tampered receipt-root and assert byte-array
-    // inequality on the digest range.
-    let mut tampered_root = receipt_root;
-    tampered_root[flip_index as usize] ^= 0x01;
-    let tampered = expect_report_data(&kernel_pk, &tampered_root);
-    assert_ne!(first[..32], tampered[..32]);
+    // Noncollision is ASSUME-SHA256. The original inequality is retained
+    // separately as unproved research, with real-SHA runtime tamper controls.
 
-    // (4) `QuoteVerificationContext::expected_report_data` is a real
+    // (3) `QuoteVerificationContext::expected_report_data` is a real
     // `pub fn` thin wrapper around `expect_report_data`. Pin the
     // invariant that the wrapper agrees with the free function so a
     // future regression that diverged the two paths is caught here.
     let context = QuoteVerificationContext::new(&kernel_pk, &receipt_root);
     let via_context = context.expected_report_data();
     assert_eq!(via_context, first);
+    core::mem::forget(kernel_pk);
+    kani::cover!(true, "public_expect_report_data_determinism_and_binding");
 }
 
 // ---------------------------------------------------------------------

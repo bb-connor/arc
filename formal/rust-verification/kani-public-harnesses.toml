@@ -2,7 +2,27 @@ schema = "chio.kani-public-harnesses.v1"
 crate = "chio-kernel-core"
 script = "scripts/check-kani-public-core.sh"
 # Named harnesses omit the legacy `--no-unwinding-checks` runner flag.
-unwinding_checks = ["verify_oracle_inclusion_walk_parity"]
+unwinding_checks = [
+  "public_sign_receipt_rejects_kernel_key_mismatch_before_signing",
+  "public_sign_receipt_accepts_matching_kernel_key",
+  "public_sign_receipt_refuses_content_hash_mismatch",
+  "public_sign_receipt_accepts_matching_content_hash",
+  "verify_family_binding_preservation",
+  "verify_oracle_inclusion_walk_parity",
+]
+cover_required = [
+  "public_sign_receipt_rejects_kernel_key_mismatch_before_signing",
+  "public_sign_receipt_accepts_matching_kernel_key",
+  "public_sign_receipt_refuses_content_hash_mismatch",
+  "public_sign_receipt_accepts_matching_content_hash",
+  "verify_family_binding_preservation",
+]
+
+# Bound the full key comparison while retaining the harness recursion bound.
+memcmp_unwind = { public_sign_receipt_rejects_kernel_key_mismatch_before_signing = 66, public_sign_receipt_accepts_matching_kernel_key = 66 }
+
+# Discover the compiler symbol from fresh diagnostics; retain all unwind checks.
+public_key_eq_unwind = { public_sign_receipt_refuses_content_hash_mismatch = 8, public_sign_receipt_accepts_matching_content_hash = 8 }
 
 # `harness_groups` is the flat-array catalog (one entry per logical edge or
 # algebraic property the harnesses exercise). Entries cover scope intersection
@@ -30,7 +50,7 @@ harness_groups = [
   "verify threshold distinct signers",
   "verify recursive delegation no widening",
   "verify delegation receipt canonical-bytes determinism",
-  "verify revocation view freshness fail-closed gate",
+  "verify revocation snapshot refusal and retry stability",
   "verify inclusion step production-extraction equivalence",
   "verify relying-party inclusion walk soundness under ASSUME-SHA256",
   "verify delivery-contract settlement admission soundness",
@@ -58,7 +78,6 @@ covered_symbols = [
   "chio_core_types::crypto::PublicKey::verify_canonical",
   "chio_core_types::capability::delegate",
   "chio_core_types::delegation_receipt::DelegationReceipt::canonical_bytes",
-  "chio_kernel_core::revocation_view::RevocationView::install_if_newer",
   "chio_core_types::merkle::MerkleProof::compute_root_from_hash",
   "chio_core_types::merkle_steps::inclusion_step",
   "chio_kernel_core::formal_core::delivery_contract_admits",
@@ -68,14 +87,10 @@ covered_symbols = [
 
 # Lane assignment.
 #
-# The concrete-fixture harnesses dominate runtime because
-# `public_verify_capability` and `public_evaluate` exercise the full
-# canonical-JSON serialise plus Ed25519/P-384 verify path, while the
-# algebraic harnesses model signatures with `model_sign`/`model_verify`
-# and finish in 1-3 seconds. The full sweep is ~2.2 min locally, within the
-# 10-minute warm PR target, so every harness lands in `lanes.pr`, including
-# the two WYSIWYS `sign_receipt` content-hash recompute harnesses, which sign
-# concrete fixtures and finish in seconds.
+# Concrete receipt/hash fixtures require complete loop bounds and reachable
+# witnesses. Their cost is measured separately from the algebraic harnesses;
+# a legacy success with disabled unwinding checks is not reachability evidence.
+# Every registered harness remains in the PR lane with its existing time cap.
 #
 # The nightly Kani job runs the union of `lanes.pr` and
 # `lanes.nightly_only`; the pull-request workflow runs only `lanes.pr`.

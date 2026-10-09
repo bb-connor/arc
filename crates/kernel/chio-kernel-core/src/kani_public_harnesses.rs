@@ -314,9 +314,16 @@ pub fn public_evaluate_rejects_untrusted_issuer_before_dispatch() {
     core::mem::forget(capability);
 }
 
-struct DeterministicBackend {
-    public_key: PublicKey,
-}
+const BACKEND_KEY_SEED: u8 = 12;
+
+/// Signing double whose public key is the P-256 fixture `public_key(BACKEND_KEY_SEED)`.
+///
+/// The key is derived on every call and never cloned. `PublicKey` is recursive
+/// through its hybrid variant, so each clone, comparison or drop of one unrolls
+/// to the unwind bound; deriving the key keeps those unrollings to the ones the
+/// code under test performs. A matching receipt body uses an independently
+/// derived key from the same seed, which compares equal byte for byte.
+struct DeterministicBackend;
 
 impl SigningBackend for DeterministicBackend {
     fn algorithm(&self) -> SigningAlgorithm {
@@ -324,7 +331,7 @@ impl SigningBackend for DeterministicBackend {
     }
 
     fn public_key(&self) -> PublicKey {
-        self.public_key.clone()
+        public_key(BACKEND_KEY_SEED)
     }
 
     fn sign_bytes(&self, message: &[u8]) -> chio_core_types::Result<Signature> {
@@ -367,10 +374,9 @@ fn receipt_body(kernel_key: PublicKey) -> ChioReceiptBody {
 }
 
 #[kani::proof]
+#[kani::unwind(8)]
 pub fn public_sign_receipt_rejects_kernel_key_mismatch_before_signing() {
-    let backend = DeterministicBackend {
-        public_key: public_key(12),
-    };
+    let backend = DeterministicBackend;
     let body = receipt_body(p384_public_key(11));
 
     // Models the body-only relay primitive's kernel-key fast-fail (no content
@@ -379,28 +385,32 @@ pub fn public_sign_receipt_rejects_kernel_key_mismatch_before_signing() {
     let result = sign_receipt_relaying_trusted_body(body, &backend);
     let rejected = matches!(&result, Err(ReceiptSigningError::KernelKeyMismatch));
     core::mem::forget(result);
-    core::mem::forget(backend);
     assert!(rejected);
+    kani::cover!(
+        true,
+        "public_sign_receipt_rejects_kernel_key_mismatch_before_signing"
+    );
 }
 
 #[kani::proof]
+#[kani::unwind(8)]
 pub fn public_sign_receipt_accepts_matching_kernel_key() {
-    let key = public_key(12);
-    let backend = DeterministicBackend {
-        public_key: key.clone(),
-    };
-    let body = receipt_body(key);
+    let backend = DeterministicBackend;
+    let body = receipt_body(public_key(BACKEND_KEY_SEED));
 
     let receipt = sign_receipt_relaying_trusted_body(body, &backend)
         .unwrap_or_else(|_| unreachable!("matching key signs"));
     assert_eq!(receipt.id, "rcpt-public-kani");
     assert_eq!(receipt.algorithm, Some(SigningAlgorithm::Ed25519));
-    assert_eq!(receipt.signature, Signature::from_bytes(&[0; 64]));
+    let expected_signature = Signature::from_bytes(&[0; 64]);
+    assert_eq!(receipt.signature, expected_signature);
+    core::mem::forget(expected_signature);
     core::mem::forget(receipt);
-    core::mem::forget(backend);
+    kani::cover!(true, "public_sign_receipt_accepts_matching_kernel_key");
 }
 
 #[kani::proof]
+#[kani::unwind(66)]
 pub fn public_sign_receipt_refuses_content_hash_mismatch() {
     // Production WYSIWYS gate: `sign_receipt` recomputes
     // `sha256_hex(canonical_content)` inside the trust boundary and refuses to
@@ -411,11 +421,8 @@ pub fn public_sign_receipt_refuses_content_hash_mismatch() {
     // to refuse is the content-hash mismatch). This also exercises the
     // `mem::forget(body)` branch on the kani cfg path with the claimed hash
     // captured before the forget.
-    let key = public_key(12);
-    let backend = DeterministicBackend {
-        public_key: key.clone(),
-    };
-    let body = receipt_body(key);
+    let backend = DeterministicBackend;
+    let body = receipt_body(public_key(BACKEND_KEY_SEED));
     let canonical_content = b"kani-content-preimage-not-h";
 
     let result = sign_receipt(body, &backend, canonical_content);
@@ -424,11 +431,12 @@ pub fn public_sign_receipt_refuses_content_hash_mismatch() {
         Err(ReceiptSigningError::ContentHashMismatch { .. })
     );
     core::mem::forget(result);
-    core::mem::forget(backend);
     assert!(refused);
+    kani::cover!(true, "public_sign_receipt_refuses_content_hash_mismatch");
 }
 
 #[kani::proof]
+#[kani::unwind(66)]
 pub fn public_sign_receipt_accepts_matching_content_hash() {
     // Production WYSIWYS gate accept path: when `body.content_hash`
     // equals `sha256_hex(canonical_content)`, `sign_receipt` recomputes, agrees,
@@ -436,21 +444,20 @@ pub fn public_sign_receipt_accepts_matching_content_hash() {
     // canonical preimage so the recompute matches, then assert the signature is
     // produced. This keeps the production `sign_receipt(body, backend,
     // canonical_content)` shape under Kani coverage, not just the relay seam.
-    let key = public_key(12);
-    let backend = DeterministicBackend {
-        public_key: key.clone(),
-    };
+    let backend = DeterministicBackend;
     let canonical_content = b"kani-content-preimage";
-    let mut body = receipt_body(key);
+    let mut body = receipt_body(public_key(BACKEND_KEY_SEED));
     body.content_hash = chio_core_types::crypto::sha256_hex(canonical_content);
 
     let receipt = sign_receipt(body, &backend, canonical_content)
         .unwrap_or_else(|_| unreachable!("matching content hash and key signs"));
     assert_eq!(receipt.id, "rcpt-public-kani");
     assert_eq!(receipt.algorithm, Some(SigningAlgorithm::Ed25519));
-    assert_eq!(receipt.signature, Signature::from_bytes(&[0; 64]));
+    let expected_signature = Signature::from_bytes(&[0; 64]);
+    assert_eq!(receipt.signature, expected_signature);
+    core::mem::forget(expected_signature);
     core::mem::forget(receipt);
-    core::mem::forget(backend);
+    kani::cover!(true, "public_sign_receipt_accepts_matching_content_hash");
 }
 
 // The verified-core surface does not currently expose a public `intersect(a, b)`
@@ -1393,6 +1400,7 @@ pub fn verify_replay_fingerprint_uniqueness() {
 }
 
 #[kani::proof]
+#[kani::unwind(9)]
 pub fn verify_family_binding_preservation() {
     let fields = [
         kani::any::<bool>(),
@@ -1415,6 +1423,9 @@ pub fn verify_family_binding_preservation() {
     if fields.iter().any(|matches| !*matches) || root_maximum != descendant_maximum {
         assert!(!preserved);
     }
+    // Witness the formerly truncated all-fields-match branch, not just a
+    // short-circuiting mismatch. Unwinding checks cover every other branch.
+    kani::cover!(preserved, "verify_family_binding_preservation");
 }
 
 #[kani::proof]
@@ -1467,8 +1478,8 @@ pub fn verify_threshold_distinct_signers() {
 //   * verify_delegate_no_widen           - Lean theorem 1.
 //   * verify_delegation_receipt_canonical - DelegationReceipt round-trip
 //     determinism on canonical bytes.
-//   * verify_revocation_view_freshness   - RevocationView::install_if_newer
-//     monotone-epoch fail-closed gate (revocation_view.rs).
+//   * verify_revocation_view_freshness   - revocation_snapshot_denies boolean
+//     refusal and retry stability. Epoch installation is a separate obligation.
 //   * verify_inclusion_step_equivalence  - production/extraction step parity.
 //   * verify_oracle_inclusion_walk_parity  - production inclusion-walk parity.
 //

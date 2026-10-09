@@ -352,3 +352,7 @@ pub trait QuoteVerifier: Send + Sync {
         context: &QuoteVerificationContext<'_>,
     ) -> Result<VerifiedQuote, AttestError>;
 }
+
+// Unproved research obligations are opt-in and never part of mandatory enrollment.
+#[cfg(all(kani, feature = "kani-research"))]
+mod kani_crypto_research;

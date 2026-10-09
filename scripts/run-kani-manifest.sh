@@ -100,10 +100,14 @@ if [[ ! -f "$MANIFEST" ]]; then
 fi
 
 # Emit one TSV row per matching harness:
-#   crate \t harness \t default_unwind \t timeout_secs \t features \t unwinding_checks
+#   crate, harness, default_unwind, timeout_secs, features, unwinding_checks,
+#   require_cover, memcmp_unwind, public_key_eq_unwind, public_key_hex_unwind
 ROWS=$(python3 - "$MANIFEST" "$LANE_FILTER" "$CRATE_FILTER" "$EXCLUDE_CRATES" <<'PY'
 import sys
 from pathlib import Path
+
+sys.path.insert(0, "scripts")
+from kani_open_residual import FOLLOWUP, validate_open_residuals
 
 try:
     import tomllib
@@ -142,9 +146,25 @@ if not isinstance(entries, list):
     sys.stderr.write("run-kani-manifest.sh: `harness` must be a TOML array of tables\n")
     sys.exit(2)
 
+try:
+    residuals = validate_open_residuals(
+        entries, require_expected=manifest_path.resolve() == Path(".kani/harnesses.toml").resolve()
+    )
+except ValueError as error:
+    raise SystemExit(f"run-kani-manifest.sh: {error}") from error
+for crate, harness in sorted(residuals):
+    print(f"OPEN/UNPROVED: {crate}::{harness} ({FOLLOWUP}); not executed or counted as passed", file=sys.stderr)
+
 required = ("crate", "harness", "default_unwind", "timeout_secs", "lane")
+allowed = set(required) | {
+    "open_residual", "features", "unwinding_checks", "require_cover", "memcmp_unwind",
+    "public_key_eq_unwind", "public_key_hex_unwind", "p256_encoder_bounds", "primary_rust_symbol", "notes",
+}
 seen = set()
 for idx, entry in enumerate(entries):
+    unknown = sorted(set(entry) - allowed)
+    if unknown:
+        raise SystemExit(f"harness[{idx}] has unknown keys: {unknown}")
     for key in required:
         if key not in entry:
             sys.stderr.write(f"harness[{idx}] missing required key {key!r}\n")
@@ -162,6 +182,8 @@ for idx, entry in enumerate(entries):
             f"{entry['lane']!r}; expected one of {list(VALID_LANES)}\n"
         )
         sys.exit(2)
+    if pair in residuals:
+        continue
     if entry["lane"] != lane_filter:
         continue
     if crate_filter and entry["crate"] != crate_filter:
@@ -180,6 +202,43 @@ for idx, entry in enumerate(entries):
             f"harness[{idx}].unwinding_checks must be a boolean\n"
         )
         sys.exit(2)
+    require_cover = entry.get("require_cover", False)
+    if not isinstance(require_cover, bool):
+        raise SystemExit(f"harness[{idx}].require_cover must be a boolean")
+    if require_cover and not unwinding_checks:
+        raise SystemExit(f"harness[{idx}] cover requires unwinding checks")
+    memcmp_unwind = entry.get("memcmp_unwind")
+    if memcmp_unwind is not None:
+        if type(memcmp_unwind) is not int or not 1 <= memcmp_unwind <= 2**32 - 1:
+            raise SystemExit(f"harness[{idx}].memcmp_unwind must be a positive u32")
+        if not require_cover or not unwinding_checks:
+            raise SystemExit(f"harness[{idx}] memcmp override requires checked reachability")
+    public_key_eq_unwind = entry.get("public_key_eq_unwind")
+    if public_key_eq_unwind is not None:
+        if type(public_key_eq_unwind) is not int or not 1 <= public_key_eq_unwind <= 2**32 - 1:
+            raise SystemExit(f"harness[{idx}].public_key_eq_unwind must be a positive u32")
+        if not require_cover or not unwinding_checks or memcmp_unwind is not None:
+            raise SystemExit(f"harness[{idx}] key recursion override requires checked reachability and no memcmp override")
+    public_key_hex_unwind = entry.get("public_key_hex_unwind")
+    if public_key_hex_unwind is not None:
+        if type(public_key_hex_unwind) is not int or not 0 <= public_key_hex_unwind <= 2**32 - 1:
+            raise SystemExit(f"harness[{idx}].public_key_hex_unwind must be a u32")
+        if not require_cover or not unwinding_checks or memcmp_unwind is not None or public_key_eq_unwind is not None:
+            raise SystemExit(f"harness[{idx}] key hex override requires checked reachability and no other override")
+    p256_encoder_bounds = entry.get("p256_encoder_bounds", False)
+    if type(p256_encoder_bounds) is not bool:
+        raise SystemExit(f"harness[{idx}].p256_encoder_bounds must be boolean")
+    if p256_encoder_bounds and (
+        public_key_hex_unwind is not None
+        or public_key_eq_unwind is not None
+        or memcmp_unwind is not None
+        or not require_cover
+        or not unwinding_checks
+        or entry["crate"] != "chio-attest-verify"
+        or entry["harness"] != "public_expect_report_data_determinism_and_binding"
+        or entry["default_unwind"] != 136
+    ):
+        raise SystemExit(f"harness[{idx}] standalone encoder profile requires checked reachability, the original P256 domain and no other override")
     print(
         "\t".join(
             [
@@ -189,6 +248,11 @@ for idx, entry in enumerate(entries):
                 str(int(entry["timeout_secs"])),
                 ",".join(features) if features else "-",
                 "true" if unwinding_checks else "false",
+                "true" if require_cover else "false",
+                str(memcmp_unwind) if memcmp_unwind is not None else "-",
+                str(public_key_eq_unwind) if public_key_eq_unwind is not None else "-",
+                str(public_key_hex_unwind) if public_key_hex_unwind is not None else "-",
+                "true" if p256_encoder_bounds else "false",
             ]
         )
     )
@@ -233,26 +297,45 @@ if command -v timeout >/dev/null 2>&1; then
 fi
 
 COUNT=0
-while IFS=$'\t' read -r crate harness unwind timeout features unwinding_checks; do
+while IFS=$'\t' read -r crate harness unwind timeout features unwinding_checks require_cover memcmp_unwind public_key_eq_unwind public_key_hex_unwind p256_encoder_bounds; do
   [[ -z "$crate" ]] && continue
   COUNT=$((COUNT + 1))
 
   qualified_harness="kani_public_harnesses::${harness}"
-  CMD=(cargo kani -p "$crate" --lib --harness "$qualified_harness" --exact
-       --default-unwind "$unwind")
+  CMD=(cargo kani -p "$crate" --lib --harness "$qualified_harness" --exact)
+  if [[ "$memcmp_unwind" == "-" && "$public_key_eq_unwind" == "-" && "$public_key_hex_unwind" == "-" && "$p256_encoder_bounds" != "true" ]]; then
+    CMD+=(--default-unwind "$unwind")
+  fi
   if [[ "$unwinding_checks" != "true" ]]; then
     CMD+=(--no-unwinding-checks)
   fi
   if [[ "$features" != "-" ]]; then
     CMD+=(--features "$features")
   fi
+  if [[ "$memcmp_unwind" != "-" ]]; then
+    # The harness attribute supplies the ordinary bound. Kani rejects native
+    # CLI unwind flags combined with CBMC loop overrides. Enrollment validates
+    # that the attribute agrees with default_unwind for these harnesses.
+    CMD+=(-Z unstable-options --cbmc-args --unwindset "memcmp.0:${memcmp_unwind}")
+  fi
 
-  if [[ "$DRY_RUN" -eq 1 ]]; then
-    if [[ "$HAS_TIMEOUT" -eq 1 ]]; then
-      echo "timeout ${timeout}s ${CMD[*]}"
-    else
-      echo "${CMD[*]}  # timeout=${timeout}s (timeout(1) not on PATH)"
+  if [[ "$require_cover" == "true" ]]; then
+    cover_args=()
+    if [[ "$public_key_eq_unwind" != "-" ]]; then
+      cover_args+=(--public-key-eq-unwind "$public_key_eq_unwind")
+    elif [[ "$public_key_hex_unwind" != "-" ]]; then
+      cover_args+=(--public-key-hex-unwind "$public_key_hex_unwind")
     fi
+    if [[ "$p256_encoder_bounds" == "true" ]]; then cover_args+=(--p256-encoder-bounds); fi
+    if [[ "${#cover_args[@]}" -gt 0 ]]; then cover_args+=(--); fi
+    CMD=(bash scripts/run-kani-with-cover.sh "$qualified_harness" "${cover_args[@]}" "${CMD[@]}")
+  fi
+  # The cap includes symbol discovery and verification together.
+  if [[ "$HAS_TIMEOUT" -eq 1 ]]; then
+    CMD=(timeout "${timeout}s" "${CMD[@]}")
+  fi
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    echo "${CMD[*]}"
     continue
   fi
 
@@ -263,13 +346,8 @@ while IFS=$'\t' read -r crate harness unwind timeout features unwinding_checks; 
   # preserves the real failure code so CI fails on harness verification
   # failure or `timeout`-induced 124.
   set +e
-  if [[ "$HAS_TIMEOUT" -eq 1 ]]; then
-    timeout "${timeout}s" "${CMD[@]}"
-    rc=$?
-  else
-    "${CMD[@]}"
-    rc=$?
-  fi
+  "${CMD[@]}"
+  rc=$?
   set -e
   if [[ "$rc" -ne 0 ]]; then
     echo "::endgroup::"

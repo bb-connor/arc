@@ -503,6 +503,9 @@ jobs:
 
       - name: Verify public Kani harness enrollment
         run: |
+          python3 scripts/check-kani-crypto-scope.py
+          python3 scripts/tests/check-kani-crypto-scope.test.py
+          python3 scripts/tests/kani-open-residual.test.py
           python3 scripts/check-kani-public-harnesses.py
           python3 scripts/tests/check-kani-public-harnesses.test.py
 

@@ -35,12 +35,12 @@ default = []
 # 8-provider * 12-fixture sweep (96 fixtures) runs nightly via the
 # existing nightly conformance lane and is not duplicated here.
 smoke = []
-# `kani` is an opt-in feature toggle for the model-checked harness
-# module (`src/kani_public_harnesses.rs`). The module body itself is
-# gated by `#[cfg(kani)]` so production builds never compile it; this
-# feature is kept available for tooling that wants to opt in without
-# invoking the Kani toolchain. No production code path depends on it.
-kani = []
+# Kani uses the real portable SHA-256 implementation without CPU probes or
+# intrinsics. The harness module remains cfg(kani)-only. Enabling this feature
+# in an ordinary build also selects software SHA-256; defaults are unchanged.
+kani = ["sha2/force-soft", "chio-core-types/kani"]
+# Unproved noncollision obligations; never enabled by the mandatory proof gate.
+kani-research = ["kani"]
 
 [lints.clippy]
 undocumented_unsafe_blocks = "deny"
