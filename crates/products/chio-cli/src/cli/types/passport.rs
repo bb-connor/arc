@@ -234,7 +234,11 @@ pub(crate) enum PassportOid4vpCommands {
         /// Requested selective-disclosure claims. Repeat to request multiple claims.
         #[arg(long = "claim")]
         disclosure_claims: Vec<String>,
-        /// Optional issuer allowlist. Repeat to allow multiple issuers.
+        /// Issuer allowlist for the presented credential. Repeat to allow
+        /// multiple issuers. Empty means local-only trust: the verifier accepts
+        /// only its own advertised issuer and fetches no remote issuer keys.
+        /// A listed remote issuer must serve its JWKS over HTTPS on a public
+        /// address.
         #[arg(long = "issuer")]
         issuer_allowlist: Vec<String>,
         /// Optional request lifetime in seconds.

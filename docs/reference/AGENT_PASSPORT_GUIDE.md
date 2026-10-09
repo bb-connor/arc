@@ -722,6 +722,13 @@ Shipped now:
   continuation contract over DPoP, mTLS thumbprint binding, and one
   attestation-confirmation profile, same-device and cross-device launch
   artifacts, public verifier metadata, and verifier `JWKS` trust bootstrap
+- OID4VP presentation issuer trust decided before any fetch: the advertised
+  issuer uses local keys, every remote credential issuer must be listed in the
+  signed request `issuerAllowlist` (`--issuer`), and an empty allowlist is
+  local-only. A remote issuer JWKS or lifecycle fetch is HTTPS only with no
+  private, loopback or link-local address, no redirects, pinned DNS, timeouts, a
+  size cap and no error-body reflection, and acceptance time is rechecked after
+  the remote waits. See `docs/reference/CREDENTIAL_INTEROP_GUIDE.md`.
 - signed public issuer-discovery and verifier-discovery documents plus one
   signed transparency snapshot over those metadata surfaces, with explicit
   informational-only/manual-review import guardrails

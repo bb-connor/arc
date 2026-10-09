@@ -108,6 +108,47 @@ lifecycle state into the credential itself.
 | `notFound` | no published lifecycle truth exists for that passport id | fail closed |
 | malformed or missing TTL-backed distribution metadata | lifecycle truth is unavailable or untrustworthy | fail closed |
 
+## OID4VP Issuer Trust And Fetch
+
+The public direct-post route `POST /v1/public/passport/oid4vp/direct-post`
+verifies a presented portable credential against issuer keys, which it may need
+to fetch. Issuer trust is decided before any network request:
+
+- the verifier's own advertised issuer (`--advertise-url`) is verified with the
+  local authority keys and is never fetched;
+- any other credential issuer must be listed explicitly in the signed OID4VP
+  request's `issuerAllowlist` (the CLI `--issuer` option on
+  `passport oid4vp create`);
+- an empty `issuerAllowlist` means local-only trust: no remote issuer is
+  trusted and no issuer JWKS is fetched.
+
+A credential whose issuer is neither the advertised issuer nor allowlisted is
+refused before any outbound request.
+
+Migration note: a deployment that previously relied on an empty
+`issuerAllowlist` to accept any issuer's self-published keys must now list each
+remote issuer it intends to trust. An empty allowlist no longer accepts remote
+issuers; this closes a path where a holder could present a self-issued
+credential and have its own JWKS fetched and trusted.
+
+When a remote allowlisted issuer's JWKS (or a credential's lifecycle resolve
+URL) is fetched, the transport is strict and bounded:
+
+- HTTPS only; HTTP, loopback, link-local and other private or special-use
+  addresses are refused (an allowlisted issuer that violates this is refused);
+- redirects are disabled and the resolved, policy-checked addresses are pinned
+  into the connection, so a DNS rebind cannot redirect the fetch to an internal
+  address;
+- connect, read and overall timeouts bound every attempt, the response body is
+  size-capped, and upstream error bodies are never echoed back to the caller;
+- fetches run off the request workers under a bounded, non-queued admission
+  limit, so a slow or unreachable issuer cannot pin the service.
+
+Acceptance time is re-read from the trusted clock after the issuer and lifecycle
+waits, so a slow remote response cannot carry acceptance past the OID4VP
+request's expiry: credential and request validity and the atomic consume all use
+the current acceptance time.
+
 ## Compatibility Boundary
 
 Shipped:
