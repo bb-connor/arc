@@ -21,8 +21,9 @@ Rules (NORTH-STAR-FLOWS section 7, unified roadmap section 9):
 Output is one `RULE: path: message` line per violation. Exit 0 when clean,
 1 when any violation is found, 2 on a usage or read error (fail closed).
 
-`--scope program` checks only the program set; it is the gate for the native
-host documents. `--scope public` checks only the public copy, which carries a
+`--scope program` checks the native host program set and UNIFIED_ROADMAP.md.
+It checks links, copy, case references and applicable budgets, not milestone
+or dependency semantics. `--scope public` checks only the public copy, which carries a
 known baseline until the roadmap's positioning items land (see
 scripts/tests/check-native-host-docs.test.sh). The default scope is both.
 """
@@ -92,6 +93,7 @@ class Layout:
             root / "docs/superpowers/specs/2026-10-07-omarchy-integration-design.md",
             self.plans / "2026-10-07-desktop-integration.md",
             root / "docs/architecture/PROGRAM-MAP.md",
+            root / "docs/operations/UNIFIED_ROADMAP.md",
         ]
         self.adr = sorted((root / "docs/adr").glob("ADR-0038-*.md"))
         program = (
@@ -119,13 +121,15 @@ class Layout:
         self.public = sorted({p for p in public if p.is_file()})
         # Inputs that quote retired phrases on purpose: the governing design
         # and ADR that retire them, the plan that removes them, and the
-        # dated architecture reviews that recorded them.
+        # dated architecture reviews that recorded them, and the unified
+        # roadmap's inventory of stale surfaces to fix.
         self.retired_allowlist = {
             self.spec / "NORTH-STAR-FLOWS.md",
             root / "docs/adr/ADR-0038-native-host-program.md",
             self.omarchy / "reviews/2026-10-07-architecture-review.md",
             self.macos / "reviews/2026-10-07-architecture-review.md",
             self.plans / "2026-10-08-north-star-restructure.md",
+            root / "docs/operations/UNIFIED_ROADMAP.md",
         }
         # Every required shared document must exist; any other top-level
         # Markdown in the spec directory also counts toward the budget.

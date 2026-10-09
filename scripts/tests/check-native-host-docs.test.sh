@@ -60,7 +60,8 @@ new_fixture() {
   local spec="$fixture/docs/superpowers/specs/2026-10-07-desktop-integration"
   mkdir -p "$spec/reviews" "$fixture/docs/superpowers/specs/2026-10-07-omarchy-integration/reviews" \
     "$fixture/docs/superpowers/plans" "$fixture/docs/assets" "$fixture/docs/architecture" \
-    "$fixture/docs/adr" "$fixture/docs/start-here" "$fixture/docs/reference" "$fixture/spec"
+    "$fixture/docs/adr" "$fixture/docs/start-here" "$fixture/docs/reference" "$fixture/spec" \
+    "$fixture/docs/operations"
   cat >"$spec/CASES.md" <<'EOF'
 # Cases
 
@@ -90,6 +91,7 @@ EOF
   printf '# ADRs\n' >"$fixture/docs/adr/README.md"
   printf '# ADR-0038\n' >"$fixture/docs/adr/ADR-0038-native-host-program.md"
   printf '# Program map\n' >"$fixture/docs/architecture/PROGRAM-MAP.md"
+  printf '# Unified roadmap\n' >"$fixture/docs/operations/UNIFIED_ROADMAP.md"
   printf '# Design\n' >"$fixture/docs/superpowers/specs/2026-10-07-omarchy-integration-design.md"
   printf '<svg xmlns="http://www.w3.org/2000/svg" aria-label="Evidence that travels"><text>Evidence that travels</text></svg>\n' \
     >"$fixture/docs/assets/subhead.svg"
@@ -113,6 +115,22 @@ EOF
 # A clean tree passes every rule.
 new_fixture clean
 expect "clean fixture passes every rule" 0 "-" --
+
+# The unified roadmap is a required program input. Check content as well as
+# membership, so a passing program check cannot silently omit the roadmap.
+new_fixture roadmap-link
+printf '\n[Missing](MISSING.md)\n' >>"$fixture/docs/operations/UNIFIED_ROADMAP.md"
+expect "program checks roadmap links" 1 "links: docs/operations/UNIFIED_ROADMAP.md: missing target MISSING.md" -- --scope program
+expect "public scope excludes roadmap" 0 "-" -- --scope public
+new_fixture roadmap-em-dash
+printf 'Second line &mdash; as an entity.\n' >>"$fixture/docs/operations/UNIFIED_ROADMAP.md"
+expect "program checks roadmap em dashes" 1 "em-dash: docs/operations/UNIFIED_ROADMAP.md: line 2 contains U+2014" -- --scope program
+new_fixture roadmap-missing
+rm "$fixture/docs/operations/UNIFIED_ROADMAP.md"
+expect "missing roadmap fails program check" 1 "links: docs/operations/UNIFIED_ROADMAP.md: required document missing" -- --scope program --rule links
+new_fixture roadmap-historical-copy
+printf '\nRetire "The kernel your agents answer to" from the README.\n' >>"$fixture/docs/operations/UNIFIED_ROADMAP.md"
+expect "roadmap may inventory retired copy" 0 "-" -- --scope program
 
 # A retired phrase in Markdown is found even when wrapped across lines.
 new_fixture markdown-retired
