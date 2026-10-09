@@ -3,7 +3,11 @@
 #   make          regenerate every committed rendering from the source
 #   make check    regenerate into a temporary directory, compare with the
 #                 committed renderings, check the generated appendices, and
-#                 run idnits
+#                 run idnits; a document date that is no longer current is
+#                 reported but does not fail
+#   make submission-check
+#                 the same check, but a document date more than three days
+#                 from today fails it; run it before posting
 #
 # Tools: kramdown-rfc (Ruby gem), xml2rfc with its PDF extra, idnits, python3.
 
@@ -33,7 +37,7 @@ export DYLD_FALLBACK_LIBRARY_PATH ?= /opt/homebrew/lib
 endif
 
 .DELETE_ON_ERROR:
-.PHONY: all vectors check clean
+.PHONY: all vectors check submission-check clean
 all: vectors $(OUTDIR)/$(OUT).xml $(OUTDIR)/$(OUT).prepped.xml $(OUTDIR)/$(OUT).txt $(OUTDIR)/$(OUT).pdf
 
 vectors:
@@ -67,6 +71,9 @@ $(OUTDIR)/$(OUT).pdf: $(OUTDIR)/$(OUT).xml $(wildcard tools/fonts/*)
 
 check:
 	./tools/check.sh
+
+submission-check:
+	CHIO_IETF_SUBMISSION=1 ./tools/check.sh
 
 clean:
 	rm -f $(OUTDIR)/$(OUT).raw.xml $(OUTDIR)/$(OUT).v3.xml

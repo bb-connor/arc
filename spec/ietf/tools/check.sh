@@ -2,6 +2,12 @@
 # Regenerate the draft into a temporary directory and compare the result with
 # the committed renderings. Fails on any difference, on a stale generated
 # appendix, and on any idnits error or warning.
+#
+# xml2rfc and idnits compare the document date with today's date, so their
+# date-proximity warnings depend on when the check runs, not on the source.
+# The freshness check reports only that warning without failing. The
+# submission check (CHIO_IETF_SUBMISSION=1, `make submission-check`) keeps it
+# fatal, so the date is current when the draft is posted.
 set -eu
 here=$(cd "$(dirname "$0")/.." && pwd)
 tmp=$(mktemp -d)
@@ -16,7 +22,25 @@ make --no-print-directory OUTDIR="$tmp" all >"$tmp/build.log" 2>&1 || {
   cat "$tmp/build.log" >&2
   exit 1
 }
-if rg -i '^.*(Warning:|Error:)' "$tmp/build.log"; then
+submission=${CHIO_IETF_SUBMISSION:-0}
+diagnostics="$tmp/build.log"
+if [ "$submission" != 1 ]; then
+  diagnostics="$tmp/diagnostics.log"
+  if rg -v "Warning: The document date \([0-9-]+\) is more than 3 days away from today's date$" \
+    "$tmp/build.log" >"$diagnostics"; then
+    :
+  else
+    date_filter_status=$?
+    if [ "$date_filter_status" -ne 1 ]; then
+      echo 'check: unable to scan writer diagnostics' >&2
+      exit 1
+    fi
+  fi
+  if rg -q "Warning: The document date \([0-9-]+\) is more than 3 days away" "$tmp/build.log"; then
+    echo 'check: note: the document date is not current; run make submission-check before posting' >&2
+  fi
+fi
+if rg -i '^.*(Warning:|Error:)' "$diagnostics"; then
   echo 'check: xml2rfc emitted a warning or error' >&2
   exit 1
 else
@@ -62,7 +86,11 @@ fi
 
 if command -v idnits >/dev/null 2>&1; then
   if idnits --mode submission --no-progress --output json "$out.xml" > "$tmp/idnits.json" 2> "$tmp/idnits.stderr"; then
-    python3 tools/idnits_gate.py "$tmp/idnits.json" || status=1
+    if [ "$submission" = 1 ]; then
+      python3 tools/idnits_gate.py "$tmp/idnits.json" || status=1
+    else
+      python3 tools/idnits_gate.py --allow-stale-date "$tmp/idnits.json" || status=1
+    fi
   else
     cat "$tmp/idnits.stderr" >&2
     echo "check: idnits did not complete successfully" >&2

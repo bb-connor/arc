@@ -8,7 +8,7 @@ Author: Connor Whelan, Backbay Industries, `connor@backbay.io`. Discussion: `age
 
 ## Owner submission steps
 
-1. Review the source, claim ledger, and rendered PDF. Set the source's `date` to the actual submission date if it differs from September 30, 2026, then regenerate and check all outputs. A date change also requires refreshing the website's generated document and downloads.
+1. Review the source, claim ledger, and rendered PDF. Set the source's `date` to the actual submission date if it differs from September 30, 2026, then regenerate all outputs and run `make -C spec/ietf submission-check`, which fails while the document date is more than three days from today. A date change also requires refreshing the website's generated document and downloads.
 2. Open <https://datatracker.ietf.org/submit/> and upload `draft-whelan-chio-protocol-00.xml`.
 3. Confirm the extracted name, revision `00`, title, author email, IETF stream, Standards Track intended status, date, and generated expiry. Confirm the author's BCP 78/79 declarations in the submission tool.
 4. Submit and complete the confirmation email sent to `connor@backbay.io`. Confirm that <https://datatracker.ietf.org/doc/draft-whelan-chio-protocol/> shows revision `00` and the intended metadata.
@@ -29,6 +29,7 @@ Use kramdown-rfc 1.7.43, xml2rfc 3.34.1, WeasyPrint 70.0, aasvg 0.5.7, idnits 3.
 ```sh
 make -C spec/ietf
 make -C spec/ietf check
+make -C spec/ietf submission-check
 ```
 
-The check regenerates all renderings, checks the vector corpus and folded bytes, compares XML/prepped XML/text and extracted PDF text, rejects writer diagnostics and incomplete validation runs, enforces 72-column text, and rejects all idnits errors or warnings. PDF layout comparison uses the bundled fonts; Linux CI is the independent cross-platform verification.
+The check regenerates all renderings, checks the vector corpus and folded bytes, compares XML/prepped XML/text and extracted PDF text, rejects writer diagnostics and incomplete validation runs, enforces 72-column text, and rejects all idnits errors or warnings. xml2rfc and idnits measure the document date against today's date, so `check`, which CI runs, reports a date that is no longer current without failing; `submission-check` makes that warning fatal. PDF layout comparison uses the bundled fonts; Linux CI is the independent cross-platform verification.

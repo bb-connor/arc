@@ -28,6 +28,28 @@ class IdnitsGate(unittest.TestCase):
             with self.subTest(severity=severity), self.assertRaises(ValueError):
                 validate(report)
 
+    def test_a_stale_date_is_rejected_unless_explicitly_allowed(self):
+        report = copy.deepcopy(CLEAN)
+        report.update(result="fail", nits=[{"severity": "ValidationWarning", "code": "DOC_DATE_IN_PAST",
+                                            "desc": "The document date is 9 days in the past."}])
+        report["nitsBySeverity"]["warning"] = 1
+        with self.assertRaises(ValueError):
+            validate(report)
+        self.assertEqual(validate(report, allow_stale_date=True)["warning"], 1)
+
+    def test_allowing_a_stale_date_keeps_other_findings_fatal(self):
+        for severity, key, code in [("ValidationWarning", "warning", "DOC_DATE_IN_FUTURE"),
+                                    ("ValidationWarning", "warning", "nit"),
+                                    ("ValidationError", "error", "DOC_DATE_IN_PAST")]:
+            report = copy.deepcopy(CLEAN)
+            report.update(result="fail", nits=[
+                {"severity": "ValidationWarning", "code": "DOC_DATE_IN_PAST", "desc": "Stale"},
+                {"severity": severity, "code": code, "desc": "Failure"}])
+            report["nitsBySeverity"]["warning"] += 1
+            report["nitsBySeverity"][key] += 1
+            with self.subTest(code=code, severity=severity), self.assertRaises(ValueError):
+                validate(report, allow_stale_date=True)
+
     def test_incomplete_and_contradictory_reports_are_rejected(self):
         reports = [None, {}, {"nits": [], "nitsBySeverity": None}]
         for change in [{"result": "fail"}, {"file": {"path": "draft.xml", "size": True}},
