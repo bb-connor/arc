@@ -1559,7 +1559,7 @@
     "crates/sdk/chio-eval-receipt/src/verify.rs::verify_chio_receipt_payload::new",
     "crates/security/chio-active-response-authority/src/config.rs::load_runtime_config::from_wire",
     "crates/security/chio-active-response-authority/src/store.rs::decode_canonical::from_wire",
-    "crates/security/chio-flow/src/classification.rs::validate_field_path::from_wire",
+    "crates/security/chio-flow/src/classification.rs::decode_payload_document::from_wire",
     "crates/security/chio-flow/src/declassification.rs::canonical_request_hash::from_wire",
     "crates/security/chio-keyring/src/enterprise_receipt.rs::from_canonical_bytes::from_wire",
     "crates/security/chio-keyring/src/ipc.rs::load_bounded_json_file::from_wire",
@@ -16840,7 +16840,7 @@
     "crates/sdk/chio-eval-receipt/src/verify.rs::verify_chio_receipt_payload::new#1::decode_signed",
     "crates/security/chio-active-response-authority/src/config.rs::load_runtime_config::from_wire#1::decode_canonical",
     "crates/security/chio-active-response-authority/src/store.rs::decode_canonical::from_wire#1::decode_canonical",
-    "crates/security/chio-flow/src/classification.rs::validate_field_path::from_wire#1::decode_signed",
+    "crates/security/chio-flow/src/classification.rs::decode_payload_document::from_wire#1::decode_signed",
     "crates/security/chio-flow/src/declassification.rs::canonical_request_hash::from_wire#1::decode_canonical",
     "crates/security/chio-keyring/src/enterprise_receipt.rs::from_canonical_bytes::from_wire#1::decode_canonical",
     "crates/security/chio-keyring/src/ipc.rs::load_bounded_json_file::from_wire#1::decode_signed",
@@ -21457,9 +21457,8 @@
       "validate_opened_envelope::shared-reader::crates/security/chio-decoy/src/registry.rs::validate_materialization_binding"
     ],
     "crates/security/chio-flow/src/classification.rs": [
-      "validate_field_path::original-json-reader::UntrustedJsonText",
-      "validate_finding::shared-reader::crates/security/chio-flow/src/classification.rs::validate_field_path",
-      "verify_result::shared-reader::crates/security/chio-flow/src/classification.rs::validate_finding"
+      "decode_payload_document::original-json-reader::UntrustedJsonText",
+      "value::shared-reader::crates/security/chio-flow/src/classification.rs::decode_payload_document"
     ],
     "crates/security/chio-flow/src/declassification.rs": [
       "canonical_request_hash::original-json-reader::UntrustedJsonText",

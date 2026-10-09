@@ -194,8 +194,9 @@ impl CategoryLabelMap {
             return Err(ClassificationMappingError::RequestBindingMismatch);
         }
         let mut label = InformationLabel::bottom();
+        let mut document = LazyPayloadDocument::new(request.payload.as_bytes());
         for finding in result.findings.as_slice() {
-            validate_finding(finding, request.payload.as_bytes())?;
+            validate_finding(finding, &mut document)?;
             let category_label = self.labels.get(&finding.category).ok_or_else(|| {
                 ClassificationMappingError::UnknownCategory(finding.category.clone())
             })?;
@@ -214,7 +215,7 @@ impl CategoryLabelMap {
 #[cfg(any(feature = "std", test))]
 fn validate_finding(
     finding: &ClassificationFinding,
-    payload: &[u8],
+    document: &mut LazyPayloadDocument<'_>,
 ) -> Result<(), ClassificationMappingError> {
     if finding.confidence_basis_points > 10_000 {
         return Err(ClassificationMappingError::InvalidConfidence);
@@ -224,28 +225,71 @@ fn validate_finding(
         (Some(_), Some(_)) => Err(ClassificationMappingError::AmbiguousLocation),
         (Some(range), None)
             if range.start >= range.end
-                || usize::try_from(range.end).map_or(true, |end| end > payload.len()) =>
+                || usize::try_from(range.end).map_or(true, |end| end > document.payload.len()) =>
         {
             Err(ClassificationMappingError::InvalidByteRange)
         }
         (Some(_), None) => Ok(()),
-        (None, Some(path)) => validate_field_path(payload, path.as_str()),
+        (None, Some(path)) => validate_field_path(document, path.as_str()),
     }
 }
 
 #[cfg(any(feature = "std", test))]
-fn validate_field_path(payload: &[u8], path: &str) -> Result<(), ClassificationMappingError> {
+fn validate_field_path(
+    document: &mut LazyPayloadDocument<'_>,
+    path: &str,
+) -> Result<(), ClassificationMappingError> {
     if !path.starts_with('/') {
         return Err(ClassificationMappingError::InvalidFieldPath);
     }
-    let document: serde_json::Value =
-        chio_core_types::canonical::UntrustedJsonText::from_wire(payload, 16 * 1024 * 1024)
-            .and_then(|text| text.decode_signed())
-            .map_err(|_| ClassificationMappingError::InvalidFieldPath)?;
     document
+        .value()?
         .pointer(path)
         .map(|_| ())
         .ok_or(ClassificationMappingError::InvalidFieldPath)
+}
+
+/// Payload decoded at most once per verification, and only when a finding
+/// carries a field path.
+#[cfg(any(feature = "std", test))]
+struct LazyPayloadDocument<'a> {
+    payload: &'a [u8],
+    value: Option<serde_json::Value>,
+}
+
+#[cfg(any(feature = "std", test))]
+impl<'a> LazyPayloadDocument<'a> {
+    const fn new(payload: &'a [u8]) -> Self {
+        Self {
+            payload,
+            value: None,
+        }
+    }
+
+    fn value(&mut self) -> Result<&serde_json::Value, ClassificationMappingError> {
+        if self.value.is_none() {
+            self.value = Some(decode_payload_document(self.payload)?);
+        }
+        self.value
+            .as_ref()
+            .ok_or(ClassificationMappingError::InvalidFieldPath)
+    }
+}
+
+#[cfg(any(feature = "std", test))]
+fn decode_payload_document(
+    payload: &[u8],
+) -> Result<serde_json::Value, ClassificationMappingError> {
+    #[cfg(test)]
+    PAYLOAD_DECODES.with(|count| count.set(count.get() + 1));
+    chio_core_types::canonical::UntrustedJsonText::from_wire(payload, 16 * 1024 * 1024)
+        .and_then(|text| text.decode_signed())
+        .map_err(|_| ClassificationMappingError::InvalidFieldPath)
+}
+
+#[cfg(test)]
+std::thread_local! {
+    static PAYLOAD_DECODES: core::cell::Cell<usize> = const { core::cell::Cell::new(0) };
 }
 
 #[cfg(test)]
@@ -462,6 +506,69 @@ mod tests {
         valid_path.field_path = Some(id("/patient/diagnosis"));
         map.verify_result(&request, result(&request, vec![valid_path]))
             .unwrap_or_else(|error| panic!("field path: {error}"));
+    }
+
+    #[test]
+    fn many_field_path_findings_decode_payload_once_and_resolve_every_pointer() {
+        let leaves: Vec<(alloc::string::String, alloc::string::String)> = (0..256)
+            .map(|index| (format!("field{index}"), format!("value{index}")))
+            .collect();
+        let body = leaves
+            .iter()
+            .map(|(key, value)| format!(r#""{key}":{{"leaf":"{value}"}}"#))
+            .collect::<Vec<_>>()
+            .join(",");
+        let payload = format!("{{{body}}}");
+        let map = map(BTreeMap::from([(
+            id("pii"),
+            label("owner-pii", "personal-data"),
+        )]));
+        let main_request = request(payload.as_bytes());
+        let path_finding = |path: alloc::string::String| {
+            let mut found = finding("pii");
+            found.byte_range = None;
+            found.field_path = Some(id(&path));
+            found
+        };
+        let findings: Vec<_> = leaves
+            .iter()
+            .map(|(key, _)| path_finding(format!("/{key}/leaf")))
+            .collect();
+        super::PAYLOAD_DECODES.with(|count| count.set(0));
+        let verified = map
+            .verify_result(&main_request, result(&main_request, findings))
+            .unwrap_or_else(|error| panic!("256 field paths: {error}"));
+        assert_eq!(verified.finding_count(), 256);
+        assert_eq!(super::PAYLOAD_DECODES.with(core::cell::Cell::get), 1);
+
+        let mut findings: Vec<_> = leaves
+            .iter()
+            .map(|(key, _)| path_finding(format!("/{key}/leaf")))
+            .collect();
+        findings[255] = path_finding("/field255/absent".into());
+        assert_eq!(
+            map.verify_result(&main_request, result(&main_request, findings)),
+            Err(ClassificationMappingError::InvalidFieldPath)
+        );
+
+        let non_pointer = path_finding("field0".into());
+        assert_eq!(
+            map.verify_result(&main_request, result(&main_request, vec![non_pointer])),
+            Err(ClassificationMappingError::InvalidFieldPath)
+        );
+        let malformed = request(b"{not json");
+        assert_eq!(
+            map.verify_result(
+                &malformed,
+                result(&malformed, vec![path_finding("/a".into())])
+            ),
+            Err(ClassificationMappingError::InvalidFieldPath)
+        );
+        let no_paths = request(b"{not json");
+        super::PAYLOAD_DECODES.with(|count| count.set(0));
+        map.verify_result(&no_paths, result(&no_paths, vec![finding("pii")]))
+            .unwrap_or_else(|error| panic!("byte range only: {error}"));
+        assert_eq!(super::PAYLOAD_DECODES.with(core::cell::Cell::get), 0);
     }
 
     #[test]
