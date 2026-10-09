@@ -215,6 +215,9 @@ fn stale_version_and_expired_leases_cannot_mutate_native_flow() -> TestResult {
 
 #[test]
 fn shared_generation_changes_are_captured_and_old_retry_is_historical_only() -> TestResult {
+    // Trusted time holds at one fixture instant, so recovery leases claimed
+    // below cannot lapse while the test runs.
+    let _clock = chio_test_support::clock::scope_unix_secs(now_ms().div_ceil(1_000));
     let fixture = fixture();
     let source = imported(&fixture, "source")?;
     let initialized = hydrate(&fixture, &source)?;

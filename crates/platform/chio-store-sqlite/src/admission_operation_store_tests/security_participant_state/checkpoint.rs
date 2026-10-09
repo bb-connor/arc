@@ -78,6 +78,9 @@ fn coverage_overhead(fixture: &Fixture) -> AnchoredTestResult<usize> {
 
 #[test]
 fn native_journal_checkpoint_ordinary_coverage_work_ignores_sealed_archive() -> AnchoredTestResult {
+    // Trusted time holds at one fixture instant, so recovery leases claimed
+    // below cannot lapse while the test runs.
+    let _clock = chio_test_support::clock::scope_unix_secs(now_ms().div_ceil(1_000));
     native::with_test_journal_bounds(1, 67_108_864, || {
         let fixture = fixture();
         let initialized = hydrate(&fixture, &imported(&fixture, "source")?)?;

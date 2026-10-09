@@ -94,6 +94,9 @@ fn stale_owner_fences_reads_and_mutations() {
 
 #[test]
 fn a_new_serving_epoch_reclaims_an_unexpired_stale_owner_lease() {
+    // Trusted time holds at one fixture instant, so recovery leases claimed
+    // below cannot lapse while the test runs.
+    let _clock = chio_test_support::clock::scope_unix_secs(now_ms().div_ceil(1_000));
     let temp = tempfile::tempdir().expect("tempdir");
     secure_directory(temp.path());
     let database = temp.path().join("authority.db");

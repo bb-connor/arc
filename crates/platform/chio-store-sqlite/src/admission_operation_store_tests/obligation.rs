@@ -1028,6 +1028,9 @@ fn obligation_load_rejects_a_tampered_head_commit_preimage() -> AnchoredTestResu
 
 #[test]
 fn obligation_head_accepts_same_millisecond_serving_owner_rotation() -> AnchoredTestResult {
+    // Trusted time holds at one fixture instant, so recovery leases claimed
+    // below cannot lapse while the test runs.
+    let _clock = chio_test_support::clock::scope_unix_secs(now_ms().div_ceil(1_000));
     let fixture = fixture();
     let committed_at = now_ms();
     let (atom, disposition) =
