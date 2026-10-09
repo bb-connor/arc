@@ -25,6 +25,31 @@ impl SqliteBudgetStore {
         self.authorize_budget_hold_atomic(request, Some(current))
     }
 
+    /// The replay counterpart of `try_charge_cost_with_ids_and_authority`. A
+    /// charge is recorded through the same atomic authorization with the
+    /// charge path's own checks (no hold identity required), so its replay
+    /// takes exactly those checks, in replay-only mode, under the same rules.
+    pub fn replay_cost_charge(
+        &self,
+        request: &BudgetAuthorizeHoldRequest,
+        current: &BudgetEventAuthority,
+    ) -> Result<bool, BudgetStoreError> {
+        if !request.invocation_quotas.is_empty()
+            || request.cumulative_approval.is_some()
+            || request.admission_binding.is_some()
+        {
+            return Err(BudgetStoreError::Invariant(
+                "budget charge replay supports only standalone charges".to_string(),
+            ));
+        }
+        self.require_standalone_mutation("unbound charge")?;
+        validate_budget_grant_index(request.grant_index)?;
+        Ok(matches!(
+            self.authorize_budget_hold_atomic(request, Some(current))?,
+            BudgetAuthorizeHoldDecision::Authorized(_)
+        ))
+    }
+
     /// `replay_under` selects replay-only mode: the original event must already
     /// exist and is validated against its own authority, which must be
     /// replayable under that lease.

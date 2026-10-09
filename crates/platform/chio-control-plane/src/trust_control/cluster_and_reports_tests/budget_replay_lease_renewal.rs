@@ -33,6 +33,16 @@ fn request(case: &str, event: &str, cost_units: u64) -> TryChargeCostRequest {
     }
 }
 
+/// A charge with no hold, identified by its event id alone.
+fn no_hold_request(case: &str, event: &str, cost_units: u64) -> TryChargeCostRequest {
+    TryChargeCostRequest {
+        hold_id: None,
+        ..request(case, event, cost_units)
+    }
+}
+
+type RequestFor = fn(&str, &str, u64) -> TryChargeCostRequest;
+
 /// node-a leads a two-node cluster, has persisted `payload` under its current
 /// lease, and node-b has acknowledged that exact event.
 fn authorized(case: &str, payload: &TryChargeCostRequest) -> ReplayFixture {
@@ -106,9 +116,10 @@ fn budget_rows(budget_db: &std::path::Path, payload: &TryChargeCostRequest) -> B
         store
             .list_mutation_events(32, Some(&payload.capability_id), Some(0))
             .test_unwrap(),
-        store
-            .budget_hold_snapshot(payload.hold_id.as_deref().test_unwrap())
-            .test_unwrap(),
+        payload
+            .hold_id
+            .as_deref()
+            .and_then(|hold_id| store.budget_hold_snapshot(hold_id).test_unwrap()),
     )
 }
 
@@ -123,10 +134,11 @@ async fn charge(state: &TrustServiceState, payload: TryChargeCostRequest) -> (St
     (status, serde_json::from_slice(&body).test_unwrap())
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn retried_authorization_replays_under_its_original_lease_after_renewal() {
-    let payload = request("renewal", "authorize", 100);
-    let fixture = authorized("renewal", &payload);
+/// A retry of `case` after the same leader renewed its lease replays the
+/// original authorization: 200, unchanged state, original commit metadata.
+async fn assert_retry_replays_after_renewal(request_for: RequestFor, case: &str) {
+    let payload = request_for(case, "authorize", 100);
+    let fixture = authorized(case, &payload);
     let renewed = renew_lease(&fixture.state);
     assert_eq!(renewed.authority_id, fixture.original.authority_id);
     assert!(renewed.lease_epoch > fixture.original.lease_epoch);
@@ -149,11 +161,14 @@ async fn retried_authorization_replays_under_its_original_lease_after_renewal() 
     assert!(matches!(
         &ordinary,
         Err(BudgetStoreError::Invariant(message))
-            if message == "budget event_id `replay-renewal:authorize` authority metadata does not match the original mutation"
+            if *message == format!(
+                "budget event_id `{}` authority metadata does not match the original mutation",
+                payload.event_id.as_deref().test_unwrap()
+            )
     ));
     assert_eq!(budget_rows(&fixture.budget_db, &payload), before);
 
-    let (status, body) = charge(&fixture.state, request("renewal", "authorize", 100)).await;
+    let (status, body) = charge(&fixture.state, request_for(case, "authorize", 100)).await;
 
     assert_eq!(status, StatusCode::OK, "replay refused: {body}");
     assert_eq!(body["allowed"], json!(true));
@@ -175,6 +190,16 @@ async fn retried_authorization_replays_under_its_original_lease_after_renewal() 
         json!(fixture.original.lease_id)
     );
     assert_eq!(budget_rows(&fixture.budget_db, &payload), before);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn retried_authorization_replays_under_its_original_lease_after_renewal() {
+    assert_retry_replays_after_renewal(request, "renewal").await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn retried_charge_without_hold_replays_under_its_original_lease_after_renewal() {
+    assert_retry_replays_after_renewal(no_hold_request, "renewal-no-hold").await;
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -213,15 +238,16 @@ async fn a_new_authorization_after_renewal_is_admitted_under_the_renewed_lease()
     assert_eq!(event.authority, Some(renewed));
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn a_conflicting_payload_under_the_original_event_id_stays_refused_after_renewal() {
-    let payload = request("conflict", "authorize", 100);
-    let fixture = authorized("conflict", &payload);
+/// A different payload under the original event id stays refused after the
+/// renewal, and nothing changes.
+async fn assert_conflict_refused_after_renewal(request_for: RequestFor, case: &str) {
+    let payload = request_for(case, "authorize", 100);
+    let fixture = authorized(case, &payload);
     renew_lease(&fixture.state);
     let before = budget_rows(&fixture.budget_db, &payload);
     let conflicting = TryChargeCostRequest {
         cost_units: 150,
-        ..request("conflict", "authorize", 100)
+        ..request_for(case, "authorize", 100)
     };
 
     let (status, body) = charge(&fixture.state, conflicting).await;
@@ -232,9 +258,19 @@ async fn a_conflicting_payload_under_the_original_event_id_stays_refused_after_r
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn an_authorization_admitted_by_another_authority_is_never_replayed() {
-    let payload = request("cross-authority", "authorize", 100);
-    let budget_db = unique_temp_path("chio-budget-replay-cross-authority", "db");
+async fn a_conflicting_payload_under_the_original_event_id_stays_refused_after_renewal() {
+    assert_conflict_refused_after_renewal(request, "conflict").await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_conflicting_charge_without_hold_stays_refused_after_renewal() {
+    assert_conflict_refused_after_renewal(no_hold_request, "conflict-no-hold").await;
+}
+
+/// An event admitted by another authority is never replayed by this leader.
+async fn assert_foreign_authority_refused(request_for: RequestFor, case: &str) {
+    let payload = request_for(case, "authorize", 100);
+    let budget_db = unique_temp_path(&format!("chio-budget-replay-{case}"), "db");
     let state = state_with_cluster(NODE_A, &[NODE_B], None, None, Some(budget_db.clone()));
     update_peer_reachable(&state, NODE_B);
     let current = current_budget_event_authority(&state)
@@ -261,12 +297,22 @@ async fn an_authorization_admitted_by_another_authority_is_never_replayed() {
         .test_unwrap());
     let before = budget_rows(&budget_db, &payload);
 
-    let (status, body) = charge(&state, request("cross-authority", "authorize", 100)).await;
+    let (status, body) = charge(&state, request_for(case, "authorize", 100)).await;
 
     assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
     assert_eq!(body, json!({"error": "budget authorization failed"}));
     assert_eq!(budget_rows(&budget_db, &payload), before);
     let _ = std::fs::remove_file(budget_db);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_authorization_admitted_by_another_authority_is_never_replayed() {
+    assert_foreign_authority_refused(request, "cross-authority").await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_charge_without_hold_admitted_by_another_authority_is_never_replayed() {
+    assert_foreign_authority_refused(no_hold_request, "cross-authority-no-hold").await;
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

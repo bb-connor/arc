@@ -263,25 +263,23 @@ pub(crate) async fn handle_try_charge_cost(
     let replay_under = authority.as_ref().filter(|_| replayed_event);
     let (already_captured, admission, denied) = if payload.hold_id.is_none() {
         let charged = match replay_under {
-            Some(current) => store
-                .replay_budget_authorization(
-                    &BudgetAuthorizeHoldRequest {
-                        capability_id: payload.capability_id.clone(),
-                        grant_index: payload.grant_index,
-                        max_invocations: payload.max_invocations,
-                        invocation_quotas: Vec::new(),
-                        cumulative_approval: None,
-                        admission_binding: None,
-                        requested_exposure_units: payload.cost_units,
-                        max_cost_per_invocation: payload.max_cost_per_invocation,
-                        max_total_cost_units: payload.max_total_cost_units,
-                        hold_id: None,
-                        event_id: Some(effective_event_id.clone()),
-                        authority: authority.clone(),
-                    },
-                    current,
-                )
-                .map(|decision| matches!(decision, BudgetAuthorizeHoldDecision::Authorized(_))),
+            Some(current) => store.replay_cost_charge(
+                &BudgetAuthorizeHoldRequest {
+                    capability_id: payload.capability_id.clone(),
+                    grant_index: payload.grant_index,
+                    max_invocations: payload.max_invocations,
+                    invocation_quotas: Vec::new(),
+                    cumulative_approval: None,
+                    admission_binding: None,
+                    requested_exposure_units: payload.cost_units,
+                    max_cost_per_invocation: payload.max_cost_per_invocation,
+                    max_total_cost_units: payload.max_total_cost_units,
+                    hold_id: None,
+                    event_id: Some(effective_event_id.clone()),
+                    authority: authority.clone(),
+                },
+                current,
+            ),
             None => store.try_charge_cost_with_ids_and_authority(
                 &payload.capability_id,
                 payload.grant_index,
