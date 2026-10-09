@@ -72,6 +72,8 @@ Root rulings applied:
 
 - **Q1. As-of semantics.** Recertification starts once an hour by default. Lag
   is reported honestly as the interval plus the pass duration. No sampling.
+  This timing claim is historical: sections 5.4 and 8 supersede it, and give
+  no wall-clock detection bound.
 - **Q2.** One snapshot connection, with every hold bounded and no unbounded
   queue.
 - **Q3. Evidence export.** It keeps its authorization and its full per-call
@@ -81,6 +83,26 @@ Root rulings applied:
 - **Q6.** Capacity evidence comes from 10M synthetic projected rows plus a
   1M-receipt signed build, labeled distinctly. There is no extrapolated 10M
   cryptographic claim.
+
+Runtime rulings recorded against the implementation:
+
+- **Lease re-check.** A read lease is refused as `invalid` only after an actual
+  invalidation. A rebuild, a resource outcome or a stop keeps its own class.
+- **Capacity and row-cap recovery.** Restart only, after the operator raises the
+  configured quota. The service never rebuilds in a loop against an unchanged
+  insufficient limit.
+- **Point reads while building.** They return the retryable `building` outcome.
+- **Request order.** State and head readiness may precede query validation. HTTP
+  authentication and tenant authorization always precede snapshot admission.
+- **Health.** The snapshot health summary takes one of the outer HTTP read
+  permits, because its custody, file and SQL work runs on the blocking pool. It
+  reports `busy` under saturation. Top-level health is unchanged.
+- **Extension trigger.** A fixed 250 ms poll plus a read-triggered wake replaces
+  the coalesced writer-commit signal of the earlier plan. It keeps the explicit
+  head wait and staleness refusal with no writer-notification dependency, at
+  the cost of bounded idle polling and a tick of delay when no read is waiting.
+  An append is not guaranteed to be visible within one tick: extension work and
+  contention can take longer.
 
 ## 3. Adversary and trust boundary
 
