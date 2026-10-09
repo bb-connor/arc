@@ -85,6 +85,10 @@ EOF
   printf '# Agents\n' >"$fixture/AGENTS.md"
   printf '# Landscape\n\nChio is compared with other stacks.\n' >"$fixture/docs/reference/COMPETITIVE_LANDSCAPE.md"
   printf '# Protocol\n' >"$fixture/spec/PROTOCOL.md"
+  printf '# ADRs\n' >"$fixture/docs/adr/README.md"
+  printf '# ADR-0038\n' >"$fixture/docs/adr/ADR-0038-native-host-program.md"
+  printf '# Program map\n' >"$fixture/docs/architecture/PROGRAM-MAP.md"
+  printf '# Design\n' >"$fixture/docs/superpowers/specs/2026-10-07-omarchy-integration-design.md"
   printf '<svg xmlns="http://www.w3.org/2000/svg" aria-label="Evidence that travels"><text>Evidence that travels</text></svg>\n' \
     >"$fixture/docs/assets/subhead.svg"
   # Every budgeted document exists; a missing one is a violation.
@@ -124,6 +128,19 @@ new_fixture svg-tspan-retired
 printf '<svg xmlns="http://www.w3.org/2000/svg"><text><tspan>Agents that pay</tspan><tspan dx="4">each other</tspan></text></svg>\n' \
   >"$fixture/docs/assets/subhead.svg"
 expect "retired phrase split across SVG spans" 1 "retired-phrases: docs/assets/subhead.svg: contains 'Agents that pay each other'" -- --rule retired-phrases
+
+# Inline Markdown cannot hide a retired phrase.
+new_fixture markdown-markup
+printf 'Agents that **pay** each other.\n' >"$fixture/docs/start-here/EMPHASIS.md"
+printf '[The kernel your agents](https://example.com) answer to.\n' >"$fixture/docs/start-here/LINK.md"
+expect "retired phrase with emphasis" 1 "retired-phrases: docs/start-here/EMPHASIS.md: contains 'Agents that pay each other'" -- --rule retired-phrases
+expect "retired phrase across a link span" 1 "retired-phrases: docs/start-here/LINK.md: contains 'The kernel your agents answer to'" -- --rule retired-phrases
+
+# A missing explicitly named input is reported for its scope.
+new_fixture missing-inputs
+rm "$fixture/docs/superpowers/specs/2026-10-07-omarchy-integration-design.md" "$fixture/docs/adr/README.md"
+expect "missing named program document" 1 "links: docs/superpowers/specs/2026-10-07-omarchy-integration-design.md: required document missing" -- --scope program --rule links
+expect "missing named public document" 1 "retired-phrases: docs/adr/README.md: required document missing" -- --scope public --rule retired-phrases
 
 # A plural retired claim is still a retired claim.
 new_fixture plural-retired

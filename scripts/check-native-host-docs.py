@@ -69,27 +69,40 @@ class Layout:
 
     def __init__(self, root: Path) -> None:
         self.root = root
+        self.scope = "all"
         self.spec = root / "docs/superpowers/specs/2026-10-07-desktop-integration"
         self.omarchy = root / "docs/superpowers/specs/2026-10-07-omarchy-integration"
         self.macos = root / "docs/superpowers/specs/2026-10-07-macos-integration"
         self.plans = root / "docs/superpowers/plans"
         self.cases = self.spec / "CASES.md"
+        # Explicitly named inputs must exist; a missing one is a violation
+        # rather than a silently smaller program set.
+        self.program_required = [
+            root / "docs/superpowers/specs/2026-10-07-omarchy-integration-design.md",
+            self.plans / "2026-10-07-desktop-integration.md",
+            root / "docs/architecture/PROGRAM-MAP.md",
+        ]
+        self.adr = sorted((root / "docs/adr").glob("ADR-0038-*.md"))
         program = (
             list(self.spec.rglob("*.md"))
             + list(self.omarchy.rglob("*.md"))
             + list(self.macos.rglob("*.md"))
-            + [root / "docs/superpowers/specs/2026-10-07-omarchy-integration-design.md"]
-            + [self.plans / "2026-10-07-desktop-integration.md"]
+            + self.program_required
             + list(self.plans.glob("2026-10-07-*-integration/*.md"))
             + list(self.plans.glob("2026-10-08-*.md"))
-            + [root / "docs/architecture/PROGRAM-MAP.md"]
-            + list((root / "docs/adr").glob("ADR-0038-*.md"))
+            + self.adr
         )
         self.program = sorted({p for p in program if p.is_file()})
+        self.public_required = [
+            root / "README.md",
+            root / "AGENTS.md",
+            root / "docs/adr/README.md",
+            root / "docs/reference/COMPETITIVE_LANDSCAPE.md",
+            root / "spec/PROTOCOL.md",
+        ]
         public = (
-            [root / "README.md", root / "AGENTS.md", root / "docs/adr/README.md"]
+            self.public_required
             + list((root / "docs/start-here").rglob("*.md"))
-            + [root / "docs/reference/COMPETITIVE_LANDSCAPE.md", root / "spec/PROTOCOL.md"]
             + list((root / "docs/assets").glob("*.svg"))
         )
         self.public = sorted({p for p in public if p.is_file()})
@@ -158,8 +171,24 @@ def prose(text: str) -> str:
     return INLINE_CODE.sub("", FENCE.sub("", text))
 
 
+def missing_inputs(layout: Layout, rule: str, public: bool) -> list[str]:
+    """Report explicitly named inputs of the selected scope that do not exist."""
+    if public:
+        if layout.scope == "program":
+            return []
+        required = list(layout.public_required)
+    else:
+        if layout.scope == "public":
+            return []
+        required = list(layout.program_required)
+    out = [f"{rule}: {layout.rel(p)}: required document missing" for p in required if not p.is_file()]
+    if not public and not layout.adr:
+        out.append(f"{rule}: docs/adr/ADR-0038-*.md: required document missing")
+    return out
+
+
 def check_links(layout: Layout) -> list[str]:
-    out = []
+    out = missing_inputs(layout, "links", public=False)
     for path in layout.program:
         for target in LINK.findall(prose(read(path))):
             if re.match(r"^[a-z][a-z0-9+.-]*:", target, re.I):
@@ -175,15 +204,21 @@ def check_links(layout: Layout) -> list[str]:
 
 
 def visible_text(path: Path, text: str) -> str:
+    """Text a reader sees: attribute text plus content with markup removed."""
+    attrs = " ".join(value[1:-1] for value in SVG_ATTR.findall(text))
     if path.suffix == ".svg":
-        attrs = " ".join(value[1:-1] for value in SVG_ATTR.findall(text))
         body = SVG_TAG.sub(" ", SVG_TEXT_BLOCK.sub(" ", text))
-        text = f"{attrs} {body}"
-    return re.sub(r"\s+", " ", text).lower()
+    else:
+        body = re.sub(r"\]\([^)]*\)", "]", text)  # link targets
+        body = SVG_TAG.sub(" ", body)  # inline HTML tags
+        body = re.sub(r"[\[\]*_~`]", "", body)  # emphasis, code and link brackets
+    return re.sub(r"\s+", " ", f"{attrs} {body}").lower()
 
 
 def check_retired(layout: Layout) -> list[str]:
-    out = []
+    out = missing_inputs(layout, "retired-phrases", public=False) + missing_inputs(
+        layout, "retired-phrases", public=True
+    )
     for path in sorted(set(layout.program) | set(layout.public)):
         if path in layout.retired_allowlist:
             continue
@@ -262,6 +297,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     try:
         layout = Layout(root)
+        layout.scope = args.scope
         if args.scope == "program":
             layout.public = []
         elif args.scope == "public":
