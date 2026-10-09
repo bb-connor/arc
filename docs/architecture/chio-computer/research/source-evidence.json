@@ -2031,8 +2031,15 @@
     "pr_1171": {
       "head": "1a6f7bfccb1030c620eb7a2f9e3a06620196076b",
       "hosted_source_commit": "1a6f7bfccb1030c620eb7a2f9e3a06620196076b",
-      "purpose": "Revision 2 pinned architecture/source corpus and manifest inventory; recording does not imply full line-by-line review.",
-      "sources": []
+      "purpose": "Pinned protocol publication context: submission status, source artifacts and qualification boundary at the recorded historical head.",
+      "sources": [
+        {
+          "path": "spec/ietf/SUBMISSION.md",
+          "sha256": "54ba5dd8ed18fb970cf485bd587adef65cf0d7f62c02eec797e06308d43807be",
+          "lines": 35,
+          "inspection": "protocol_publication_context"
+        }
+      ]
     },
     "pr_1197": {
       "head": "3ab02761b9859be81e858ce3d6ef14da309f764c",
@@ -2054,14 +2061,14 @@
       ]
     },
     "computer_roadmap_revision_5": {
-      "head": "652d6db4806fb24853419936f759e3d2dfbf9628",
-      "hosted_source_commit": "652d6db4806fb24853419936f759e3d2dfbf9628",
+      "head": "8e41fd4e2be2f83110ebe4f30629c575dd8d2e54",
+      "hosted_source_commit": "8e41fd4e2be2f83110ebe4f30629c575dd8d2e54",
       "hosted_source_commit_matches_recorded_files": true,
-      "inspection": "Computer-0 closure exits, qualified WORK identifiers, installed hero, COMP-7 reuse after COMP-5, and the roadmap docs gate",
+      "inspection": "Computer-0 closure exits, full-hero COMP-5 completion, COMP-6 branch/work prerequisites and non-blocking COMP-7 reuse",
       "sources": [
         {
           "path": "docs/operations/UNIFIED_ROADMAP.md",
-          "sha256": "104037c88fe70cad7ecb807f507bc0a4f0a70b82292191b115070ee8d23f1654",
+          "sha256": "2a9eb9fe72b4235215485ded0a99e3eec637c23d82def34e9a8b7665339ba288",
           "lines": 874,
           "matches_head": true
         }
