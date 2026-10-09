@@ -23,7 +23,8 @@ use crate::receipt_query_snapshot::db::{
 use crate::receipt_query_snapshot::pass::{build_snapshot, retry_busy, Target};
 use crate::receipt_query_snapshot::query::select;
 use crate::receipt_query_snapshot::service::{
-    ReceiptQuerySnapshotConfig, ReceiptQuerySnapshotState, ReceiptQuerySnapshots,
+    GateAction, GatePoint, ReceiptQuerySnapshotConfig, ReceiptQuerySnapshotState,
+    ReceiptQuerySnapshots,
 };
 use crate::receipt_query_snapshot::walk::{observe, WalkContext, WalkError, WalkLimits};
 use crate::receipt_store::support::receipt_signature_verifications;
@@ -915,6 +916,242 @@ fn linux_file_large_checkpoint_and_rotation_holds() {
             "insert_rows": config.insert_rows,
             "service_c17": capacity,
             "hold_steps": holds,
+        }),
+    );
+}
+
+const COVERED_RANGE: u64 = 100_000;
+const CANCEL_RANGE: u64 = 10_000;
+
+/// Wait until the store's observation covers `head` entries with checkpoint
+/// `seq` persisted.
+fn await_checkpoint(fixture: &Fixture, limits: WalkLimits, seq: i64, head: u64) {
+    let cancel = Arc::new(AtomicBool::new(false));
+    let ctx = context(&fixture.store, &cancel, limits);
+    let head = i64::try_from(head).unwrap();
+    let deadline = Instant::now() + Duration::from_secs(1_800);
+    loop {
+        let observation = observe(&ctx).unwrap();
+        if observation.checkpoint >= seq && observation.head >= head {
+            return;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "checkpoint {seq} over {head} entries was never persisted"
+        );
+        std::thread::sleep(Duration::from_millis(20));
+    }
+}
+
+/// The admin total the snapshot serves, or `None` for a typed refusal such as
+/// staleness. An integrity refusal fails the run.
+fn served_total(service: &ReceiptQuerySnapshots) -> Option<u64> {
+    match service.query_receipts(&admin(5)) {
+        Ok(page) => Some(page.total_count),
+        Err(ReceiptStoreError::QuerySnapshot(ReceiptQuerySnapshotError::Invalid(reason))) => {
+            panic!("a covered range was refused as tamper: {reason}")
+        }
+        Err(ReceiptStoreError::QuerySnapshot(_)) => None,
+        Err(error) => panic!("an untyped read outcome: {error}"),
+    }
+}
+
+/// Whether a positive point read returns `Spec::varied(index)`.
+fn served(service: &ReceiptQuerySnapshots, index: u64) -> bool {
+    let id = Spec::varied(index).sign(&keypair()).id;
+    matches!(
+        service.load_receipt(
+            &id,
+            &chio_kernel::receipt_query::ReceiptReadContext::admin_service()
+        ),
+        Ok((Some(_), _))
+    )
+}
+
+/// Snapshot answers against the authenticated per-call path for an admin and
+/// a tenant page: page seqs, total and cursor.
+fn per_call_parity(service: &ReceiptQuerySnapshots, fixture: &Fixture) -> Value {
+    let queries = [
+        ("admin", admin(200)),
+        (
+            "tenant_a",
+            ReceiptQuery {
+                limit: 200,
+                ..ReceiptQuery::default().authenticated_tenant("tenant-a")
+            },
+        ),
+    ];
+    let mut checked = serde_json::Map::new();
+    for (name, query) in queries {
+        let expected = super::super::support::per_call(&fixture.store, &query);
+        let page = service.query_receipts(&query).unwrap();
+        let seqs: Vec<u64> = page.receipts.iter().map(|row| row.seq).collect();
+        assert_eq!(
+            (seqs, page.total_count, page.next_cursor),
+            expected,
+            "{name} page differs from the authenticated per-call path"
+        );
+        checked.insert(name.to_string(), json!({ "total_count": expected.1 }));
+    }
+    Value::Object(checked)
+}
+
+/// A large checkpoint-covered range appended behind a paused extension is
+/// staged as pending leaves without publishing a row, verified against its
+/// signed root, then re-read and published, while reads continue and a
+/// rotation archives it. A second covered range is cancelled midway
+/// through publication.
+#[test]
+#[ignore = "capacity evidence: a large unpublished checkpoint-covered range staged, verified and published through the production service"]
+fn linux_file_large_covered_range_staging() {
+    let covered = scaled(COVERED_RANGE);
+    let prefix = scaled(SMALL_BATCH);
+    let config = ReceiptQuerySnapshotConfig {
+        extension_tick: Duration::from_millis(20),
+        invalid_retry_backoff: Duration::from_millis(20),
+        ..ReceiptQuerySnapshotConfig::default()
+    };
+    let insert_rows = u64::try_from(config.insert_rows).unwrap();
+    let limits = production_limits(&config);
+
+    // A published, checkpointed prefix.
+    let fixture = Fixture::new(prefix);
+    append_signed(&fixture, 0..prefix, &keypair());
+    await_checkpoint(&fixture, limits, 1, prefix);
+    let service = ReceiptQuerySnapshots::start(fixture.store.clone(), config.clone()).unwrap();
+    wait_for(&service, "ready", |state| {
+        *state == ReceiptQuerySnapshotState::Ready
+    });
+    let published = service.query_receipts(&admin(5)).unwrap();
+    assert_eq!(published.total_count, prefix);
+
+    // The covered range: signed and checkpointed while extension is paused,
+    // so none of it has been published.
+    service.pause_extension_for_test(true);
+    set_signer(&fixture, keypair(), covered);
+    let started = Instant::now();
+    append_signed(&fixture, prefix..prefix + covered, &keypair());
+    await_checkpoint(&fixture, limits, 2, prefix + covered);
+    let append_seconds = started.elapsed().as_secs_f64();
+    let used_before = service.status().used_bytes;
+
+    // Resume and stop at the root check: the whole range is staged.
+    let peak_reset = reset_peak_rss();
+    let memory_before = ProcMemory::read();
+    let sampler = PeakSampler::start();
+    let resumed = Instant::now();
+    service.arm_gate_for_test(GatePoint::Settlement, GateAction::Hold, 0);
+    service.pause_extension_for_test(false);
+    assert!(
+        service.await_gate_for_test(Duration::from_secs(1_800)),
+        "extension never staged the covered range"
+    );
+    let staged_seconds = resumed.elapsed().as_secs_f64();
+    let staged_per_hold = service.max_staged_per_hold_for_test();
+    assert!(staged_per_hold > 0 && staged_per_hold <= insert_rows);
+    let used_staged = service.status().used_bytes;
+    // While the range is staged, readers see the previous version or a
+    // typed stale refusal, never a covered row.
+    let during = served_total(&service);
+    assert!(during.is_none_or(|total| total == prefix), "{during:?}");
+    assert!(!served(&service, prefix));
+    assert!(!served(&service, prefix + covered - 1));
+
+    // Verify the root, then re-read and publish the range while reads run
+    // and a rotation archives the prefix and the whole covered range.
+    let released = Instant::now();
+    service.release_gate_for_test();
+    let publication = settle(&service, &fixture, 2, released, cutoff(prefix + covered));
+    let publish_seconds = released.elapsed().as_secs_f64();
+    let memory_peak = sampler.finish();
+    let memory_after = ProcMemory::read();
+    let used_after = service.status().used_bytes;
+    let settled_per_hold = service.max_settled_per_hold_for_test();
+    assert!(settled_per_hold > 0 && settled_per_hold <= insert_rows);
+    let page = service.query_receipts(&admin(5)).unwrap();
+    assert_eq!(page.total_count, prefix + covered);
+    let parity = per_call_parity(&service, &fixture);
+    assert_eq!(service.status().state, ReceiptQuerySnapshotState::Ready);
+
+    // A second covered range, cancelled after part of it is published.
+    let cancel_range = scaled(CANCEL_RANGE);
+    service.pause_extension_for_test(true);
+    set_signer(&fixture, keypair(), cancel_range);
+    let start = prefix + covered;
+    append_signed(&fixture, start..start + cancel_range, &keypair());
+    await_checkpoint(&fixture, limits, 3, start + cancel_range);
+    // Stop midway through publication when the range spans several
+    // publication steps; a development-sized range is cancelled while staged.
+    let step_rows = config.step_rows;
+    let (gate, skip) = if cancel_range > step_rows {
+        (
+            GatePoint::Publication,
+            u32::try_from((cancel_range / 2) / step_rows)
+                .unwrap()
+                .max(1),
+        )
+    } else {
+        (GatePoint::Settlement, 0)
+    };
+    service.arm_gate_for_test(gate, GateAction::Hold, skip);
+    service.pause_extension_for_test(false);
+    assert!(
+        service.await_gate_for_test(Duration::from_secs(1_800)),
+        "extension never reached {gate:?} for the second range"
+    );
+    // Verified steps before the gate are published; the rest are not.
+    if gate == GatePoint::Publication {
+        assert!(served(&service, start));
+    }
+    assert!(!served(&service, start + cancel_range - 1));
+    let cancelled = Instant::now();
+    service.shutdown();
+    let shutdown_ms = cancelled.elapsed().as_secs_f64() * 1_000.0;
+    assert_eq!(service.status().state, ReceiptQuerySnapshotState::Stopped);
+
+    emit(
+        "linux_file_large_covered_range_staging",
+        LINUX_FILE,
+        prefix + covered + cancel_range,
+        json!({
+            "prefix_entries": prefix,
+            "covered_entries": covered,
+            "append_seconds": rounded(append_seconds),
+            "config": {
+                "step_rows": config.step_rows,
+                "step_bytes": config.step_bytes,
+                "insert_rows": config.insert_rows,
+                "hold_sql_steps": config.hold_sql_steps,
+                "quota_bytes": config.quota_bytes,
+            },
+            "staging": {
+                "seconds": rounded(staged_seconds),
+                "max_leaves_per_hold": staged_per_hold,
+                "served_total_while_staged": during,
+                "used_bytes_before": used_before,
+                "used_bytes_staged": used_staged,
+            },
+            "publication": {
+                "seconds_after_release": rounded(publish_seconds),
+                "settle": publication,
+                "max_settled_per_hold": settled_per_hold,
+                "used_bytes_after": used_after,
+                "served_total": page.total_count,
+                "per_call_parity": parity,
+            },
+            "memory": {
+                "peak_reset": peak_reset,
+                "before": memory_before.json(),
+                "peak": memory_peak.json(),
+                "after": memory_after.json(),
+            },
+            "cancellation": {
+                "range_entries": cancel_range,
+                "gate": format!("{gate:?}"),
+                "gate_skipped_publication_steps": skip,
+                "shutdown_ms": rounded(shutdown_ms),
+                "state": "stopped",
+            },
         }),
     );
 }
