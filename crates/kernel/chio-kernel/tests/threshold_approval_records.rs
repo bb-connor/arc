@@ -19,11 +19,14 @@ type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 #[test]
 fn creation_context_validates_deserialized_route_and_requirement() -> TestResult {
     let fixture = Fixture::new()?;
-    let mut parameters = fixture.parameters.clone();
-    parameters.matched_request = serde_json::from_value(serde_json::json!({
+    let Err(error) = serde_json::from_value::<ThresholdApprovalRequest>(serde_json::json!({
         "requestId": "request-1", "serverId": "server\u{0000}", "toolName": "tool",
-    }))?;
-    assert!(ThresholdApprovalProposalCreationContext::new(parameters).is_err());
+    })) else {
+        return Err("a request naming an invalid server must not deserialize".into());
+    };
+    assert!(error
+        .to_string()
+        .contains("threshold approval server_id is invalid"));
     let mut parameters = fixture.parameters;
     parameters.requirement.threshold = 0;
     assert!(ThresholdApprovalProposalCreationContext::new(parameters).is_err());
