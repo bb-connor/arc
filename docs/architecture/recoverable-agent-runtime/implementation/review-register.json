@@ -9136,10 +9136,24 @@
       "source_path": "crates/platform/chio-store-sqlite/src/receipt_store/native_owner/tests.rs",
       "reviewed_sha256": "6e2e99d10700e38dea2d3c69509da78589e6d5417d867125b62751545c5d713c",
       "obligation": "Retain the invalid-request-schema control and add a genuine actor-committed row test. Keep the requested canonical original unchanged, mutate only stored raw JSON, prove the extra stored field and unchanged typed signed identity, require the exact production stored-original mismatch, and restore only original raw bytes to recover successful readback.",
-      "current_reason": "The predecessor assertion adds an unknown field to the requested original, so typed canonical decoding refuses before actual stored-row comparison. This is a causal test coverage gap, not an observed production comparison defect. Corrective source, independent review and actual owning acceptance remain pending.",
+      "current_reason": "The original request-schema test gap remains preserved. The reviewed successor appends a genuine receipt, changes only stored raw JSON, proves typed signed identity, requires the exact stored-original mismatch without row mutation, and restores successful readback by restoring original bytes. SPEC_PASS, QUALITY_PASS and the corrected 27-case owning run close this P3 in the exact four-file candidate scope. The repair is uninstalled; configured_owner integration and isolated Store acceptance remain pending. Candidate-only classification is retained and the runtime remains unqualified.",
       "predecessor_source_verdict": "QUALITY_PASS with two non-blocking P3 findings",
       "installation_acceptance": "CHANGES_REQUIRED / NOT FULLY ACCEPTED until both findings are satisfied and the receipt-only dependency boundary is validated.",
-      "candidate_source": "target/recovery-pr/current-review-followup/local-native-process-owner-composition-20261009T0610/source"
+      "candidate_source": "target/recovery-pr/current-review-followup/local-native-process-owner-composition-20261009T0610/source",
+      "current_successor": {
+        "recorded_at_utc": "2026-10-09T17:19:02.339449+00:00",
+        "recorded_disposition": "closed_in_reviewed_candidate_scope",
+        "previous_current_reason": "The predecessor assertion adds an unknown field to the requested original, so typed canonical decoding refuses before actual stored-row comparison. This is a causal test coverage gap, not an observed production comparison defect. Corrective source, independent review and actual owning acceptance remain pending.",
+        "review_ref": "docs/architecture/recoverable-agent-runtime/implementation/reviews/receipt-owner-registration.md",
+        "evidence_ref": "#/candidate_review_evidence/receipt_p3_successor",
+        "reviewer_label": "P3-B1",
+        "spec_verdict": "SPEC_PASS",
+        "quality_verdict": "QUALITY_PASS",
+        "source_files": 4,
+        "owning_tests_passed": 27,
+        "installed": false,
+        "qualified": false
+      }
     },
     {
       "id": null,
@@ -9164,10 +9178,24 @@
       "source_path": "crates/platform/chio-store-sqlite/src/receipt_store/native_owner.rs",
       "reviewed_sha256": "5920baef524b54dcf9a38cdda04dae75d6685456f9d494e8d1dfe18c41582f6d",
       "obligation": "Give the Native command exactly-once inflight/failure accounting across queued, dispatched and returned states. Accept a lane behind a deliberately terminating actor, require the unavailable result and no stranded inflight increment, and prevent double decrement or interference with concurrently accepted requests.",
-      "current_reason": "Dropping an accepted queued LaneRequest before serve_lane closes ready without handing the increment to WriterInflightGuard. The caller returns writer_dead_error without compensating accounting. The actor is already dead and authority remains closed; no runtime reproduction is claimed by this source report. Corrective source, independent review and actual owning acceptance remain pending.",
+      "current_reason": "The genuine predecessor control recorded stranded inflight 2 instead of 0. The reviewed successor gives each Native command one accounting token across queued, dispatched and returned states, with actual terminal-supervisor, saturation, deferral and loss/unwind controls. SPEC_PASS, QUALITY_PASS and the corrected 27-case owning run close this P3 in the exact four-file candidate scope. The repair is uninstalled; configured_owner integration and isolated Store acceptance remain pending. Candidate-only classification is retained and the runtime remains unqualified.",
       "predecessor_source_verdict": "QUALITY_PASS with two non-blocking P3 findings",
       "installation_acceptance": "CHANGES_REQUIRED / NOT FULLY ACCEPTED until both findings are satisfied and the receipt-only dependency boundary is validated.",
-      "candidate_source": "target/recovery-pr/current-review-followup/local-native-process-owner-composition-20261009T0610/source"
+      "candidate_source": "target/recovery-pr/current-review-followup/local-native-process-owner-composition-20261009T0610/source",
+      "current_successor": {
+        "recorded_at_utc": "2026-10-09T17:19:02.339449+00:00",
+        "recorded_disposition": "closed_in_reviewed_candidate_scope",
+        "previous_current_reason": "Dropping an accepted queued LaneRequest before serve_lane closes ready without handing the increment to WriterInflightGuard. The caller returns writer_dead_error without compensating accounting. The actor is already dead and authority remains closed; no runtime reproduction is claimed by this source report. Corrective source, independent review and actual owning acceptance remain pending.",
+        "review_ref": "docs/architecture/recoverable-agent-runtime/implementation/reviews/receipt-owner-registration.md",
+        "evidence_ref": "#/candidate_review_evidence/receipt_p3_successor",
+        "reviewer_label": "P3-B2",
+        "spec_verdict": "SPEC_PASS",
+        "quality_verdict": "QUALITY_PASS",
+        "source_files": 4,
+        "owning_tests_passed": 27,
+        "installed": false,
+        "qualified": false
+      }
     }
   ],
   "inventory_confidence": "high: exact ID, row-count and recorded-disposition joins; current behavior is not requalified",
@@ -9299,6 +9327,28 @@
       "review": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-installed-pin-continuity.json",
       "review_sha256": "9c167305133a41830c5020b8c3e4a988219a8a869a6d51dfe99e0dff7d5b2584",
       "scope": "29 distinct installed Kernel paths intersect none of the 767 canonical, five document or 30 additional direct/current/accepted pin pairs. No new closure revalidation flag; existing 47 flags and four SDK continuity mappings preserved. Older semantic retained-request snapshot remains within its already-flagged ID.",
+      "qualified": false
+    },
+    {
+      "findings": [
+        "candidate:receipt-stored-original-comparison-control",
+        "candidate:receipt-queued-lane-inflight-ownership"
+      ],
+      "at_utc": "2026-10-09T17:19:02.339449+00:00",
+      "review": "docs/architecture/recoverable-agent-runtime/implementation/reviews/receipt-owner-registration.md",
+      "previous_review_sha256": "e04b2eb7c64ffb03a4dd05fabea73d7321ffedd124630eada747af8e7dca206a",
+      "previous_review_commit": "929a54931ef5502b17c330108f0ce4bf419b71f2",
+      "scope": "P3-B1 and P3-B2 closed only in the independently reviewed corrected four-file candidate, with 27 owning passes. Original findings, failures, severities, candidate-only statuses and all counts preserved. Store installation and Capture acceptance remain separate.",
+      "qualified": false,
+      "review_sha256": "81e643477832374d6c1d7439861c0d0a3d2b2acbbd20bfa512398dc9e8d1fe67"
+    },
+    {
+      "findings": [
+        "candidate:receipt-stored-original-comparison-control",
+        "candidate:receipt-queued-lane-inflight-ownership"
+      ],
+      "at_utc": "2026-10-09T17:23:57.657544+00:00",
+      "scope": "Preserved broader receipt module failure: 390 passed, 17 failed at missing /dev/shm rollback-anchor setup, two existing scale cases ignored. Four receipt repair paths unchanged; 27-case candidate P3 closure retains its scope. Separate initial Capture source/selection controls total 12 passes with SPEC_PASS and quality review pending. No canonical closure or qualification change.",
       "qualified": false
     }
   ],
@@ -9553,6 +9603,118 @@
       "kernel_installed_pin_continuity_summary": {
         "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-installed-pin-continuity.md",
         "sha256": "7ba0713993adc705e369ee25f64ba42700ae3acc03ec4138d1df3652c1ef6328"
+      },
+      "receipt_p3_corrected_source_manifest": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/p3-accounting-successor/module-path-successor/source-manifest.json",
+        "sha256": "2b48d43205b2c3b654f67038cfcb23e09ba71b4268af2eedd045ad727bb31e37"
+      },
+      "receipt_p3_corrected_patch": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/p3-accounting-successor/module-path-successor/successor.patch",
+        "sha256": "7f66a8167e3fa874b12cb99814a7b7444a5ddb62aae5efcddc1f4f19a267c0c6"
+      },
+      "receipt_p3_spec_review": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/p3-accounting-successor/spec-review.md",
+        "sha256": "16f6313f2383f1a56f7ad96a174eb9ac68d00495cc40290bf6c90e27ce03215a"
+      },
+      "receipt_p3_spec_reviewed_manifest": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/p3-accounting-successor/module-path-spec-reviewed-manifest.json",
+        "sha256": "d925e64fdaaf9333950ce1a78bf868203e01d1a5a1755d9b21a8c23a5340ac7d"
+      },
+      "receipt_p3_quality_review": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/p3-accounting-successor/quality-review.md",
+        "sha256": "2269a7fbd3902ba714944a76c70fbd7074c6abaee20a0cc9b0828cb1206a5ac0"
+      },
+      "receipt_p3_quality_reviewed_manifest": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/p3-accounting-successor/quality-reviewed-manifest.json",
+        "sha256": "e29fffd8e6dd43b101fb6396a3ee1b1dd449d2de60d56b1a667ae454fc698b4f"
+      },
+      "receipt_p3_quality_seal": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/p3-accounting-successor/quality-seal.json",
+        "sha256": "10cd698527b081449155c7bad644691f09dfd6ae5be757b64bf53c032e8c6133"
+      },
+      "receipt_p3_runtime_checkpoint": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-and-initial-capture-checkpoint.json",
+        "sha256": "429ca0c63cb26c2db4786af88feadb9365392392f77f97ae97287bed8cbfc753"
+      },
+      "receipt_p3_predecessor_red_manifest": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/p3-accounting-successor/red-source-manifest.json",
+        "sha256": "b062a432f9203cedf757395c08cb2af5ae0ec4a2181aad5c61516ca6112a8612"
+      },
+      "receipt_p3_initial_repair_manifest": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/p3-accounting-successor/source-manifest.json",
+        "sha256": "60b111db13039385e1904a120531f2c633008dd75c89910e10f45c7f2c8a27fd"
+      },
+      "receipt_p3_comparator_first_result": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/p3-accounting-successor/stored-original-comparator-first.json",
+        "sha256": "d4e43eef575509d9b4b597280942a5a97d4cb2191a5693a93d37e38147e20b19"
+      },
+      "receipt_p3_comparator_first_log": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/p3-accounting-successor/stored-original-comparator-first.log",
+        "sha256": "f8547348079cecf8d29df8e1e7bf705fa837126fbf8152d17a6bca6eee4a92b7"
+      },
+      "receipt_p3_queued_lane_red_result": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/p3-accounting-successor/queued-lane-red.json",
+        "sha256": "2beb2ea8f154e65f2642e71e5f8c89801ed4f976a7e24bfd901b82313ced2beb"
+      },
+      "receipt_p3_queued_lane_red_log": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/p3-accounting-successor/queued-lane-red.log",
+        "sha256": "b424b327bcb4b98ef4ae45d744e8d3b2b141a0acf3b59403265170ca7efab625"
+      },
+      "receipt_p3_first_compile_failure_result": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/p3-accounting-successor/receipt-owner-green-first.json",
+        "sha256": "5f6bdcd9c99bca487e6f7ffb37e65f8944ec8b2d50dce9722372671a45d43b91"
+      },
+      "receipt_p3_first_compile_failure_log": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/p3-accounting-successor/receipt-owner-green-first.log",
+        "sha256": "5d56cfa01f1c99f2a4b0bd9940dfcd9e3aec1d8cdcadb02733e122bd3a80ad38"
+      },
+      "receipt_p3_corrected_green_result": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/p3-accounting-successor/receipt-owner-green-second.json",
+        "sha256": "f46c1d94a4fac3e17d28791dcda7d7872689175a775360b1712a29b4a35e611a"
+      },
+      "receipt_p3_corrected_green_log": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/p3-accounting-successor/receipt-owner-green-second.log",
+        "sha256": "d51d67b154560c85255eb5ecdd3932ccd429fb6a616e12f4384e87912c7f5dcc"
+      },
+      "receipt_module_broader_result": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/p3-accounting-successor/receipt-store-module.json",
+        "sha256": "f2779ff6eb3b561aee8a3b9684a7ed07935864ec5ded64993f15d5ec19f702af"
+      },
+      "receipt_module_broader_log": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/p3-accounting-successor/receipt-store-module.log",
+        "sha256": "cc54803984819ea91dcaeaf3718abe5da0d1a95d3f89463a84f18dc58cc5f340"
+      },
+      "receipt_module_broader_manifest": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-and-initial-capture-format.json",
+        "sha256": "84c165f2d2a4dc2a1ee5d8847a5d31545824dcba74ee831221fa7f576463457d"
+      },
+      "receipt_module_anchor_test_helper": {
+        "path": "target/recovery-pr/current-review-followup/local-native-process-owner-composition-20261009T0610/source/crates/platform/chio-store-sqlite/src/receipt_store/tests/support.rs",
+        "sha256": "150214bc2b7a8fe8f2d018fcd709ff069dcfcda2e02a4d42da9682912807c392"
+      },
+      "initial_capture_owning_profile_result": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/initial-capture-source/initial-capture-owning-profile.json",
+        "sha256": "0f77509d64ec3c913d451dc839ca8cfd4fa33c4047b2853394210eaab4478302"
+      },
+      "initial_capture_typed_preimages_result": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/initial-capture-source/typed-preimages-owning-profile.json",
+        "sha256": "37ba757845f31a177134783bc972fc2a5041d2aa85940bb622c7413672aa8ae5"
+      },
+      "initial_capture_observation_budget_result": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/initial-capture-source/observation-budget-owning-profile.json",
+        "sha256": "28dbc0a197cfd751cd9c89b9dcefed8bd732eab44073978ea701243dab87dfa0"
+      },
+      "initial_capture_spec_review": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/initial-capture-source/spec-review.md",
+        "sha256": "c5506631bbace773e6ce7b13010b607c9a66a5bb1cdebdfc42f70ff8831f3160"
+      },
+      "initial_capture_owning_profile_manifest": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/initial-capture-source/owning-profile-verification-source.json",
+        "sha256": "1c2f5bf784e0d7337eb2f25f7f44e152067cae44a6fb5f8578a58d296c730ac8"
+      },
+      "initial_capture_spec_seal": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/initial-capture-source/spec-source-seal.json",
+        "sha256": "1ce43e60d693a1bafb96dc522ae6b482cee36d0e4136f11b9e4700c2efde0cc8"
       }
     },
     "local_pass_recorded_at_utc": "2026-10-09T14:45:26.431181+00:00",
@@ -9594,6 +9756,106 @@
       "qualified": false
     },
     "receipt_registration_successor_recorded_at_utc": "2026-10-09T16:55:02.154817+00:00",
-    "receipt_base_findings_recorded_at_utc": "2026-10-09T16:55:02.154817+00:00"
+    "receipt_base_findings_recorded_at_utc": "2026-10-09T16:55:02.154817+00:00",
+    "receipt_p3_successor": {
+      "source_manifest_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/p3-accounting-successor/module-path-successor/source-manifest.json",
+      "spec_review_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/p3-accounting-successor/spec-review.md",
+      "quality_review_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/p3-accounting-successor/quality-review.md",
+      "quality_seal_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/p3-accounting-successor/quality-seal.json",
+      "runtime_checkpoint_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-and-initial-capture-checkpoint.json",
+      "source_scope": "Exact corrected four-file receipt successor. The composed 18-file checkpoint binds these four files but also contains a disjoint Capture stream; receipt acceptance does not transfer to Capture.",
+      "local_validation": {
+        "result_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/p3-accounting-successor/receipt-owner-green-second.json",
+        "log_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/p3-accounting-successor/receipt-owner-green-second.log",
+        "exit_code": 0,
+        "passed": 27,
+        "failed": 0,
+        "ignored": 0,
+        "source_stable": true
+      },
+      "preserved_failures": [
+        {
+          "result_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/p3-accounting-successor/queued-lane-red.json",
+          "log_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/p3-accounting-successor/queued-lane-red.log",
+          "scope": "Genuine predecessor accepted-then-dropped queued lane failure: inflight 2 rather than 0.",
+          "exit_code": 101
+        },
+        {
+          "result_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/p3-accounting-successor/receipt-owner-green-first.json",
+          "log_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/p3-accounting-successor/receipt-owner-green-first.log",
+          "scope": "Initial repair compile failed E0583 before any tests; corrected module path is an additive successor.",
+          "exit_code": 101,
+          "tests_executed": false
+        }
+      ],
+      "installation_status": "uninstalled; genuine configured_owner consumer, closed receipt Store selection and isolated strict Store checks remain pending",
+      "confidence": "High for exact independent spec/quality approval and the genuine 27-case owning run; no Store installation, Capture or whole-runtime acceptance.",
+      "qualified": false,
+      "recorded_at_utc": "2026-10-09T17:19:02.339449+00:00",
+      "closed_reviewer_labels": [
+        "P3-B1",
+        "P3-B2"
+      ],
+      "broader_module_validation": {
+        "recorded_at_utc": "2026-10-09T17:23:57.657544+00:00",
+        "result_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/p3-accounting-successor/receipt-store-module.json",
+        "log_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/p3-accounting-successor/receipt-store-module.log",
+        "source_manifest_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-and-initial-capture-format.json",
+        "exit_code": 101,
+        "passed": 390,
+        "failed": 17,
+        "ignored": 2,
+        "source_stable": true,
+        "reviewed_receipt_four_paths_unchanged": true,
+        "failure_classification": "failed_environment_prerequisite",
+        "failure_stage": "All 17 failures occur in rollback_anchor_tempdir setup: its unconditional /dev/shm test root is absent on this macOS host. Associated qualified rollback-anchor behavior was not exercised.",
+        "test_helper_ref": "target/recovery-pr/current-review-followup/local-native-process-owner-composition-20261009T0610/source/crates/platform/chio-store-sqlite/src/receipt_store/tests/support.rs",
+        "ignored_tests": [
+          {
+            "name": "receipt_store::tests::scale_proof::append_scale_proof_is_batch_bounded_across_history_sizes",
+            "reason": "scale proof; seeds up to 1e6 receipts, run with --release -- --ignored"
+          },
+          {
+            "name": "receipt_store::tests::scale_recovery::million_receipts_preserve_integrity_queries_retention_and_restore",
+            "reason": "scale campaign; one million real appends, integrity, retention and restore"
+          }
+        ],
+        "scope": "The 390 passes provide broader ordinary actor coverage, but this module gate failed. Existing ignored scale cases are not acceptance. The independent 27-case P3 closure remains bounded; Linux/environment, isolated Store lint and installation requirements stay open.",
+        "qualified": false
+      }
+    },
+    "initial_capture_source_observation": {
+      "recorded_at_utc": "2026-10-09T17:23:57.657544+00:00",
+      "spec_review_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/initial-capture-source/spec-review.md",
+      "source_manifest_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/initial-capture-source/owning-profile-verification-source.json",
+      "spec_verdict": "SPEC_PASS for initial Capture source and owning selection only",
+      "local_validation": [
+        {
+          "result_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/initial-capture-source/initial-capture-owning-profile.json",
+          "log_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/initial-capture-source/initial-capture-owning-profile.log",
+          "passed": 10,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "result_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/initial-capture-source/typed-preimages-owning-profile.json",
+          "log_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/initial-capture-source/typed-preimages-owning-profile.log",
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "result_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/initial-capture-source/observation-budget-owning-profile.json",
+          "log_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/initial-capture-source/observation-budget-owning-profile.log",
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0
+        }
+      ],
+      "total_passed": 12,
+      "quality_review": "pending",
+      "scope": "Separate source/selection controls only. Earlier failed checkpoints remain preserved; no final acceptance, productive capture, pricing, funding, retirement or qualification is established.",
+      "qualified": false
+    }
   }
 }
