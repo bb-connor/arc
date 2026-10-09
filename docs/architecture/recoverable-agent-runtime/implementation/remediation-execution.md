@@ -51,6 +51,17 @@ The [checkpoint coordination review](reviews/checkpoint-coordination.md) records
 the completed local controls and their limits, including the outstanding lint
 failure and missing broader runtime acceptance.
 
+The next bounded installation has completed for
+[SDK state projection](reviews/sdk-recovery-state-projection.md) and
+[explicit authority provisioning](reviews/native-authority-provisioning.md).
+The maintained source passed 1,435 Python SDK/framework tests, 288 TypeScript
+recovery tests and five provisioning/upgrade controls. These independent units
+do not install the larger Native bank or close its lifecycle obligations.
+The candidate also passed all 19 budget-source, atomic ledger and provisioning
+controls after repairing its fixtures and actual owning connection profile.
+Kernel and Process foundation reviews now precede their separate installation;
+the complete Capture producer remains a later dependency.
+
 ## Acceptance order
 
 Start with formatting, manifest consistency, focused compilation and meaningful

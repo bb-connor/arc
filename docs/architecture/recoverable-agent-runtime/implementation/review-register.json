@@ -8815,6 +8815,22 @@
       ],
       "at_utc": "2026-10-09T14:45:26.431181+00:00",
       "scope": "Recorded three envelope and two actual checkpoint local passes against the preserved successor manifest; candidate-only classification and all counts unchanged."
+    },
+    {
+      "finding": "H-SDK-01",
+      "at_utc": "2026-10-09T15:46:10.659835+00:00",
+      "review": "docs/architecture/recoverable-agent-runtime/implementation/reviews/sdk-recovery-state-projection.md",
+      "review_sha256": "e7ba673af4bef1a5a5d36dff95afa355a3903413eeea56b19b81fcc3f02f4607",
+      "scope": "Reviewed SDK projection facet installed and locally verified; native/product/provider obligations and whole finding remain open.",
+      "qualified": false
+    },
+    {
+      "finding": null,
+      "at_utc": "2026-10-09T15:46:10.659835+00:00",
+      "review": "docs/architecture/recoverable-agent-runtime/implementation/reviews/native-authority-provisioning.md",
+      "review_sha256": "8828fabd6427457be3c6bde6a5bcb7b0a5b497786f9c5f3753bf758890a12118",
+      "scope": "Reviewed independent provisioning prerequisite installed; five owning tests passed. No canonical finding closure.",
+      "qualified": false
     }
   ],
   "candidate_review_evidence": {

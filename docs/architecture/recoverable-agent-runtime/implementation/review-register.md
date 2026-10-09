@@ -50,6 +50,14 @@ difference remains recorded, alongside the current review and its scope.
 
 ## Candidate follow-ups
 
+Two independently reviewed source units have subsequently been installed and
+verified locally: [SDK state projection](reviews/sdk-recovery-state-projection.md)
+and [explicit authority provisioning](reviews/native-authority-provisioning.md).
+Their evidence and remaining obligations are recorded in `current_updates`.
+H-SDK-01 remains open and provisioning is a prerequisite. All 382 inventory
+records and every count above remain unchanged; the historical pin audit has not
+been promoted to current qualification.
+
 The two additive `candidate_followup` records preserve the original 380 entries
 and do not change canonical closure counts or installed-finding totals. Their
 exact local evidence hashes and accounting time are in `candidate_review_evidence`.
