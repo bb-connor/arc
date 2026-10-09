@@ -7,6 +7,6 @@ model: "gpt-6.1-sol"
 effort: "high"
 tiers: ["premium"]
 status: "active"
-last_heartbeat: "2026-10-09T07:32:11Z"
+last_heartbeat: "2026-10-09T08:59:09Z"
 throttled_until: ""
 ---
