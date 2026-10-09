@@ -5,20 +5,23 @@
 The independent whole-PR review of `fd8bfdc947` is preserved in
 [the October 9 review report](../reviews/2026-10-09-pr1160-landing-review.md).
 It records two P1 and 20 confirmed P2 findings, six plausible P2 findings,
-and one separately tracked pre-existing issue. Ten are required for this
-foundation landing. The report names the remaining 18 follow-up items;
-they remain open and must not be reported as repaired by this wave.
+and one separately tracked pre-existing issue. The original review selected
+ten landing findings. A reproduced JSON ingress bypass promoted V26 before
+landing, so eleven are now required. The remaining 17 review findings stay
+open in the follow-up track.
 
 [The machine-readable review index](audits/landing-review-wave-20261009.json)
 adds all 28 findings and the separately tracked pre-existing SSE issue. The
 canonical JSON ledger now has **1,828 requirements**. Every prior 1,799
 requirement object, source record and current-state entry remains unchanged;
 the new rows record repairs, bounded evidence and remaining acceptance
-separately. The 18 later review findings and the SSE issue remain open in the
-security follow-up track.
+separately. [The V26 promotion audit](audits/landing-review-v26-promotion-20261009.json)
+records the later decision without rewriting the original report. The 17 later
+review findings and the SSE issue remain open. V29 has an owner-tested candidate
+at `ba02f3eb63`, preserved for independent follow-up review and not integrated.
 
-All ten repairs start from local source `a457a89c75`. Root remains the sole
-integration writer. Claude owns eight isolated Rust repair lanes; Root owns
+All eleven repairs start from local source `a457a89c75`. Root remains the sole
+integration writer. Claude owns nine isolated Rust repair lanes; Root owns
 the two workflow boundaries. Every row requires a regression that fails on
 the original source, focused owning verification, review of the composed
 change, and final candidate checks. No feature additions are admitted.
@@ -35,6 +38,8 @@ change, and final candidate checks. No feature additions are admitted.
 | V22 P2 | Claude | `dfb58ee550`, `a902313b4c`: discover sets through live contributions; retain generation and replay state | Original historical-set and orphan controls fail; composed suspension 11 tests and strict all-target Clippy pass | Final hosted candidate and independent delta review | #1160 |
 | V24 P2, P1 follow-up | Claude | `6f35827a64`, `20dc901d6d`, `7c0b275486` bind destination continuity and the in-place exception to the provisioned lock identity | Original rollback, zeroed-slot and retirement-byte replay failures retained; final composed 171 controls pass with one existing ignored helper, strict CP/store Clippy passes | Final hosted candidate and independent delta review; whole lock-root restoration remains outside the guarantee | #1160 |
 | V25 P2 | Claude and Root | User-selected authenticated snapshots; [core design](../superpowers/specs/2026-10-09-authenticated-receipt-query-snapshots-design.md) accepted and [execution plan](../superpowers/plans/2026-10-09-authenticated-receipt-query-snapshots.md) integrated at `5fdd7f8d07` | Original linear work reproduced; persistent lifetime, snapshot core and separate SDK implementation in progress | Complete implementation and filter/count/freshness controls, Linux custody, large-history capacity, owning and composed qualification | #1160 |
+
+| V26 P2 | Claude | `0dbfa910d1`: validate every media type accepted by the JSON extractor and refuse non-JSON contract requests before body consumption | Original duplicate-key and lossy-number controls fail; composed 24 ingress tests and strict all-target control-plane Clippy pass | Final candidate checks and independent delta review | #1160 |
 
 The user explicitly selected authenticated receipt query snapshots on October
 9. Strict whole-history request budgets that permanently disable healthy
@@ -78,10 +83,11 @@ campaign in 916.22 seconds; it does not establish the pending attestation proof.
 The prior combined runtime evidence has been renewed for the later retry,
 budget and dual-clock boundaries. Exact commands, source hashes, failures
 and successful resumptions remain under
-`/tmp/pr1160-integrated-check-20261009/attempt3` through `attempt11`. Attempt8
+`/tmp/pr1160-integrated-check-20261009/attempt3` through `attempt12`. Attempt8
 and attempt9 qualify the initial V24 and V01 changes; attempt11 renews both
 with their final rollback and error-lifetime repairs. Attempt10 qualifies
-the three-commit V06 composition. Each records its bounded source composition;
+the three-commit V06 composition; attempt12 qualifies the V26 ingress repair.
+Each records its bounded source composition;
 none is a full final-candidate or hosted qualification.
 These focused results do not replace the four required protected hosted
 checks, review-thread dispositions, or the final independent review delta.
