@@ -16,6 +16,10 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 TOOL = ROOT / "scripts/verify-recovery-qualification.py"
+FIXTURE_SPEC = importlib.util.spec_from_file_location(
+    "primary_compiler_probe_fixture", Path(__file__).with_name("primary_compiler_probe_fixture.py"))
+PRIMARY_FIXTURE = importlib.util.module_from_spec(FIXTURE_SPEC)
+FIXTURE_SPEC.loader.exec_module(PRIMARY_FIXTURE)
 
 
 class QualificationAuditTest(unittest.TestCase):
@@ -2358,6 +2362,331 @@ timeout_secs = 60
             with self.subTest(version=mutant), self.assertRaisesRegex(ValueError,"^qualification.formal_tool_version$"):
                 self.audit.audit_kani_tool_version(mutant)
 
+
+
+class PublicLauncherObservationTest(unittest.TestCase):
+    """Exercise maintained command and capture checks with fixed public inputs."""
+
+    setUp = QualificationAuditTest.setUp
+
+    def fixture(self, name="allowed-read"):
+        candidate = "/var/tmp/chio-public-fixture"
+        authorization = self.audit.checked_public_authorization(PRIMARY_FIXTURE.AUTHORIZATION_BYTES)
+        approved = next(row for row in authorization["cases"] if row["name"] == name)
+        configuration = candidate + "/" + approved["configuration_relative_path"]
+        command = [value.format(candidate=candidate, configuration=configuration)
+                   for value in approved["command_template"]]
+        logs, captures = {}, {}
+        for stream, body in [("stdout", b""), ("stderr", b"PUBLIC-OUTSIDE-SYNC-OBSERVATION\n")]:
+            path = candidate + "/target/metadata/primary-observations/" + name + "/launcher." + stream + ".log"
+            logs[path] = body
+            captures[stream] = {"path": path, "sha256": hashlib.sha256(body).hexdigest(), "size": len(body)}
+        observation = {"schema": "chio.public-linux-launcher-observation.v1", "candidate": candidate,
+            "source_binding": "a" * 64, "name": name, "command": command, "actual_exit": 0,
+            "command_timeout_seconds": approved["timeout_seconds"], "elapsed_seconds": 1.0,
+            "pid": 123, "process_group": 123, "launcher_capture": captures}
+        return observation, {"candidate": candidate, "source_binding": "a" * 64}, command[command.index("--")+1:], logs
+
+    def consume(self, parts):
+        observation, configuration, command, logs = parts
+        authorization = self.audit.checked_public_authorization(PRIMARY_FIXTURE.AUTHORIZATION_BYTES)
+        return self.audit.checked_public_launcher_observation(
+            observation, authorization, configuration, command, lambda path: logs[str(path)])
+
+    def test_exact_approved_commands_and_original_outer_captures_are_accepted(self):
+        self.assertEqual(hashlib.sha256(PRIMARY_FIXTURE.AUTHORIZATION_BYTES).hexdigest(),
+                         PRIMARY_FIXTURE.AUTHORIZATION_SHA256)
+        self.assertEqual(hashlib.sha256(PRIMARY_FIXTURE.CONTROLLER_BYTES).hexdigest(),
+                         PRIMARY_FIXTURE.CONTROLLER_SHA256)
+        for name in self.audit.PRIMARY_COMPILER_PROBES:
+            with self.subTest(name=name):
+                self.assertEqual(self.consume(self.fixture(name)),
+                                 {"stdout": b"", "stderr": b"PUBLIC-OUTSIDE-SYNC-OBSERVATION\n"})
+
+    def test_missing_replaced_and_resealed_outer_capture_references_refuse(self):
+        for change in ["missing", "changed-digest", "changed-size", "changed-body", "alternate-path", "float-size"]:
+            with self.subTest(change=change):
+                parts = self.fixture()
+                observation, _, _, logs = parts
+                capture = observation["launcher_capture"]["stderr"]
+                reason = "micro_primary_capture"
+                if change == "missing":
+                    del observation["launcher_capture"]
+                    reason = "micro_primary_observation"
+                elif change == "changed-body":
+                    logs[capture["path"]] = b"REPLACED-PUBLIC-BODY"
+                elif change == "alternate-path":
+                    capture["path"] += ".replacement"
+                    logs[capture["path"]] = b"PUBLIC-OUTSIDE-SYNC-OBSERVATION\n"
+                elif change == "changed-digest":
+                    capture["sha256"] = "0" * 64
+                elif change == "float-size":
+                    capture["size"] = float(capture["size"])
+                else:
+                    capture["size"] += 1
+                with self.assertRaisesRegex(ValueError, "^qualification\\." + reason + "$"):
+                    self.consume(parts)
+
+    def test_unsupported_argv_or_configuration_cannot_self_reseal(self):
+        for change in ["argv", "config", "inner", "source", "false-exit", "false-pid", "extra-ready"]:
+            with self.subTest(change=change):
+                parts = self.fixture()
+                observation, _, command, _ = parts
+                reason = "micro_primary_command" if change in {"argv", "config", "inner"} else "micro_primary_observation"
+                if change == "argv":
+                    observation["command"][-1] += ".altered"
+                elif change == "config":
+                    observation["command"][4] += ".samebytes"
+                elif change == "inner":
+                    command[-1] += ".altered"
+                elif change == "source":
+                    observation["source_binding"] = "b" * 64
+                elif change == "false-exit":
+                    observation["actual_exit"] = False
+                elif change == "false-pid":
+                    observation["pid"] = observation["process_group"] = True
+                else:
+                    observation["qualified"] = True
+                with self.assertRaisesRegex(ValueError, "^qualification\\." + reason + "$"):
+                    self.consume(parts)
+
+    def test_fixed_authorization_rejects_a_self_approved_payload(self):
+        authorization = json.loads(PRIMARY_FIXTURE.AUTHORIZATION_BYTES)
+        authorization["payloads"][0]["sha256"] = "0" * 64
+        with self.assertRaisesRegex(ValueError, "^qualification.micro_primary_authorization$"):
+            self.audit.checked_public_authorization((json.dumps(authorization, indent=2, sort_keys=True)+"\n").encode())
+
+    def test_inner_probe_observation_is_distinct_from_outer_launcher_bytes(self):
+        sample = {"schema": "chio.public-linux-compilation-probe.v1", "mode": "allowed-read",
+                  "result": {"public_bytes": 20}}
+        raw = json.dumps(sample).encode() + b"\n"
+        self.assertEqual(self.audit.checked_public_probe_observation(raw, "allowed-read", 0), sample)
+        for raw in self.consume(self.fixture()).values():
+            with self.subTest(outer_stream=raw), self.assertRaisesRegex(ValueError, "^qualification.micro_primary_probe$"):
+                self.audit.checked_public_probe_observation(raw, "allowed-read", 0)
+        for value in [20.0, False]:
+            sample["result"]["public_bytes"] = value
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, "^qualification.micro_primary_probe$"):
+                self.audit.checked_public_probe_observation(json.dumps(sample).encode()+b"\n", "allowed-read", 0)
+
+
+class CurrentPrimaryPackageTest(unittest.TestCase):
+    """Finite synthetic parser controls, without native campaign execution."""
+
+    setUp = QualificationAuditTest.setUp
+
+    def package(self, root):
+        return PRIMARY_FIXTURE.PrimaryProbePackage(self.audit, root, ROOT)
+
+    def refuse(self,change,reason,*,bundle_change=None):
+        with tempfile.TemporaryDirectory() as temporary:
+            package = self.package(Path(temporary))
+            change(package)
+            package.bundle()
+            if bundle_change is not None:
+                bundle_change(package)
+            reference = package.ref("final-evidence.json",package.evidence)
+            with self.assertRaisesRegex(ValueError,"^qualification\\."+reason+"$"):
+                self.audit.audit_primary_compiler_probes(package.root,reference,package.sources)
+
+    def test_current_decoder_joins_separate_inner_and_outer_streams(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            package = self.package(Path(temporary)); reference = package.bundle()
+            result = self.audit.audit_primary_compiler_probes(package.root,reference,package.sources)
+            self.assertEqual(result["case_count"],9)
+            self.assertNotIn("qualified",result)
+
+    def test_current_decoder_does_not_accept_legacy_evidence_as_current(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            package = self.package(Path(temporary)); package.bundle()
+            package.evidence["schema"] = "chio.linux-compiler-primary-probes.v1"
+            reference = package.ref("legacy.json",package.evidence)
+            with self.assertRaisesRegex(ValueError,"^qualification.compiled_profile_primary_record$"):
+                self.audit.audit_primary_compiler_probes(package.root,reference,package.sources)
+
+    def test_missing_inner_capture_refuses_at_the_case_boundary(self):
+        self.refuse(lambda package:package.cases[0].pop("scope_stdout"),"compiled_profile_primary_case")
+
+    def test_missing_or_reordered_case_cannot_change_the_fixed_denominator(self):
+        for change in [lambda package:package.cases.pop(),lambda package:package.cases.reverse(),
+                       lambda package:package.cases.__setitem__(0,False)]:
+            with self.subTest(change=change):
+                self.refuse(change,"compiled_profile_primary_denominator")
+
+    def test_literal_authorization_cannot_be_replaced_by_a_self_consistent_table(self):
+        for field in ["timeout", "payload"]:
+            def change(package):
+                value = package.read(package.authorization_ref)
+                if field == "timeout":
+                    value["cases"][0]["timeout_seconds"] += 1
+                else:
+                    value["payloads"][0]["sha256"] = "0" * 64
+                package.replace(package.authorization_ref,value)
+            with self.subTest(field=field):
+                self.refuse(change,"micro_primary_authorization")
+
+    def test_resealed_result_and_plan_cannot_approve_altered_argv_or_configuration(self):
+        for argument in [-1, 4]:
+            def change(package):
+                def alter_command(row):
+                    row["command"][argument] += ".altered"
+                package.change_observation(0, alter_command)
+                command = package.results[0]["command"]
+                package.configs[0]["command"] = command
+                package.replace(package.cases[0]["command"], command[command.index("--")+1:])
+            with self.subTest(argument=argument):
+                self.refuse(change, "micro_primary_command")
+
+    def test_boolean_deadline_does_not_equal_a_numeric_deadline(self):
+        for field,value in [("ordinary_seconds",120.0),("retry",0)]:
+            def change(package,field=field,value=value):
+                for key in ["plan","summary","dispatch_start"]:
+                    ref=package.evidence[key];data=package.read(ref);data["caps"][field]=value;package.replace(ref,data)
+            with self.subTest(field=field):
+                self.refuse(lambda _:None,"compiled_profile_primary_execution",bundle_change=change)
+
+    def test_runtime_output_must_come_from_the_case_path_and_pinned_collector(self):
+        for field in ["path","command","actual_exit"]:
+            def change(package,field=field):
+                def mutate(row):
+                    if field=="path":row["runtime_before"][field] += ".copied"
+                    elif field=="command":row["runtime_before"][field][3] += ".copied"
+                    else:row["runtime_before"][field] = False
+                package.change_result(0,mutate)
+            with self.subTest(field=field):
+                self.refuse(change,"compiled_profile_primary_source")
+
+    def test_same_byte_outer_capture_cannot_claim_another_original_path(self):
+        self.refuse(lambda package:package.cases[0]["launcher_stdout"].update(original_path="/var/tmp/copied-stdout.log"),
+                    "compiled_profile_primary_capture")
+
+    def test_boolean_capture_size_cannot_replace_an_empty_stream_size(self):
+        self.refuse(lambda package:package.cases[0]["launcher_stdout"].update(size=False),"compiled_profile_primary_capture")
+
+    def test_current_capture_references_require_their_measured_size_and_original_path(self):
+        for name in ["launcher_stdout","launcher_stderr","scope_stdout","scope_stderr","launcher_observation"]:
+            for field in ["size","original_path"]:
+                with self.subTest(name=name,field=field):
+                    self.refuse(lambda package,name=name,field=field:package.cases[0][name].pop(field),
+                                "compiled_profile_primary_capture")
+
+    def test_native_metadata_probes_cannot_satisfy_compilation_minimum(self):
+        for index in [7,8]:
+            with self.subTest(index=index):
+                self.refuse(lambda package,index=index:package.change_original(index,lambda row:row.update(verified_compilations=0)),
+                            "compiled_profile_primary_observation")
+
+    def test_original_report_counts_are_typed_and_cannot_promote_qualification(self):
+        for field,value,reason in [("verified_publications",True,"compiled_profile_primary_observation"),
+                                   ("verified_compilations",1.0,"compiled_profile_primary_observation"),
+                                   ("qualified",True,"compiled_profile_primary_custody")]:
+            with self.subTest(field=field):
+                self.refuse(lambda package,field=field,value=value:package.change_original(0,lambda row:row.update({field:value})),reason)
+
+    def test_original_namespace_and_scope_identity_are_checked(self):
+        for field,value in [("original_namespace","/var/tmp/copied-namespace"),("scope_id","not-a-scope-id")]:
+            with self.subTest(field=field):
+                self.refuse(lambda package,field=field,value=value:package.change_original(0,lambda row:row.update({field:value})),
+                            "compiled_profile_primary_custody")
+
+    def test_boolean_launcher_exit_does_not_equal_success(self):
+        self.refuse(lambda package:package.change_result(0,lambda row:row.update(actual_exit=False)),"compiled_profile_primary_case")
+
+    def test_campaign_range_checks_precede_numeric_conversion(self):
+        for value in [10**400, 1e308, 0, -1, True]:
+            with self.subTest(field="summary",value=value):
+                def change_summary(package,value=value):
+                    reference=package.evidence["summary"]
+                    summary=package.read(reference)
+                    summary["elapsed_from_first_dispatch_seconds"]=value
+                    package.replace(reference,summary)
+                self.refuse(lambda _:None,"compiled_profile_primary_execution",bundle_change=change_summary)
+            with self.subTest(field="case",value=value):
+                self.refuse(lambda package,value=value:package.change_observation(0,
+                    lambda row:row.update(elapsed_seconds=value)),"compiled_profile_primary_execution")
+            with self.subTest(field="timeout",value=value):
+                self.refuse(lambda package,value=value:package.change_observation(0,
+                    lambda row:row.update(command_timeout_seconds=value)),"compiled_profile_primary_execution")
+
+    def test_wrong_public_inner_bytes_refuse_even_when_report_and_hashes_match(self):
+        def change(package):
+            sample = package.sample("allowed-read");sample["result"]["public_bytes"] = 21
+            ref = package.cases[0]["scope_stdout"]
+            package.replace(ref,self.audit.compilation_canonical(sample)+b"\n")
+            package.change_original(0,lambda row:row.update(probe_observation=sample,
+                scope_stdout_capture={"path":ref["original_path"],"sha256":ref["sha256"],"size":ref["size"]}))
+        self.refuse(change,"micro_primary_probe")
+
+    def test_duplicate_inner_observation_is_not_a_single_success(self):
+        def change(package):
+            ref=package.cases[0]["scope_stdout"];raw=(package.root/ref["path"]).read_bytes()*2
+            package.replace(ref,raw)
+            package.change_original(0,lambda row:row.update(scope_stdout_capture={
+                "path":ref["original_path"],"sha256":ref["sha256"],"size":ref["size"]}))
+        self.refuse(change,"micro_primary_probe")
+
+    def test_resealed_outer_success_cannot_replace_the_missing_inner_observation(self):
+        def change(package):
+            inner = package.cases[0]["scope_stdout"]
+            outer = package.cases[0]["launcher_stdout"]
+            package.replace(outer, (package.root/inner["path"]).read_bytes())
+            package.change_observation(0, lambda row: row["launcher_capture"].update(stdout={
+                "path": outer["original_path"], "sha256": outer["sha256"], "size": outer["size"]}))
+            package.replace(inner, b"")
+            package.change_original(0, lambda row: row.update(scope_stdout_capture={
+                "path": inner["original_path"], "sha256": inner["sha256"], "size": inner["size"]}))
+        self.refuse(change, "micro_primary_probe")
+
+    def test_changed_required_sync_digest_refuses(self):
+        self.refuse(lambda package:package.change_original(7,lambda row:row.update(required_sync_observation_sha256="0"*64)),
+                    "compiled_profile_primary_sync")
+
+    def test_durability_unknown_refuses_despite_complete_physical_outcomes(self):
+        def change(package):
+            ref=package.cases[7]["launcher_stderr"]
+            raw=(package.root/ref["path"]).read_bytes().replace(b'"status":"confirmed"',b'"status":"unconfirmed"')
+            package.replace(ref,raw)
+            package.change_observation(7,lambda row:row["launcher_capture"].update(stderr={
+                "path":ref["original_path"],"sha256":ref["sha256"],"size":ref["size"]}))
+        self.refuse(change,"compiler_required_sync_observation")
+
+    def test_missing_outside_unit_outcomes_cannot_be_inferred_from_the_report(self):
+        def change(package):
+            ref=package.cases[7]["launcher_stderr"];package.replace(ref,b"")
+            package.change_observation(7,lambda row:row["launcher_capture"].update(stderr={
+                "path":ref["original_path"],"sha256":ref["sha256"],"size":ref["size"]}))
+        self.refuse(change,"compiled_profile_primary_sync")
+
+    def test_resealed_inner_stderr_cannot_supply_outer_publication_outcomes(self):
+        def change(package):
+            outer = package.cases[7]["launcher_stderr"]
+            inner = package.cases[7]["scope_stderr"]
+            package.replace(inner, (package.root/outer["path"]).read_bytes())
+            package.change_original(7, lambda row: row.update(scope_stderr_capture={
+                "path": inner["original_path"], "sha256": inner["sha256"], "size": inner["size"]}))
+            package.replace(outer, b"")
+            package.change_observation(7, lambda row: row["launcher_capture"].update(stderr={
+                "path": outer["original_path"], "sha256": outer["sha256"], "size": outer["size"]}))
+        self.refuse(change, "compiled_profile_primary_sync")
+
+    def test_actual_enclosing_process_exit_is_required(self):
+        def change(package):
+            ref=package.evidence["execution"]["provenance"]["result"]
+            value=package.read(ref);value["actual_command_exit"] = 1;package.replace(ref,value)
+        self.refuse(lambda _:None,"gate_execution_provenance",bundle_change=change)
+
+    def test_actual_tool_pins_need_the_owning_purpose_in_both_brackets(self):
+        def change(package):
+            proof=package.evidence["execution"]["provenance"]
+            for key in ["before","after"]:
+                value=package.read(proof[key]);value["explicit_file_pins"][2]["purpose"]="unrelated-pin"
+                value["content_manifest_sha256"]=hashlib.sha256(json.dumps({name:value[name] for name in ["git","entries","explicit_file_pins"]},
+                    sort_keys=True,ensure_ascii=True,separators=(",",":"),allow_nan=False).encode()).hexdigest()
+                package.replace(proof[key],value)
+            result=package.read(proof["result"])
+            result["before_manifest_sha256"]=result["after_manifest_sha256"]=value["content_manifest_sha256"]
+            package.replace(proof["result"],result)
+        self.refuse(lambda _:None,"compiled_profile_primary_tool",bundle_change=change)
 
 
 class RetainedCohortOutcomeTest(unittest.TestCase):
