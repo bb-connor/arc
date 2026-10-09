@@ -4,6 +4,7 @@ use crate::receipt_store::support::{decoded_json_text_bytes, SqlWorkBudget};
 use chio_security_types::ports::PortErrorKind;
 use rusqlite::types::ValueRef;
 
+/// Bound on sets that currently hold at least one contribution.
 const MAX_SETS: u64 = 1024;
 const MAX_CONTRIBUTIONS: u64 = 4096;
 const MAX_MEMBERS: u64 = 65_536;
@@ -224,9 +225,15 @@ fn evaluate_in_snapshot(
     connection: &Connection,
     query: &CapabilitySuspensionQuery,
 ) -> PortResult<CapabilitySuspensionDecision> {
+    // Discovery is driven by the contribution rows themselves: only sets that
+    // still hold a contribution count against the set budget, and every such
+    // set (including one with no state row) is fully verified by load_snapshot.
+    // State rows of sets with no remaining contribution keep their generation
+    // and fencing token for stale-apply rejection but are never enumerated.
     let mut statement = connection.prepare_cached(
         "SELECT octet_length(affected_set_hash), CASE WHEN octet_length(affected_set_hash) = 32 THEN affected_set_hash END
-         FROM security_capability_set_suspension_state WHERE tenant_id = ?1 ORDER BY affected_set_hash LIMIT ?2"
+         FROM security_capability_set_suspension_effects WHERE tenant_id = ?1
+         GROUP BY affected_set_hash ORDER BY affected_set_hash LIMIT ?2"
     ).map_err(sqlite_error)?;
     let mut rows = statement
         .query(params![query.tenant_id.as_str(), to_i64(MAX_SETS + 1)?])

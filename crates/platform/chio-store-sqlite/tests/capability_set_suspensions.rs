@@ -450,3 +450,6 @@ mod tenant_isolation;
 
 #[path = "capability_set_suspensions/work_bounds.rs"]
 mod work_bounds;
+
+#[path = "capability_set_suspensions/historical_sets.rs"]
+mod historical_sets;

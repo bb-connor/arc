@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn historical_suspension_discovery_refuses_one_past_its_supported_bound() {
+fn state_rows_without_contributions_are_not_enumerated() {
     let directory =
         chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("suspension-history-bound.db");
@@ -12,7 +12,7 @@ fn historical_suspension_discovery_refuses_one_past_its_supported_bound() {
     let transaction = external
         .transaction()
         .unwrap_or_else(|error| panic!("transaction: {error}"));
-    for index in 1_u64..=1024 {
+    for index in 1_u64..=2048 {
         let mut hash = [0_u8; 32];
         hash[..8].copy_from_slice(&index.to_be_bytes());
         transaction
@@ -32,32 +32,7 @@ fn historical_suspension_discovery_refuses_one_past_its_supported_bound() {
     assert!(
         !store
             .evaluate_capability_suspension(&query)
-            .unwrap_or_else(|error| panic!("exact-bound history: {error}"))
-            .denied
-    );
-    external
-        .execute(
-            "INSERT INTO security_capability_set_suspension_state VALUES (?1, ?2, 1, 1)",
-            rusqlite::params![tenant().as_str(), [255_u8; 32].as_slice()],
-        )
-        .unwrap_or_else(|error| panic!("seed one-over history: {error}"));
-    let refusal = require_error(store.evaluate_capability_suspension(&query));
-    assert_eq!(refusal.kind(), PortErrorKind::Unavailable);
-    assert_eq!(
-        refusal.code().as_str(),
-        "store.suspension_lookup_budget_exhausted"
-    );
-    // A refusal must clear the progress callback and release its snapshot.
-    external
-        .execute(
-            "DELETE FROM security_capability_set_suspension_state WHERE affected_set_hash = ?1",
-            [[255_u8; 32].as_slice()],
-        )
-        .unwrap_or_else(|error| panic!("remove one-over history: {error}"));
-    assert!(
-        !store
-            .evaluate_capability_suspension(&query)
-            .unwrap_or_else(|error| panic!("bounded retry: {error}"))
+            .unwrap_or_else(|error| panic!("history without contributions: {error}"))
             .denied
     );
 }
