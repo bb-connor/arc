@@ -406,7 +406,7 @@ async fn leader_forward_retry_readmits_under_one_permit_after_a_failed_attempt()
 }
 
 /// Forwards whose returned response this node builds from the leader's JSON.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum FinalizedForward {
     Authority,
     ScimPost,
@@ -434,12 +434,12 @@ impl FinalizedForward {
         }
     }
 
-    fn finalized(self) -> Response {
-        let leader = json!({ "forwardedTo": "leader" });
+    /// The response this node returns for the leader's `reply`.
+    fn finalized(self, reply: Value) -> Response {
         match self {
-            Self::Authority => Json(leader).into_response(),
-            Self::ScimPost => scim_json_response(StatusCode::CREATED, &leader),
-            Self::ScimDelete => scim_json_response(StatusCode::OK, &leader),
+            Self::Authority => Json(reply).into_response(),
+            Self::ScimPost => scim_json_response(StatusCode::CREATED, &reply),
+            Self::ScimDelete => scim_json_response(StatusCode::OK, &reply),
         }
     }
 
@@ -505,7 +505,7 @@ async fn finalized_leader_forwards_return_the_built_response_under_their_permit(
             .test_unwrap()
             .test_unwrap()
             .test_unwrap();
-        assert_same_response(response, kind.finalized()).await;
+        assert_same_response(response, kind.finalized(json!({ "forwardedTo": "leader" }))).await;
         assert_eq!(lane.available_permits(), 1, "{kind:?}");
     }
 }
@@ -531,4 +531,139 @@ async fn cancelled_finalized_leader_forwards_keep_their_permit_until_the_respons
         drop(returned);
         assert_eq!(lane.available_permits(), 1, "{kind:?}");
     }
+}
+
+/// A leader that answers its forwarded write at once with `reply`; any other
+/// request gets 404. It serves until it has answered one write.
+fn answering_leader(write: fn(&str) -> bool, reply: &Value) -> String {
+    let listener = TcpListener::bind("127.0.0.1:0").test_unwrap();
+    let url = loopback_url(&listener);
+    let reply = reply.to_string();
+    std::thread::spawn(move || loop {
+        let Ok((stream, _)) = listener.accept() else {
+            return;
+        };
+        let Ok((request_line, stream)) = read_request(stream) else {
+            return;
+        };
+        if write(&request_line) {
+            respond(stream, "200 OK", &reply);
+            return;
+        }
+        respond(stream, "404 Not Found", r#"{"error":"not a write"}"#);
+    });
+    url
+}
+
+/// A leader reply whose response build pauses on the pause armed for `token`.
+fn paused_build_reply(token: &str) -> Value {
+    json!({
+        "forwardedTo": "leader",
+        (forward_finalization_pause::FIELD): token,
+    })
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn paused_forward_response_build_leaves_the_async_worker_free() {
+    let mut stalled = Vec::new();
+    for kind in FinalizedForward::ALL {
+        let token = format!("worker-free-{kind:?}");
+        let reply = paused_build_reply(&token);
+        let (pause, mut reached) = forward_finalization_pause::arm(&token);
+        let state = follower_of(&answering_leader(kind.held_requests(), &reply));
+        let forward_finished = Arc::new(AtomicBool::new(false));
+        let forward = tokio::spawn({
+            let state = state.clone();
+            let forward_finished = Arc::clone(&forward_finished);
+            async move {
+                let outcome = kind.forward(&state).await;
+                forward_finished.store(true, Ordering::SeqCst);
+                outcome
+            }
+        });
+        // A second task on the same single worker. It can observe the paused
+        // build while the forward is still outstanding only if the build runs
+        // off the async worker.
+        let (progress_tx, progress_rx) = tokio::sync::oneshot::channel();
+        let observed = Arc::clone(&forward_finished);
+        tokio::spawn(async move {
+            let build_paused = reached.recv().await.is_some();
+            let _ = progress_tx.send(build_paused && !observed.load(Ordering::SeqCst));
+        });
+
+        let progressed_while_paused = tokio::time::timeout(HANG_GUARD, progress_rx)
+            .await
+            .test_unwrap()
+            .test_unwrap();
+        pause.release();
+        if !progressed_while_paused {
+            stalled.push(kind);
+        }
+        let response = tokio::time::timeout(HANG_GUARD, forward)
+            .await
+            .test_unwrap()
+            .test_unwrap()
+            .test_unwrap()
+            .test_unwrap();
+        assert_same_response(response, kind.finalized(reply)).await;
+    }
+    assert_eq!(
+        stalled,
+        Vec::<FinalizedForward>::new(),
+        "a task on the forwarding worker made no progress while these forwarded responses were being built"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn paused_forward_response_build_keeps_its_permit_and_refuses_the_next_forward() {
+    let mut admission_lost = Vec::new();
+    for kind in FinalizedForward::ALL {
+        let token = format!("admission-{kind:?}");
+        let reply = paused_build_reply(&token);
+        let (pause, mut reached) = forward_finalization_pause::arm(&token);
+        let leader_url = answering_leader(kind.held_requests(), &reply);
+        let mut state = follower_of(&leader_url);
+        let lane = Arc::new(tokio::sync::Semaphore::new(1));
+        state.leader_forward_lane = Arc::clone(&lane);
+        let forward = tokio::spawn({
+            let state = state.clone();
+            async move { kind.forward(&state).await }
+        });
+        tokio::time::timeout(HANG_GUARD, reached.recv())
+            .await
+            .test_unwrap()
+            .test_unwrap();
+
+        let permit_held = lane.available_permits() == 0;
+        update_peer_reachable(&state, &leader_url);
+        let next = kind.forward(&state).now_or_never();
+        pause.release();
+        let next_refused = match next {
+            Some(Err(refusal)) => {
+                assert_same_response(refusal, kind.at_capacity()).await;
+                true
+            }
+            _ => false,
+        };
+        if !(permit_held && next_refused) {
+            admission_lost.push(kind);
+        }
+        let response = tokio::time::timeout(HANG_GUARD, forward)
+            .await
+            .test_unwrap()
+            .test_unwrap()
+            .test_unwrap()
+            .test_unwrap();
+        assert_same_response(response, kind.finalized(reply)).await;
+        let returned = tokio::time::timeout(HANG_GUARD, Arc::clone(&lane).acquire_owned())
+            .await
+            .test_unwrap()
+            .test_unwrap();
+        drop(returned);
+    }
+    assert_eq!(
+        admission_lost,
+        Vec::<FinalizedForward>::new(),
+        "the forward permit was free, or the next forward was admitted, while these forwarded responses were being built"
+    );
 }

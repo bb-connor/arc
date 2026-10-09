@@ -458,7 +458,11 @@ pub(crate) async fn forward_authority_post_to_leader<B: Serialize>(
                     );
                     let forwarded = client
                         .post_internal_json::<_, Value>(&request_path, &json, Some(term))
-                        .map(|value| Json(value).into_response());
+                        .map(|value| {
+                            #[cfg(test)]
+                            forward_finalization_pause::pause_if_armed(&value);
+                            Json(value).into_response()
+                        });
                     (forwarded, term)
                 })
                 .await
@@ -580,7 +584,11 @@ pub(crate) async fn forward_scim_post_to_leader<B: Serialize>(
                 run_leader_forward(state, move || {
                     client
                         .post_json::<_, Value>(&request_path, &json)
-                        .map(|value| scim_json_response(StatusCode::CREATED, &value))
+                        .map(|value| {
+                            #[cfg(test)]
+                            forward_finalization_pause::pause_if_armed(&value);
+                            scim_json_response(StatusCode::CREATED, &value)
+                        })
                 })
                 .await
                 .map_err(|refusal| {
@@ -662,9 +670,11 @@ pub(crate) async fn forward_scim_delete_to_leader(
                 })?;
         let request_path = path.to_owned();
         let attempt = run_leader_forward(state, move || {
-            client
-                .delete_json::<Value>(&request_path)
-                .map(|value| scim_json_response(StatusCode::OK, &value))
+            client.delete_json::<Value>(&request_path).map(|value| {
+                #[cfg(test)]
+                forward_finalization_pause::pause_if_armed(&value);
+                scim_json_response(StatusCode::OK, &value)
+            })
         })
         .await
         .map_err(|refusal| refusal.into_response("trust-control writes", scim_error_response))?;
@@ -705,4 +715,92 @@ pub(crate) async fn forward_scim_delete_to_leader(
         StatusCode::SERVICE_UNAVAILABLE,
         "failed to forward scim delete to cluster leader",
     ))
+}
+
+/// Test-only pause inside the builders of forwarded leader responses. A pause
+/// armed for a token blocks the build of any leader reply whose `FIELD` holds
+/// that token, so a test can observe where response finalization runs.
+#[cfg(test)]
+pub(crate) mod forward_finalization_pause {
+    use serde_json::Value;
+    use std::sync::{Arc, Condvar, LazyLock, Mutex, PoisonError};
+    use std::time::Duration;
+
+    pub(crate) const FIELD: &str = "finalizationPause";
+    /// Bounds one pause, so a build that blocks the only async worker ends
+    /// instead of hanging the test binary.
+    const PAUSE_GUARD: Duration = Duration::from_secs(10);
+
+    struct Gate {
+        token: String,
+        released: Mutex<bool>,
+        wake: Condvar,
+        reached: tokio::sync::mpsc::UnboundedSender<()>,
+    }
+
+    static ARMED: LazyLock<Mutex<Vec<Arc<Gate>>>> = LazyLock::new(|| Mutex::new(Vec::new()));
+
+    /// Releases its paused builds when released or dropped.
+    pub(crate) struct Pause(Arc<Gate>);
+
+    impl Pause {
+        pub(crate) fn release(&self) {
+            *self
+                .0
+                .released
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner) = true;
+            self.0.wake.notify_all();
+        }
+    }
+
+    impl Drop for Pause {
+        fn drop(&mut self) {
+            self.release();
+            ARMED
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .retain(|gate| !Arc::ptr_eq(gate, &self.0));
+        }
+    }
+
+    /// Arms a pause for replies carrying `token`. Each delivery on the
+    /// returned receiver means one build has reached the pause.
+    pub(crate) fn arm(token: &str) -> (Pause, tokio::sync::mpsc::UnboundedReceiver<()>) {
+        let (reached, reached_rx) = tokio::sync::mpsc::unbounded_channel();
+        let gate = Arc::new(Gate {
+            token: token.to_owned(),
+            released: Mutex::new(false),
+            wake: Condvar::new(),
+            reached,
+        });
+        ARMED
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(Arc::clone(&gate));
+        (Pause(gate), reached_rx)
+    }
+
+    pub(crate) fn pause_if_armed(reply: &Value) {
+        let Some(token) = reply.get(FIELD).and_then(Value::as_str) else {
+            return;
+        };
+        let gate = ARMED
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .iter()
+            .find(|gate| gate.token == token)
+            .cloned();
+        let Some(gate) = gate else {
+            return;
+        };
+        if gate.reached.send(()).is_err() {
+            return;
+        }
+        let released = gate.released.lock().unwrap_or_else(PoisonError::into_inner);
+        let (_released, _timed_out) = gate
+            .wake
+            .wait_timeout_while(released, PAUSE_GUARD, |released| !*released)
+            .unwrap_or_else(PoisonError::into_inner);
+    }
 }
