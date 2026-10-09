@@ -312,7 +312,7 @@ fn embedded_tool_call(data: &Value) -> Option<&Value> {
         .or_else(|| data.get("delta").and_then(|delta| delta.get("tool_call")))
 }
 
-/// Empty/null lifecycle placeholders are not calls. Every other tool member
+/// Empty or null tool members (the shape of lifecycle frames) are not calls. Every other tool member
 /// must pass through a supported tool-call frame, including malformed shapes.
 fn carries_tool_call_payload(value: &Value) -> bool {
     carries_other_tool_call_payload(value, None)

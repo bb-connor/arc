@@ -1,5 +1,5 @@
 {
-  "description": "Shared conformance corpus for the chio.process.v1 worker protocol. Normative text: spec/PROTOCOL.md section 8.6. server cases run in order, one connection each, against one fresh reference host; client cases drive each SDK client against a stub host that returns the given response bytes.",
+  "description": "Shared conformance corpus for the chio.process.v1 worker protocol. Normative text: spec/PROTOCOL.md section 8.6. server cases run in order, one connection each, against one fresh reference host; client cases drive each SDK client against a scripted host that returns the given response bytes.",
   "protocol": "chio.process.v1",
   "schemas": {
     "request": "spec/schemas/chio-process/v1/request.schema.json",
