@@ -1,23 +1,35 @@
 # Security and process landing ledger
 
-## Public route composition checkpoint (October 9)
+## Current composed snapshot checkpoint (October 9)
 
-The ledger now contains **1,831 requirements**. The previous 1,828 requirement
-objects remain preserved. [Three public-route findings](../reviews/2026-10-09-pr1160-public-route-findings.md)
-add the issuer trust/SSRF and authority read-write amplification P1s plus the
-bounded public-worker P2. All three must be repaired before #1160 lands.
-Issuer and public-worker repairs are composed on the isolated snapshot stage;
-full composed owning tests are running. The authority read-only repair remains
-in progress. The canonical JSON current-state view records their source
-commits, original failures, bounded owner evidence and remaining acceptance.
+The canonical ledger contains **1,834 requirements**. Every prior requirement
+object remains preserved. The [public-route findings](../reviews/2026-10-09-pr1160-public-route-findings.md)
+and [independent snapshot composition review](../reviews/2026-10-09-pr1160-snapshot-composition-review.md)
+record the newly discovered obligations separately from the original review.
 
-The signed Linux snapshot capacity campaign completed at one million receipts;
-quiet and contended builds each authenticated all one million signatures and
-reported zero count mismatches. Synthetic ten-million-row projection and actual
-default-quota exhaustion remain separate measurements. Capacity evidence and
-its committed test handoff are still being reconciled. The real-SHA attestation
-proof has timed out without a verdict on both full solver attempts; it remains
-unqualified. No staged source has been pushed or merged by this checkpoint.
+The isolated stage includes the issuer trust/SSRF, public-worker and receipt
+response-finalization repairs. The finalization repair at `f9faea6937` has
+three genuine original failures, 45 composed HTTP/issuer/forward controls,
+103 snapshot controls, strict control-plane/CLI/store Clippy, six static gates,
+and independent source review. Five store tests are explicitly ignored in that
+focused run (four capacity campaigns and one existing helper). The earlier full
+control-plane run was cancelled after 456 observed passes to prioritize repair
+feedback; it is not a completed owning-suite pass.
+
+**Landing blockers remain:** authority read-write amplification (P1), publication
+of extension rows before their covering checkpoint authenticates (P1), lineage
+refresh provenance validation (P2), and the original-domain real-SHA proof.
+The specified C20 invalidation/rebuild count campaign also remains required.
+The JSON current-state view records each repair, evidence and remaining check.
+Source and the published PR have not been advanced by this checkpoint.
+
+[Exact capacity measurements](audits/receipt-snapshot-capacity-20261009.json)
+bind to production source `f24a5240e6`: one million signed Linux receipts and
+ten million synthetic projection rows passed their distinct campaigns. Each
+signed build authenticated one million signatures with zero count mismatches.
+Rotation started during the contended build and finished after it. RSS does
+not isolate walker allocations. Later integrity repairs need affected renewal;
+these measurements do not qualify the final candidate or imply unlimited quota.
 
 ## Current landing repair wave (October 9)
 
