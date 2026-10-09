@@ -134,10 +134,14 @@ class ReceiptQueryClient:
         self.retry_budget_seconds = retry_budget_seconds
 
     def query(self, params: ReceiptQueryParams | None = None) -> ReceiptQueryResponse:
-        """Retry transient snapshot outcomes within a monotonic per-page budget.
+        """Retry transient snapshot outcomes with a monotonic admission budget.
 
-        Injected blocking transports must honor their supplied timeout. Their
-        existing response buffering and timeout semantics remain their own.
+        A positive per-query/page budget bounds retry admission and delays.
+        Blocking reads can outlive it: default urllib uses socket inactivity
+        timeouts, and injected transports retain their timeout and buffering
+        semantics. Late responses are refused when blocking I/O returns, and
+        an expired budget admits no further retry. A zero budget permits one
+        initial request without retries.
         """
         deadline = time.monotonic() + self.retry_budget_seconds
         last_error = None
