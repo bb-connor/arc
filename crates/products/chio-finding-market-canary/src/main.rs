@@ -377,14 +377,16 @@ async fn network_canary(
     } = publish_fresh_network_finding(
         &http,
         profile,
-        tenant_id,
-        &seller_key_id,
-        &seller_key_secret,
-        &buyer_key_id,
-        &buyer_key_secret,
-        &candidate_sha,
-        &run_nonce,
-        finding_candidates,
+        FreshFindingPublication {
+            tenant_id,
+            seller_key_id: &seller_key_id,
+            seller_key_secret: &seller_key_secret,
+            buyer_key_id: &buyer_key_id,
+            buyer_key_secret: &buyer_key_secret,
+            candidate_sha: &candidate_sha,
+            run_nonce: &run_nonce,
+            candidates: finding_candidates,
+        },
     )
     .await?;
     let finding = candidate.finding;
@@ -395,12 +397,14 @@ async fn network_canary(
     let retry = publish_network_finding(
         &http,
         profile,
-        tenant_id,
-        &seller_key_id,
-        &seller_key_secret,
-        &retry_request_id,
-        &event_id,
-        &finding_bytes,
+        FindingPublication {
+            tenant_id,
+            key_id: &seller_key_id,
+            key_secret: &seller_key_secret,
+            request_id: &retry_request_id,
+            event_id: &event_id,
+            finding: &finding_bytes,
+        },
     )
     .await?;
     validate_network_mutation(
@@ -584,19 +588,33 @@ fn load_network_finding_pool(
     Ok((sha256_hex(&pool_bytes), candidates))
 }
 
-#[allow(clippy::too_many_arguments)]
+/// Parameters of `publish_fresh_network_finding`.
+struct FreshFindingPublication<'a> {
+    tenant_id: &'a str,
+    seller_key_id: &'a str,
+    seller_key_secret: &'a str,
+    buyer_key_id: &'a str,
+    buyer_key_secret: &'a str,
+    candidate_sha: &'a str,
+    run_nonce: &'a str,
+    candidates: Vec<NetworkFindingCandidate>,
+}
+
 async fn publish_fresh_network_finding(
     http: &NetworkHttpClient,
     profile: &FindingHostedProfile,
-    tenant_id: &str,
-    seller_key_id: &str,
-    seller_key_secret: &str,
-    buyer_key_id: &str,
-    buyer_key_secret: &str,
-    candidate_sha: &str,
-    run_nonce: &str,
-    candidates: Vec<NetworkFindingCandidate>,
+    params: FreshFindingPublication<'_>,
 ) -> Result<FreshNetworkPublication, &'static str> {
+    let FreshFindingPublication {
+        tenant_id,
+        seller_key_id,
+        seller_key_secret,
+        buyer_key_id,
+        buyer_key_secret,
+        candidate_sha,
+        run_nonce,
+        candidates,
+    } = params;
     for candidate in candidates {
         let finding_id = candidate.finding.finding_id.as_str();
         let event_id = network_event_id(
@@ -632,12 +650,14 @@ async fn publish_fresh_network_finding(
         let Some(response) = try_publish_network_finding(
             http,
             profile,
-            tenant_id,
-            seller_key_id,
-            seller_key_secret,
-            &request_id,
-            &event_id,
-            &candidate.bytes,
+            FindingPublication {
+                tenant_id,
+                key_id: seller_key_id,
+                key_secret: seller_key_secret,
+                request_id: &request_id,
+                event_id: &event_id,
+                finding: &candidate.bytes,
+            },
         )
         .await?
         else {
@@ -687,19 +707,40 @@ fn finding_catalog_path(finding_id: &str) -> Result<String, &'static str> {
     Ok("/v1/findings?limit=1".to_owned())
 }
 
-#[allow(clippy::too_many_arguments)]
+/// Parameters of `try_publish_network_finding`.
+struct FindingPublication<'a> {
+    tenant_id: &'a str,
+    key_id: &'a str,
+    key_secret: &'a str,
+    request_id: &'a str,
+    event_id: &'a str,
+    finding: &'a [u8],
+}
+
 async fn try_publish_network_finding(
     http: &NetworkHttpClient,
     profile: &FindingHostedProfile,
-    tenant_id: &str,
-    key_id: &str,
-    key_secret: &str,
-    request_id: &str,
-    event_id: &str,
-    finding: &[u8],
+    params: FindingPublication<'_>,
 ) -> Result<Option<NetworkMutationResponse>, &'static str> {
+    let FindingPublication {
+        tenant_id,
+        key_id,
+        key_secret,
+        request_id,
+        event_id,
+        finding,
+    } = params;
     let response = send_network_finding(
-        http, profile, tenant_id, key_id, key_secret, request_id, event_id, finding,
+        http,
+        profile,
+        FindingPublication {
+            tenant_id,
+            key_id,
+            key_secret,
+            request_id,
+            event_id,
+            finding,
+        },
     )
     .await?;
     if response.status() == StatusCode::CONFLICT {
@@ -709,35 +750,48 @@ async fn try_publish_network_finding(
     parse_network_publish_response(response).map(Some)
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn publish_network_finding(
     http: &NetworkHttpClient,
     profile: &FindingHostedProfile,
-    tenant_id: &str,
-    key_id: &str,
-    key_secret: &str,
-    request_id: &str,
-    event_id: &str,
-    finding: &[u8],
+    params: FindingPublication<'_>,
 ) -> Result<NetworkMutationResponse, &'static str> {
+    let FindingPublication {
+        tenant_id,
+        key_id,
+        key_secret,
+        request_id,
+        event_id,
+        finding,
+    } = params;
     let response = send_network_finding(
-        http, profile, tenant_id, key_id, key_secret, request_id, event_id, finding,
+        http,
+        profile,
+        FindingPublication {
+            tenant_id,
+            key_id,
+            key_secret,
+            request_id,
+            event_id,
+            finding,
+        },
     )
     .await?;
     parse_network_publish_response(response)
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn send_network_finding(
     http: &NetworkHttpClient,
     profile: &FindingHostedProfile,
-    tenant_id: &str,
-    key_id: &str,
-    key_secret: &str,
-    request_id: &str,
-    event_id: &str,
-    finding: &[u8],
+    params: FindingPublication<'_>,
 ) -> Result<ContractResponse, &'static str> {
+    let FindingPublication {
+        tenant_id,
+        key_id,
+        key_secret,
+        request_id,
+        event_id,
+        finding,
+    } = params;
     let request = http
         .client
         .post(format!(
