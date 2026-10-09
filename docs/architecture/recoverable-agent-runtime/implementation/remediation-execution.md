@@ -59,8 +59,21 @@ recovery tests and five provisioning/upgrade controls. These independent units
 do not install the larger Native bank or close its lifecycle obligations.
 The candidate also passed all 19 budget-source, atomic ledger and provisioning
 controls after repairing its fixtures and actual owning connection profile.
-Kernel and Process foundation reviews now precede their separate installation;
-the complete Capture producer remains a later dependency.
+The [Kernel foundation successor](reviews/kernel-foundation.md) has independent
+spec and quality approval after correcting ordinary durable eligibility and the
+Session-only Loom gate. The composed candidate passed both eligibility controls,
+all 1,469 Kernel library cases and 18 Loom controls with a preemption bound of
+three. Those runs include a separately reviewed atomic-ledger overlay; the
+foundation source selection uses frozen preimages for two overlapping files.
+The reviewed 22-path foundation is now installed at `b7d71059c`; its separate
+maintained checks passed 1,468 library cases, 25 doctests, 18 bounded Loom
+controls, format, names, boundaries and strict Kernel library-only Clippy.
+The excluded atomic-ledger callback case explains the one-test difference.
+All-targets strict Kernel Clippy remains failed with 248 unchanged Store
+development-dependency diagnostic signatures. The Process supplier finding,
+candidate ReceiptStore borrowed-backend regression and complete Capture producer
+retain their own obligations. The ReceiptStore regression has an actual compile
+failure; no corrected successor is accepted here.
 
 ## Acceptance order
 
