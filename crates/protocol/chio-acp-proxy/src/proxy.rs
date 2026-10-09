@@ -1,3 +1,11 @@
+use crate::attestation::{AcpAttestationMode, CapabilityChecker, ReceiptSigner};
+use crate::clock::AcpClock;
+use crate::config::AcpProxyConfig;
+use crate::input::AcpMessage;
+use crate::interceptor::{Direction, InterceptResult, MessageInterceptor};
+use crate::transport::AcpTransport;
+use crate::AcpProxyError;
+
 /// Top-level ACP proxy orchestrator.
 ///
 /// Wraps the transport, interceptor, and configuration into a single

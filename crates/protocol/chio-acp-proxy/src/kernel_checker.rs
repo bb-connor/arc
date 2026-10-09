@@ -1,3 +1,8 @@
+use crate::attestation::{
+    AcpCapabilityRequest, AcpVerdict, CapabilityCheckError, CapabilityChecker,
+};
+use serde_json::Value;
+
 // Kernel-backed CapabilityChecker implementation.
 //
 // Routes ACP live-path checks through the shared cross-protocol orchestrator and
@@ -23,7 +28,7 @@ const ACP_GUARD_WRITE_TOOL: &str = "fs/write_text_file";
 const ACP_GUARD_TERMINAL_TOOL: &str = "terminal/create";
 const ACP_GUARD_TERMINAL_KILL_TOOL: &str = "terminal/kill";
 const ACP_GUARD_TERMINAL_RELEASE_TOOL: &str = "terminal/release";
-const ACP_GUARD_TOOLS: [&str; 5] = [
+pub(super) const ACP_GUARD_TOOLS: [&str; 5] = [
     ACP_GUARD_READ_TOOL,
     ACP_GUARD_WRITE_TOOL,
     ACP_GUARD_TERMINAL_TOOL,
@@ -177,7 +182,7 @@ impl KernelCapabilityChecker {
     fn parse_token(&self, token_json: &str) -> Result<CapabilityToken, CapabilityCheckError> {
         Ok(chio_core::canonical::SignedRecordJson::from_wire(
             token_json.as_bytes(),
-            input::MAX_CAPABILITY_BYTES,
+            crate::input::MAX_CAPABILITY_BYTES,
         )?
         .decode()?)
     }

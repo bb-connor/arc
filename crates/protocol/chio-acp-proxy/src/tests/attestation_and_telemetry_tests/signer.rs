@@ -1,4 +1,20 @@
-use super::*;
+use crate::attestation::{AcpReceiptRequest, ReceiptSigner};
+use crate::clock::AcpClock;
+use crate::kernel_signer::KernelReceiptSigner;
+use crate::receipt_error::{ReceiptAuthorizationError, ReceiptBinding, ReceiptSignError};
+use crate::tests::attestation_and_telemetry_tests::{
+    make_audit_entry, make_authorization_receipt, make_authorization_receipt_with_semantics,
+    make_authorization_receipt_with_tenant, mark_entry_cryptographically_enforced, now_secs,
+    rewrite_authorization_action_parameters, test_authorization_correlation_id,
+    test_authorization_parameter_hash, test_authorization_resource, MockReceiptStore,
+    MockStoreState, UnsupportedDurableConsumptionStore,
+};
+use chio_core::crypto::Keypair;
+use chio_core::receipt::body::ChioReceipt;
+use chio_core::receipt::decision::Decision;
+use chio_kernel::receipt_store::ReceiptStoreError;
+use serde_json::json;
+use std::sync::{Arc, Mutex};
 
 #[test]
 fn kernel_receipt_signer_uses_store_owned_checkpoint_creation() {

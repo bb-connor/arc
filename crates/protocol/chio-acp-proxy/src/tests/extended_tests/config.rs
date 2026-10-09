@@ -1,4 +1,7 @@
-use super::*;
+use crate::config::AcpProxyConfig;
+use crate::interceptor::MessageInterceptor;
+use crate::proxy::AcpProxy;
+use crate::tests::extended_tests::test_config;
 
 #[test]
 fn config_builder_defaults() {

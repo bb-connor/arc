@@ -1,3 +1,10 @@
+use crate::attestation::{AcpReceiptRequest, ReceiptSigner};
+use crate::clock::{AcpAuditError, AcpClock};
+use crate::receipt::AcpEnforcementMode;
+use crate::receipt_error::{ReceiptAuthorizationError, ReceiptBinding, ReceiptSignError};
+use chio_core::receipt::body::ChioReceipt;
+use chio_security_types::clock::Clock;
+
 // Kernel-backed ReceiptSigner implementation.
 //
 // Signs ACP audit entries into Chio receipts using an Ed25519 keypair,
@@ -440,7 +447,7 @@ impl ReceiptSigner for KernelReceiptSigner {
         let entry = &request.audit_entry;
 
         let now = self.clock.read().map_err(AcpAuditError::from)?;
-        let timestamp = clock::event_timestamp(&entry.timestamp, now)?;
+        let timestamp = crate::clock::event_timestamp(&entry.timestamp, now)?;
         let enforcement_mode = entry
             .enforcement_mode
             .unwrap_or(AcpEnforcementMode::AuditOnly);

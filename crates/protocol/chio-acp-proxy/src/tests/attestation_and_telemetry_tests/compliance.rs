@@ -1,4 +1,12 @@
-use super::*;
+use crate::clock::AcpClock;
+use crate::compliance::{
+    generate_compliance_certificate, verify_compliance_certificate, VerificationMode,
+};
+use crate::tests::attestation_and_telemetry_tests::{make_receipt_for_session, now_secs};
+use crate::{ComplianceCertificateError, ComplianceConfig, ComplianceReceiptEntry};
+use chio_core::crypto::Keypair;
+use chio_core::receipt::decision::Decision;
+use chio_core::receipt::metadata::GuardEvidence;
 
 #[test]
 fn compliance_certificate_rejects_empty_invalid_and_non_compliant_receipts() {

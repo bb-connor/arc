@@ -1,3 +1,6 @@
+use crate::input::{AcpFrameReader, AcpMessage};
+use crate::AcpProxyError;
+
 use std::io::{BufReader, Write};
 use std::process::{Child, Command, Stdio};
 
@@ -48,7 +51,7 @@ impl AcpTransport {
             .as_mut()
             .ok_or_else(|| AcpProxyError::PipeUnavailable)?;
 
-        let serialized = input::encode(message)?;
+        let serialized = crate::input::encode(message)?;
         stdin.write_all(&serialized)?;
         stdin.write_all(b"\n")?;
         stdin.flush()?;

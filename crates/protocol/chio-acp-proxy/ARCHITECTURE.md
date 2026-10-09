@@ -7,10 +7,9 @@ IDE) and a third-party ACP coding agent subprocess. It runs in two modes: a
 standalone mode backed only by local fail-closed allowlists, and a
 kernel-backed mode where an installed `CapabilityChecker` and `ReceiptSigner`
 route filesystem and terminal requests through `chio-kernel`'s guard pipeline
-and sign the resulting receipts. Every file under `src/` is pulled into the
-crate root with `include!` rather than declared as a Rust module, so the
-public surface lives in one flat `chio_acp_proxy::*` namespace; the module map
-below groups by file, not by `mod`.
+and sign the resulting receipts. Each file under `src/` is a Rust module declared from
+`lib.rs`; the public surface is re-exported from the crate root so it lives in
+one flat `chio_acp_proxy::*` namespace.
 
 ## Module map
 

@@ -1,3 +1,8 @@
+use crate::rejection::AcpProtocolError;
+use crate::AcpProxyError;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
 use std::collections::BTreeMap;
 
 /// A JSON-RPC 2.0 message envelope used by the ACP protocol.
@@ -36,7 +41,7 @@ pub struct JsonRpcError {
 /// Uses the server error range (-32000 to -32099) rather than the
 /// standard "invalid request" code (-32600), since the request is
 /// syntactically valid but policy-rejected.
-const ACP_ERROR_ACCESS_DENIED: i64 = -32000;
+pub(super) const ACP_ERROR_ACCESS_DENIED: i64 = -32000;
 
 /// Discriminated ACP method names that the proxy needs to understand.
 #[derive(Debug, Clone, PartialEq, Eq)]

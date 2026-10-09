@@ -17,41 +17,74 @@
 //!    Chio receipts by a downstream component with key material.
 
 #![forbid(unsafe_code)]
+pub use attestation::{
+    AcpAttestationMode, AcpCapabilityRequest, AcpReceiptRequest, AcpVerdict, CapabilityCheckError,
+    CapabilityChecker, ReceiptSigner,
+};
+pub use compliance::{
+    generate_compliance_certificate, generate_compliance_certificate_with_coverage,
+    verify_compliance_certificate, verify_compliance_certificate_with_clock,
+    CertificateVerificationResult, CertificateVerificationScope, ComplianceBundleError,
+    ComplianceCertificate, ComplianceCertificateBody, ComplianceCertificateError,
+    ComplianceCheckStatus, ComplianceChecks, ComplianceConfig, ComplianceCoverage,
+    ComplianceProfile, ComplianceReceiptEntry, ComplianceToolTarget, VerificationMode,
+    COMPLIANCE_CERTIFICATE_SCHEMA, COMPLIANCE_CERTIFICATE_SCHEMA_V1,
+};
+pub use config::AcpProxyConfig;
+pub use fs_guard::FsGuard;
+pub use interceptor::{Direction, InterceptResult, MessageInterceptor};
+pub use kernel_checker::KernelCapabilityChecker;
+pub use kernel_signer::{KernelReceiptSigner, KernelSignerCheckpointHealth};
+pub use permission::{MappedPermission, PermissionDecision, PermissionMapper};
+pub use protocol::{
+    extract_method, json_rpc_error, json_rpc_error_with_data, parse_session_update, AcpMethod,
+    CreateTerminalParams, JsonRpcError, JsonRpcMessage, KillTerminalParams, PermissionOption,
+    ReadTextFileParams, ReleaseTerminalParams, RequestPermissionParams, SessionCancelParams,
+    SessionUpdate, SessionUpdateNotification, ToolCallEvent, ToolCallUpdateEvent,
+    WriteTextFileParams,
+};
+pub use proxy::AcpProxy;
+pub use receipt::{
+    AcpCapabilityAuditContext, AcpEnforcementMode, AcpToolCallAuditEntry, ReceiptLogger,
+};
+pub use telemetry::{
+    compliance_certificate_event, derive_trace_id, receipt_to_span, receipt_to_span_with_authority,
+    session_root_span, JsonFileExporter, LoggingSpanExporter, ReceiptAuthorityFields, ReceiptSpan,
+    ReceiptSpanExporter, SpanAttribute, SpanEvent, TelemetryConfig, TelemetryExportError,
+};
+pub use terminal_guard::TerminalGuard;
+pub use transport::AcpTransport;
 
 mod rejection;
 pub use rejection::{AcpGuardError, AcpProtocolError};
 mod receipt_error;
 pub use receipt_error::{ReceiptAuthorizationError, ReceiptBinding, ReceiptSignError};
 mod clock;
-use chio_security_types::clock::Clock;
 pub use clock::{AcpAuditError, AcpClock};
 mod input;
-use chio_core::crypto::PublicKey;
 pub use input::{AcpFrameReader, AcpMessage, MAX_ACP_MESSAGE_BYTES};
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 #[cfg(feature = "otel")]
 pub mod otel;
 
-// ---------- source files (include! pattern) ----------
+// ---------- modules ----------
 
-include!("protocol.rs");
-include!("config.rs");
-include!("fs_guard.rs");
-include!("terminal_guard.rs");
-include!("permission.rs");
-include!("receipt.rs");
-include!("attestation.rs");
-include!("kernel_signer.rs");
-include!("kernel_checker.rs");
-include!("compliance.rs");
-include!("telemetry.rs");
-include!("interceptor.rs");
-include!("transport.rs");
-include!("proxy.rs");
+mod attestation;
+mod compliance;
+mod config;
+mod fs_guard;
+mod interceptor;
+mod kernel_checker;
+mod kernel_signer;
+mod permission;
+mod protocol;
+mod proxy;
+mod receipt;
+mod telemetry;
+mod terminal_guard;
 #[cfg(test)]
 mod tests;
+mod transport;
 
 // ---------- error type ----------
 

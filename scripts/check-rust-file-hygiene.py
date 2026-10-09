@@ -441,12 +441,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "serving-owner provisioning test suite with sequenced revocation stream coverage; capped to current size until split",
         max_lines=2_281,
     ),
-    "crates/protocol/chio-acp-proxy/src/lib.rs": allow(
-        "2027-01-31",
-        "ACP proxy surface assembled from include! fragments; capped until the fragments become modules",
-        max_lines=12_252,
-        max_fragments=33,
-    ),
     "crates/protocol/chio-a2a-adapter/src/lib.rs": allow(
         "2027-01-31",
         "A2A adapter surface assembled from include! fragments; capped until the fragments become modules",

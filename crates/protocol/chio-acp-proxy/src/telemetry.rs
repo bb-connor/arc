@@ -1,3 +1,7 @@
+use crate::compliance::ComplianceCertificateBody;
+use chio_core::receipt::body::{chio_receipt_id, ChioReceipt};
+use serde::{Deserialize, Serialize};
+
 // OpenTelemetry-compatible telemetry export for ACP receipts.
 //
 // This module provides a thin abstraction layer for exporting Chio
@@ -316,7 +320,8 @@ pub fn receipt_to_span_with_authority(
     ];
 
     // Add deny reason if applicable.
-    if let Some(chio_core::receipt::decision::Decision::Deny { reason, guard }) = &receipt.decision {
+    if let Some(chio_core::receipt::decision::Decision::Deny { reason, guard }) = &receipt.decision
+    {
         attributes.push(SpanAttribute {
             key: "chio.deny_reason".to_string(),
             value: reason.clone(),
@@ -345,11 +350,7 @@ pub fn receipt_to_span_with_authority(
                 },
                 SpanAttribute {
                     key: "guard.details".to_string(),
-                    value: ev
-                        .details
-                        .as_deref()
-                        .unwrap_or("")
-                        .to_string(),
+                    value: ev.details.as_deref().unwrap_or("").to_string(),
                 },
             ],
         })
@@ -370,9 +371,7 @@ pub fn receipt_to_span_with_authority(
 }
 
 /// Convert a compliance certificate event into a span event on the session root span.
-pub fn compliance_certificate_event(
-    cert: &ComplianceCertificateBody,
-) -> SpanEvent {
+pub fn compliance_certificate_event(cert: &ComplianceCertificateBody) -> SpanEvent {
     let timestamp_nanos = cert.issued_at.saturating_mul(1_000_000_000);
 
     SpanEvent {
@@ -518,27 +517,24 @@ impl JsonFileExporter {
 
 impl ReceiptSpanExporter for JsonFileExporter {
     fn export(&self, spans: &[ReceiptSpan]) -> Result<usize, TelemetryExportError> {
-        let path = self.path.lock().map_err(|e| {
-            TelemetryExportError::ExportFailed(format!("lock poisoned: {e}"))
-        })?;
+        let path = self
+            .path
+            .lock()
+            .map_err(|e| TelemetryExportError::ExportFailed(format!("lock poisoned: {e}")))?;
 
         let mut file = std::fs::OpenOptions::new()
             .create(true)
             .append(true)
             .open(path.as_str())
-            .map_err(|e| {
-                TelemetryExportError::ExportFailed(format!("failed to open file: {e}"))
-            })?;
+            .map_err(|e| TelemetryExportError::ExportFailed(format!("failed to open file: {e}")))?;
 
         let mut count = 0;
         for span in spans {
-            let json = serde_json::to_string(span).map_err(|e| {
-                TelemetryExportError::SerializationFailed(format!("{e}"))
-            })?;
+            let json = serde_json::to_string(span)
+                .map_err(|e| TelemetryExportError::SerializationFailed(format!("{e}")))?;
             use std::io::Write;
-            writeln!(file, "{json}").map_err(|e| {
-                TelemetryExportError::ExportFailed(format!("write failed: {e}"))
-            })?;
+            writeln!(file, "{json}")
+                .map_err(|e| TelemetryExportError::ExportFailed(format!("write failed: {e}")))?;
             count += 1;
         }
 

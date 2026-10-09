@@ -1,4 +1,25 @@
-use super::*;
+use crate::attestation::AcpAttestationMode;
+use crate::clock::AcpClock;
+use crate::compliance::{ComplianceCertificateBody, COMPLIANCE_CERTIFICATE_SCHEMA_V1};
+use crate::config::AcpProxyConfig;
+use crate::input::AcpMessage;
+use crate::interceptor::InterceptResult;
+use crate::proxy::AcpProxy;
+use crate::telemetry::{
+    compliance_certificate_event, derive_trace_id, receipt_to_span, session_root_span,
+    JsonFileExporter, LoggingSpanExporter, ReceiptSpan, ReceiptSpanExporter, SpanAttribute,
+    TelemetryConfig, TelemetryExportError,
+};
+use crate::tests::attestation_and_telemetry_tests::{
+    make_receipt, now_secs, DummyChecker, DummySigner,
+};
+use crate::transport::AcpTransport;
+use crate::AcpProxyError;
+use chio_core::crypto::Keypair;
+use chio_core::receipt::decision::Decision;
+use chio_core::receipt::metadata::GuardEvidence;
+use serde_json::json;
+use std::fs;
 
 #[test]
 fn telemetry_helpers_map_receipts_and_certificates() {

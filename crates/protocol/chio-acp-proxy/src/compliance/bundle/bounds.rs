@@ -10,7 +10,6 @@
 //!
 //! Object ordering changes no byte lengths. Float lengths come from the core
 //! canonicalizer, avoiding raw-serde or sequence-wrapper boundary exclusions.
-
 use super::{
     ComplianceBundleError, ComplianceCertificateError, ComplianceCoverage, ComplianceReceiptEntry,
     MAX_CERTIFICATE_RECEIPTS, MAX_RECEIPT_BYTES, MAX_RECEIPT_SET_BYTES,

@@ -1,3 +1,8 @@
+use crate::receipt::AcpToolCallAuditEntry;
+use crate::receipt_error::ReceiptSignError;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
 // Attestation traits for ACP proxy kernel integration.
 //
 // These traits allow optional injection of a receipt signer and

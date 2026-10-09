@@ -1,3 +1,6 @@
+use crate::rejection::AcpGuardError;
+use crate::AcpProxyError;
+
 /// Filesystem access guard that enforces path-scoped capabilities.
 ///
 /// The guard is fail-closed: if no allowed prefix matches, access is

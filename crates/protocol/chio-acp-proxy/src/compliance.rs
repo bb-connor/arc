@@ -1,3 +1,9 @@
+use crate::clock::{AcpAuditError, AcpClock};
+use chio_core::crypto::{Keypair, PublicKey};
+use chio_core::receipt::body::ChioReceipt;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
 // Session compliance certificate generation and verification.
 //
 // Commits an ordered signed receipt set and explicitly configured tool-target,
@@ -10,9 +16,8 @@ use chio_core::canonical::canonical_json_bytes;
 use chio_core::crypto::Signature;
 use chio_core::receipt::body::chio_receipt_id;
 
-#[path = "compliance/bundle.rs"]
-mod compliance_bundle;
-pub use compliance_bundle::{
+mod bundle;
+pub use bundle::{
     ComplianceBundleError, ComplianceCheckStatus, ComplianceChecks, ComplianceCoverage,
     ComplianceProfile, ComplianceToolTarget,
 };
@@ -349,8 +354,7 @@ pub const COMPLIANCE_CERTIFICATE_SCHEMA_V1: &str = "chio.compliance.certificate.
 pub const COMPLIANCE_CERTIFICATE_SCHEMA: &str = "chio.compliance.certificate.v2";
 
 #[cfg(test)]
-#[path = "compliance/bundle_tests.rs"]
-mod compliance_bundle_tests;
+mod bundle_tests;
 
 fn receipt_session_id(receipt: &ChioReceipt) -> Option<&str> {
     let metadata = receipt.metadata.as_ref()?.as_object()?;
@@ -492,7 +496,7 @@ pub fn generate_compliance_certificate_with_coverage(
         ));
     }
     let now = clock.seconds()?;
-    let summary = compliance_bundle::validate_set(session_id, receipts, config, now, &coverage)?;
+    let summary = bundle::validate_set(session_id, receipts, config, now, &coverage)?;
     if keypair.public_key() != summary.kernel_key {
         return Err(ComplianceCertificateError::SelfVerification);
     }
@@ -518,7 +522,7 @@ pub fn generate_compliance_certificate_with_coverage(
         checks: Some(summary.checks),
         coverage: Some(coverage),
     };
-    compliance_bundle::preflight_body(&body)?;
+    bundle::preflight_body(&body)?;
     let body_bytes = canonical_json_bytes(&body)?;
     let signature = keypair.sign(&body_bytes);
     let certificate = ComplianceCertificate {
@@ -579,7 +583,7 @@ fn verify_compliance_certificate_at_time(
     config: &ComplianceConfig,
     now: u64,
 ) -> CertificateVerificationResult {
-    if compliance_bundle::preflight_certificate(cert).is_err() {
+    if bundle::preflight_certificate(cert).is_err() {
         return CertificateVerificationResult {
             verification_scope: CertificateVerificationScope::Unverified,
             certificate_signature_valid: false,
@@ -664,7 +668,7 @@ fn verify_compliance_certificate_at_time(
             summary: ComplianceBundleError::MissingCommitment.reason().into(),
         };
     }
-    let mut report = compliance_bundle::ReceiptVerificationReport::default();
+    let mut report = bundle::ReceiptVerificationReport::default();
     let validation = cert
         .body
         .coverage
@@ -672,7 +676,7 @@ fn verify_compliance_certificate_at_time(
         .ok_or(ComplianceBundleError::MissingCommitment)
         .map_err(ComplianceCertificateError::from)
         .and_then(|coverage| {
-            compliance_bundle::validate_set_with_report(
+            bundle::validate_set_with_report(
                 &cert.body.session_id,
                 entries,
                 config,
@@ -759,8 +763,8 @@ fn certificate_body_consistent(cert: &ComplianceCertificate, now: u64) -> bool {
         return body.scope_compliant && body.budget_compliant && body.guards_compliant;
     }
     if body.schema != COMPLIANCE_CERTIFICATE_SCHEMA
-        || !compliance_bundle::valid_digest(body.receipt_set_digest.as_deref())
-        || !compliance_bundle::valid_digest(body.compliance_profile_digest.as_deref())
+        || !bundle::valid_digest(body.receipt_set_digest.as_deref())
+        || !bundle::valid_digest(body.compliance_profile_digest.as_deref())
         || body
             .invocation_count
             .is_none_or(|count| count > body.receipt_count)

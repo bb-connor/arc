@@ -1,4 +1,7 @@
-use super::*;
+use crate::input::{AcpFrameReader, AcpMessage, MAX_CAPABILITY_BYTES};
+use crate::AcpProxyError;
+use chio_core::canonical::{SignedRecordJson, UntrustedJsonError};
+
 use chio_core::{
     capability::{scope::ChioScope, token::CapabilityToken, token::CapabilityTokenBody},
     crypto::Keypair,
@@ -95,7 +98,7 @@ fn original_capability_objects_keep_full_width_signed_integers() -> TestResult {
         for field in ["capabilityToken", "capability_token"] {
             let bytes = authority_message(field, &raw, nested);
             let message = AcpMessage::decode(bytes.as_bytes())?;
-            let text = crate::extract_capability_token(&message.as_value()["params"])
+            let text = crate::interceptor::extract_capability_token(&message.as_value()["params"])
                 .ok_or("missing object-form token")?;
             let decoded: CapabilityToken =
                 SignedRecordJson::from_wire(text.as_bytes(), MAX_CAPABILITY_BYTES)?.decode()?;
@@ -150,8 +153,9 @@ fn original_nonce_objects_keep_full_width_signed_integers() -> TestResult {
         for field in ["executionNonce", "execution_nonce"] {
             let bytes = authority_message(field, &raw, nested);
             let message = AcpMessage::decode(bytes.as_bytes())?;
-            let decoded = crate::extract_execution_nonce(&message.as_value()["params"])?
-                .ok_or("missing object-form nonce")?;
+            let decoded =
+                crate::interceptor::extract_execution_nonce(&message.as_value()["params"])?
+                    .ok_or("missing object-form nonce")?;
             assert_eq!(decoded.nonce.issued_at, 9_007_199_254_740_993);
             assert_eq!(decoded.nonce.expires_at, i64::MAX);
             assert!(key
@@ -169,7 +173,7 @@ fn encoded_capability_text_still_uses_its_strict_signed_reader() -> TestResult {
     let encoded = serde_json::to_string(&raw)?;
     let bytes = authority_message("capabilityToken", &encoded, true);
     let message = AcpMessage::decode(bytes.as_bytes())?;
-    let text = crate::extract_capability_token(&message.as_value()["params"])
+    let text = crate::interceptor::extract_capability_token(&message.as_value()["params"])
         .ok_or("missing token text")?;
     assert_eq!(text, raw);
     assert!(matches!(

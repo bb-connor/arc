@@ -1,4 +1,5 @@
 //! ACP-specific GenAI OTel span helpers.
+use chio_core::receipt::body::chio_receipt_id;
 
 pub use chio_kernel::otel::{
     build_gen_ai_tool_call_span, GenAiToolCallSpan, GenAiToolCallSpanInput, OtelAttribute,

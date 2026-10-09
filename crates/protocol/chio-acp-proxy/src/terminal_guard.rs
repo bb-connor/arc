@@ -1,3 +1,6 @@
+use crate::rejection::AcpGuardError;
+use crate::AcpProxyError;
+
 /// Terminal command execution guard.
 ///
 /// Fail-closed: only commands explicitly on the allowlist may execute.

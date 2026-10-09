@@ -1,4 +1,5 @@
-use super::*;
+use crate::fs_guard::FsGuard;
+use crate::terminal_guard::TerminalGuard;
 
 #[test]
 fn fs_guard_path_with_trailing_slash() {

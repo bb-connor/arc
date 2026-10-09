@@ -1,6 +1,13 @@
-use super::*;
+use crate::attestation::{
+    AcpCapabilityRequest, AcpReceiptRequest, AcpVerdict, CapabilityCheckError, CapabilityChecker,
+    ReceiptSigner,
+};
+use crate::kernel_checker::{KernelCapabilityChecker, ACP_GUARD_TOOLS};
+use crate::receipt::{AcpEnforcementMode, AcpToolCallAuditEntry};
+use crate::receipt_error::ReceiptSignError;
+use chio_kernel::receipt_store::AuthorizationReceiptConsumption;
+
 use std::collections::VecDeque;
-use std::fs;
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -15,8 +22,7 @@ use chio_core::receipt::{
 };
 use chio_kernel::receipt_store::{ReceiptCheckpointCreateReport, ReceiptStore, ReceiptStoreError};
 use chio_kernel::{
-    ChioKernel, ExecutionNonceConfig, InMemoryExecutionNonceStore, KernelConfig,
-    DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
+    ChioKernel, KernelConfig, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
     DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 use chio_manifest::{
@@ -790,20 +796,14 @@ impl CapabilityChecker for ErrorChecker {
     }
 }
 
-#[path = "attestation_denials.rs"]
 mod denials;
 
-#[path = "attestation_lifecycle.rs"]
 mod lifecycle;
 
-#[path = "attestation_compliance.rs"]
 mod compliance;
 
-#[path = "attestation_clock.rs"]
 mod clock;
 
-#[path = "attestation_signer.rs"]
 mod signer;
 
-#[path = "attestation_telemetry_transport.rs"]
 mod telemetry_transport;

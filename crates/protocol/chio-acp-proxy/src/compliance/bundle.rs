@@ -1,5 +1,4 @@
 //! Authenticated ACP receipt sets and the exact checks requested by an operator.
-
 use crate::{AcpAuditError, ComplianceCertificateError, ComplianceConfig, ComplianceReceiptEntry};
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::crypto::PublicKey;
@@ -7,10 +6,8 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 
-#[path = "bundle/coverage.rs"]
 mod coverage;
 pub use coverage::ComplianceCoverage;
-#[path = "bundle/bounds.rs"]
 mod bounds;
 pub(crate) use bounds::{preflight_body, preflight_certificate};
 
@@ -217,7 +214,9 @@ pub(crate) fn validate_set_with_report(
     let mut authority_error = None;
     for entry in entries {
         report.reverified = report.reverified.saturating_add(1);
-        if let Err(error) = crate::validate_compliance_receipt(session_id, entry, config) {
+        if let Err(error) =
+            crate::compliance::validate_compliance_receipt(session_id, entry, config)
+        {
             report.failures = report.failures.saturating_add(1);
             authority_error.get_or_insert(error);
         }

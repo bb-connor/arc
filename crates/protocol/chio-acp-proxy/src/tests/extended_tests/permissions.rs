@@ -1,4 +1,5 @@
-use super::*;
+use crate::permission::{PermissionDecision, PermissionMapper};
+use crate::protocol::PermissionOption;
 
 #[test]
 fn permission_mapper_all_four_kinds() {

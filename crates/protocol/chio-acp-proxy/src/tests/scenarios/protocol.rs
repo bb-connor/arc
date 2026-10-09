@@ -1,4 +1,8 @@
-use super::*;
+use crate::protocol::{
+    extract_method, parse_session_update, AcpMethod, CreateTerminalParams, JsonRpcMessage,
+    PermissionOption, ReadTextFileParams, SessionUpdate, WriteTextFileParams,
+};
+use serde_json::json;
 
 #[test]
 fn parse_json_rpc_message() {

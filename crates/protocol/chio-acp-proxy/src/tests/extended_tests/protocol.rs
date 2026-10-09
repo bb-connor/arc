@@ -1,4 +1,8 @@
-use super::*;
+use crate::protocol::{
+    extract_method, json_rpc_error, parse_session_update, AcpMethod, CreateTerminalParams,
+    JsonRpcMessage, ReadTextFileParams, RequestPermissionParams, SessionUpdate,
+};
+use serde_json::json;
 
 #[test]
 fn protocol_malformed_json_rpc_missing_jsonrpc_field() {

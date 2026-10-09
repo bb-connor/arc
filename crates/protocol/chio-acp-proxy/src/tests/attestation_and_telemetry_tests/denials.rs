@@ -1,4 +1,22 @@
-use super::*;
+use crate::attestation::{
+    AcpAttestationMode, AcpCapabilityRequest, AcpVerdict, CapabilityCheckError, CapabilityChecker,
+};
+use crate::clock::AcpClock;
+use crate::config::AcpProxyConfig;
+use crate::interceptor::{Direction, InterceptResult, MessageInterceptor};
+use crate::protocol::ACP_ERROR_ACCESS_DENIED;
+use crate::receipt::AcpEnforcementMode;
+use crate::receipt_error::ReceiptSignError;
+use crate::tests::attestation_and_telemetry_tests::{
+    make_capability_token, now_secs, test_kernel_capability_checker, test_kernel_config,
+    FailingSigner, MockReceiptStore, MockStoreState, RecordingChecker, SequencedChecker,
+};
+use crate::AcpProxyError;
+use chio_core::capability::scope::Constraint;
+use chio_core::crypto::Keypair;
+use chio_kernel::{ChioKernel, ExecutionNonceConfig, InMemoryExecutionNonceStore};
+use serde_json::json;
+use std::sync::{Arc, Mutex};
 
 #[test]
 fn interceptor_required_attestation_blocks_when_signer_is_missing_or_fails() {

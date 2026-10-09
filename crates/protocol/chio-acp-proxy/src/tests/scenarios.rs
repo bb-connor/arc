@@ -1,6 +1,4 @@
-use super::*;
-use serde_json::json;
-use std::time::{SystemTime, UNIX_EPOCH};
+use crate::config::AcpProxyConfig;
 
 fn test_config() -> AcpProxyConfig {
     AcpProxyConfig::new("echo", "deadbeef")
@@ -9,14 +7,10 @@ fn test_config() -> AcpProxyConfig {
         .with_allowed_command("npm")
 }
 
-#[path = "core_guards.rs"]
 mod guards;
 
-#[path = "core_receipts.rs"]
 mod receipts;
 
-#[path = "core_protocol.rs"]
 mod protocol;
 
-#[path = "core_interceptor.rs"]
 mod interceptor;

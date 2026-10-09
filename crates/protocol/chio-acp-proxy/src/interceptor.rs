@@ -1,3 +1,27 @@
+use crate::attestation::{
+    AcpAttestationMode, AcpCapabilityRequest, AcpReceiptRequest, CapabilityCheckError,
+    CapabilityChecker, ReceiptSigner,
+};
+use crate::clock::{AcpAuditError, AcpClock};
+use crate::config::AcpProxyConfig;
+use crate::fs_guard::FsGuard;
+use crate::input::AcpMessage;
+use crate::permission::PermissionMapper;
+use crate::protocol::{
+    extract_method, json_rpc_error, json_rpc_error_with_data, parse_session_update, AcpMethod,
+    CreateTerminalParams, KillTerminalParams, ReadTextFileParams, ReleaseTerminalParams,
+    RequestPermissionParams, SessionCancelParams, SessionUpdate, SessionUpdateNotification,
+    WriteTextFileParams, ACP_ERROR_ACCESS_DENIED,
+};
+use crate::receipt::{
+    AcpCapabilityAuditContext, AcpEnforcementMode, AcpToolCallAuditEntry, ReceiptLogger,
+};
+use crate::receipt_error::ReceiptSignError;
+use crate::rejection::AcpProtocolError;
+use crate::terminal_guard::TerminalGuard;
+use crate::AcpProxyError;
+use serde_json::Value;
+
 use std::collections::HashMap;
 
 /// Maximum number of pending capability contexts buffered per session.
@@ -164,7 +188,7 @@ impl MessageInterceptor {
         self.intercept_value(direction, message.as_value())
     }
 
-    fn intercept_value(
+    pub(super) fn intercept_value(
         &self,
         direction: Direction,
         message: &Value,
@@ -265,7 +289,7 @@ impl MessageInterceptor {
 
     // -- private handlers --
 
-    fn jsonrpc_params<'a>(
+    pub(super) fn jsonrpc_params<'a>(
         message: &'a Value,
         method_name: &'static str,
     ) -> Result<&'a Value, AcpProxyError> {
@@ -276,7 +300,7 @@ impl MessageInterceptor {
         })
     }
 
-    fn decode_jsonrpc_params<T>(
+    pub(super) fn decode_jsonrpc_params<T>(
         params: &Value,
         _method_name: &'static str,
     ) -> Result<T, AcpProxyError>
@@ -1054,7 +1078,7 @@ fn acp_receipt_tool_name(entry: &AcpToolCallAuditEntry) -> String {
     .to_string()
 }
 
-fn authorization_parameter_hash(params: &Value) -> Result<String, AcpProxyError> {
+pub(super) fn authorization_parameter_hash(params: &Value) -> Result<String, AcpProxyError> {
     let payload = authorization_operation_payload(params);
     let bytes = chio_core::canonical::canonical_json_bytes(&payload)
         .map_err(|e| AcpProxyError::Audit(AcpAuditError::Canonical(e)))?;
@@ -1106,7 +1130,7 @@ fn is_valid_checker_evidence_id(value: &str) -> bool {
     !trimmed.is_empty() && trimmed == value && !value.chars().any(char::is_control)
 }
 
-fn authorization_correlation_id(
+pub(super) fn authorization_correlation_id(
     id: Option<&Value>,
     session_id: &str,
     operation: &str,
@@ -1122,7 +1146,7 @@ fn authorization_correlation_id(
     format!("acp-auth-{}", chio_core::sha256_hex(&bytes))
 }
 
-fn extract_capability_token(params: &Value) -> Option<String> {
+pub(super) fn extract_capability_token(params: &Value) -> Option<String> {
     extract_token_value(params.get("capabilityToken"))
         .or_else(|| extract_token_value(params.get("capability_token")))
         .or_else(|| {
@@ -1137,7 +1161,7 @@ fn extract_capability_token(params: &Value) -> Option<String> {
         })
 }
 
-fn extract_execution_nonce(
+pub(super) fn extract_execution_nonce(
     params: &Value,
 ) -> Result<Option<chio_kernel::SignedExecutionNonce>, AcpProxyError> {
     let value = params

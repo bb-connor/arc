@@ -1,3 +1,5 @@
+use crate::protocol::PermissionOption;
+
 /// Maps ACP permission requests to Chio capability decisions.
 ///
 /// The mapper translates between ACP's permission model (allow_once,

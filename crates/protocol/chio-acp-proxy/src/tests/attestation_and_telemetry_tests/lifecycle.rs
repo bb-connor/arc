@@ -1,4 +1,17 @@
-use super::*;
+use crate::attestation::{
+    AcpAttestationMode, AcpCapabilityRequest, AcpVerdict, CapabilityCheckError, CapabilityChecker,
+};
+use crate::clock::AcpClock;
+use crate::config::AcpProxyConfig;
+use crate::interceptor::{Direction, InterceptResult, MessageInterceptor};
+use crate::protocol::ACP_ERROR_ACCESS_DENIED;
+use crate::receipt::AcpEnforcementMode;
+use crate::tests::attestation_and_telemetry_tests::{
+    ErrorChecker, RecordingChecker, SequencedChecker,
+};
+use crate::AcpProxyError;
+use serde_json::json;
+use std::sync::{Arc, Mutex};
 
 #[test]
 fn interceptor_checker_denies_and_errors_fail_closed_before_builtin_guards() {

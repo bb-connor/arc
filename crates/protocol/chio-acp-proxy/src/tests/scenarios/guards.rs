@@ -1,4 +1,8 @@
-use super::*;
+use crate::fs_guard::FsGuard;
+use crate::permission::{PermissionDecision, PermissionMapper};
+use crate::protocol::PermissionOption;
+use crate::terminal_guard::TerminalGuard;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 // -- FsGuard tests --
 
