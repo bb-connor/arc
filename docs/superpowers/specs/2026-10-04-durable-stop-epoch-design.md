@@ -1353,3 +1353,9 @@ Where the analogy breaks:
 | Review | Issue | Disposition | Contract |
 |---|---|---|---|
 | 4228925644 | Unbounded quorum approvals could push a stop record past 4 KiB | Fixed. S29 bounds `k` by a deployment-configured `stop_quorum_max` (default 8, hard maximum 64; larger configurations reject at load) and an artifact at `2 * stop_quorum_max` approvals; the record keeps exactly `k` principals inline, and S6 gives quorum-authorized `Resume` and `Relax` records a derived allowance computed from the canonical JSON encoding (at most 15,352 bytes) while every other record keeps 4 KiB, so no operator threshold is weakened. | S29; S6; section 17 |
+
+### PR #1174 review round 37 (review bot)
+
+| Review | Issue | Disposition | Contract |
+|---|---|---|---|
+| 4230630372 | A `Quorum` authorizer does not name the roster generation it was checked against, so a verifier after a roster rotation cannot revalidate it | Tracked as follow-up R1174-4230630372 under the docs review rule (line not changed by the final push). The S29 quorum artifact already signs `roster_digest`; the follow-up carries `roster_digest` and the deployment generation into `StopAuthorizer::Quorum` and retains the authenticated roster configuration for offline verification | S29; `StopAuthorizer` |

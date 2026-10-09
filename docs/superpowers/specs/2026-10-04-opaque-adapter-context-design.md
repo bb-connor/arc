@@ -347,9 +347,24 @@ pub fn bound_verdict_from_response(
     namespace: &RequestNamespace,
     invocation: &ToolInvocation,
     response: &ToolCallResponse,
-    trusted_kernel_keys: &[PublicKey],
+    receipt_signers: &ReceiptSignerHistory,
     block: Option<&[u8]>,
 ) -> Result<BoundOutcome, ProviderVerdictError>;
+
+/// Authenticated receipt-signer history (spec 9 M11b signer liveness), loaded from signed
+/// deployment configuration, never a bare key list. Each entry carries the retirement fields
+/// of `docs/protocols/TRUST-MODEL-AND-KEY-MANAGEMENT.md` section 5.4.
+pub struct ReceiptSignerHistory { entries: Vec<ReceiptSignerEntry> }
+
+pub struct ReceiptSignerEntry {
+    pub kernel_key: PublicKey,
+    pub valid_from: u64,
+    /// Absent only for the current boot-selected signer.
+    pub valid_to: Option<u64>,
+    pub retirement_reason: Option<KeyRetirementReason>,
+    /// `false` for a key retired for compromise.
+    pub historical_verification: bool,
+}
 
 pub enum ProviderVerdictError {
     // existing variants unchanged
@@ -458,7 +473,12 @@ binding_digest = hex(SHA256("chio.tool-invocation-binding.v3\0"
 
    Any mismatch returns `ResultBindingMismatch`, and nothing is lowered. Passing invocation and verdict B with result A therefore fails: A's binding digest differs, and A's bytes do not hash to B's signed `content_hash`.
 10. **The kernel response is bound before the verdict exists.** `bound_verdict_from_response` checks in this order, and constructs nothing until every check passes:
-    1. `response.receipt` verifies, and its `kernel_key` is in `trusted_kernel_keys`.
+    1. `response.receipt` verifies under its `kernel_key`, and that key was live for this receipt under spec 9 M11b's signer-liveness rule. Membership in a key set is not enough:
+       - `receipt_signers` has an authenticated entry for `kernel_key` whose `[valid_from, valid_to)` contains the receipt's signed `timestamp` (a current signer has no `valid_to`), and whose `historical_verification` is true;
+       - a key retired for compromise has `historical_verification: false` and constructs no outcome at any `timestamp`, because its holder can backdate a receipt into the window;
+       - an entry missing any of these fields, or no entry, fails closed.
+
+       The failure is `ResponseBindingMismatch { check: KernelKey }`, and no verdict, `Allow` included, is built. A retained historical key therefore still replays a pre-rotation receipt, and a retired or compromised key cannot pass a new one. The constructor applies the same rule on durable replay, through the replay harness.
     1a. `response.verdict` and its terminal semantics equal the verdict projected from the receipt's signed decision and signed metadata. `spec/PROTOCOL.md` section 6.1 has no pending decision (only `Allow`, `Deny`, `Cancelled` and `Incomplete`), so the projection is:
        - a signed `Allow` projects to an `Allow` verdict;
        - a **pending-approval receipt** is a signed `Deny` whose signed metadata carries `threshold_approval.state = "approval_required"`, with its `proposal_id` and `proposal_hash`. It is what the kernel signs for a parked approval: the decision is `Deny { guard: "kernel" }`, and the separate response carries `Verdict::PendingApproval` with terminal state `Incomplete { reason: "approval_required" }` (M: `kernel/responses/pending_responses.rs:38-72`; `main` the same). It projects to a `PendingApproval` verdict, and only such a receipt does;
@@ -535,7 +555,11 @@ lowered(response, binding, verdict, result) ->
        and (verdict.result_sha256 = Some(h) -> sha256(r.bytes) == h))
 
 constructed(verdict, invocation, kernel_response r) ->
-  verified(r.receipt) and r.receipt.kernel_key in trusted_kernel_keys
+  verified(r.receipt)
+  and e = receipt_signers[r.receipt.kernel_key] exists
+  and e.historical_verification
+  and e.valid_from <= r.receipt.timestamp
+  and (e.valid_to = None or r.receipt.timestamp < e.valid_to)
   and r.receipt.request_id == invocation.provenance.request_id
   and rec = submissions[(r.receipt.receipt_context.request_namespace_digest, r.receipt.request_id)] exists
   and namespace == r.receipt.receipt_context.request_namespace_digest
@@ -658,6 +682,7 @@ Today `ToolInvocation` carries all the correlation every adapter needs: the prov
   - correlation keys present inside `ToolResult` are ignored by `lower_bound`;
   - two same-name Gemini calls in one payload produce distinct ids, and two payloads with identical calls at the same index produce distinct ids;
   - re-lifting one `LiftContext` turn reproduces its ids, and a different turn does not;
+  - **signer liveness (round 37):** a receipt signed by a retained historical key, with a `timestamp` inside its window, constructs (pre-rotation replay). A receipt by a retired key with a `timestamp` at or after its `valid_to`, any receipt by a key retired for compromise (`historical_verification: false`, backdated `timestamp` included), a receipt by a key with no entry, and an entry missing a retirement field each fail `KernelKey`, with no `Allow` built;
   - **retry identity (R-6-04):** two real adapter lifts of the same turn with the same `LiftContext`, at distinct `received_at` values (Gemini and Ollama synthesized ids, and a provider-id adapter), produce the same request ids and the same invocation and binding digests. The second seal is idempotent. A terminal receipt for the first lift is then replayed through the second lift's binding and lowers; separately, a `Reusable` denial for the first lift followed by an allow for the second binds the allow;
   - **namespace swap (R-6-05):** the same invocation bytes and request id are sealed in two authenticated namespaces A and B. Pairing receipt A with namespace B fails `RequestNamespace`, a receipt whose kernel-resolved tenant differs fails `Tenant`, and a receipt for another capability fails `CapabilityId`. A local-system submission (`authenticated_tenant_id = "local-system"`) constructs from a receipt with no `tenant_id`, both on first evaluation and on durable replay, and fails `Tenant` when the receipt carries any tenant. Caller metadata that tries to set `receipt_context` is refused as reserved;
   - **deny then allow (R-6-06):** with one sealed binding, an `Overloaded` deny (`Reusable`) followed by an allow binds the allow; an early `KernelStopped` deny (`Reusable`) followed by an allow after resume binds the allow; a compensated slow-path `KernelStopped` deny (`Terminal`) binds, and a later different receipt fails `ReceiptAlreadyBound`; a deny without the disposition field binds as `Terminal`;
@@ -798,3 +823,10 @@ Today `ToolInvocation` carries all the correlation every adapter needs: the prov
 |---|---|---|---|
 | CV-1 | Tenant comparison rejects valid local receipts | Fixed. Verified on M: and `main`: local calls derive their namespace from `"local-system"` but the kernel omits that tenant from receipts. Check 2a now compares the receipt's `tenant_id` with the kernel's projection (`None` for `LOCAL_SYSTEM_TENANT_ID`, otherwise `Some(tenant)`), the same projection durable replay uses | Rule 10 check 2a; `constructed` predicate; R-6-05 test |
 | CV-2 | Pending approval assumes a nonexistent signed decision | Fixed. Verified: PROTOCOL 6.1 has no pending decision, and the kernel signs a parked approval as `Deny` with `threshold_approval.state = "approval_required"` beside a separate `Verdict::PendingApproval`. Check 1a now projects the verdict from that signed metadata; the binding rules, the missing-field fallback and the `bound` predicate use the projection | Rule 10 checks 1a and 6; section 5.3; section 10 |
+
+### PR #1174 review round 37 (review bot)
+
+| Comment | Issue | Disposition | Contract |
+|---|---|---|---|
+| 4230630360 | Membership in `trusted_kernel_keys` does not enforce signer liveness, so a retained retired or compromised key could construct an `Allow` | Fixed. `bound_verdict_from_response` takes an authenticated `ReceiptSignerHistory` (TRUST-MODEL section 5.4 fields, from signed deployment configuration) instead of `&[PublicKey]`. Rule 10 check 1 applies spec 9 M11b's signer-liveness rule before any verdict is built: the entry's window must contain the receipt `timestamp`, `historical_verification` must be true, and a missing entry or field fails closed | Section 5.1 (`ReceiptSignerHistory`); rule 10 check 1; `constructed` predicate; section 10 |
+| 4230630381 | Retained submission records have no capacity or reclamation rule | Tracked as follow-up R1174-4230630381 under the docs review rule (line not changed by the final push). The bounded admission quota and replay-safe reclamation policy land with the phase 1 implementation, before any host enables the bound profile | Rule 11 retention |
