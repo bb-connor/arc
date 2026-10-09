@@ -1,6 +1,6 @@
 # Chio unified roadmap
 
-**Status:** design approved by the owner on 2026-10-08, section by section. Nothing in this document starts work. Execution begins only on an explicit start.
+**Status:** design approved by the owner on 2026-10-08, section by section. Decisions D1 to D7 were recorded on 2026-10-09 (section 8). Nothing in this document starts work. Execution begins only on an explicit start.
 
 **Chio is a Rust kernel for agentic operating systems that coordinate work, share resources, and cooperate across organizational boundaries.**
 
@@ -90,6 +90,8 @@ A run qualifies only if all of the following hold.
   - An independent-operation record (operators, hosts, key fingerprints, versions) is published and reviewed against ADR-0011.
 - **(g) Repeatable.** At least one team repeats a qualifying run without Backbay's hands-on help.
 
+**Which team executes (ruling, 2026-10-09).** The executing organization runs HOST-M2 (criterion c), and HOST-M2 is Linux-only before the test. So the executing organization runs Linux. Outside teams that are macOS-only take part as the counterparty (requesting) organization. macOS HOST-M2 is not pulled forward: that would reopen the approved design and put Apple's Endpoint Security entitlement approval, an outside party, on the critical path. G1 still requires a timed outsider install on both Linux and macOS.
+
 **Strongest form.** Two outside teams cooperate with each other. Backbay as the counterparty also counts.
 
 **Stretch.** One outside team writes its own provider. That would also close the verifiable-work paper's open independent-operation gate, which requires "separately operated participants and independently written provider".
@@ -139,7 +141,7 @@ Gate 0 exists so that parallel lanes do not collide. Everything a lane builds ag
 
 ### G0.2 Integration rules
 
-- **Schema ledger lock.**
+- **Schema ledger lock** (D3, decided 2026-10-09; the lock goes live as policy).
   - Admission-store versions are assigned in landing order, at merge time, under a lock recorded in the #1160 landing ledger.
   - Branches use symbolic version names until they rebase.
   - A static reservation (for example "#1179 takes v39 and up") would force every earlier lander to renumber, so it is not used.
@@ -158,11 +160,11 @@ Gate 0 exists so that parallel lanes do not collide. Everything a lane builds ag
 | Contract | Freezes |
 | --- | --- |
 | **CT-ABI** | Process ABI v4. `chio.process.v1` schemas in `spec/schemas` (39 identifiers are unspecified today). `KERNEL_ABI_VERSION`, published from the KSPEC-01 phase 0 census. Operation IDs are never reused. |
-| **CT-WORK** | `chio.work.v1` and the WORK-W1 facade (`WorkClient`, `WorkHandleV1`, `WorkViewV1`). These are mapped to #1179's real port names (`RecoveryProcessReservationPort`, `RecoveryProcessOriginPort`, `RecoveryAuthorityPort`), not the doc-only names. Includes an **unpaid** `Agreement` variant. |
-| **CT-SETTLE** | The settlement composition rule (#1174 decision 4, spec 9 rules M7a, M7b, M11a, R-9-05), implemented on #1160's paged startup sweep. Details below the table. |
-| **CT-COOP** | The **partner card**: org DID, trust-control URL, authority key history, receipt-signer keys, status resolve URL. Issuer-signed passport lifecycle status. DPoP possession for federated grants at the door. The evidence trust-anchor format. |
+| **CT-WORK** | `chio.work.v1` and the WORK-W1 facade (`WorkClient`, `WorkHandleV1`, `WorkViewV1`). These are mapped to #1179's real port names (`RecoveryProcessReservationPort`, `RecoveryProcessOriginPort`, `RecoveryAuthorityPort`), not the doc-only names. Includes an **unpaid** `Agreement` variant (D5, decided 2026-10-09). |
+| **CT-SETTLE** | The settlement composition rule (#1174 decision 4, spec 9 rules M7a, M7b, M11a, R-9-05), implemented on #1160's paged startup sweep (D1, decided 2026-10-09). Details below the table. |
+| **CT-COOP** | The **partner card**: org DID, trust-control URL, authority key history, receipt-signer keys, status resolve URL. Issuer-signed passport lifecycle status. DPoP possession for federated grants at the door (D6, decided 2026-10-09). The evidence trust-anchor format. |
 | **CT-CTRL** | OpenAPI for trust-control and the `chio api protect` sidecar. Per-route principals in place of one shared service token. The KSPEC-08 stop routes. |
-| **CT-CROSS** | The cross-org transport for co-signing and bilateral delivery (decision D4). |
+| **CT-CROSS** | The cross-org transport for co-signing and bilateral delivery: HTTPS with mTLS or signed bodies by default; iroh as an optional lane with self-hosted relays (D4, decided 2026-10-09). |
 | **CT-REL** | The release channel. Details below the table. |
 | **CT-WIRE** | The freeze list for the preview window: receipt, capability, passport, challenge, issuance, evidence and co-sign bytes; process ABI v4; `chio.work.v1`. |
 
@@ -174,12 +176,13 @@ Gate 0 exists so that parallel lanes do not collide. Everything a lane builds ag
   - For a known return with a pending capture, only `ContractualCaptureWaiver` stops the capture.
 - **Holds versus successors.** A hold blocks finalization, receipts and delivery, but never a co-signed monetary successor.
 - **Read before finalizing.** Every finalizer reads the effective payment journal first.
-- **One signer-rotation rule** applies to finalization, release completion and waiver completion (decision D2).
+- **One signer-rotation rule** applies to finalization, release completion and waiver completion: sign with the current key and bind the original identity (D2, decided 2026-10-09).
+  - Still to settle inside CT-SETTLE (raised by #1179): whether a finalization under a rotated signer may deliver output, or only withhold it.
 
 **CT-REL in detail.**
 
 - **Preview versions:** `0.2.0-alpha.N`. This is SEC-M10's developer preview, widened to include what HOST-M3 needs.
-- **Repos:** the development repo and the distribution mirror (decision D7).
+- **Repos:** `bb-connor/arc` is the development repo; `backbay-labs/chio` is the distribution mirror, synced on every tag (D7, decided 2026-10-09).
 - **Preview exception:** previews may ship before #1160's full-release obligations close (decision D8).
 - **Host compatibility:** tested version ranges for harness hosts, instead of exact pinned hashes.
 
@@ -195,7 +198,7 @@ Gate 0 exists so that parallel lanes do not collide. Everything a lane builds ag
 - #1160 is on main;
 - every contract is merged with schemas and vectors;
 - the ledger lock is live;
-- decisions D1 to D7 are recorded.
+- decisions D1 to D7 are recorded (done on 2026-10-09, section 8).
 
 ## 4. Lanes
 
@@ -389,7 +392,7 @@ Only the kernel hold ledger durably records consumption. Money is not pooled acr
 
 **After the test.**
 
-- macOS HOST-M2: a Darwin process runner, a Keychain and XPC broker, and `LOCAL_PEERTOKEN` IPC.
+- macOS HOST-M2: a Darwin process runner, a Keychain and XPC broker, and `LOCAL_PEERTOKEN` IPC. It stays after the test (ruling of 2026-10-09, section 1): the executing organization at G5 runs Linux, and macOS-only teams take part as the counterparty.
 - Economy modules: funded WORK-W2.3, and x402 as a module.
 - Sender-funded holds shared across organizations.
 
@@ -518,7 +521,7 @@ G2 and G3 run in parallel with the critical path. HOST-M1 never depends on #1179
 | G3 | One root grant's holds bound spend and invocations of kernel-mediated calls across harnesses on one host. | `prevent` | `ready_after_adr` (ADR-0016, CT-ABI) |
 | G3 | Native effects outside the kernel path. These are `prevent` only where a qualified KSPEC-07 backend confines them, and are otherwise rendered "unconfined". | `cannot_see` | `ready_after_adr` (KSPEC-07) |
 | G4, G5 | The receiver admits a co-signed work commitment at its own door. | `prevent` | `ready_after_adr` (CT-WORK, CT-CROSS) |
-| G4, G5 | A lost reply is recovered by original identity with no second dispatch. | `prevent` | `blocked_by_adr` until CT-SETTLE and D2 are decided |
+| G4, G5 | A lost reply is recovered by original identity with no second dispatch. | `prevent` | `blocked_by_adr` until CT-SETTLE is frozen (D1 and D2 decided 2026-10-09) |
 | G4, G5 | The evaluator's signed acceptance or rejection is recorded. | `detect_only` | `ready_after_adr` (CT-WORK) |
 | After G5 | Rail settlement outcomes and cross-org money. | `detect_only` | `deferred` |
 
@@ -536,7 +539,7 @@ None of these depend on #1160.
 | U6 | **`backbay-labs/chio-bridge#3`:** `approval-decide` does not check the recorded decision or the approval ID. The scope is that utility; the gateway resume path honours the signed decision. |
 | U7 | **Recruiting:** a named owner, trial terms and legal groundwork. |
 | U8 | **IETF -00:** decide whether to submit by the cutoff (section 10). If it is submitted, fix or flag the single-key multi-hop rule in draft step 7 first. |
-| U9 | **CT-CROSS:** decide early, because the free iroh relays end (section 10). |
+| U9 | **CT-CROSS:** decided on 2026-10-09 (D4). Draft the contract early, because the free iroh relays end (section 10). |
 | U10 | **Stale artifacts:** add deprecation notices to the stale installer and registry artifacts now, and replace them at G1. |
 
 ## 7. PR dispositions
@@ -558,10 +561,10 @@ None of these depend on #1160.
 | #1172 | Land after #1160 (Lane REC). |
 | #1173 | Split by path into slices α, β, γ, c, d and δ; re-derive or drop ε and ζ. Close when the slices land. |
 | #1179 | Stays a draft until it is re-scoped and rebased (Lane REC). |
-| #1174 | Merge as the KSPEC program. Fix its north-star research document, which still carries a superseded north star and the retired tagline. |
-| #1177 | Merge after the restructure and the server-first HOST-M1 re-cut. Mark NORTH-STAR-FLOWS approved. Apply the ADR-0038 amendment. Rewrite the Clawdstrike material as prior art (U2). Move macOS HOST-M2 after the test. HOST-M1 code no longer waits on the docs restructure. |
+| #1174 | Merge this PR as the KSPEC program (owner decision 2026-10-09: it lands by merging the PR, not by importing its documents elsewhere). Fix its north-star research document on the PR branch first; it still carries a superseded north star and the retired tagline. |
+| #1177 | Merge this PR after the restructure and the server-first HOST-M1 re-cut (owner decision 2026-10-09: it lands by merging the PR, not by importing its documents elsewhere). Mark NORTH-STAR-FLOWS approved. Apply the ADR-0038 amendment. Rewrite the Clawdstrike material as prior art (U2). Move macOS HOST-M2 after the test. HOST-M1 code no longer waits on the docs restructure. |
 | #1170 | Split private material per U1. Void F-17. Scope ADR-0023 to ADR-0038 (thin OS adapters allowed; broker, cage and launchers not frozen). Scope ADR-0028 to "where an IdP exists". Replace the review criterion with section 1. Drop the capacity model. Merge the public remainder. |
-| #1171 | Rebase. Submit if U8 says so. Federation material goes to companion drafts later. |
+| #1171 | Rebase and merge this PR (owner decision 2026-10-09: it lands by merging the PR, not by importing the draft elsewhere). Submit the -00 if U8 says so. Federation material goes to companion drafts later. |
 | #1164 | Close. Salvage its MCP adoption, activation and preview-distribution machinery into Lane REL. |
 | #1161, #1159, #1158 | Close as contained in #1173. #1161's peer transport is example-only and does not satisfy STRAT-F15. |
 | #1162 | Archive its evidence and `examples/repair-machine-proof`, then close. |
@@ -579,26 +582,29 @@ None of these depend on #1160.
 
 ## 8. Owner decision register
 
-| # | Decision | Recommendation | Blocks |
-| --- | --- | --- | --- |
-| D1 | Settlement composition | Adopt #1174 decision 4 on #1160's sweep (CT-SETTLE). | Gate 0, REC, WORK slice δ |
-| D2 | Signer-rotation rule | Sign with the current key and bind the original identity, uniformly across finalization, release and waiver. Today #1160 quarantines, #1179 re-signs and #1173 refuses. | Gate 0, REC |
-| D3 | Schema allocation | Landing order under the ledger lock; symbolic names on branches. | Gate 0 |
-| D4 | Cross-org transport | Default to HTTPS with mTLS or signed bodies, which fits outside teams' firewalls and operations. iroh stays an optional lane with self-hosted relays. | Gate 0, COOP-3, WORK-W2.2 |
-| D5 | Unpaid work agreement | Add an unpaid `Agreement` variant to `chio.work.v1`. | Gate 0 |
-| D6 | Holder possession | Require DPoP for federated grants at the door. | Gate 0, COOP-2 |
-| D7 | Canonical repositories | `bb-connor/arc` is the development repo; `backbay-labs/chio` is the distribution mirror, synced on every tag. | Gate 0, REL-1 |
-| D8 | Preview exception | Allow tagged `0.2.0-alpha.N` previews before #1160's full-release obligations close. They are labelled as previews, with claims limited under ADR-0011. | G1 |
-| D9 | Licensing (STRAT-F5) | Apache-2.0 for verifiers, adapters and preview binaries. | G1 |
-| D10 | crates.io | Yank 0.1.x with a pointer to the preview channel, unless the Rust library is in the preview's supported surface. | G1 |
-| D11 | IETF -00 | Submit as an individual draft, with the multi-hop rule flagged as an open issue. | OUT-3 |
-| D12 | Required harnesses | Claude Code and Codex for G1 to G5; Pi and Hermes as additional HOST-M2 harnesses; record a decision on OpenClaw and Cursor after the test. | REL-3, G3 |
-| D13 | Recruiting owner and legal (STRAT-F4, F13) | Name the owner and start legal now. | G2 |
-| D14 | Receipt privacy (STRAT-F10, ADR-0036) | Argument commitments before any outside run, or at minimum a rule of no personal data in arguments. | G2 |
-| D15 | STRAT-F1 | Keep commercially sensitive and GTM material private; publish the rest after review. | #1170 merge |
+| # | Decision | Recommendation | Status | Blocks |
+| --- | --- | --- | --- | --- |
+| D1 | Settlement composition | Adopt #1174 decision 4 on #1160's sweep (CT-SETTLE). | **Decided 2026-10-09:** the owner accepted the recommendation. Freezes CT-SETTLE; also gates the REC re-scope and the WORK slice δ. | Gate 0, REC, WORK slice δ |
+| D2 | Signer-rotation rule | Sign with the current key and bind the original identity, uniformly across finalization, release and waiver. Today #1160 quarantines, #1179 re-signs and #1173 refuses. | **Decided 2026-10-09:** the owner accepted the recommendation. Freezes the CT-SETTLE rotation rule. Open sub-question, to be settled inside CT-SETTLE: whether a finalization under a rotated signer may deliver output, or only withhold it (#1179). | Gate 0, REC |
+| D3 | Schema allocation | Landing order under the ledger lock; symbolic names on branches. | **Decided 2026-10-09:** the owner accepted the recommendation. The ledger lock goes live as policy. | Gate 0 |
+| D4 | Cross-org transport | Default to HTTPS with mTLS or signed bodies, which fits outside teams' firewalls and operations. iroh stays an optional lane with self-hosted relays. | **Decided 2026-10-09:** the owner accepted the recommendation. Freezes CT-CROSS. | Gate 0, COOP-3, WORK-W2.2 |
+| D5 | Unpaid work agreement | Add an unpaid `Agreement` variant to `chio.work.v1`. | **Decided 2026-10-09:** the owner accepted the recommendation. Freezes the CT-WORK `Agreement` variant. | Gate 0 |
+| D6 | Holder possession | Require DPoP for federated grants at the door. | **Decided 2026-10-09:** the owner accepted the recommendation. Freezes the CT-COOP DPoP profile; COOP-2 implements it. | Gate 0, COOP-2 |
+| D7 | Canonical repositories | `bb-connor/arc` is the development repo; `backbay-labs/chio` is the distribution mirror, synced on every tag. | **Decided 2026-10-09:** the owner accepted the recommendation. Freezes the CT-REL repos; the REL-1 mirror sync assumes it. | Gate 0, REL-1 |
+| D8 | Preview exception | Allow tagged `0.2.0-alpha.N` previews before #1160's full-release obligations close. They are labelled as previews, with claims limited under ADR-0011. | Open | G1 |
+| D9 | Licensing (STRAT-F5) | Apache-2.0 for verifiers, adapters and preview binaries. | Open | G1 |
+| D10 | crates.io | Yank 0.1.x with a pointer to the preview channel, unless the Rust library is in the preview's supported surface. | Open | G1 |
+| D11 | IETF -00 | Submit as an individual draft, with the multi-hop rule flagged as an open issue. | Open | OUT-3 |
+| D12 | Required harnesses | Claude Code and Codex for G1 to G5; Pi and Hermes as additional HOST-M2 harnesses; record a decision on OpenClaw and Cursor after the test. | Open | REL-3, G3 |
+| D13 | Recruiting owner and legal (STRAT-F4, F13) | Name the owner and start legal now. | Open | G2 |
+| D14 | Receipt privacy (STRAT-F10, ADR-0036) | Argument commitments before any outside run, or at minimum a rule of no personal data in arguments. | Open | G2 |
+| D15 | STRAT-F1 | Keep commercially sensitive and GTM material private; publish the rest after review. | Open | #1170 merge |
 
 **Recorded, not open:**
 
+- decisions D1 to D7 (2026-10-09, table above);
+- the executing team at the success test runs Linux; macOS-only outside teams take part as the counterparty; macOS HOST-M2 stays after the test (ruling of 2026-10-09, delegated by the owner; section 1);
+- #1174, #1177 and #1171 land by merging their PRs (owner decision 2026-10-09; section 7);
 - the success test and the qualifying-run definition (section 1);
 - STRAT-F17 void;
 - ADR-0023 scoped to ADR-0038;
