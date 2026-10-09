@@ -20,8 +20,10 @@ mod dispatch_context;
 pub use blocking_connection::{BlockingToolServerAdapter, BlockingToolServerConnection};
 pub use dispatch_context::ToolDispatchContext;
 mod invocation_context;
+mod outcome_class;
 pub use connection::ToolServerConnection;
 pub use invocation_context::ToolInvocationContext;
+pub use outcome_class::ToolCallOutcomeClass;
 
 /// Verdict of a guard or capability evaluation.
 ///

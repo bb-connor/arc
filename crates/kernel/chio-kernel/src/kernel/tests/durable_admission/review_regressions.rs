@@ -104,6 +104,10 @@ fn durable_server_url_elicitation_terminalizes_as_outcome_unknown() {
         .evaluate_tool_call_blocking(&request)
         .expect("signed replay refusal");
     assert_eq!(response.verdict, Verdict::Deny);
+    assert_eq!(
+        response.outcome_class(),
+        crate::runtime::ToolCallOutcomeClass::OutcomeUnknownAfterDispatch
+    );
     assert!(response.receipt.verify_signature().expect("signature"));
     let metadata = &response.receipt.metadata.as_ref().expect("metadata")["admission_operation"];
     let schema: serde_json::Value = serde_json::from_str(include_str!(concat!(

@@ -5815,8 +5815,10 @@
     "crates/kernel/chio-process/examples/recoverable_swarm.rs": [
       "worker::from_slice"
     ],
+    "crates/kernel/chio-kernel/src/runtime/outcome_class.rs": [
+      "retains_unknown_outcome::from_value"
+    ],
     "crates/kernel/chio-process/src/lib.rs": [
-      "outcome_unknown::from_value",
       "tool_request::from_value"
     ],
     "crates/kernel/chio-process/src/mailboxes/mod.rs": [
@@ -7804,12 +7806,12 @@
         }
       ]
     },
-    "crates/kernel/chio-process/src/lib.rs": {
+    "crates/kernel/chio-kernel/src/runtime/outcome_class.rs": {
       "kind": "typed-value-conversion",
       "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority.",
       "readers": [
         {
-          "reader": "outcome_unknown",
+          "reader": "retains_unknown_outcome",
           "decoders": [
             "from_value"
           ],
@@ -7817,7 +7819,13 @@
             "serde_json::from_value"
           ],
           "checked": true
-        },
+        }
+      ]
+    },
+    "crates/kernel/chio-process/src/lib.rs": {
+      "kind": "typed-value-conversion",
+      "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority.",
+      "readers": [
         {
           "reader": "tool_request",
           "decoders": [

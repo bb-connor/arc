@@ -40,6 +40,7 @@ use std::sync::{Arc, Mutex};
 use chio_core_types::capability::attenuation::{scope_hash, validate_attenuation};
 use chio_core_types::capability::token::CapabilityToken;
 use chio_core_types::crypto::{canonical_json_bytes, sha256_hex};
+use chio_kernel::runtime::ToolCallOutcomeClass;
 use chio_kernel::{ChioKernel, ToolCallRequest, ToolCallResponse, Verdict};
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -532,7 +533,7 @@ impl ProcessRuntime {
             }
             if attempt >= MAX_DISPATCH_ATTEMPTS
                 || known_outcome_only
-                || !outcome_unknown(&response)
+                || response.outcome_class() != ToolCallOutcomeClass::OutcomeUnknownAfterDispatch
                 || !self.kernel.can_redispatch_unknown_read(&current)
             {
                 return Ok(response);
@@ -578,35 +579,6 @@ impl ProcessRuntime {
         let mut store = self.store.lock().map_err(|_| ProcessError::StorePoisoned)?;
         f(&mut store)
     }
-}
-
-/// The kernel retains this operation as dispatched without a recorded outcome,
-/// so the denial describes uncertainty rather than a policy decision.
-fn outcome_unknown(response: &ToolCallResponse) -> bool {
-    if response.verdict != Verdict::Deny {
-        return false;
-    }
-    let Some(metadata) = response
-        .receipt
-        .metadata
-        .as_ref()
-        .and_then(|metadata| metadata.get("admission_operation"))
-    else {
-        return false;
-    };
-    // Old thin or unrecognized markers remain signed evidence, but cannot
-    // authorize fresh dispatch. Never rewrite their bytes into the new schema.
-    let Ok(projection) = serde_json::from_value::<
-        chio_kernel::admission_operation::AdmissionReceiptMetadataV1,
-    >(metadata.clone()) else {
-        return false;
-    };
-    projection.projected_state
-        == chio_kernel::admission_operation::AdmissionOperationState::OutcomeUnknownAfterDispatch
-        && projection.request_id.as_str() == response.request_id
-        && projection.retained_dispatch_commit.is_some()
-        && projection.tool_outcome_id.is_none()
-        && projection.tool_outcome_version.is_none()
 }
 
 fn digest(value: &impl Serialize) -> Result<String, ProcessError> {
