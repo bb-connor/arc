@@ -273,16 +273,18 @@ impl SqliteFiscalStore {
         {
             verify_exact_genesis(
                 &transaction,
-                &policy_json,
-                &authority_json,
-                &charter_json,
-                &readiness_json,
-                &registry_json,
-                &checkpoint_json,
-                policy,
-                charter,
-                readiness,
-                checkpoint,
+                ExactGenesis {
+                    policy_json: &policy_json,
+                    authority_json: &authority_json,
+                    charter_json: &charter_json,
+                    readiness_json: &readiness_json,
+                    registry_json: &registry_json,
+                    checkpoint_json: &checkpoint_json,
+                    policy,
+                    charter,
+                    readiness,
+                    checkpoint,
+                },
             )?;
             transaction.commit().map_err(sqlite_error)?;
             return Ok(());
@@ -347,16 +349,16 @@ impl SqliteFiscalStore {
         fence: &StoreMutationFence,
     ) -> Result<(), FiscalStoreError> {
         let json = canonical_json_bytes(proposal.signed()).map_err(canonical_error)?;
-        self.persist_immutable_artifact(
-            "fiscal_proposals",
-            "proposal_id",
-            &proposal.body().proposal_id,
-            "proposal_digest",
-            proposal.digest(),
-            &json,
-            "persist_proposal",
+        self.persist_immutable_artifact(ImmutableArtifact {
+            table: "fiscal_proposals",
+            id_column: "proposal_id",
+            id: &proposal.body().proposal_id,
+            digest_column: "proposal_digest",
+            digest: proposal.digest(),
+            json: &json,
+            mutation_kind: "persist_proposal",
             fence,
-        )
+        })
     }
 
     #[allow(
@@ -836,16 +838,16 @@ impl SqliteFiscalStore {
         fence: &StoreMutationFence,
     ) -> Result<(), FiscalStoreError> {
         let json = canonical_json_bytes(approval.signed()).map_err(canonical_error)?;
-        self.persist_immutable_artifact(
-            "fiscal_approvals",
-            "approval_id",
-            &approval.body().approval_id,
-            "approval_digest",
-            approval.digest(),
-            &json,
-            "persist_approval",
+        self.persist_immutable_artifact(ImmutableArtifact {
+            table: "fiscal_approvals",
+            id_column: "approval_id",
+            id: &approval.body().approval_id,
+            digest_column: "approval_digest",
+            digest: approval.digest(),
+            json: &json,
+            mutation_kind: "persist_approval",
             fence,
-        )
+        })
     }
 
     pub fn require_approval(
@@ -921,16 +923,16 @@ impl SqliteFiscalStore {
         fence: &StoreMutationFence,
     ) -> Result<(), FiscalStoreError> {
         let json = canonical_json_bytes(activation.signed()).map_err(canonical_error)?;
-        self.persist_immutable_artifact(
-            "fiscal_activations",
-            "activation_id",
-            &activation.body().activation_id,
-            "activation_digest",
-            activation.digest(),
-            &json,
-            "persist_activation",
+        self.persist_immutable_artifact(ImmutableArtifact {
+            table: "fiscal_activations",
+            id_column: "activation_id",
+            id: &activation.body().activation_id,
+            digest_column: "activation_digest",
+            digest: activation.digest(),
+            json: &json,
+            mutation_kind: "persist_activation",
             fence,
-        )
+        })
     }
 
     pub fn bind_legacy_fee_schedule(
@@ -1050,21 +1052,20 @@ impl SqliteFiscalStore {
         Ok(record)
     }
 
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-    )]
     fn persist_immutable_artifact(
         &self,
-        table: &str,
-        id_column: &str,
-        id: &str,
-        digest_column: &str,
-        digest: &str,
-        json: &[u8],
-        mutation_kind: &str,
-        fence: &StoreMutationFence,
+        params: ImmutableArtifact<'_>,
     ) -> Result<(), FiscalStoreError> {
+        let ImmutableArtifact {
+            table,
+            id_column,
+            id,
+            digest_column,
+            digest,
+            json,
+            mutation_kind,
+            fence,
+        } = params;
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection, fence)?;
         let sql =
@@ -2733,23 +2734,22 @@ fn ensure_legacy_envelope_digest_column(
     Ok(())
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-)]
 fn verify_exact_genesis(
     transaction: &Transaction<'_>,
-    policy_json: &[u8],
-    authority_json: &[u8],
-    charter_json: &[u8],
-    readiness_json: &[u8],
-    registry_json: &[u8],
-    checkpoint_json: &[u8],
-    policy: &FiscalGenesisPolicy,
-    charter: &VerifiedFiscalCharter,
-    readiness: &VerifiedFiscalRuntimeReadiness,
-    checkpoint: &VerifiedFiscalContinuityCheckpoint,
+    params: ExactGenesis<'_>,
 ) -> Result<(), FiscalStoreError> {
+    let ExactGenesis {
+        policy_json,
+        authority_json,
+        charter_json,
+        readiness_json,
+        registry_json,
+        checkpoint_json,
+        policy,
+        charter,
+        readiness,
+        checkpoint,
+    } = params;
     let exact = transaction
         .query_row(
             r#"

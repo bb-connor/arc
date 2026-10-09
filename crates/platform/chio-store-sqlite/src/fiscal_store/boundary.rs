@@ -34,3 +34,29 @@ pub(super) fn sqlite_i64(value: u64, field: &str) -> Result<i64, FiscalStoreErro
 pub(super) fn read_u64(value: i64, field: &str) -> Result<u64, FiscalStoreError> {
     u64::try_from(value).map_err(|_| invariant(format!("{field} is negative")))
 }
+
+/// Parameters of `persist_immutable_artifact`.
+pub(super) struct ImmutableArtifact<'a> {
+    pub(super) table: &'a str,
+    pub(super) id_column: &'a str,
+    pub(super) id: &'a str,
+    pub(super) digest_column: &'a str,
+    pub(super) digest: &'a str,
+    pub(super) json: &'a [u8],
+    pub(super) mutation_kind: &'a str,
+    pub(super) fence: &'a StoreMutationFence,
+}
+
+/// Parameters of `verify_exact_genesis`.
+pub(super) struct ExactGenesis<'a> {
+    pub(super) policy_json: &'a [u8],
+    pub(super) authority_json: &'a [u8],
+    pub(super) charter_json: &'a [u8],
+    pub(super) readiness_json: &'a [u8],
+    pub(super) registry_json: &'a [u8],
+    pub(super) checkpoint_json: &'a [u8],
+    pub(super) policy: &'a FiscalGenesisPolicy,
+    pub(super) charter: &'a VerifiedFiscalCharter,
+    pub(super) readiness: &'a VerifiedFiscalRuntimeReadiness,
+    pub(super) checkpoint: &'a VerifiedFiscalContinuityCheckpoint,
+}
