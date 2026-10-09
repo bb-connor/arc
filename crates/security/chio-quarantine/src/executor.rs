@@ -4,6 +4,8 @@ use crate::executor_proof::{
     validate_dispatch_authorization as validate_dispatch_authorization_proof,
 };
 mod error;
+mod rollback_failure;
+use rollback_failure::RollbackFailure;
 
 pub use error::ExecutorError;
 
@@ -150,18 +152,6 @@ pub struct ResponseExecutor<
     effects: Arc<E>,
     receipts: Arc<R>,
     alerts: Arc<A>,
-}
-
-/// Parameters of `record_rollback_failure`.
-struct RollbackFailure<'a> {
-    current: ResponsePlanRecord,
-    effect_record: ResponseEffectRecord,
-    journal: EffectJournal,
-    attempt: u32,
-    installed_version_hash: Digest32,
-    error_code: ErrorCode,
-    work: &'a ScheduledWork,
-    now_unix_ms: u64,
 }
 
 impl<
@@ -1318,9 +1308,7 @@ impl<
 
     fn record_rollback_failure(
         &self,
-        params: RollbackFailure<'_>,
-    ) -> Result<ResponsePlanRecord, ExecutorError> {
-        let RollbackFailure {
+        RollbackFailure {
             current,
             effect_record,
             journal,
@@ -1329,7 +1317,8 @@ impl<
             error_code,
             work,
             now_unix_ms,
-        } = params;
+        }: RollbackFailure<'_>,
+    ) -> Result<ResponsePlanRecord, ExecutorError> {
         let failed = self.update_effect_record(
             &current,
             &effect_record,
