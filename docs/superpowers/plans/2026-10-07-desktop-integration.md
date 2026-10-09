@@ -38,7 +38,7 @@ sets product priority or substitutes for a named integration.
 | Location | Responsibility |
 | --- | --- |
 | PROGRAM-MAP and proposed `docs/superpowers/evidence/native-host/` | Actual owner source, API, qualification and candidate case manifest |
-| Existing `chio-kernel`, `chio-process`, `chio-secure-ipc`, store, broker, trust-control, credential and swarm owners | Native semantics; no platform fork of their authority or state |
+| Existing `chio-kernel`, store, trust-control, credential and swarm owners, plus `chio-process`, `chio-secure-ipc` and the broker from #1160 (F) once it lands | Native semantics; no platform fork of their authority or state |
 | Landed W1-W3/recovery and SDK paths reconciled in packet 1 | Work preparation/submission/query, exact recovery and independent owner transport |
 | Existing `crates/products/chio-cli/` | Required terminal diagnostic/admin consumer, packet 4a |
 | Proposed `tests/integration/native_host/` | Independent installed owner/consumer acceptance; not a fake runtime |
@@ -88,7 +88,7 @@ source or open PR alone establishes runtime readiness.
 - [ ] Qualify passport proof-of-possession/relying-party/lifecycle policy for a passport-selected profile; it grants no effect authority. Qualify recursive delegation at the actual serving path and its supported chain/budget form, including ancestor revocation. Qualify swarm graph head/issuance and accepted-parent joins when exposed (Q24-Q26).
 - [ ] Qualify S3 phase 1 and the owner-reviewed focused M20 disposition delta for selected effect/recovery paths. Current authority, exact intent, atomic transition, required persistence and retained uncertainty remain mandatory even before whole S9/S10 redesign completion.
 - [ ] Qualify S8 phase 1 kernel stop and S30 reach with native authorization and restart evidence (Q08). Tenant/recovery scopes remain unavailable before their own phases; kernel stop implies no task cleanup without separate custody evidence.
-- [ ] Qualify S4/process live cancel/revoke and descendant closure (Q07/Q19). Run the existing `cargo test --locked -p chio-cli --test process_host` at the reconciled owner plus its new live-control cases. Stopped-host admin tests do not prove live control.
+- [ ] Qualify S4/process live cancel/revoke and descendant closure (Q07/Q19). Run `cargo test --locked -p chio-cli --test process_host` (on #1160 until it lands) at the reconciled owner plus its new live-control cases. Stopped-host admin tests do not prove live control.
 - [ ] Qualify W1 original preparation/command/work lookup, evaluator binding and selected recovery using actual current source and dispositions. A missing handle or response never authorizes a replacement dispatch.
 - [ ] Qualify S28, production endorsement verification and the actual installed approval route's exact decision/ID binding (Q05/Q06), including direct utility invocation when that component is shipped or exposed. A route without that dependency does not require installing Pi. Native approvals, OS consent and application confirmation remain distinct.
 - [ ] Commit each delta in its owner program, then update references and case evidence here. A green consumer mock cannot close an owner gate.

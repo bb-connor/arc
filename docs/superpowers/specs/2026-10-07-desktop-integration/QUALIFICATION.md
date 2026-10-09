@@ -96,18 +96,14 @@ evidence refuses the bounded profile and never silently selects a narrower one.
 
 ## Release sequence
 
-1. Freeze the source tuple and obtain each predecessor's native acceptance.
-2. Freeze each owner binding only after its real schemas and queries exist, and
-   run independent consumer conformance against installed owners.
-3. Build signed candidates and publish clean-host install inputs on a labelled
-   candidate channel.
-4. Install on clean supported machines and run positive, negative, restart,
-   update and uninstall controls, plus accessibility checks for selected
-   graphical clients.
-5. Verify public artifact availability and checksums, then promote the exact
-   tuple. A rebuilt artifact restarts the artifact gates.
-6. Record local tests, hosted CI, bot review, release publication and native
-   qualification as separate statuses.
+1. Freeze the source tuple and each predecessor's native acceptance.
+2. Freeze owner bindings only once their real schemas exist, and run
+   independent consumer conformance against installed owners.
+3. Publish signed candidates on a labelled candidate channel.
+4. Install on clean machines and run positive, negative, restart, update and
+   uninstall controls, plus accessibility checks for selected graphical clients.
+5. Verify public availability and checksums, then promote the exact tuple; a
+   rebuilt artifact restarts the artifact gates.
 
 A protected host needs its own foundation, I01-I08, boundary, resource, release
 and installed evidence; it does not need an earlier sealed-coding release. A

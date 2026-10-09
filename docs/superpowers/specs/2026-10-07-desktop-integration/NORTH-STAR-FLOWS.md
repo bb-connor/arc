@@ -24,7 +24,8 @@ uses Linux.
 Source aliases (T, F, W, K, N, R, G) are the pins in
 [PROGRAM-MAP](../../../architecture/PROGRAM-MAP.md). T is current `main`. F is
 `main` after the #1160 merge commit; its runtime is experimental and its
-broker is Linux-only.
+broker is Linux-only. Until #1160 lands at Gate 0, F paths exist only on #1160,
+and every "main (experimental)" status below reads "on #1160".
 
 ## 1. North star and vocabulary
 
@@ -126,8 +127,8 @@ authority type.
 
 ### Key custody
 
-Today keys are plaintext seed files (`--seed-file`, `--signing-seed-file`,
-`--holder-seed-file`). This is the largest gap for cooperation.
+Today keys are plaintext seed files (`--authority-seed-file`,
+`--signing-seed-file`, `--holder-seed-file`). This is the largest gap for cooperation.
 
 **Owner change:** add a custody provider behind the existing `SigningBackend`
 surface, so every signing command accepts a key reference instead of a seed
@@ -168,9 +169,16 @@ First run creates the organization key in OS custody, or imports it there.
 **Scenario.** Org A, a developer on **Omarchy**, has an agent that needs a
 capability Org B provides. Org B runs a **Mac** and exposes a governed tool
 behind `chio api protect`. There are two machines, two human operators and
-no shared keys. Every command below ships today (T:
+no shared keys. Every command below exists today (T:
 `docs/reference/AGENT_PASSPORT_GUIDE.md`, sections Federated Issuance, Holder
-Transport and Remote Verifier Surface).
+Transport and Remote Verifier Surface), but the sequence does not yet run end
+to end: on T, federated issue rejects A's signed ceiling (its signer is not a
+B authority key) and consumes a challenge already consumed at verification
+(`trust_control/passport_handlers.rs`). The roadmap's COOP-1 re-cut fixes this:
+B owns the ceiling, steps 3 and 4 use an issuance inbox with holder pickup,
+step 6 exports the door's receipts, step 7 verifies against a pinned partner
+card, and step 4 approval can come from the CLI. Until then the table is the
+target, not a runnable script.
 
 | Step | Who | Action | `boundary_class` |
 | --- | --- | --- | --- |
@@ -405,8 +413,9 @@ DOCS-1177.7 commits on #1177:
   and the ADR index) belongs to the unified roadmap's U3 items, not to this
   program's documents.
 
-`scripts/check-native-host-docs.py` gates links, retired phrases, em dashes,
-case IDs and these word budgets:
+`scripts/check-native-host-docs.py --scope program` gates links, retired
+phrases, em dashes, case IDs and these word budgets (`--scope public` reports
+the public copy that the U3 items still have to fix):
 
 | Document set | Budget |
 | --- | --- |
@@ -493,7 +502,7 @@ Each row becomes a tracked issue after this document is approved, linked from
 | Durable sibling-share registry outside process paths | `chio-kernel` | M2 |
 | Token and spend dimension at the model relay | Relay and broker (F) | M2 |
 | Linux launchers for Claude Code, Codex and Hermes | Plugin repositories | M2 Omarchy |
-| Megastart allowance on kernel holds; Megastart Linux port | Megastart (G) | M2 |
+| Megastart allowance on kernel holds; Megastart Linux port | Megastart (G) | M2 coordinator; the roadmap schedules the Megastart and Herdr showcases after the success test |
 | Darwin process runner, broker and peer identity | `chio-process`, broker, `chio-secure-ipc` | M2 macOS, after the success test |
 | macOS resource backend selection | macOS annex owner | M2 macOS, after the success test |
 | W1 facade | W | M3 |

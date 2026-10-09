@@ -22,7 +22,7 @@ Used in the `Status` column of [CAPABILITIES](CAPABILITIES.md).
 | Term | Meaning |
 | --- | --- |
 | shipped | On `main` (alias T) with tests; not qualified as a native host profile. |
-| main (experimental) | Arrives on `main` with #1160 (alias F); experimental, and the credential broker is Linux-only. |
+| main (experimental) | On `main` once #1160 lands at Gate 0 (alias F); until then only on #1160. Experimental, and the credential broker is Linux-only. |
 | W planned | Designed in #1173; no code. `WorkHandleV1`, `WorkViewV1`, `WorkClient` and `WorkTransport` are design-only. |
 | R unqualified | Implemented in #1179; not qualified. |
 | library-only | A crate exists with no native host serving path in this program. |

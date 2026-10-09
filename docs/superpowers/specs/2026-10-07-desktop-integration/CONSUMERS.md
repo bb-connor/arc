@@ -47,9 +47,9 @@ gates pass; never fabricate an absent file or port locally.
 | Work commitments and acceptance | W:`docs/superpowers/specs/2026-10-03-work-runtime-design.md` | Work owner lands W1; an application exit or queue completion cannot synthesize accepted work. |
 | Recovery and result release | R:`crates/security/chio-security-types/src/recovery/commands.rs`; R:`crates/kernel/chio-kernel/src/knowledge.rs` | Owners reconcile revision, recipient, retry disposition and disclosure through non-persisting observation. |
 | Independent operators | `crates/trust/chio-federation`; `crates/kernel/chio-kernel/src/federation_artifact_store.rs` | Owners test peer trust, treaty evidence, local refusal, revocation freshness and bilateral artifacts. |
-| Identity and passports | F:`crates/trust/chio-credentials`; F:`crates/kernel/chio-kernel-core/src/passport_verify.rs` | Owners bind subject, issuer policy, challenge, audience and validity; a passport never becomes a grant. |
-| Recursive delegation | F:`crates/core/chio-core-types/src/capability/attenuation.rs`; K:S1 and S4 | Owners qualify supported depth and reduce-only scope and revoke descendants through current admission. |
-| Swarm authority | W:`crates/kernel/chio-swarm-authority`; W:`crates/kernel/chio-runtime-core/src/store/sqlite/swarm_authority_bundles.rs` | Swarm and W1 owners keep the protected graph head; extension needs an atomic owner commit. |
+| Identity and passports | T:`crates/trust/chio-credentials`; T:`crates/kernel/chio-kernel-core/src/passport_verify.rs` | Owners bind subject, issuer policy, challenge, audience and validity; a passport never becomes a grant. |
+| Recursive delegation | T:`crates/core/chio-core-types/src/capability/attenuation.rs`; K:S1 and S4 | Owners qualify supported depth and reduce-only scope and revoke descendants through current admission. |
+| Swarm authority | T:`crates/kernel/chio-swarm-authority` and `crates/kernel/chio-runtime-core/src/store/sqlite/swarm_authority_bundles.rs`; W: graph extension (`evolution.rs`) | Swarm and W1 owners keep the protected graph head; extension needs an atomic owner commit. |
 | Existing application and Herdr consumer | Megastart `src/{authority,mission,operator}.rs`, `herdr/{CONTRACT.md,src/client.rs}` | The application keeps its v1 API and adapts to new owner bindings if needed. |
 
 ## Organizational claims
@@ -63,12 +63,11 @@ allowance from local C04.
 
 ## Megastart and Herdr compatibility
 
-The packaged `herdr/CONTRACT.md` v1 is Megastart's application API. Nothing here
-renames its routes or actions or turns them into a host contract. An adapter
-that maps a new owner binding into that projection preserves operation identity,
-approval binding, authority and capacity provenance, disconnection semantics and
-no automatic mutation retry, and passes the existing client conformance plus
-C02, C04, C05 and C08 against the installed tuple.
+The packaged `herdr/CONTRACT.md` v1 is Megastart's application API, not a host
+contract. An adapter mapping a new owner binding into it must preserve operation
+identity, approval binding, authority and capacity provenance, disconnection
+semantics and no automatic mutation retry, and pass the existing client
+conformance plus C02, C04, C05 and C08 on the installed tuple.
 
 Retain the documented limits: one-hop aggregate-family delegation, single-owner
 durable family accounting, explicit uncertainty outside the captured crash point

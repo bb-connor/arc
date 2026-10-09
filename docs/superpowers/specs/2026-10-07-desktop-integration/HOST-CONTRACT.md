@@ -128,7 +128,6 @@ disconnects do not prove billing stopped, so obligations stay retained across
 loss and restart, with no replay.
 
 The pinned Pi Codex-subscription route has no demonstrated output-token
-ceiling, so it cannot satisfy a bounded-output or bounded-spend profile. A
-separately approved narrower profile may run with token and spend explicitly
-unclaimed if its grants do not require them; nothing switches to it, another
-account or API billing automatically. Q15, Q27 and C04 carry the route cases.
+ceiling, so it cannot satisfy a bounded-output or bounded-spend profile; an
+approved narrower profile may leave token and spend unclaimed, but nothing
+switches to it, another account or API billing automatically (Q15, Q27, C04).
