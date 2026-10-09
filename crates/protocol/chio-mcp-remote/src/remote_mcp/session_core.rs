@@ -376,6 +376,12 @@ enum RemoteSessionEntry {
     Terminal(Arc<RemoteSessionDiagnosticRecord>),
 }
 
+struct TerminalIntent {
+    record: RemoteSessionDiagnosticRecord,
+    terminal_at: u64,
+    durable_tombstone: Option<RemoteSessionTombstoneRecord>,
+}
+
 #[derive(Clone)]
 struct RemoteSessionLedger {
     clock: RemoteClock,

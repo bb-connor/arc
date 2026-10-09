@@ -27,6 +27,9 @@ mod remote_mcp_admin;
 #[path = "remote_mcp/approval_policy.rs"]
 mod remote_mcp_approval_policy;
 pub use remote_mcp_approval_policy::RemoteApprovalConfig;
+#[path = "remote_mcp/blocking.rs"]
+mod blocking;
+use blocking::{blocking_cli, blocking_response, run_blocking};
 #[path = "remote_mcp/http_body.rs"]
 mod http_body;
 #[path = "remote_mcp/protocol_refusal_http.rs"]

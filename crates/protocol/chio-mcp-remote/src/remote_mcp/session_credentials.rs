@@ -291,26 +291,30 @@ async fn issue(
         Ok(None) => return unavailable(),
         Err(error) => return storage_error(error),
     };
-    let Some(keyring) = session.resume_hmac_keyring.as_deref() else {
+    let Some(keyring) = session.resume_hmac_keyring.as_ref() else {
         return unavailable();
     };
     // Do not deliver a usable credential if its retained session was not durable.
     if let Err(error) = session.ensure_session_store_owned() {
         return storage_error(error);
     }
-    if let Err(error) = persist_active_session_record(
-        path,
-        &resume,
-        keyring,
-        match state.factory.config.clock.millis() {
-            Ok(now) => now,
-            Err(error) => return clock::rejection(error),
-        },
-    ) {
-        return storage_error(error);
-    }
-    if let Err(error) = persist_record(path, &keypair, &record) {
-        return storage_error(error);
+    let now_millis = match state.factory.config.clock.millis() {
+        Ok(now) => now,
+        Err(error) => return clock::rejection(error),
+    };
+    let keyring = keyring.clone();
+    let persisted = {
+        let path = path.to_path_buf();
+        let record = record.clone();
+        blocking_response(move || {
+            persist_active_session_record(&path, &resume, &keyring, now_millis)
+                .map_err(storage_error)?;
+            persist_record(&path, &keypair, &record).map_err(storage_error)
+        })
+        .await
+    };
+    if let Err(response) = persisted {
+        return response;
     }
     let mut result = record.public_binding();
     result["bearerToken"] = json!(token);
@@ -360,16 +364,21 @@ async fn revoke(
         Some(session) => Some(session.active_request_stream.lock().await),
         None => None,
     };
-    let conn = match open_db(path) {
-        Ok(conn) => conn,
-        Err(error) => return storage_error(error),
-    };
-    match conn.execute(
-        &format!("DELETE FROM {TABLE} WHERE session_id=?1"),
-        params![session_id],
-    ) {
+    let path = path.to_path_buf();
+    let target = session_id.clone();
+    let deleted = blocking_response(move || {
+        open_db(&path)
+            .map_err(storage_error)?
+            .execute(
+                &format!("DELETE FROM {TABLE} WHERE session_id=?1"),
+                params![target],
+            )
+            .map_err(storage_error)
+    })
+    .await;
+    match deleted {
         Ok(_) => Json(json!({"revoked": true, "sessionId": session_id})).into_response(),
-        Err(error) => storage_error(error),
+        Err(response) => response,
     }
 }
 
@@ -430,9 +439,12 @@ pub(super) async fn authenticate_request(
         _ => return Err(unavailable()),
     };
     let (path, keypair) = operator_runtime(state)?;
-    let record = load_record(path, &keypair, &sha256_hex(token.as_bytes()))
-        .map_err(storage_error)?
-        .ok_or_else(unavailable)?;
+    let token_hash = sha256_hex(token.as_bytes());
+    let path = path.to_path_buf();
+    let record =
+        blocking_response(move || load_record(&path, &keypair, &token_hash).map_err(storage_error))
+            .await?
+            .ok_or_else(unavailable)?;
     let Some(RemoteSessionEntry::Active(session)) = resolve_session_entry(state, &session_id).await
     else {
         return Err(unavailable());
@@ -640,6 +652,24 @@ fn write_call(
     )
     .map_err(storage_error)?;
     Ok(())
+}
+
+pub(super) async fn finish_call_off_runtime(
+    state: &RemoteAppState,
+    pending: &CredentialCall,
+    message: &Value,
+) -> Result<Value, Response> {
+    let (state, pending, message) = (state.clone(), pending.clone(), message.clone());
+    blocking_response(move || finish_call(&state, &pending, &message)).await
+}
+
+pub(super) async fn acknowledge_call_off_runtime(
+    state: &RemoteAppState,
+    credential: &SessionCredential,
+    message: &Value,
+) -> Result<Value, Response> {
+    let (state, credential, message) = (state.clone(), credential.clone(), message.clone());
+    blocking_response(move || acknowledge_call(&state, &credential, &message)).await
 }
 
 pub(super) fn reserve_call(
@@ -902,11 +932,14 @@ async fn status(
         Ok(runtime) => runtime,
         Err(response) => return response,
     };
-    let conn = match open_db(path) {
-        Ok(conn) => conn,
-        Err(error) => return storage_error(error),
-    };
-    match read_latch(&conn,&keypair,&session_id) {
+    let path = path.to_path_buf();
+    let target = session_id.clone();
+    let latch = blocking_response(move || {
+        let conn = open_db(&path).map_err(storage_error)?;
+        read_latch(&conn, &keypair, &target)
+    })
+    .await;
+    match latch {
         Ok(call) => Json(json!({"sessionId":session_id,"call":call,"recovery":"operator-inspect-and-revoke; no automatic unfencing"})).into_response(),
         Err(response)=>response,
     }

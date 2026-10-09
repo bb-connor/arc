@@ -162,6 +162,14 @@ fn projection(record: &ApprovalRecord) -> Value {
     result
 }
 
+async fn storage_off_runtime(
+    state: &RemoteAppState,
+    headers: &HeaderMap,
+) -> Result<(Connection, Keypair), Response> {
+    let (state, headers) = (state.clone(), headers.clone());
+    blocking_response(move || storage(&state, &headers)).await
+}
+
 pub(super) async fn submit(
     State(state): State<RemoteAppState>,
     headers: HeaderMap,
@@ -212,7 +220,7 @@ pub(super) async fn submit(
     if capability.expires_at <= now {
         return failure(StatusCode::CONFLICT, "capability expired");
     }
-    let (connection, signer) = match storage(&state, &headers) {
+    let (connection, signer) = match storage_off_runtime(&state, &headers).await {
         Ok(value) => value,
         Err(response) => return response,
     };
@@ -267,11 +275,22 @@ pub(super) async fn submit(
         Ok(value) => value,
         Err(response) => return response,
     };
-    match connection.execute("INSERT OR IGNORE INTO remote_operator_approvals (id, session_id, request_id, signed_record) VALUES (?1, ?2, ?3, ?4)",
-        params![id, record.session_id, record.request_id, serialized]) {
+    let (insert_id, insert_session, insert_request) =
+        (id, record.session_id.clone(), record.request_id.clone());
+    let inserted = blocking_response(move || {
+        connection
+            .execute("INSERT OR IGNORE INTO remote_operator_approvals (id, session_id, request_id, signed_record) VALUES (?1, ?2, ?3, ?4)",
+                params![insert_id, insert_session, insert_request, serialized])
+            .map_err(internal)
+    })
+    .await;
+    match inserted {
         Ok(1) => (StatusCode::CREATED, Json(projection(&record))).into_response(),
-        Ok(_) => failure(StatusCode::CONFLICT, "session request already has an approval record; retrieve it instead"),
-        Err(error) => internal(error),
+        Ok(_) => failure(
+            StatusCode::CONFLICT,
+            "session request already has an approval record; retrieve it instead",
+        ),
+        Err(response) => response,
     }
 }
 
@@ -280,14 +299,15 @@ pub(super) async fn get_record(
     AxumPath(id): AxumPath<String>,
     headers: HeaderMap,
 ) -> Response {
-    let (connection, signer) = match storage(&state, &headers) {
-        Ok(value) => value,
-        Err(response) => return response,
-    };
-    match load_record(&connection, &id, &signer.public_key()) {
-        Ok(record) => Json(projection(&record)).into_response(),
-        Err(error) => error.response(),
-    }
+    let lookup = blocking_response(move || {
+        let (connection, signer) = storage(&state, &headers)?;
+        match load_record(&connection, &id, &signer.public_key()) {
+            Ok(record) => Ok(Json(projection(&record)).into_response()),
+            Err(error) => Ok(error.response()),
+        }
+    })
+    .await;
+    lookup.unwrap_or_else(|response| response)
 }
 
 pub(super) async fn decide(
@@ -296,21 +316,41 @@ pub(super) async fn decide(
     headers: HeaderMap,
     BoundedJson(request): BoundedJson<DecisionRequest>,
 ) -> Response {
-    let (mut connection, signer) = match storage(&state, &headers) {
-        Ok(value) => value,
-        Err(response) => return response,
+    let loaded = {
+        let (state, headers, id) = (state.clone(), headers, id.clone());
+        blocking_response(move || {
+            let (connection, signer) = storage(&state, &headers)?;
+            match load_record(&connection, &id, &signer.public_key()) {
+                Ok(record) => Ok((connection, signer, record)),
+                Err(error) => Err(error.response()),
+            }
+        })
+        .await
     };
     // Resolve the live session before taking the SQLite writer transaction.
     // Reload the signed record under that transaction before accepting a decision.
-    let pending = match load_record(&connection, &id, &signer.public_key()) {
-        Ok(record) => record,
-        Err(error) => return error.response(),
+    let (connection, signer, pending) = match loaded {
+        Ok(value) => value,
+        Err(response) => return response,
     };
     let Some(RemoteSessionEntry::Active(session)) =
         resolve_session_entry(&state, &pending.session_id).await
     else {
         return failure(StatusCode::CONFLICT, "active MCP session required");
     };
+    run_blocking(move || decide_locked(state, session, connection, signer, id, request))
+        .await
+        .unwrap_or_else(internal)
+}
+
+fn decide_locked(
+    state: RemoteAppState,
+    session: Arc<RemoteSession>,
+    mut connection: Connection,
+    signer: Keypair,
+    id: String,
+    request: DecisionRequest,
+) -> Response {
     let transaction = match connection.transaction_with_behavior(TransactionBehavior::Immediate) {
         Ok(value) => value,
         Err(error) => return internal(error),

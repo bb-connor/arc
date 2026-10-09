@@ -45,8 +45,23 @@ pub(super) fn install_admin_routes(router: Router<RemoteAppState>) -> Router<Rem
         )
 }
 
+async fn run_admin_blocking<F>(job: F) -> Response
+where
+    F: FnOnce() -> Response + Send + 'static,
+{
+    match run_blocking(job).await {
+        Ok(response) => response,
+        Err(error) => plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string()),
+    }
+}
+
 async fn handle_admin_authority(State(state): State<RemoteAppState>, request: Request) -> Response {
-    if let Err(response) = validate_admin_request(request.headers(), state.admin_token.as_deref()) {
+    let headers = request.headers().clone();
+    run_admin_blocking(move || handle_admin_authority_blocking(state, headers)).await
+}
+
+fn handle_admin_authority_blocking(state: RemoteAppState, headers: HeaderMap) -> Response {
+    if let Err(response) = validate_admin_request(&headers, state.admin_token.as_deref()) {
         return response;
     }
 
@@ -71,9 +86,12 @@ async fn handle_admin_health(State(state): State<RemoteAppState>, request: Reque
         );
     }
     let (active, terminal) = state.sessions.snapshot().await;
-    let authority = match load_authority_status(&state) {
-        Ok(status) => status,
-        Err(response) => return response,
+    let authority = {
+        let state = state.clone();
+        match blocking_response(move || load_authority_status(&state)).await {
+            Ok(status) => status,
+            Err(response) => return response,
+        }
     };
 
     let enterprise_provider_summary = state
@@ -179,7 +197,12 @@ async fn handle_admin_rotate_authority(
     State(state): State<RemoteAppState>,
     request: Request,
 ) -> Response {
-    if let Err(response) = validate_admin_request(request.headers(), state.admin_token.as_deref()) {
+    let headers = request.headers().clone();
+    run_admin_blocking(move || handle_admin_rotate_authority_blocking(state, headers)).await
+}
+
+fn handle_admin_rotate_authority_blocking(state: RemoteAppState, headers: HeaderMap) -> Response {
+    if let Err(response) = validate_admin_request(&headers, state.admin_token.as_deref()) {
         return response;
     }
 
@@ -246,6 +269,14 @@ async fn handle_admin_rotate_authority(
 async fn handle_admin_tool_receipts(
     State(state): State<RemoteAppState>,
     Query(query): Query<AdminToolReceiptQuery>,
+    headers: HeaderMap,
+) -> Response {
+    run_admin_blocking(move || handle_admin_tool_receipts_blocking(state, query, headers)).await
+}
+
+fn handle_admin_tool_receipts_blocking(
+    state: RemoteAppState,
+    query: AdminToolReceiptQuery,
     headers: HeaderMap,
 ) -> Response {
     if let Err(response) = validate_admin_request(&headers, state.admin_token.as_deref()) {
@@ -316,6 +347,14 @@ async fn handle_admin_tool_receipts(
 async fn handle_admin_child_receipts(
     State(state): State<RemoteAppState>,
     Query(query): Query<AdminChildReceiptQuery>,
+    headers: HeaderMap,
+) -> Response {
+    run_admin_blocking(move || handle_admin_child_receipts_blocking(state, query, headers)).await
+}
+
+fn handle_admin_child_receipts_blocking(
+    state: RemoteAppState,
+    query: AdminChildReceiptQuery,
     headers: HeaderMap,
 ) -> Response {
     if let Err(response) = validate_admin_request(&headers, state.admin_token.as_deref()) {
@@ -391,6 +430,14 @@ async fn handle_admin_budgets(
     Query(query): Query<AdminBudgetQuery>,
     headers: HeaderMap,
 ) -> Response {
+    run_admin_blocking(move || handle_admin_budgets_blocking(state, query, headers)).await
+}
+
+fn handle_admin_budgets_blocking(
+    state: RemoteAppState,
+    query: AdminBudgetQuery,
+    headers: HeaderMap,
+) -> Response {
     if let Err(response) = validate_admin_request(&headers, state.admin_token.as_deref()) {
         return response;
     }
@@ -441,6 +488,14 @@ async fn handle_admin_budgets(
 async fn handle_admin_revocations(
     State(state): State<RemoteAppState>,
     Query(query): Query<AdminRevocationQuery>,
+    headers: HeaderMap,
+) -> Response {
+    run_admin_blocking(move || handle_admin_revocations_blocking(state, query, headers)).await
+}
+
+fn handle_admin_revocations_blocking(
+    state: RemoteAppState,
+    query: AdminRevocationQuery,
     headers: HeaderMap,
 ) -> Response {
     if let Err(response) = validate_admin_request(&headers, state.admin_token.as_deref()) {
@@ -504,6 +559,15 @@ async fn handle_admin_revoke_capability(
     headers: HeaderMap,
     BoundedJson(payload): BoundedJson<AdminRevokeCapabilityRequest>,
 ) -> Response {
+    run_admin_blocking(move || handle_admin_revoke_capability_blocking(state, headers, payload))
+        .await
+}
+
+fn handle_admin_revoke_capability_blocking(
+    state: RemoteAppState,
+    headers: HeaderMap,
+    payload: AdminRevokeCapabilityRequest,
+) -> Response {
     if let Err(response) = validate_admin_request(&headers, state.admin_token.as_deref()) {
         return response;
     }
@@ -548,21 +612,17 @@ async fn handle_admin_session_trust(
     let Some(entry) = resolve_session_entry(&state, &session_id).await else {
         return plain_http_error(StatusCode::NOT_FOUND, "unknown MCP session");
     };
-    let (record, statuses) = match entry {
-        RemoteSessionEntry::Active(session) => {
-            let record = session.diagnostic_record();
-            let statuses = match load_session_revocation_status(&state, &record.capabilities) {
-                Ok(statuses) => statuses,
-                Err(response) => return response,
-            };
-            (record, statuses)
-        }
-        RemoteSessionEntry::Terminal(record) => {
-            let statuses = match load_session_revocation_status(&state, &record.capabilities) {
-                Ok(statuses) => statuses,
-                Err(response) => return response,
-            };
-            ((*record).clone(), statuses)
+    let record = match entry {
+        RemoteSessionEntry::Active(session) => session.diagnostic_record(),
+        RemoteSessionEntry::Terminal(record) => (*record).clone(),
+    };
+    let statuses = {
+        let state = state.clone();
+        let capabilities = record.capabilities.clone();
+        match blocking_response(move || load_session_revocation_status(&state, &capabilities)).await
+        {
+            Ok(statuses) => statuses,
+            Err(response) => return response,
         }
     };
 

@@ -215,6 +215,51 @@ async fn serve_http_async(mut config: RemoteServeHttpConfig) -> Result<(), CliEr
     .map_err(|error| CliError::cli_other_error(format!("remote MCP edge server failed: {error}")))
 }
 
+async fn touch_off_runtime(session: &Arc<RemoteSession>) -> Result<(), CliError> {
+    let session = session.clone();
+    blocking_cli(move || session.touch()).await
+}
+
+type AdmittedRequest = (
+    RequestEvents,
+    Option<Box<remote_mcp_session_credentials::CredentialCall>>,
+);
+
+/// Synchronous admission for one request: credential reservation, route
+/// registration, enqueue, and the exact rollback of a reservation that was not
+/// enqueued.
+fn admit_request(
+    state: &RemoteAppState,
+    session: &Arc<RemoteSession>,
+    credential: Option<&remote_mcp_session_credentials::SessionCredential>,
+    reserve: bool,
+    message: AccountedMessage,
+) -> Result<AdmittedRequest, Response> {
+    let credential_call = match credential.filter(|_| reserve) {
+        Some(credential) => {
+            match remote_mcp_session_credentials::reserve_call(state, credential, &message)? {
+                remote_mcp_session_credentials::CallReservation::Pending(call) => Some(call),
+                remote_mcp_session_credentials::CallReservation::Replay(response) => {
+                    return Err(Json(response).into_response());
+                }
+            }
+        }
+        None => None,
+    };
+    let enqueued = session
+        .register_request(message.request_generation())
+        .and_then(|events| session.send_accounted(message).map(|()| events));
+    match enqueued {
+        Ok(events) => Ok((events, credential_call)),
+        Err(error) => {
+            if let Some(call) = credential_call.as_ref() {
+                remote_mcp_session_credentials::rollback_not_enqueued_call(state, call, &error)?;
+            }
+            Err(remote_session_send_error(error.into_error()))
+        }
+    }
+}
+
 async fn fail_closed_session_after_persistence_error(
     state: &RemoteAppState,
     session: &Arc<RemoteSession>,
@@ -240,7 +285,10 @@ async fn fail_closed_session_after_persistence_error(
                 session.lifecycle_snapshot().last_seen_at,
             );
             state.sessions.remove_active(&session.session_id).await;
-            if let Err(shutdown_error) = session.shutdown_upstream_transport() {
+            let stopped = session.clone();
+            if let Ok(Err(shutdown_error)) =
+                run_blocking(move || stopped.shutdown_upstream_transport()).await
+            {
                 warn!(
                     session_id = %session.session_id,
                     error = %shutdown_error,
@@ -413,7 +461,7 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
                 if let Err(response) = validate_session_lifecycle(&session) {
                     return response;
                 }
-                if let Err(error) = session.touch() {
+                if let Err(error) = touch_off_runtime(&session).await {
                     return fail_closed_session_after_persistence_error(&state, &session, error)
                         .await;
                 }
@@ -444,8 +492,16 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
                 return response;
             }
         }
-        if let Err(error) = session.send_accounted(message) {
-            return remote_session_send_error(error.into_error());
+        let notified = {
+            let session = session.clone();
+            run_blocking(move || session.send_accounted(message)).await
+        };
+        match notified {
+            Ok(Ok(())) => {}
+            Ok(Err(error)) => return remote_session_send_error(error.into_error()),
+            Err(error) => {
+                return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string());
+            }
         }
         return response_with_mode(
             StatusCode::ACCEPTED.into_response(),
@@ -476,49 +532,36 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
     }
     if response_method == "chio/acknowledge" {
         if let Some(credential) = session_credential.as_ref() {
-            return match remote_mcp_session_credentials::acknowledge_call(
+            return match remote_mcp_session_credentials::acknowledge_call_off_runtime(
                 &state, credential, &message,
-            ) {
+            )
+            .await
+            {
                 Ok(response) => Json(response).into_response(),
                 Err(response) => response,
             };
         }
     }
-    let credential_call = if response_method == "tools/call" {
-        if let Some(credential) = session_credential.as_ref() {
-            match remote_mcp_session_credentials::reserve_call(&state, credential, &message) {
-                Ok(remote_mcp_session_credentials::CallReservation::Pending(call)) => Some(call),
-                Ok(remote_mcp_session_credentials::CallReservation::Replay(response)) => {
-                    return Json(response).into_response();
-                }
-                Err(response) => return response,
-            }
-        } else {
-            None
-        }
-    } else {
-        None
-    };
     // The stream subscribes only once it owns the request stream and has passed
     // final authentication, immediately before enqueue, so events published for
     // a previous owner while this POST waited are never delivered on it.
-    let request_generation = message.request_generation();
     let mut event_rx = session.subscribe();
-    let enqueued = session
-        .register_request(request_generation)
-        .and_then(|events| session.send_accounted(message).map(|()| events));
-    let mut request_events = match enqueued {
-        Ok(events) => events,
+    // Reservation, route registration, enqueue and rollback run as one
+    // uninterruptible unit: a dropped connection can neither strand a pending
+    // reservation nor enqueue a request without its route.
+    let admission = {
+        let state = state.clone();
+        let session = session.clone();
+        let credential = session_credential.clone();
+        let reserve = response_method == "tools/call";
+        run_blocking(move || admit_request(&state, &session, credential.as_ref(), reserve, message))
+            .await
+    };
+    let (mut request_events, credential_call) = match admission {
+        Ok(Ok(admitted)) => admitted,
+        Ok(Err(response)) => return response,
         Err(error) => {
-        if let Some(call) = credential_call.as_ref() {
-            if let Err(response) = remote_mcp_session_credentials::rollback_not_enqueued_call(
-                &state, call, &error,
-            ) {
-                return response;
-            }
-        }
-        drop(stream_lock);
-        return remote_session_send_error(error.into_error());
+            return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string());
         }
     };
 
@@ -538,7 +581,7 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
                     let mut outgoing = event.message.clone();
                     if is_terminal_response_for_request(&event.message, &request_id) {
                         if let Some(call) = credential_call.as_ref() {
-                            match remote_mcp_session_credentials::finish_call(&state, call, &event.message) {
+                            match remote_mcp_session_credentials::finish_call_off_runtime(&state, call, &event.message).await {
                                 Ok(response) => outgoing = response,
                                 Err(_) => {
                                     // The effect may already exist. Withhold success
@@ -629,16 +672,22 @@ async fn handle_initialize_post(
                 let is_terminal = is_terminal_response_for_request(&event.message, &request_id);
                 let is_success = is_successful_initialize_response(&event.message, &request_id);
                 if is_success {
-                    if let Err(error) = session.mark_ready(
-                        event
-                            .message
-                            .get("result")
-                            .and_then(|result| result.get("protocolVersion"))
-                            .and_then(Value::as_str)
-                            .map(ToOwned::to_owned),
-                        initialize_params.clone(),
-                        peer_capabilities.clone(),
-                    ) {
+                    let protocol_version = event
+                        .message
+                        .get("result")
+                        .and_then(|result| result.get("protocolVersion"))
+                        .and_then(Value::as_str)
+                        .map(ToOwned::to_owned);
+                    let ready = {
+                        let session = session.clone();
+                        let params = initialize_params.clone();
+                        let capabilities = peer_capabilities.clone();
+                        blocking_cli(move || {
+                            session.mark_ready(protocol_version, params, capabilities)
+                        })
+                        .await
+                    };
+                    if let Err(error) = ready {
                         return fail_closed_session_after_persistence_error(
                             &state, &session, error,
                         )
@@ -754,7 +803,7 @@ async fn handle_get(State(state): State<RemoteAppState>, request: Request) -> Re
                 if let Err(response) = validate_session_lifecycle(&session) {
                     return response;
                 }
-                if let Err(error) = session.touch() {
+                if let Err(error) = touch_off_runtime(&session).await {
                     return fail_closed_session_after_persistence_error(&state, &session, error)
                         .await;
                 }

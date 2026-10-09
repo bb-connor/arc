@@ -52,21 +52,28 @@ pub(super) async fn close(state: &RemoteAppState, session: &Arc<RemoteSession>) 
         // A clock failure cannot make a dead actor serve again. Remove resume
         // authority under the same lifecycle lock as renewal, without inventing
         // a clock reading or signed terminal epoch.
-        {
-            let mut lifecycle = session
+        let stopped = session.clone();
+        let released = run_blocking(move || {
+            let mut lifecycle = stopped
                 .lifecycle
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
-            if let Err(error) = session.remove_resumable_record() {
-                error!(error = %error, session_id = %session.session_id,
+            if let Err(error) = stopped.remove_resumable_record() {
+                error!(error = %error, session_id = %stopped.session_id,
                     "stopped MCP worker resume-state removal requires operator reconciliation");
             }
             lifecycle.state = RemoteSessionState::Closed;
             lifecycle.deadline = None;
             lifecycle.drain_deadline_at = None;
+        })
+        .await;
+        if let Err(error) = released {
+            error!(error = %error, session_id = %session.session_id,
+                "stopped MCP worker resume-state release did not complete");
         }
         state.sessions.remove_active(&session.session_id).await;
-        if let Err(error) = session.shutdown_upstream_transport() {
+        let stopped = session.clone();
+        if let Ok(Err(error)) = run_blocking(move || stopped.shutdown_upstream_transport()).await {
             warn!(error = %error, session_id = %session.session_id,
                 "stopped MCP worker upstream shutdown failed");
         }
