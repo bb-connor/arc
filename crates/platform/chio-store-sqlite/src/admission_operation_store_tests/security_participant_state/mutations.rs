@@ -134,6 +134,63 @@ fn setup_selected_phase(
         execution_nonce: nonce_preflight,
         ..AdmissionParticipantRequirements::NONE
     };
+    setup_with_requirements(
+        fixture,
+        name,
+        context,
+        decision_at,
+        selected,
+        requirements,
+        nonce_preflight,
+    )
+}
+
+/// A selected native operation whose retained request also requires a
+/// threshold approval, registered with its broker attempt.
+pub(super) fn setup_with_approval(
+    fixture: &Fixture,
+    name: &str,
+    context: &SecurityInvocationContext,
+) -> TestResult<(AdmissionOperationV1, AdmissionRecoveryLease)> {
+    let initialized = fixture
+        .store
+        .load_security_participant_state(
+            &identifier("authority", "source"),
+            &fixture.fence,
+            now_ms(),
+        )?
+        .ok_or("source initialization absent")?;
+    let requirements = AdmissionParticipantRequirements {
+        broker_attempt: true,
+        budget_capture: true,
+        approval: true,
+        ..AdmissionParticipantRequirements::NONE
+    };
+    let (operation, lease, _) = setup_with_requirements(
+        fixture,
+        name,
+        context,
+        now_ms(),
+        Some(initialized.admission_binding()?),
+        requirements,
+        false,
+    )?;
+    Ok((operation, lease))
+}
+
+fn setup_with_requirements(
+    fixture: &Fixture,
+    name: &str,
+    context: &SecurityInvocationContext,
+    decision_at: u64,
+    selected: Option<chio_kernel::admission_operation::NativeSecurityAuthorityBindingV1>,
+    requirements: AdmissionParticipantRequirements,
+    nonce_preflight: bool,
+) -> TestResult<(
+    AdmissionOperationV1,
+    AdmissionRecoveryLease,
+    AdmissionRecoveryLease,
+)> {
     let (unbound, original) = super::super::retained_request::original_with_requirements(
         &fixture.fence,
         name,

@@ -142,7 +142,8 @@ impl SqliteAdmissionOperationStore {
         }
         let record = records::new(&source, observed, fence)?;
         storage::hydrate(&tx, &source)?;
-        storage::admit_operation(&tx)?;
+        // Imported rows must leave every unfinished operation's reservation.
+        storage::admit_operation(&tx, false)?;
         cutpoint(2)?;
         records::insert(&tx, &record)?;
         records::verify_all(&tx)?;

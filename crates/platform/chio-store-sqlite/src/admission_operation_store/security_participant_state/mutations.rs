@@ -233,7 +233,11 @@ impl SqliteAdmissionOperationStore {
                     .ok_or_else(|| invalid("native byte count overflow"))?;
             }
         }
-        storage::admit_operation(&tx)?;
+        // A first native write reserves the operation's later growth; a
+        // dispatch join after its own preflight is already reserved.
+        if !storage::preflight_recorded(&tx, operation.binding().operation_id())? {
+            storage::admit_operation(&tx, true)?;
+        }
         let record = history::Record {
             schema: history::format(command.input().is_some()),
             authority: actual.authority.clone(),

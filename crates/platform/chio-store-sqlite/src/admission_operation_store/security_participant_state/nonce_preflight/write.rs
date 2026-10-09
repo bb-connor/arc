@@ -112,7 +112,8 @@ impl SqliteAdmissionOperationStore {
                     .ok_or_else(|| invalid("native byte count overflow"))?;
             }
         }
-        super::super::storage::admit_operation(&tx)?;
+        // A preflight is always its operation's first native write.
+        super::super::storage::admit_operation(&tx, true)?;
         let record = Record {
             schema: Record::format(),
             authority: actual.authority.clone(),

@@ -323,16 +323,98 @@ fn capacity(detail: impl std::fmt::Display) -> AdmissionOperationStoreError {
     ))
 }
 
+/// Largest current-row growth one admitted operation can still cause after
+/// its first native write: its dispatch join after a nonce preflight (one
+/// transition), one egress fence, a declassified commitment (use, evidence
+/// and outbox rows), and one output join (a transition plus declassification
+/// evidence and outbox rows). Every other later change rewrites existing rows.
+pub(super) const OPERATION_ROWS: u64 = 8;
+
+/// Unfinished operations scanned through the terminal index before the
+/// reservation evidence counts as incomplete.
+const MAX_UNFINISHED_SCAN: i64 = 65_537;
+
+/// Whether this operation already made its first native write as a nonce
+/// preflight, which reserved its later growth.
+pub(super) fn preflight_recorded(
+    connection: &Connection,
+    operation: &AdmissionOperationId,
+) -> Result<bool, AdmissionOperationStoreError> {
+    if !super::nonce_preflight::exists(connection)? {
+        return Ok(false);
+    }
+    connection
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM security_participant_nonce_preflight_events WHERE operation_id = ?1)",
+            [operation.as_str()],
+            |row| row.get(0),
+        )
+        .map_err(sqlite_error)
+}
+
+/// Unfinished operations that already hold native history, through the
+/// terminal index and the journals' unique operation indexes.
+fn unfinished_operations(connection: &Connection) -> Result<u64, AdmissionOperationStoreError> {
+    let scanned: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM (SELECT 1 FROM admission_operations WHERE terminal = 0 LIMIT ?1)",
+            [MAX_UNFINISHED_SCAN],
+            |row| row.get(0),
+        )
+        .map_err(sqlite_error)?;
+    if scanned >= MAX_UNFINISHED_SCAN {
+        return Err(capacity(
+            "unfinished operations exceed the reservation scan",
+        ));
+    }
+    let preflight = if super::nonce_preflight::exists(connection)? {
+        " OR EXISTS(SELECT 1 FROM security_participant_nonce_preflight_events AS preflight
+            WHERE preflight.operation_id = operation.operation_id)"
+    } else {
+        ""
+    };
+    let unfinished: i64 = connection
+        .query_row(
+            &format!(
+                "SELECT COUNT(*) FROM (SELECT operation_id FROM admission_operations
+                 WHERE terminal = 0 LIMIT ?1) AS operation
+                 WHERE EXISTS(SELECT 1 FROM security_participant_state_mutations AS joined
+                     WHERE joined.operation_id = operation.operation_id){preflight}"
+            ),
+            [MAX_UNFINISHED_SCAN],
+            |row| row.get(0),
+        )
+        .map_err(sqlite_error)?;
+    u64::try_from(unfinished).map_err(invalid)
+}
+
 /// Admit a new native admission write after it is applied in the caller's
-/// transaction. A write that would leave more current rows than the
-/// store-wide budget is refused as a retryable operator resource condition,
-/// never an integrity verdict, and rolls back.
-pub(super) fn admit_operation(connection: &Connection) -> Result<(), AdmissionOperationStoreError> {
+/// transaction. Every unfinished operation with native history keeps
+/// `OPERATION_ROWS` reserved, and so does the admitted operation itself when
+/// `operation` is set, so their later egress, commitment and output writes
+/// cannot cross the store-wide budget. A write that would leave less room is
+/// refused as a retryable operator resource condition, never an integrity
+/// verdict, and rolls back.
+pub(super) fn admit_operation(
+    connection: &Connection,
+    operation: bool,
+) -> Result<(), AdmissionOperationStoreError> {
     let budget = current_rows_budget();
     let total = current_rows(connection)?;
-    if total > budget {
+    let unfinished = unfinished_operations(connection)?
+        .checked_add(u64::from(operation))
+        .ok_or_else(|| invalid("native reservation overflow"))?;
+    let reserved = unfinished
+        .checked_mul(OPERATION_ROWS)
+        .ok_or_else(|| invalid("native reservation overflow"))?;
+    if total
+        .checked_add(reserved)
+        .ok_or_else(|| invalid("native reservation overflow"))?
+        > budget
+    {
         return Err(capacity(format_args!(
-            "{total} current rows, budget {budget}"
+            "{total} current rows, {reserved} reserved for {unfinished} unfinished operations, \
+             budget {budget}"
         )));
     }
     Ok(())
