@@ -40,6 +40,7 @@ fuzz = []
 [dependencies]
 chacha20poly1305 = { workspace = true }
 chio-agent-web-interop = { workspace = true }
+chio-custody-store = { workspace = true }
 chio-core = { version = "=0.1.0", package = "chio-core-types", path = "../../core/chio-core-types" }
 chio-credit = { workspace = true }
 chio-federation = { workspace = true }
@@ -72,6 +73,7 @@ uuid = { workspace = true, features = ["v7"] }
 zeroize = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
+chio-custody-store = { workspace = true, features = ["test-support"] }
 rusqlite = { workspace = true, features = ["trace"] }
 base64.workspace = true
 async-trait = { workspace = true }

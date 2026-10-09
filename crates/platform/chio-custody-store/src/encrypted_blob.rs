@@ -312,7 +312,7 @@ pub fn decrypt_blob(tenant_key: &TenantKey, blob: &EncryptedBlob) -> Result<Vec<
         .map_err(|_| DecryptError::AuthenticationFailed)
 }
 
-pub(crate) fn decrypt_blob_with_aad(
+pub fn decrypt_blob_with_aad(
     tenant_key: &TenantKey,
     blob: &EncryptedBlob,
     aad: &[u8],
@@ -333,7 +333,7 @@ fn try_encrypt_blob(tenant_key: &TenantKey, plaintext: &[u8]) -> Result<Encrypte
     try_encrypt_blob_with_aad(tenant_key, plaintext, &[])
 }
 
-pub(crate) fn try_encrypt_blob_with_aad(
+pub fn try_encrypt_blob_with_aad(
     tenant_key: &TenantKey,
     plaintext: &[u8],
     aad: &[u8],
@@ -388,7 +388,7 @@ impl SqliteEncryptedBlobStore {
         // Resolve any `file:` URI to its on-disk parent before creating it, so a
         // URI-configured store creates the real backing directory rather than a
         // bogus scheme-prefixed one.
-        if let Some(parent) = crate::sqlite_parent_dir_to_create(path) {
+        if let Some(parent) = crate::sqlite_uri::sqlite_parent_dir_to_create(path) {
             fs::create_dir_all(&parent)?;
         }
         let manager = SqliteConnectionManager::file(path)
@@ -425,7 +425,7 @@ impl SqliteEncryptedBlobStore {
 
     fn run_migrations(&self) -> Result<(), BlobStoreError> {
         let conn = self.pool.get()?;
-        crate::check_schema_version(
+        crate::schema_version::check_schema_version(
             &conn,
             ENCRYPTED_BLOB_STORE_SCHEMA_KEY,
             ENCRYPTED_BLOB_STORE_SUPPORTED_SCHEMA_VERSION,
@@ -489,7 +489,7 @@ impl SqliteEncryptedBlobStore {
             END;
             "#,
         )?;
-        crate::stamp_schema_version(
+        crate::schema_version::stamp_schema_version(
             &conn,
             ENCRYPTED_BLOB_STORE_SCHEMA_KEY,
             ENCRYPTED_BLOB_STORE_SUPPORTED_SCHEMA_VERSION,

@@ -5,25 +5,25 @@ use std::sync::{Arc, Mutex};
 use chio_security_types::clock::{Clock, ClockError, ClockFence, ClockReading, UnixMillis};
 
 #[derive(Clone)]
-pub(crate) struct StoreClock {
+pub struct StoreClock {
     clock: Arc<dyn Clock>,
     fence: Arc<Mutex<ClockFence>>,
 }
 
 impl StoreClock {
-    pub(crate) fn new(clock: Arc<dyn Clock>) -> Self {
+    pub fn new(clock: Arc<dyn Clock>) -> Self {
         Self::with_fence(clock, Arc::new(Mutex::new(ClockFence::default())))
     }
 
-    pub(crate) fn with_fence(clock: Arc<dyn Clock>, fence: Arc<Mutex<ClockFence>>) -> Self {
+    pub fn with_fence(clock: Arc<dyn Clock>, fence: Arc<Mutex<ClockFence>>) -> Self {
         Self { clock, fence }
     }
 
-    pub(crate) fn unix_millis(&self) -> Result<UnixMillis, ClockError> {
+    pub fn unix_millis(&self) -> Result<UnixMillis, ClockError> {
         self.read().map(ClockReading::unix_millis)
     }
 
-    pub(crate) fn now_secs(&self) -> Result<i64, ClockError> {
+    pub fn now_secs(&self) -> Result<i64, ClockError> {
         i64::try_from(self.unix_millis()?.as_secs()).map_err(|_| ClockError::Overflow)
     }
 }

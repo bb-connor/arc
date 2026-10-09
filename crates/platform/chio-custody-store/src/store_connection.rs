@@ -25,12 +25,12 @@ use rusqlite::Connection;
 /// Proves that the artifact paired with this connection's commits agrees with
 /// the database head. It runs on a recovered connection before the connection
 /// serves again.
-pub(crate) type ConsistencyCheck =
+pub type ConsistencyCheck =
     dyn Fn(&Connection) -> Result<(), Box<dyn Error + Send + Sync>> + Send + Sync;
 
 /// A store's single SQLite connection, with the recovery contract it was
 /// classified under.
-pub(crate) struct StoreConnection {
+pub struct StoreConnection {
     store: &'static str,
     connection: Mutex<Connection>,
     consistency: Option<Box<ConsistencyCheck>>,
@@ -41,16 +41,16 @@ pub(crate) struct StoreConnection {
 /// refuses every operation until the store is reopened.
 #[derive(Clone, Debug, thiserror::Error)]
 #[error("{store} connection is fenced until it is reopened: {reason}")]
-pub(crate) struct ConnectionFenced {
-    pub(crate) store: &'static str,
+pub struct ConnectionFenced {
+    pub store: &'static str,
     #[source]
-    pub(crate) reason: FenceReason,
+    pub reason: FenceReason,
 }
 
 /// Housekeeping cannot run unbudgeted recovery before installing its SQL guard.
 /// The existing qualified port or reopen still owns connection recovery.
 #[derive(Debug, thiserror::Error)]
-pub(crate) enum MaintenanceLockError {
+pub enum MaintenanceLockError {
     #[error(transparent)]
     Fenced(#[from] ConnectionFenced),
     #[error(
@@ -60,7 +60,7 @@ pub(crate) enum MaintenanceLockError {
 }
 
 #[derive(Clone, Debug, thiserror::Error)]
-pub(crate) enum FenceReason {
+pub enum FenceReason {
     #[error("rollback of the transaction the panic interrupted failed: {0}")]
     RollbackFailed(#[source] Arc<rusqlite::Error>),
     #[error("the connection stayed inside a transaction after rollback")]
@@ -74,7 +74,7 @@ impl StoreConnection {
     /// whose writes all run inside RAII transactions. After a verified rollback
     /// the last commit is the only state there is, so the connection serves
     /// again.
-    pub(crate) fn transaction_only(store: &'static str, connection: Connection) -> Self {
+    pub fn transaction_only(store: &'static str, connection: Connection) -> Self {
         Self::new(store, connection, None)
     }
 
@@ -83,7 +83,7 @@ impl StoreConnection {
     /// database head; a recovered connection serves only once it does, because
     /// a panic between the commit and the artifact write leaves the database
     /// ahead of the record that vouches for it.
-    pub(crate) fn anchored(
+    pub fn anchored(
         store: &'static str,
         connection: Connection,
         verify: impl Fn(&Connection) -> Result<(), Box<dyn Error + Send + Sync>> + Send + Sync + 'static,
@@ -107,7 +107,7 @@ impl StoreConnection {
     /// Acquire the connection. A lock another thread poisoned is recovered
     /// only after the connection's state is re-established and verified; a
     /// fenced connection is refused without being touched.
-    pub(crate) fn lock(&self) -> Result<MutexGuard<'_, Connection>, ConnectionFenced> {
+    pub fn lock(&self) -> Result<MutexGuard<'_, Connection>, ConnectionFenced> {
         if let Some(fenced) = self.fence.get() {
             return Err(fenced.clone());
         }
@@ -124,9 +124,7 @@ impl StoreConnection {
     /// Acquire a healthy connection without executing panic-recovery SQL.
     /// This check is inside the lock acquisition, so poison cannot race an
     /// earlier `is_poisoned` observation. No fence or anchor proof is bypassed.
-    pub(crate) fn lock_for_maintenance(
-        &self,
-    ) -> Result<MutexGuard<'_, Connection>, MaintenanceLockError> {
+    pub fn lock_for_maintenance(&self) -> Result<MutexGuard<'_, Connection>, MaintenanceLockError> {
         if let Some(fenced) = self.fence.get() {
             return Err(fenced.clone().into());
         }
@@ -141,20 +139,20 @@ impl StoreConnection {
     }
 
     /// The reason this connection refuses to serve, once it does.
-    #[cfg(test)]
-    pub(crate) fn fence(&self) -> Option<&ConnectionFenced> {
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn fence(&self) -> Option<&ConnectionFenced> {
         self.fence.get()
     }
 
     /// Whether commits on this connection are paired with an external artifact.
-    pub(crate) fn is_anchored(&self) -> bool {
+    pub fn is_anchored(&self) -> bool {
         self.consistency.is_some()
     }
 
     /// The raw non-blocking acquire, for test doubles that assert a store is not
     /// holding its connection while it calls back into them.
-    #[cfg(test)]
-    pub(crate) fn try_lock(
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn try_lock(
         &self,
     ) -> Result<MutexGuard<'_, Connection>, std::sync::TryLockError<MutexGuard<'_, Connection>>>
     {
@@ -224,12 +222,12 @@ impl std::fmt::Debug for StoreConnection {
 
 /// Drivers that leave a connection in each durable phase a panic can leave it
 /// in, and a subscriber that records what recovery decided.
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 #[allow(
     clippy::expect_used,
     reason = "Test and proof fixtures deliberately fail on violated setup invariants."
 )]
-pub(crate) mod test_support {
+pub mod test_support {
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::{Arc, Mutex, PoisonError};
 
@@ -244,7 +242,7 @@ pub(crate) mod test_support {
     /// Run `critical_section` on another thread while holding the connection
     /// lock. The closure must panic, as a fault inside a store's critical
     /// section would, so the lock is left poisoned.
-    pub(crate) fn panic_while_holding(
+    pub fn panic_while_holding(
         connection: &StoreConnection,
         critical_section: impl FnOnce(&mut Connection) + Send,
     ) {
@@ -271,7 +269,7 @@ pub(crate) mod test_support {
 
     /// Panic inside an open transaction after `write`. The transaction's drop
     /// rolls back during unwinding.
-    pub(crate) fn panic_before_commit(
+    pub fn panic_before_commit(
         connection: &StoreConnection,
         write: impl FnOnce(&Transaction<'_>) + Send,
     ) {
@@ -285,7 +283,7 @@ pub(crate) mod test_support {
     /// Panic inside an open transaction after `write`, with `ROLLBACK` denied
     /// on this connection, so neither the transaction's drop nor the recovery
     /// path can end the transaction.
-    pub(crate) fn panic_with_rollback_denied(
+    pub fn panic_with_rollback_denied(
         connection: &StoreConnection,
         write: impl FnOnce(&Transaction<'_>) + Send,
     ) {
@@ -301,7 +299,7 @@ pub(crate) mod test_support {
     /// With a no-op `after_commit` this is the phase between a commit and the
     /// artifact write that follows it; with the artifact write it is the phase
     /// between that write and the caller's acknowledgement.
-    pub(crate) fn panic_after_commit(
+    pub fn panic_after_commit(
         connection: &StoreConnection,
         write: impl FnOnce(&Transaction<'_>) + Send,
         after_commit: impl FnOnce(&Connection) + Send,
@@ -342,15 +340,15 @@ pub(crate) mod test_support {
 
     /// The `user_version` header field: transactional, unread by these stores,
     /// and visible to any connection once committed.
-    pub(crate) const PROBE_USER_VERSION: i64 = 7;
+    pub const PROBE_USER_VERSION: i64 = 7;
 
-    pub(crate) fn write_probe_user_version(transaction: &Transaction<'_>) {
+    pub fn write_probe_user_version(transaction: &Transaction<'_>) {
         transaction
             .pragma_update(None, "user_version", PROBE_USER_VERSION)
             .expect("write the probe user_version");
     }
 
-    pub(crate) fn user_version(connection: &Connection) -> i64 {
+    pub fn user_version(connection: &Connection) -> i64 {
         connection
             .pragma_query_value(None, "user_version", |row| row.get(0))
             .expect("read user_version")
@@ -358,19 +356,19 @@ pub(crate) mod test_support {
 
     /// What recovery decided for one connection, as it was logged.
     #[derive(Clone, Debug, Eq, PartialEq)]
-    pub(crate) struct RecoveryEvent {
-        pub(crate) store: String,
-        pub(crate) outcome: String,
+    pub struct RecoveryEvent {
+        pub store: String,
+        pub outcome: String,
     }
 
-    pub(crate) fn recovered(store: &str) -> RecoveryEvent {
+    pub fn recovered(store: &str) -> RecoveryEvent {
         RecoveryEvent {
             store: store.to_owned(),
             outcome: "recovered".to_owned(),
         }
     }
 
-    pub(crate) fn fenced(store: &str) -> RecoveryEvent {
+    pub fn fenced(store: &str) -> RecoveryEvent {
         RecoveryEvent {
             store: store.to_owned(),
             outcome: "fenced".to_owned(),
@@ -379,9 +377,7 @@ pub(crate) mod test_support {
 
     /// Run `operation` with a subscriber that records every recovery decision
     /// logged on this thread.
-    pub(crate) fn recovery_events_during<R>(
-        operation: impl FnOnce() -> R,
-    ) -> (R, Vec<RecoveryEvent>) {
+    pub fn recovery_events_during<R>(operation: impl FnOnce() -> R) -> (R, Vec<RecoveryEvent>) {
         let events = Arc::new(Mutex::new(Vec::new()));
         let result = tracing::subscriber::with_default(RecoveryLog(events.clone()), operation);
         let events = events

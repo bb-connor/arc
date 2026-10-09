@@ -145,6 +145,7 @@ members = [
     "crates/platform/chio-finding-worker",
     "crates/platform/chio-manifest",
     "crates/platform/chio-risk-comptroller",
+    "crates/platform/chio-custody-store",
     "crates/platform/chio-sqlite-file-identity",
     "crates/platform/chio-store-sqlite",
     "crates/platform/chio-transaction-passport",
@@ -588,6 +589,7 @@ chio-sqlite-file-identity = { version = "=0.1.0", path = "crates/platform/chio-s
 chio-spec-codegen = { path = "crates/tooling/chio-spec-codegen" }
 chio-spec-validate = { path = "crates/tooling/chio-spec-validate" }
 chio-trace-validate = { path = "crates/tooling/chio-trace-validate" }
+chio-custody-store = { version = "=0.1.0", path = "crates/platform/chio-custody-store" }
 chio-store-sqlite = { version = "=0.1.0", path = "crates/platform/chio-store-sqlite" }
 chio-swarm-authority = { version = "=0.1.0", path = "crates/kernel/chio-swarm-authority" }
 chio-transaction-passport = { version = "=0.1.0", path = "crates/platform/chio-transaction-passport" }

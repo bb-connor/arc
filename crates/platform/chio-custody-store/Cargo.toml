@@ -1,0 +1,45 @@
+[package]
+name = "chio-custody-store"
+description = "SQLite blob custody, enterprise migration state, and the connection core they share"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "chio_custody_store"
+
+[features]
+default = []
+# Exposes the connection-recovery drivers to the tests of crates that embed
+# the connection core. Default-off; production builds do not compile it.
+test-support = []
+
+[dependencies]
+chacha20poly1305 = { workspace = true }
+chio-core = { version = "=0.1.0", package = "chio-core-types", path = "../../core/chio-core-types" }
+chio-security-types = { workspace = true, features = ["std"] }
+r2d2 = "0.8"
+r2d2_sqlite = "0.33.0"
+rusqlite = { workspace = true, features = ["functions", "hooks"] }
+rustix = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true, features = ["v7"] }
+zeroize = { workspace = true, features = ["derive"] }
+
+[dev-dependencies]
+rusqlite = { workspace = true, features = ["trace"] }
+chio-test-support = { workspace = true }
+tempfile = { workspace = true }
+
+[lints.clippy]
+undocumented_unsafe_blocks = "deny"
+multiple_unsafe_ops_per_block = "deny"
+unwrap_used = "deny"
+expect_used = "deny"
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
