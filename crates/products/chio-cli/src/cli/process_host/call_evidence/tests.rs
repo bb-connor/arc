@@ -301,9 +301,10 @@ mod retained_selection {
 
     use chio_kernel::admission_operation::{
         AdmissionBeginResult, AdmissionCommandResult, AdmissionIdentifier,
-        AdmissionOperationCommand, AdmissionOperationId, AdmissionOperationStore,
-        AdmissionOperationStoreError, AdmissionOperationV1, AdmissionReplayKey,
-        RetainedToolAdmissionRequestV1, StoreMutationFence, UntrustedAdmissionRecoveryClaim,
+        AdmissionOperationBindingInputV1, AdmissionOperationCommand, AdmissionOperationId,
+        AdmissionOperationStore, AdmissionOperationStoreError, AdmissionOperationV1,
+        AdmissionReplayKey, AuthenticatedRequestNamespace, RetainedToolAdmissionRequestV1,
+        StoreMutationFence, UntrustedAdmissionRecoveryClaim,
     };
 
     use super::*;
@@ -315,6 +316,7 @@ mod retained_selection {
     #[derive(Default)]
     struct SelectorProbe {
         selected: Mutex<Vec<String>>,
+        operations: Vec<AdmissionOperationV1>,
     }
 
     impl SelectorProbe {
@@ -392,9 +394,14 @@ mod retained_selection {
 
         fn load_by_replay_key(
             &self,
-            _replay_key: &AdmissionReplayKey,
+            replay_key: &AdmissionReplayKey,
         ) -> Result<Option<AdmissionOperationV1>, AdmissionOperationStoreError> {
-            unused()
+            self.record(replayed(replay_key))?;
+            Ok(self
+                .operations
+                .iter()
+                .find(|operation| operation.replay_key() == *replay_key)
+                .cloned())
         }
 
         fn compare_and_swap(
@@ -443,15 +450,27 @@ mod retained_selection {
         }
     }
 
+    fn replayed(replay_key: &AdmissionReplayKey) -> String {
+        format!(
+            "replay:{}:{}",
+            replay_key.request_namespace_digest.as_str(),
+            replay_key.request_id.as_str()
+        )
+    }
+
     fn fence() -> StoreMutationFence {
+        fence_for("store")
+    }
+
+    fn fence_for(store_uuid: &str) -> StoreMutationFence {
         StoreMutationFence {
-            store_uuid: "store".into(),
+            store_uuid: store_uuid.into(),
             lease_id: "lease".into(),
             owner_epoch: 1,
         }
     }
 
-    fn fixture_call(text: &str, key: &str) -> Result<(ChioReceipt, Value), CliError> {
+    fn fixture_evidence(text: &str, key: &str) -> Result<(ChioReceipt, Evidence), CliError> {
         let key = PublicKey::from_hex(key.trim()).map_err(error)?;
         let signed = crate::receipt_verify::verify_original_receipt(text, &key)?;
         let evidence: Evidence =
@@ -462,16 +481,44 @@ mod retained_selection {
             &evidence.response,
             &key,
         )?;
+        Ok((call, evidence))
+    }
+
+    fn fixture_call(text: &str, key: &str) -> Result<(ChioReceipt, Value), CliError> {
+        let (call, evidence) = fixture_evidence(text, key)?;
         Ok((call, evidence.response))
     }
 
     fn select(call: &ChioReceipt, response: &Value) -> Result<Vec<String>, CliError> {
-        let probe = SelectorProbe::default();
+        select_from(SelectorProbe::default(), call, response, &fence())
+    }
+
+    fn select_from(
+        probe: SelectorProbe,
+        call: &ChioReceipt,
+        response: &Value,
+        fence: &StoreMutationFence,
+    ) -> Result<Vec<String>, CliError> {
         let retained =
-            super::super::exporting::select_retained_request(&probe, call, response, &fence(), 1)?;
+            super::super::exporting::select_retained_request(&probe, call, response, fence, 1)?;
         assert!(retained.is_none());
         probe.selected()
     }
+
+    fn signed_request_id(call: &ChioReceipt) -> Result<AdmissionIdentifier, CliError> {
+        let request_id = call.metadata.as_ref().ok_or_else(|| error("metadata"))?
+            ["receipt_context"]["request_id"]
+            .as_str()
+            .ok_or_else(|| error("fixture carries a signed request ID"))?;
+        AdmissionIdentifier::try_new("request_id", request_id).map_err(error)
+    }
+
+    const ISSUED_DENIAL: &str = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/fixtures/process-call-observation/issued-denial.json"
+    ));
+    const ISSUED_DENIAL_KEY: &str =
+        "b4cdc34f12b6f9b4bca630d008b3c15333b82df760f801516c40c921b9257534";
 
     #[test]
     fn signed_operation_reference_selects_by_operation_id() -> Result<(), CliError> {
@@ -496,13 +543,7 @@ mod retained_selection {
 
     #[test]
     fn unprojected_denial_selects_by_its_issued_nonce() -> Result<(), CliError> {
-        let (call, response) = fixture_call(
-            include_str!(concat!(
-                env!("CARGO_MANIFEST_DIR"),
-                "/tests/fixtures/process-call-observation/issued-denial.json"
-            )),
-            "b4cdc34f12b6f9b4bca630d008b3c15333b82df760f801516c40c921b9257534",
-        )?;
+        let (call, response) = fixture_call(ISSUED_DENIAL, ISSUED_DENIAL_KEY)?;
         assert!(super::super::super::nonce_evidence::operation_id(&call)?.is_none());
         let nonce = crate::process_response_verify::response_nonce(&response)?
             .ok_or_else(|| error("fixture carries an issued nonce"))?;
@@ -514,16 +555,118 @@ mod retained_selection {
     }
 
     #[test]
-    fn call_without_signed_identity_never_selects_by_request_id() -> Result<(), CliError> {
-        let (call, mut response) = fixture_call(
-            include_str!(concat!(
-                env!("CARGO_MANIFEST_DIR"),
-                "/tests/fixtures/process-call-observation/issued-denial.json"
-            )),
-            "b4cdc34f12b6f9b4bca630d008b3c15333b82df760f801516c40c921b9257534",
-        )?;
+    fn call_without_signed_identity_selects_by_its_replay_key_never_by_request_id(
+    ) -> Result<(), CliError> {
+        let (call, mut response) = fixture_call(ISSUED_DENIAL, ISSUED_DENIAL_KEY)?;
         response["execution_nonce_json"] = Value::Null;
-        assert!(select(&call, &response)?.is_empty());
+        let replay_key = AdmissionReplayKey::for_signed_receipt(
+            AdmissionIdentifier::try_new("coordinator_authority_id", "store").map_err(error)?,
+            None,
+            signed_request_id(&call)?,
+        )
+        .map_err(error)?;
+        assert_eq!(select(&call, &response)?, vec![replayed(&replay_key)]);
+        Ok(())
+    }
+
+    #[test]
+    fn callers_reusing_a_request_id_each_select_their_own_operation() -> Result<(), CliError> {
+        let (call, evidence) = fixture_evidence(ISSUED_DENIAL, ISSUED_DENIAL_KEY)?;
+        let mut response = evidence.response.clone();
+        response["execution_nonce_json"] = Value::Null;
+        let original = AdmissionOperationV1::from_persisted(
+            evidence
+                .nonce
+                .as_ref()
+                .ok_or_else(|| error("fixture retains its nonce operation"))?
+                .operation
+                .clone(),
+        )
+        .map_err(error)?;
+        let binding = original.binding().to_persisted();
+        let request_id = signed_request_id(&call)?;
+        assert_eq!(binding.request_id, request_id);
+        // Another caller's namespace, reusing the same request ID.
+        let other_coordinator =
+            AdmissionIdentifier::try_new("coordinator_authority_id", "another-coordinator")
+                .map_err(error)?;
+        let other = AdmissionOperationV1::prepare(
+            chio_kernel::admission_operation::AdmissionOperationBindingV1::new(
+                AdmissionOperationBindingInputV1 {
+                    kind: binding.kind,
+                    namespace: AuthenticatedRequestNamespace::for_local_system(
+                        other_coordinator.clone(),
+                    )
+                    .map_err(error)?,
+                    request_id: request_id.clone(),
+                    capability_id: AdmissionIdentifier::try_new(
+                        "capability_id",
+                        "another-caller-capability",
+                    )
+                    .map_err(error)?,
+                    authorization_capability_hash: binding.authorization_capability_hash.clone(),
+                    request_binding: binding.request_binding.clone(),
+                    policy_hash: binding.policy_hash.clone(),
+                    effect_class: binding.effect_class,
+                },
+            )
+            .map_err(error)?,
+            1,
+        )
+        .map_err(error)?;
+        assert_eq!(other.replay_key().request_id, original.replay_key().request_id);
+        assert_ne!(other.replay_key(), original.replay_key());
+        let probe = || SelectorProbe {
+            operations: vec![other.clone(), original.clone()],
+            ..SelectorProbe::default()
+        };
+
+        let own = select_from(
+            probe(),
+            &call,
+            &response,
+            &fence_for(binding.coordinator_authority_id.as_str()),
+        )?;
+        assert_eq!(
+            own,
+            vec![
+                replayed(&original.replay_key()),
+                format!("operation:{}", binding.operation_id.as_str()),
+            ]
+        );
+
+        let theirs = select_from(
+            probe(),
+            &call,
+            &response,
+            &fence_for(other_coordinator.as_str()),
+        )?;
+        assert_eq!(
+            theirs,
+            vec![
+                replayed(&other.replay_key()),
+                format!("operation:{}", other.binding().operation_id().as_str()),
+            ]
+        );
+
+        // A tenant's call never adopts the local operation sharing its ID.
+        let mut tenant_call = call.clone();
+        tenant_call.tenant_id = Some("tenant-a".into());
+        let tenant_key = AdmissionReplayKey::for_signed_receipt(
+            binding.coordinator_authority_id.clone(),
+            Some("tenant-a"),
+            request_id,
+        )
+        .map_err(error)?;
+        assert_eq!(
+            select_from(
+                probe(),
+                &tenant_call,
+                &response,
+                &fence_for(binding.coordinator_authority_id.as_str()),
+            )?,
+            vec![replayed(&tenant_key)]
+        );
         Ok(())
     }
 }

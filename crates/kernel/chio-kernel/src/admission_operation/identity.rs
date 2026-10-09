@@ -638,6 +638,34 @@ pub struct AdmissionReplayKey {
     pub request_id: AdmissionIdentifier,
 }
 
+impl AdmissionReplayKey {
+    /// The replay key a signed receipt names under one coordinator: the
+    /// receipt's tenant, or the local system namespace when it carries none,
+    /// with its request ID. This selects an existing operation only. It
+    /// authenticates no caller and grants no admission authority.
+    pub fn for_signed_receipt(
+        coordinator_authority_id: AdmissionIdentifier,
+        receipt_tenant_id: Option<&str>,
+        request_id: AdmissionIdentifier,
+    ) -> Result<Self, AdmissionOperationError> {
+        let tenant = match receipt_tenant_id {
+            Some(LOCAL_SYSTEM_TENANT_ID) => {
+                return Err(AdmissionOperationError::ReservedLocalSystemTenant)
+            }
+            Some(tenant) => tenant,
+            None => LOCAL_SYSTEM_TENANT_ID,
+        };
+        let namespace = AuthenticatedRequestNamespace::bind(
+            coordinator_authority_id,
+            BoundedAdmissionText::try_new("authenticated_tenant_id", tenant)?,
+        )?;
+        Ok(Self {
+            request_namespace_digest: namespace.digest,
+            request_id,
+        })
+    }
+}
+
 pub(super) struct OperationIdInput<'a> {
     pub(super) kind: AdmissionOperationKind,
     pub(super) coordinator_authority_id: &'a AdmissionIdentifier,
@@ -722,3 +750,7 @@ fn is_sha256_hex(value: &str) -> bool {
             .iter()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(byte))
 }
+
+#[cfg(test)]
+#[path = "identity_tests.rs"]
+mod tests;

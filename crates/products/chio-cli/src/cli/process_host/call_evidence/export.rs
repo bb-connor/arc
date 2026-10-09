@@ -1,6 +1,6 @@
 use chio_core::receipt::decision::ToolCallAction;
 use chio_kernel::admission_operation::{
-    AdmissionIdentifier, AdmissionOperationStore, AdmissionOperationV1,
+    AdmissionIdentifier, AdmissionOperationStore, AdmissionOperationV1, AdmissionReplayKey,
     RetainedToolAdmissionRequestV1, StoreMutationFence,
 };
 
@@ -51,8 +51,9 @@ pub(crate) fn export(
 
 /// Selects the retained original by an identity the kernel signed for this
 /// call: the admission operation its receipt projects or claims, else the
-/// execution nonce it issued. A request ID is not an identity, since other
-/// callers may reuse it, so a call carrying neither claims no retained custody.
+/// execution nonce it issued, else the replay key its signed tenant and
+/// request ID name in this coordinator's namespace. A request ID alone is not
+/// an identity, since callers in other namespaces may reuse it.
 pub(super) fn select_retained_request<S>(
     store: &S,
     call: &ChioReceipt,
@@ -68,14 +69,38 @@ where
             .load_retained_tool_request(&operation_id, fence, now)
             .map_err(error);
     }
-    let Some(nonce) = crate::process_response_verify::response_nonce(response)? else {
+    if let Some(nonce) = crate::process_response_verify::response_nonce(response)? {
+        let selector =
+            AdmissionIdentifier::try_new("execution_nonce_id", nonce.nonce_id()).map_err(error)?;
+        return store
+            .load_retained_tool_request_by_execution_nonce(&selector, fence, now)
+            .map_err(error);
+    }
+    let request_id = call
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata["receipt_context"]["request_id"].as_str())
+        .ok_or_else(|| error("missing signed call request ID"))?;
+    let replay_key = AdmissionReplayKey::for_signed_receipt(
+        AdmissionIdentifier::try_new("coordinator_authority_id", fence.store_uuid.as_str())
+            .map_err(error)?,
+        call.tenant_id.as_deref(),
+        AdmissionIdentifier::try_new("request_id", request_id).map_err(error)?,
+    )
+    .map_err(error)?;
+    let Some(operation) = store.load_by_replay_key(&replay_key).map_err(error)? else {
         return Ok(None);
     };
-    let selector =
-        AdmissionIdentifier::try_new("execution_nonce_id", nonce.nonce_id()).map_err(error)?;
-    store
-        .load_retained_tool_request_by_execution_nonce(&selector, fence, now)
-        .map_err(error)
+    let retained = store
+        .load_retained_tool_request(operation.binding().operation_id(), fence, now)
+        .map_err(error)?;
+    if retained
+        .as_ref()
+        .is_some_and(|(operation, _)| operation.replay_key() != replay_key)
+    {
+        return Err(error("retained operation differs from the signed replay key"));
+    }
+    Ok(retained)
 }
 
 /// Read the same anchored state under the caller's existing stopped-host lease.
