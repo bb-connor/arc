@@ -45,7 +45,7 @@ permissions:
 
 concurrency:
   group: verdict-matrix-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
 
 jobs:
   rust-kernel:

@@ -28,6 +28,10 @@ on:
       - "xtask/**"
       - ".github/workflows/chio-pheromone-transit.yml"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+
 jobs:
   chio-pheromone-transit:
     runs-on: ubuntu-latest

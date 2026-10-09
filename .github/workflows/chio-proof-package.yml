@@ -32,7 +32,7 @@ permissions:
 
 concurrency:
   group: chio-proof-package-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
 
 env:
   CARGO_TERM_COLOR: always
