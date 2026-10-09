@@ -1819,11 +1819,8 @@ fn secure_existing_migration_sidecars(database_path: &Path) -> Result<(), CliErr
 fn set_private_directory_permissions(path: &Path) -> Result<(), CliError> {
     #[cfg(unix)]
     {
-        use std::os::unix::fs::{OpenOptionsExt as _, PermissionsExt as _};
-        OpenOptions::new()
-            .read(true)
-            .custom_flags(libc::O_CLOEXEC | libc::O_DIRECTORY | libc::O_NOFOLLOW)
-            .open(path)
+        use std::os::unix::fs::PermissionsExt as _;
+        chio_secure_fs::open_directory_nofollow(path)
             .and_then(|directory| {
                 directory.set_permissions(std::fs::Permissions::from_mode(0o700))
             })
@@ -1848,12 +1845,10 @@ fn validate_private_directory(path: &Path) -> Result<(), CliError> {
         return Err(tampered("demo output is not a real directory"));
     }
     #[cfg(unix)]
-    {
-        // SAFETY: geteuid takes no arguments and only reads the calling
-        // process identity.
-        let operator = unsafe { libc::geteuid() };
-        private_files::require_private_directory_metadata(&metadata, operator)?;
-    }
+    private_files::require_private_directory_metadata(
+        &metadata,
+        chio_secure_fs::effective_uid(),
+    )?;
     Ok(())
 }
 

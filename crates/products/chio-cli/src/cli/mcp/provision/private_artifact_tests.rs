@@ -60,6 +60,58 @@ fn a_symlinked_staging_directory_does_not_chmod_its_target(
 }
 
 #[test]
+fn the_staging_directory_is_restricted_only_through_a_no_follow_directory_descriptor(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let root = tempfile::tempdir()?;
+    let staging = root.path().join("staging");
+    std::fs::create_dir(&staging)?;
+    std::fs::set_permissions(&staging, std::fs::Permissions::from_mode(0o755))?;
+    set_private_directory_permissions(&staging)?;
+    assert_eq!(mode(&staging)?, 0o700);
+
+    let refusal = |path: &Path, errno: i32| {
+        format!(
+            "failed to set private directory permissions on {}: {}",
+            path.display(),
+            std::io::Error::from_raw_os_error(errno)
+        )
+    };
+    let elsewhere = root.path().join("elsewhere");
+    std::fs::create_dir(&elsewhere)?;
+    std::fs::set_permissions(&elsewhere, std::fs::Permissions::from_mode(0o755))?;
+    let linked = root.path().join("linked");
+    std::os::unix::fs::symlink(&elsewhere, &linked)?;
+    let refused = set_private_directory_permissions(&linked)
+        .err()
+        .ok_or("a symlinked staging directory must be refused")?;
+    // Linux refuses a final symlink opened as a no-follow directory with
+    // ENOTDIR; other Unix kernels may report ELOOP.
+    let symlink_errnos: &[i32] = if cfg!(any(target_os = "linux", target_os = "android")) {
+        &[libc::ENOTDIR]
+    } else {
+        &[libc::ENOTDIR, libc::ELOOP]
+    };
+    assert!(
+        symlink_errnos
+            .iter()
+            .any(|errno| refused.to_string().contains(&refusal(&linked, *errno))),
+        "{refused}"
+    );
+    assert_eq!(mode(&elsewhere)?, 0o755);
+
+    let victim = victim(root.path())?;
+    let refused = set_private_directory_permissions(&victim)
+        .err()
+        .ok_or("a regular file must not be restricted as the staging directory")?;
+    assert!(
+        refused.to_string().contains(&refusal(&victim, libc::ENOTDIR)),
+        "{refused}"
+    );
+    assert_eq!(mode(&victim)?, 0o644);
+    Ok(())
+}
+
+#[test]
 fn an_artifact_replaced_after_open_is_restricted_through_its_descriptor(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let root = tempfile::tempdir()?;
