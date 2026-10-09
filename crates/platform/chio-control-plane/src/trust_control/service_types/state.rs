@@ -40,6 +40,10 @@ pub(crate) struct TrustServiceState {
     /// leader. A forward acquires one only when it will contact a remote
     /// leader, and holds it until its blocking transport call has ended.
     pub(crate) leader_forward_lane: Arc<tokio::sync::Semaphore>,
+    /// Independent admission for public holder submissions. Local verification
+    /// and leader forwarding share this lane and hold permits through blocking
+    /// completion even when their request future is cancelled.
+    pub(crate) public_passport_challenge_lane: Arc<tokio::sync::Semaphore>,
     /// Evidenced rail seam for finding-market fee collection;
     /// `None` fails activation closed.
     pub(crate) finding_rail: Option<Arc<dyn super::super::finding_handlers::FindingRailObserver>>,

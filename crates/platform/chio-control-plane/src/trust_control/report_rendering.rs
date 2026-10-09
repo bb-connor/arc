@@ -210,6 +210,9 @@ fn forwarded_control_response(response: ureq::Response) -> Result<Response, CliE
 /// one eighth of Tokio's default 512-thread blocking pool.
 pub(crate) const LEADER_FORWARD_PERMITS: usize = 64;
 
+/// Public holder submissions, including remote forwards, admitted on one node.
+pub(crate) const PUBLIC_PASSPORT_CHALLENGE_PERMITS: usize = 16;
+
 /// Why a leader forward attempt produced no transport outcome.
 enum LeaderForwardRefusal {
     /// Every forward permit was held, so the attempt never started.
@@ -241,13 +244,13 @@ impl LeaderForwardRefusal {
 /// full and the forwarded response is built, so a request future dropped
 /// mid-forward keeps its permit until that work has actually ended.
 async fn run_leader_forward<T>(
-    state: &TrustServiceState,
+    lane: &Arc<tokio::sync::Semaphore>,
     forward: impl FnOnce() -> T + Send + 'static,
 ) -> Result<T, LeaderForwardRefusal>
 where
     T: Send + 'static,
 {
-    let permit = Arc::clone(&state.leader_forward_lane)
+    let permit = Arc::clone(lane)
         .try_acquire_owned()
         .map_err(|_| LeaderForwardRefusal::AtCapacity)?;
     tokio::task::spawn_blocking(move || {
@@ -293,6 +296,30 @@ pub(crate) async fn forward_post_to_leader<B: Serialize>(
     path: &str,
     body: &B,
 ) -> Result<Option<Response>, Response> {
+    forward_post_to_leader_in_lane(state, path, body, &state.leader_forward_lane).await
+}
+
+/// This unauthenticated route has independent admission, shared with its local
+/// verification path. It cannot consume authenticated write-forwarding permits.
+pub(crate) async fn forward_public_passport_challenge_to_leader<B: Serialize>(
+    state: &TrustServiceState,
+    body: &B,
+) -> Result<Option<Response>, Response> {
+    forward_post_to_leader_in_lane(
+        state,
+        PUBLIC_PASSPORT_CHALLENGE_VERIFY_PATH,
+        body,
+        &state.public_passport_challenge_lane,
+    )
+    .await
+}
+
+async fn forward_post_to_leader_in_lane<B: Serialize>(
+    state: &TrustServiceState,
+    path: &str,
+    body: &B,
+    lane: &Arc<tokio::sync::Semaphore>,
+) -> Result<Option<Response>, Response> {
     let Some(self_url) = cluster_self_url(state) else {
         return Ok(None);
     };
@@ -336,7 +363,7 @@ pub(crate) async fn forward_post_to_leader<B: Serialize>(
         let attempt = match forwarded_request_json(body, "forwarded trust control request") {
             Ok(json) => {
                 let request_path = path.to_owned();
-                run_leader_forward(state, move || {
+                run_leader_forward(lane, move || {
                     post_json_to_control_service(&client, &request_path, json)
                 })
                 .await
@@ -449,7 +476,7 @@ pub(crate) async fn forward_authority_post_to_leader<B: Serialize>(
                 let peer_state = state.clone();
                 let target = leader_url.clone();
                 let request_path = path.to_owned();
-                run_leader_forward(state, move || {
+                run_leader_forward(&state.leader_forward_lane, move || {
                     let term = leader_confirmed_authority_term(
                         &peer_state,
                         &client,
@@ -581,7 +608,7 @@ pub(crate) async fn forward_scim_post_to_leader<B: Serialize>(
         let attempt = match forwarded_request_json(body, "trust control request") {
             Ok(json) => {
                 let request_path = path.to_owned();
-                run_leader_forward(state, move || {
+                run_leader_forward(&state.leader_forward_lane, move || {
                     client
                         .post_json::<_, Value>(&request_path, &json)
                         .map(|value| {
@@ -669,7 +696,7 @@ pub(crate) async fn forward_scim_delete_to_leader(
                     scim_error_response(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
                 })?;
         let request_path = path.to_owned();
-        let attempt = run_leader_forward(state, move || {
+        let attempt = run_leader_forward(&state.leader_forward_lane, move || {
             client.delete_json::<Value>(&request_path).map(|value| {
                 #[cfg(test)]
                 forward_finalization_pause::pause_if_armed(&value);

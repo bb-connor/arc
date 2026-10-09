@@ -84,6 +84,9 @@ fn metrics_state(service_token: &str) -> TrustServiceState {
         cluster: None,
         cluster_progress: None,
         leader_forward_lane: Arc::new(tokio::sync::Semaphore::new(1)),
+        public_passport_challenge_lane: Arc::new(tokio::sync::Semaphore::new(
+            crate::trust_control::report_rendering::PUBLIC_PASSPORT_CHALLENGE_PERMITS,
+        )),
         finding_rail: None,
         finding_purchase_executor: None,
         finding_purchase_execution_lane: Arc::new(tokio::sync::Semaphore::new(1)),

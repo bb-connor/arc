@@ -1,5 +1,5 @@
 use super::super::cluster::{build_cluster_state, run_cluster_sync_loop};
-use super::super::report_rendering::LEADER_FORWARD_PERMITS;
+use super::super::report_rendering::{LEADER_FORWARD_PERMITS, PUBLIC_PASSPORT_CHALLENGE_PERMITS};
 use super::super::*;
 use super::router;
 use chio_http_serve::{
@@ -242,6 +242,9 @@ async fn serve_async_inner(
         cluster,
         cluster_progress,
         leader_forward_lane: Arc::new(tokio::sync::Semaphore::new(LEADER_FORWARD_PERMITS)),
+        public_passport_challenge_lane: Arc::new(tokio::sync::Semaphore::new(
+            PUBLIC_PASSPORT_CHALLENGE_PERMITS,
+        )),
         finding_rail,
         finding_purchase_executor,
         finding_purchase_execution_lane: Arc::new(tokio::sync::Semaphore::new(1)),

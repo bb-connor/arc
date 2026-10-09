@@ -2,7 +2,9 @@
 //! presentation and wallet exchange, passport status lifecycle, verifier
 //! policies, presentation challenges, and federated issuance.
 
-use super::report_rendering::forward_post_to_leader;
+use super::report_rendering::{
+    forward_post_to_leader, forward_public_passport_challenge_to_leader,
+};
 use super::report_validation::{
     bearer_token_from_headers, load_capability_authority,
     load_capability_authority_with_deferred_lineage, validate_service_auth,
@@ -721,19 +723,6 @@ pub(crate) async fn handle_public_get_passport_challenge(
     }
 }
 
-/// Public holder submissions this node verifies at once: an explicit bound on
-/// the blocking-pool threads this unauthenticated route can hold.
-const PUBLIC_PASSPORT_CHALLENGE_VERIFY_PERMITS: usize = 16;
-
-/// Admission for local verification of public holder submissions. No other
-/// route draws on it, so this route can exhaust only its own permits.
-static PUBLIC_PASSPORT_CHALLENGE_VERIFY_LANE: LazyLock<Arc<tokio::sync::Semaphore>> =
-    LazyLock::new(|| {
-        Arc::new(tokio::sync::Semaphore::new(
-            PUBLIC_PASSPORT_CHALLENGE_VERIFY_PERMITS,
-        ))
-    });
-
 pub(crate) async fn handle_public_verify_passport_challenge(
     State(state): State<TrustServiceState>,
     Json(payload): Json<VerifyPassportChallengeRequest>,
@@ -742,18 +731,13 @@ pub(crate) async fn handle_public_verify_passport_challenge(
         Ok(now) => now,
         Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
     };
-    match forward_post_to_leader(&state, PUBLIC_PASSPORT_CHALLENGE_VERIFY_PATH, &payload).await {
+    match forward_public_passport_challenge_to_leader(&state, &payload).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
     }
-    verify_public_passport_challenge_in_lane(
-        &PUBLIC_PASSPORT_CHALLENGE_VERIFY_LANE,
-        state,
-        payload,
-        clock_now,
-    )
-    .await
+    let lane = Arc::clone(&state.public_passport_challenge_lane);
+    verify_public_passport_challenge_in_lane(&lane, state, payload, clock_now).await
 }
 
 /// Verifies one public holder submission on the blocking pool under a permit

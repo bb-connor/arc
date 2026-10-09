@@ -667,3 +667,188 @@ async fn paused_forward_response_build_keeps_its_permit_and_refuses_the_next_for
         "the forward permit was free, or the next forward was admitted, while these forwarded responses were being built"
     );
 }
+
+/// The leader holds public submissions while continuing to answer privileged
+/// writes. A watch retains the release signal even if a request has just arrived.
+struct PublicForwardLeader {
+    url: String,
+    release: tokio::sync::watch::Sender<bool>,
+    shutdown: Option<tokio::sync::oneshot::Sender<()>>,
+    server: Option<std::thread::JoinHandle<()>>,
+}
+
+impl PublicForwardLeader {
+    fn start() -> (Self, tokio::sync::mpsc::UnboundedReceiver<()>) {
+        let listener = TcpListener::bind("127.0.0.1:0").test_unwrap();
+        let url = loopback_url(&listener);
+        listener.set_nonblocking(true).test_unwrap();
+        let (entered_tx, entered) = tokio::sync::mpsc::unbounded_channel();
+        let (release, release_rx) = tokio::sync::watch::channel(false);
+        let (shutdown, stopped) = tokio::sync::oneshot::channel();
+        let router = Router::new()
+            .route(
+                PUBLIC_PASSPORT_CHALLENGE_VERIFY_PATH,
+                post(move || {
+                    let entered_tx = entered_tx.clone();
+                    let mut release_rx = release_rx.clone();
+                    async move {
+                        let _ = entered_tx.send(());
+                        let _ = release_rx.wait_for(|released| *released).await;
+                        (StatusCode::OK, LEADER_BODY)
+                    }
+                }),
+            )
+            .route(REVOCATIONS_PATH, post(Self::privileged_write))
+            .route(BUDGET_INCREMENT_PATH, post(Self::privileged_write));
+        let server = std::thread::spawn(move || {
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .test_unwrap()
+                .block_on(async move {
+                    axum::serve(
+                        tokio::net::TcpListener::from_std(listener).test_unwrap(),
+                        router,
+                    )
+                    .with_graceful_shutdown(async move {
+                        let _ = stopped.await;
+                    })
+                    .await
+                    .test_unwrap();
+                });
+        });
+        (
+            Self {
+                url,
+                release,
+                shutdown: Some(shutdown),
+                server: Some(server),
+            },
+            entered,
+        )
+    }
+
+    async fn privileged_write(headers: HeaderMap) -> Response {
+        match validate_service_auth(&headers, "token") {
+            Ok(()) => (StatusCode::OK, LEADER_BODY).into_response(),
+            Err(response) => response,
+        }
+    }
+}
+
+impl Drop for PublicForwardLeader {
+    fn drop(&mut self) {
+        let _ = self.release.send(true);
+        if let Some(shutdown) = self.shutdown.take() {
+            let _ = shutdown.send(());
+        }
+        if let Some(server) = self.server.take() {
+            server.join().test_unwrap();
+        }
+    }
+}
+
+/// Valid wire shape; verification belongs to the leader in these follower tests.
+fn public_forward_submission() -> VerifyPassportChallengeRequest {
+    serde_json::from_value(json!({
+        "presentation": {
+            "schema": "chio.passport-presentation-response.v1",
+            "challenge": {
+                "schema": "chio.passport-presentation-challenge.v1",
+                "verifier": "https://verifier.example",
+                "challengeId": "held-public-submission",
+                "nonce": "nonce",
+                "issuedAt": "2026-10-09T00:00:00Z",
+                "expiresAt": "2026-10-09T00:05:00Z"
+            },
+            "passport": {
+                "schema": "chio.agent-passport.v1",
+                "subject": "holder",
+                "credentials": [],
+                "merkleRoots": [],
+                "issuedAt": "2026-10-09T00:00:00Z",
+                "validUntil": "2026-10-09T00:05:00Z"
+            },
+            "proof": {
+                "type": "Ed25519Signature2020",
+                "created": "2026-10-09T00:00:00Z",
+                "proofPurpose": "authentication",
+                "verificationMethod": "holder",
+                "proofValue": "fixture"
+            }
+        }
+    }))
+    .test_unwrap()
+}
+
+fn start_public_forward(state: &TrustServiceState) -> tokio::task::JoinHandle<Response> {
+    let state = state.clone();
+    tokio::spawn(async move {
+        handle_public_verify_passport_challenge(State(state), Json(public_forward_submission()))
+            .await
+    })
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn final_f10_public_forward_preserves_authenticated_revocation_and_budget_progress() {
+    let (leader, mut entered) = PublicForwardLeader::start();
+    let mut state = follower_of(&leader.url);
+    // One authenticated permit is enough to witness the isolation contract.
+    state.leader_forward_lane = Arc::new(tokio::sync::Semaphore::new(1));
+    let public = start_public_forward(&state);
+    await_requests(&mut entered, 1).await;
+    let mut headers = HeaderMap::new();
+    headers.insert(AUTHORIZATION, "Bearer token".parse().test_unwrap());
+    let revoked = handle_revoke_capability(
+        State(state.clone()),
+        headers.clone(),
+        Json(RevokeCapabilityRequest {
+            capability_id: "compromised-capability".to_string(),
+        }),
+    )
+    .await;
+    let budget = handle_try_increment_budget(
+        State(state.clone()),
+        headers,
+        Json(TryIncrementBudgetRequest {
+            capability_id: "active-capability".to_string(),
+            grant_index: 0,
+            max_invocations: Some(1),
+        }),
+    )
+    .await;
+    let statuses = [revoked.status(), budget.status()];
+    let _ = leader.release.send(true);
+    assert_eq!(public.await.test_unwrap().status(), StatusCode::OK);
+    assert_eq!(
+        statuses,
+        [StatusCode::OK, StatusCode::OK],
+        "an unauthenticated public forward consumed authenticated write admission"
+    );
+    assert_eq!(state.leader_forward_lane.available_permits(), 1);
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn final_f10_public_forwards_refuse_the_seventeenth_submission_without_queuing() {
+    let (leader, mut entered) = PublicForwardLeader::start();
+    let state = follower_of(&leader.url);
+    let held = (0..16)
+        .map(|_| start_public_forward(&state))
+        .collect::<Vec<_>>();
+    await_requests(&mut entered, 16).await;
+    let next = handle_public_verify_passport_challenge(
+        State(state.clone()),
+        Json(public_forward_submission()),
+    )
+    .now_or_never();
+    let _ = leader.release.send(true);
+    for public in held {
+        assert_eq!(public.await.test_unwrap().status(), StatusCode::OK);
+    }
+    assert_eq!(
+        next.map(|response| response.status()),
+        Some(StatusCode::SERVICE_UNAVAILABLE),
+        "public forwarding admitted or queued a submission beyond its sixteen-worker bound"
+    );
+    assert_eq!(state.leader_forward_lane.available_permits(), 64);
+}

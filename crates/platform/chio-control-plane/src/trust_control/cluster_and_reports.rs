@@ -96,6 +96,9 @@ mod cluster_and_reports_tests {
             cluster,
             cluster_progress,
             leader_forward_lane: Arc::new(tokio::sync::Semaphore::new(LEADER_FORWARD_PERMITS)),
+            public_passport_challenge_lane: Arc::new(tokio::sync::Semaphore::new(
+                crate::trust_control::report_rendering::PUBLIC_PASSPORT_CHALLENGE_PERMITS,
+            )),
             finding_rail: None,
             finding_purchase_executor: None,
             finding_purchase_execution_lane: Arc::new(tokio::sync::Semaphore::new(1)),
