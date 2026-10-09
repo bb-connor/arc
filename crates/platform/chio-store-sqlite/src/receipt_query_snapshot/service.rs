@@ -230,6 +230,7 @@ impl Published {
         owned
             .db
             .connection()
+            .map_err(SnapshotDbError::from)?
             .progress_handler(
                 1_000,
                 Some(move || {
@@ -249,6 +250,7 @@ impl Published {
         let _ = owned
             .db
             .connection()
+            .map_err(SnapshotDbError::from)?
             .progress_handler(0, None::<fn() -> bool>);
         drop(owned);
         match result {

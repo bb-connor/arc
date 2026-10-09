@@ -92,8 +92,8 @@ pub mod memory_provenance_store;
 mod read_companion;
 pub mod receipt_query;
 pub mod receipt_query_snapshot;
-// The isolated custody backend is exercised before snapshot production wiring.
-#[cfg(all(target_os = "linux", test))]
+// Linux snapshots own a private file and recheck custody on every connection borrow.
+#[cfg(target_os = "linux")]
 mod receipt_query_snapshot_backing;
 pub mod receipt_store;
 mod replay_clock;

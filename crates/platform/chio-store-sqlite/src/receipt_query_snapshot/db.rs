@@ -1,6 +1,9 @@
-//! Process-owned snapshot storage. The first backend is a private in-memory
-//! SQLite database bounded by a page quota.
+//! Process-owned snapshot storage with a page quota and checked platform custody.
 use std::collections::HashMap;
+
+#[path = "db/storage.rs"]
+mod storage;
+use storage::Storage;
 
 use chio_kernel::ReceiptStoreError;
 use rusqlite::{params, Connection, ErrorCode, OptionalExtension};
@@ -181,7 +184,7 @@ impl From<rusqlite::Error> for SnapshotDbError {
 }
 
 pub(super) struct SnapshotDb {
-    connection: Connection,
+    storage: Storage,
     quota_bytes: u64,
     page_size: u64,
     dims: HashMap<(i64, String), i64>,
@@ -192,9 +195,18 @@ pub(super) struct SnapshotDb {
 }
 
 impl SnapshotDb {
-    /// Open an empty in-memory snapshot whose pages never exceed `quota_bytes`.
+    /// Linux uses a process-private file. Other platforms use private memory.
+    pub(super) fn open_private(quota_bytes: u64) -> Result<Self, SnapshotDbError> {
+        Self::from_storage(Storage::create()?, quota_bytes)
+    }
+
+    #[cfg(test)]
     pub(super) fn open_memory(quota_bytes: u64) -> Result<Self, SnapshotDbError> {
-        let connection = Connection::open_in_memory()?;
+        Self::from_storage(Storage::memory()?, quota_bytes)
+    }
+
+    fn from_storage(storage: Storage, quota_bytes: u64) -> Result<Self, SnapshotDbError> {
+        let connection = storage.connection()?;
         connection.execute_batch("PRAGMA journal_mode = MEMORY; PRAGMA temp_store = MEMORY;")?;
         let page_size: i64 = connection.query_row("PRAGMA page_size", [], |row| row.get(0))?;
         let page_size = u64::try_from(page_size)
@@ -214,7 +226,7 @@ impl SnapshotDb {
             .min(u64::try_from(pages).unwrap_or(u64::MAX))
             .saturating_mul(page_size);
         let db = Self {
-            connection,
+            storage,
             quota_bytes,
             page_size,
             dims: HashMap::new(),
@@ -222,20 +234,25 @@ impl SnapshotDb {
             #[cfg(test)]
             max_settled_per_hold: std::cell::Cell::new(0),
         };
-        with_quota(&db.connection, quota_bytes, page_size, |connection| {
+        with_quota(db.connection()?, quota_bytes, page_size, |connection| {
             connection.execute_batch(SCHEMA)
         })?;
         Ok(db)
     }
 
-    pub(super) fn connection(&self) -> &Connection {
-        &self.connection
+    pub(super) fn connection(&self) -> Result<&Connection, ReceiptStoreError> {
+        self.storage.connection()
     }
 
     #[cfg(test)]
-    pub(super) fn trace_for_test(&mut self, trace: Option<fn(rusqlite::trace::TraceEvent<'_>)>) {
-        self.connection
+    pub(super) fn trace_for_test(
+        &mut self,
+        trace: Option<fn(rusqlite::trace::TraceEvent<'_>)>,
+    ) -> Result<(), ReceiptStoreError> {
+        self.storage
+            .connection_mut()?
             .trace_v2(rusqlite::trace::TraceEventCodes::SQLITE_TRACE_STMT, trace);
+        Ok(())
     }
 
     pub(super) fn quota_bytes(&self) -> u64 {
@@ -244,7 +261,7 @@ impl SnapshotDb {
 
     pub(super) fn used_bytes(&self) -> Result<u64, SnapshotDbError> {
         let pages: i64 = self
-            .connection
+            .connection()?
             .query_row("PRAGMA page_count", [], |row| row.get(0))?;
         Ok(u64::try_from(pages)
             .unwrap_or(0)
@@ -261,7 +278,7 @@ impl SnapshotDb {
             return Ok(None);
         }
         Ok(self
-            .connection
+            .connection()?
             .query_row(
                 "SELECT value FROM snapshot_dim WHERE id = ?1",
                 [id],
@@ -276,7 +293,7 @@ impl SnapshotDb {
         let mut dims = Interned::new(&self.dims);
         let mut signers = Interned::new(&self.signers);
         let result = with_quota(
-            &self.connection,
+            self.connection()?,
             self.quota_bytes,
             self.page_size,
             |connection| {
@@ -341,7 +358,7 @@ impl SnapshotDb {
         };
         let mut dims = Interned::new(&self.dims);
         let result = with_quota(
-            &self.connection,
+            self.connection()?,
             self.quota_bytes,
             self.page_size,
             |connection| {
@@ -402,7 +419,7 @@ impl SnapshotDb {
         limit: i64,
     ) -> Result<u64, SnapshotDbError> {
         let removed = self
-            .connection
+            .connection()?
             .prepare_cached(
                 "DELETE FROM snapshot_pending_leaf WHERE entry_seq IN (
                      SELECT entry_seq FROM snapshot_pending_leaf
@@ -424,7 +441,7 @@ impl SnapshotDb {
         value: i64,
     ) -> Result<Option<(u64, i64, i64)>, SnapshotDbError> {
         Ok(self
-            .connection
+            .connection()?
             .prepare_cached(
                 "SELECT n, min_seq, max_seq FROM snapshot_count WHERE scope = ?1 AND dim = ?2 AND value = ?3",
             )?
@@ -443,7 +460,7 @@ impl SnapshotDb {
         seq: i64,
     ) -> Result<Option<OwnedCheckpoint>, SnapshotDbError> {
         Ok(self
-            .connection
+            .connection()?
             .prepare_cached(
                 "SELECT seq, batch_start, batch_end, tree_size, merkle_root, kernel_key FROM snapshot_checkpoint WHERE seq = ?1",
             )?
@@ -466,7 +483,7 @@ impl SnapshotDb {
         start: i64,
         end: i64,
     ) -> Result<Vec<PendingLeaf>, SnapshotDbError> {
-        let mut statement = self.connection.prepare_cached(
+        let mut statement = self.connection()?.prepare_cached(
             "SELECT p.entry_seq, p.kind, p.leaf_hash, s.kernel_key FROM snapshot_pending_leaf p
              JOIN snapshot_signer s ON s.id = p.signer
              WHERE p.entry_seq >= ?1 AND p.entry_seq <= ?2 ORDER BY p.entry_seq",
@@ -491,7 +508,7 @@ impl SnapshotDb {
     ) -> Result<(Vec<ProjectedToolRow>, Vec<ChildCursor>), SnapshotDbError> {
         let mut tools = Vec::new();
         {
-            let mut statement = self.connection.prepare_cached(
+            let mut statement = self.connection()?.prepare_cached(
                 "SELECT r.seq, r.entry_seq, r.leaf_hash, s.kernel_key, r.receipt_id, r.ts,
                         r.tenant, r.capability, r.tool_server, r.tool_name, r.decision,
                         r.subject, r.subject_signed, r.cost_currency, r.cost_charged
@@ -545,7 +562,7 @@ impl SnapshotDb {
         }
         let mut children = Vec::new();
         {
-            let mut statement = self.connection.prepare_cached(
+            let mut statement = self.connection()?.prepare_cached(
                 "SELECT c.source_seq, c.entry_seq, s.kernel_key FROM snapshot_child_cursor c
                  JOIN snapshot_signer s ON s.id = c.signer
                  WHERE c.entry_seq >= ?1 AND c.entry_seq <= ?2 ORDER BY c.entry_seq",
@@ -570,10 +587,10 @@ impl SnapshotDb {
         low: i64,
         high: i64,
     ) -> Result<(u64, u64), SnapshotDbError> {
-        let tools: i64 = self.connection.prepare_cached(
+        let tools: i64 = self.connection()?.prepare_cached(
             "SELECT COUNT(*) FROM snapshot_tool_receipt INDEXED BY sq_entry WHERE entry_seq > ?1 AND entry_seq <= ?2",
         )?.query_row(params![low, high], |row| row.get(0))?;
-        let children: i64 = self.connection.prepare_cached(
+        let children: i64 = self.connection()?.prepare_cached(
             "SELECT COUNT(*) FROM snapshot_child_cursor WHERE entry_seq > ?1 AND entry_seq <= ?2",
         )?.query_row(params![low, high], |row| row.get(0))?;
         Ok((
@@ -589,7 +606,7 @@ impl SnapshotDb {
     }
 
     pub(super) fn dim_stats(&self) -> Result<(u64, u64), SnapshotDbError> {
-        let (count, bytes): (i64, i64) = self.connection.query_row(
+        let (count, bytes): (i64, i64) = self.connection()?.query_row(
             "SELECT COUNT(*), COALESCE(SUM(length(CAST(value AS BLOB))), 0) FROM snapshot_dim",
             [],
             |row| Ok((row.get(0)?, row.get(1)?)),

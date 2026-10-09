@@ -121,6 +121,7 @@ impl SnapshotFileBacking {
         Ok(connection)
     }
 
+    #[cfg(test)]
     pub(crate) fn checked_connection_mut(
         &mut self,
     ) -> Result<&mut Connection, SnapshotBackingError> {
@@ -142,6 +143,7 @@ impl SnapshotFileBacking {
 
     /// Close SQLite, then remove only still-bound custody entries. A refusal
     /// leaves substituted objects untouched and reports the cleanup failure.
+    #[cfg(test)]
     pub(crate) fn close(mut self) -> Result<(), SnapshotBackingError> {
         self.close_connection()?;
         self.custody.cleanup()
@@ -155,6 +157,7 @@ impl SnapshotFileBacking {
             ))
     }
 
+    #[cfg(test)]
     fn close_connection(&mut self) -> Result<(), SnapshotBackingError> {
         if let Some(connection) = self.connection.take() {
             if let Err((connection, error)) = connection.close() {

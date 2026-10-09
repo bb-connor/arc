@@ -263,6 +263,7 @@ fn c11b_a_checkpoint_appended_during_the_build_belongs_to_extension() {
     assert_eq!(db.tool_row_count().unwrap(), 6);
     let max_entry: i64 = db
         .connection()
+        .unwrap()
         .query_row(
             "SELECT MAX(entry_seq) FROM snapshot_tool_receipt",
             [],
@@ -332,4 +333,64 @@ fn c17_quota_exhaustion_during_the_build_is_typed() {
         build_snapshot(&ctx, target(&ctx), empty + 8 * 4096, &mut |_, _| {}),
         Err(WalkError::Capacity { .. })
     ));
+}
+
+/// The production build must use private disk custody on Linux. Changing its
+/// mode after publication refuses the next hold and never falls back to memory.
+#[cfg(target_os = "linux")]
+#[test]
+fn linux_snapshot_build_uses_private_disk_and_rechecks_custody() {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+    let fixture = Fixture::new(4);
+    fixture.append_varied(0..4);
+    let db = build(&fixture).unwrap();
+    let path = db
+        .connection()
+        .unwrap()
+        .path()
+        .filter(|path| !path.is_empty())
+        .map(std::path::PathBuf::from)
+        .expect("Linux production snapshot must have a private backing file");
+    let directory = path.parent().unwrap().to_path_buf();
+    let file_metadata = std::fs::metadata(&path).unwrap();
+    assert_eq!(file_metadata.mode() & 0o777, 0o600);
+    assert_eq!(file_metadata.nlink(), 1);
+    assert_eq!(std::fs::metadata(&directory).unwrap().mode() & 0o777, 0o700);
+    assert_eq!(db.tool_row_count().unwrap(), 4);
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o640)).unwrap();
+    assert!(matches!(
+        db.used_bytes(),
+        Err(super::super::db::SnapshotDbError::Store(
+            chio_kernel::ReceiptStoreError::QuerySnapshot(
+                chio_kernel::receipt_query::ReceiptQuerySnapshotError::Invalid(_)
+            )
+        ))
+    ));
+    let unknown_tenant = ReceiptQuery::default().authenticated_tenant("unknown-tenant");
+    assert!(
+        matches!(
+            super::super::query::select(&db, &unknown_tenant, 100_000),
+            Err(chio_kernel::ReceiptStoreError::QuerySnapshot(
+                chio_kernel::receipt_query::ReceiptQuerySnapshotError::Invalid(_)
+            ))
+        ),
+        "cached empty answers still require custody"
+    );
+    assert!(
+        matches!(
+            super::super::query::locate(&db, "absent", Some("unknown-tenant")),
+            Err(chio_kernel::ReceiptStoreError::QuerySnapshot(
+                chio_kernel::receipt_query::ReceiptQuerySnapshotError::Invalid(_)
+            ))
+        ),
+        "point negatives still require custody"
+    );
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+    assert_eq!(db.tool_row_count().unwrap(), 4);
+    drop(db);
+    assert!(!path.exists(), "owned file is cleaned up after close");
+    assert!(
+        !directory.exists(),
+        "owned directory is cleaned up after close"
+    );
 }

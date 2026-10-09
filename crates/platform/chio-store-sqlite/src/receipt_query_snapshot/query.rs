@@ -76,6 +76,8 @@ pub(super) fn select(
     query: &ReceiptQuery,
     sql_steps: u64,
 ) -> Result<Selection, ReceiptStoreError> {
+    // Even a cached empty answer requires intact custody for this hold.
+    db.connection()?;
     const VALID_OUTCOMES: &[&str] = &["allow", "deny", "cancelled", "incomplete"];
     if let Some(outcome) = query.outcome.as_deref() {
         if !VALID_OUTCOMES.contains(&outcome) {
@@ -165,7 +167,7 @@ pub(super) fn select(
         });
     }
 
-    let budget = SqlWorkBudget::new_for(db.connection(), sql_steps, "receipt query")?;
+    let budget = SqlWorkBudget::new_for(db.connection()?, sql_steps, "receipt query")?;
     let result = run_plan(
         db,
         tenant,
@@ -297,7 +299,7 @@ fn run_plan(
             let sql =
                 format!("SELECT COUNT(*) FROM snapshot_tool_receipt {index_clause} WHERE {filter}");
             let count: i64 = db
-                .connection()
+                .connection()?
                 .prepare(&sql)?
                 .query_row(params_from_iter(values.iter()), |row| row.get(0))?;
             u64::try_from(count).unwrap_or(0)
@@ -312,7 +314,7 @@ fn run_plan(
     );
     values.push(Value::Integer(cursor));
     values.push(Value::Integer(crate::integer::checked::<_, i64>(limit)?));
-    let mut statement = db.connection().prepare(&sql)?;
+    let mut statement = db.connection()?.prepare(&sql)?;
     let rows = statement.query_map(params_from_iter(values.iter()), |row| {
         Ok(SelectedRow {
             seq: u64::try_from(row.get::<_, i64>(0)?).unwrap_or(0),
@@ -365,7 +367,7 @@ fn time_window(
     let interior_high = high_hour.map_or(i64::MAX, |hour| hour.saturating_sub(1));
     if interior_low <= interior_high {
         let (n, low, high): (i64, Option<i64>, Option<i64>) = db
-            .connection()
+            .connection()?
             .prepare_cached(
                 "SELECT COALESCE(SUM(n), 0), MIN(min_seq), MAX(max_seq) FROM snapshot_count
                  WHERE scope = ?1 AND dim = ?2 AND value >= ?3 AND value <= ?4",
@@ -399,7 +401,7 @@ fn time_window(
     for (start, end) in boundaries {
         let (n, low, high): (i64, Option<i64>, Option<i64>) = match tenant {
             Some(tenant) => db
-                .connection()
+                .connection()?
                 .prepare_cached(
                     "SELECT COUNT(*), MIN(seq), MAX(seq) FROM snapshot_tool_receipt INDEXED BY sq_t_ts
                      WHERE tenant = ?1 AND ts >= ?2 AND ts <= ?3",
@@ -408,7 +410,7 @@ fn time_window(
                     Ok((row.get(0)?, row.get(1)?, row.get(2)?))
                 })?,
             None => db
-                .connection()
+                .connection()?
                 .prepare_cached(
                     "SELECT COUNT(*), MIN(seq), MAX(seq) FROM snapshot_tool_receipt INDEXED BY sq_ts
                      WHERE ts >= ?1 AND ts <= ?2",
@@ -436,6 +438,7 @@ pub(super) fn locate(
     receipt_id: &str,
     tenant: Option<&str>,
 ) -> Result<Option<LocatedReceipt>, ReceiptStoreError> {
+    db.connection()?;
     let tenant_id = match tenant {
         None => None,
         Some(tenant) => match db.dim_id(DIM_TENANT, tenant) {
@@ -444,7 +447,7 @@ pub(super) fn locate(
         },
     };
     let row = db
-        .connection()
+        .connection()?
         .prepare_cached(
             "SELECT seq, entry_seq, leaf_hash, tenant FROM snapshot_tool_receipt INDEXED BY sq_receipt_id
              WHERE receipt_id = ?1",

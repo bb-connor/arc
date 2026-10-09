@@ -220,6 +220,7 @@ fn c17_quota_exhaustion_is_typed_and_leaves_the_snapshot_unchanged() {
     assert_eq!(db.tool_row_count().unwrap(), committed);
     let stored: String = db
         .connection()
+        .unwrap()
         .query_row(
             "SELECT receipt_id FROM snapshot_tool_receipt WHERE seq = 1",
             [],
@@ -242,11 +243,11 @@ fn trace(event: rusqlite::trace::TraceEvent<'_>) {
 #[test]
 fn c18_fixed_plans_never_use_a_temporary_btree() {
     let (_fixture, mut db) = built_fixture();
-    db.trace_for_test(Some(trace));
+    db.trace_for_test(Some(trace)).unwrap();
     for query in queries() {
         let _ = select(&db, &query, STEPS);
     }
-    db.trace_for_test(None);
+    db.trace_for_test(None).unwrap();
     let traced = TRACED.with(|traced| traced.take());
     let mut explained = 0;
     for sql in traced
@@ -255,6 +256,7 @@ fn c18_fixed_plans_never_use_a_temporary_btree() {
     {
         let mut statement = db
             .connection()
+            .unwrap()
             .prepare(&format!("EXPLAIN QUERY PLAN {sql}"))
             .unwrap();
         let unbound = vec![rusqlite::types::Value::Null; statement.parameter_count()];
@@ -275,6 +277,7 @@ fn c18_fixed_plans_never_use_a_temporary_btree() {
 fn count_rows(db: &SnapshotDb) -> Vec<(i64, i64, i64, i64, i64, i64)> {
     let mut statement = db
         .connection()
+        .unwrap()
         .prepare(
             "SELECT scope, dim, value, n, min_seq, max_seq FROM snapshot_count ORDER BY 1, 2, 3",
         )
@@ -324,7 +327,7 @@ fn grouped_rows(db: &SnapshotDb) -> Vec<(i64, i64, i64, i64, i64, i64)> {
         ));
     }
     let sql = format!("{} ORDER BY 1, 2, 3", parts.join(" UNION ALL "));
-    let mut statement = db.connection().prepare(&sql).unwrap();
+    let mut statement = db.connection().unwrap().prepare(&sql).unwrap();
     statement
         .query_map([], |row| {
             Ok((

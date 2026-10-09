@@ -377,7 +377,7 @@ pub(super) fn build_snapshot(
     quota_bytes: u64,
     on_progress: &mut dyn FnMut(u64, u64),
 ) -> Result<(SnapshotDb, PassResult), WalkError> {
-    let mut db = SnapshotDb::open_memory(quota_bytes)?;
+    let mut db = SnapshotDb::open_private(quota_bytes)?;
     let mut pass = Pass::new(PassMode::Build, target);
     loop {
         let progress = retry_busy(ctx, || pass.step(ctx, &mut db))?;
