@@ -469,6 +469,88 @@ mod cli_env_tests {
         }
     }
 
+    fn trust_serve_snapshot_quota(args: &[&str]) -> Result<u64, String> {
+        use clap::CommandFactory;
+        let argv: Vec<String> = ["chio", "trust", "serve", "--service-token", "token"]
+            .into_iter()
+            .chain(args.iter().copied())
+            .map(str::to_owned)
+            .collect();
+        std::thread::Builder::new()
+            .stack_size(8 * 1024 * 1024)
+            .spawn(move || {
+                let parsed = Cli::command()
+                    .try_get_matches_from(argv)
+                    .map_err(|error| error.to_string())?;
+                let serve = parsed
+                    .subcommand_matches("trust")
+                    .and_then(|trust| trust.subcommand_matches("serve"))
+                    .ok_or("missing trust serve command")?;
+                serve
+                    .try_get_one::<u64>("receipt_query_snapshot_quota_bytes")
+                    .map_err(|error| error.to_string())?
+                    .copied()
+                    .ok_or_else(|| "missing receipt query snapshot quota".to_owned())
+            })
+            .unwrap_or_else(|error| panic!("spawn 8 MiB quota parse thread: {error}"))
+            .join()
+            .unwrap_or_else(|_| panic!("quota parse thread must not panic"))
+    }
+
+    #[test]
+    fn trust_serve_snapshot_quota_defaults_to_two_gib() {
+        assert_eq!(trust_serve_snapshot_quota(&[]), Ok(2_147_483_648));
+    }
+
+    #[test]
+    fn trust_serve_snapshot_quota_accepts_exact_operator_bytes() {
+        for (value, expected) in [
+            ("1048576", 1_048_576),
+            ("4294967296", 4_294_967_296),
+            ("18446744073709551615", u64::MAX),
+        ] {
+            assert_eq!(
+                trust_serve_snapshot_quota(&["--receipt-query-snapshot-quota-bytes", value]),
+                Ok(expected)
+            );
+        }
+    }
+
+    #[test]
+    fn trust_serve_snapshot_quota_reaches_the_typed_serve_command() {
+        let parsed = parse_cli([
+            "chio",
+            "trust",
+            "serve",
+            "--service-token",
+            "token",
+            "--receipt-query-snapshot-quota-bytes",
+            "4294967296",
+        ])
+        .unwrap_or_else(|error| panic!("quota CLI parse failed: {error}"));
+        match parsed.command {
+            Commands::Trust {
+                command:
+                    TrustCommands::Serve {
+                        receipt_query_snapshot_quota_bytes,
+                        ..
+                    },
+            } => assert_eq!(receipt_query_snapshot_quota_bytes, 4_294_967_296),
+            _ => panic!("expected typed trust serve command"),
+        }
+    }
+
+    #[test]
+    fn trust_serve_snapshot_quota_refuses_zero_negative_overflow_and_units() {
+        for value in ["0", "1048575", "-1", "18446744073709551616", "2GiB", "NaN"] {
+            assert!(
+                trust_serve_snapshot_quota(&["--receipt-query-snapshot-quota-bytes", value])
+                    .is_err(),
+                "invalid quota accepted: {value}"
+            );
+        }
+    }
+
     #[test]
     fn guard_publish_reads_registry_password_env_var() {
         let _guard = env_lock();

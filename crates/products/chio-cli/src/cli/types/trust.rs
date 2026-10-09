@@ -48,6 +48,15 @@ pub(crate) enum TrustCommands {
         #[arg(long, requires = "authority_keyring_config")]
         authority_keyring_receipt_anchor_root: Option<PathBuf>,
 
+        /// Maximum authenticated receipt query snapshot database bytes (minimum 1 MiB).
+        #[arg(
+            long,
+            value_name = "BYTES",
+            default_value_t = 2_147_483_648u64,
+            value_parser = clap::value_parser!(u64).range(1_048_576..)
+        )]
+        receipt_query_snapshot_quota_bytes: u64,
+
         /// Public base URL this trust-control node advertises to peers and clients.
         #[arg(long)]
         advertise_url: Option<String>,

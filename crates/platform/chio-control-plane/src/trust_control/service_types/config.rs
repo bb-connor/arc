@@ -73,6 +73,8 @@ pub struct TrustServiceConfig {
     pub tenant_read_tokens: BTreeMap<String, String>,
     pub authority_workload_token: Option<String>,
     pub receipt_db_path: Option<PathBuf>,
+    /// Maximum private receipt query snapshot database bytes (at least 1 MiB).
+    pub receipt_query_snapshot_quota_bytes: u64,
     pub revocation_db_path: Option<PathBuf>,
     pub authority_seed_path: Option<PathBuf>,
     pub authority_db_path: Option<PathBuf>,
@@ -112,11 +114,18 @@ pub struct TrustServiceConfig {
     pub finding_market: Option<super::finding_market_config::FindingMarketConfig>,
 }
 
+const MIN_RECEIPT_QUERY_SNAPSHOT_QUOTA_BYTES: u64 = 1024 * 1024;
+
 impl TrustServiceConfig {
     pub fn validate(&self) -> Result<(), CliError> {
         self.transport
             .validate(self.listen)
             .map_err(std::io::Error::other)?;
+        if self.receipt_query_snapshot_quota_bytes < MIN_RECEIPT_QUERY_SNAPSHOT_QUOTA_BYTES {
+            return Err(CliError::cli_other_error(format!(
+                "--receipt-query-snapshot-quota-bytes must be at least {MIN_RECEIPT_QUERY_SNAPSHOT_QUOTA_BYTES} bytes (1 MiB)"
+            )));
+        }
         validate_control_secret(&self.service_token, "control service token")?;
         if self.authority_seed_path.is_some() && self.authority_db_path.is_some() {
             return Err(CliError::cli_other_error(
@@ -301,6 +310,7 @@ mod service_config_tests {
             tenant_read_tokens: BTreeMap::new(),
             authority_workload_token: None,
             receipt_db_path: None,
+            receipt_query_snapshot_quota_bytes: 2_147_483_648,
             revocation_db_path: None,
             authority_seed_path: None,
             authority_db_path: None,
@@ -328,6 +338,32 @@ mod service_config_tests {
             roster_policy: None,
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
             finding_market: None,
+        }
+    }
+
+    #[test]
+    fn trust_service_config_refuses_receipt_query_snapshot_quota_below_minimum() {
+        for quota in [0, 1, 1_048_575] {
+            let mut config = base_config();
+            config.receipt_query_snapshot_quota_bytes = quota;
+            let error = config
+                .validate()
+                .test_expect_err("snapshot quotas below 1 MiB must fail service configuration");
+            assert!(error
+                .to_string()
+                .contains("--receipt-query-snapshot-quota-bytes must be at least 1048576"));
+        }
+    }
+
+    #[test]
+    fn trust_service_config_preserves_explicit_nonzero_snapshot_quota_bytes() {
+        for quota in [1_048_576, 2_147_483_648, 4_294_967_296, u64::MAX] {
+            let mut config = base_config();
+            config.receipt_query_snapshot_quota_bytes = quota;
+            config
+                .validate()
+                .test_expect("a nonzero u64 quota belongs to core capacity validation");
+            assert_eq!(config.receipt_query_snapshot_quota_bytes, quota);
         }
     }
 

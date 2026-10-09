@@ -11,6 +11,7 @@ pub(super) fn challenge_route_state(
         tenant_read_tokens: BTreeMap::new(),
         authority_workload_token: None,
         receipt_db_path: None,
+        receipt_query_snapshot_quota_bytes: 2_147_483_648,
         revocation_db_path: None,
         authority_seed_path: None,
         authority_db_path: None,
