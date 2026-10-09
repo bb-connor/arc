@@ -39,6 +39,24 @@ The fault case verifies Process rollback and absent receipt. It does not assert
 the retained Native Prepared reservation. Broader capture, historical settlement,
 release, Linux, live-provider, formal and hosted qualification remain open.
 
+### Additional retained-reservation control
+
+A subsequent integration case now verifies that actual receipt failure leaves
+one Native Prepared record with positive write and confirmation reservations.
+The pre-existing provider for that same original intent then retries without
+new provisioning. Confirmation changes only the receipt in the complete original
+payload, and another exact replay writes nothing. All three integration cases
+passed on the later local candidate, with zero failures or ignored cases. The
+original two cases remain byte-identical. Independent spec and quality reviews
+approved the added case after strengthening its original-metadata comparison.
+
+Its source SHA-256 is
+`df99f1d8b60e16f31724acef6165989ae71b73a6036d4ca1477be4306b35dd1f`.
+`checkpoint-retained-reservation/scoped-verification.json` links both reviews,
+the corrected snapshot and the actual `checkpoint-retained-reservation-first`
+run. This adds scoped reservation coverage; it does not establish the broader
+capture or qualification obligations above.
+
 ## Exact local records
 
 Records below are relative to
