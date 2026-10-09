@@ -1,5 +1,12 @@
 # Security and process landing ledger
 
+The first checkpoint below is the latest staged summary. For each requirement,
+use `current_requirement_states` in the [canonical JSON ledger](landing-ledger.json),
+with its stated source and acceptance boundary. The remaining dated sections
+preserve execution history, including their original counts and headings that
+say "current". Those labels describe the time of capture; they do not override
+a later requirement state or establish current candidate qualification.
+
 ## Current composed snapshot checkpoint (October 9)
 
 The canonical ledger contains **1,834 requirements**. Every prior requirement
