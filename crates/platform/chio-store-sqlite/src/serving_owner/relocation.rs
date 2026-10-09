@@ -6,9 +6,13 @@
 //! binding: `export` retires the store where it is and seals its commit chain
 //! heads, and `import` re-anchors a byte-identical copy at its new location
 //! after proving the copy matches the seal. An exported store never serves
-//! again at its old location, so one export yields at most one serving lineage
-//! per import; importing the same copy twice is the operator's responsibility
-//! to avoid, and both imports would share history only up to the seal.
+//! again at its old location. At its new location, import replaces the lock
+//! artifacts only when the destination rollback anchor is absent or records
+//! exactly the exported state, so a retained copy of the export can retry an
+//! import that has not served, but once the destination serves its anchor
+//! records history beyond the seal and every further import of that export
+//! there is refused. Imports under distinct lock roots are not coordinated:
+//! each is its own serving lineage, sharing history only up to the seal.
 
 use chio_security_types::clock::{Clock, ClockError, SystemClock, UnixMillis};
 use std::fs::{self, File};
@@ -380,7 +384,10 @@ impl SqliteAuthorityStore {
     /// The copy must reproduce the sealed commit chain heads exactly; a copy
     /// taken behind the export, or a store that was never exported, is
     /// refused. Lock files and identity markers copied from the previous
-    /// location are replaced, and an interrupted import can be repeated.
+    /// location are replaced, and an interrupted import can be repeated. A
+    /// destination whose rollback anchor records history beyond the seal is
+    /// refused with `RelocationDestinationAnchored`, leaving its anchor, lock
+    /// and identity markers untouched.
     pub fn import_relocated(
         database_path: impl AsRef<Path>,
         lock_root: impl AsRef<Path>,
@@ -568,6 +575,18 @@ impl SqliteAuthorityStore {
             return Ok(RelocationImport { seal, import_id });
         }
 
+        // An existing anchor at the destination may record a lineage that
+        // served after an earlier import of this export. It is replaced only
+        // when it records nothing beyond the exported state, and it stays
+        // locked until the replacement is created.
+        let lock_path = lock_root.join(format!("{}.lock", record.store_uuid));
+        let previous_anchor = lock_replaceable_anchor(
+            &lock_root,
+            &lock_path,
+            &database_path,
+            &record.store_uuid,
+            &connection,
+        )?;
         verify_files(RelocationImportPhase::Exported)?;
         relocation_time(
             &clock,
@@ -581,15 +600,13 @@ impl SqliteAuthorityStore {
         connection.execute_batch(
             "PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA foreign_keys = ON;",
         )?;
-        // Lock artifacts belong to the previous location; nothing serves an
-        // exported store, so they are replaced rather than reused.
-        let lock_path = lock_root.join(format!("{}.lock", record.store_uuid));
-        let _previous_lock = remove_previous_lock_artifacts(
+        remove_previous_lock_artifacts(
             &lock_root,
             &lock_path,
             &database_path,
             Path::new(&record.database_path),
             &record.store_uuid,
+            previous_anchor.as_ref(),
         )?;
         let lock_file = create_lock_file(&lock_path)?;
         let lock_metadata = lock_file.metadata()?;
@@ -676,23 +693,51 @@ impl SqliteAuthorityStore {
     }
 }
 
+/// Lock the destination's existing serving lock and prove its rollback anchor
+/// records nothing beyond the exported state. Reads only; a refusal leaves the
+/// anchor, the lock and the path markers untouched.
+fn lock_replaceable_anchor(
+    lock_root: &Path,
+    lock_path: &Path,
+    database_path: &Path,
+    store_uuid: &str,
+    connection: &Connection,
+) -> Result<Option<RollbackAnchor>, SqliteServingOwnerError> {
+    match fs::symlink_metadata(lock_path) {
+        Ok(_) => {
+            let file = open_lock_file(lock_path)?;
+            let metadata = file.metadata()?;
+            validate_lock_metadata(lock_root, &metadata)?;
+            acquire_serving_lock(&file, database_path)?;
+            let anchor = RollbackAnchor::new(
+                file,
+                lock_root,
+                store_uuid,
+                read_u64(metadata_device(&metadata)?, "lock_device")?,
+                read_u64(metadata_inode(&metadata)?, "lock_inode")?,
+            )?;
+            anchor.verify_replaceable_by_export(connection)?;
+            Ok(Some(anchor))
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error.into()),
+    }
+}
+
+/// Lock artifacts belong to the previous location or to an import of this
+/// export that never served, so they are replaced rather than reused. The
+/// lock removed is the one whose anchor was proven replaceable.
 fn remove_previous_lock_artifacts(
     lock_root: &Path,
     lock_path: &Path,
     database_path: &Path,
     previous_database_path: &Path,
     store_uuid: &str,
-) -> Result<Option<File>, SqliteServingOwnerError> {
-    let previous_lock = match fs::symlink_metadata(lock_path) {
-        Ok(_) => {
-            let file = open_lock_file(lock_path)?;
-            validate_lock_metadata(lock_root, &file.metadata()?)?;
-            acquire_serving_lock(&file, database_path)?;
-            Some(file)
-        }
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
-        Err(error) => return Err(error.into()),
-    };
+    previous_anchor: Option<&RollbackAnchor>,
+) -> Result<(), SqliteServingOwnerError> {
+    if let Some(anchor) = previous_anchor {
+        anchor.validate_identity()?;
+    }
     path_identity::remove_for_relocation(
         lock_root,
         previous_database_path,
@@ -702,11 +747,11 @@ fn remove_previous_lock_artifacts(
     if previous_database_path != database_path {
         path_identity::remove_for_relocation(lock_root, database_path, store_uuid, false)?;
     }
-    if previous_lock.is_some() {
+    if previous_anchor.is_some() {
         fs::remove_file(lock_path)?;
     }
     File::open(lock_root)?.sync_all()?;
-    Ok(previous_lock)
+    Ok(())
 }
 
 /// Bound offline relocation time to retained serving and admission history.

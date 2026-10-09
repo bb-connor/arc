@@ -167,6 +167,54 @@ impl RollbackAnchor {
         self.write_next(&database, 0)
     }
 
+    /// Refuse to replace this anchor unless it records nothing beyond the
+    /// exported state `connection` holds.
+    ///
+    /// An import may replace an anchor that was never seeded or whose first
+    /// seed did not complete, the export's own retirement record, or the
+    /// record an import of the same export seeded before the destination
+    /// served. Any other record anchors history the exported copy does not
+    /// carry, and replacing it would let that copy roll the destination back.
+    /// Any other damaged slot cannot prove the absence of such history. The
+    /// anchor file is only read.
+    pub(crate) fn verify_replaceable_by_export(
+        &self,
+        connection: &Connection,
+    ) -> Result<(), SqliteServingOwnerError> {
+        let _rotation = self.hold_rotation()?;
+        self.validate_identity()?;
+        if self.file.metadata()?.len() == 0 {
+            return Ok(());
+        }
+        // A non-empty file is only size-checked here, never reshaped.
+        self.ensure_shape()?;
+        let mut slots = [[0_u8; SLOT_SIZE]; SLOT_COUNT];
+        for (slot_index, slot) in slots.iter_mut().enumerate() {
+            read_exact_at(&self.file, slot, slot_index * SLOT_SIZE)?;
+        }
+        if unfinished_first_seed(&slots) {
+            return Ok(());
+        }
+        let Some(loaded) = decode_slots(&slots)? else {
+            return Ok(());
+        };
+        let database = DatabaseState::load_current(connection)?;
+        if database.retired_export_id.is_none() {
+            return Err(invalid("relocation import source is not exported"));
+        }
+        let retired = database.record(loaded.record.generation);
+        let seeded = AnchorRecord {
+            retired_export_id: None,
+            ..retired.clone()
+        };
+        if loaded.corrupt_slot || (loaded.record != retired && loaded.record != seeded) {
+            return Err(SqliteServingOwnerError::RelocationDestinationAnchored(
+                self.lock_path.display().to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     pub(crate) fn verify_current(
         &self,
         connection: &Connection,
@@ -348,7 +396,7 @@ impl RollbackAnchor {
         Ok(())
     }
 
-    fn validate_identity(&self) -> Result<(), SqliteServingOwnerError> {
+    pub(crate) fn validate_identity(&self) -> Result<(), SqliteServingOwnerError> {
         validate_secure_lock_root(&self.lock_root)?;
         let path_metadata = fs::symlink_metadata(&self.lock_path)?;
         let file_metadata = self.file.metadata()?;
@@ -529,6 +577,16 @@ fn record_extends(current: &AnchorRecord, prior: &AnchorRecord) -> bool {
         && current.global_commit_head >= prior.global_commit_head
         && (current.global_commit_head != prior.global_commit_head
             || current.global_commit_chain_digest == prior.global_commit_chain_digest)
+}
+
+/// The image a crash leaves while the first record is written: the first slot
+/// does not decode and the second slot was never written. A serving owner
+/// opens only over a decodable anchor and exists only after its epoch's
+/// generation is durable, and generation two is the first write to the
+/// second slot, so this image never anchored a served epoch.
+fn unfinished_first_seed(slots: &[[u8; SLOT_SIZE]; SLOT_COUNT]) -> bool {
+    let [first, second] = slots;
+    second.iter().all(|byte| *byte == 0) && decode_slot(first).is_err()
 }
 
 /// The newest record an anchor image holds, or nothing for an empty image.

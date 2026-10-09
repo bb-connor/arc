@@ -328,3 +328,148 @@ fn verified_import_retries_after_lock_artifact_io_refusal() {
         imported
     );
 }
+
+#[test]
+fn reimporting_a_retained_export_cannot_roll_back_a_destination_that_served() {
+    let (temp, database, lock_root) = fixture();
+    SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
+    drop(crate::test_authority::open_serving(&database, &lock_root).expect("serve at source"));
+    let seal = SqliteAuthorityStore::export_for_relocation(&database, &lock_root).expect("export");
+    let (moved, locks) = copy_store(temp.path(), &temp.path().join("moved"));
+    SqliteAuthorityStore::import_relocated_checked(&moved, &locks, &seal, || Ok(()))
+        .expect("first import");
+    SqliteAuthorityStore::provision(&moved, &locks).expect("re-provision at new path");
+
+    let served = temp.path().join("served.db");
+    let served_epoch = {
+        let authority =
+            crate::test_authority::open_serving(&moved, &locks).expect("serve at new path");
+        assert!(matches!(
+            authority
+                .budget_store()
+                .authorize_budget_hold(structured_request(Some(active_authority(&authority))))
+                .expect("budget hold after import"),
+            BudgetAuthorizeHoldDecision::Authorized(_)
+        ));
+        assert!(authority
+            .revocation_store()
+            .revoke("revoked-after-import")
+            .expect("revocation after import"));
+        database_snapshot(&authority, &moved, &served);
+        authority.mutation_fence().owner_epoch
+    };
+    assert!(served_epoch > seal.owner_epoch);
+
+    let lock = locks.join(format!("{}.lock", seal.store_uuid));
+    let marker = path_identity_marker(&moved, &locks);
+    let anchor = fs::read(&lock).expect("served anchor");
+    let lock_inode = lock_identity(&lock);
+    let marker_bytes = fs::read(&marker).expect("served path marker");
+    // The retained exported file still matches its manifest, so only the
+    // destination anchor can tell that this location has served since.
+    restore_database_in_place(&moved, &database);
+    let exported = fs::read(&moved).expect("re-copied export");
+
+    let canonical_lock = fs::canonicalize(&lock).expect("canonical lock path");
+    let refused = SqliteAuthorityStore::import_relocated_checked(&moved, &locks, &seal, || {
+        panic!("a served destination refuses before file verification")
+    });
+    assert!(
+        matches!(
+            &refused,
+            Err(SqliteServingOwnerError::RelocationDestinationAnchored(path))
+                if Path::new(path) == canonical_lock
+        ),
+        "{refused:?}"
+    );
+    assert_eq!(fs::read(&lock).expect("retained anchor"), anchor);
+    assert_eq!(lock_identity(&lock), lock_inode);
+    assert_eq!(fs::read(&marker).expect("retained marker"), marker_bytes);
+    assert!(fs::read(&moved).expect("refused export") == exported);
+    assert_eq!(serving_lock_paths(&locks), vec![lock.clone()]);
+
+    // The anchor still protects the served history: the served database
+    // reopens past its epoch and keeps its admissions.
+    restore_database_in_place(&moved, &served);
+    let reopened = crate::test_authority::open_serving(&moved, &locks).expect("served store");
+    assert_eq!(reopened.mutation_fence().owner_epoch, served_epoch + 1);
+    assert!(
+        reopened
+            .revocation_store()
+            .observe_revocation("revoked-after-import")
+            .expect("observe revocation")
+            .revoked
+    );
+    drop(reopened);
+
+    // A damaged slot beside the served record cannot prove the destination
+    // never served, so it refuses as well.
+    restore_database_in_place(&moved, &database);
+    overwrite_lock_bytes(&lock, 64, &[0xa5; 32]);
+    let anchor = fs::read(&lock).expect("damaged anchor");
+    assert!(matches!(
+        SqliteAuthorityStore::import_relocated_checked(&moved, &locks, &seal, || Ok(())),
+        Err(SqliteServingOwnerError::RelocationDestinationAnchored(_))
+    ));
+    assert_eq!(fs::read(&lock).expect("retained damaged anchor"), anchor);
+}
+
+#[test]
+fn an_import_interrupted_before_serving_retries_from_the_retained_export() {
+    let (temp, database, lock_root) = fixture();
+    SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
+    drop(crate::test_authority::open_serving(&database, &lock_root).expect("serve at source"));
+    let seal = SqliteAuthorityStore::export_for_relocation(&database, &lock_root).expect("export");
+    let (moved, locks) = copy_store(temp.path(), &temp.path().join("moved"));
+    let lock = locks.join(format!("{}.lock", seal.store_uuid));
+
+    // The import seeded its anchor but its database commit did not land.
+    let first = SqliteAuthorityStore::import_relocated_checked(&moved, &locks, &seal, || Ok(()))
+        .expect("first import");
+    restore_database_in_place(&moved, &database);
+    let retried =
+        SqliteAuthorityStore::import_relocated_checked_with_phase(&moved, &locks, &seal, |phase| {
+            assert_eq!(phase, RelocationImportPhase::Exported);
+            Ok(())
+        })
+        .expect("retry after a seeded anchor");
+    assert_eq!(retried.seal, seal);
+    assert_ne!(retried.import_id, first.import_id);
+
+    // The import created its lock but stopped before seeding it.
+    restore_database_in_place(&moved, &database);
+    fs::remove_file(&lock).expect("remove seeded lock");
+    drop(create_lock_file(&lock).expect("unseeded lock"));
+    SqliteAuthorityStore::import_relocated_checked(&moved, &locks, &seal, || Ok(()))
+        .expect("retry after an unseeded lock");
+
+    // The import's first anchor write was torn: the first slot does not
+    // decode and the second was never written.
+    restore_database_in_place(&moved, &database);
+    overwrite_lock_bytes(&lock, 64, &[0xa5; 32]);
+    let imported = SqliteAuthorityStore::import_relocated_checked(&moved, &locks, &seal, || Ok(()))
+        .expect("retry after a torn first seed");
+    assert_eq!(imported.seal, seal);
+
+    SqliteAuthorityStore::provision(&moved, &locks).expect("re-provision at new path");
+    let relocated = crate::test_authority::open_serving(&moved, &locks).expect("serve after retry");
+    assert_eq!(relocated.mutation_fence().owner_epoch, seal.owner_epoch + 1);
+    assert_eq!(relocated.mutation_fence().store_uuid, seal.store_uuid);
+    assert_eq!(serving_lock_paths(&locks), vec![lock]);
+}
+
+fn overwrite_lock_bytes(path: &Path, offset: u64, bytes: &[u8]) {
+    use std::os::unix::fs::FileExt;
+    let file = OpenOptions::new()
+        .write(true)
+        .open(path)
+        .expect("open lock for damage");
+    file.write_all_at(bytes, offset).expect("damage lock");
+    file.sync_all().expect("sync damaged lock");
+}
+
+fn lock_identity(path: &Path) -> (u64, u64) {
+    use std::os::unix::fs::MetadataExt;
+    let metadata = fs::metadata(path).expect("lock metadata");
+    (metadata.dev(), metadata.ino())
+}

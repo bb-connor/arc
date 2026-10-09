@@ -159,6 +159,8 @@ pub enum SqliteServingOwnerError {
     OutcomeUnknown(String),
     #[error("sqlite authority store was exported for relocation ({0}); import it before serving")]
     Exported(String),
+    #[error("relocation destination anchors history beyond the export seal: {0}")]
+    RelocationDestinationAnchored(String),
 }
 
 pub(crate) struct SqliteServingOwner {
