@@ -26,7 +26,7 @@ pub(crate) async fn handle_list_tool_receipts(
         Ok(principal) => principal,
         Err(response) => return response,
     };
-    let store = match open_receipt_store(&state.config) {
+    let store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -130,7 +130,7 @@ pub(crate) async fn handle_append_tool_receipt(
         Ok(None) => {}
         Err(response) => return response,
     }
-    let store = match open_receipt_store(&state.config) {
+    let store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -184,7 +184,7 @@ pub(crate) async fn handle_list_child_receipts(
             "tenant read token cannot list child receipts until child receipts carry tenant attribution",
         );
     }
-    let store = match open_receipt_store(&state.config) {
+    let store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -267,7 +267,7 @@ pub(crate) async fn handle_query_receipts(
         Ok(principal) => principal,
         Err(response) => return response,
     };
-    let store = match open_receipt_store(&state.config) {
+    let store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -339,7 +339,7 @@ pub(crate) async fn handle_receipt_analytics(
             Ok(context) => Some(context),
             Err(response) => return response,
         };
-    let store = match open_receipt_store(&state.config) {
+    let store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -358,7 +358,7 @@ pub(crate) async fn handle_evidence_export(
         Ok(principal) => principal,
         Err(response) => return response,
     };
-    let store = match open_receipt_store(&state.config) {
+    let store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -423,7 +423,7 @@ pub(crate) async fn handle_evidence_import(
             return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
         }
     };
-    let mut store = match open_receipt_store(&state.config) {
+    let store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -444,7 +444,7 @@ pub(crate) async fn handle_cost_attribution_report(
             Ok(context) => Some(context),
             Err(response) => return response,
         };
-    let store = match open_receipt_store(&state.config) {
+    let store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -467,7 +467,7 @@ pub(crate) async fn handle_shared_evidence_report(
         Ok(context) => Some(context),
         Err(response) => return response,
     };
-    let store = match open_receipt_store(&state.config) {
+    let store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -488,7 +488,7 @@ pub(crate) async fn handle_operator_report(
             Err(response) => return response,
         };
 
-    let receipt_store = match open_receipt_store(&state.config) {
+    let receipt_store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -514,7 +514,7 @@ pub(crate) async fn handle_comptroller_surface_report(
             Err(response) => return response,
         };
 
-    let receipt_store = match open_receipt_store(&state.config) {
+    let receipt_store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -543,8 +543,8 @@ pub(crate) async fn handle_behavioral_feed_report(
         Err(response) => return response,
     };
 
-    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
-        Some(path) => path,
+    let receipt_store = match state.receipt_store.as_deref() {
+        Some(store) => store,
         None => {
             return plain_http_error(
                 StatusCode::CONFLICT,
@@ -554,7 +554,7 @@ pub(crate) async fn handle_behavioral_feed_report(
     };
 
     match build_signed_behavioral_feed(
-        receipt_db_path,
+        receipt_store,
         state.config.budget_db_path.as_deref(),
         state.config.authority_seed_path.as_deref(),
         state.config.authority_db_path.as_deref(),
@@ -579,7 +579,7 @@ pub(crate) async fn handle_settlement_report(
         Err(response) => return response,
     };
 
-    let receipt_store = match open_receipt_store(&state.config) {
+    let receipt_store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -599,7 +599,7 @@ pub(crate) async fn handle_record_settlement_reconciliation(
         return response;
     }
 
-    let receipt_store = match open_receipt_store(&state.config) {
+    let receipt_store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -645,7 +645,7 @@ pub(crate) async fn handle_metered_billing_report(
         Err(response) => return response,
     };
 
-    let receipt_store = match open_receipt_store(&state.config) {
+    let receipt_store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -668,7 +668,7 @@ pub(crate) async fn handle_economic_receipt_report(
             Err(response) => return response,
         };
 
-    let receipt_store = match open_receipt_store(&state.config) {
+    let receipt_store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -693,7 +693,7 @@ pub(crate) async fn handle_economic_completion_flow_report(
         Err(response) => return response,
     };
 
-    let receipt_store = match open_receipt_store(&state.config) {
+    let receipt_store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -718,7 +718,7 @@ pub(crate) async fn handle_authorization_context_report(
         Err(response) => return response,
     };
 
-    let receipt_store = match open_receipt_store(&state.config) {
+    let receipt_store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -741,7 +741,7 @@ pub(crate) async fn handle_authorization_profile_metadata_report(
         return response;
     }
 
-    let receipt_store = match open_receipt_store(&state.config) {
+    let receipt_store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -766,7 +766,7 @@ pub(crate) async fn handle_authorization_review_pack_report(
         Err(response) => return response,
     };
 
-    let receipt_store = match open_receipt_store(&state.config) {
+    let receipt_store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -789,7 +789,7 @@ pub(crate) async fn handle_record_metered_billing_reconciliation(
         return plain_http_error(StatusCode::BAD_REQUEST, &message);
     }
 
-    let receipt_store = match open_receipt_store(&state.config) {
+    let receipt_store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -849,7 +849,7 @@ pub(crate) async fn handle_record_lineage_snapshot(
         Ok(None) => {}
         Err(response) => return response,
     }
-    let store = match open_receipt_store(&state.config) {
+    let store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -904,7 +904,7 @@ pub(crate) async fn handle_get_lineage(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    let store = match open_receipt_store(&state.config) {
+    let store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -929,7 +929,7 @@ pub(crate) async fn handle_get_delegation_chain(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    let store = match open_receipt_store(&state.config) {
+    let store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -954,7 +954,7 @@ pub(crate) async fn handle_agent_receipts(
         Ok(principal) => principal,
         Err(response) => return response,
     };
-    let store = match open_receipt_store(&state.config) {
+    let store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -1003,7 +1003,7 @@ pub(crate) async fn handle_append_child_receipt(
         Ok(None) => {}
         Err(response) => return response,
     }
-    let store = match open_receipt_store(&state.config) {
+    let store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };

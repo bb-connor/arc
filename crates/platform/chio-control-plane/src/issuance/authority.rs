@@ -87,10 +87,51 @@ fn wrap_capability_authority_with_lineage_mode(
         inner,
         issuance_policy,
         runtime_assurance_policy,
-        receipt_db_path: receipt_db_path.map(Path::to_path_buf),
+        receipt_store: receipt_db_path.map(|path| IssuanceReceiptStore::Path(path.to_path_buf())),
         budget_db_path: budget_db_path.map(Path::to_path_buf),
         persist_lineage_immediately,
     })
+}
+
+/// Wrap a service authority over the service's own long-lived receipt store,
+/// so issuance never opens another store or starts another writer. Issuance
+/// reads time from that store's clock rather than adding another owner.
+pub(crate) fn wrap_capability_authority_with_receipt_store(
+    inner: Box<dyn CapabilityAuthority>,
+    issuance_policy: Option<ReputationIssuancePolicy>,
+    runtime_assurance_policy: Option<RuntimeAssuranceIssuancePolicy>,
+    receipt_store: Arc<SqliteReceiptStore>,
+    budget_db_path: Option<&Path>,
+    persist_lineage_immediately: bool,
+) -> Box<dyn CapabilityAuthority> {
+    Box::new(PolicyBackedCapabilityAuthority {
+        clock: receipt_store.authority_clock(),
+        inner,
+        issuance_policy,
+        runtime_assurance_policy,
+        receipt_store: Some(IssuanceReceiptStore::Shared(receipt_store)),
+        budget_db_path: budget_db_path.map(Path::to_path_buf),
+        persist_lineage_immediately,
+    })
+}
+
+/// The receipt history an issuing authority reads and records lineage into.
+enum IssuanceReceiptStore {
+    /// A database path opened for each use by a standalone host.
+    Path(PathBuf),
+    /// A store owned by a long-lived service.
+    Shared(Arc<SqliteReceiptStore>),
+}
+
+impl IssuanceReceiptStore {
+    fn store(&self, clock: &Arc<dyn Clock>) -> Result<Arc<SqliteReceiptStore>, KernelError> {
+        match self {
+            Self::Path(path) => SqliteReceiptStore::open_with_clock(path, clock.clone())
+                .map(Arc::new)
+                .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string())),
+            Self::Shared(store) => Ok(Arc::clone(store)),
+        }
+    }
 }
 
 struct PolicyBackedCapabilityAuthority {
@@ -98,7 +139,7 @@ struct PolicyBackedCapabilityAuthority {
     inner: Box<dyn CapabilityAuthority>,
     issuance_policy: Option<ReputationIssuancePolicy>,
     runtime_assurance_policy: Option<RuntimeAssuranceIssuancePolicy>,
-    receipt_db_path: Option<PathBuf>,
+    receipt_store: Option<IssuanceReceiptStore>,
     budget_db_path: Option<PathBuf>,
     persist_lineage_immediately: bool,
 }
@@ -183,12 +224,17 @@ impl PolicyBackedCapabilityAuthority {
                 .map(|key| key.to_hex())
                 .collect();
             trusted_keys.push(self.inner.authority_public_key().to_hex());
+            let receipt_store = self
+                .receipt_store
+                .as_ref()
+                .map(|store| store.store(&self.clock))
+                .transpose()?;
             enforce_reputation_policy(
                 subject,
                 &scope,
                 ttl_seconds,
                 policy,
-                self.receipt_db_path.as_deref(),
+                receipt_store.as_deref(),
                 self.budget_db_path.as_deref(),
                 ReputationInspectionContext {
                     clock: self.clock.clone(),
@@ -245,12 +291,11 @@ impl PolicyBackedCapabilityAuthority {
         };
 
         if self.persist_lineage_immediately {
-            let Some(path) = self.receipt_db_path.as_deref() else {
+            let Some(store) = self.receipt_store.as_ref() else {
                 return Ok(capability);
             };
-            let store = SqliteReceiptStore::open_with_clock(path, self.clock.clone())
-                .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?;
             store
+                .store(&self.clock)?
                 .record_capability_snapshot(&capability, None)
                 .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?;
         }

@@ -146,7 +146,8 @@ pub(crate) async fn handle_public_generic_listings(
     State(state): State<TrustServiceState>,
     Query(query): Query<GenericListingQuery>,
 ) -> Response {
-    match build_public_generic_listing_report(&state.config, &query) {
+    match build_public_generic_listing_report(&state.config, state.receipt_store.as_deref(), &query)
+    {
         Ok(report) => Json(report).into_response(),
         Err(error) => public_discovery_error_response(&error),
     }

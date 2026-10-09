@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering};
-use std::sync::{mpsc, Arc, Mutex, OnceLock};
+use std::sync::{mpsc, Arc, Condvar, Mutex, OnceLock};
 use std::thread;
 use std::time::Duration;
 #[cfg(test)]
@@ -212,6 +212,7 @@ struct SupervisedReceiptWriter {
     supervisor: Option<SupervisedThread>,
     health: HealthFlag,
     thread_id: Arc<OnceLock<thread::ThreadId>>,
+    join_on_reaper: AtomicBool,
 }
 
 impl ReceiptCommitWorker {
@@ -284,6 +285,9 @@ struct ReceiptCommitWriterHealth {
     // pre-dispatch gate, so a tool is never executed against a store that cannot
     // persist its receipt.
     head_poisoned: AtomicBool,
+    /// Whether this run's seed has verified or poisoned the head.
+    seed_settled: Mutex<bool>,
+    seed_settled_changed: Condvar,
     critical_write_poisoned: AtomicBool,
     accounting_poisoned: AtomicBool,
 }
@@ -630,6 +634,7 @@ impl ReceiptCommitActor {
                 join: Some(SupervisedReceiptWriter {
                     supervisor: Some(supervisor),
                     health: supervisor_health,
+                    join_on_reaper: AtomicBool::new(false),
                     thread_id,
                 }),
             }),
@@ -823,14 +828,22 @@ impl Drop for SupervisedReceiptWriter {
         let Some(supervisor) = self.supervisor.take() else {
             return;
         };
-        if self.thread_id.get() == Some(&thread::current().id()) {
+        #[cfg(test)]
+        let releasing = thread::current().name().map(str::to_owned);
+        if self.join_on_reaper.load(Ordering::SeqCst)
+            || self.thread_id.get() == Some(&thread::current().id())
+        {
             let _ = thread::Builder::new()
                 .name("chio-receipt-writer-reaper".to_string())
                 .spawn(move || {
                     let _ = supervisor.join();
+                    #[cfg(test)]
+                    test_hooks::observe_writer_join(releasing);
                 });
         } else {
             let _ = supervisor.join();
+            #[cfg(test)]
+            test_hooks::observe_writer_join(releasing);
         }
     }
 }
@@ -1285,8 +1298,11 @@ fn receipt_commit_actor_loop(
     sink_qualification: Option<Arc<ReceiptSinkQualification>>,
     checkpoint_signer: &mut Option<BackgroundCheckpointSigner>,
 ) -> SupervisedOutcome {
+    health.set_seed_settled(false);
     let mut head_state = match receipt_pool_connection(&pool, sink_qualification.as_deref())
         .and_then(|connection| {
+            #[cfg(test)]
+            test_hooks::fail_seed(&connection)?;
             if incremental_verification {
                 seed_verified_head(&connection)
             } else {
@@ -1313,6 +1329,7 @@ fn receipt_commit_actor_loop(
             WriterHeadState::Poisoned(error.to_string())
         }
     };
+    health.set_seed_settled(true);
 
     let mut pending_flush_error: Option<ReceiptStoreError> = None;
     while let Ok(command) = receiver.recv() {

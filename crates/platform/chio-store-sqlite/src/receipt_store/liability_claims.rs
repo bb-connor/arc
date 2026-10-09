@@ -28,7 +28,7 @@ where
 
 impl SqliteReceiptStore {
     pub fn record_liability_claim_package(
-        &mut self,
+        &self,
         claim: &SignedLiabilityClaimPackage,
     ) -> Result<(), ReceiptStoreError> {
         if !claim
@@ -205,7 +205,7 @@ impl SqliteReceiptStore {
     }
 
     pub fn record_liability_claim_response(
-        &mut self,
+        &self,
         response: &SignedLiabilityClaimResponse,
     ) -> Result<(), ReceiptStoreError> {
         if !response
@@ -303,7 +303,7 @@ impl SqliteReceiptStore {
     }
 
     pub fn record_liability_claim_dispute(
-        &mut self,
+        &self,
         dispute: &SignedLiabilityClaimDispute,
     ) -> Result<(), ReceiptStoreError> {
         if !dispute
@@ -401,7 +401,7 @@ impl SqliteReceiptStore {
     }
 
     pub fn record_liability_claim_adjudication(
-        &mut self,
+        &self,
         adjudication: &SignedLiabilityClaimAdjudication,
     ) -> Result<(), ReceiptStoreError> {
         if !adjudication
@@ -494,7 +494,7 @@ impl SqliteReceiptStore {
     }
 
     pub fn record_liability_claim_payout_instruction(
-        &mut self,
+        &self,
         payout_instruction: &SignedLiabilityClaimPayoutInstruction,
     ) -> Result<(), ReceiptStoreError> {
         if !payout_instruction
@@ -594,7 +594,7 @@ impl SqliteReceiptStore {
     }
 
     pub fn record_liability_claim_payout_receipt(
-        &mut self,
+        &self,
         payout_receipt: &SignedLiabilityClaimPayoutReceipt,
     ) -> Result<(), ReceiptStoreError> {
         if !payout_receipt
@@ -694,7 +694,7 @@ impl SqliteReceiptStore {
     }
 
     pub fn record_liability_claim_settlement_instruction(
-        &mut self,
+        &self,
         settlement_instruction: &SignedLiabilityClaimSettlementInstruction,
     ) -> Result<(), ReceiptStoreError> {
         if !settlement_instruction
@@ -804,7 +804,7 @@ impl SqliteReceiptStore {
     }
 
     pub fn record_liability_claim_settlement_receipt(
-        &mut self,
+        &self,
         settlement_receipt: &SignedLiabilityClaimSettlementReceipt,
     ) -> Result<(), ReceiptStoreError> {
         if !settlement_receipt

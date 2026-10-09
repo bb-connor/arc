@@ -71,8 +71,9 @@ pub(crate) fn cmd_trust_underwriting_input_export(
                     .to_string(),
             )
         })?;
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
         trust_control::build_signed_underwriting_policy_input(
-            receipt_db_path,
+            &receipt_store,
             backend.budget_db_path,
             backend.authority_seed_path,
             backend.authority_db_path,
@@ -141,8 +142,9 @@ pub(crate) fn cmd_trust_underwriting_decision_evaluate(
             )
         })?;
         let trusted_kernel_keys = trusted_kernel_keys_from_authority(backend.authority_seed_path)?;
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
         trust_control::build_underwriting_decision_report(
-            receipt_db_path,
+            &receipt_store,
             backend.budget_db_path,
             backend.certification_registry_file,
             &query,
@@ -198,8 +200,9 @@ pub(crate) fn cmd_trust_underwriting_decision_simulate(
             )
         })?;
         let trusted_kernel_keys = trusted_kernel_keys_from_authority(backend.authority_seed_path)?;
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
         trust_control::build_underwriting_simulation_report(
-            receipt_db_path,
+            &receipt_store,
             backend.budget_db_path,
             backend.certification_registry_file,
             &request,
@@ -323,8 +326,9 @@ pub(crate) fn cmd_trust_underwriting_decision_issue(
                     .to_string(),
             )
         })?;
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
         trust_control::issue_signed_underwriting_decision(
-            receipt_db_path,
+            &receipt_store,
             backend.budget_db_path,
             backend.authority_seed_path,
             backend.authority_db_path,
@@ -389,7 +393,8 @@ pub(crate) fn cmd_trust_underwriting_decision_list(
                     .to_string(),
             )
         })?;
-        trust_control::list_underwriting_decisions(receipt_db_path, &query)?
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
+        trust_control::list_underwriting_decisions(&receipt_store, &query)?
     };
 
     if backend.json_output {
@@ -445,7 +450,8 @@ pub(crate) fn cmd_trust_underwriting_appeal_create(
                     .to_string(),
             )
         })?;
-        trust_control::create_underwriting_appeal(receipt_db_path, &request)?
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
+        trust_control::create_underwriting_appeal(&receipt_store, &request)?
     };
 
     if json_output {
@@ -481,7 +487,8 @@ pub(crate) fn cmd_trust_underwriting_appeal_resolve(
                     .to_string(),
             )
         })?;
-        trust_control::resolve_underwriting_appeal(receipt_db_path, &request)?
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
+        trust_control::resolve_underwriting_appeal(&receipt_store, &request)?
     };
 
     if backend.json_output {

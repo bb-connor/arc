@@ -3,7 +3,6 @@ use super::*;
 
 pub(crate) fn build_credit_provider_risk_package_from_store(
     receipt_store: &SqliteReceiptStore,
-    receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     issuance_policy: Option<&crate::policy::ReputationIssuancePolicy>,
@@ -50,7 +49,6 @@ pub(crate) fn build_credit_provider_risk_package_from_store(
     let trusted_kernel_keys = vec![keypair.public_key().to_hex()];
     let scorecard_report = build_credit_scorecard_report_with_context(
         receipt_store,
-        receipt_db_path,
         budget_db_path,
         issuance_policy,
         &exposure_query,
@@ -61,7 +59,6 @@ pub(crate) fn build_credit_provider_risk_package_from_store(
         .map_err(|error| TrustHttpError::internal(error.to_string()))?;
     let facility_report = build_credit_facility_report_from_store_with_context(
         receipt_store,
-        receipt_db_path,
         budget_db_path,
         certification_registry_file,
         issuance_policy,
@@ -71,7 +68,6 @@ pub(crate) fn build_credit_provider_risk_package_from_store(
     )?;
     let underwriting_input = build_underwriting_policy_input(
         receipt_store,
-        receipt_db_path,
         budget_db_path,
         certification_registry_file,
         &underwriting_input_query_from_exposure_query(&exposure_query),
@@ -153,7 +149,6 @@ pub(crate) fn build_credit_provider_risk_package_from_store(
 
 pub(crate) fn build_credit_scorecard_report(
     receipt_store: &SqliteReceiptStore,
-    receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
     issuance_policy: Option<&crate::policy::ReputationIssuancePolicy>,
     query: &ExposureLedgerQuery,
@@ -161,7 +156,6 @@ pub(crate) fn build_credit_scorecard_report(
 ) -> Result<CreditScorecardReport, TrustHttpError> {
     build_credit_scorecard_report_with_context(
         receipt_store,
-        receipt_db_path,
         budget_db_path,
         issuance_policy,
         query,
@@ -176,7 +170,6 @@ pub(crate) fn build_credit_scorecard_report(
 )]
 pub(crate) fn build_credit_scorecard_report_with_context(
     receipt_store: &SqliteReceiptStore,
-    receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
     issuance_policy: Option<&crate::policy::ReputationIssuancePolicy>,
     query: &ExposureLedgerQuery,
@@ -207,9 +200,9 @@ pub(crate) fn build_credit_scorecard_report_with_context(
         ));
     }
 
-    let mut inspection = issuance::inspect_local_reputation_with_read_context(
+    let mut inspection = issuance::inspect_local_reputation_with_store(
         &subject_key,
-        Some(receipt_db_path),
+        receipt_store,
         budget_db_path,
         normalized_query.since,
         normalized_query.until,
@@ -221,7 +214,7 @@ pub(crate) fn build_credit_scorecard_report_with_context(
 
     inspection.imported_trust = Some(
         reputation::build_imported_trust_report(
-            receipt_db_path,
+            receipt_store,
             &inspection.subject_key,
             inspection.since,
             inspection.until,
@@ -296,7 +289,6 @@ pub(crate) fn build_credit_scorecard_report_with_context(
 
 pub(crate) fn build_credit_facility_report_from_store(
     receipt_store: &SqliteReceiptStore,
-    receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     issuance_policy: Option<&crate::policy::ReputationIssuancePolicy>,
@@ -305,7 +297,6 @@ pub(crate) fn build_credit_facility_report_from_store(
 ) -> Result<CreditFacilityReport, TrustHttpError> {
     build_credit_facility_report_from_store_with_context(
         receipt_store,
-        receipt_db_path,
         budget_db_path,
         certification_registry_file,
         issuance_policy,
@@ -317,7 +308,6 @@ pub(crate) fn build_credit_facility_report_from_store(
 
 fn build_credit_facility_report_from_store_with_context(
     receipt_store: &SqliteReceiptStore,
-    receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     issuance_policy: Option<&crate::policy::ReputationIssuancePolicy>,
@@ -328,7 +318,6 @@ fn build_credit_facility_report_from_store_with_context(
     let clock_now = unix_timestamp_now()?;
     let scorecard = build_credit_scorecard_report_with_context(
         receipt_store,
-        receipt_db_path,
         budget_db_path,
         issuance_policy,
         query,
@@ -337,7 +326,6 @@ fn build_credit_facility_report_from_store_with_context(
     )?;
     let underwriting_input = build_underwriting_policy_input(
         receipt_store,
-        receipt_db_path,
         budget_db_path,
         certification_registry_file,
         &underwriting_input_query_from_exposure_query(&scorecard.filters),
@@ -420,7 +408,6 @@ fn build_credit_facility_report_from_store_with_context(
 
 pub(crate) fn build_credit_bond_report_from_store(
     receipt_store: &SqliteReceiptStore,
-    receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     issuance_policy: Option<&crate::policy::ReputationIssuancePolicy>,
@@ -430,7 +417,6 @@ pub(crate) fn build_credit_bond_report_from_store(
     let clock_now = unix_timestamp_now()?;
     let scorecard = build_credit_scorecard_report(
         receipt_store,
-        receipt_db_path,
         budget_db_path,
         issuance_policy,
         query,
@@ -446,7 +432,6 @@ pub(crate) fn build_credit_bond_report_from_store(
     }
     let underwriting_input = build_underwriting_policy_input(
         receipt_store,
-        receipt_db_path,
         budget_db_path,
         certification_registry_file,
         &underwriting_input_query_from_exposure_query(&scorecard.filters),
@@ -456,7 +441,6 @@ pub(crate) fn build_credit_bond_report_from_store(
 
     let facility_policy = build_credit_facility_report_from_store(
         receipt_store,
-        receipt_db_path,
         budget_db_path,
         certification_registry_file,
         issuance_policy,
@@ -584,7 +568,7 @@ pub(crate) fn issue_signed_credit_bond_detailed(
 ) -> Result<SignedCreditBond, TrustHttpError> {
     let clock_now = unix_timestamp_now()?;
     let CreditIssuanceArgs {
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         authority_seed_path,
         authority_db_path,
@@ -593,15 +577,13 @@ pub(crate) fn issue_signed_credit_bond_detailed(
         query,
         supersedes_artifact_id,
     } = args;
-    let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     // Load the signing keypair up front so its public key anchors the
     // reputation scoring trust set; reuse it to sign the bond artifact below.
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)
         .map_err(|error| TrustHttpError::internal(error.to_string()))?;
     let trusted_kernel_keys = vec![keypair.public_key().to_hex()];
     let report = build_credit_bond_report_from_store(
-        &receipt_store,
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         certification_registry_file,
         issuance_policy,
@@ -609,7 +591,7 @@ pub(crate) fn issue_signed_credit_bond_detailed(
         &trusted_kernel_keys,
     )?;
     let latest_facility_expires_at = latest_active_granted_credit_facility(
-        &receipt_store,
+        receipt_store,
         report.filters.capability_id.as_deref(),
         report.filters.agent_subject.as_deref(),
         report.filters.tool_server.as_deref(),
@@ -1122,7 +1104,7 @@ pub(crate) fn issue_signed_credit_facility_detailed(
 ) -> Result<SignedCreditFacility, TrustHttpError> {
     let clock_now = unix_timestamp_now()?;
     let CreditIssuanceArgs {
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         authority_seed_path,
         authority_db_path,
@@ -1131,15 +1113,13 @@ pub(crate) fn issue_signed_credit_facility_detailed(
         query,
         supersedes_artifact_id,
     } = args;
-    let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     // Load the signing keypair up front so its public key anchors the
     // reputation scoring trust set; reuse it to sign the facility artifact.
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)
         .map_err(|error| TrustHttpError::internal(error.to_string()))?;
     let trusted_kernel_keys = vec![keypair.public_key().to_hex()];
     let report = build_credit_facility_report_from_store(
-        &receipt_store,
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         certification_registry_file,
         issuance_policy,

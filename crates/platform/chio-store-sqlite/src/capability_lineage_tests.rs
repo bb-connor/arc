@@ -261,7 +261,7 @@ fn signed_capability_round_trips_through_replication() -> Result<(), Box<dyn std
     let source_path = unique_db_path("cl-signed-source");
     let destination_path = unique_db_path("cl-signed-destination");
     let source = SqliteReceiptStore::open(&source_path)?;
-    let mut destination = SqliteReceiptStore::open(&destination_path)?;
+    let destination = SqliteReceiptStore::open(&destination_path)?;
     let subject = Keypair::generate();
     let issuer = Keypair::generate();
     let token = make_token("cap-signed", &subject, &issuer, 1000, 2000);
@@ -322,7 +322,7 @@ fn signed_capability_upgrade_advances_replication_cursor() -> Result<(), Box<dyn
     let source_path = unique_db_path("cl-signed-upgrade-source");
     let destination_path = unique_db_path("cl-signed-upgrade-destination");
     let source = SqliteReceiptStore::open(&source_path)?;
-    let mut destination = SqliteReceiptStore::open(&destination_path)?;
+    let destination = SqliteReceiptStore::open(&destination_path)?;
     let subject = Keypair::generate();
     let issuer = Keypair::generate();
     let token = make_token("cap-signed-upgrade", &subject, &issuer, 1000, 2000);
@@ -532,7 +532,7 @@ fn record_rechecks_conflicts_after_waiting_for_an_external_writer(
 fn replication_rejects_signed_capability_downgrade_conflict_and_mismatch(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("cl-signed-conflicts");
-    let mut store = SqliteReceiptStore::open(&path)?;
+    let store = SqliteReceiptStore::open(&path)?;
     let subject = Keypair::generate();
     let issuer = Keypair::generate();
     let token = make_token("cap-conflict", &subject, &issuer, 1000, 2000);

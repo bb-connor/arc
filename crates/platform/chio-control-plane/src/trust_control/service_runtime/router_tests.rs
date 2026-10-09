@@ -16,6 +16,9 @@ use std::time::Duration;
 #[path = "ingress_tests.rs"]
 mod ingress_tests;
 
+#[path = "router_tests/receipt_store_ownership_tests.rs"]
+mod receipt_store_ownership_tests;
+
 #[path = "attestation_authentication_tests.rs"]
 mod attestation_authentication_tests;
 
@@ -64,6 +67,7 @@ fn metrics_state(service_token: &str) -> TrustServiceState {
         fiscal_runtime: None,
         budget_store: None,
         revocation_store: None,
+        receipt_store: None,
         enterprise_provider_registry: None,
         verifier_policy_registry: None,
         federation_admission_rate_limiter: Arc::new(Mutex::new(

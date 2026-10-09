@@ -591,7 +591,7 @@ pub(crate) fn record_test_credit_loss_event_with_kind(
     };
     let event =
         SignedCreditLossLifecycle::sign(artifact, &keypair).expect("sign test loss lifecycle");
-    let mut store = SqliteReceiptStore::open(receipt_db_path).expect("open store for loss event");
+    let store = SqliteReceiptStore::open(receipt_db_path).expect("open store for loss event");
     store
         .record_credit_loss_lifecycle(&event)
         .expect("record test loss lifecycle");

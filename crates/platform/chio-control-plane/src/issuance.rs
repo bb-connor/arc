@@ -4,8 +4,10 @@ mod reputation;
 mod scope;
 mod types;
 
-pub(crate) use self::authority::wrap_capability_authority_with_deferred_lineage;
 pub use self::authority::{wrap_capability_authority, wrap_capability_authority_with_clock};
+pub(crate) use self::authority::{
+    wrap_capability_authority_with_deferred_lineage, wrap_capability_authority_with_receipt_store,
+};
 pub use self::reputation::{
     build_local_reputation_corpus, build_local_reputation_corpus_with_read_context,
 };
@@ -16,6 +18,7 @@ pub use self::types::{
 
 pub(crate) use self::reputation::{
     inspect_local_reputation, inspect_local_reputation_with_read_context,
+    inspect_local_reputation_with_store,
 };
 
 #[cfg(test)]

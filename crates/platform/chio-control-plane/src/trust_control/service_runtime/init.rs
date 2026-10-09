@@ -68,24 +68,41 @@ async fn serve_async_inner(
         .authority_keyring_config_path
         .as_ref()
         .and(config.authority_seed_path.clone());
-    let authority_keyring = match (
+    // Keyring custody owns the anchored receipt store; handlers share that same
+    // store so one writer serves the database.
+    let (authority_keyring, anchored_receipt_store) = match (
         config.authority_keyring_config_path.as_deref(),
         authority_keyring_seed_path.as_deref(),
         config.receipt_db_path.as_deref(),
         config.authority_keyring_receipt_anchor_root.as_deref(),
     ) {
         (Some(keyring_config), Some(seed_path), Some(receipt_path), Some(anchor_root)) => {
-            let receipt_store =
-                SqliteReceiptStore::open_for_finding_pool(receipt_path, anchor_root)?;
-            receipt_store.wait_for_writer_ready(std::time::Duration::from_secs(30))?;
+            let receipt_store = Arc::new(SqliteReceiptStore::open_for_finding_pool(
+                receipt_path,
+                anchor_root,
+            )?);
+            receipt_store.join_writer_on_reaper();
+            // Keyring custody writes through this store, so it waits for the
+            // seed to finish instead of serving while the writer seeds.
+            let seeding = Arc::clone(&receipt_store);
+            tokio::task::spawn_blocking(move || {
+                await_receipt_writer_seed(&seeding, RECEIPT_WRITER_READY_WAIT)
+            })
+            .await
+            .map_err(|error| {
+                CliError::cli_other_error(format!(
+                    "trust-control receipt writer readiness task failed: {error}"
+                ))
+            })??;
+            let keyring_receipts: Arc<dyn chio_kernel::ReceiptStore> = receipt_store.clone();
             let (_, composition) = crate::load_keyring_runtime_from_authority_seed(
                 keyring_config,
                 seed_path,
-                Arc::new(receipt_store),
+                keyring_receipts,
             )?;
-            Some(composition)
+            (Some(composition), Some(receipt_store))
         }
-        (None, None, _, None) => None,
+        (None, None, _, None) => (None, None),
         _ => {
             return Err(CliError::cli_other_error(
                 "validated keyring runtime configuration is incomplete".to_string(),
@@ -163,6 +180,20 @@ async fn serve_async_inner(
         })?
         .map(Arc::new);
     let cluster = build_cluster_state(&config, local_addr)?;
+    let receipt_store = match anchored_receipt_store {
+        Some(store) => Some(store),
+        None => {
+            let path = config.receipt_db_path.clone();
+            tokio::task::spawn_blocking(move || open_service_receipt_store(path.as_deref()))
+                .await
+                .map_err(|error| {
+                    CliError::cli_other_error(format!(
+                        "trust-control receipt store startup task failed: {error}"
+                    ))
+                })??
+        }
+    };
+    let receipt_store_owner = receipt_store.clone();
     // Thread the operator-configured memory budget into the admission guard so a
     // lowered `admission_key_cap` actually tightens it. Read the cap before
     // `config` is moved into the state.
@@ -179,6 +210,7 @@ async fn serve_async_inner(
         fiscal_runtime,
         budget_store,
         revocation_store,
+        receipt_store,
         enterprise_provider_registry,
         verifier_policy_registry,
         federation_admission_rate_limiter,
@@ -241,8 +273,9 @@ async fn serve_async_inner(
     let server = axum::serve(listener, router).with_graceful_shutdown(controller.signalled());
 
     // Trust-control writes budget and revocation state synchronously inside its
-    // handlers, so completing in-flight requests during the drain is the whole
-    // fix; there is no async commit actor to flush.
+    // handlers, and a receipt append returns only after the shared writer made
+    // it durable, so completing in-flight requests during the drain is the whole
+    // fix; no queued receipt write outlives its request.
     let serve_result = run_until_drained(
         server,
         controller.subscribe(),
@@ -276,9 +309,90 @@ async fn serve_async_inner(
         })?;
     }
 
+    // Make queued receipt work durable before returning. Whichever owner
+    // releases the store last (this guard, a handler detached by a forced
+    // drain, or a cluster loop abandoned at its join budget), the writer is
+    // joined on its reaper thread, never on an async worker.
+    if let Some(store) = receipt_store_owner {
+        let flushed = tokio::task::spawn_blocking(move || {
+            let flushed = store.flush_receipt_writes().map(|_| ());
+            drop(store);
+            flushed
+        })
+        .await;
+        match flushed {
+            Ok(Ok(())) => {}
+            Ok(Err(error)) => warn!(%error, "trust-control receipt store shutdown flush failed"),
+            Err(error) => warn!(%error, "trust-control receipt store shutdown task failed"),
+        }
+    }
+
     serve_result.map(|_outcome| ()).map_err(|error| {
         CliError::cli_other_error(format!("trust control service failed: {error}"))
     })
+}
+
+/// How long one startup readiness probe waits before it reports a writer that
+/// is still seeding.
+const RECEIPT_WRITER_READY_WAIT: Duration = Duration::from_secs(30);
+
+/// Startup state of the service's single receipt writer. A failed seed is not
+/// a state: it refuses startup.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ReceiptWriterStartup {
+    /// The writer verified the persisted history and is serving.
+    Ready,
+    /// The writer is still verifying a large history. It is the only seed
+    /// owner and serves queued appends in order once its head is verified.
+    Seeding,
+}
+
+/// Open the service's unanchored receipt store and wait for its writer.
+///
+/// A failed seed (a poisoned verified head or a dead writer) refuses startup. A
+/// seed still running after the wait is not a failure, so a large healthy
+/// history never becomes a startup refusal, and no second store or reseed is
+/// started for it.
+pub(crate) fn open_service_receipt_store(
+    path: Option<&Path>,
+) -> Result<Option<Arc<SqliteReceiptStore>>, CliError> {
+    let Some(path) = path else {
+        return Ok(None);
+    };
+    let store = SqliteReceiptStore::open(path).map_err(|error| {
+        CliError::cli_other_error(format!(
+            "failed to open trust-control receipt store: {error}"
+        ))
+    })?;
+    store.join_writer_on_reaper();
+    await_receipt_writer(&store, RECEIPT_WRITER_READY_WAIT)?;
+    Ok(Some(Arc::new(store)))
+}
+
+/// Wait for the writer's seed to finish, however long a healthy history takes.
+/// A failed seed still refuses; a healthy one is never cut off or restarted.
+fn await_receipt_writer_seed(store: &SqliteReceiptStore, poll: Duration) -> Result<(), CliError> {
+    while await_receipt_writer(store, poll)? == ReceiptWriterStartup::Seeding {}
+    Ok(())
+}
+
+fn await_receipt_writer(
+    store: &SqliteReceiptStore,
+    wait: Duration,
+) -> Result<ReceiptWriterStartup, CliError> {
+    let seeded = store.wait_for_writer_seed(wait).map_err(|error| {
+        CliError::cli_other_error(format!(
+            "trust-control receipt writer failed startup readiness: {error}"
+        ))
+    })?;
+    if seeded {
+        return Ok(ReceiptWriterStartup::Ready);
+    }
+    warn!(
+        wait_ms = wait.as_millis(),
+        "trust-control receipt writer is still verifying its history"
+    );
+    Ok(ReceiptWriterStartup::Seeding)
 }
 
 fn validate_finding_purchase_runtime_dependencies(

@@ -1327,7 +1327,7 @@ pub(crate) async fn handle_federated_issue(
     }
     let mut store =
         if payload.delegation_policy.is_some() || payload.upstream_capability_id.is_some() {
-            match open_receipt_store(&state.config) {
+            match state.receipt_store() {
                 Ok(store) => Some(store),
                 Err(response) => return response,
             }

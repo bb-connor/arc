@@ -1,14 +1,13 @@
 use super::*;
 
 pub fn issue_signed_liability_provider(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     report: &LiabilityProviderReport,
     supersedes_provider_record_id: Option<&str>,
 ) -> Result<SignedLiabilityProvider, CliError> {
     let clock_now = unix_timestamp_now()?;
-    let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     report.validate().map_err(CliError::cli_other_error)?;
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
     let issued_at = clock_now;

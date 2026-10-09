@@ -628,24 +628,29 @@ fn load_capability_authority_with_lineage_mode(
     persist_lineage_immediately: bool,
 ) -> Result<Box<dyn CapabilityAuthority>, Response> {
     let config = &state.config;
-    let wrap = |inner: Box<dyn CapabilityAuthority>| {
-        if persist_lineage_immediately {
-            issuance::wrap_capability_authority(
-                inner,
-                config.issuance_policy.clone(),
-                config.runtime_assurance_policy.clone(),
-                config.receipt_db_path.as_deref(),
-                config.budget_db_path.as_deref(),
-            )
-        } else {
-            issuance::wrap_capability_authority_with_deferred_lineage(
-                inner,
-                config.issuance_policy.clone(),
-                config.runtime_assurance_policy.clone(),
-                config.receipt_db_path.as_deref(),
-                config.budget_db_path.as_deref(),
-            )
-        }
+    let wrap = |inner: Box<dyn CapabilityAuthority>| match state.receipt_store.as_ref() {
+        Some(receipt_store) => issuance::wrap_capability_authority_with_receipt_store(
+            inner,
+            config.issuance_policy.clone(),
+            config.runtime_assurance_policy.clone(),
+            Arc::clone(receipt_store),
+            config.budget_db_path.as_deref(),
+            persist_lineage_immediately,
+        ),
+        None if persist_lineage_immediately => issuance::wrap_capability_authority(
+            inner,
+            config.issuance_policy.clone(),
+            config.runtime_assurance_policy.clone(),
+            None,
+            config.budget_db_path.as_deref(),
+        ),
+        None => issuance::wrap_capability_authority_with_deferred_lineage(
+            inner,
+            config.issuance_policy.clone(),
+            config.runtime_assurance_policy.clone(),
+            None,
+            config.budget_db_path.as_deref(),
+        ),
     };
     if let Some(keyring) = state.authority_keyring.as_ref() {
         let authority = keyring.capability_authority().map_err(|_| {

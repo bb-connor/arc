@@ -451,16 +451,28 @@ pub(crate) fn evaluate_federation_policy_request(
                 ))
             })?
             .unwrap_or_default();
-        let inspection = crate::issuance::inspect_local_reputation_with_read_context(
-            &request.subject_key,
-            state.config.receipt_db_path.as_deref(),
-            state.config.budget_db_path.as_deref(),
-            None,
-            None,
-            state.config.issuance_policy.as_ref(),
-            &trusted_kernel_keys,
-            &read_context,
-        )
+        let inspection = match state.receipt_store.as_deref() {
+            Some(receipt_store) => crate::issuance::inspect_local_reputation_with_store(
+                &request.subject_key,
+                receipt_store,
+                state.config.budget_db_path.as_deref(),
+                None,
+                None,
+                state.config.issuance_policy.as_ref(),
+                &trusted_kernel_keys,
+                &read_context,
+            ),
+            None => crate::issuance::inspect_local_reputation_with_read_context(
+                &request.subject_key,
+                None,
+                state.config.budget_db_path.as_deref(),
+                None,
+                None,
+                state.config.issuance_policy.as_ref(),
+                &trusted_kernel_keys,
+                &read_context,
+            ),
+        }
         .map_err(|error| {
             CliError::cli_other_error(format!(
                 "failed to inspect local reputation for federation admission: {error}"

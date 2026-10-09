@@ -341,6 +341,7 @@ fn build_signed_generic_listing_from_liability_provider(
 
 pub(crate) fn build_public_generic_listing_report(
     config: &TrustServiceConfig,
+    receipt_store: Option<&SqliteReceiptStore>,
     query: &GenericListingQuery,
 ) -> Result<GenericListingReport, CliError> {
     let signer_keypair = load_behavioral_feed_signing_keypair(
@@ -383,9 +384,9 @@ pub(crate) fn build_public_generic_listing_report(
         &signer_keypair,
     )?);
 
-    if let Some(receipt_db_path) = config.receipt_db_path.as_deref() {
+    if let Some(receipt_store) = receipt_store {
         let provider_report =
-            list_liability_providers(receipt_db_path, &LiabilityProviderListQuery::default())?;
+            list_liability_providers(receipt_store, &LiabilityProviderListQuery::default())?;
         for row in &provider_report.providers {
             listings.push(build_signed_generic_listing_from_liability_provider(
                 row,

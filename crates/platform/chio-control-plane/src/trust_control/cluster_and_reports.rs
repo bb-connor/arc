@@ -65,6 +65,9 @@ mod cluster_and_reports_tests {
             .transpose()
             .test_unwrap()
             .map(Arc::new);
+        let receipt_store =
+            service_runtime::open_service_receipt_store(config.receipt_db_path.as_deref())
+                .test_unwrap();
         let state = TrustServiceState {
             finding_challenge_clock: Arc::new(chio_security_types::clock::SystemClock),
             config,
@@ -74,6 +77,7 @@ mod cluster_and_reports_tests {
             fiscal_runtime: None,
             budget_store,
             revocation_store,
+            receipt_store,
             enterprise_provider_registry: None,
             verifier_policy_registry: None,
             federation_admission_rate_limiter: Arc::new(Mutex::new(

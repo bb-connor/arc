@@ -792,7 +792,7 @@ fn economic_receipt_projection_report_joins_signed_envelope_with_reconciliation_
 #[test]
 fn economic_completion_flow_report_bundles_receipts_underwriting_and_credit_artifacts() {
     let path = unique_db_path("chio-receipts-economic-flow");
-    let mut store = SqliteReceiptStore::open(&path).test_unwrap();
+    let store = SqliteReceiptStore::open(&path).test_unwrap();
     let receipt_kp = Keypair::generate();
     let subject_key = "subject-flow";
     let capability_id = format!("cap-{subject_key}");

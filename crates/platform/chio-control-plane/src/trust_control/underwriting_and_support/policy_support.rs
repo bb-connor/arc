@@ -2,7 +2,6 @@ use super::*;
 
 pub(crate) fn build_underwriting_policy_input(
     receipt_store: &SqliteReceiptStore,
-    receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     query: &UnderwritingPolicyInputQuery,
@@ -39,7 +38,7 @@ pub(crate) fn build_underwriting_policy_input(
     let reputation = match normalized_query.agent_subject.as_deref() {
         Some(subject_key) => Some(
             reputation::build_behavioral_feed_reputation_summary(
-                receipt_db_path,
+                receipt_store,
                 budget_db_path,
                 subject_key,
                 normalized_query.since,
@@ -950,19 +949,6 @@ fn ratio_option(numerator: u64, denominator: u64) -> Option<f64> {
 pub(crate) fn unix_timestamp_now() -> Result<u64, chio_security_types::clock::ClockError> {
     use chio_security_types::clock::{Clock, SystemClock};
     SystemClock.unix_millis().map(|now| now.as_secs())
-}
-
-pub(crate) fn open_receipt_store(
-    config: &TrustServiceConfig,
-) -> Result<SqliteReceiptStore, Response> {
-    let Some(path) = config.receipt_db_path.as_deref() else {
-        return Err(plain_http_error(
-            StatusCode::CONFLICT,
-            "trust control service requires --receipt-db",
-        ));
-    };
-    SqliteReceiptStore::open(path)
-        .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))
 }
 
 pub(crate) fn revocation_list_response(

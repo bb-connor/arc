@@ -30,14 +30,14 @@ pub(in crate::issuance) fn enforce_reputation_policy(
     scope: &ChioScope,
     ttl_seconds: u64,
     policy: &ReputationIssuancePolicy,
-    receipt_db_path: Option<&Path>,
+    receipt_store: Option<&SqliteReceiptStore>,
     budget_db_path: Option<&Path>,
     context: ReputationInspectionContext<'_>,
 ) -> Result<(), KernelError> {
     let subject_key = subject.to_hex();
-    let inspection = inspect_local_reputation_with_context(
+    let inspection = inspect_local_reputation_on_store(
         &subject_key,
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         None,
         None,
@@ -113,9 +113,57 @@ fn inspect_local_reputation_with_context(
     issuance_policy: Option<&ReputationIssuancePolicy>,
     context: ReputationInspectionContext<'_>,
 ) -> Result<LocalReputationInspection, KernelError> {
-    let corpus = build_local_reputation_corpus_with_clock(
+    let receipt_store = open_reputation_receipt_store(receipt_db_path, &context.clock)?;
+    inspect_local_reputation_on_store(
         subject_key,
-        receipt_db_path,
+        receipt_store.as_ref(),
+        budget_db_path,
+        since,
+        until,
+        issuance_policy,
+        context,
+    )
+}
+
+/// Inspect reputation over a service's already open receipt store, using that
+/// store's clock so the inspection adds no other time owner.
+pub(crate) fn inspect_local_reputation_with_store(
+    subject_key: &str,
+    receipt_store: &SqliteReceiptStore,
+    budget_db_path: Option<&Path>,
+    since: Option<u64>,
+    until: Option<u64>,
+    issuance_policy: Option<&ReputationIssuancePolicy>,
+    trusted_kernel_keys: &[String],
+    read_context: &ReceiptReadContext,
+) -> Result<LocalReputationInspection, KernelError> {
+    inspect_local_reputation_on_store(
+        subject_key,
+        Some(receipt_store),
+        budget_db_path,
+        since,
+        until,
+        issuance_policy,
+        ReputationInspectionContext {
+            clock: receipt_store.authority_clock(),
+            trusted_kernel_keys,
+            read_context,
+        },
+    )
+}
+
+fn inspect_local_reputation_on_store(
+    subject_key: &str,
+    receipt_store: Option<&SqliteReceiptStore>,
+    budget_db_path: Option<&Path>,
+    since: Option<u64>,
+    until: Option<u64>,
+    issuance_policy: Option<&ReputationIssuancePolicy>,
+    context: ReputationInspectionContext<'_>,
+) -> Result<LocalReputationInspection, KernelError> {
+    let corpus = build_local_reputation_corpus_on_store(
+        subject_key,
+        receipt_store,
         budget_db_path,
         since,
         until,
@@ -208,12 +256,41 @@ fn build_local_reputation_corpus_with_clock(
     read_context: &ReceiptReadContext,
     clock: Arc<dyn Clock>,
 ) -> Result<LocalReputationCorpus, KernelError> {
+    let receipt_store = open_reputation_receipt_store(receipt_db_path, &clock)?;
+    build_local_reputation_corpus_on_store(
+        subject_key,
+        receipt_store.as_ref(),
+        budget_db_path,
+        since,
+        until,
+        read_context,
+        clock,
+    )
+}
+
+fn open_reputation_receipt_store(
+    receipt_db_path: Option<&Path>,
+    clock: &Arc<dyn Clock>,
+) -> Result<Option<SqliteReceiptStore>, KernelError> {
+    receipt_db_path
+        .map(|path| SqliteReceiptStore::open_with_clock(path, clock.clone()))
+        .transpose()
+        .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))
+}
+
+fn build_local_reputation_corpus_on_store(
+    subject_key: &str,
+    receipt_store: Option<&SqliteReceiptStore>,
+    budget_db_path: Option<&Path>,
+    since: Option<u64>,
+    until: Option<u64>,
+    read_context: &ReceiptReadContext,
+    clock: Arc<dyn Clock>,
+) -> Result<LocalReputationCorpus, KernelError> {
     let mut receipts = Vec::new();
     let mut capabilities = BTreeMap::new();
 
-    if let Some(path) = receipt_db_path {
-        let store = SqliteReceiptStore::open_with_clock(path, clock.clone())
-            .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?;
+    if let Some(store) = receipt_store {
         receipts = store
             .list_tool_receipts_for_subject_with_context(read_context, subject_key)
             .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?

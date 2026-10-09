@@ -446,8 +446,9 @@ pub(crate) fn cmd_trust_behavioral_feed_export(
                     .to_string(),
             )
         })?;
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
         trust_control::reports::build_signed_behavioral_feed(
-            receipt_db_path,
+            &receipt_store,
             backend.budget_db_path,
             backend.authority_seed_path,
             backend.authority_db_path,
@@ -511,8 +512,9 @@ pub(crate) fn cmd_trust_exposure_ledger_export(
                     .to_string(),
             )
         })?;
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
         trust_control::reports::build_signed_exposure_ledger_report(
-            receipt_db_path,
+            &receipt_store,
             backend.authority_seed_path,
             backend.authority_db_path,
             &query,
@@ -582,8 +584,9 @@ pub(crate) fn cmd_trust_credit_scorecard_export(
                     .to_string(),
             )
         })?;
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
         trust_control::reports::build_signed_credit_scorecard_report(
-            receipt_db_path,
+            &receipt_store,
             backend.budget_db_path,
             backend.authority_seed_path,
             backend.authority_db_path,
@@ -655,8 +658,9 @@ pub(crate) fn cmd_trust_capital_book_export(
                     .to_string(),
             )
         })?;
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
         trust_control::reports::build_signed_capital_book_report(
-            receipt_db_path,
+            &receipt_store,
             backend.authority_seed_path,
             backend.authority_db_path,
             &query,
@@ -728,8 +732,9 @@ pub(crate) fn cmd_trust_capital_instruction_issue(
                     .to_string(),
             )
         })?;
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
         trust_control::reports::issue_signed_capital_execution_instruction(
-            receipt_db_path,
+            &receipt_store,
             authority_seed_path,
             authority_db_path,
             &request,
@@ -778,8 +783,9 @@ pub(crate) fn cmd_trust_capital_allocation_issue(
                     .to_string(),
             )
         })?;
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
         trust_control::reports::issue_signed_capital_allocation_decision(
-            receipt_db_path,
+            &receipt_store,
             backend.budget_db_path,
             backend.authority_seed_path,
             backend.authority_db_path,
@@ -832,8 +838,9 @@ pub(crate) fn cmd_trust_credit_facility_evaluate(
             )
         })?;
         let trusted_kernel_keys = trusted_kernel_keys_from_authority(backend.authority_seed_path)?;
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
         trust_control::build_credit_facility_report(
-            receipt_db_path,
+            &receipt_store,
             backend.budget_db_path,
             backend.certification_registry_file,
             None,
@@ -892,8 +899,9 @@ pub(crate) fn cmd_trust_credit_facility_issue(
                     .to_string(),
             )
         })?;
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
         trust_control::issue_signed_credit_facility(trust_control::CreditIssuanceArgs {
-            receipt_db_path,
+            receipt_store: &receipt_store,
             budget_db_path: backend.budget_db_path,
             authority_seed_path: backend.authority_seed_path,
             authority_db_path: backend.authority_db_path,
@@ -957,7 +965,8 @@ pub(crate) fn cmd_trust_credit_facility_list(
                     .to_string(),
             )
         })?;
-        trust_control::list_credit_facilities(receipt_db_path, &query)?
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
+        trust_control::list_credit_facilities(&receipt_store, &query)?
     };
 
     if backend.json_output {
@@ -1010,8 +1019,9 @@ pub(crate) fn cmd_trust_credit_bond_evaluate(
             )
         })?;
         let trusted_kernel_keys = trusted_kernel_keys_from_authority(backend.authority_seed_path)?;
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
         trust_control::build_credit_bond_report(
-            receipt_db_path,
+            &receipt_store,
             backend.budget_db_path,
             backend.certification_registry_file,
             None,
@@ -1070,8 +1080,9 @@ pub(crate) fn cmd_trust_credit_bond_issue(
                     .to_string(),
             )
         })?;
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
         trust_control::issue_signed_credit_bond(trust_control::CreditIssuanceArgs {
-            receipt_db_path,
+            receipt_store: &receipt_store,
             budget_db_path: backend.budget_db_path,
             authority_seed_path: backend.authority_seed_path,
             authority_db_path: backend.authority_db_path,
@@ -1129,7 +1140,8 @@ pub(crate) fn cmd_trust_credit_bond_simulate(
                     .to_string(),
             )
         })?;
-        trust_control::build_credit_bonded_execution_simulation_report(receipt_db_path, &request)?
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
+        trust_control::build_credit_bonded_execution_simulation_report(&receipt_store, &request)?
     };
 
     if json_output {
@@ -1193,7 +1205,8 @@ pub(crate) fn cmd_trust_credit_bond_list(
                     .to_string(),
             )
         })?;
-        trust_control::list_credit_bonds(receipt_db_path, &query)?
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
+        trust_control::list_credit_bonds(&receipt_store, &query)?
     };
 
     if backend.json_output {

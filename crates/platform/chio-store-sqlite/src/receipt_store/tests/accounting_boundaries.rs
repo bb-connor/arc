@@ -54,7 +54,7 @@ fn cost_attribution_refuses_charged_and_attempted_overflow() -> TestResult {
 #[test]
 fn underwriting_refuses_premium_overflow_within_one_currency() -> TestResult {
     let (_directory, path) = temp_db("premium-overflow")?;
-    let mut store = SqliteReceiptStore::open(&path)?;
+    let store = SqliteReceiptStore::open(&path)?;
     // Each persisted INTEGER is representable; their report total is not.
     let largest_stored = i64::MAX as u64;
     for (index, units) in [largest_stored, largest_stored, 2].into_iter().enumerate() {

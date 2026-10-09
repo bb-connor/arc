@@ -28,7 +28,7 @@ fn replace_raw(store: &SqliteReceiptStore, table: &str, raw: &str) {
 #[test]
 fn signed_readback_underwriting_rejects_precision_alias_before_verification() {
     let (_directory, path) = temp_db("signed-underwriting-alias").test_unwrap();
-    let mut store = SqliteReceiptStore::open(&path).test_unwrap();
+    let store = SqliteReceiptStore::open(&path).test_unwrap();
     let decision = underwriting_fixture();
     store.record_underwriting_decision(&decision).test_unwrap();
     let raw = serde_json::to_string(&decision).test_unwrap();
@@ -47,7 +47,7 @@ fn signed_readback_underwriting_rejects_precision_alias_before_verification() {
 #[test]
 fn signed_readback_preserves_historical_encodings_and_full_width_premiums() {
     let (_directory, path) = temp_db("signed-underwriting-encoding").test_unwrap();
-    let mut store = SqliteReceiptStore::open(&path).test_unwrap();
+    let store = SqliteReceiptStore::open(&path).test_unwrap();
     let keypair = Keypair::from_seed(&[71; 32]);
     let original = underwriting_fixture();
     store.record_underwriting_decision(&original).test_unwrap();
@@ -73,7 +73,7 @@ fn signed_readback_preserves_historical_encodings_and_full_width_premiums() {
 #[test]
 fn signed_readback_reports_reject_changed_signed_bodies() {
     let (_directory, path) = temp_db("signed-report-tamper").test_unwrap();
-    let mut store = SqliteReceiptStore::open(&path).test_unwrap();
+    let store = SqliteReceiptStore::open(&path).test_unwrap();
     let mut decision = underwriting_fixture();
     store.record_underwriting_decision(&decision).test_unwrap();
     decision.body.premium.quoted_amount = Some(usd(999_999));
@@ -112,7 +112,7 @@ fn signed_readback_reports_reject_changed_signed_bodies() {
 #[test]
 fn signed_readback_provider_resolution_and_successor_reject_damaged_signature() {
     let (_directory, path) = temp_db("signed-provider-tamper").test_unwrap();
-    let mut store = SqliteReceiptStore::open(&path).test_unwrap();
+    let store = SqliteReceiptStore::open(&path).test_unwrap();
     let mut provider = signed_liability_provider(
         "provider-record",
         "carrier-alpha",
@@ -164,7 +164,7 @@ fn signed_readback_provider_resolution_and_successor_reject_damaged_signature() 
 #[test]
 fn signed_readback_quote_workflow_rejects_corrupt_persisted_predecessor() {
     let (_directory, path) = temp_db("signed-quote-tamper").test_unwrap();
-    let mut store = SqliteReceiptStore::open(&path).test_unwrap();
+    let store = SqliteReceiptStore::open(&path).test_unwrap();
     let provider = signed_liability_provider(
         "provider-record",
         "carrier-alpha",

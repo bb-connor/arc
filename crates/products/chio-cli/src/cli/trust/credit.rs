@@ -63,7 +63,8 @@ pub(crate) fn cmd_trust_credit_loss_lifecycle_evaluate(
                     .to_string(),
             )
         })?;
-        trust_control::build_credit_loss_lifecycle_report(receipt_db_path, &query)?
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
+        trust_control::build_credit_loss_lifecycle_report(&receipt_store, &query)?
     };
 
     if json_output {
@@ -151,8 +152,9 @@ pub(crate) fn cmd_trust_credit_loss_lifecycle_issue(
                     .to_string(),
             )
         })?;
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
         trust_control::issue_signed_credit_loss_lifecycle(
-            receipt_db_path,
+            &receipt_store,
             authority_seed_path,
             authority_db_path,
             &request,
@@ -206,7 +208,8 @@ pub(crate) fn cmd_trust_credit_loss_lifecycle_list(
                     .to_string(),
             )
         })?;
-        trust_control::list_credit_loss_lifecycle(receipt_db_path, &query)?
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
+        trust_control::list_credit_loss_lifecycle(&receipt_store, &query)?
     };
 
     if backend.json_output {
@@ -283,8 +286,9 @@ pub(crate) fn cmd_trust_credit_backtest_export(
             )
         })?;
         let trusted_kernel_keys = trusted_kernel_keys_from_authority(backend.authority_seed_path)?;
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
         trust_control::build_credit_backtest_report(
-            receipt_db_path,
+            &receipt_store,
             backend.budget_db_path,
             backend.certification_registry_file,
             None,
@@ -345,8 +349,9 @@ pub(crate) fn cmd_trust_provider_risk_package_export(
                     .to_string(),
             )
         })?;
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
         trust_control::build_signed_credit_provider_risk_package(
-            receipt_db_path,
+            &receipt_store,
             backend.budget_db_path,
             backend.authority_seed_path,
             backend.authority_db_path,

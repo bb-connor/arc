@@ -919,7 +919,7 @@ mod tests {
     use super::*;
     use std::collections::BTreeMap;
     use std::fs;
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
     use std::time::Duration;
 
     use chio_core::crypto::Keypair;
@@ -1136,11 +1136,10 @@ mod tests {
             fiscal_runtime: None,
             budget_store: None,
             revocation_store: None,
+            receipt_store: None,
             enterprise_provider_registry: None,
             verifier_policy_registry: None,
-            federation_admission_rate_limiter: Arc::new(Mutex::new(
-                FederationAdmissionRateLimiter::default(),
-            )),
+            federation_admission_rate_limiter: Arc::default(),
             cluster: None,
             cluster_progress: None,
             finding_rail: None,

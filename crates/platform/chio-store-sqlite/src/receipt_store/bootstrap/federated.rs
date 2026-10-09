@@ -116,7 +116,7 @@ fn persist_immutable_federated_lineage_bridge(
 
 impl SqliteReceiptStore {
     pub fn import_federated_evidence_share(
-        &mut self,
+        &self,
         import: &FederatedEvidenceShareImport,
     ) -> Result<FederatedEvidenceShareSummary, ReceiptStoreError> {
         let clock = self.clock.clone();
@@ -627,7 +627,7 @@ impl SqliteReceiptStore {
     }
 
     pub fn record_federated_lineage_bridge(
-        &mut self,
+        &self,
         local_capability_id: &str,
         parent_capability_id: &str,
         share_id: Option<&str>,
@@ -651,7 +651,7 @@ impl SqliteReceiptStore {
 
     /// Persist a federated issuance lineage as one all-or-nothing operation.
     pub fn persist_federated_delegation_lineage(
-        &mut self,
+        &self,
         anchor: &CapabilitySnapshot,
         upstream_bridge: Option<(&str, &str)>,
         child: &CapabilitySnapshot,

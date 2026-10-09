@@ -67,3 +67,65 @@ pub(crate) fn panic_during_append_batch(content_hash: &str) -> bool {
     content_hash == PANIC_DURING_APPEND_BATCH_MARKER_CONTENT_HASH
         && PANIC_DURING_APPEND_BATCH.load(Ordering::SeqCst)
 }
+
+type WriterJoin = (Option<String>, Option<String>);
+
+/// Receivers of `(releasing thread, joining thread)` names for every writer
+/// join, so a test can prove which thread joined a released writer.
+static WRITER_JOIN_OBSERVERS: std::sync::Mutex<Vec<std::sync::mpsc::Sender<WriterJoin>>> =
+    std::sync::Mutex::new(Vec::new());
+
+pub(crate) fn observe_writer_joins() -> std::sync::mpsc::Receiver<WriterJoin> {
+    let (sender, receiver) = std::sync::mpsc::channel();
+    if let Ok(mut observers) = WRITER_JOIN_OBSERVERS.lock() {
+        observers.push(sender);
+    }
+    receiver
+}
+
+pub(crate) fn observe_writer_join(releasing: Option<String>) {
+    let joining = std::thread::current().name().map(str::to_owned);
+    if let Ok(mut observers) = WRITER_JOIN_OBSERVERS.lock() {
+        observers.retain(|observer| observer.send((releasing.clone(), joining.clone())).is_ok());
+    }
+}
+
+/// A database whose path contains this marker fails its writer seed after
+/// opening, so a test can reach the poisoned-seed state the open-time audit
+/// would otherwise reject first.
+pub(crate) const FAIL_SEED_PATH_MARKER: &str = "chio-seed-failure-marker";
+
+/// A database whose path contains this marker holds its writer seed until
+/// `release_held_seeds`, so a test can observe a writer that is still seeding.
+pub(crate) const HOLD_SEED_PATH_MARKER: &str = "chio-seed-hold-marker";
+
+static SEEDS_RELEASED: (std::sync::Mutex<bool>, std::sync::Condvar) =
+    (std::sync::Mutex::new(false), std::sync::Condvar::new());
+
+pub(crate) fn release_held_seeds() {
+    if let Ok(mut released) = SEEDS_RELEASED.0.lock() {
+        *released = true;
+        SEEDS_RELEASED.1.notify_all();
+    }
+}
+
+pub(crate) fn fail_seed(
+    connection: &rusqlite::Connection,
+) -> Result<(), chio_kernel::ReceiptStoreError> {
+    let path = connection.path().unwrap_or_default();
+    if path.contains(HOLD_SEED_PATH_MARKER) {
+        if let Ok(released) = SEEDS_RELEASED.0.lock() {
+            let _ = SEEDS_RELEASED.1.wait_timeout_while(
+                released,
+                std::time::Duration::from_secs(60),
+                |released| !*released,
+            );
+        }
+    }
+    if path.contains(FAIL_SEED_PATH_MARKER) {
+        return Err(chio_kernel::ReceiptStoreError::Conflict(
+            "injected writer seed failure".to_string(),
+        ));
+    }
+    Ok(())
+}

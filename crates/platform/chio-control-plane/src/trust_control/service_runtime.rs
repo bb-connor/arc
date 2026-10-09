@@ -29,4 +29,6 @@ mod tests;
 
 use super::*;
 
+#[cfg(test)]
+pub(crate) use init::open_service_receipt_store;
 pub(crate) use init::serve_async;

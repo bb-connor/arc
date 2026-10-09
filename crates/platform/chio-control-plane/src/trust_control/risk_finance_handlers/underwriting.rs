@@ -10,18 +10,14 @@ pub(crate) async fn handle_underwriting_policy_input(
         return response;
     }
 
-    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
-        Some(path) => path,
+    let receipt_store = match state.receipt_store.as_deref() {
+        Some(store) => store,
         None => {
             return plain_http_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "trust service is missing receipt_db_path for underwriting input queries",
             );
         }
-    };
-    let receipt_store = match open_receipt_store(&state.config) {
-        Ok(store) => store,
-        Err(response) => return response,
     };
     let keypair = match load_behavioral_feed_signing_keypair(
         state.config.authority_seed_path.as_deref(),
@@ -35,8 +31,7 @@ pub(crate) async fn handle_underwriting_policy_input(
 
     let trusted_kernel_keys = vec![keypair.public_key().to_hex()];
     match build_underwriting_policy_input(
-        &receipt_store,
-        receipt_db_path,
+        receipt_store,
         state.config.budget_db_path.as_deref(),
         state.config.certification_registry_file.as_deref(),
         &query,
@@ -65,18 +60,14 @@ pub(crate) async fn handle_underwriting_decision_report(
         Err(response) => return response,
     };
 
-    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
-        Some(path) => path,
+    let receipt_store = match state.receipt_store.as_deref() {
+        Some(store) => store,
         None => {
             return plain_http_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "trust service is missing receipt_db_path for underwriting decision queries",
             );
         }
-    };
-    let receipt_store = match open_receipt_store(&state.config) {
-        Ok(store) => store,
-        Err(response) => return response,
     };
 
     let trusted_kernel_keys = match trusted_kernel_keys_from_service_config(&state.config) {
@@ -91,8 +82,7 @@ pub(crate) async fn handle_underwriting_decision_report(
         }
     };
     match build_underwriting_decision_report_from_store(
-        &receipt_store,
-        receipt_db_path,
+        receipt_store,
         state.config.budget_db_path.as_deref(),
         state.config.certification_registry_file.as_deref(),
         &query,
@@ -118,18 +108,14 @@ pub(crate) async fn handle_underwriting_simulation_report(
         Err(response) => return response,
     };
 
-    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
-        Some(path) => path,
+    let receipt_store = match state.receipt_store.as_deref() {
+        Some(store) => store,
         None => {
             return plain_http_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "trust service is missing receipt_db_path for underwriting simulation queries",
             );
         }
-    };
-    let receipt_store = match open_receipt_store(&state.config) {
-        Ok(store) => store,
-        Err(response) => return response,
     };
 
     let trusted_kernel_keys = match trusted_kernel_keys_from_service_config(&state.config) {
@@ -144,8 +130,7 @@ pub(crate) async fn handle_underwriting_simulation_report(
         }
     };
     match build_underwriting_simulation_report_from_store(
-        &receipt_store,
-        receipt_db_path,
+        receipt_store,
         state.config.budget_db_path.as_deref(),
         state.config.certification_registry_file.as_deref(),
         &request,
@@ -166,7 +151,7 @@ pub(crate) async fn handle_query_underwriting_decisions(
         return response;
     }
 
-    let receipt_store = match open_receipt_store(&state.config) {
+    let receipt_store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -197,8 +182,8 @@ pub(crate) async fn handle_issue_underwriting_decision(
         }
     }
 
-    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
-        Some(path) => path,
+    let receipt_store = match state.receipt_store.as_deref() {
+        Some(store) => store,
         None => {
             return plain_http_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -208,7 +193,7 @@ pub(crate) async fn handle_issue_underwriting_decision(
     };
 
     match issue_signed_underwriting_decision_detailed(
-        receipt_db_path,
+        receipt_store,
         state.config.budget_db_path.as_deref(),
         state.config.authority_seed_path.as_deref(),
         state.config.authority_db_path.as_deref(),
@@ -232,7 +217,7 @@ pub(crate) async fn handle_create_underwriting_appeal(
         return response;
     }
 
-    let mut receipt_store = match open_receipt_store(&state.config) {
+    let receipt_store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -257,7 +242,7 @@ pub(crate) async fn handle_resolve_underwriting_appeal(
         return response;
     }
 
-    let mut receipt_store = match open_receipt_store(&state.config) {
+    let receipt_store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };

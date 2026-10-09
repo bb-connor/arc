@@ -1100,7 +1100,7 @@ pub fn cmd_evidence_import(
             ));
         }
         (Some(receipt_db), None) => {
-            let mut store = SqliteReceiptStore::open(receipt_db)?;
+            let store = SqliteReceiptStore::open(receipt_db)?;
             store.import_federated_evidence_share(&share_import)?
         }
         (None, Some(control_url)) => {

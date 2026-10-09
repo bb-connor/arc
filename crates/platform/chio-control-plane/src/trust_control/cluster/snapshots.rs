@@ -65,17 +65,15 @@ pub(crate) async fn handle_internal_authority_snapshot(
 pub(crate) fn cluster_replication_heads(
     state: &TrustServiceState,
 ) -> Result<ClusterReplicationHeadsView, CliError> {
-    let (tool_seq, child_seq, lineage_seq) =
-        if let Some(path) = state.config.receipt_db_path.as_deref() {
-            let store = SqliteReceiptStore::open(path)?;
-            (
-                store.max_tool_receipt_seq()?,
-                store.max_child_receipt_seq()?,
-                store.max_lineage_seq()?,
-            )
-        } else {
-            (0, 0, 0)
-        };
+    let (tool_seq, child_seq, lineage_seq) = if let Some(store) = state.receipt_store.as_deref() {
+        (
+            store.max_tool_receipt_seq()?,
+            store.max_child_receipt_seq()?,
+            store.max_lineage_seq()?,
+        )
+    } else {
+        (0, 0, 0)
+    };
     let budget_seq = match state
         .optional_budget_store()
         .map_err(|error| CliError::cli_other_error(error.to_string()))?
@@ -163,13 +161,12 @@ pub(crate) fn build_cluster_state_snapshot(
     } = revocation_export;
 
     let (tool_receipts, child_receipts, lineage) =
-        if let Some(path) = state.config.receipt_db_path.as_deref() {
-            let store = SqliteReceiptStore::open(path)?;
+        if let Some(store) = state.receipt_store.as_deref() {
             let read_context = ReceiptReadContext::admin_service();
             (
-                collect_tool_receipt_views(&store, &read_context)?,
-                collect_child_receipt_views(&store, &read_context)?,
-                collect_lineage_views(&store)?,
+                collect_tool_receipt_views(store, &read_context)?,
+                collect_child_receipt_views(store, &read_context)?,
+                collect_lineage_views(store)?,
             )
         } else {
             (Vec::new(), Vec::new(), Vec::new())
@@ -364,8 +361,7 @@ pub(crate) fn recover_cluster_snapshot(
         }
     }
 
-    if let Some(path) = state.config.receipt_db_path.as_deref() {
-        let mut store = SqliteReceiptStore::open(path)?;
+    if let Some(store) = state.receipt_store.as_deref() {
         for record in &tool_receipts {
             let receipt: ChioReceipt = serde_json::from_value(record.receipt.clone())?;
             store.append_chio_receipt(&receipt)?;

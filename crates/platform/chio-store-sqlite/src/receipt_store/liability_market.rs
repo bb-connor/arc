@@ -2,7 +2,7 @@ use super::*;
 
 impl SqliteReceiptStore {
     pub fn record_liability_provider(
-        &mut self,
+        &self,
         provider: &SignedLiabilityProvider,
     ) -> Result<(), ReceiptStoreError> {
         if !provider
@@ -272,7 +272,7 @@ impl SqliteReceiptStore {
     }
 
     pub fn record_liability_quote_request(
-        &mut self,
+        &self,
         request: &SignedLiabilityQuoteRequest,
     ) -> Result<(), ReceiptStoreError> {
         if !request
@@ -379,7 +379,7 @@ impl SqliteReceiptStore {
     }
 
     pub fn record_liability_quote_response(
-        &mut self,
+        &self,
         response: &SignedLiabilityQuoteResponse,
     ) -> Result<(), ReceiptStoreError> {
         if !response
@@ -526,7 +526,7 @@ impl SqliteReceiptStore {
     }
 
     pub fn record_liability_placement(
-        &mut self,
+        &self,
         placement: &SignedLiabilityPlacement,
     ) -> Result<(), ReceiptStoreError> {
         if !placement
@@ -689,7 +689,7 @@ impl SqliteReceiptStore {
     }
 
     pub fn record_liability_pricing_authority(
-        &mut self,
+        &self,
         authority: &SignedLiabilityPricingAuthority,
     ) -> Result<(), ReceiptStoreError> {
         if !authority
@@ -789,7 +789,7 @@ impl SqliteReceiptStore {
     }
 
     pub fn record_liability_bound_coverage(
-        &mut self,
+        &self,
         coverage: &SignedLiabilityBoundCoverage,
     ) -> Result<(), ReceiptStoreError> {
         if !coverage
@@ -908,7 +908,7 @@ impl SqliteReceiptStore {
     }
 
     pub fn record_liability_auto_bind_decision(
-        &mut self,
+        &self,
         decision: &SignedLiabilityAutoBindDecision,
     ) -> Result<(), ReceiptStoreError> {
         if !decision

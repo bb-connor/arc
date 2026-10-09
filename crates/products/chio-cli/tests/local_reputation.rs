@@ -292,7 +292,7 @@ fn import_federated_reputation_share(
     let delegate_token = CapabilityToken::sign(delegate_body, subject_keypair)
         .expect("sign imported delegated capability");
 
-    let mut store = SqliteReceiptStore::open(receipt_db_path).expect("open receipt store");
+    let store = SqliteReceiptStore::open(receipt_db_path).expect("open receipt store");
     store
         .import_federated_evidence_share(&FederatedEvidenceShareImport {
             share_id: share_id.to_string(),

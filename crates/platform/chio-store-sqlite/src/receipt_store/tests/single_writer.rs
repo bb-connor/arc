@@ -345,6 +345,7 @@ fn disconnected_writer_routes_preserve_supervisor_context() -> Result<(), Box<dy
     supervisor_health.record_failure("writer restart failed: disk full", 1, 1);
     let worker = Arc::new(ReceiptCommitWorker {
         join: Some(SupervisedReceiptWriter {
+            join_on_reaper: AtomicBool::new(false),
             supervisor: None,
             health: supervisor_health,
             thread_id: Arc::new(OnceLock::new()),
@@ -403,6 +404,7 @@ fn accepted_flush_samples_supervisor_failure_after_response_loss(
     let receiver_health = supervisor_health.clone();
     let worker = Arc::new(ReceiptCommitWorker {
         join: Some(SupervisedReceiptWriter {
+            join_on_reaper: AtomicBool::new(false),
             supervisor: None,
             health: supervisor_health,
             thread_id: Arc::new(OnceLock::new()),
@@ -816,4 +818,136 @@ fn wait_until(predicate: impl Fn() -> bool) -> bool {
         std::thread::sleep(std::time::Duration::from_millis(1));
     }
     predicate()
+}
+
+/// Wait for the writer join released by `releasing`, ignoring joins from
+/// stores other tests release concurrently.
+fn joining_thread_for(
+    joins: &mpsc::Receiver<(Option<String>, Option<String>)>,
+    releasing: &str,
+) -> Result<Option<String>, Box<dyn std::error::Error>> {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+    loop {
+        let wait = deadline.saturating_duration_since(std::time::Instant::now());
+        let (released_by, joined_on) = joins.recv_timeout(wait)?;
+        if released_by.as_deref() == Some(releasing) {
+            return Ok(joined_on);
+        }
+    }
+}
+
+fn release_on_thread(
+    store: SqliteReceiptStore,
+    name: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    std::thread::Builder::new()
+        .name(name.to_string())
+        .spawn(move || drop(store))?
+        .join()
+        .map_err(|_| "release thread panicked")?;
+    Ok(())
+}
+
+#[test]
+fn a_reaper_store_never_joins_its_writer_on_the_releasing_thread(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let joins = test_hooks::observe_writer_joins();
+    let (_unshared_directory, unshared_path) = temp_db("chio-writer-inline-join-")?;
+    let unshared = SqliteReceiptStore::open(&unshared_path)?;
+    unshared.flush_receipt_writes()?;
+    assert!(!unshared.writer_joins_on_reaper());
+    release_on_thread(unshared, "unshared-store-last-owner")?;
+    assert_eq!(
+        joining_thread_for(&joins, "unshared-store-last-owner")?.as_deref(),
+        Some("unshared-store-last-owner")
+    );
+
+    let (_shared_directory, shared_path) = temp_db("chio-writer-reaper-join-")?;
+    let shared = SqliteReceiptStore::open(&shared_path)?;
+    shared.flush_receipt_writes()?;
+    shared.join_writer_on_reaper();
+    assert!(shared.writer_joins_on_reaper());
+    release_on_thread(shared, "shared-store-last-owner")?;
+    assert_eq!(
+        joining_thread_for(&joins, "shared-store-last-owner")?.as_deref(),
+        Some("chio-receipt-writer-reaper")
+    );
+    Ok(())
+}
+
+#[test]
+fn writer_seed_wait_separates_a_failed_seed_from_a_ready_writer(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let (_failed_directory, failed_path) = temp_db(test_hooks::FAIL_SEED_PATH_MARKER)?;
+    let failed = SqliteReceiptStore::open(&failed_path)?;
+    match failed.wait_for_writer_seed(std::time::Duration::from_secs(30)) {
+        Err(ReceiptStoreError::Conflict(message)) => {
+            assert!(
+                message.contains("injected writer seed failure"),
+                "{message}"
+            );
+        }
+        other => return Err(format!("a failed seed must not report {other:?}").into()),
+    }
+    match failed.wait_for_writer_seed(std::time::Duration::ZERO) {
+        Err(ReceiptStoreError::Conflict(_)) => {}
+        other => return Err(format!("a settled failed seed must not report {other:?}").into()),
+    }
+
+    let (_ready_directory, ready_path) = temp_db("chio-seed-ready-")?;
+    let ready = SqliteReceiptStore::open(&ready_path)?;
+    assert!(ready.wait_for_writer_seed(std::time::Duration::from_secs(30))?);
+    Ok(())
+}
+
+#[test]
+fn writer_seed_wait_reports_a_held_seed_as_still_seeding_without_a_cutoff(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let (_directory, path) = temp_db(test_hooks::HOLD_SEED_PATH_MARKER)?;
+    let store = SqliteReceiptStore::open(&path)?;
+    // Probes while the seed runs report Seeding and queue no writer command,
+    // however often a host polls.
+    for _ in 0..=RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY {
+        assert!(!store.wait_for_writer_seed(std::time::Duration::ZERO)?);
+    }
+    assert_eq!(store.receipt_commit_actor.writer_counters().queue_depth, 0);
+    test_hooks::release_held_seeds();
+    assert!(store.wait_for_writer_seed(std::time::Duration::from_secs(30))?);
+    Ok(())
+}
+
+#[test]
+fn a_reaper_store_released_by_an_abandoned_async_task_never_joins_on_the_worker(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let joins = test_hooks::observe_writer_joins();
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .thread_name("abandoned-task-worker")
+        .enable_time()
+        .build()?;
+    let (_directory, path) = temp_db("chio-writer-abandoned-task-")?;
+    let store = Arc::new(SqliteReceiptStore::open(&path)?);
+    store.flush_receipt_writes()?;
+    store.join_writer_on_reaper();
+    let (release, released) = tokio::sync::oneshot::channel::<()>();
+    let task_store = Arc::clone(&store);
+    runtime.block_on(async move {
+        let task = tokio::spawn(async move {
+            let _ = released.await;
+            drop(task_store);
+        });
+        // The owner's join budget expires: the handle is dropped, the task
+        // keeps running and now outlives the owner's own handle.
+        let _ = tokio::time::timeout(std::time::Duration::from_millis(10), task).await;
+    });
+    drop(store);
+    release
+        .send(())
+        .map_err(|()| "abandoned task stopped early")?;
+    assert_eq!(
+        joining_thread_for(&joins, "abandoned-task-worker")?.as_deref(),
+        Some("chio-receipt-writer-reaper")
+    );
+    drop(runtime);
+    Ok(())
 }

@@ -85,7 +85,7 @@ fn test_shared_evidence_reporting_surfaces() {
     );
 
     {
-        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
+        let store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         store
             .import_federated_evidence_share(&FederatedEvidenceShareImport {
                 share_id: "share-cross-org".to_string(),

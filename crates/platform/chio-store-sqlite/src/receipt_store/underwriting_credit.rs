@@ -2,7 +2,7 @@ use super::*;
 
 impl SqliteReceiptStore {
     pub fn record_underwriting_decision(
-        &mut self,
+        &self,
         decision: &SignedUnderwritingDecision,
     ) -> Result<(), ReceiptStoreError> {
         if !decision
@@ -112,7 +112,7 @@ impl SqliteReceiptStore {
     }
 
     pub fn create_underwriting_appeal(
-        &mut self,
+        &self,
         request: &UnderwritingAppealCreateRequest,
     ) -> Result<UnderwritingAppealRecord, ReceiptStoreError> {
         let request_owned = request.clone();
@@ -200,7 +200,7 @@ impl SqliteReceiptStore {
     }
 
     pub fn resolve_underwriting_appeal(
-        &mut self,
+        &self,
         request: &UnderwritingAppealResolveRequest,
     ) -> Result<UnderwritingAppealRecord, ReceiptStoreError> {
         let request_owned = request.clone();
@@ -401,7 +401,7 @@ impl SqliteReceiptStore {
     }
 
     pub fn record_credit_facility(
-        &mut self,
+        &self,
         facility: &SignedCreditFacility,
     ) -> Result<(), ReceiptStoreError> {
         if !facility
@@ -592,7 +592,7 @@ impl SqliteReceiptStore {
         })
     }
 
-    pub fn record_credit_bond(&mut self, bond: &SignedCreditBond) -> Result<(), ReceiptStoreError> {
+    pub fn record_credit_bond(&self, bond: &SignedCreditBond) -> Result<(), ReceiptStoreError> {
         if !bond
             .verify_signature()
             .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?
@@ -783,7 +783,7 @@ impl SqliteReceiptStore {
     }
 
     pub fn record_credit_loss_lifecycle(
-        &mut self,
+        &self,
         event: &SignedCreditLossLifecycle,
     ) -> Result<(), ReceiptStoreError> {
         if !event

@@ -318,9 +318,10 @@ async fn ingress_unsigned_simulation_accepts_ordinary_decimals_and_rejects_dupli
 ) -> Result<(), Box<dyn std::error::Error>> {
     let temp = tempfile::tempdir()?;
     let path = temp.path().join("receipts.sqlite3");
-    drop(SqliteReceiptStore::open(&path)?);
+    let store = Arc::new(SqliteReceiptStore::open(&path)?);
     let mut state = metrics_state("service-secret");
     state.config.receipt_db_path = Some(path);
+    state.receipt_store = Some(store);
     let router = super::super::build_router(state);
     let request = UnderwritingSimulationRequest {
         query: UnderwritingPolicyInputQuery {

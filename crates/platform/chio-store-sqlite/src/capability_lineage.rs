@@ -405,7 +405,7 @@ impl SqliteReceiptStore {
     /// This is used by cluster replication so followers can converge on the
     /// leader's lineage table without reconstructing full signed tokens.
     pub fn upsert_capability_snapshot(
-        &mut self,
+        &self,
         snapshot: &CapabilitySnapshot,
     ) -> Result<(), CapabilityLineageError> {
         validate_snapshot_for_transport(snapshot)?;

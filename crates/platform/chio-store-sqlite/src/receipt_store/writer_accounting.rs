@@ -27,9 +27,33 @@ impl ReceiptCommitWriterHealth {
             // and run a tool before the first append could reject. The seed path
             // clears this the moment it succeeds.
             head_poisoned: AtomicBool::new(true),
+            seed_settled: Mutex::new(false),
+            seed_settled_changed: Condvar::new(),
             critical_write_poisoned: AtomicBool::new(false),
             accounting_poisoned: AtomicBool::new(false),
         }
+    }
+}
+
+impl ReceiptCommitWriterHealth {
+    pub(super) fn set_seed_settled(&self, settled: bool) {
+        if let Ok(mut current) = self.seed_settled.lock() {
+            *current = settled;
+            self.seed_settled_changed.notify_all();
+        }
+    }
+
+    /// Wait up to `wait` for this run's seed to settle.
+    pub(super) fn wait_seed_settled(&self, wait: Duration) -> bool {
+        self.seed_settled
+            .lock()
+            .ok()
+            .and_then(|settled| {
+                self.seed_settled_changed
+                    .wait_timeout_while(settled, wait, |settled| !*settled)
+                    .ok()
+            })
+            .is_some_and(|(settled, _)| *settled)
     }
 }
 

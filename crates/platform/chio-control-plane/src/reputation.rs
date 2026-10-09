@@ -112,7 +112,7 @@ pub fn cmd_reputation_local(command: ReputationLocalCommand<'_>) -> Result<(), C
     if control_url.is_none() {
         let receipt_db_path = require_receipt_db_path(receipt_db_path)?;
         inspection.imported_trust = Some(build_imported_trust_report(
-            receipt_db_path,
+            &SqliteReceiptStore::open(receipt_db_path)?,
             &inspection.subject_key,
             inspection.since,
             inspection.until,
@@ -267,7 +267,7 @@ pub fn cmd_reputation_compare(command: ReputationCompareCommand<'_>) -> Result<(
         let imported_trust = {
             let receipt_db_path = require_receipt_db_path(receipt_db_path)?;
             build_imported_trust_report(
-                receipt_db_path,
+                &SqliteReceiptStore::open(receipt_db_path)?,
                 &local.subject_key,
                 local.since,
                 local.until,
@@ -386,7 +386,7 @@ pub(crate) fn build_reputation_comparison(
 }
 
 pub(crate) fn build_imported_trust_report(
-    receipt_db_path: &Path,
+    store: &SqliteReceiptStore,
     subject_key: &str,
     since: Option<u64>,
     until: Option<u64>,
@@ -394,7 +394,6 @@ pub(crate) fn build_imported_trust_report(
     scoring: &chio_reputation::ReputationConfig,
 ) -> Result<issuance::ImportedTrustReport, CliError> {
     let policy = ImportedTrustPolicy::default();
-    let store = SqliteReceiptStore::open(receipt_db_path)?;
     let signals = store
         .list_federated_share_subject_corpora(subject_key, since, until)?
         .into_iter()
@@ -439,7 +438,7 @@ pub(crate) fn build_imported_trust_report(
 }
 
 pub(crate) fn build_behavioral_feed_reputation_summary(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     budget_db_path: Option<&Path>,
     subject_key: &str,
     since: Option<u64>,
@@ -447,17 +446,18 @@ pub(crate) fn build_behavioral_feed_reputation_summary(
     now: u64,
     trusted_kernel_keys: &[String],
 ) -> Result<BehavioralFeedReputationSummary, CliError> {
-    let inspection = issuance::inspect_local_reputation(
+    let inspection = issuance::inspect_local_reputation_with_store(
         subject_key,
-        Some(receipt_db_path),
+        receipt_store,
         budget_db_path,
         since,
         until,
         None,
         trusted_kernel_keys,
+        &chio_kernel::ReceiptReadContext::local_operator_admin_all(),
     )?;
     let imported_trust = build_imported_trust_report(
-        receipt_db_path,
+        receipt_store,
         &inspection.subject_key,
         inspection.since,
         inspection.until,

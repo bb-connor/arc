@@ -2,8 +2,10 @@
 
 use super::cluster_join_budget;
 use super::{
-    open_configured_joint_authority_store, validate_finding_purchase_runtime_dependencies,
-    validate_injected_joint_authority_store, SqliteAuthorityStore, TrustServiceConfig,
+    await_receipt_writer, await_receipt_writer_seed, open_configured_joint_authority_store,
+    open_service_receipt_store, validate_finding_purchase_runtime_dependencies,
+    validate_injected_joint_authority_store, ReceiptWriterStartup, SqliteAuthorityStore,
+    SqliteReceiptStore, TrustServiceConfig,
 };
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -220,5 +222,123 @@ fn configured_joint_authority_hardens_an_existing_lock_root(
         "startup must remove group and other access before provisioning"
     );
     drop(store);
+    Ok(())
+}
+
+fn signed_receipt(
+    keypair: &chio_core::crypto::Keypair,
+    index: usize,
+) -> Result<chio_core::receipt::body::ChioReceipt, Box<dyn std::error::Error>> {
+    use chio_core::receipt::body::{ChioReceipt, ChioReceiptBody};
+    use chio_core::receipt::decision::{Decision, ToolCallAction};
+    Ok(ChioReceipt::sign(
+        ChioReceiptBody {
+            id: format!("startup-receipt-{index}"),
+            timestamp: 100,
+            capability_id: "startup-capability".to_string(),
+            tool_server: "startup-server".to_string(),
+            tool_name: "startup-tool".to_string(),
+            action: ToolCallAction::from_parameters(serde_json::json!({ "index": index }))?,
+            decision: Some(Decision::Allow),
+            receipt_kind: Default::default(),
+            boundary_class: Default::default(),
+            observation_outcome: None,
+            tool_origin: Default::default(),
+            redaction_mode: Default::default(),
+            actor_chain: Vec::new(),
+            content_hash: format!("content-{index}"),
+            policy_hash: "startup-policy".to_string(),
+            evidence: Vec::new(),
+            metadata: None,
+            trust_level: chio_core::receipt::kinds::TrustLevel::default(),
+            tenant_id: None,
+            kernel_key: keypair.public_key(),
+            bbs_projection_version: None,
+        },
+        keypair,
+    )?)
+}
+
+/// Persist `receipts` signed receipts under checkpoints of ten.
+fn checkpointed_history(path: &Path, receipts: usize) -> Result<(), Box<dyn std::error::Error>> {
+    use chio_kernel::ReceiptStore;
+    let keypair = std::sync::Arc::new(chio_core::crypto::Keypair::generate());
+    let store = SqliteReceiptStore::open(path)?;
+    store.enable_background_checkpoints(chio_store_sqlite::BackgroundCheckpointSigner {
+        keypair: std::sync::Arc::clone(&keypair),
+        max_batch: 10,
+    })?;
+    for index in 0..receipts {
+        store.append_chio_receipt(&signed_receipt(&keypair, index)?)?;
+    }
+    store.flush_receipt_writes()?;
+    Ok(())
+}
+
+#[test]
+fn startup_refuses_a_receipt_history_that_fails_verification(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let temp = chio_test_support::private_tempdir()?;
+    let database = temp.path().join("receipts.sqlite3");
+    checkpointed_history(&database, 20)?;
+    let tamper = rusqlite::Connection::open(&database)?;
+    let triggers = tamper
+        .prepare(
+            "SELECT name FROM sqlite_master
+             WHERE type = 'trigger' AND tbl_name = 'checkpoint_tree_heads'",
+        )?
+        .query_map([], |row| row.get::<_, String>(0))?
+        .collect::<Result<Vec<_>, _>>()?;
+    for trigger in triggers {
+        tamper.execute_batch(&format!("DROP TRIGGER \"{trigger}\""))?;
+    }
+    // The interior checkpoint's tree-head projection no longer mirrors its
+    // signed row.
+    assert_eq!(
+        tamper.execute(
+            "UPDATE checkpoint_tree_heads SET issued_at = issued_at + 1 WHERE checkpoint_seq = 1",
+            [],
+        )?,
+        1
+    );
+    drop(tamper);
+
+    let error = match open_service_receipt_store(Some(&database)) {
+        Ok(_) => panic!("a receipt history that fails verification must refuse startup"),
+        Err(error) => error.to_string(),
+    };
+    assert!(
+        error.contains("trust-control receipt store")
+            && error.contains("tree head projection for checkpoint 1 diverges"),
+        "{error}"
+    );
+    Ok(())
+}
+
+#[test]
+fn startup_serves_while_its_one_writer_still_verifies_a_healthy_history(
+) -> Result<(), Box<dyn std::error::Error>> {
+    assert!(open_service_receipt_store(None)?.is_none());
+    let temp = chio_test_support::private_tempdir()?;
+    let database = temp.path().join("receipts.sqlite3");
+    checkpointed_history(&database, 200)?;
+
+    // A writer probed before its seed finishes is never a startup failure; the
+    // store crate holds a seed to prove the Seeding state deterministically.
+    let store = SqliteReceiptStore::open(&database)?;
+    assert!(matches!(
+        await_receipt_writer(&store, Duration::ZERO)?,
+        ReceiptWriterStartup::Seeding | ReceiptWriterStartup::Ready
+    ));
+    // The same writer finishes its seed; nothing reopened or reseeded it, and
+    // polling far more often than the seed takes is never a cutoff.
+    await_receipt_writer_seed(&store, Duration::from_millis(1))?;
+    assert_eq!(
+        await_receipt_writer(&store, Duration::from_secs(30))?,
+        ReceiptWriterStartup::Ready
+    );
+
+    let shared = open_service_receipt_store(Some(&database))?.ok_or("store was not opened")?;
+    assert!(shared.writer_joins_on_reaper());
     Ok(())
 }

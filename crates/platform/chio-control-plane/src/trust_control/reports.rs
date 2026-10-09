@@ -101,26 +101,20 @@ pub(crate) fn build_comptroller_surface_report(
 }
 
 pub fn build_signed_behavioral_feed(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     budget_db_path: Option<&Path>,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     query: &BehavioralFeedQuery,
 ) -> Result<SignedBehavioralFeed, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     // Load the signing keypair up front so its public key anchors the
     // reputation scoring trust set (chio-reputation::receipt_integrity_valid
     // fails closed on an empty set).
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
     let trusted_kernel_keys = vec![keypair.public_key().to_hex()];
-    let report = build_behavioral_feed_report(
-        &receipt_store,
-        receipt_db_path,
-        budget_db_path,
-        query,
-        &trusted_kernel_keys,
-    )
-    .map_err(|response| CliError::cli_other_error(response_status_text(&response)))?;
+    let report =
+        build_behavioral_feed_report(receipt_store, budget_db_path, query, &trusted_kernel_keys)
+            .map_err(|response| CliError::cli_other_error(response_status_text(&response)))?;
     SignedBehavioralFeed::sign(report, &keypair).map_err(Into::into)
 }
 
@@ -219,7 +213,6 @@ pub fn build_runtime_attestation_appraisal_import_report(
 
 fn build_behavioral_feed_report(
     receipt_store: &SqliteReceiptStore,
-    receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
     query: &BehavioralFeedQuery,
     trusted_kernel_keys: &[String],
@@ -244,7 +237,7 @@ fn build_behavioral_feed_report(
     let reputation = match normalized_query.agent_subject.as_deref() {
         Some(subject_key) => Some(
             reputation::build_behavioral_feed_reputation_summary(
-                receipt_db_path,
+                receipt_store,
                 budget_db_path,
                 subject_key,
                 normalized_query.since,
@@ -301,13 +294,12 @@ pub fn build_signed_comptroller_surface_report(
 }
 
 pub fn build_signed_exposure_ledger_report(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     query: &ExposureLedgerQuery,
 ) -> Result<SignedExposureLedgerReport, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
-    let report = build_exposure_ledger_report(&receipt_store, query).map_err(CliError::from)?;
+    let report = build_exposure_ledger_report(receipt_store, query).map_err(CliError::from)?;
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
     SignedExposureLedgerReport::sign(report, &keypair).map_err(Into::into)
 }
@@ -492,20 +484,18 @@ pub(crate) fn build_exposure_ledger_report_with_context(
 }
 
 pub fn build_signed_credit_scorecard_report(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     budget_db_path: Option<&Path>,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     query: &ExposureLedgerQuery,
 ) -> Result<SignedCreditScorecardReport, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     // Load the signing keypair up front so its public key anchors the
     // reputation scoring trust set.
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
     let trusted_kernel_keys = vec![keypair.public_key().to_hex()];
     let report = build_credit_scorecard_report(
-        &receipt_store,
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         None,
         query,
@@ -516,26 +506,25 @@ pub fn build_signed_credit_scorecard_report(
 }
 
 pub fn build_signed_capital_book_report(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     query: &CapitalBookQuery,
 ) -> Result<SignedCapitalBookReport, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     let report =
-        build_capital_book_report_from_store(&receipt_store, query).map_err(CliError::from)?;
+        build_capital_book_report_from_store(receipt_store, query).map_err(CliError::from)?;
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
     SignedCapitalBookReport::sign(report, &keypair).map_err(Into::into)
 }
 
 pub fn issue_signed_capital_execution_instruction(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     request: &CapitalExecutionInstructionRequest,
 ) -> Result<SignedCapitalExecutionInstruction, CliError> {
     issue_signed_capital_execution_instruction_detailed(
-        receipt_db_path,
+        receipt_store,
         authority_seed_path,
         authority_db_path,
         request,
@@ -544,21 +533,19 @@ pub fn issue_signed_capital_execution_instruction(
 }
 
 pub(crate) fn issue_signed_capital_execution_instruction_detailed(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     request: &CapitalExecutionInstructionRequest,
 ) -> Result<SignedCapitalExecutionInstruction, TrustHttpError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
-    let artifact =
-        build_capital_execution_instruction_artifact_from_store(&receipt_store, request)?;
+    let artifact = build_capital_execution_instruction_artifact_from_store(receipt_store, request)?;
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
     SignedCapitalExecutionInstruction::sign(artifact, &keypair)
         .map_err(|error| TrustHttpError::internal(error.to_string()))
 }
 
 pub fn issue_signed_capital_allocation_decision(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     budget_db_path: Option<&Path>,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
@@ -566,7 +553,7 @@ pub fn issue_signed_capital_allocation_decision(
     request: &CapitalAllocationDecisionRequest,
 ) -> Result<SignedCapitalAllocationDecision, CliError> {
     issue_signed_capital_allocation_decision_detailed(
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         authority_seed_path,
         authority_db_path,
@@ -577,22 +564,20 @@ pub fn issue_signed_capital_allocation_decision(
 }
 
 pub(crate) fn issue_signed_capital_allocation_decision_detailed(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     budget_db_path: Option<&Path>,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     request: &CapitalAllocationDecisionRequest,
 ) -> Result<SignedCapitalAllocationDecision, TrustHttpError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     // Load the signing keypair up front so its public key anchors the
     // reputation scoring trust set, then reuse it to sign the artifact.
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)
         .map_err(|error| TrustHttpError::internal(error.to_string()))?;
     let trusted_kernel_keys = vec![keypair.public_key().to_hex()];
     let artifact = build_capital_allocation_decision_artifact_from_store(
-        &receipt_store,
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         certification_registry_file,
         request,
@@ -608,7 +593,6 @@ pub(crate) fn issue_signed_capital_allocation_decision_detailed(
 )]
 fn build_capital_allocation_decision_artifact_from_store(
     receipt_store: &SqliteReceiptStore,
-    receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     request: &CapitalAllocationDecisionRequest,
@@ -673,7 +657,6 @@ fn build_capital_allocation_decision_artifact_from_store(
     let fallback_facility_report = if active_facility.is_none() {
         Some(build_credit_facility_report_from_store(
             receipt_store,
-            receipt_db_path,
             budget_db_path,
             certification_registry_file,
             None,

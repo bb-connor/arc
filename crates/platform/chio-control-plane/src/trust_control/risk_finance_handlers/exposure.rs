@@ -14,7 +14,7 @@ pub(crate) async fn handle_exposure_ledger_report(
         Err(response) => return response,
     };
 
-    let receipt_store = match open_receipt_store(&state.config) {
+    let receipt_store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };

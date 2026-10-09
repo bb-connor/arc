@@ -243,7 +243,7 @@ pub(crate) async fn handle_scim_delete_user(
             }
         }
     }
-    let receipt_store = match open_receipt_store(&state.config) {
+    let receipt_store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };

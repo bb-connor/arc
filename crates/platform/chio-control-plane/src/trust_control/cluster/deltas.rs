@@ -124,7 +124,7 @@ pub(crate) async fn handle_internal_tool_receipts_delta(
     {
         return response;
     }
-    let store = match open_receipt_store(&state.config) {
+    let store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -158,7 +158,7 @@ pub(crate) async fn handle_internal_child_receipts_delta(
     {
         return response;
     }
-    let store = match open_receipt_store(&state.config) {
+    let store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -272,7 +272,7 @@ pub(crate) async fn handle_internal_lineage_delta(
     {
         return response;
     }
-    let store = match open_receipt_store(&state.config) {
+    let store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -853,10 +853,9 @@ fn sync_peer_tool_receipts(
     peer_url: &str,
     round: &mut PullRoundBudget,
 ) -> Result<u64, PullError> {
-    let Some(path) = state.config.receipt_db_path.as_deref() else {
+    let Some(store) = state.receipt_store.as_deref() else {
         return Ok(0);
     };
-    let store = SqliteReceiptStore::open(path).map_err(CliError::from)?;
     let mut applied = 0u64;
     loop {
         if round.is_exhausted() {
@@ -911,10 +910,9 @@ fn sync_peer_child_receipts(
     peer_url: &str,
     round: &mut PullRoundBudget,
 ) -> Result<u64, PullError> {
-    let Some(path) = state.config.receipt_db_path.as_deref() else {
+    let Some(store) = state.receipt_store.as_deref() else {
         return Ok(0);
     };
-    let store = SqliteReceiptStore::open(path).map_err(CliError::from)?;
     let mut applied = 0u64;
     loop {
         if round.is_exhausted() {
@@ -1306,10 +1304,9 @@ fn sync_peer_lineage(
     peer_url: &str,
     round: &mut PullRoundBudget,
 ) -> Result<u64, PullError> {
-    let Some(path) = state.config.receipt_db_path.as_deref() else {
+    let Some(store) = state.receipt_store.as_deref() else {
         return Ok(0);
     };
-    let mut store = SqliteReceiptStore::open(path).map_err(CliError::from)?;
     let mut applied = 0u64;
     loop {
         if round.is_exhausted() {

@@ -1109,17 +1109,15 @@ pub(crate) fn push_unique_capital_book_evidence(
 }
 
 pub fn build_credit_facility_report(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     budget_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     issuance_policy: Option<&crate::policy::ReputationIssuancePolicy>,
     query: &ExposureLedgerQuery,
     trusted_kernel_keys: &[String],
 ) -> Result<CreditFacilityReport, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     build_credit_facility_report_from_store(
-        &receipt_store,
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         certification_registry_file,
         issuance_policy,
@@ -1130,7 +1128,7 @@ pub fn build_credit_facility_report(
 }
 
 pub struct CreditIssuanceArgs<'a> {
-    pub receipt_db_path: &'a Path,
+    pub receipt_store: &'a SqliteReceiptStore,
     pub budget_db_path: Option<&'a Path>,
     pub authority_seed_path: Option<&'a Path>,
     pub authority_db_path: Option<&'a Path>,
@@ -1147,27 +1145,24 @@ pub fn issue_signed_credit_facility(
 }
 
 pub fn list_credit_facilities(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     query: &CreditFacilityListQuery,
 ) -> Result<CreditFacilityListReport, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     receipt_store
         .query_credit_facilities(query)
         .map_err(|error| CliError::cli_other_error(error.to_string()))
 }
 
 pub fn build_credit_bond_report(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     budget_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     issuance_policy: Option<&crate::policy::ReputationIssuancePolicy>,
     query: &ExposureLedgerQuery,
     trusted_kernel_keys: &[String],
 ) -> Result<CreditBondReport, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     build_credit_bond_report_from_store(
-        &receipt_store,
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         certification_registry_file,
         issuance_policy,
@@ -1184,40 +1179,37 @@ pub fn issue_signed_credit_bond(
 }
 
 pub fn list_credit_bonds(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     query: &CreditBondListQuery,
 ) -> Result<CreditBondListReport, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     receipt_store
         .query_credit_bonds(query)
         .map_err(|error| CliError::cli_other_error(error.to_string()))
 }
 
 pub fn build_credit_bonded_execution_simulation_report(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     request: &CreditBondedExecutionSimulationRequest,
 ) -> Result<CreditBondedExecutionSimulationReport, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
-    build_credit_bonded_execution_simulation_report_from_store(&receipt_store, request)
+    build_credit_bonded_execution_simulation_report_from_store(receipt_store, request)
         .map_err(CliError::from)
 }
 
 pub fn build_credit_loss_lifecycle_report(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     query: &CreditLossLifecycleQuery,
 ) -> Result<CreditLossLifecycleReport, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
-    build_credit_loss_lifecycle_report_from_store(&receipt_store, query).map_err(CliError::from)
+    build_credit_loss_lifecycle_report_from_store(receipt_store, query).map_err(CliError::from)
 }
 
 pub fn issue_signed_credit_loss_lifecycle(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     request: &CreditLossLifecycleIssueRequest,
 ) -> Result<SignedCreditLossLifecycle, CliError> {
     issue_signed_credit_loss_lifecycle_detailed(
-        receipt_db_path,
+        receipt_store,
         authority_seed_path,
         authority_db_path,
         request,
@@ -1226,27 +1218,24 @@ pub fn issue_signed_credit_loss_lifecycle(
 }
 
 pub fn list_credit_loss_lifecycle(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     query: &CreditLossLifecycleListQuery,
 ) -> Result<CreditLossLifecycleListReport, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     receipt_store
         .query_credit_loss_lifecycle(query)
         .map_err(|error| CliError::cli_other_error(error.to_string()))
 }
 
 pub fn build_credit_backtest_report(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     budget_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     issuance_policy: Option<&crate::policy::ReputationIssuancePolicy>,
     query: &CreditBacktestQuery,
     trusted_kernel_keys: &[String],
 ) -> Result<CreditBacktestReport, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     build_credit_backtest_report_from_store(
-        &receipt_store,
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         certification_registry_file,
         issuance_policy,
@@ -1257,7 +1246,7 @@ pub fn build_credit_backtest_report(
 }
 
 pub fn build_signed_credit_provider_risk_package(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     budget_db_path: Option<&Path>,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
@@ -1265,11 +1254,9 @@ pub fn build_signed_credit_provider_risk_package(
     issuance_policy: Option<&crate::policy::ReputationIssuancePolicy>,
     query: &CreditProviderRiskPackageQuery,
 ) -> Result<SignedCreditProviderRiskPackage, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
     let package = build_credit_provider_risk_package_from_store(
-        &receipt_store,
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         certification_registry_file,
         issuance_policy,
@@ -1283,7 +1270,6 @@ pub fn build_signed_credit_provider_risk_package(
 
 pub(crate) fn build_credit_backtest_report_from_store(
     receipt_store: &SqliteReceiptStore,
-    receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     issuance_policy: Option<&crate::policy::ReputationIssuancePolicy>,
@@ -1342,7 +1328,6 @@ pub(crate) fn build_credit_backtest_report_from_store(
         };
         let scorecard = build_credit_scorecard_report(
             receipt_store,
-            receipt_db_path,
             budget_db_path,
             issuance_policy,
             &exposure_query,
@@ -1350,7 +1335,6 @@ pub(crate) fn build_credit_backtest_report_from_store(
         )?;
         let facility = build_credit_facility_report_from_store(
             receipt_store,
-            receipt_db_path,
             budget_db_path,
             certification_registry_file,
             issuance_policy,

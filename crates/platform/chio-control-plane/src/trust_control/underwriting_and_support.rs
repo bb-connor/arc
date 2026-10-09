@@ -979,22 +979,20 @@ where
 }
 
 pub fn build_signed_underwriting_policy_input(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     budget_db_path: Option<&Path>,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     query: &UnderwritingPolicyInputQuery,
 ) -> Result<SignedUnderwritingPolicyInput, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     // Load the signing keypair up front so its public key can anchor the
     // reputation scoring trust set; an empty set would silently filter every
     // signed receipt out (see chio-reputation::receipt_integrity_valid).
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
     let trusted_kernel_keys = vec![keypair.public_key().to_hex()];
     let report = build_underwriting_policy_input(
-        &receipt_store,
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         certification_registry_file,
         query,
@@ -1006,16 +1004,14 @@ pub fn build_signed_underwriting_policy_input(
 }
 
 pub fn build_underwriting_decision_report(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     budget_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     query: &UnderwritingPolicyInputQuery,
     trusted_kernel_keys: &[String],
 ) -> Result<UnderwritingDecisionReport, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     build_underwriting_decision_report_from_store(
-        &receipt_store,
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         certification_registry_file,
         query,
@@ -1027,7 +1023,6 @@ pub fn build_underwriting_decision_report(
 
 pub(crate) fn build_underwriting_decision_report_from_store(
     receipt_store: &SqliteReceiptStore,
-    receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     query: &UnderwritingPolicyInputQuery,
@@ -1036,7 +1031,6 @@ pub(crate) fn build_underwriting_decision_report_from_store(
 ) -> Result<UnderwritingDecisionReport, TrustHttpError> {
     let input = build_underwriting_policy_input(
         receipt_store,
-        receipt_db_path,
         budget_db_path,
         certification_registry_file,
         query,
@@ -1049,16 +1043,14 @@ pub(crate) fn build_underwriting_decision_report_from_store(
 }
 
 pub fn build_underwriting_simulation_report(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     budget_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     request: &UnderwritingSimulationRequest,
     trusted_kernel_keys: &[String],
 ) -> Result<UnderwritingSimulationReport, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     build_underwriting_simulation_report_from_store(
-        &receipt_store,
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         certification_registry_file,
         request,
@@ -1070,7 +1062,6 @@ pub fn build_underwriting_simulation_report(
 
 pub(crate) fn build_underwriting_simulation_report_from_store(
     receipt_store: &SqliteReceiptStore,
-    receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     request: &UnderwritingSimulationRequest,
@@ -1080,7 +1071,6 @@ pub(crate) fn build_underwriting_simulation_report_from_store(
     let clock_now = unix_timestamp_now()?;
     let input = build_underwriting_policy_input(
         receipt_store,
-        receipt_db_path,
         budget_db_path,
         certification_registry_file,
         &request.query,
@@ -1107,7 +1097,7 @@ pub(crate) fn build_underwriting_simulation_report_from_store(
 }
 
 pub fn issue_signed_underwriting_decision(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     budget_db_path: Option<&Path>,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
@@ -1116,7 +1106,7 @@ pub fn issue_signed_underwriting_decision(
     supersedes_decision_id: Option<&str>,
 ) -> Result<SignedUnderwritingDecision, CliError> {
     issue_signed_underwriting_decision_detailed(
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         authority_seed_path,
         authority_db_path,
@@ -1130,7 +1120,7 @@ pub fn issue_signed_underwriting_decision(
 }
 
 pub(crate) fn issue_signed_underwriting_decision_detailed(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     budget_db_path: Option<&Path>,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
@@ -1141,7 +1131,6 @@ pub(crate) fn issue_signed_underwriting_decision_detailed(
     fiscal_runtime: Option<&TrustFiscalRuntime>,
 ) -> Result<SignedUnderwritingDecision, TrustHttpError> {
     let clock_now = unix_timestamp_now()?;
-    let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     // Load the signing keypair first so its public key anchors the reputation
     // scoring trust set (chio-reputation::receipt_integrity_valid fails closed
     // on an empty set, which would zero out the reputation contribution).
@@ -1149,15 +1138,14 @@ pub(crate) fn issue_signed_underwriting_decision_detailed(
         .map_err(|error| TrustHttpError::internal(error.to_string()))?;
     let trusted_kernel_keys = vec![keypair.public_key().to_hex()];
     let report = build_underwriting_decision_report_from_store(
-        &receipt_store,
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         certification_registry_file,
         query,
         read_context.clone(),
         &trusted_kernel_keys,
     )?;
-    let quoted_exposure = build_underwriting_quoted_exposure(&receipt_store, query, read_context)?;
+    let quoted_exposure = build_underwriting_quoted_exposure(receipt_store, query, read_context)?;
     let issued_at = clock_now;
     let mut artifact = if let Some(runtime) = fiscal_runtime {
         runtime
@@ -1191,30 +1179,27 @@ pub(crate) fn issue_signed_underwriting_decision_detailed(
 }
 
 pub fn list_underwriting_decisions(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     query: &UnderwritingDecisionQuery,
 ) -> Result<UnderwritingDecisionListReport, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     receipt_store
         .query_underwriting_decisions(query)
         .map_err(|error| CliError::cli_other_error(error.to_string()))
 }
 
 pub fn create_underwriting_appeal(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     request: &UnderwritingAppealCreateRequest,
 ) -> Result<UnderwritingAppealRecord, CliError> {
-    let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     receipt_store
         .create_underwriting_appeal(request)
         .map_err(|error| CliError::cli_other_error(error.to_string()))
 }
 
 pub fn resolve_underwriting_appeal(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     request: &UnderwritingAppealResolveRequest,
 ) -> Result<UnderwritingAppealRecord, CliError> {
-    let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     receipt_store
         .resolve_underwriting_appeal(request)
         .map_err(|error| CliError::cli_other_error(error.to_string()))

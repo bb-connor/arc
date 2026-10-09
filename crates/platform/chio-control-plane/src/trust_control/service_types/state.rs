@@ -17,6 +17,10 @@ pub(crate) struct TrustServiceState {
     pub(crate) fiscal_runtime: Option<Arc<TrustFiscalRuntime>>,
     pub(crate) budget_store: Option<Arc<SqliteBudgetStore>>,
     pub(crate) revocation_store: Option<Arc<SqliteRevocationStore>>,
+    /// The single receipt store for `config.receipt_db_path`, opened before
+    /// serving. Handlers share it and its one writer instead of opening a store
+    /// (and seeding a writer) per request.
+    pub(crate) receipt_store: Option<Arc<SqliteReceiptStore>>,
     pub(crate) enterprise_provider_registry: Option<Arc<EnterpriseProviderRegistry>>,
     pub(crate) verifier_policy_registry: Option<Arc<VerifierPolicyRegistry>>,
     pub(crate) federation_admission_rate_limiter: Arc<Mutex<FederationAdmissionRateLimiter>>,
@@ -182,6 +186,15 @@ impl TrustServiceState {
                     "trust control service requires --budget-db",
                 )
             })
+    }
+
+    pub(crate) fn receipt_store(&self) -> Result<Arc<SqliteReceiptStore>, Response> {
+        self.receipt_store.clone().ok_or_else(|| {
+            plain_http_error(
+                StatusCode::CONFLICT,
+                "trust control service requires --receipt-db",
+            )
+        })
     }
 
     pub(crate) fn optional_revocation_store(

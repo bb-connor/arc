@@ -337,14 +337,57 @@ impl SqliteReceiptStore {
         if !self.writer_serving_closed() {
             return Ok(());
         }
+        Err(self.writer_startup_failure())
+    }
+
+    /// Wait up to `wait` for the writer's seed. `Ok(true)`: the seed verified
+    /// the history and the writer is serving. `Ok(false)`: the single writer is
+    /// still verifying a large history and serves queued commands in order once
+    /// it finishes. A poisoned seed or a failed writer thread is an error.
+    pub fn wait_for_writer_seed(&self, wait: Duration) -> Result<bool, ReceiptStoreError> {
+        let settled = self.receipt_commit_actor.health.wait_seed_settled(wait);
+        let thread_failed = self
+            .receipt_commit_actor
+            .worker
+            .health()
+            .is_none_or(chio_supervisor::HealthFlag::is_serving_closed);
+        if thread_failed || (settled && self.writer_serving_closed()) {
+            return Err(self.writer_startup_failure());
+        }
+        Ok(settled)
+    }
+
+    /// The authority clock this store's history is written against.
+    pub fn authority_clock(&self) -> Arc<dyn chio_security_types::clock::Clock> {
+        Arc::new(self.clock.clone())
+    }
+
+    /// Join this store's writer on a dedicated reaper thread when the store is
+    /// released, never on the releasing thread. A shared service store can be
+    /// released last by an async task, which must not block on that join.
+    pub fn join_writer_on_reaper(&self) {
+        if let Some(writer) = self.receipt_commit_actor.worker.join.as_ref() {
+            writer.join_on_reaper.store(true, Ordering::SeqCst);
+        }
+    }
+
+    pub fn writer_joins_on_reaper(&self) -> bool {
+        self.receipt_commit_actor
+            .worker
+            .join
+            .as_ref()
+            .is_some_and(|writer| writer.join_on_reaper.load(Ordering::SeqCst))
+    }
+
+    fn writer_startup_failure(&self) -> ReceiptStoreError {
         let detail = self
             .receipt_commit_actor
             .writer_counters()
             .last_error
             .unwrap_or_else(|| "durable receipt head is unavailable".to_string());
-        Err(ReceiptStoreError::Conflict(format!(
+        ReceiptStoreError::Conflict(format!(
             "receipt commit writer failed startup readiness: {detail}"
-        )))
+        ))
     }
 
     pub fn open_existing(path: impl AsRef<Path>) -> Result<Self, ReceiptStoreError> {

@@ -612,6 +612,7 @@ fn market_state(
         fiscal_runtime: None,
         budget_store: None,
         revocation_store: None,
+        receipt_store: None,
         enterprise_provider_registry: None,
         verifier_policy_registry: None,
         federation_admission_rate_limiter: Arc::new(std::sync::Mutex::new(
