@@ -8,6 +8,9 @@ use private_fixture::write_private_file;
 mod fixture_paths;
 use fixture_paths::{unique_path, workspace_root};
 
+#[cfg(target_os = "linux")]
+#[path = "passport/authority_startup.rs"]
+mod authority_startup;
 #[path = "passport/replay.rs"]
 mod replay;
 
