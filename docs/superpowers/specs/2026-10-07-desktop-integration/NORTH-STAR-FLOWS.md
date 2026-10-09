@@ -418,9 +418,10 @@ DOCS-1177.7 commits on #1177:
   and the ADR index) belongs to the unified roadmap's U3 items, not to this
   program's documents.
 
-`scripts/check-native-host-docs.py --scope program` gates links, retired
-phrases, em dashes, case IDs and these word budgets (`--scope public` reports
-the public copy that the U3 items still have to fix):
+`scripts/check-native-host-docs.py --scope program`, run by the
+`native-host-docs` workflow on every change to these documents, gates links,
+retired phrases, em dashes, case IDs and these word budgets (`--scope public`
+reports the public copy that the U3 items still have to fix):
 
 | Document set | Budget |
 | --- | --- |

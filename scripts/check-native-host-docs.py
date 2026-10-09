@@ -5,7 +5,8 @@ Rules (NORTH-STAR-FLOWS section 7, unified roadmap section 9):
 
 - links: relative Markdown links and anchors in the program set resolve.
 - retired-phrases: retired positioning phrases do not appear in the program
-  set or the public copy. SVG text nodes and alt/aria-label/title attributes
+  set or the public copy (README, AGENTS, the ADR index, docs/start-here,
+  the competitive landscape, spec/PROTOCOL.md and docs/assets SVGs). SVG text nodes and alt/aria-label/title attributes
   are scanned with tags removed, so a phrase split across elements is found.
 - em-dash: no U+2014 in the program set or the public copy.
 - case-ids: every Q, C and H case referenced in the program set is defined
@@ -86,7 +87,7 @@ class Layout:
         )
         self.program = sorted({p for p in program if p.is_file()})
         public = (
-            [root / "README.md", root / "AGENTS.md"]
+            [root / "README.md", root / "AGENTS.md", root / "docs/adr/README.md"]
             + list((root / "docs/start-here").rglob("*.md"))
             + [root / "docs/reference/COMPETITIVE_LANDSCAPE.md", root / "spec/PROTOCOL.md"]
             + list((root / "docs/assets").glob("*.svg"))

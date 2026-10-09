@@ -143,6 +143,11 @@ new_fixture scope-program-only
 printf '\nAgents that pay each other.\n' >>"$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/README.md"
 expect "--scope public ignores a program violation" 0 "-" -- --scope public
 
+# The ADR index is public copy.
+new_fixture adr-index
+printf '# ADRs\n\nThe kernel your agents answer to.\n' >"$fixture/docs/adr/README.md"
+expect "retired phrase in the ADR index" 1 "retired-phrases: docs/adr/README.md: contains 'The kernel your agents answer to'" -- --scope public --rule retired-phrases
+
 # "verify-only protocol" is a projection name, not an "only protocol" claim.
 new_fixture verify-only
 printf 'Payments use the verify-only protocol projections.\n' >>"$fixture/docs/start-here/FLAGSHIP.md"
