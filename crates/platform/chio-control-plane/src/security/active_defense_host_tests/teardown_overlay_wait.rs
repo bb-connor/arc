@@ -11,7 +11,10 @@ const MIN_REMAINING_TTL_MS: u64 = 5_000;
 const WORKER_TICK_INTERVAL: Duration = Duration::from_secs(2);
 /// Longer than the teardown's bounded fault attempts at its retry interval.
 const HEALTHY_WAIT: Duration = Duration::from_secs(8);
-const EXPIRY_CLEANUP_BOUND: Duration = Duration::from_secs(4);
+/// Worker ticks that may begin from a TTL expiry until its cleanup completes:
+/// the first tick to read the expired trusted clock lifts the overlay, and the
+/// teardown observes the lift and stops its worker before the tick after that.
+const EXPIRY_CLEANUP_TICKS: u64 = 2;
 const ATTEMPTS_BEFORE_PARK: usize = 50;
 const PARK_OBSERVATION_TIMEOUT: Duration = Duration::from_secs(30);
 const PARKED_AUDIT: &str = "active_defense_teardown_cleanup_parked";
@@ -283,12 +286,17 @@ async fn healthy_ttl_wait_spends_no_fault_budget_and_cleans_up_once_expired() {
     let overlay_held = ttl.fixture.has_active_overlay_contributions();
     let remaining_ttl_ms = ttl.remaining_ttl_ms();
 
+    let ticks_before_expiry = worker.health().ticks_attempted;
     ttl.expire();
     let cleanup_started = Instant::now();
     let attempts = tokio::time::timeout(HOST_LIFECYCLE_TEST_TIMEOUT, teardown)
         .await
         .unwrap_or_else(|_| panic!("teardown did not clean up after the TTL expired"));
     let cleanup_elapsed = cleanup_started.elapsed();
+    let cleanup_ticks = worker
+        .health()
+        .ticks_attempted
+        .saturating_sub(ticks_before_expiry);
 
     assert!(
         health.lifecycle == ResponseWorkerLifecycle::Ready
@@ -309,8 +317,8 @@ async fn healthy_ttl_wait_spends_no_fault_budget_and_cleans_up_once_expired() {
     );
     assert_eq!(capture.snapshot(), Vec::new());
     assert!(
-        cleanup_elapsed < EXPIRY_CLEANUP_BOUND,
-        "cleanup after TTL expiry took {cleanup_elapsed:?}"
+        cleanup_ticks <= EXPIRY_CLEANUP_TICKS,
+        "cleanup after TTL expiry spanned {cleanup_ticks} worker ticks ({cleanup_elapsed:?})"
     );
     assert!(!ttl.fixture.has_active_overlay_contributions());
     assert!(ttl.fixture.registry.snapshot().is_none());
@@ -322,6 +330,8 @@ async fn two_teardowns_in_healthy_ttl_waits_each_clean_up_on_their_own_expiry() 
     let expiring = LongTtlHost::new();
     let waiting_host = waiting.start().await;
     let expiring_host = expiring.start().await;
+    let waiting_worker = Arc::clone(waiting_host.orchestrator().worker());
+    let expiring_worker = Arc::clone(expiring_host.orchestrator().worker());
     drop(waiting_host);
     drop(expiring_host);
 
@@ -336,16 +346,26 @@ async fn two_teardowns_in_healthy_ttl_waits_each_clean_up_on_their_own_expiry() 
     });
     let remaining_ttl_ms = waiting.remaining_ttl_ms().min(expiring.remaining_ttl_ms());
 
+    let expiring_ticks_before = expiring_worker.health().ticks_attempted;
     expiring.expire();
     let expiring_started = Instant::now();
     let expiring_released = released_within(&expiring, HOST_LIFECYCLE_TEST_TIMEOUT).await;
     let expiring_elapsed = expiring_started.elapsed();
+    let expiring_ticks = expiring_worker
+        .health()
+        .ticks_attempted
+        .saturating_sub(expiring_ticks_before);
     let waiting_still_held = waiting.fixture.registry.snapshot().is_some()
         && waiting.fixture.has_active_overlay_contributions();
+    let waiting_ticks_before = waiting_worker.health().ticks_attempted;
     waiting.expire();
     let waiting_started = Instant::now();
     let waiting_released = released_within(&waiting, HOST_LIFECYCLE_TEST_TIMEOUT).await;
     let waiting_elapsed = waiting_started.elapsed();
+    let waiting_ticks = waiting_worker
+        .health()
+        .ticks_attempted
+        .saturating_sub(waiting_ticks_before);
 
     assert!(
         both_held,
@@ -356,16 +376,16 @@ async fn two_teardowns_in_healthy_ttl_waits_each_clean_up_on_their_own_expiry() 
         "the TTLs were not live for the whole wait: remaining_ttl_ms={remaining_ttl_ms}"
     );
     assert!(
-        expiring_released && expiring_elapsed < EXPIRY_CLEANUP_BOUND,
-        "the first expiry was not cleaned up promptly beside a waiting teardown: released={expiring_released} after {expiring_elapsed:?}"
+        expiring_released && expiring_ticks <= EXPIRY_CLEANUP_TICKS,
+        "the first expiry was not cleaned up promptly beside a waiting teardown: released={expiring_released} after {expiring_ticks} worker ticks ({expiring_elapsed:?})"
     );
     assert!(
         waiting_still_held,
         "the waiting teardown released before its own TTL expired"
     );
     assert!(
-        waiting_released && waiting_elapsed < EXPIRY_CLEANUP_BOUND,
-        "the second expiry was not cleaned up promptly: released={waiting_released} after {waiting_elapsed:?}"
+        waiting_released && waiting_ticks <= EXPIRY_CLEANUP_TICKS,
+        "the second expiry was not cleaned up promptly: released={waiting_released} after {waiting_ticks} worker ticks ({waiting_elapsed:?})"
     );
     assert!(!waiting.fixture.has_active_overlay_contributions());
     assert!(!expiring.fixture.has_active_overlay_contributions());
@@ -484,6 +504,7 @@ async fn expired_overlay_whose_rollback_keeps_failing_spends_the_fault_budget() 
     let faulted_host = faulted.start().await;
     let healthy_host = healthy.start().await;
     let worker = Arc::clone(faulted_host.orchestrator().worker());
+    let healthy_worker = Arc::clone(healthy_host.orchestrator().worker());
     let connection = rusqlite::Connection::open(&faulted.fixture.security_path)
         .unwrap_or_else(|error| panic!("open rollback fault connection: {error}"));
     connection
@@ -512,6 +533,7 @@ async fn expired_overlay_whose_rollback_keeps_failing_spends_the_fault_budget() 
     .await;
     let durable_failure_after = expired_at.elapsed();
 
+    let healthy_ticks_before = healthy_worker.health().ticks_attempted;
     healthy.expire();
     let healthy_started = Instant::now();
     hold_after_expiry(
@@ -523,6 +545,10 @@ async fn expired_overlay_whose_rollback_keeps_failing_spends_the_fault_budget() 
     )
     .await;
     let healthy_elapsed = healthy_started.elapsed();
+    let healthy_ticks = healthy_worker
+        .health()
+        .ticks_attempted
+        .saturating_sub(healthy_ticks_before);
     let healthy_released = healthy.fixture.registry.snapshot().is_none()
         && !healthy.fixture.has_active_overlay_contributions();
 
@@ -595,8 +621,8 @@ async fn expired_overlay_whose_rollback_keeps_failing_spends_the_fault_budget() 
         "worker ticks did not keep returning cleanly: {health:?}"
     );
     assert!(
-        healthy_released && healthy_elapsed < EXPIRY_CLEANUP_BOUND,
-        "a healthy second teardown did not progress beside the failing rollback: released={healthy_released} after {healthy_elapsed:?}"
+        healthy_released && healthy_ticks <= EXPIRY_CLEANUP_TICKS,
+        "a healthy second teardown did not progress beside the failing rollback: released={healthy_released} after {healthy_ticks} worker ticks ({healthy_elapsed:?})"
     );
     assert!(
         overlay_held && owner_held,
