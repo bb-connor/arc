@@ -128,8 +128,6 @@ use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::fs;
 #[cfg(unix)]
-use std::fs::File;
-#[cfg(unix)]
 use std::os::fd::OwnedFd;
 #[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
@@ -144,10 +142,6 @@ pub struct SqliteSecurityStateStore {
     connection: StoreConnection,
     isolation_epoch_verifier: Arc<dyn IsolationEpochEvidenceVerifierPort>,
     clock: Arc<dyn Clock>,
-    #[cfg(unix)]
-    database_path: PathBuf,
-    #[cfg(unix)]
-    database_identity: SecurityStateDatabaseFileIdentity,
 }
 
 #[cfg(unix)]
@@ -155,19 +149,6 @@ pub struct SqliteSecurityStateStore {
 struct SecurityStateDatabaseFileIdentity {
     device: u64,
     inode: u64,
-}
-
-/// Store-bound proof that the caller retains the exclusive lifecycle-owner
-/// lease for this exact security-state database file.
-#[cfg(unix)]
-#[derive(Debug)]
-pub struct SecurityStateLifecycleOwnerProof {
-    locked_database_file: File,
-    database_identity: SecurityStateDatabaseFileIdentity,
-    #[cfg(target_os = "macos")]
-    locked_lifecycle_file: File,
-    #[cfg(target_os = "macos")]
-    lifecycle_lock_identity: SecurityStateDatabaseFileIdentity,
 }
 
 /// Exact durable contribution counts that must reach zero before the
@@ -261,8 +242,7 @@ impl SqliteSecurityStateStore {
         // The identity is bound before the first statement so an aliased path
         // is refused before migration writes through it.
         #[cfg(unix)]
-        let (connection, database_identity) =
-            open_unaliased_database(&database_parent, &database_path)?;
+        let (connection, _) = open_unaliased_database(&database_parent, &database_path)?;
         #[cfg(not(unix))]
         let connection = Connection::open(path).map_err(sqlite_error)?;
         // Reuse suspension lookup bytecode, never the observed authority state.
@@ -278,118 +258,7 @@ impl SqliteSecurityStateStore {
             connection: StoreConnection::transaction_only("security_state", connection),
             isolation_epoch_verifier,
             clock,
-            #[cfg(unix)]
-            database_path,
-            #[cfg(unix)]
-            database_identity,
         })
-    }
-
-    /// Bind a retained, exclusively locked descriptor to this store's exact
-    /// opened main-database identity. The returned proof retains the lock.
-    #[cfg(unix)]
-    pub fn security_state_lifecycle_owner_proof(
-        &self,
-        locked_database_file: File,
-        #[cfg(target_os = "macos")] locked_lifecycle_file: File,
-    ) -> PortResult<SecurityStateLifecycleOwnerProof> {
-        validate_security_state_database_binding(
-            &self.database_path,
-            self.database_identity,
-            &locked_database_file,
-        )?;
-        #[cfg(not(target_os = "macos"))]
-        rustix::fs::flock(
-            &locked_database_file,
-            rustix::fs::FlockOperation::NonBlockingLockExclusive,
-        )
-        .map_err(|_| PortError::conflict())?;
-        #[cfg(target_os = "macos")]
-        let lifecycle_lock_path = security_state_lifecycle_lock_path(&self.database_path)?;
-        #[cfg(target_os = "macos")]
-        let lifecycle_lock_identity = security_state_database_path_identity(&lifecycle_lock_path)?;
-        #[cfg(target_os = "macos")]
-        validate_security_state_database_binding(
-            &lifecycle_lock_path,
-            lifecycle_lock_identity,
-            &locked_lifecycle_file,
-        )?;
-        #[cfg(target_os = "macos")]
-        rustix::fs::flock(
-            &locked_lifecycle_file,
-            rustix::fs::FlockOperation::NonBlockingLockExclusive,
-        )
-        .map_err(|_| PortError::conflict())?;
-        let proof = SecurityStateLifecycleOwnerProof {
-            locked_database_file,
-            database_identity: self.database_identity,
-            #[cfg(target_os = "macos")]
-            locked_lifecycle_file,
-            #[cfg(target_os = "macos")]
-            lifecycle_lock_identity,
-        };
-        self.validate_security_state_lifecycle_owner_proof(&proof)?;
-        Ok(proof)
-    }
-
-    #[cfg(unix)]
-    fn validate_security_state_lifecycle_owner_proof(
-        &self,
-        proof: &SecurityStateLifecycleOwnerProof,
-    ) -> PortResult<()> {
-        if proof.database_identity != self.database_identity {
-            return Err(PortError::conflict());
-        }
-        #[cfg(not(target_os = "macos"))]
-        rustix::fs::flock(
-            &proof.locked_database_file,
-            rustix::fs::FlockOperation::NonBlockingLockExclusive,
-        )
-        .map_err(|_| PortError::conflict())?;
-        validate_security_state_database_binding(
-            &self.database_path,
-            self.database_identity,
-            &proof.locked_database_file,
-        )?;
-        #[cfg(target_os = "macos")]
-        {
-            let lifecycle_lock_path = security_state_lifecycle_lock_path(&self.database_path)?;
-            let current_lock_identity =
-                security_state_database_path_identity(&lifecycle_lock_path)?;
-            if proof.lifecycle_lock_identity != current_lock_identity {
-                return Err(PortError::conflict());
-            }
-            rustix::fs::flock(
-                &proof.locked_lifecycle_file,
-                rustix::fs::FlockOperation::NonBlockingLockExclusive,
-            )
-            .map_err(|_| PortError::conflict())?;
-            validate_security_state_database_binding(
-                &lifecycle_lock_path,
-                proof.lifecycle_lock_identity,
-                &proof.locked_lifecycle_file,
-            )?;
-        }
-        Ok(())
-    }
-
-    /// Reset process-owned declassification lifecycle flags only while the
-    /// caller retains a store-bound exclusive lifecycle-owner proof.
-    #[cfg(unix)]
-    pub fn reset_declassification_lifecycle_for_owner_takeover(
-        &self,
-        proof: &SecurityStateLifecycleOwnerProof,
-    ) -> PortResult<()> {
-        self.validate_security_state_lifecycle_owner_proof(proof)?;
-
-        let mut connection = self.connection()?;
-        let transaction = connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(sqlite_error)?;
-        declassification::reset_legacy_lifecycle(&transaction)?;
-        self.validate_security_state_lifecycle_owner_proof(proof)?;
-        transaction.commit().map_err(sqlite_error)?;
-        self.validate_security_state_lifecycle_owner_proof(proof)
     }
 
     fn connection(&self) -> PortResult<MutexGuard<'_, Connection>> {
@@ -706,14 +575,6 @@ fn unavailable_errno(error: rustix::io::Errno) -> PortError {
     unavailable_io(error.into())
 }
 
-#[cfg(target_os = "macos")]
-fn security_state_lifecycle_lock_path(path: &Path) -> PortResult<PathBuf> {
-    let file_name = path.file_name().ok_or_else(PortError::invalid_data)?;
-    let mut lock_name = file_name.to_os_string();
-    lock_name.push(".lifecycle.lock");
-    Ok(path.with_file_name(lock_name))
-}
-
 #[cfg(unix)]
 fn security_state_database_path_identity(
     path: &Path,
@@ -727,29 +588,6 @@ fn security_state_database_path_identity(
         device: metadata.dev(),
         inode: metadata.ino(),
     })
-}
-
-#[cfg(unix)]
-fn validate_security_state_database_binding(
-    path: &Path,
-    expected_identity: SecurityStateDatabaseFileIdentity,
-    file: &File,
-) -> PortResult<()> {
-    let path_metadata = fs::symlink_metadata(path).map_err(|_| PortError::conflict())?;
-    let file_metadata = file.metadata().map_err(|_| PortError::conflict())?;
-    if path_metadata.file_type().is_symlink()
-        || !path_metadata.file_type().is_file()
-        || !file_metadata.file_type().is_file()
-        || path_metadata.nlink() != 1
-        || file_metadata.nlink() != 1
-        || path_metadata.dev() != expected_identity.device
-        || path_metadata.ino() != expected_identity.inode
-        || file_metadata.dev() != expected_identity.device
-        || file_metadata.ino() != expected_identity.inode
-    {
-        return Err(PortError::conflict());
-    }
-    Ok(())
 }
 
 mod codec;

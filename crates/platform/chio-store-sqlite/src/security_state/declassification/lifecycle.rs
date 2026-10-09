@@ -71,6 +71,7 @@ impl ScopedMutation<'_> {
         Ok(())
     }
 
+    #[cfg(test)]
     pub(super) fn reset_declassification_lifecycle(&self) -> PortResult<()> {
         if self
             .execute(sql::RESET_LIFECYCLE, &[])

@@ -83,10 +83,6 @@ pub(super) fn verify_legacy_lifecycle(connection: &Connection) -> PortResult<()>
     lifecycle::verify(ScopedReader::legacy(connection))
 }
 
-pub(super) fn reset_legacy_lifecycle(transaction: &Transaction<'_>) -> PortResult<()> {
-    ScopedMutation::legacy(transaction).reset_declassification_lifecycle()
-}
-
 pub(super) fn verify_legacy_integrity(connection: &Connection) -> PortResult<()> {
     integrity::verify(ScopedReader::legacy(connection))
 }

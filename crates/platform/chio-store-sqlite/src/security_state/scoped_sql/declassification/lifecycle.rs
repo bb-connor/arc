@@ -48,6 +48,7 @@ pub(in crate::security_state) const SEAL_DISPATCH: WriteQuery = WriteQuery {
                   AND live_dispatch_sealed = 0 AND compaction_active = 0"#,
 };
 
+#[cfg(test)]
 pub(in crate::security_state) const RESET_LIFECYCLE: WriteQuery = WriteQuery {
     parameters: 0,
     legacy: r#"UPDATE security_declassification_lifecycle
