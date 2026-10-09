@@ -75,9 +75,9 @@ The [fixture lifecycle and SDK readiness review](reviews/fixture-lifecycle-and-s
 records the eleven-file installation at `c5f53a96dbfc836bfc42805c2fee2d393dd78821`.
 SPEC_PASS, independent QUALITY_PASS and EOF-only quality continuity bind the exact
 source. The final maintained checks passed 1,438 SDK/framework cases and 56
-composed fixture cases in each Python mode, with zero recorded network attempts. A later full fixture discovery gate remains failed with 129 passed
-and one assurance-map error across 130 tests; its separate scope and source pins
-are preserved in the review. No closure follows from that broader run.
+composed fixture cases in each Python mode, with zero recorded network attempts. The later full fixture discovery at that epoch failed with 129 passed
+and one assurance-map error across 130 tests. That review and failure remain
+unchanged; the accepted successor below supplies the later result.
 One additional maintained SDK readiness P2 has a bounded local closure covering
 both inherited facets. Five introduced candidate defects retain their historical
 classification with reviewed, installed corrective successors. The prior three
@@ -88,6 +88,19 @@ No PAC/SFE obligation is credited by these local controls.
 The source-bound hosted snapshot records 64 queued checks, two skipped and two
 unresolved review threads, already mapped to existing settlement-capacity and
 large-database obligations. It grants no hosted acceptance or all-P1-resolved claim.
+
+The [source-map and fixture-environment successor](reviews/source-map-and-fixture-environment.md)
+records complete source-only closure of `R2-R-evidence-06`, installed at
+`14b5b4170`, and the distinct maintained assurance-map P2 correction installed at
+`59431cb6b`. Both full fixture modes passed 133 cases on 663 stable inputs with
+zero recorded external attempts. Independent spec and quality close `QF-04` only
+for its original import/cwd scope on the disclosed supported Python 3.12 profile;
+literal catalogue command equality remains false. The original failed run and
+historical reports remain intact. Original comment continuity also restores
+`SOURCE-HYGIENE-SUPPORT-03` without build or dependency acceptance. The live
+register has 395 records, with 80 currently scoped closed, 229 open and 41 needing
+revalidation; 44 candidate-only records and one prerequisite remain separate.
+
 The candidate also passed all 19 budget-source, atomic ledger and provisioning
 controls after repairing its fixtures and actual owning connection profile.
 The [Kernel foundation successor](reviews/kernel-foundation.md) has independent

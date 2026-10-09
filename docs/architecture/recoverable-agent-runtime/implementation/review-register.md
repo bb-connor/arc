@@ -8,41 +8,48 @@ provider, formal, hosted, or release qualification.
 
 ## Reconciliation
 
-| Inventory | Records | Recorded scoped closures | Recorded unclosed |
+The live inventory and effective scoped dispositions are:
+
+| Inventory | Records | Effective scoped dispositions | Currently open |
 | --- | ---: | ---: | ---: |
-| Canonical original findings | 328 | 99 | 229 |
-| Additional maintained or actually executed support findings | 20 | 19 | 1 |
+| Canonical original findings | 328 | 101 | 227 |
+| Additional maintained or actually executed support findings | 21 | 20 | 1 |
 | Supplemental PR obligations | 1 | 0 | 1 |
-| Current or executed-support total | 349 | 118 | 231 |
+| Current or executed-support total | 350 | 121 | 229 |
 | Prevented candidate issues, counted separately | 31 | Not combined | Not combined |
 | Follow-up findings first observed in uninstalled candidates | 13 | Not combined | Not combined |
 | Provenance prerequisite, excluded from implementation findings | 1 | Not applicable | Not applicable |
 
-The canonical 99 recorded closures comprise 92 source-only and seven scoped
-local closures. The additional 19 comprise seven source-only and twelve scoped
-local closures, including the newly reviewed bounded SDK readiness closure. The
-original 117-closure snapshot is preserved; the expanded inventory contains 118.
+The 121 scoped dispositions include 41 historical closures whose current source
+applicability still needs review. They are not 121 current-source approvals.
+`counts.current_acceptance` separates these dispositions from current applicability.
 
-There are **393 findings or candidate issues**, plus the excluded provenance
-prerequisite, for **394 records**. The original prevented inventory retains 23
-assigned IDs and eight unassigned records. The thirteen candidate follow-ups and
-one additional SDK readiness finding have register keys and null finding IDs.
-There are still 371 assigned finding IDs, or 372 including the provenance
-prerequisite, and twenty-two null IDs. Every
-original ID and exact unassigned reviewer label remains preserved.
+The explicitly historical **394-record baseline** retains 99 canonical closures
+(92 source-only, seven scoped local), 19 additional closures (seven source-only,
+twelve scoped local), and 231 unclosed maintained/support findings. Its 118 total
+scoped closures and every `recorded_*` counter remain unchanged. New canonical
+and additional closures are recorded through additive successors and counted in
+`current_acceptance`. The earlier 117-closure snapshot also remains preserved.
+
+There are **394 findings or candidate issues**, plus the excluded provenance
+prerequisite, for **395 live records**. The original prevented inventory retains
+23 assigned IDs and eight unassigned records. Thirteen candidate follow-ups and
+two additional findings have null finding IDs. There are still 371 assigned
+finding IDs, or 372 including the prerequisite, and twenty-three null IDs.
+Every original ID and exact unassigned reviewer label remains preserved.
 
 The current status counts are:
 
 | Status | Records | Meaning |
 | --- | ---: | --- |
-| `open` | 231 | No complete independent disposition is recorded. |
-| `needs_revalidation` | 42 | Historical closure remains, but cited source or document pins differ without an accepted current continuity review. |
-| `recorded_scoped_closed` | 76 | The recorded scoped disposition is retained, with the limits stated per record. |
+| `open` | 229 | No complete independent disposition is recorded. |
+| `needs_revalidation` | 41 | Historical closure remains, but cited source or document pins differ without an accepted current continuity review. |
+| `recorded_scoped_closed` | 80 | Historical or additive accepted scoped disposition currently applies, with the limits stated per record. |
 | `candidate_only` | 44 | The defective candidate was uninstalled when found; corrected successors may have separate evidence. |
 | `prerequisite_only` | 1 | Provenance work, not a proved implementation defect. |
 
-The 42 remaining revalidation flags are part of the 117 historical scoped closures. They
-are not added to the 231 historically unclosed findings. No finding is declared
+The 41 remaining revalidation flags are part of the original 117 historical scoped
+closures. They are not added to the 229 currently open findings. No finding is declared
 regressed merely because its bytes changed, and no matching pin constitutes a
 new behavioral test. The initial audit flagged 48 closures. An independent
 [explanation evidence continuity review](reviews/explanation-evidence-continuity.md)
@@ -64,8 +71,8 @@ subsequently restores `C1-08`, `E-knowledge-15` and `G-product-07` for their ori
 source-locator obligations only. SPEC_PASS and independent QUALITY_PASS account
 for all 243 pointers (160/55/28), 14 protected historical inputs and the unchanged
 mappings of 108 references in the changed containing test file. Historical pins
-and previous statuses/reasons remain intact. The remaining flags are 32 canonical
-and ten additional. This grants no behavioral, test-run or runtime acceptance.
+and previous statuses/reasons remain intact. That update left 32 canonical
+and ten additional flags. This grants no behavioral, test-run or runtime acceptance.
 
 The installed SDK changes affect six direct pin pairs across `H-SDK-03`,
 `H-SDK-08`, `H-SDK-09` and `SDK-INDEPENDENT-03`. The independent
@@ -188,9 +195,9 @@ The [fixture lifecycle and SDK readiness review](reviews/fixture-lifecycle-and-s
 records the eleven-file installation at `c5f53a96dbfc836bfc42805c2fee2d393dd78821`.
 The exact maintained source passed 1,438 SDK/framework cases and 56 composed
 fixture cases in each of normal and optimized Python, with zero recorded network
-attempts. A later full fixture discovery gate remains failed with 129 passed
-and one assurance-map error across 130 tests; its separate scope and source pins
-are preserved in the review. No closure follows from that broader run. The canonical installation record pins the final selection, independent
+attempts. The later full fixture discovery at that epoch failed with 129 passed
+and one assurance-map error across 130 tests; its scope and source pins remain
+preserved. The subsequent accepted correction is recorded below. The canonical installation record pins the final selection, independent
 reviews, EOF-only quality continuity and final runs. Previous failures and review
 snapshots remain unchanged.
 
@@ -213,6 +220,30 @@ unresolved comments map to existing `PR-SETTLEMENT-CAPACITY-01` and the
 `R2-X-resources-01` large-database facet; the latter is outdated but unresolved.
 `R2-X-authority-03` remains a distinct related obligation. This adds no duplicate,
 thread resolution, behavioral acceptance or global qualification.
+
+## Source-map, environment and comment successors
+
+The [source-map and fixture-environment review](reviews/source-map-and-fixture-environment.md)
+records four independent spec/quality acceptances. `R2-R-evidence-06` receives a
+source-only successor closure for the two documents installed at `14b5b4170`.
+A new maintained P2, `additional:assurance-map-removed-begin-anchor`, preserves
+the original 129/130 failure and receives a bounded local closure after the
+reviewed two-file repair was installed at `59431cb6b`.
+
+Both full installed fixture suites passed 133 cases on 663 stable inputs, with
+zero recorded external attempts. Independent review closes `QF-04` only for its
+original import/cwd defect on the disclosed Python 3.12 supported profile and
+exact five-value relative parent environment. Interpreter and audit-wrapper
+substitutions are explicit; literal catalogue equality and qualification remain
+false. The earlier fixture/SDK report stays an unchanged historical snapshot.
+
+`SOURCE-HYGIENE-SUPPORT-03` regains its original source-only comment classification;
+its changed manifest pin, historical closure and previous revalidation reason
+remain intact. The current flags are 31 canonical and ten additional. Comment
+continuity grants no dependency or build acceptance. The three original rows
+retain every historical field, with additive successors and current status/reason
+changes only. No native, provider, Linux, formal, hosted or whole-runtime
+qualification is added.
 
 ## Source-pin audit
 
@@ -256,7 +287,7 @@ Each `records` entry has:
 - `key`: unique register identity. Assigned IDs are used verbatim. The eight
   `unassigned-prevented:<index>` values are register keys, not invented finding
   IDs; the index resolves to the unchanged addendum record. The thirteen descriptive
-  `candidate:<behavior>` keys and the additional SDK readiness key likewise have
+  `candidate:<behavior>` keys and both additional descriptive keys likewise have
   null finding IDs, with authentic reviewer labels retained separately.
 - `id`, `severity`, `title`, and `dependency_group`: original identity and review
   priority, plus the execution workstream. A null severity means the reviewer
@@ -269,7 +300,8 @@ Each `records` entry has:
 - `evidence_refs`: exact source records. `reviewed#/rows/0`, for example, means
   the `reviewed` path in `source_inventory` and JSON Pointer `/rows/0`. Candidate
   follow-ups use direct repository-relative paths pinned in
-  `candidate_review_evidence.files` or `fixture_lifecycle_sdk_evidence.files`.
+  `candidate_review_evidence.files`, `fixture_lifecycle_sdk_evidence.files`, or
+  `source_map_fixture_environment_evidence.files`.
 - `remaining_obligation_refs` or `remaining_obligations`: all applicable owner
   checks remain authoritative. A short summary does not replace the linked
   detailed requirements, nested support findings, same-ID updates, or limits.
@@ -378,7 +410,7 @@ its pre-update Git blob. The reviewed manifest remains unchanged.
 The later locator continuity update preserves 385 of 388 row byte sequences
 exactly and every historical field in the three updated rows. Only their current
 statuses/reasons and additive reviews change. All 19 prior updates, historical
-pins and original inventories remain intact. The current counts become 42 needing
+pins and original inventories remain intact. That update left 42 needing
 revalidation and 75 retaining scoped closure; the total remains 388. The 89
 reviewed input pins and all eleven original/quality packet artifact pins were
 verified, retaining the register input against its pre-update Git blob. No tests
@@ -396,3 +428,11 @@ records produce the derived 394-record inventory. Original source catalogs,
 pin audit, 20 preceding current updates and candidate evidence remain intact.
 The additive accounting validation and diff are in the installed fixture packet;
 no source test or blocked investigation was rerun for this documentation update.
+
+The subsequent four-item update preserves 391 of the 394 prior record bodies
+byte-for-byte. Only `R2-R-evidence-06`, `QF-04` and `SOURCE-HYGIENE-SUPPORT-03`
+change current status/reason and gain an additive successor retaining both prior
+values. One additional null-ID P2 produces 395 records. Historical disposition
+counters, catalogs, previous updates, failed runs and earlier review bytes remain
+unchanged; current acceptance is counted separately. The exact baseline, diff
+and validation are retained in the fixture-environment accounting packet.
