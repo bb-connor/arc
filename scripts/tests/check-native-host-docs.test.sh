@@ -60,7 +60,8 @@ new_fixture() {
   local spec="$fixture/docs/superpowers/specs/2026-10-07-desktop-integration"
   mkdir -p "$spec/reviews" "$fixture/docs/superpowers/specs/2026-10-07-omarchy-integration/reviews" \
     "$fixture/docs/superpowers/plans" "$fixture/docs/assets" "$fixture/docs/architecture" \
-    "$fixture/docs/adr" "$fixture/docs/start-here" "$fixture/docs/reference" "$fixture/spec"
+    "$fixture/docs/adr" "$fixture/docs/start-here" "$fixture/docs/reference" "$fixture/spec" \
+    "$fixture/docs/operations"
   cat >"$spec/CASES.md" <<'EOF'
 # Cases
 
@@ -90,6 +91,7 @@ EOF
   printf '# ADRs\n' >"$fixture/docs/adr/README.md"
   printf '# ADR-0038\n' >"$fixture/docs/adr/ADR-0038-native-host-program.md"
   printf '# Program map\n' >"$fixture/docs/architecture/PROGRAM-MAP.md"
+  printf '# Unified roadmap\n' >"$fixture/docs/operations/UNIFIED_ROADMAP.md"
   printf '# Design\n' >"$fixture/docs/superpowers/specs/2026-10-07-omarchy-integration-design.md"
   printf '<svg xmlns="http://www.w3.org/2000/svg" aria-label="Evidence that travels"><text>Evidence that travels</text></svg>\n' \
     >"$fixture/docs/assets/subhead.svg"
@@ -113,6 +115,50 @@ EOF
 # A clean tree passes every rule.
 new_fixture clean
 expect "clean fixture passes every rule" 0 "-" --
+
+# The unified roadmap is a required program input. Check content as well as
+# membership, so a passing program check cannot silently omit the roadmap.
+new_fixture roadmap-link
+printf '\n[Missing](MISSING.md)\n' >>"$fixture/docs/operations/UNIFIED_ROADMAP.md"
+expect "program checks roadmap links" 1 "links: docs/operations/UNIFIED_ROADMAP.md: missing target MISSING.md" -- --scope program
+expect "public scope excludes roadmap" 0 "-" -- --scope public
+new_fixture roadmap-em-dash
+printf 'Second line &mdash; as an entity.\n' >>"$fixture/docs/operations/UNIFIED_ROADMAP.md"
+expect "program checks roadmap em dashes" 1 "em-dash: docs/operations/UNIFIED_ROADMAP.md: line 2 contains U+2014" -- --scope program
+new_fixture roadmap-missing
+rm "$fixture/docs/operations/UNIFIED_ROADMAP.md"
+expect "missing roadmap fails program check" 1 "links: docs/operations/UNIFIED_ROADMAP.md: required document missing" -- --scope program --rule links
+new_fixture roadmap-inventory-copy
+printf '\n**Stale surfaces on main to fix (U3):**\n\n- **README.md**:\n  - line 16: "The kernel your agents answer to";\n\n**How to describe payments.** Rails plug in.\n' >>"$fixture/docs/operations/UNIFIED_ROADMAP.md"
+expect "roadmap inventory may quote retired copy" 0 "-" -- --scope program
+new_fixture roadmap-positioning-copy
+printf '\nOur builder line: "The kernel your agents answer to."\n' >>"$fixture/docs/operations/UNIFIED_ROADMAP.md"
+expect "roadmap positioning copy is checked" 1 "retired-phrases: docs/operations/UNIFIED_ROADMAP.md: contains 'The kernel your agents answer to' (count 1)" -- --scope program
+new_fixture roadmap-after-inventory
+printf '\n**Stale surfaces on main to fix (U3):**\n\n- **README.md**: "only protocol".\n\n**How to describe payments.** Agents that pay each other.\n' >>"$fixture/docs/operations/UNIFIED_ROADMAP.md"
+expect "roadmap inventory ends at the next bold paragraph" 1 "retired-phrases: docs/operations/UNIFIED_ROADMAP.md: contains 'Agents that pay each other' (count 1)" -- --scope program
+
+# Valid Markdown boundaries must not extend the historical exception over
+# active copy. Test both permitted indentation and both Setext underline kinds.
+for boundary in '## Active positioning' '   ## Active positioning' \
+  '  **Active positioning.**' ' __Active positioning.__' \
+  $'Active positioning\n------------------' $'  Active positioning\n  =================='; do
+  new_fixture roadmap-markdown-boundary
+  printf '\n**Stale surfaces on main to fix (U3):**\n\n- Historical "only protocol" quote.\n\n%s\n\nThe kernel your agents answer to.\n' "$boundary" \
+    >>"$fixture/docs/operations/UNIFIED_ROADMAP.md"
+  expect "roadmap boundary: ${boundary//$'\n'/ /}" 1 "retired-phrases: docs/operations/UNIFIED_ROADMAP.md: contains 'The kernel your agents answer to' (count 1)" -- --scope program
+done
+
+# A malformed or unbounded exception must not silently hide copy.
+for inventory in \
+  $'**Renamed inventory:**\n\n- "only protocol".\n\n## Next' \
+  $'**Stale surfaces on main to fix (U3):** extra text\n\n- "only protocol".\n\n## Next' \
+  $'**Stale surfaces on main to fix (U3):**\n\n- "only protocol".' \
+  $'**Stale surfaces on main to fix (U3):**\n\n- "only protocol".\n\n**Stale surfaces on main to fix (U3):**\n\n## Next'; do
+  new_fixture roadmap-invalid-inventory
+  printf '\n%s\n' "$inventory" >>"$fixture/docs/operations/UNIFIED_ROADMAP.md"
+  expect "invalid roadmap inventory remains checked" 1 "retired-phrases: docs/operations/UNIFIED_ROADMAP.md: contains 'only protocol' (count 1)" -- --scope program
+done
 
 # A retired phrase in Markdown is found even when wrapped across lines.
 new_fixture markdown-retired

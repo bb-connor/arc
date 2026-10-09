@@ -21,8 +21,9 @@ Rules (NORTH-STAR-FLOWS section 7, unified roadmap section 9):
 Output is one `RULE: path: message` line per violation. Exit 0 when clean,
 1 when any violation is found, 2 on a usage or read error (fail closed).
 
-`--scope program` checks only the program set; it is the gate for the native
-host documents. `--scope public` checks only the public copy, which carries a
+`--scope program` checks the native host program set and UNIFIED_ROADMAP.md.
+It checks links, copy, case references and applicable budgets, not milestone
+or dependency semantics. `--scope public` checks only the public copy, which carries a
 known baseline until the roadmap's positioning items land (see
 scripts/tests/check-native-host-docs.test.sh). The default scope is both.
 """
@@ -92,6 +93,7 @@ class Layout:
             root / "docs/superpowers/specs/2026-10-07-omarchy-integration-design.md",
             self.plans / "2026-10-07-desktop-integration.md",
             root / "docs/architecture/PROGRAM-MAP.md",
+            root / "docs/operations/UNIFIED_ROADMAP.md",
         ]
         self.adr = sorted((root / "docs/adr").glob("ADR-0038-*.md"))
         program = (
@@ -127,6 +129,11 @@ class Layout:
             self.macos / "reviews/2026-10-07-architecture-review.md",
             self.plans / "2026-10-08-north-star-restructure.md",
         }
+        # The unified roadmap quotes retired phrases only inside its inventory
+        # of stale surfaces to fix. Only that block is exempt; the rest of the
+        # file, including its positioning copy, is checked. If the block's
+        # marker is missing, nothing is exempt (fail closed).
+        self.retired_inventory = {root / "docs/operations/UNIFIED_ROADMAP.md"}
         # Every required shared document must exist; any other top-level
         # Markdown in the spec directory also counts toward the budget.
         # REVIEW.md and TRIM-LEDGER.md are audit records, not specification.
@@ -309,6 +316,32 @@ def visible_text(path: Path, text: str) -> str:
     return re.sub(r"\s+", " ", f"{attrs} {body}").lower()
 
 
+RETIRED_INVENTORY_START = "**Stale surfaces on main to fix (U3):**"
+
+
+def strip_retired_inventory(text: str) -> str:
+    """Blank the stale-surface inventory block, keeping line numbers.
+
+    Require one exact marker and a following bold paragraph or heading. Use
+    the same ATX/Setext heading syntax as the link checker, including Markdown
+    indentation. An absent, ambiguous or unterminated block exempts nothing.
+    """
+    lines = text.split("\n")
+    starts = [i for i, line in enumerate(lines) if line == RETIRED_INVENTORY_START]
+    if len(starts) != 1:
+        return text
+    start = starts[0]
+    for end in range(start + 1, len(lines)):
+        line = lines[end]
+        pair = "\n".join(lines[end:end + 2])
+        if (HEADING.fullmatch(line)
+                or SETEXT.fullmatch(pair)
+                or re.match(r"^ {0,3}(?:\*\*|__)\S", line)):
+            lines[start:end] = [""] * (end - start)
+            return "\n".join(lines)
+    return text
+
+
 def check_retired(layout: Layout) -> list[str]:
     out = missing_inputs(layout, "retired-phrases", public=False) + missing_inputs(
         layout, "retired-phrases", public=True
@@ -316,7 +349,10 @@ def check_retired(layout: Layout) -> list[str]:
     for path in sorted(set(layout.program) | set(layout.public)):
         if path in layout.retired_allowlist:
             continue
-        text = visible_text(path, read(path))
+        raw = read(path)
+        if path in layout.retired_inventory:
+            raw = strip_retired_inventory(raw)
+        text = visible_text(path, raw)
         for phrase in RETIRED:
             # "verify-only protocol" is not an "only protocol" claim. The
             # count lets a baseline catch an added occurrence in a known file.
