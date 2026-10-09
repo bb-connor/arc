@@ -506,7 +506,7 @@ The accounting has two snapshots. Both are evidence only.
 
 ## 10. Federation
 
-- A subtree closure of a locally issued root publishes through revocation checkpoints over iroh lane b (V: `lanes/revocation.rs:1-6`). Remote kernels deny within their view freshness window.
+- A subtree closure of a locally issued root publishes through revocation checkpoints. They travel over the default cross-org transport, HTTPS with mTLS or signed bodies (owner decision UR-D4, contract UR-CT-CROSS), or over iroh lane b where a deployment enables that optional lane (V: `lanes/revocation.rs:1-6`). Remote kernels deny within their view freshness window.
 - A kernel that commits or installs a revocation from any source runs the drain for ids in its authority refs (reactive drain). Each kernel drains only its own work.
 - Closures of remote capabilities, sessions, process trees, swarm graphs and D1 roots are local. The artifact marks them `scope: local`.
 

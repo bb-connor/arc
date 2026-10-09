@@ -277,7 +277,7 @@ New records carry the new state in a separate, versioned field (`influence_state
 **Readiness and downgrade:**
 - The migration records `knowledge_projection_version` only after seeds and heads are complete and the startup rebuild matches.
 - `integrity-gating` cannot be enabled, and a gated grant does not load, unless that version is current. A partial migration, or an unsupported commitment or projection version, refuses readiness.
-- The admission schema version is bumped, so an older binary refuses to open the store instead of writing journal rows that bypass the heads.
+- The admission schema version is bumped, so an older binary refuses to open the store instead of writing journal rows that bypass the heads. The new number is allocated in landing order under the schema ledger lock, with a symbolic name on the branch (owner decision UR-D3).
 
 **Owner's open question 2, resolved.** The P4 knowledge journal is the canonical owner. `chio.influence-state.v1` is a versioned projection beside `ArtifactInfluenceV1`, which it extends rather than replaces. The commitment algorithm and old-state migration are frozen above, before any signed schema is published. The old artifact, approval and semantic domains are kept as history.
 

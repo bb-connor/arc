@@ -680,7 +680,7 @@ The B: kernel-only and sustained-load figures stay as context (section 2.8).
 - **`spec/PROTOCOL.md` section 6:** durable-before-allow is satisfied by the receipt in the anchored terminal projection. A receipt is audit-complete when the receipt store and a checkpoint cover it.
 - **Admission design amendments:** X14 and X14a (the opt-in two-commit read and its stop fallback), X15 and X15a (deny tombstones on the fused path except for `KernelStopped`; rule 4 unchanged), the caller report as a progress-only return record (section 7), and the commit classes of section 5.
 - **ADR-0013:** no rule change. The authority writer is the local WAL under rules 23 to 25.
-- **Store schema:** new tables `crossing_records` and the receipt content table, and a receipt sequence counter per namespace. Fence and stop tables belong to specs 4 and 8.
+- **Store schema:** new tables `crossing_records` and the receipt content table, and a receipt sequence counter per namespace. Fence and stop tables belong to specs 4 and 8. The admission schema version this bumps is allocated in landing order under the schema ledger lock, with a symbolic name on the branch (owner decision UR-D3).
 - **Formal:** the new model and its manifest entries.
 
 ## 16. Rollout

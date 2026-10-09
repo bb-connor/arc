@@ -73,7 +73,7 @@ The first pass asked what Chio could borrow from FTL's kernel. This pass asks wh
 - Persist the stop as a signed, fenced record in the serving-epoch state that restart safety already reconciles before readiness (`M:docs/security/native-restart-safety.md`). A restarted kernel comes up stopped.
 - Expose it through the authenticated control plane.
 - Make every `KernelOp` declare a stop disposition (spec 1 rule R5), so the two unchecked admit paths become a recorded decision rather than an accident.
-- Optionally publish a stop epoch over iroh lane b, so federated peers refuse continuations from a stopped owner.
+- Optionally publish a stop epoch to federated peers, so they refuse continuations from a stopped owner. The default cross-org transport is HTTPS with mTLS or signed bodies, and iroh lane b is an optional lane (owner decision UR-D4, 2026-10-09).
 
 **Value: high (operational safety, ledgered). Cost: low to medium.**
 
