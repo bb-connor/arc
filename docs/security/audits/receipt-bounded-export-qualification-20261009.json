@@ -1,0 +1,297 @@
+{
+  "schema": "chio.security.component-qualification.v1",
+  "observed_utc": "2026-10-09T22:18:01.512783+00:00",
+  "finding": "FINAL-F03",
+  "scope": "Bounded authenticated HTTP evidence export and composed snapshot backing; local component evidence only.",
+  "producer_commit": "a8027c07fdea84197d413113507f46fdd33a67ac",
+  "integration_commit": "e7d5a7d0e3bc21da866ddb6063eb5dc2c11582eb",
+  "source_files": {
+    "crates/platform/chio-control-plane/src/trust_control/receipt_handlers.rs": "bcc88578f96e4af28780c276bdcecad0bf78f63499cb0f12128fcbccf3bcac0b",
+    "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests.rs": "99a2031fa8d660f6db65fa4b194217d5ad6d9c2500ca35260f032342d367de2b",
+    "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/evidence_snapshot_export_tests.rs": "c096bdd00b2804f467a3e3cf75d0f23a8a7fe837bc53ed1dde0071757496da4e",
+    "crates/platform/chio-store-sqlite/src/evidence_export.rs": "125fb077f09f058e25327d4578ad8ada60b5a310e17e995d321fac081e9833f2",
+    "crates/platform/chio-store-sqlite/src/evidence_export/http_budget.rs": "4201dc3b6589d7d87a2ed1f800f8d6642e84c64a03e834a197f3beb96ed052a2",
+    "crates/platform/chio-store-sqlite/src/evidence_export/tests/snapshot_tests.rs": "85ad1e2be5fb26e48271503b463917c891ed40468c5b40f6061881a73318c180",
+    "crates/platform/chio-store-sqlite/src/receipt_query_snapshot.rs": "bf0829e31d55c7887e38de556919534b3dff29d4738ebb0a9c95416d710f795b",
+    "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/db.rs": "8a4edf91ed07c6824bc9fdd36f5e0037e708f6d1c3d3afd2763c63006b75db9a",
+    "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export.rs": "1f2672bfc9cf93c2e2e6aff6941260d8da93a62786030344689022d7b7ba2474",
+    "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export/metadata.rs": "7b423e90757d970f156bde4946571b9f40cd510f4f7daf0ed54de7aa5860c7f7",
+    "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export/proofs.rs": "ac53f94d8b251c48754ea75255bbec42bd0110fc1e05ad030f81bb67c8f64d27",
+    "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export/tests.rs": "d709178dd7e626c19e814532314056e2daf62f845ce1ae80271af8294f5d8593",
+    "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/fetch.rs": "781c8e710e4d674bf5853114def4fbf26b62d8a21bcf442daba8a50bf9dce657",
+    "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/query.rs": "836fc751f44c235c057df0cbcb5987d30fa7fd80f0eb9c83f20e5fab99699cbc",
+    "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service.rs": "01f4b43f7744801cf9febf06f62f3e1a9e67ad08a5f35811c04e9806e7d020ce",
+    "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/capacity/linux_file.rs": "88589c410a3e5101c0699c82971878942963a6c940b0559bb1a60d79d632bf4d",
+    "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/walk.rs": "f4d2a8929f62522fc471294f112c3fc81cf7108b2a26b0150a9c57e27186582b",
+    "docs/security/receipt-http-evidence-export.md": "76efab5afb00f181d29c95636df484f92366fd8d0799b1ea5d8f18d80f298475"
+  },
+  "composition": "Two service.rs overlap resolutions retain Root health telemetry and requested quota while exposing only sibling export access. Other producer changes applied without conflict.",
+  "original": {
+    "http_campaign": {
+      "passed": 26,
+      "failed": 2,
+      "record": {
+        "evidence_path": "pr1160-final-review-20261009/composed/http-green-export-original.log",
+        "sha256": "31b7c32dc2e8d35e4a015b4bdcf8504b26f05b48c6c06bf2c599f7dfa1263e70"
+      },
+      "fixture": {
+        "evidence_path": "pr1160-final-review-20261009/export/ROOT-F03-ORIGINAL-CONTROL.rs",
+        "sha256": "7cf758c475a6b4abe1aff84ce1e4f1fc41ea023e5f8cdb415b974024889a4512"
+      },
+      "fixture_provenance": {
+        "evidence_path": "pr1160-final-review-20261009/export/ARCHIVED-FIXTURE-SOURCE.json",
+        "sha256": "d41b42d15b0bccb55e141b1539f84942a33004c449d67463099c04f4eca1c41d"
+      },
+      "failures": [
+        "Export without a configured authenticated projection returned200 instead of503.",
+        "Unrelated archived-tenant corruption made a selected-tenant export fail500 instead of returning200."
+      ]
+    },
+    "semantic_campaign": {
+      "passed": 1,
+      "failed": 2,
+      "record": {
+        "evidence_path": "pr1160-bounded-export-20261009/f03-witnesses-red-valid.json",
+        "sha256": "45c39758c9e2c554d7b6a52547faa4246184bdddcb3e6295c4fb1ac5c3300e96"
+      },
+      "log": {
+        "evidence_path": "pr1160-bounded-export-20261009/f03-witnesses-red-valid.log",
+        "sha256": "0680a4e35fa6cc38d909637f78931d778a0fd170a0b2f54cfc6601eff8791625"
+      },
+      "failures": [
+        "Combined publication core and binding metadata did not share one preallocation allowance.",
+        "Deletion of current attribution for a captured known unsigned subject was accepted."
+      ],
+      "positive": "An originally unknown unsigned subject legitimately retains empty-lineage export semantics."
+    },
+    "provenance_limit": "The earlier composed SOURCE.json pins a different fixture revision. The archived fixture source record above is the provenance of the retained HTTP Original, not that earlier revision."
+  },
+  "earlier_attempts": [
+    {
+      "record": {
+        "evidence_path": "pr1160-bounded-export-20261009/store-final-root-green.json",
+        "sha256": "94488c1d06b30e96b4f73105ca1c78c5029ed34ca2c5c7674ef62c8e5971eb21"
+      },
+      "result": "174passed,0failed,7ignored before checked-tail and test-alias edits; historical evidence only."
+    },
+    {
+      "record": {
+        "evidence_path": "pr1160-bounded-export-20261009/store-final-root-clippy.json",
+        "sha256": "13acdf7e97d2ef89a24d19e4299869822431067dde34c130b7d48ba85b64d75d"
+      },
+      "result": "exit101, two denied unchecked tail slices; retained failure."
+    },
+    {
+      "record": {
+        "evidence_path": "pr1160-bounded-export-20261009/store-repaired-root-clippy.json",
+        "sha256": "bcb69f73902fc41e9ea8c45ea9c176a509fd4bd65aeba7a863e2be08cfccffff"
+      },
+      "result": "exit101, test-hook type complexity; retained failure."
+    },
+    {
+      "result": "The first semantic witness attempt did not compile because ReceiptStore was not imported; it is not runtime RED. A queued metadata run was cancelled and is not passing evidence."
+    }
+  ],
+  "composed_checks": {
+    "store": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-store-sqlite",
+        "--lib",
+        "--",
+        "evidence_export",
+        "receipt_query_snapshot",
+        "--show-output"
+      ],
+      "exit": 0,
+      "source_stable": true,
+      "test_summaries": [
+        "test result: ok. 180 passed; 0 failed; 7 ignored; 0 measured; 2110 filtered out; finished in 111.58s"
+      ],
+      "elapsed_seconds": 258.86288085533306,
+      "record": {
+        "evidence_path": "pr1160-final-review-20261009/export-composed/store.json",
+        "sha256": "94c5f365599d7a890de849239712a0c2a34457e7f5fc11d4dc7686dd1e784e43"
+      },
+      "log": {
+        "evidence_path": "pr1160-final-review-20261009/export-composed/store.log",
+        "sha256": "33f675d7b871377df768c25efa2ddec6627324122766b3f7b721eb619e048bde"
+      }
+    },
+    "http": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--lib",
+        "--",
+        "evidence_snapshot_export_tests",
+        "receipt_query_snapshot_tests",
+        "--show-output"
+      ],
+      "exit": 0,
+      "source_stable": true,
+      "test_summaries": [
+        "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 1567 filtered out; finished in 7.06s"
+      ],
+      "elapsed_seconds": 214.94300010195002,
+      "record": {
+        "evidence_path": "pr1160-final-review-20261009/export-composed/http.json",
+        "sha256": "2c9ea64700171a599159df4e1ebe5d5c0cdd4c9de3e3b5a02c1e964214cfeefa"
+      },
+      "log": {
+        "evidence_path": "pr1160-final-review-20261009/export-composed/http.log",
+        "sha256": "f860daf2959d05b77863437f7bf4f05d42a807496780b02bfbe95e9d74b8a598"
+      }
+    },
+    "capacity100k": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-store-sqlite",
+        "--lib",
+        "linux_file_large_covered_range_staging",
+        "--",
+        "--ignored",
+        "--show-output"
+      ],
+      "exit": 0,
+      "source_stable": true,
+      "test_summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2296 filtered out; finished in 1428.65s"
+      ],
+      "elapsed_seconds": 1429.7490822449327,
+      "record": {
+        "evidence_path": "pr1160-final-review-20261009/export-composed/capacity100k.json",
+        "sha256": "66240b96d02abfdabffadd39cbc89a59daa4b52c6a9e66c822c923967783cec9"
+      },
+      "log": {
+        "evidence_path": "pr1160-final-review-20261009/export-composed/capacity100k.log",
+        "sha256": "3f4b2f7175ccb6c6cedd4bf4522ab9a2fbe42797d632f22efcceb02c12bc40b1"
+      }
+    },
+    "strict": {
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-control-plane",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "source_stable": true,
+      "test_summaries": [],
+      "elapsed_seconds": 160.0717331217602,
+      "record": {
+        "evidence_path": "pr1160-final-review-20261009/export-composed/strict.json",
+        "sha256": "a9307daa2bc740e07dde91c81bf13c38d2348f07d698c2c0ef5d41462d329fbc"
+      },
+      "log": {
+        "evidence_path": "pr1160-final-review-20261009/export-composed/strict.log",
+        "sha256": "42b9cab26df7c1ef3648aad4021b3c5a49a34b1eb9ffc51305e9ce693dfe31a0"
+      }
+    },
+    "fmt": {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit": 0,
+      "source_stable": true,
+      "test_summaries": [],
+      "elapsed_seconds": 28.116695096716285,
+      "record": {
+        "evidence_path": "pr1160-final-review-20261009/export-composed/fmt.json",
+        "sha256": "f33f857be5f72e53e45e580f32e793773ad1e66a768f696f0fbe308d4f649aea"
+      },
+      "log": {
+        "evidence_path": "pr1160-final-review-20261009/export-composed/fmt.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  },
+  "full_size_control": {
+    "profile": "unoptimized test profile; functional evidence only, not production throughput",
+    "total_entries": 111000,
+    "covered_entries": 100000,
+    "prefix_entries": 1000,
+    "max_staged_per_hold": 256,
+    "max_settled_per_hold": 256,
+    "archived_entries": 101000,
+    "per_call_parity": {
+      "admin": {
+        "total_count": 101000
+      },
+      "tenant_a": {
+        "total_count": 50500
+      }
+    },
+    "cancellation": {
+      "gate": "Publication",
+      "gate_skipped_publication_steps": 4,
+      "range_entries": 10000,
+      "shutdown_ms": 16.127,
+      "state": "stopped"
+    }
+  },
+  "constraints": {
+    "selected_receipts": 4096,
+    "combined_bytes": 33554432,
+    "genesis_checkpoint_prefix": 4096,
+    "proof_leaves": 131072,
+    "request_semantics": "Capture selected receipts, children and unsigned-subject identities from one authenticated watermark. Verify immutable payloads and proofs outside snapshot holds, with epoch/invalidation fences. Benign generation advancement remains allowed.",
+    "attribution": "Signed subjects remain authoritative. Captured known unsigned attribution must match validated current lineage; deletion refuses. Originally unknown attribution preserves empty lineage.",
+    "checkpoint_binding": "Canonical complete signed checkpoint, including its signature, under chio.receipt-query-snapshot.checkpoint.v1\u0000.",
+    "retention_diagnostics": "Not available in snapshot HTTP bundles; complete local operator export still computes them.",
+    "fallback": "A genesis-prefix ceiling cannot be repaired by narrowing a recent query. The explicit error directs operators to complete local export. Authenticated paginated or anchored export format remains a separate follow-up.",
+    "receipt_gets": "HTTP export ceilings do not limit authenticated receipt GET query history."
+  },
+  "hygiene": {
+    "record": {
+      "evidence_path": "pr1160-final-review-20261009/export-composed/hygiene.json",
+      "sha256": "5774c56d4ab986713869cdbae859d25121809499312d5a9e62ab57f602466663"
+    },
+    "log": {
+      "evidence_path": "pr1160-final-review-20261009/export-composed/hygiene.log",
+      "sha256": "8b592be8e262f9f867fcc1d1d9171ac3feb5d7e3a5a78f887d58778665ec9ea9"
+    },
+    "result": "passed without changed limits"
+  },
+  "boundary_inventory": {
+    "application": {
+      "evidence_path": "pr1160-final-review-20261009/export-composed/CENSUS-PRESERVATION.json",
+      "sha256": "e5c87014adacf49aa690646808dc43e31b08192971331d5fb22ff449eeb1eb24"
+    },
+    "review": {
+      "evidence_path": "pr1160-final-review-20261009/export-composed/REVIEWED-CENSUS-ADDITION.json",
+      "sha256": "9430e8b66300f0f15fe780bebf10ed97a3082361cdbc42141a7f98e71e880257"
+    },
+    "delta": "Exactly two new files and six shared authenticated-reader calls; no changed existing consumer or exemption.",
+    "verification": {
+      "evidence_path": "pr1160-final-review-20261009/export-composed/trust-final.json",
+      "sha256": "e5b848b491282b86a8fbc441105fff4ca71ec0475e98e92504fb05b1072330f7"
+    }
+  },
+  "remaining_acceptance": [
+    "Compose the remaining F01/F02/F04-OPERATOR/F11/F12/F13 repairs.",
+    "Obtain final independent candidate review and exact protected hosted checks before normal protected merge."
+  ],
+  "hosted_qualified": false,
+  "merged": false
+}
