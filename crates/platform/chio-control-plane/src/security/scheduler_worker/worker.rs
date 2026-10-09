@@ -248,6 +248,24 @@ impl ProductionResponseWorker {
         })
     }
 
+    /// Runs one tick on a blocking thread so the worker's runtime keeps
+    /// driving alert delivery and stop requests while a tick is parked. The
+    /// tick is always awaited to completion: a store transaction is never
+    /// abandoned, and the port is never shut down beside a running tick.
+    async fn tick_blocking(
+        self: &Arc<Self>,
+    ) -> Result<ResponseWorkerTick, ResponseWorkerTickError> {
+        let worker = Arc::clone(self);
+        match tokio::task::spawn_blocking(move || worker.tick_once_catching_crash()).await {
+            Ok(result) => result,
+            Err(_) => {
+                let error = worker_task_crash_error();
+                self.mark_failed(&error);
+                Err(error)
+            }
+        }
+    }
+
     async fn tick_until_initial_ready(
         &self,
         config: ProductionResponseWorkerLoopConfig,
@@ -419,7 +437,7 @@ impl ProductionResponseWorker {
                                     }
                                 }
                                 _ = interval.tick() => {
-                                    match worker.tick_once_catching_crash() {
+                                    match worker.tick_blocking().await {
                                         Ok(_) => {}
                                         Err(ResponseWorkerTickError::WorkerStopped)
                                             if phase_receiver.borrow().stop_requested() =>
@@ -593,6 +611,9 @@ impl ProductionResponseWorker {
 
     pub(super) fn request_stop(&self) {
         self.shutdown_requested.store(true, Ordering::Release);
+        if !self.shutdown_completed.load(Ordering::Acquire) {
+            self.port.request_stop();
+        }
         self.with_health(|health| {
             if !matches!(
                 health.lifecycle,

@@ -245,3 +245,66 @@ async fn a_clock_failure_is_recorded_and_the_next_pass_clears_it() {
         }
     );
 }
+
+#[tokio::test]
+async fn alert_delivery_makes_progress_while_a_tick_is_parked() {
+    use crate::security::scheduler_worker::tests::BlockingWorkerPort;
+    use crate::security::scheduler_worker::{
+        ProductionResponseWorker, ProductionResponseWorkerLoopConfig,
+    };
+    use std::time::Duration;
+
+    let fixture = fixture(true, 3);
+    let delivery = Arc::new(SecurityAlertDelivery::new(
+        Arc::clone(&fixture.outbox),
+        fixture.clock.clone(),
+    ));
+    let port = Arc::new(BlockingWorkerPort::new());
+    let worker = Arc::new(
+        ProductionResponseWorker::new_with_alert_delivery(
+            Arc::clone(&port) as Arc<dyn crate::security::scheduler_worker::ResponseWorkerPort>,
+            Some(Arc::clone(&delivery)),
+        )
+        .unwrap_or_else(|error| panic!("worker: {error}")),
+    );
+    let mut handle = worker
+        .start_parked(ProductionResponseWorkerLoopConfig {
+            tick_interval: Duration::from_millis(10),
+        })
+        .await
+        .unwrap_or_else(|error| panic!("start: {error}"));
+    handle
+        .arm()
+        .await
+        .unwrap_or_else(|error| panic!("arm: {error}"));
+    handle
+        .release_publication()
+        .unwrap_or_else(|error| panic!("publication: {error}"));
+    handle
+        .wait_for_publication_readiness()
+        .await
+        .unwrap_or_else(|error| panic!("readiness: {error}"));
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !port.tick_in_flight.load(Ordering::Acquire) {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap_or_else(|_| panic!("tick did not park"));
+
+    let passes_when_parked = delivery.health().passes;
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while delivery.health().passes < passes_when_parked.saturating_add(2) {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .unwrap_or_else(|_| panic!("alert delivery stalled behind the parked tick"));
+    assert!(port.tick_in_flight.load(Ordering::Acquire));
+
+    port.release();
+    handle
+        .shutdown()
+        .await
+        .unwrap_or_else(|error| panic!("shutdown: {error}"));
+}

@@ -57,6 +57,11 @@ pub trait ResponseWorkerPort: Send + Sync {
     ) -> Result<ResponseWorkerTick, ResponseWorkerTickError>;
     fn shutdown(&self) -> Result<(), ResponseWorkerTickError>;
 
+    /// A stop was requested. A tick in flight may end at its next safe point,
+    /// which is never inside a store transaction. Work it leaves unprocessed
+    /// is released by `shutdown`.
+    fn request_stop(&self) {}
+
     fn declassification_outbox_status(&self) -> (bool, Option<u64>, Option<String>) {
         (false, None, None)
     }

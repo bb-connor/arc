@@ -1,12 +1,12 @@
 use super::{
-    canonical_json_bytes, sha256, ActionId, Arc, BTreeMap, Clock, DeclassificationOutboxHealth,
-    EffectPort, LeaseOwnerId, Mutex, PortError, PortErrorKind,
-    ProductionDeclassificationReceiptOutbox, RecordId, ResponseDispatchStore, ResponseExecutor,
-    ResponseScheduler, ResponseSchedulerStore, ResponseWorkerPort, ResponseWorkerTick,
-    ResponseWorkerTickError, ScheduledResponseExecutor, ScheduledWork, SchedulerError,
-    SchedulerHealthPort, SchedulerPolicy, SchedulerTickRequest, SchedulerWorkOutcome,
-    SecurityAlertPort, SecurityReceiptSink, Serialize, SqliteSecurityStateStore, TenantId,
-    WORKER_CLAIM_DOMAIN,
+    canonical_json_bytes, sha256, ActionId, Arc, AtomicBool, BTreeMap, Clock,
+    DeclassificationOutboxHealth, EffectPort, LeaseOwnerId, Mutex, Ordering, PortError,
+    PortErrorKind, ProductionDeclassificationReceiptOutbox, RecordId, ResponseDispatchStore,
+    ResponseExecutor, ResponseScheduler, ResponseSchedulerStore, ResponseWorkerPort,
+    ResponseWorkerTick, ResponseWorkerTickError, ScheduledResponseExecutor, ScheduledWork,
+    SchedulerError, SchedulerHealthPort, SchedulerPolicy, SchedulerTickRequest,
+    SchedulerWorkOutcome, SecurityAlertPort, SecurityReceiptSink, Serialize,
+    SqliteSecurityStateStore, TenantId, WORKER_CLAIM_DOMAIN,
 };
 
 #[derive(Clone, Debug)]
@@ -56,6 +56,7 @@ pub struct SqliteResponseWorkerPort {
     claim_incarnation_id: RecordId,
     operation_lock: Mutex<()>,
     owned_leases: Mutex<BTreeMap<String, OwnedLease>>,
+    stop_requested: AtomicBool,
 }
 
 impl SqliteResponseWorkerPort {
@@ -170,6 +171,7 @@ impl SqliteResponseWorkerPort {
             claim_incarnation_id,
             operation_lock: Mutex::new(()),
             owned_leases: Mutex::new(BTreeMap::new()),
+            stop_requested: AtomicBool::new(false),
         };
         worker.ensure_ready()?;
         Ok(worker)
@@ -335,7 +337,7 @@ impl ResponseWorkerPort for SqliteResponseWorkerPort {
         shutdown_requested: bool,
     ) -> Result<ResponseWorkerTick, ResponseWorkerTickError> {
         let _operation_guard = self.operation_guard();
-        if shutdown_requested {
+        if shutdown_requested || self.stop_requested.load(Ordering::Acquire) {
             self.release_safe_owned()?;
             return Err(ResponseWorkerTickError::WorkerStopped);
         }
@@ -352,6 +354,12 @@ impl ResponseWorkerPort for SqliteResponseWorkerPort {
             lease_lost_action_ids: Vec::new(),
         };
         for work in claimed {
+            // Each action commits in its own transaction, so a stop takes
+            // effect between actions. Leases still unprocessed stay safe to
+            // release and `shutdown` hands them back.
+            if self.stop_requested.load(Ordering::Acquire) {
+                return Err(ResponseWorkerTickError::WorkerStopped);
+            }
             let processed = (|| -> Result<SchedulerWorkOutcome, ResponseWorkerTickError> {
                 let current = self.prepare_work(&work)?;
                 let now_unix_ms = self
@@ -385,6 +393,9 @@ impl ResponseWorkerPort for SqliteResponseWorkerPort {
         // A broken declassification outbox must close admission, but cannot
         // prevent independent, already-authorized response rollback. Each
         // response still commits its own required receipts through the executor.
+        if self.stop_requested.load(Ordering::Acquire) {
+            return Err(ResponseWorkerTickError::WorkerStopped);
+        }
         if let Some(outbox) = &self.declassification_outbox {
             let (declassification, compaction) = outbox.maintain_one_batch()?;
             report.declassification_receipts_appended = declassification.appended;
@@ -395,12 +406,17 @@ impl ResponseWorkerPort for SqliteResponseWorkerPort {
         Ok(report)
     }
 
+    fn request_stop(&self) {
+        self.stop_requested.store(true, Ordering::Release);
+    }
+
     fn shutdown(&self) -> Result<(), ResponseWorkerTickError> {
         let _operation_guard = self.operation_guard();
         self.release_safe_owned()?;
         if let Some(outbox) = &self.declassification_outbox {
             outbox.drain_to_zero()?;
         }
+        self.stop_requested.store(false, Ordering::Release);
         Ok(())
     }
 
