@@ -34,12 +34,12 @@ The current status counts are:
 | Status | Records | Meaning |
 | --- | ---: | --- |
 | `open` | 231 | No complete independent disposition is recorded. |
-| `needs_revalidation` | 47 | Historical closure remains, but cited source or document pins differ without an accepted current continuity review. |
-| `recorded_scoped_closed` | 70 | The recorded scoped disposition is retained, with the limits stated per record. |
+| `needs_revalidation` | 45 | Historical closure remains, but cited source or document pins differ without an accepted current continuity review. |
+| `recorded_scoped_closed` | 72 | The recorded scoped disposition is retained, with the limits stated per record. |
 | `candidate_only` | 39 | The defective candidate was uninstalled when found; corrected successors may have separate evidence. |
 | `prerequisite_only` | 1 | Provenance work, not a proved implementation defect. |
 
-The 47 remaining revalidation flags are part of the 117 historical scoped closures. They
+The 45 remaining revalidation flags are part of the 117 historical scoped closures. They
 are not added to the 231 historically unclosed findings. No finding is declared
 regressed merely because its bytes changed, and no matching pin constitutes a
 new behavioral test. The initial audit flagged 48 closures. An independent
@@ -47,6 +47,14 @@ new behavioral test. The initial audit flagged 48 closures. An independent
 subsequently confirmed that the README change for `A-planner-07` adds navigation
 only and preserves its original source-only obligation. Its historical pin
 difference remains recorded, alongside the current review and its scope.
+
+The [SDK compatibility and portability continuity review](reviews/sdk-compatibility-portability.md)
+then restores only the original scoped classifications of `H-SDK-02` and
+`H-SDK-11` after SPEC_PASS and independent QUALITY_PASS. Their historical changed
+pins remain recorded; additive `current_review` objects retain both previous
+statuses and reasons. The remaining flags comprise 35 canonical and ten additional
+findings. Historical closure totals and every other record are unchanged.
+`H-SDK-01`, source-fixture cleanup and metadata work remain pending.
 
 The installed SDK changes affect six direct pin pairs across `H-SDK-03`,
 `H-SDK-08`, `H-SDK-09` and `SDK-INDEPENDENT-03`. The independent
@@ -306,8 +314,23 @@ evidence pins were verified, including the four exact reviewed postimages within
 the 18-file composed checkpoint and all four predecessor/corrected execution
 records and logs. The broader
 receipt failure and its source manifest are separately pinned. The twelve
-initial Capture source/selection passes and SPEC_PASS remain separate with quality
-review pending; they establish no final Capture acceptance.
+initial Capture source/selection passes and SPEC_PASS were recorded with quality
+review pending at that historical 14-path stage. The later documentation correction
+records CHANGES_REQUIRED, a production compile failure and subsequent export
+repair compilation within a RED owning run. One unresolved Capture finding and
+related work remain parked after an automatic guard block and the instruction to
+stop, with no retry. The [receipt report](reviews/receipt-owner-registration.md)
+preserves that correction; no blocked case was re-inspected for this accounting.
+The current Capture candidate remains uninstalled and unaccepted.
+The SDK continuity update preserves 386 of 388 records byte-for-byte. Only the
+two SDK current statuses and reasons change, with additive reviews retaining
+their previous values. All canonical historical fields, pin audits, original
+inventories and prior updates remain unchanged. The two restored scoped closures
+change only current classification counts: 45 need revalidation and 72 retain
+their scoped closure. The 269 reviewed source hashes, 58 evidence hashes and ten
+frozen portable-packet files were verified without rerunning source tests.
+After accounting, 268 source hashes still match; the frozen register pin matches
+its pre-update Git blob. The reviewed manifest remains unchanged.
 The installation-specific SDK continuity audit supplements the historical pin
 audit; it does not rerun unrelated flags. Confidence is high for this accounting;
 current integrated behavior remains unqualified.
