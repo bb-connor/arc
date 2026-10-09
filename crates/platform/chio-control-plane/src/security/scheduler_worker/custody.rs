@@ -1,6 +1,6 @@
 use super::{
-    advance_phase, catch_unwind, worker_task_crash_error, Arc, AssertUnwindSafe, Condvar, Duration,
-    Mutex, OnceLock, Ordering, ProductionResponseWorker, ProductionResponseWorkerHandle,
+    advance_phase, catch_unwind, worker_task_crash_error, Arc, AssertUnwindSafe, Condvar, Mutex,
+    OnceLock, Ordering, ProductionResponseWorker, ProductionResponseWorkerHandle,
     ResponseWorkerJoinOwnership, ResponseWorkerStartupGuard, ResponseWorkerThreadCompletion,
     ResponseWorkerTickError, VecDeque, WorkerPhase,
 };
@@ -8,7 +8,6 @@ use super::{
 use std::sync::atomic::AtomicBool;
 
 pub(super) const MAX_RESPONSE_WORKER_JOIN_OWNERS: usize = 64;
-pub(super) const RESPONSE_WORKER_REAPER_POLL_INTERVAL: Duration = Duration::from_millis(10);
 
 pub(super) struct ResponseWorkerJoinPermit {
     registry: Arc<ResponseWorkerReaperRegistry>,
@@ -31,6 +30,8 @@ pub(super) struct ResponseWorkerReaperRegistry {
     wake: Condvar,
     #[cfg(test)]
     fail_next_spawn: AtomicBool,
+    #[cfg(test)]
+    idle_wakeups: std::sync::atomic::AtomicU64,
 }
 
 pub(super) static RESPONSE_WORKER_REAPER_REGISTRY: OnceLock<Arc<ResponseWorkerReaperRegistry>> =
@@ -47,6 +48,8 @@ impl ResponseWorkerReaperRegistry {
             wake: Condvar::new(),
             #[cfg(test)]
             fail_next_spawn: AtomicBool::new(false),
+            #[cfg(test)]
+            idle_wakeups: std::sync::atomic::AtomicU64::new(0),
         }
     }
 
@@ -118,27 +121,20 @@ impl ResponseWorkerReaperRegistry {
         }
     }
 
-    fn take_ready_job(&self) -> ResponseWorkerJoinJob {
+    /// Sleeps until a job is queued, then takes the oldest. Joining it then
+    /// blocks on the worker thread itself, so nothing here polls.
+    fn take_next_job(&self) -> ResponseWorkerJoinJob {
         let mut state = self.lock_state();
         loop {
-            while state.jobs.is_empty() {
-                state = match self.wake.wait(state) {
-                    Ok(state) => state,
-                    Err(poisoned) => poisoned.into_inner(),
-                };
+            if let Some(job) = state.jobs.pop_front() {
+                return job;
             }
-            if let Some(index) = state.jobs.iter().position(|job| job.join.is_finished()) {
-                if let Some(job) = state.jobs.remove(index) {
-                    return job;
-                }
-            }
-            state = match self
-                .wake
-                .wait_timeout(state, RESPONSE_WORKER_REAPER_POLL_INTERVAL)
-            {
-                Ok((state, _)) => state,
-                Err(poisoned) => poisoned.into_inner().0,
+            state = match self.wake.wait(state) {
+                Ok(state) => state,
+                Err(poisoned) => poisoned.into_inner(),
             };
+            #[cfg(test)]
+            self.idle_wakeups.fetch_add(1, Ordering::AcqRel);
         }
     }
 
@@ -148,7 +144,7 @@ impl ResponseWorkerReaperRegistry {
                 join,
                 worker,
                 _permit,
-            } = self.take_ready_job();
+            } = self.take_next_job();
             let joined = catch_unwind(AssertUnwindSafe(|| {
                 join_response_worker_thread(join, &worker)
             }));
@@ -436,6 +432,10 @@ impl Drop for ProductionResponseWorkerHandle {
 #[cfg(test)]
 #[path = "tests/reaper_spawn_failure_retains_join_ownership_for_later_recovery.rs"]
 mod reaper_spawn_failure_retains_join_ownership_for_later_recovery;
+
+#[cfg(test)]
+#[path = "tests/reaper_blocks_on_the_worker_join_without_polling.rs"]
+mod reaper_blocks_on_the_worker_join_without_polling;
 
 #[cfg(test)]
 #[path = "tests/join_registry_reservations_bound_retained_worker_growth.rs"]
