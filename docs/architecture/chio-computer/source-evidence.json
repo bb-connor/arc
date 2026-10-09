@@ -1,0 +1,264 @@
+{
+  "schema": "chio.computer.design-source-snapshot.v1",
+  "captured_at": "2026-10-09T16:20:47.304163+00:00",
+  "scope": "Source inspection only; no runtime qualification performed",
+  "views": {
+    "main": {
+      "head": "f5a9d2ab238448b8a85b04e9d426c507a2e09929",
+      "sources": [
+        {
+          "path": "spec/PROTOCOL.md",
+          "sha256": "6c925ecff4b6fb0e7f337a2330253022ec98cbfd263fe3f9eb23c13154e0a40b",
+          "lines": 4450,
+          "matches_head": true
+        },
+        {
+          "path": "crates/core/chio-core-types/src/capability/scope.rs",
+          "sha256": "de9cbc93c397f7b02e731164be24a67f8ad520cbad420711f996d7fc3d480bf8",
+          "lines": 629,
+          "matches_head": true
+        },
+        {
+          "path": "crates/core/chio-core-types/src/capability/attenuation.rs",
+          "sha256": "824be25091a4da3394b43a64d70cc7a2261f371a4a2e4da4497c9c5c09ef6365",
+          "lines": 1154,
+          "matches_head": true
+        },
+        {
+          "path": "crates/kernel/chio-kernel/ARCHITECTURE.md",
+          "sha256": "843c3ff8095f2b20f69ac9767b6c1e9b80b956473e9e40e709915d46bb1d0ea5",
+          "lines": 98,
+          "matches_head": true
+        },
+        {
+          "path": "crates/kernel/chio-kernel/src/kernel/dispatch.rs",
+          "sha256": "de227936483f009fbb5cdd6aa76dc00794dd33aa94586af8d4c481b22b14d8cb",
+          "lines": 2058,
+          "matches_head": true
+        },
+        {
+          "path": "crates/kernel/chio-kernel/src/kernel/validation.rs",
+          "sha256": "521c3e9ecde872488021cac2e93fd50d2515ff013bcd6d5bc5cd8a36cdc5ec58",
+          "lines": 2821,
+          "matches_head": true
+        },
+        {
+          "path": "crates/kernel/chio-kernel/src/kernel/mod.rs",
+          "sha256": "6e5601a319e580c23e15abc65e8436d9680af327ee14c76092942dd9b4698efb",
+          "lines": 1522,
+          "matches_head": true
+        },
+        {
+          "path": "crates/kernel/chio-kernel/src/budget_store.rs",
+          "sha256": "ba08e552596802e4618c9348af09a7e183639cff66943185c426018e22bc91f5",
+          "lines": 1411,
+          "matches_head": true
+        },
+        {
+          "path": "crates/kernel/chio-kernel/src/budget_store/model.rs",
+          "sha256": "6fe7b63454680ca5cb95896a1fe8664630e55439d7c4d6271b95666fceabe076",
+          "lines": 496,
+          "matches_head": true
+        },
+        {
+          "path": "crates/kernel/chio-swarm-authority/src/types.rs",
+          "sha256": "33b9b0a28adbccb868f12c490822bc422ba3fc1319ce0b8ad16bb9a7671adf05",
+          "lines": 389,
+          "matches_head": true
+        },
+        {
+          "path": "crates/kernel/chio-swarm-authority/src/verifier.rs",
+          "sha256": "09b924f6460b2fdbd92e59f13ad06792a4e4d5524f04947ed21363761df33112",
+          "lines": 2235,
+          "matches_head": true
+        },
+        {
+          "path": "crates/kernel/chio-swarm-authority/src/verifier/budget_accounting.rs",
+          "sha256": "79d9ac6aa1447880e8aad5fe2ed65d8c9c0c622d2ba502c5129a6ee9538a0487",
+          "lines": 73,
+          "matches_head": true
+        },
+        {
+          "path": "crates/kernel/chio-runtime/ARCHITECTURE.md",
+          "sha256": "9c5cf10c8ee189b9834b39625e2a424580456abf35d85d8d83e8a1a178349ca5",
+          "lines": 106,
+          "matches_head": true
+        },
+        {
+          "path": "crates/kernel/chio-runtime-core/src/admission_hook.rs",
+          "sha256": "4046cb2f530113aea43f028c494db1a4a15f143ab562c55a3fa78760d4c2d4ab",
+          "lines": 1084,
+          "matches_head": true
+        },
+        {
+          "path": "crates/trust/chio-federation-transport-iroh/ARCHITECTURE.md",
+          "sha256": "c98f98b6735f7ce4080cfed22af7d3c6cfb53184cf28ce345c32038dc4fcfe33",
+          "lines": 132,
+          "matches_head": true
+        },
+        {
+          "path": "crates/platform/chio-agent-web-interop/ARCHITECTURE.md",
+          "sha256": "bd0b808d186cb4fea1a6c3e665635616ab43657606d8f83157e6dc012f831fb0",
+          "lines": 149,
+          "matches_head": true
+        },
+        {
+          "path": "crates/platform/chio-workflow/ARCHITECTURE.md",
+          "sha256": "c9d699380a4026378c147f5f9c5ef6f2d0afb8a4a12fec9d84694a146e25babf",
+          "lines": 90,
+          "matches_head": true
+        },
+        {
+          "path": "crates/platform/chio-manifest/src/lib.rs",
+          "sha256": "5cd6c8f3a6e85b97b0aa7c139aaf975422199c8f66fee8f394560a33be8230d9",
+          "lines": 715,
+          "matches_head": true
+        }
+      ],
+      "hosted_source_commit": "f5566d9a765c21cb36652a99c79de64968a656bf",
+      "hosted_source_commit_matches_recorded_files": true
+    },
+    "process_recovery": {
+      "head": "67cf758253944d3591174e35feefaf680bda9464",
+      "sources": [
+        {
+          "path": "crates/kernel/chio-process/src/lib.rs",
+          "sha256": "192c8e2f8e634b4c5e544dcfd870cfcbe8abb6802f279a278a64af3afecb2554",
+          "lines": 722,
+          "matches_head": true
+        },
+        {
+          "path": "crates/kernel/chio-process/src/types.rs",
+          "sha256": "3a0129483ab251cd2f088f245e7eac5ee799c3d081ddbbf92f28566dfc8df9ee",
+          "lines": 148,
+          "matches_head": true
+        },
+        {
+          "path": "crates/kernel/chio-process/src/registry.rs",
+          "sha256": "70588b6aeb909f24f2a55ee4d5ed2dac662dd3edce816a264acf6018659b1690",
+          "lines": 191,
+          "matches_head": true
+        },
+        {
+          "path": "crates/kernel/chio-process/src/store/children.rs",
+          "sha256": "b27503b07dd4144b45525d81a0bc46dc57971e2aed0d15f2c73fa7e9c1306d1c",
+          "lines": 314,
+          "matches_head": true
+        },
+        {
+          "path": "crates/kernel/chio-process/MAILBOXES.md",
+          "sha256": "60b424e24c7830caa3d3ff119fb77f9d6ef4aefdd624f620227edc63d3ff3f0d",
+          "lines": 254,
+          "matches_head": true
+        },
+        {
+          "path": "crates/kernel/chio-process/WORKER_PROTOCOL.md",
+          "sha256": "29f93f479d6fcdc547b71120c3b50e1134d749e2730a16742d2a7992a49aa503",
+          "lines": 184,
+          "matches_head": true
+        },
+        {
+          "path": "crates/kernel/chio-process/tests/aggregate_family.rs",
+          "sha256": "9efa0454c30a1df4b6db3a1ead9a1209bbbac4169ac2696d6cae029802a63ae3",
+          "lines": 135,
+          "matches_head": true
+        },
+        {
+          "path": "crates/kernel/chio-process/tests/processes.rs",
+          "sha256": "a51185179dc29c5ac9a3c442e2af068b42cc7c4bba21c697f577ba8a6ad56e1a",
+          "lines": 728,
+          "matches_head": true
+        },
+        {
+          "path": "crates/kernel/chio-process/tests/crash_recovery.rs",
+          "sha256": "4a8849124e365f307ea1b71081ea1faf0ef482460979fd06abe1cba21975345b",
+          "lines": 576,
+          "matches_head": true
+        },
+        {
+          "path": "crates/kernel/chio-process/tests/child_submission.rs",
+          "sha256": "a820bc55ef9a6cb76ec437f4c2fe3a8e5de9df8ac79c4ff237595244ad0985be",
+          "lines": 490,
+          "matches_head": true
+        },
+        {
+          "path": "docs/architecture/recoverable-agent-runtime/implementation/STATUS.md",
+          "sha256": "fbc92c9cf996d322be7576de007444389c0425501133a81a05de032392214c2a",
+          "lines": 481,
+          "matches_head": true
+        }
+      ],
+      "hosted_source_commit": "67cf758253944d3591174e35feefaf680bda9464",
+      "hosted_source_commit_matches_recorded_files": true
+    },
+    "command_project": {
+      "head": "e245965435a1b912c9ae57bab81c81ba6f5391ea",
+      "sources": [
+        {
+          "path": "crates/products/chio-cli/PROCESS_RUNNER.md",
+          "sha256": "8d080873fabbb2b331700de76fbf5da11f3d421ea39c854858b64569abebd65e",
+          "lines": 506,
+          "matches_head": true
+        },
+        {
+          "path": "crates/products/chio-cli/src/cli/process_host/runner/plan.rs",
+          "sha256": "ecc3bf17fb476735a7067175bca24fe0e2baa8120c1eb74effd7c0a5cb08d1be",
+          "lines": 304,
+          "matches_head": true
+        },
+        {
+          "path": "crates/products/chio-cli/src/cli/process_host/runner/portable.rs",
+          "sha256": "ed63c522dd9af0e3e41e6db645ddb02033b9be6fcaa75808807db3c40bfc5f62",
+          "lines": 115,
+          "matches_head": true
+        },
+        {
+          "path": "crates/products/chio-cli/src/cli/process_host/runner/container.rs",
+          "sha256": "e3f444f88c4e41cf8b9a0fa989b4126426f9907b1fcec24882b05bd187e129a3",
+          "lines": 408,
+          "matches_head": true
+        },
+        {
+          "path": "crates/products/chio-cli/src/cli/process_host/relocation.rs",
+          "sha256": "a6c77486e96b7e16b8748d26d52caab848bd34b288635345529288b41f0c573e",
+          "lines": 250,
+          "matches_head": true
+        },
+        {
+          "path": "sdks/python/chio-mini-swe/src/chio_mini_swe/repository_snapshots.py",
+          "sha256": "ac44f8f6339af48656954430734a179e0aae8941bca6ad351259f24ff75e007f",
+          "lines": 201,
+          "matches_head": true
+        },
+        {
+          "path": "sdks/python/chio-mini-swe/src/chio_mini_swe/repository_store.py",
+          "sha256": "086b35e51dfd871e608309767b4c8ec4663ebf9e8467fd1818331e1835532272",
+          "lines": 327,
+          "matches_head": true
+        },
+        {
+          "path": "sdks/python/chio-mini-swe/src/chio_mini_swe/repository_review.py",
+          "sha256": "9df4e7b8c7f718632848633ad6e8f03869ef929b96e808fe9953a19c87e46546",
+          "lines": 252,
+          "matches_head": true
+        },
+        {
+          "path": "sdks/python/chio-process/README.md",
+          "sha256": "7ddfa5376e6467ebf1020c7119360993cace43ea04ca7108a6eb4928d7f49068",
+          "lines": 180,
+          "matches_head": true
+        },
+        {
+          "path": "sdks/python/chio-process/src/chio_process/__init__.py",
+          "sha256": "f5a04a9d759931f99ffda59875a287f8a6272c8963e05c2ad350ac5b280c763a",
+          "lines": 195,
+          "matches_head": true
+        }
+      ],
+      "hosted_source_commit": "e245965435a1b912c9ae57bab81c81ba6f5391ea",
+      "hosted_source_commit_matches_recorded_files": true
+    }
+  },
+  "repository": "https://github.com/bb-connor/arc.git",
+  "publication_note": "The main inspection head contains unpublished review tooling. All recorded main source files also match its hosted parent. Candidate snapshots are source evidence, not qualification claims."
+}
