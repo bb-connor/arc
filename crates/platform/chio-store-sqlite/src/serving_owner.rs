@@ -23,6 +23,7 @@ use crate::{SqliteBudgetStore, SqliteRevocationStore};
 
 mod finding_market_snapshot_versions;
 mod global_commit_chain;
+mod native_financing_provision;
 mod native_source_transaction;
 pub(crate) use global_commit_chain::GlobalCommitAppendReceipt;
 pub(crate) use native_source_transaction::NativeSourceTransactionOrigin;
@@ -381,6 +382,24 @@ impl SqliteAuthorityStore {
         database_path: impl AsRef<Path>,
         lock_root: impl AsRef<Path>,
     ) -> Result<(), SqliteServingOwnerError> {
+        Self::provision_with_native_geometry(database_path, lock_root, false)
+    }
+
+    /// Provision an actual 512-byte-page authority for the constrained Native
+    /// financing source. This configures storage only and grants no financing.
+    /// An existing different-page database is rejected without conversion.
+    pub fn provision_small_page_native_authority(
+        database_path: impl AsRef<Path>,
+        lock_root: impl AsRef<Path>,
+    ) -> Result<(), SqliteServingOwnerError> {
+        Self::provision_with_native_geometry(database_path, lock_root, true)
+    }
+
+    fn provision_with_native_geometry(
+        database_path: impl AsRef<Path>,
+        lock_root: impl AsRef<Path>,
+        small_page_native: bool,
+    ) -> Result<(), SqliteServingOwnerError> {
         Self::ensure_serving_supported()?;
         let database_path = database_path.as_ref();
         let lock_root = canonical_lock_root(lock_root.as_ref())?;
@@ -404,6 +423,9 @@ impl SqliteAuthorityStore {
         let canonical_database_path = fs::canonicalize(database_path)?;
         let mut connection = open_existing_database(&canonical_database_path)?;
         validate_database_identity(&canonical_database_path, &expected_database)?;
+        if small_page_native {
+            native_financing_provision::require_small_pages_before_schema(&connection)?;
+        }
         if owner_table_exists(&connection)? {
             verify_serving_owner_schema(&connection)?;
             let record = load_provisioning_record(&connection)?.ok_or_else(|| {
