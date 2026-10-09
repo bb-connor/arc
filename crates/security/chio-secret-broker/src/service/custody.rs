@@ -21,6 +21,8 @@ struct RetainedPreparedDispatch {
     revocation_set: CanonicalBrokerRevocationSet,
 }
 
+#[cfg_attr(not(test), expect(dead_code))]
+pub(super) mod dispatch_claim;
 mod execution;
 mod registration;
 
@@ -47,6 +49,17 @@ impl BrokerService {
             .keys()
             .cloned()
             .collect())
+    }
+
+    #[cfg(test)]
+    pub(super) fn rebind_retained_prepared_dispatch_for_test(
+        &self,
+        operation_id: &str,
+    ) -> Result<()> {
+        if let Some(prepared) = self.retained_prepared_dispatches()?.get_mut(operation_id) {
+            prepared.prepared_dispatch_id.push_str("-rebound");
+        }
+        Ok(())
     }
 
     #[cfg(test)]
