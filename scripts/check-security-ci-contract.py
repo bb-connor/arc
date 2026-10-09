@@ -956,7 +956,7 @@ EXPECTED_TRUST_JOB_DIGESTS = {
     (
         "security contract revocation",
         "bind-revocation",
-    ): "f74f39999f07af9156cc30543dc414322fa68668b47c20e134cbdb52dd752bb5",
+    ): "e3fec7b0c8de003471d2e091442587d79ea506fb0949bf7c81e5c9781adcf546",
     (
         "security contract revocation",
         "revoke-security-contract",
