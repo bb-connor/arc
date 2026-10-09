@@ -459,11 +459,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         max_lines=2_715,
         max_fragments=2,
     ),
-    "crates/guards/chio-policy/src/evaluate.rs": allow(
-        "2026-12-31",
-        "policy evaluation production fragments remain pending module ownership; tests are a separate module",
-        max_fragments=4,
-    ),
     "crates/core/chio-core-types/src/receipt/security.rs": allow(
         "2026-12-31",
         "security receipt projection assembled from include! fragments; capped until the fragments become modules",

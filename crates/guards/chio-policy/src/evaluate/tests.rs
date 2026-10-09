@@ -14,9 +14,10 @@ use crate::models::{
 };
 
 use super::{
-    evaluate, evaluate_with_context, selected_origin_profile_id, Condition, Decision,
-    EvaluationAction, OriginContext, PostureContext, RuntimeAttestationContext, RuntimeContext,
+    evaluate, evaluate_with_context, selected_origin_profile_id, Decision, EvaluationAction,
+    OriginContext, PostureContext, RuntimeAttestationContext,
 };
+use crate::conditions::{Condition, RuntimeContext};
 
 fn origin_profile(id: &str, match_rules: OriginMatch) -> OriginProfile {
     OriginProfile {

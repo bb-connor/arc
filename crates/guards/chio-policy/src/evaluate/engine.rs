@@ -1,3 +1,14 @@
+use crate::conditions::{observed_time, validate_condition_keys, Condition, RuntimeContext};
+use crate::evaluate::context::{is_panic_active, Decision, EvaluationAction, EvaluationResult};
+use crate::evaluate::matchers::{
+    apply_conditions, evaluate_computer_use, evaluate_egress, evaluate_file_read,
+    evaluate_file_write, evaluate_input_injection, evaluate_patch, evaluate_shell_command,
+    evaluate_tool_call, origin_admission_denial, posture_capability_guard, resolve_posture,
+    select_origin_profile,
+};
+use crate::models::HushSpec;
+use std::collections::HashMap;
+
 // ---------------------------------------------------------------------------
 // Core evaluation
 // ---------------------------------------------------------------------------

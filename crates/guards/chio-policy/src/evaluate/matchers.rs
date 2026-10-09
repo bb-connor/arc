@@ -1,8 +1,25 @@
+use crate::conditions::{evaluate_condition_at, Condition, RuntimeContext};
+use crate::evaluate::context::{
+    EvaluationAction, EvaluationResult, OriginContext, PostureContext, PostureResult,
+};
+use crate::evaluate::outcomes::{
+    allow_result, deny_result, find_first_match_or_deny, imbalance_ratio, more_restrictive_result,
+    patch_stats, profile_rule_prefix, required_capability, trigger_name, warn_result,
+};
+use crate::models::{
+    ComputerUseMode, ComputerUseRule, DefaultAction, ForbiddenPathsRule, HushSpec,
+    InputInjectionRule, OriginDefaultBehavior, OriginMatch, OriginProfile, PatchIntegrityRule,
+    PathAllowlistRule, PostureExtension, RemoteDesktopChannelsRule, SecretPatternsRule,
+    ShellCommandsRule,
+};
+use crate::regex_safety::policy_regex_is_match;
+use std::collections::HashMap;
+
 // ---------------------------------------------------------------------------
 // Condition filtering
 // ---------------------------------------------------------------------------
 
-fn apply_conditions(
+pub(super) fn apply_conditions(
     spec: &HushSpec,
     context: &RuntimeContext,
     conditions: &HashMap<String, Condition>,
@@ -29,7 +46,7 @@ fn apply_conditions(
 // Per-action-type evaluators
 // ---------------------------------------------------------------------------
 
-fn evaluate_tool_call(
+pub(super) fn evaluate_tool_call(
     spec: &HushSpec,
     action: &EvaluationAction,
     matched_profile: Option<&OriginProfile>,
@@ -448,7 +465,7 @@ fn workload_identity_path_matches_prefix(expected_prefix: &str, actual_path: &st
             .is_some_and(|suffix| suffix.starts_with('/'))
 }
 
-fn evaluate_egress(
+pub(super) fn evaluate_egress(
     spec: &HushSpec,
     action: &EvaluationAction,
     matched_profile: Option<&OriginProfile>,
@@ -599,7 +616,7 @@ fn evaluate_egress(
     }
 }
 
-fn evaluate_file_read(
+pub(super) fn evaluate_file_read(
     spec: &HushSpec,
     action: &EvaluationAction,
     _matched_profile: Option<&OriginProfile>,
@@ -618,7 +635,7 @@ fn evaluate_file_read(
     allow_result(None, None, origin_profile_id, posture)
 }
 
-fn evaluate_file_write(
+pub(super) fn evaluate_file_write(
     spec: &HushSpec,
     action: &EvaluationAction,
     _matched_profile: Option<&OriginProfile>,
@@ -652,7 +669,7 @@ fn evaluate_file_write(
     allow_result(None, None, origin_profile_id, posture)
 }
 
-fn evaluate_patch(
+pub(super) fn evaluate_patch(
     spec: &HushSpec,
     action: &EvaluationAction,
     _matched_profile: Option<&OriginProfile>,
@@ -685,7 +702,7 @@ fn evaluate_patch(
     allow_result(None, None, origin_profile_id, posture)
 }
 
-fn evaluate_shell_command(
+pub(super) fn evaluate_shell_command(
     spec: &HushSpec,
     action: &EvaluationAction,
     _matched_profile: Option<&OriginProfile>,
@@ -707,7 +724,7 @@ fn evaluate_shell_command(
     allow_result(None, None, origin_profile_id, posture)
 }
 
-fn evaluate_computer_use(
+pub(super) fn evaluate_computer_use(
     spec: &HushSpec,
     action: &EvaluationAction,
     posture: Option<PostureResult>,
@@ -741,7 +758,7 @@ fn evaluate_computer_use(
     }
 }
 
-fn evaluate_input_injection(
+pub(super) fn evaluate_input_injection(
     spec: &HushSpec,
     action: &EvaluationAction,
     posture: Option<PostureResult>,
@@ -1216,7 +1233,7 @@ fn evaluate_path_allowlist(
 // Posture
 // ---------------------------------------------------------------------------
 
-fn posture_capability_guard(
+pub(super) fn posture_capability_guard(
     action: &EvaluationAction,
     posture: &Option<PostureResult>,
     spec: &HushSpec,
@@ -1252,7 +1269,7 @@ fn posture_capability_guard(
     ))
 }
 
-fn resolve_posture(
+pub(super) fn resolve_posture(
     spec: &HushSpec,
     matched_profile: Option<&OriginProfile>,
     posture: Option<&PostureContext>,
@@ -1293,7 +1310,7 @@ fn next_posture_state(posture: &PostureExtension, current: &str, signal: &str) -
 // Origin profile selection
 // ---------------------------------------------------------------------------
 
-fn origin_admission_denial(
+pub(super) fn origin_admission_denial(
     spec: &HushSpec,
     origin: Option<&OriginContext>,
     matched_profile: Option<&OriginProfile>,
@@ -1320,7 +1337,7 @@ fn origin_admission_denial(
     ))
 }
 
-fn select_origin_profile<'a>(
+pub(super) fn select_origin_profile<'a>(
     spec: &'a HushSpec,
     origin: Option<&OriginContext>,
 ) -> Option<&'a OriginProfile> {

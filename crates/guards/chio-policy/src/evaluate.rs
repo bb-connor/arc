@@ -3,24 +3,17 @@
 //! Evaluates an action against a policy and returns a decision
 //! (allow/warn/deny).
 
-use crate::conditions::{
-    evaluate_condition_at, observed_time, validate_condition_keys, Condition, RuntimeContext,
+pub use context::{
+    activate_panic, deactivate_panic, is_panic_active, Decision, EvaluationAction,
+    EvaluationResult, OriginContext, PostureContext, PostureResult, RuntimeAttestationContext,
 };
-use crate::models::{
-    ComputerUseMode, ComputerUseRule, DefaultAction, ForbiddenPathsRule, HushSpec,
-    InputInjectionRule, OriginDefaultBehavior, OriginMatch, OriginProfile, PatchIntegrityRule,
-    PathAllowlistRule, PostureExtension, RemoteDesktopChannelsRule, SecretPatternsRule,
-    ShellCommandsRule, TransitionTrigger,
-};
-use crate::regex_safety::{compile_generated_policy_regex, policy_regex_is_match};
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
+pub use engine::{evaluate, evaluate_with_context};
+pub use matchers::selected_origin_profile_id;
+pub use outcomes::glob_matches;
 
-include!("evaluate/context.rs");
-include!("evaluate/engine.rs");
-include!("evaluate/matchers.rs");
-include!("evaluate/outcomes.rs");
+mod context;
+mod engine;
+mod matchers;
+mod outcomes;
 #[cfg(test)]
-#[path = "evaluate/tests.rs"]
 mod tests;

@@ -1,8 +1,12 @@
+use crate::evaluate::context::{Decision, EvaluationResult, PostureResult};
+use crate::models::TransitionTrigger;
+use crate::regex_safety::compile_generated_policy_regex;
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-fn required_capability(action_type: &str) -> Option<&'static str> {
+pub(super) fn required_capability(action_type: &str) -> Option<&'static str> {
     match action_type {
         "file_read" => Some("file_access"),
         "file_write" => Some("file_write"),
@@ -14,7 +18,7 @@ fn required_capability(action_type: &str) -> Option<&'static str> {
     }
 }
 
-fn trigger_name(trigger: &TransitionTrigger) -> &'static str {
+pub(super) fn trigger_name(trigger: &TransitionTrigger) -> &'static str {
     match trigger {
         TransitionTrigger::UserApproval => "user_approval",
         TransitionTrigger::UserDenial => "user_denial",
@@ -26,7 +30,7 @@ fn trigger_name(trigger: &TransitionTrigger) -> &'static str {
     }
 }
 
-fn profile_rule_prefix(profile_id: &str, field: &str) -> String {
+pub(super) fn profile_rule_prefix(profile_id: &str, field: &str) -> String {
     format!("extensions.origins.profiles.{profile_id}.{field}")
 }
 
@@ -38,7 +42,10 @@ fn decision_rank(decision: &Decision) -> u8 {
     }
 }
 
-fn more_restrictive_result(left: EvaluationResult, right: EvaluationResult) -> EvaluationResult {
+pub(super) fn more_restrictive_result(
+    left: EvaluationResult,
+    right: EvaluationResult,
+) -> EvaluationResult {
     let left_rank = decision_rank(&left.decision);
     let right_rank = decision_rank(&right.decision);
     if right_rank > left_rank {
@@ -54,7 +61,7 @@ fn more_restrictive_result(left: EvaluationResult, right: EvaluationResult) -> E
     }
 }
 
-fn allow_result(
+pub(super) fn allow_result(
     matched_rule: Option<String>,
     reason: Option<String>,
     origin_profile: Option<String>,
@@ -69,7 +76,7 @@ fn allow_result(
     }
 }
 
-fn warn_result(
+pub(super) fn warn_result(
     matched_rule: Option<String>,
     reason: Option<String>,
     origin_profile: Option<String>,
@@ -84,7 +91,7 @@ fn warn_result(
     }
 }
 
-fn deny_result(
+pub(super) fn deny_result(
     matched_rule: Option<String>,
     reason: Option<String>,
     origin_profile: Option<String>,
@@ -108,7 +115,7 @@ fn find_first_match(target: &str, patterns: &[String]) -> Result<Option<usize>, 
     Ok(None)
 }
 
-fn find_first_match_or_deny(
+pub(super) fn find_first_match_or_deny(
     target: &str,
     patterns: &[String],
     field: &str,
@@ -131,12 +138,12 @@ pub fn glob_matches(pattern: &str, target: &str) -> Result<bool, String> {
         .map(|compiled| compiled.is_match(target))
 }
 
-struct PatchStats {
-    additions: usize,
-    deletions: usize,
+pub(super) struct PatchStats {
+    pub(super) additions: usize,
+    pub(super) deletions: usize,
 }
 
-fn patch_stats(content: &str) -> PatchStats {
+pub(super) fn patch_stats(content: &str) -> PatchStats {
     let mut additions = 0usize;
     let mut deletions = 0usize;
 
@@ -157,7 +164,7 @@ fn patch_stats(content: &str) -> PatchStats {
     }
 }
 
-fn imbalance_ratio(additions: usize, deletions: usize) -> f64 {
+pub(super) fn imbalance_ratio(additions: usize, deletions: usize) -> f64 {
     match (additions, deletions) {
         (0, 0) => 0.0,
         (0, _) => deletions as f64,

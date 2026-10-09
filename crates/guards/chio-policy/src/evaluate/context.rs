@@ -1,4 +1,9 @@
-use chio_core::capability::{runtime_attestation::{RuntimeAssuranceTier}, workload_identity::{WorkloadIdentity}};
+use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicBool, Ordering};
+
+use chio_core::capability::{
+    runtime_attestation::RuntimeAssuranceTier, workload_identity::WorkloadIdentity,
+};
 
 // ---------------------------------------------------------------------------
 // Panic mode (global emergency deny-all)
