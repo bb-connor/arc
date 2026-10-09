@@ -12,8 +12,6 @@ use super::walk::{
     WalkError,
 };
 
-/// Pending leaves settled per hold while verifying a checkpoint's root.
-const SETTLE_CHUNK: i64 = 65_536;
 /// Lineage rows read per refresh step.
 const LINEAGE_CHUNK: i64 = 256;
 /// Receipt rows updated per lineage refresh hold.
@@ -56,6 +54,8 @@ pub(super) fn extend_cycle(
         next = last + 1;
     }
 
+    // Pending leaves read or removed per hold, the same bound as inserts.
+    let chunk = i64::try_from(ctx.limits.insert_rows.max(1)).unwrap_or(i64::MAX);
     let mut seq = state.checkpoint_seq + 1;
     while seq <= observation.checkpoint {
         ctx.check_cancel()?;
@@ -65,7 +65,7 @@ pub(super) fn extend_cycle(
         let verified = authenticate_checkpoints(ctx, rows, &mut previous, &mut chain)?;
         for (checkpoint, _) in verified {
             let owned = owned_checkpoint(&checkpoint)?;
-            settle_streaming(published, &owned)?;
+            settle_streaming(published, &owned, chunk)?;
             accepted_chain.append(
                 chio_kernel::checkpoint::checkpoint_chain_leaf_hash(&checkpoint.body)
                     .map_err(|error| WalkError::Integrity(error.to_string()))?,
@@ -73,12 +73,12 @@ pub(super) fn extend_cycle(
             published.accept_checkpoint(
                 &SnapshotBatch {
                     checkpoints: vec![owned.clone()],
-                    settle_pending: Some((owned.batch_start, owned.batch_end)),
                     ..SnapshotBatch::default()
                 },
                 checkpoint,
                 accepted_chain.clone(),
             )?;
+            published.settle_residual(owned.batch_start, owned.batch_end, chunk)?;
             seq = owned.seq + 1;
         }
     }
@@ -133,13 +133,12 @@ fn refresh_capability(
 fn settle_streaming(
     published: &Published,
     checkpoint: &super::db::OwnedCheckpoint,
+    chunk: i64,
 ) -> Result<(), WalkError> {
     let mut frontier = chio_kernel::checkpoint::CheckpointChainFrontier::empty();
     let mut expected = checkpoint.batch_start;
     while expected <= checkpoint.batch_end {
-        let high = expected
-            .saturating_add(SETTLE_CHUNK - 1)
-            .min(checkpoint.batch_end);
+        let high = expected.saturating_add(chunk - 1).min(checkpoint.batch_end);
         let leaves = published.with_db(|db| db.pending_leaves(expected, high))?;
         for leaf in &leaves {
             if leaf.entry_seq != expected {

@@ -607,3 +607,63 @@ fn head_rotation_between_reads_never_serves_an_uncovered_page() {
     }
     service.shutdown();
 }
+
+/// A snapshot whose whole history (`tail` receipts) is uncheckpointed, then a
+/// signer that covers it with one checkpoint.
+fn large_tail(tail: u64, config: ReceiptQuerySnapshotConfig) -> (Fixture, ReceiptQuerySnapshots) {
+    let fixture = Fixture::new(0);
+    fixture.append_varied(0..tail);
+    let service = ready(&fixture, config);
+    fixture
+        .store
+        .enable_background_checkpoints(crate::receipt_store::BackgroundCheckpointSigner {
+            keypair: std::sync::Arc::new(keypair()),
+            max_batch: tail,
+        })
+        .unwrap();
+    fixture.flush();
+    (fixture, service)
+}
+
+#[test]
+fn hold_a_large_checkpoint_settles_in_bounded_holds_while_reads_proceed() {
+    let insert_rows = 64;
+    let (fixture, service) = large_tail(
+        600,
+        ReceiptQuerySnapshotConfig {
+            insert_rows,
+            step_rows: 256,
+            ..config()
+        },
+    );
+    let deadline = Instant::now() + Duration::from_secs(60);
+    loop {
+        // Reads keep being served while the checkpoint is accepted.
+        let page = service.query_receipts(&admin(5)).unwrap();
+        if page.snapshot.unwrap().checkpoint_seq == Some(1) {
+            break;
+        }
+        assert!(Instant::now() < deadline, "the checkpoint was not accepted");
+    }
+    let settled = service.max_settled_per_hold_for_test();
+    assert!(
+        settled <= u64::try_from(insert_rows).unwrap(),
+        "one snapshot hold settled {settled} pending leaves"
+    );
+    assert_eq!(per_call(&fixture.store, &admin(5)).1, 600);
+    service.shutdown();
+}
+
+#[test]
+fn hold_shutdown_during_a_large_settlement_stops_the_walker() {
+    let (_fixture, service) = large_tail(
+        600,
+        ReceiptQuerySnapshotConfig {
+            insert_rows: 16,
+            step_rows: 256,
+            ..config()
+        },
+    );
+    service.shutdown();
+    assert_eq!(service.status().state, ReceiptQuerySnapshotState::Stopped);
+}

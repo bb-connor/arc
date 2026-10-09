@@ -155,8 +155,6 @@ pub(super) struct SnapshotBatch {
     pub(super) children: Vec<ChildCursor>,
     pub(super) pending: Vec<PendingLeaf>,
     pub(super) checkpoints: Vec<OwnedCheckpoint>,
-    /// Inclusive entry range whose pending leaves a verified checkpoint covers.
-    pub(super) settle_pending: Option<(i64, i64)>,
 }
 
 /// Failures of the owned store. Capacity is a resource limit; a uniqueness
@@ -188,6 +186,9 @@ pub(super) struct SnapshotDb {
     page_size: u64,
     dims: HashMap<(i64, String), i64>,
     signers: HashMap<String, i64>,
+    /// Largest number of pending leaves one snapshot transaction removed.
+    #[cfg(test)]
+    pub(super) max_settled_per_hold: std::cell::Cell<u64>,
 }
 
 impl SnapshotDb {
@@ -218,6 +219,8 @@ impl SnapshotDb {
             page_size,
             dims: HashMap::new(),
             signers: HashMap::new(),
+            #[cfg(test)]
+            max_settled_per_hold: std::cell::Cell::new(0),
         };
         with_quota(&db.connection, quota_bytes, page_size, |connection| {
             connection.execute_batch(SCHEMA)
@@ -311,13 +314,7 @@ impl SnapshotDb {
                         checkpoint.kernel_key
                     ])?;
                 }
-                if let Some((start, end)) = batch.settle_pending {
-                    transaction
-                    .prepare_cached(
-                        "DELETE FROM snapshot_pending_leaf WHERE entry_seq >= ?1 AND entry_seq <= ?2",
-                    )?
-                    .execute(params![start, end])?;
-                }
+
                 transaction.commit()
             },
         );
@@ -395,6 +392,28 @@ impl SnapshotDb {
             self.dims.extend(added);
         }
         result
+    }
+
+    /// Remove at most `limit` settled pending leaves in `[start, end]`.
+    pub(super) fn delete_pending_chunk(
+        &mut self,
+        start: i64,
+        end: i64,
+        limit: i64,
+    ) -> Result<u64, SnapshotDbError> {
+        let removed = self
+            .connection
+            .prepare_cached(
+                "DELETE FROM snapshot_pending_leaf WHERE entry_seq IN (
+                     SELECT entry_seq FROM snapshot_pending_leaf
+                     WHERE entry_seq >= ?1 AND entry_seq <= ?2 ORDER BY entry_seq LIMIT ?3)",
+            )?
+            .execute(params![start, end, limit])?;
+        let removed = u64::try_from(removed).unwrap_or(u64::MAX);
+        #[cfg(test)]
+        self.max_settled_per_hold
+            .set(self.max_settled_per_hold.get().max(removed));
+        Ok(removed)
     }
 
     /// Maintained count for one key: `(n, min_seq, max_seq)`.

@@ -59,6 +59,8 @@ pub struct ReceiptQuerySnapshotConfig {
     pub invalid_retry_backoff: Duration,
     /// SQLite busy timeout of walker connections.
     pub walker_busy_timeout: Duration,
+    /// SQLite VM steps one walker hold of the snapshot connection may spend.
+    pub hold_sql_steps: u64,
 }
 
 impl Default for ReceiptQuerySnapshotConfig {
@@ -81,6 +83,7 @@ impl Default for ReceiptQuerySnapshotConfig {
             recertify_interval: Duration::from_secs(3_600),
             invalid_retry_backoff: Duration::from_secs(300),
             walker_busy_timeout: Duration::from_secs(5),
+            hold_sql_steps: 5_000_000,
         }
     }
 }
@@ -152,6 +155,9 @@ pub(super) struct Published {
     owned: Mutex<Owned>,
     waiting: Arc<AtomicUsize>,
     changed: Arc<Condvar>,
+    cancel: Arc<AtomicBool>,
+    /// SQLite VM steps one walker hold of the snapshot connection may spend.
+    hold_sql_steps: u64,
 }
 
 /// Position an extension cycle starts from.
@@ -209,22 +215,66 @@ impl Published {
         Ok((owned.head.clone(), owned.chain.clone()))
     }
 
+    /// One bounded walker hold of the snapshot connection: SQL work is
+    /// limited to `hold_sql_steps` VM steps and cancellation interrupts it.
+    /// Exhaustion and cancellation are resource outcomes, never integrity.
+    fn hold<T>(
+        &self,
+        work: impl FnOnce(&mut Owned) -> Result<T, SnapshotDbError>,
+    ) -> Result<T, WalkError> {
+        let mut owned = self.walker_lock()?;
+        let exhausted = Arc::new(AtomicBool::new(false));
+        let signal = Arc::clone(&exhausted);
+        let cancel = Arc::clone(&self.cancel);
+        let mut remaining = self.hold_sql_steps;
+        owned
+            .db
+            .connection()
+            .progress_handler(
+                1_000,
+                Some(move || {
+                    if cancel.load(Ordering::SeqCst) {
+                        return true;
+                    }
+                    remaining = remaining.saturating_sub(1_000);
+                    if remaining == 0 {
+                        signal.store(true, Ordering::SeqCst);
+                        return true;
+                    }
+                    false
+                }),
+            )
+            .map_err(|error| WalkError::Integrity(error.to_string()))?;
+        let result = work(&mut owned);
+        let _ = owned
+            .db
+            .connection()
+            .progress_handler(0, None::<fn() -> bool>);
+        drop(owned);
+        match result {
+            Ok(value) => Ok(value),
+            Err(_) if self.cancel.load(Ordering::SeqCst) => Err(WalkError::Cancelled),
+            Err(_) if exhausted.load(Ordering::SeqCst) => Err(WalkError::WalkerBudget),
+            Err(error) => Err(error.into()),
+        }
+    }
+
     pub(super) fn with_db<T>(
         &self,
         read: impl FnOnce(&SnapshotDb) -> Result<T, SnapshotDbError>,
     ) -> Result<T, WalkError> {
-        let owned = self.walker_lock()?;
-        Ok(read(&owned.db)?)
+        self.hold(|owned| read(&owned.db))
     }
 
     pub(super) fn with_db_mut<T>(
         &self,
         write: impl FnOnce(&mut SnapshotDb) -> Result<T, SnapshotDbError>,
     ) -> Result<T, WalkError> {
-        let mut owned = self.walker_lock()?;
-        let value = write(&mut owned.db)?;
-        owned.meta.generation += 1;
-        drop(owned);
+        let value = self.hold(|owned| {
+            let value = write(&mut owned.db)?;
+            owned.meta.generation += 1;
+            Ok(value)
+        })?;
         self.changed.notify_all();
         Ok(value)
     }
@@ -233,24 +283,44 @@ impl Published {
         PublishedSink { published: self }
     }
 
-    /// Commit a verified checkpoint, settle its pending leaves and advance the
-    /// owned chain head, as one version.
+    /// Commit a verified checkpoint and advance the owned chain head as one
+    /// version, in one bounded hold. The leaves it settles are removed
+    /// afterwards by [`Published::settle_residual`].
     pub(super) fn accept_checkpoint(
         &self,
         batch: &SnapshotBatch,
         checkpoint: KernelCheckpoint,
         chain: CheckpointChainFrontier,
     ) -> Result<(), WalkError> {
-        let mut owned = self.walker_lock()?;
-        owned.db.commit(batch)?;
-        owned.meta.checkpoint_seq =
-            i64::try_from(checkpoint.body.checkpoint_seq).unwrap_or(i64::MAX);
-        owned.head = Some(checkpoint);
-        owned.chain = chain;
-        owned.meta.generation += 1;
-        drop(owned);
+        self.hold(|owned| {
+            owned.db.commit(batch)?;
+            owned.meta.checkpoint_seq =
+                i64::try_from(checkpoint.body.checkpoint_seq).unwrap_or(i64::MAX);
+            owned.head = Some(checkpoint);
+            owned.chain = chain;
+            owned.meta.generation += 1;
+            Ok(())
+        })?;
         self.changed.notify_all();
         Ok(())
+    }
+
+    /// Remove pending leaves an accepted checkpoint settled, at most `chunk`
+    /// per bounded, cancellable hold. Leaves at or below the owned head are
+    /// never consulted again, so an interrupted cleanup leaves no wrong
+    /// answer behind.
+    pub(super) fn settle_residual(
+        &self,
+        start: i64,
+        end: i64,
+        chunk: i64,
+    ) -> Result<(), WalkError> {
+        loop {
+            let removed = self.hold(|owned| owned.db.delete_pending_chunk(start, end, chunk))?;
+            if removed == 0 {
+                return Ok(());
+            }
+        }
     }
 
     /// Record that this version covers an observed head target.
@@ -315,11 +385,12 @@ pub(super) struct PublishedSink<'a> {
 
 impl OwnedSink for PublishedSink<'_> {
     fn commit(&mut self, batch: &SnapshotBatch, through_entry_seq: i64) -> Result<(), WalkError> {
-        let mut owned = self.published.walker_lock()?;
-        owned.db.commit(batch)?;
-        owned.meta.through_entry_seq = owned.meta.through_entry_seq.max(through_entry_seq);
-        owned.meta.generation += 1;
-        drop(owned);
+        self.published.hold(|owned| {
+            owned.db.commit(batch)?;
+            owned.meta.through_entry_seq = owned.meta.through_entry_seq.max(through_entry_seq);
+            owned.meta.generation += 1;
+            Ok(())
+        })?;
         self.published.changed.notify_all();
         Ok(())
     }
@@ -900,6 +971,8 @@ fn build_and_serve(inner: &Arc<Inner>) -> Result<(), WalkError> {
         }),
         waiting: Arc::clone(&inner.waiting),
         changed: Arc::clone(&inner.changed),
+        cancel: Arc::clone(&inner.cancel),
+        hold_sql_steps: inner.config.hold_sql_steps,
     });
     inner.set_phase(Phase::Ready(Arc::clone(&published)));
     serve(inner, &extension_ctx, &ctx, &published)
@@ -1004,6 +1077,17 @@ impl ReceiptQuerySnapshots {
 
     pub(super) fn recheck_lease_for_test(&self, epoch: u64) -> Result<(), ReceiptStoreError> {
         self.inner.recheck_lease(epoch)
+    }
+
+    pub(super) fn max_settled_per_hold_for_test(&self) -> u64 {
+        match self.inner.phase() {
+            Phase::Ready(published) => published
+                .owned
+                .lock()
+                .map(|owned| owned.db.max_settled_per_hold.get())
+                .unwrap_or(0),
+            _ => 0,
+        }
     }
 }
 
