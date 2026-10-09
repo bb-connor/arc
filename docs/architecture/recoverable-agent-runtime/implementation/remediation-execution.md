@@ -61,14 +61,33 @@ The [SDK compatibility and portability continuity review](reviews/sdk-compatibil
 restores only the original scoped closures of `H-SDK-02` and `H-SDK-11` after
 SPEC_PASS and independent QUALITY_PASS. Alias, naming, portable lock, offline
 fixture library and resolved-boundary checks retain their recorded scopes.
-Historical pins and evidence remain intact. `H-SDK-01`, source-fixture cleanup
-and metadata work remain pending; no runtime or hosted qualification is added.
+Historical pins and evidence remain intact. That earlier review left fixture
+cleanup and metadata pending. Their later bounded installation is recorded below;
+`H-SDK-01` remains open and no runtime or hosted qualification is added.
 The [coverage locator continuity review](reviews/coverage-locator-continuity.md)
 restores the original source-locator closures of `C1-08`, `E-knowledge-15` and
 `G-product-07` after SPEC_PASS and independent QUALITY_PASS. All 243 pointers and
 14 historical input pins retain their mappings and evidence. The 108 references
 in the changed containing test file still resolve; no behavior or test execution
-is credited. Fixture, SDK and campaign repair acceptance remains separate.
+is credited. Fixture, SDK and campaign acceptance has its own later scope.
+
+The [fixture lifecycle and SDK readiness review](reviews/fixture-lifecycle-and-sdk-readiness.md)
+records the eleven-file installation at `c5f53a96dbfc836bfc42805c2fee2d393dd78821`.
+SPEC_PASS, independent QUALITY_PASS and EOF-only quality continuity bind the exact
+source. The final maintained checks passed 1,438 SDK/framework cases and 56
+composed fixture cases in each Python mode, with zero recorded network attempts. A later full fixture discovery gate remains failed with 129 passed
+and one assurance-map error across 130 tests; its separate scope and source pins
+are preserved in the review. No closure follows from that broader run.
+One additional maintained SDK readiness P2 has a bounded local closure covering
+both inherited facets. Five introduced candidate defects retain their historical
+classification with reviewed, installed corrective successors. The prior three
+SDK closures have explicit current-pin continuity; original evidence is preserved.
+`H-SDK-01`, `H-SDK-04` and `QF-07` remain open for their remaining all-state native
+projection, native preflight/host and source-bound matched live campaign gates.
+No PAC/SFE obligation is credited by these local controls.
+The source-bound hosted snapshot records 64 queued checks, two skipped and two
+unresolved review threads, already mapped to existing settlement-capacity and
+large-database obligations. It grants no hosted acceptance or all-P1-resolved claim.
 The candidate also passed all 19 budget-source, atomic ledger and provisioning
 controls after repairing its fixtures and actual owning connection profile.
 The [Kernel foundation successor](reviews/kernel-foundation.md) has independent

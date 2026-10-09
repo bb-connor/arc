@@ -32,8 +32,8 @@
       "recorded_not_closed": 229
     },
     "additional": {
-      "total": 19,
-      "recorded_scoped_closed": 18,
+      "total": 20,
+      "recorded_scoped_closed": 19,
       "recorded_not_closed": 1
     },
     "supplemental_pr": {
@@ -49,19 +49,19 @@
       "total": 1,
       "excluded_from_implementation_finding_counts": true
     },
-    "current_or_executed_support_findings": 348,
-    "implementation_recorded_scoped_closed": 117,
+    "current_or_executed_support_findings": 349,
+    "implementation_recorded_scoped_closed": 118,
     "implementation_recorded_not_closed": 231,
-    "findings_and_prevented_candidates": 387,
-    "all_records_including_provenance": 388,
+    "findings_and_prevented_candidates": 393,
+    "all_records_including_provenance": 394,
     "assigned_finding_ids_excluding_provenance": 371,
     "qualified": 0,
     "current_status": {
-      "candidate_only": 39,
+      "candidate_only": 44,
       "needs_revalidation": 42,
       "open": 231,
       "prerequisite_only": 1,
-      "recorded_scoped_closed": 75
+      "recorded_scoped_closed": 76
     },
     "needs_revalidation_by_category": {
       "additional": 10,
@@ -75,7 +75,7 @@
       },
       "additional": {
         "P1": 2,
-        "P2": 9,
+        "P2": 10,
         "P3": 8
       },
       "supplemental_pr": {
@@ -92,15 +92,15 @@
       },
       "candidate_followup": {
         "P1": 1,
-        "P2": 3,
-        "P3": 3,
+        "P2": 7,
+        "P3": 4,
         "unassigned": 1
       }
     },
     "candidate_followup": {
-      "total": 8,
+      "total": 13,
       "assigned_ids": 0,
-      "unassigned_records": 8
+      "unassigned_records": 13
     }
   },
   "pin_audit": {
@@ -2661,7 +2661,7 @@
         "changed_paths": []
       },
       "current_status": "recorded_scoped_closed",
-      "current_reason": "Direct source pins changed after the SDK installation. The independent continuity audit maps the bounded SDK reviews and maintained running-loop tests to the unchanged worker, one-request/one-attempt and fixed-refusal contract. Historical pins and the original scoped disposition remain; no new runtime qualification.",
+      "current_reason": "The cited Python host pins changed again at c5f53a96dbfc836bfc42805c2fee2d393dd78821. Independent final quality maps this original scoped contract and its named controls to the installed source: Synchronous Crew tool inside a running event loop returns one bounded native outcome, exactly one request and one spent attempt, without an unawaited coroutine. The previous continuity review, exact previous reason and historical pin_check remain preserved in the additive successor. No installed-wheel, native, provider or hosted qualification is added.",
       "current_continuity": {
         "review": "docs/architecture/recoverable-agent-runtime/implementation/reviews/installed-sdk-continuity.md",
         "review_sha256": "913279e6d97dfde598350c34f3d61b8e402521587417905d847270451089e40e",
@@ -2676,7 +2676,27 @@
           ]
         },
         "historical_pin_check_preserved": true,
-        "qualified": false
+        "qualified": false,
+        "successor": {
+          "recorded_at_utc": "2026-10-09T19:07:39.569909+00:00",
+          "previous_current_reason": "Direct source pins changed after the SDK installation. The independent continuity audit maps the bounded SDK reviews and maintained running-loop tests to the unchanged worker, one-request/one-attempt and fixed-refusal contract. Historical pins and the original scoped disposition remain; no new runtime qualification.",
+          "previous_current_status": "recorded_scoped_closed",
+          "review": "docs/architecture/recoverable-agent-runtime/implementation/reviews/fixture-lifecycle-and-sdk-readiness.md",
+          "review_sha256": "4f311718df5f6aed84f4ae78173d9bec96a212e6e9ff0791bb369655d1c61503",
+          "evidence_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/host-response-metadata/readiness-successor/teardown-successor/late-cleanup-successor/quality-review.json#/historical_contract_continuity/contracts/0",
+          "evidence_sha256": "1a46619de95b4dcd8fd0564285567015ebae5cb7ee3818cf466ba3c8cdab97de",
+          "installation_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/local-sdk-fixture-validation/installation.json",
+          "source_path": "sdks/python/chio-sdk-python/src/chio_sdk/recovery_host.py",
+          "historical_source_sha256": "9fd234399433151aabd5198db8298df6279bc834447859953a3305a095f5f899",
+          "previous_installed_sha256": "e7c9f732e6d9f01524f23c64503c60cdb392240cfef40d572e91a7d4285874bb",
+          "current_installed_sha256": "30dba8c8ca16e4f694eb50b17cee9ac30c45bdc0061a4d81c9b1dd07538e1e77",
+          "scope": "Synchronous Crew tool inside a running event loop returns one bounded native outcome, exactly one request and one spent attempt, without an unawaited coroutine.",
+          "limits": [
+            "Source and installed-framework integration only. These runs import maintained SDK source, so they do not requalify a newly built installed wheel.",
+            "No native effect authority, provider, compiler, hosted or production qualification."
+          ],
+          "qualified": false
+        }
       }
     },
     {
@@ -2701,7 +2721,7 @@
         "changed_paths": []
       },
       "current_status": "recorded_scoped_closed",
-      "current_reason": "Direct source pins changed after the SDK installation. The independent continuity audit confirms reviewed preservation of deadline selection, cancellation and cleanup timing, with unchanged timing assertions and companion route/CLI/TypeScript pins. Maintained tests support the original scope; no new elapsed-120-second, settlement or runtime qualification claim.",
+      "current_reason": "The cited Python host pins changed again at c5f53a96dbfc836bfc42805c2fee2d393dd78821. Independent final quality maps this original scoped contract and its named controls to the installed source: Setup defaults to 120 seconds; settlement and other routes default to 20 seconds; explicit overrides are integers 1..120; one total request/body and cleanup wait bound. The previous continuity review, exact previous reason and historical pin_check remain preserved in the additive successor. No installed-wheel, native, provider or hosted qualification is added.",
       "current_continuity": {
         "review": "docs/architecture/recoverable-agent-runtime/implementation/reviews/installed-sdk-continuity.md",
         "review_sha256": "913279e6d97dfde598350c34f3d61b8e402521587417905d847270451089e40e",
@@ -2717,7 +2737,28 @@
           ]
         },
         "historical_pin_check_preserved": true,
-        "qualified": false
+        "qualified": false,
+        "successor": {
+          "recorded_at_utc": "2026-10-09T19:07:39.569909+00:00",
+          "previous_current_reason": "Direct source pins changed after the SDK installation. The independent continuity audit confirms reviewed preservation of deadline selection, cancellation and cleanup timing, with unchanged timing assertions and companion route/CLI/TypeScript pins. Maintained tests support the original scope; no new elapsed-120-second, settlement or runtime qualification claim.",
+          "previous_current_status": "recorded_scoped_closed",
+          "review": "docs/architecture/recoverable-agent-runtime/implementation/reviews/fixture-lifecycle-and-sdk-readiness.md",
+          "review_sha256": "4f311718df5f6aed84f4ae78173d9bec96a212e6e9ff0791bb369655d1c61503",
+          "evidence_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/host-response-metadata/readiness-successor/teardown-successor/late-cleanup-successor/quality-review.json#/historical_contract_continuity/contracts/1",
+          "evidence_sha256": "1a46619de95b4dcd8fd0564285567015ebae5cb7ee3818cf466ba3c8cdab97de",
+          "installation_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/local-sdk-fixture-validation/installation.json",
+          "source_path": "sdks/python/chio-sdk-python/src/chio_sdk/recovery_host.py",
+          "historical_source_sha256": "9fd234399433151aabd5198db8298df6279bc834447859953a3305a095f5f899",
+          "previous_installed_sha256": "e7c9f732e6d9f01524f23c64503c60cdb392240cfef40d572e91a7d4285874bb",
+          "current_installed_sha256": "30dba8c8ca16e4f694eb50b17cee9ac30c45bdc0061a4d81c9b1dd07538e1e77",
+          "scope": "Setup defaults to 120 seconds; settlement and other routes default to 20 seconds; explicit overrides are integers 1..120; one total request/body and cleanup wait bound.",
+          "limits": [
+            "No dedicated elapsed-120-second or settlement-specific timing oracle is claimed.",
+            "CLI and TypeScript historical evidence remains historical and was not rerun, inspected anew, or promoted by this Python review.",
+            "No native/provider/hosted qualification."
+          ],
+          "qualified": false
+        }
       }
     },
     {
@@ -4908,7 +4949,7 @@
         "changed_paths": []
       },
       "current_status": "recorded_scoped_closed",
-      "current_reason": "Direct source pins changed after the SDK installation. The independent continuity audit confirms reviewed preservation of cleanup deadlines, retained task ownership and one-action behavior, with unchanged synchronous transport evidence and maintained owning tests. Historical pins and source-only limits remain; no new runtime qualification.",
+      "current_reason": "The cited Python host pins changed again at c5f53a96dbfc836bfc42805c2fee2d393dd78821. Independent final quality maps this original scoped contract and its named controls to the installed source: One selected deadline bounds delivery; actual unfinished request or cleanup retains admission only until it drains; cancellation neither retries nor leaks diagnostics nor changes an already delivered native outcome. The previous continuity review, exact previous reason and historical pin_check remain preserved in the additive successor. No installed-wheel, native, provider or hosted qualification is added.",
       "current_continuity": {
         "review": "docs/architecture/recoverable-agent-runtime/implementation/reviews/installed-sdk-continuity.md",
         "review_sha256": "913279e6d97dfde598350c34f3d61b8e402521587417905d847270451089e40e",
@@ -4923,7 +4964,27 @@
           ]
         },
         "historical_pin_check_preserved": true,
-        "qualified": false
+        "qualified": false,
+        "successor": {
+          "recorded_at_utc": "2026-10-09T19:07:39.569909+00:00",
+          "previous_current_reason": "Direct source pins changed after the SDK installation. The independent continuity audit confirms reviewed preservation of cleanup deadlines, retained task ownership and one-action behavior, with unchanged synchronous transport evidence and maintained owning tests. Historical pins and source-only limits remain; no new runtime qualification.",
+          "previous_current_status": "recorded_scoped_closed",
+          "review": "docs/architecture/recoverable-agent-runtime/implementation/reviews/fixture-lifecycle-and-sdk-readiness.md",
+          "review_sha256": "4f311718df5f6aed84f4ae78173d9bec96a212e6e9ff0791bb369655d1c61503",
+          "evidence_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/host-response-metadata/readiness-successor/teardown-successor/late-cleanup-successor/quality-review.json#/historical_contract_continuity/contracts/2",
+          "evidence_sha256": "1a46619de95b4dcd8fd0564285567015ebae5cb7ee3818cf466ba3c8cdab97de",
+          "installation_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/local-sdk-fixture-validation/installation.json",
+          "source_path": "sdks/python/chio-sdk-python/src/chio_sdk/recovery_host.py",
+          "historical_source_sha256": "9fd234399433151aabd5198db8298df6279bc834447859953a3305a095f5f899",
+          "previous_installed_sha256": "e7c9f732e6d9f01524f23c64503c60cdb392240cfef40d572e91a7d4285874bb",
+          "current_installed_sha256": "30dba8c8ca16e4f694eb50b17cee9ac30c45bdc0061a4d81c9b1dd07538e1e77",
+          "scope": "One selected deadline bounds delivery; actual unfinished request or cleanup retains admission only until it drains; cancellation neither retries nor leaks diagnostics nor changes an already delivered native outcome.",
+          "limits": [
+            "The old installed-source pins are not rewritten or retroactively made current.",
+            "No full SDK/framework/runtime/native/provider/compiler/hosted acceptance follows from these selected controls."
+          ],
+          "qualified": false
+        }
       }
     },
     {
@@ -9409,6 +9470,233 @@
         "installed": false,
         "qualified": false
       }
+    },
+    {
+      "key": "additional:sdk-sync-admission-readiness",
+      "id": null,
+      "category": "additional",
+      "severity": "P2",
+      "title": "Synchronous SDK admission outlives completed owned work",
+      "dependency_group": "sdk_host",
+      "obligation": "Release synchronous action admission once its owned request and close work have drained, before unrelated loop teardown; keep it BUSY while owned work is unfinished. Deliver the fixed outcome within its original bound, permit the next explicit action, and prevent an old worker from clearing or draining its successor.",
+      "evidence_refs": [
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/host-response-metadata/quality-review.json#/findings/1",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/host-response-metadata/readiness-successor/teardown-successor/spec-review.json#/findings/0",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/host-response-metadata/readiness-successor/sync-handoff-red.json",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/host-response-metadata/readiness-successor/teardown-successor/late-cleanup-successor/quality-review.json#/resolved_findings",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/host-response-metadata/readiness-successor/teardown-successor/late-cleanup-successor/spec-review.json",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/local-sdk-fixture-validation/installation.json"
+      ],
+      "recorded_disposition": "closed_scoped_local",
+      "recorded_scope_ref": "docs/architecture/recoverable-agent-runtime/implementation/reviews/fixture-lifecycle-and-sdk-readiness.md",
+      "current_status": "recorded_scoped_closed",
+      "current_reason": "Both inherited readiness facets have independently reviewed corrections and bounded local owning evidence on the eleven-file installed selection. The immediate admission race was reproduced on maintained source; the late-drain probe ran on a successor and its inherited finalizer cause was established by source comparison. This is one maintained P2 with two explicit facets, separate from the introduced completed-delivery candidate defect. The closure does not complete H-SDK-01, H-SDK-04 or QF-07.",
+      "installed_when_found": true,
+      "current_implementation_finding": true,
+      "original_observation": {
+        "recorded_disposition": "open_source_review_finding",
+        "maintained_source_sha256": "e7c9f732e6d9f01524f23c64503c60cdb392240cfef40d572e91a7d4285874bb",
+        "facets": [
+          {
+            "reviewer_label": "sequential-crew-replay-races-session-readiness",
+            "evidence_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/host-response-metadata/quality-review.json#/findings/1",
+            "reproduction_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/host-response-metadata/readiness-successor/sync-handoff-red.json",
+            "reproduction_scope": "Deterministic maintained-source failure, one failed test and exit 1."
+          },
+          {
+            "reviewer_label": "drained-late-cleanup-retains-admission-through-unrelated-teardown",
+            "evidence_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/host-response-metadata/readiness-successor/teardown-successor/spec-review.json#/findings/0",
+            "reproduction_scope": "Normal and optimized successor probes left admission BUSY after owned close drained. Source comparison, not a maintained-predecessor probe, establishes the inherited finalizer ordering."
+          }
+        ]
+      },
+      "current_successor": {
+        "recorded_disposition": "closed_scoped_local",
+        "review_ref": "docs/architecture/recoverable-agent-runtime/implementation/reviews/fixture-lifecycle-and-sdk-readiness.md",
+        "evidence_ref": "#/fixture_lifecycle_sdk_evidence",
+        "spec_verdict": "SPEC_PASS",
+        "quality_verdict": "QUALITY_PASS",
+        "installed": true,
+        "commit": "c5f53a96dbfc836bfc42805c2fee2d393dd78821",
+        "qualified": false
+      },
+      "confidence": "High for preserved source findings, owning failed observations and independent corrective reviews; local scope only.",
+      "qualified": false
+    },
+    {
+      "key": "candidate:campaign-body-interruption-retention",
+      "id": null,
+      "category": "candidate_followup",
+      "severity": "P2",
+      "title": "Campaign body interruption loses retained rows or admits more work",
+      "reviewer_label": "body-interruption-retention-and-cleanup-gate",
+      "dependency_group": "campaign_fixture",
+      "obligation": "Preserve the primary body interruption, stop admitting work before slow row handling, aggregate already written rows and finish owned-child cleanup.",
+      "evidence_refs": [
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/campaign-child-cleanup/spec-review.json#/findings/0",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/campaign-child-cleanup/interruption-successor/spec-review.json",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/campaign-child-cleanup/interruption-successor/quality-review.json",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/local-sdk-fixture-validation/installation.json"
+      ],
+      "recorded_disposition": "open_candidate_source_review_finding",
+      "current_status": "candidate_only",
+      "current_reason": "The original two-file candidate failed the body-interruption retention contract. The reviewed successor stops admission, preserves written evidence and the primary interruption, and passes the campaign owning controls. Its corrective source is installed at c5f53a96dbfc836bfc42805c2fee2d393dd78821 after bounded local acceptance; the original candidate-only classification and failed review epoch remain intact.",
+      "installed_when_found": false,
+      "current_implementation_finding": false,
+      "current_successor": {
+        "recorded_at_utc": "2026-10-09T19:07:39.569909+00:00",
+        "recorded_disposition": "closed_in_reviewed_candidate_scope",
+        "review_ref": "docs/architecture/recoverable-agent-runtime/implementation/reviews/fixture-lifecycle-and-sdk-readiness.md",
+        "evidence_ref": "#/fixture_lifecycle_sdk_evidence",
+        "spec_verdict": "SPEC_PASS",
+        "quality_verdict": "QUALITY_PASS",
+        "source_scope": "Two campaign files and their reviewed owner dependency.",
+        "installed": true,
+        "commit": "c5f53a96dbfc836bfc42805c2fee2d393dd78821",
+        "qualified": false
+      },
+      "confidence": "High for preserved independent finding and corrective reviews with the recorded local owning controls; no native or runtime qualification.",
+      "qualified": false
+    },
+    {
+      "key": "candidate:campaign-scheduler-interruption-abort",
+      "id": null,
+      "category": "candidate_followup",
+      "severity": "P2",
+      "title": "Scheduler interruption omits an honest incomplete abort",
+      "reviewer_label": "scheduler-interruption-abort-record",
+      "dependency_group": "campaign_fixture",
+      "obligation": "Stop admission on scheduler interruption, cancel unstarted work, drain active owned children, write an honest incomplete abort and rethrow the original interruption.",
+      "evidence_refs": [
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/campaign-child-cleanup/spec-review.json#/findings/1",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/campaign-child-cleanup/interruption-successor/spec-review.json",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/campaign-child-cleanup/interruption-successor/quality-review.json",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/local-sdk-fixture-validation/installation.json"
+      ],
+      "recorded_disposition": "open_candidate_source_review_finding",
+      "current_status": "candidate_only",
+      "current_reason": "The original two-file candidate lacked the required scheduler abort record and cleanup boundary. The independently approved successor retains the original interruption and honest incomplete aggregate after draining owned children. Its corrective source is installed at c5f53a96dbfc836bfc42805c2fee2d393dd78821 after bounded local acceptance; the original candidate-only classification and failed review epoch remain intact.",
+      "installed_when_found": false,
+      "current_implementation_finding": false,
+      "current_successor": {
+        "recorded_at_utc": "2026-10-09T19:07:39.569909+00:00",
+        "recorded_disposition": "closed_in_reviewed_candidate_scope",
+        "review_ref": "docs/architecture/recoverable-agent-runtime/implementation/reviews/fixture-lifecycle-and-sdk-readiness.md",
+        "evidence_ref": "#/fixture_lifecycle_sdk_evidence",
+        "spec_verdict": "SPEC_PASS",
+        "quality_verdict": "QUALITY_PASS",
+        "source_scope": "Two campaign files and their reviewed owner dependency.",
+        "installed": true,
+        "commit": "c5f53a96dbfc836bfc42805c2fee2d393dd78821",
+        "qualified": false
+      },
+      "confidence": "High for preserved independent finding and corrective reviews with the recorded local owning controls; no native or runtime qualification.",
+      "qualified": false
+    },
+    {
+      "key": "candidate:fixture-cooperative-success-grace",
+      "id": null,
+      "category": "candidate_followup",
+      "severity": "P2",
+      "title": "Cooperative cleanup success control depends on scheduler speed",
+      "reviewer_label": "cooperative-success-test-grace-is-scheduler-fragile",
+      "dependency_group": "campaign_fixture",
+      "obligation": "Give cooperative success controls deterministic readiness and adequate grace while proving one cumulative cleanup deadline and exact finish, terminate and kill ordering.",
+      "evidence_refs": [
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/host-response-metadata/quality-review.json#/findings/0",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/host-response-metadata/readiness-successor/teardown-successor/late-cleanup-successor/spec-review.json",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/host-response-metadata/readiness-successor/teardown-successor/late-cleanup-successor/quality-review.json",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/local-sdk-fixture-validation/installation.json"
+      ],
+      "recorded_disposition": "open_candidate_source_review_finding",
+      "current_status": "candidate_only",
+      "current_reason": "The original uncommitted fixture control failed under normal scheduling. The approved successor uses five-second cooperative readiness/grace and deterministic cumulative deadlines, retaining the negative separate-wait control. Its corrective source is installed at c5f53a96dbfc836bfc42805c2fee2d393dd78821 after bounded local acceptance; the original candidate-only classification and failed review epoch remain intact.",
+      "installed_when_found": false,
+      "current_implementation_finding": false,
+      "current_successor": {
+        "recorded_at_utc": "2026-10-09T19:07:39.569909+00:00",
+        "recorded_disposition": "closed_in_reviewed_candidate_scope",
+        "review_ref": "docs/architecture/recoverable-agent-runtime/implementation/reviews/fixture-lifecycle-and-sdk-readiness.md",
+        "evidence_ref": "#/fixture_lifecycle_sdk_evidence",
+        "spec_verdict": "SPEC_PASS",
+        "quality_verdict": "QUALITY_PASS",
+        "source_scope": "Nine-file SDK and fixture successor with independently approved EOF-only continuity.",
+        "installed": true,
+        "commit": "c5f53a96dbfc836bfc42805c2fee2d393dd78821",
+        "qualified": false
+      },
+      "confidence": "High for preserved independent finding and corrective reviews with the recorded local owning controls; no native or runtime qualification.",
+      "qualified": false
+    },
+    {
+      "key": "candidate:fixture-stale-lifecycle-imports",
+      "id": null,
+      "category": "candidate_followup",
+      "severity": "P3",
+      "title": "Stale imports remain after lifecycle extraction",
+      "reviewer_label": "stale-lifecycle-imports",
+      "dependency_group": "campaign_fixture",
+      "obligation": "Remove imports left behind by lifecycle extraction and patch the actual owning launch module in lifecycle tests.",
+      "evidence_refs": [
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/host-response-metadata/quality-review.json#/nonblocking_notes/0",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/host-response-metadata/readiness-successor/teardown-successor/late-cleanup-successor/spec-review.json",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/host-response-metadata/readiness-successor/teardown-successor/late-cleanup-successor/quality-review.json",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/local-sdk-fixture-validation/installation.json"
+      ],
+      "recorded_disposition": "open_candidate_source_review_finding",
+      "current_status": "candidate_only",
+      "current_reason": "The authentic original nonblocking P3 note is preserved, including its report pointer and later resolved label. The approved successor removes stale subprocess/time imports and targets the owning lifecycle module. Its corrective source is installed at c5f53a96dbfc836bfc42805c2fee2d393dd78821 after bounded local acceptance; the original candidate-only classification and failed review epoch remain intact.",
+      "installed_when_found": false,
+      "current_implementation_finding": false,
+      "current_successor": {
+        "recorded_at_utc": "2026-10-09T19:07:39.569909+00:00",
+        "recorded_disposition": "closed_in_reviewed_candidate_scope",
+        "review_ref": "docs/architecture/recoverable-agent-runtime/implementation/reviews/fixture-lifecycle-and-sdk-readiness.md",
+        "evidence_ref": "#/fixture_lifecycle_sdk_evidence",
+        "spec_verdict": "SPEC_PASS",
+        "quality_verdict": "QUALITY_PASS",
+        "source_scope": "Nine-file SDK and fixture successor with independently approved EOF-only continuity.",
+        "installed": true,
+        "commit": "c5f53a96dbfc836bfc42805c2fee2d393dd78821",
+        "qualified": false
+      },
+      "confidence": "High for preserved independent finding and corrective reviews with the recorded local owning controls; no native or runtime qualification.",
+      "qualified": false
+    },
+    {
+      "key": "candidate:sdk-completed-delivery-teardown",
+      "id": null,
+      "category": "candidate_followup",
+      "severity": "P2",
+      "title": "Completed synchronous delivery waits for unrelated loop teardown",
+      "reviewer_label": "completed-sync-delivery-waits-for-unbounded-loop-teardown",
+      "dependency_group": "sdk_host",
+      "obligation": "Publish a completed fixed outcome within the original selected delivery bound even when unrelated default-executor teardown is blocked; preserve request ownership and subsequent admission.",
+      "evidence_refs": [
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/host-response-metadata/readiness-successor/spec-review.json#/findings/0",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/host-response-metadata/readiness-successor/teardown-successor/late-cleanup-successor/spec-review.json",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/host-response-metadata/readiness-successor/teardown-successor/late-cleanup-successor/quality-review.json",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/local-sdk-fixture-validation/installation.json"
+      ],
+      "recorded_disposition": "open_candidate_source_review_finding",
+      "current_status": "candidate_only",
+      "current_reason": "The first uncommitted handoff correction introduced delayed completed-outcome delivery. Its normal and optimized executor-barrier probes failed while the predecessor passed. Final spec and independent quality prove bounded completed delivery with unrelated teardown still held. Its corrective source is installed at c5f53a96dbfc836bfc42805c2fee2d393dd78821 after bounded local acceptance; the original candidate-only classification and failed review epoch remain intact.",
+      "installed_when_found": false,
+      "current_implementation_finding": false,
+      "current_successor": {
+        "recorded_at_utc": "2026-10-09T19:07:39.569909+00:00",
+        "recorded_disposition": "closed_in_reviewed_candidate_scope",
+        "review_ref": "docs/architecture/recoverable-agent-runtime/implementation/reviews/fixture-lifecycle-and-sdk-readiness.md",
+        "evidence_ref": "#/fixture_lifecycle_sdk_evidence",
+        "spec_verdict": "SPEC_PASS",
+        "quality_verdict": "QUALITY_PASS",
+        "source_scope": "Nine-file SDK and fixture successor with independently approved EOF-only continuity.",
+        "installed": true,
+        "commit": "c5f53a96dbfc836bfc42805c2fee2d393dd78821",
+        "qualified": false
+      },
+      "confidence": "High for preserved independent finding and corrective reviews with the recorded local owning controls; no native or runtime qualification.",
+      "qualified": false
     }
   ],
   "inventory_confidence": "high: exact ID, row-count and recorded-disposition joins; current behavior is not requalified",
@@ -9615,6 +9903,191 @@
       "current_status": "recorded_scoped_closed",
       "historical_closure_and_pin_audit_unchanged": true,
       "tests_executed": 0,
+      "qualified": false
+    },
+    {
+      "at_utc": "2026-10-09T19:07:39.569909+00:00",
+      "review": "docs/architecture/recoverable-agent-runtime/implementation/reviews/fixture-lifecycle-and-sdk-readiness.md",
+      "review_sha256": "4f311718df5f6aed84f4ae78173d9bec96a212e6e9ff0791bb369655d1c61503",
+      "qualified": false,
+      "findings": [
+        "additional:sdk-sync-admission-readiness",
+        "candidate:campaign-body-interruption-retention",
+        "candidate:campaign-scheduler-interruption-abort",
+        "candidate:fixture-cooperative-success-grace",
+        "candidate:fixture-stale-lifecycle-imports",
+        "candidate:sdk-completed-delivery-teardown"
+      ],
+      "scope": "Six authentic findings from ordinary local SDK and fixture reviews: one maintained P2 with two inherited readiness facets receives a bounded local installed closure; five introduced candidate defects retain candidate_only classification with reviewed and installed corrective successors. All original 388 recorded dispositions, identities, pin checks and historical closure classifications remain intact.",
+      "installation_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/local-sdk-fixture-validation/installation.json",
+      "counts_before": {
+        "canonical": {
+          "total": 328,
+          "recorded_scoped_closed": 99,
+          "recorded_source_only_closed": 92,
+          "recorded_scoped_local_closed": 7,
+          "recorded_not_closed": 229
+        },
+        "additional": {
+          "total": 19,
+          "recorded_scoped_closed": 18,
+          "recorded_not_closed": 1
+        },
+        "supplemental_pr": {
+          "total": 1,
+          "recorded_not_closed": 1
+        },
+        "prevented_candidate": {
+          "total": 31,
+          "assigned_ids": 23,
+          "unassigned_exact_records": 8
+        },
+        "provenance_prerequisite": {
+          "total": 1,
+          "excluded_from_implementation_finding_counts": true
+        },
+        "current_or_executed_support_findings": 348,
+        "implementation_recorded_scoped_closed": 117,
+        "implementation_recorded_not_closed": 231,
+        "findings_and_prevented_candidates": 387,
+        "all_records_including_provenance": 388,
+        "assigned_finding_ids_excluding_provenance": 371,
+        "qualified": 0,
+        "current_status": {
+          "candidate_only": 39,
+          "needs_revalidation": 42,
+          "open": 231,
+          "prerequisite_only": 1,
+          "recorded_scoped_closed": 75
+        },
+        "needs_revalidation_by_category": {
+          "additional": 10,
+          "canonical": 32
+        },
+        "severity_by_category": {
+          "canonical": {
+            "P1": 17,
+            "P2": 144,
+            "P3": 167
+          },
+          "additional": {
+            "P1": 2,
+            "P2": 9,
+            "P3": 8
+          },
+          "supplemental_pr": {
+            "P1": 1
+          },
+          "prevented_candidate": {
+            "P1": 4,
+            "P2": 23,
+            "P3": 3,
+            "unassigned": 1
+          },
+          "provenance_prerequisite": {
+            "unassigned": 1
+          },
+          "candidate_followup": {
+            "P1": 1,
+            "P2": 3,
+            "P3": 3,
+            "unassigned": 1
+          }
+        },
+        "candidate_followup": {
+          "total": 8,
+          "assigned_ids": 0,
+          "unassigned_records": 8
+        }
+      },
+      "counts_after": {
+        "all_records": 394,
+        "maintained_or_support": 349,
+        "recorded_scoped_closed": 118,
+        "recorded_not_closed": 231,
+        "current_status": {
+          "candidate_only": 44,
+          "needs_revalidation": 42,
+          "open": 231,
+          "prerequisite_only": 1,
+          "recorded_scoped_closed": 76
+        }
+      },
+      "historical_original_scoped_closures_preserved": 117
+    },
+    {
+      "at_utc": "2026-10-09T19:07:39.569909+00:00",
+      "review": "docs/architecture/recoverable-agent-runtime/implementation/reviews/fixture-lifecycle-and-sdk-readiness.md",
+      "review_sha256": "4f311718df5f6aed84f4ae78173d9bec96a212e6e9ff0791bb369655d1c61503",
+      "qualified": false,
+      "findings": [
+        "H-SDK-08",
+        "H-SDK-09",
+        "SDK-INDEPENDENT-03"
+      ],
+      "scope": "Additive continuity for the changed Python host pin only, mapped by independent final quality to each exact original contract and named selectors. Previous current reasons and the prior continuity objects are preserved. No existing status or historical closure changes.",
+      "evidence_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/host-response-metadata/readiness-successor/teardown-successor/late-cleanup-successor/quality-review.json#/historical_contract_continuity",
+      "historical_closure_and_pin_audit_unchanged": true
+    },
+    {
+      "at_utc": "2026-10-09T19:07:39.569909+00:00",
+      "review": "docs/architecture/recoverable-agent-runtime/implementation/reviews/fixture-lifecycle-and-sdk-readiness.md",
+      "review_sha256": "4f311718df5f6aed84f4ae78173d9bec96a212e6e9ff0791bb369655d1c61503",
+      "qualified": false,
+      "findings": [
+        "H-SDK-01",
+        "H-SDK-04",
+        "QF-07"
+      ],
+      "current_status": "open",
+      "scope": "Installed controlled metadata, optimized harmless-child lifecycle and campaign row-retention progress only. Original all-state native projections, native preflight/host enforced-request controls and source-bound matched live framework campaigns remain unaccepted. These three rows and their original obligations are unchanged. No PAC/SFE cross-credit."
+    },
+    {
+      "at_utc": "2026-10-09T19:07:39.569909+00:00",
+      "review": "docs/architecture/recoverable-agent-runtime/implementation/reviews/fixture-lifecycle-and-sdk-readiness.md",
+      "review_sha256": "4f311718df5f6aed84f4ae78173d9bec96a212e6e9ff0791bb369655d1c61503",
+      "qualified": false,
+      "findings": [
+        "PR-SETTLEMENT-CAPACITY-01",
+        "R2-X-resources-01"
+      ],
+      "scope": "Read-only hosted snapshot for the installed source: two unresolved threads map to existing records, with no added finding, implementation disposition, reply or resolution. The large-database comment remains an existing facet and R2-X-authority-03 remains distinct.",
+      "head": "c5f53a96dbfc836bfc42805c2fee2d393dd78821",
+      "evidence_refs": [
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/hosted-state-c5f53a96d.json",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/hosted-review-threads-c5f53a96d.json"
+      ],
+      "hosted_checks": {
+        "QUEUED": 64,
+        "SKIPPED": 2
+      },
+      "unresolved_threads": [
+        {
+          "finding": "PR-SETTLEMENT-CAPACITY-01",
+          "thread_severity": "P1",
+          "is_outdated": false,
+          "url": "https://github.com/bb-connor/arc/pull/1179#discussion_r4206947954"
+        },
+        {
+          "finding": "R2-X-resources-01",
+          "thread_severity": "P2",
+          "is_outdated": true,
+          "related_distinct_finding": "R2-X-authority-03",
+          "url": "https://github.com/bb-connor/arc/pull/1179#discussion_r4206947962"
+        }
+      ],
+      "current_status_changes": false
+    },
+    {
+      "at_utc": "2026-10-09T19:09:04.761392+00:00",
+      "findings": [
+        "QF-04"
+      ],
+      "review": "docs/architecture/recoverable-agent-runtime/implementation/reviews/fixture-lifecycle-and-sdk-readiness.md",
+      "review_sha256": "4f311718df5f6aed84f4ae78173d9bec96a212e6e9ff0791bb369655d1c61503",
+      "scope": "Later full fixture discovery ran 130 tests: 129 passed and one assurance-map error. Source inputs remained stable and no remote attempt was recorded. This distinct broader gate remains failed, without erasing focused local evidence, changing QF-04 or adding an unclassified duplicate. Scope diagnosis remains separate.",
+      "evidence_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/fixture-environment-continuity/normal.json",
+      "current_status_changes": false,
       "qualified": false
     }
   ],
@@ -10122,6 +10595,77 @@
       "quality_review": "pending",
       "scope": "Separate source/selection controls only. Earlier failed checkpoints remain preserved; no final acceptance, productive capture, pricing, funding, retirement or qualification is established.",
       "qualified": false
+    }
+  },
+  "fixture_lifecycle_sdk_evidence": {
+    "recorded_at_utc": "2026-10-09T19:07:39.569909+00:00",
+    "scope": "Reviewed eleven-file fixture and Python SDK installation; original failures and review epochs remain intact. Local controlled runs only.",
+    "installation_commit": "c5f53a96dbfc836bfc42805c2fee2d393dd78821",
+    "review_ref": "docs/architecture/recoverable-agent-runtime/implementation/reviews/fixture-lifecycle-and-sdk-readiness.md",
+    "review_sha256": "4f311718df5f6aed84f4ae78173d9bec96a212e6e9ff0791bb369655d1c61503",
+    "files": {
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/local-sdk-fixture-validation/installation.json": "2539e2f1bd87d33b75beb2dcd89f7a666b5ba31f5747b98d327951370cbcbdeb",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/local-sdk-fixture-validation/final-source-selection.json": "b696b51a9df4f6a5bbf216dcae104234d8ddf5171a4c420933ace2f909a61d4d",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/local-sdk-fixture-validation/maintained-sdk-framework-successor.json": "a8ecd81125207a3e6c44f88b2ce16dc5588145499a7fcfc6181d8f7319176f33",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/local-sdk-fixture-validation/maintained-sdk-framework-successor.log": "4c3ed3f1a27becc8ab36a4e150e3db49baff790a91eec7acbc1818653eb4f3fa",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/local-sdk-fixture-validation/composed-fixtures-final-normal.json": "f7b5580f6c40db8291c4772387ec4a34caa89e5722c6f3dfe5532965196ab9bf",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/local-sdk-fixture-validation/composed-fixtures-final-normal.log": "83901e573500d9814a5c1d3d4e5b8d54f82481efbc24c399a56b01742add6043",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/local-sdk-fixture-validation/composed-fixtures-final-optimized.json": "39d214458254d99539fd1413f3afd9defded0d2cc83ddd41a2175269b6dda8b5",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/local-sdk-fixture-validation/composed-fixtures-final-optimized.log": "17397976613bf43ffb45a8b73ea937e51f54740fd8c1e1e541c6cd971dfab951",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/local-sdk-fixture-validation/formatting-successor/quality-continuity.json": "663da4b1375c081efb8e2a732b2aa8aa12d1e75eb697995af6eb1d622fe921ec",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/local-sdk-fixture-validation/formatting-successor/quality-continuity.md": "6d7cab660043fc7ae9aaebf58ec71706c280680250147660fe9568f01c9d3dea",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/host-response-metadata/readiness-successor/teardown-successor/late-cleanup-successor/spec-review.json": "9a619a6055dd7286027f670f9e9b3b38477549c9f5825df2818997713a32fdff",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/host-response-metadata/readiness-successor/teardown-successor/late-cleanup-successor/quality-review.json": "1a46619de95b4dcd8fd0564285567015ebae5cb7ee3818cf466ba3c8cdab97de",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/host-response-metadata/readiness-successor/teardown-successor/late-cleanup-successor/freeze.json": "ef8457f71a0063575357e8049c69e97f95f0aa868d2b16cdea9fe32701a69622",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/campaign-child-cleanup/interruption-successor/spec-review.json": "932f7da5de47fe000f9e165f4f23a4c93f7eee60f589e534e7c91d21ceca8920",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/campaign-child-cleanup/interruption-successor/quality-review.json": "103702bd0392e6cff853f243642751a44fecef06b8ba5f43744b357da170aced",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/host-response-metadata/quality-review.json": "3638c98009136d0f89fa95066158c19540ff7bd1ed4be0fe43a7643b35567ed1",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/campaign-child-cleanup/spec-review.json": "90d4155b6f17c847c86cba161f5154bd113ea40e2f28d5d24f6f3951018c10ea",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/host-response-metadata/readiness-successor/spec-review.json": "68e08dbc1baf54dd9501c52e813484851eaca2d42ffa488ac2b45fa22bd50c5b",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/host-response-metadata/readiness-successor/teardown-successor/spec-review.json": "0b35e7a4b99b609c8248393a13d7aab2e72bd6bf4b73d6999b861d90401659f2",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/host-response-metadata/readiness-successor/sync-handoff-red.json": "1abcf6df4ae61805d70b60cd8207e4c508fad86e003e0f42e24958f7e8d3cc8d",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/host-response-metadata/readiness-successor/sync-handoff-red.log": "72b8ddfe582f0cb469ff3c42af5073b1a6f6acf11af25e6594032c9e14290c3d",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/hosted-review-threads-c5f53a96d.json": "9859d1b314cfcdf0fbf9f85d0e2bfb5d0572964518d1a4bafd434535d0986bf6",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/hosted-state-c5f53a96d.json": "b94a77e7fda67e048360973ee2bf6bdeb40d1b9f0b7645917766f4fb5b060233",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/fixture-environment-continuity/normal.json": "2d647a2b74aeab112a3520c4c239fdba258c468958b536abcc36f5f70691d928",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/fixture-environment-continuity/normal.log": "80a75f9bf988c9c87a3a690b14926cf499f7e34473c2e4a20c32da970c549453"
+    },
+    "source_selection_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/local-sdk-fixture-validation/final-source-selection.json",
+    "installation_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/local-sdk-fixture-validation/installation.json",
+    "source_selection_historical_status_preserved": true,
+    "validation": {
+      "sdk_framework": {
+        "result_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/local-sdk-fixture-validation/maintained-sdk-framework-successor.json",
+        "passed": 1438,
+        "source_inputs": 634
+      },
+      "fixtures_normal": {
+        "result_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/local-sdk-fixture-validation/composed-fixtures-final-normal.json",
+        "passed": 56,
+        "source_inputs": 643
+      },
+      "fixtures_optimized": {
+        "result_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/local-sdk-fixture-validation/composed-fixtures-final-optimized.json",
+        "passed": 56,
+        "source_inputs": 643
+      },
+      "all_exit_codes": 0,
+      "network_attempts": 0,
+      "source_inputs_before_after_and_current_match": true
+    },
+    "qualified": false,
+    "broader_fixture_gate": {
+      "result_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/fixture-environment-continuity/normal.json",
+      "log_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/fixture-environment-continuity/normal.log",
+      "exit_code": 1,
+      "tests_run": 130,
+      "passed": 129,
+      "errors": 1,
+      "error": "assurance.missing_owner_or_cutpoint",
+      "source_inputs": 644,
+      "source_stable": true,
+      "remote_attempts": 0,
+      "scope": "Separate full discovery gate using recorded catalog environment and supported Python 3.12 audit wrapper. The focused passes remain valid; broader acceptance is pending. No finding closure or new record is inferred."
     }
   }
 }
