@@ -1,1 +1,9 @@
-//! Receipt query snapshot tests.
+//! Receipt query snapshot controls. Control ids refer to the plan.
+#[path = "tests/build.rs"]
+mod build;
+#[path = "tests/query.rs"]
+mod query;
+#[path = "tests/service.rs"]
+mod service;
+#[path = "tests/support.rs"]
+mod support;

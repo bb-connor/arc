@@ -28,5 +28,10 @@ pub use service::{
 };
 
 #[cfg(test)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test fixtures deliberately fail on violated setup invariants."
+)]
 #[path = "receipt_query_snapshot/tests.rs"]
 mod tests;

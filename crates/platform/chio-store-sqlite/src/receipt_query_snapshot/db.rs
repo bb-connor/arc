@@ -229,6 +229,12 @@ impl SnapshotDb {
         &self.connection
     }
 
+    #[cfg(test)]
+    pub(super) fn trace_for_test(&mut self, trace: Option<fn(rusqlite::trace::TraceEvent<'_>)>) {
+        self.connection
+            .trace_v2(rusqlite::trace::TraceEventCodes::SQLITE_TRACE_STMT, trace);
+    }
+
     pub(super) fn quota_bytes(&self) -> u64 {
         self.quota_bytes
     }

@@ -348,6 +348,8 @@ struct Inner {
     waiting: Arc<AtomicUsize>,
     epoch: AtomicU64,
     last_recertification_ms: AtomicU64,
+    #[cfg(test)]
+    pause_extension: AtomicBool,
 }
 
 /// Owner of the authenticated receipt query snapshot of one store.
@@ -387,6 +389,8 @@ impl ReceiptQuerySnapshots {
             waiting: Arc::new(AtomicUsize::new(0)),
             epoch: AtomicU64::new(0),
             last_recertification_ms: AtomicU64::new(0),
+            #[cfg(test)]
+            pause_extension: AtomicBool::new(false),
         });
         let walker = Arc::clone(&inner);
         let handle = std::thread::Builder::new()
@@ -905,6 +909,11 @@ fn serve(
                 "receipt writer head is poisoned".into(),
             ));
         }
+        #[cfg(test)]
+        if inner.pause_extension.load(Ordering::SeqCst) {
+            inner.sleep(inner.config.extension_tick);
+            continue;
+        }
         match extend_cycle(ctx, published, &|| inner.now_ms()) {
             Ok(observation) => covered = Some(observation),
             Err(WalkError::Busy(_)) => {}
@@ -953,4 +962,24 @@ fn duration_ms(duration: Duration) -> u64 {
     u64::try_from(duration.as_millis())
         .unwrap_or(u64::MAX)
         .max(1)
+}
+
+#[cfg(test)]
+impl ReceiptQuerySnapshots {
+    pub(super) fn pause_extension_for_test(&self, paused: bool) {
+        self.inner.pause_extension.store(paused, Ordering::SeqCst);
+        self.inner.wake();
+    }
+
+    pub(super) fn invalidate_for_test(&self, reason: &str) {
+        self.inner.invalidate(reason);
+    }
+
+    pub(super) fn lease_for_test(&self) -> Result<u64, ReceiptStoreError> {
+        self.inner.ready().map(|(_, epoch)| epoch)
+    }
+
+    pub(super) fn recheck_lease_for_test(&self, epoch: u64) -> Result<(), ReceiptStoreError> {
+        self.inner.recheck_lease(epoch)
+    }
 }

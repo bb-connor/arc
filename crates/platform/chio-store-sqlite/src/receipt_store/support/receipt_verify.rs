@@ -40,6 +40,29 @@ pub(crate) fn sqlite_bool(value: bool) -> i64 {
     }
 }
 
+#[cfg(test)]
+thread_local! {
+    static RECEIPT_SIGNATURE_VERIFICATIONS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
+
+/// Stored receipt signature verifications performed on this thread.
+#[cfg(test)]
+pub(crate) fn receipt_signature_verifications() -> u64 {
+    RECEIPT_SIGNATURE_VERIFICATIONS.with(std::cell::Cell::get)
+}
+
+/// Stored receipt signature verifications performed on any thread, including
+/// the writer actor.
+#[cfg(test)]
+pub(crate) static ALL_THREAD_RECEIPT_SIGNATURE_VERIFICATIONS: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(0);
+
+#[cfg(test)]
+fn count_receipt_signature_verification() {
+    RECEIPT_SIGNATURE_VERIFICATIONS.with(|count| count.set(count.get() + 1));
+    ALL_THREAD_RECEIPT_SIGNATURE_VERIFICATIONS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+}
+
 pub(crate) fn ensure_chio_receipt_verified(receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
     ensure_chio_receipt_verified_with_context(receipt, "tool receipt", None)
 }
@@ -70,6 +93,8 @@ pub(crate) fn ensure_chio_receipt_verified_with_context(
     receipt_kind: &str,
     seq: Option<u64>,
 ) -> Result<(), ReceiptStoreError> {
+    #[cfg(test)]
+    count_receipt_signature_verification();
     let context = format_receipt_context(receipt_kind, Some(receipt.id.as_str()), seq);
     // The standalone SQLite verifier has no policy handle. Keep the
     // compatibility floor explicit: accept classical and hybrid receipts, while policy-bearing callers enforce their configured
@@ -102,6 +127,8 @@ pub(crate) fn ensure_child_receipt_verified_with_context(
     receipt_kind: &str,
     seq: Option<u64>,
 ) -> Result<(), ReceiptStoreError> {
+    #[cfg(test)]
+    count_receipt_signature_verification();
     let context = format_receipt_context(receipt_kind, Some(receipt.id.as_str()), seq);
     // The standalone SQLite verifier has no policy handle. Keep the
     // compatibility floor explicit: accept classical and hybrid receipts, while policy-bearing callers enforce their configured
