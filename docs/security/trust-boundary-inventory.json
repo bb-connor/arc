@@ -19570,8 +19570,12 @@
       "query_receipts_on_connection::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_verified_chio_receipt"
     ],
     "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/extend.rs": [
+      "extend_cycle::shared-reader::crates/platform/chio-store-sqlite/src/receipt_query_snapshot/extend.rs::publish_verified",
+      "extend_cycle::shared-reader::crates/platform/chio-store-sqlite/src/receipt_query_snapshot/extend.rs::stage_leaves",
       "extend_cycle::shared-reader::crates/platform/chio-store-sqlite/src/receipt_query_snapshot/walk.rs::authenticate",
-      "extend_cycle::shared-reader::crates/platform/chio-store-sqlite/src/receipt_query_snapshot/walk.rs::authenticate_checkpoints"
+      "extend_cycle::shared-reader::crates/platform/chio-store-sqlite/src/receipt_query_snapshot/walk.rs::authenticate_checkpoints",
+      "publish_verified::shared-reader::crates/platform/chio-store-sqlite/src/receipt_query_snapshot/walk.rs::authenticate",
+      "stage_leaves::shared-reader::crates/platform/chio-store-sqlite/src/receipt_query_snapshot/walk.rs::authenticate"
     ],
     "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/fetch.rs": [
       "fetch::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_verified_chio_receipt"

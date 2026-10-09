@@ -14,7 +14,7 @@ use super::super::service::{
 use super::support::{keypair, per_call, substitute, Fixture, Spec};
 use crate::receipt_store::support::receipt_signature_verifications;
 
-fn config() -> ReceiptQuerySnapshotConfig {
+pub(super) fn config() -> ReceiptQuerySnapshotConfig {
     ReceiptQuerySnapshotConfig {
         step_rows: 3,
         insert_rows: 2,
@@ -26,7 +26,7 @@ fn config() -> ReceiptQuerySnapshotConfig {
     }
 }
 
-fn wait_for(
+pub(super) fn wait_for(
     service: &ReceiptQuerySnapshots,
     what: &str,
     mut done: impl FnMut(&ReceiptQuerySnapshotState) -> bool,
@@ -45,7 +45,10 @@ fn wait_for(
     }
 }
 
-fn ready(fixture: &Fixture, config: ReceiptQuerySnapshotConfig) -> ReceiptQuerySnapshots {
+pub(super) fn ready(
+    fixture: &Fixture,
+    config: ReceiptQuerySnapshotConfig,
+) -> ReceiptQuerySnapshots {
     let service = ReceiptQuerySnapshots::start(fixture.store.clone(), config).unwrap();
     wait_for(&service, "ready", |state| {
         *state == ReceiptQuerySnapshotState::Ready
@@ -62,14 +65,14 @@ fn mixed_fixture() -> Fixture {
     fixture
 }
 
-fn admin(limit: usize) -> ReceiptQuery {
+pub(super) fn admin(limit: usize) -> ReceiptQuery {
     ReceiptQuery {
         limit,
         ..ReceiptQuery::default().local_operator_admin()
     }
 }
 
-fn snapshot_error(error: ReceiptStoreError) -> ReceiptQuerySnapshotError {
+pub(super) fn snapshot_error(error: ReceiptStoreError) -> ReceiptQuerySnapshotError {
     match error {
         ReceiptStoreError::QuerySnapshot(error) => error,
         other => panic!("expected a typed snapshot outcome, got {other}"),

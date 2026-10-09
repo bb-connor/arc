@@ -213,6 +213,39 @@ pub(super) struct Published {
     /// Storage failure the next status hold reports.
     #[cfg(test)]
     status_fault: Mutex<Option<SnapshotDbError>>,
+    /// Gate the extension stops at, before verifying a checkpoint root or
+    /// before publishing a verified step.
+    #[cfg(test)]
+    gate: (Mutex<TestGate>, Condvar),
+    /// Most pending leaves one staging hold wrote.
+    #[cfg(test)]
+    max_staged_per_hold: AtomicU64,
+}
+
+/// Where the extension's test gate stands.
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum GatePoint {
+    Settlement,
+    Publication,
+}
+
+/// What the extension does on reaching an armed gate.
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum GateAction {
+    /// Wait until the gate is released.
+    Hold,
+    /// End the cycle as contention once, then disarm.
+    Interrupt,
+}
+
+#[cfg(test)]
+#[derive(Default)]
+struct TestGate {
+    armed: Option<(GatePoint, GateAction)>,
+    skip: u32,
+    reached: bool,
 }
 
 /// Position an extension cycle starts from.
@@ -334,6 +367,61 @@ impl Published {
         })?;
         self.changed.notify_all();
         Ok(value)
+    }
+
+    /// Stop at the test gate when it is armed at `point`.
+    #[cfg(test)]
+    pub(super) fn test_gate(&self, point: GatePoint) -> Result<(), WalkError> {
+        let (gate, signal) = &self.gate;
+        let Ok(mut state) = gate.lock() else {
+            return Ok(());
+        };
+        let Some((armed, action)) = state.armed else {
+            return Ok(());
+        };
+        if armed != point {
+            return Ok(());
+        }
+        if state.skip > 0 {
+            state.skip -= 1;
+            return Ok(());
+        }
+        state.reached = true;
+        signal.notify_all();
+        if action == GateAction::Interrupt {
+            state.armed = None;
+            return Err(WalkError::Busy("interrupted at the test gate".into()));
+        }
+        while state.armed.is_some() && !self.cancel.load(Ordering::SeqCst) {
+            state = match signal.wait_timeout(state, Duration::from_millis(50)) {
+                Ok((state, _)) => state,
+                Err(_) => return Ok(()),
+            };
+        }
+        Ok(())
+    }
+
+    /// Stage pending leaves without publishing a version: no row becomes
+    /// visible and the version's coverage is unchanged.
+    pub(super) fn stage(&self, batch: &SnapshotBatch) -> Result<(), WalkError> {
+        self.hold(|owned| {
+            #[cfg(test)]
+            if let Some(fault) = self
+                .commit_fault
+                .lock()
+                .ok()
+                .and_then(|mut fault| fault.take())
+            {
+                return Err(fault);
+            }
+            owned.db.commit(batch)
+        })?;
+        #[cfg(test)]
+        self.max_staged_per_hold.fetch_max(
+            u64::try_from(batch.pending.len()).unwrap_or(u64::MAX),
+            Ordering::SeqCst,
+        );
+        Ok(())
     }
 
     pub(super) fn sink(&self) -> PublishedSink<'_> {
@@ -1222,6 +1310,10 @@ fn build_and_serve(inner: &Arc<Inner>) -> Result<(), WalkError> {
         read_fault: Mutex::new(None),
         #[cfg(test)]
         status_fault: Mutex::new(None),
+        #[cfg(test)]
+        gate: (Mutex::new(TestGate::default()), Condvar::new()),
+        #[cfg(test)]
+        max_staged_per_hold: AtomicU64::new(0),
     });
     inner.set_phase(Phase::Ready(Arc::clone(&published)));
     inner.published_since_failure.store(true, Ordering::SeqCst);
@@ -1382,6 +1474,53 @@ impl ReceiptQuerySnapshots {
     }
 
     /// Make the next status hold fail with `fault`.
+    /// Arm the extension's test gate on the published lineage, letting it
+    /// pass `skip` times first.
+    pub(super) fn arm_gate_for_test(&self, point: GatePoint, action: GateAction, skip: u32) {
+        if let Phase::Ready(published) = self.inner.phase() {
+            if let Ok(mut state) = published.gate.0.lock() {
+                *state = TestGate {
+                    armed: Some((point, action)),
+                    skip,
+                    reached: false,
+                };
+            }
+        }
+    }
+
+    /// Wait until the extension reaches the armed gate.
+    pub(super) fn await_gate_for_test(&self, timeout: Duration) -> bool {
+        let Phase::Ready(published) = self.inner.phase() else {
+            return false;
+        };
+        let (gate, signal) = &published.gate;
+        let Ok(state) = gate.lock() else {
+            return false;
+        };
+        signal
+            .wait_timeout_while(state, timeout, |state| !state.reached)
+            .map(|(state, _)| state.reached)
+            .unwrap_or(false)
+    }
+
+    /// Release the extension's test gate.
+    pub(super) fn release_gate_for_test(&self) {
+        if let Phase::Ready(published) = self.inner.phase() {
+            if let Ok(mut state) = published.gate.0.lock() {
+                state.armed = None;
+            }
+            published.gate.1.notify_all();
+        }
+    }
+
+    /// Most pending leaves one staging hold wrote on the published lineage.
+    pub(super) fn max_staged_per_hold_for_test(&self) -> u64 {
+        match self.inner.phase() {
+            Phase::Ready(published) => published.max_staged_per_hold.load(Ordering::SeqCst),
+            _ => 0,
+        }
+    }
+
     pub(super) fn fail_next_status_for_test(&self, fault: SnapshotDbError) {
         if let Phase::Ready(published) = self.inner.phase() {
             if let Ok(mut slot) = published.status_fault.lock() {

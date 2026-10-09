@@ -5,6 +5,8 @@ mod build;
 mod capacity;
 #[path = "tests/memory.rs"]
 mod memory;
+#[path = "tests/publication.rs"]
+mod publication;
 #[path = "tests/query.rs"]
 mod query;
 #[path = "tests/service.rs"]
