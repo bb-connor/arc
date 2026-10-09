@@ -33,6 +33,10 @@ on:
       - "scripts/check-sre-metrics-registry.sh"
       - ".github/workflows/chio-pheromone-relay-observability.yml"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+
 jobs:
   chio-pheromone-relay-observability:
     runs-on: ubuntu-latest
