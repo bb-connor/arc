@@ -9,7 +9,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 import shutil
 from check_fonts import FONTS, check as check_fonts
-from compare_pages import TOLERANCE, compare as compare_pages
+from compare_pages import PIXEL_TOLERANCE, compare as compare_pages
 from idnits_gate import validate
 from normalize_xml import normalize
 
@@ -129,7 +129,14 @@ class FontManifest(unittest.TestCase):
 
 
 class PageComparison(unittest.TestCase):
-    """Rasterized PDF pages must agree beyond antialiasing noise."""
+    """Rasterized PDF pages must agree beyond isolated antialiasing noise."""
+
+    # A 400 by 500 page: at most 100 pixels may change, by at most
+    # PIXEL_TOLERANCE levels each, with at most 1000 levels changed in all.
+    WIDTH, HEIGHT = 400, 500
+    # A figure: a box outline with 2-pixel black strokes and one
+    # 2-pixel-wide black diagonal, 2376 artwork pixels on a white page.
+    BOX = (50, 50, 350, 250)
 
     def pages(self, tmp, name, pages):
         directory = Path(tmp) / name
@@ -142,13 +149,75 @@ class PageComparison(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             return compare_pages(self.pages(tmp, "committed", committed), self.pages(tmp, "fresh", fresh))
 
-    def test_identical_and_noise_level_pages_pass(self):
-        white = (4, 2, [255] * 8)
-        noisy = (4, 2, [255 - TOLERANCE] + [255] * 7)
-        self.assertEqual(self.run_compare([white, white], [white, white]), ([], []))
-        failures, notes = self.run_compare([white], [noisy])
+    def figure(self):
+        """Return a page with black figure artwork and its artwork pixels."""
+        pixels = bytearray([255] * (self.WIDTH * self.HEIGHT))
+        left, top, right, bottom = self.BOX
+        artwork = set()
+        for x in range(left, right):
+            for y in (top, top + 1, bottom - 2, bottom - 1):
+                artwork.add(y * self.WIDTH + x)
+        for y in range(top, bottom):
+            for x in (left, left + 1, right - 2, right - 1):
+                artwork.add(y * self.WIDTH + x)
+            diagonal = left + (y - top) * (right - left) // (bottom - top)
+            artwork.update({y * self.WIDTH + diagonal, y * self.WIDTH + diagonal + 1})
+        for index in artwork:
+            pixels[index] = 0
+        return pixels, sorted(artwork)
+
+    def page(self, pixels):
+        return (self.WIDTH, self.HEIGHT, pixels)
+
+    def changed(self, pixels, indices, delta):
+        """Return a copy of pixels with each index moved delta levels toward mid-gray."""
+        changed = bytearray(pixels)
+        for index in indices:
+            changed[index] += delta if changed[index] < 128 else -delta
+        return changed
+
+    def test_an_identical_render_passes(self):
+        committed, _ = self.figure()
+        self.assertEqual(self.run_compare([self.page(committed)] * 2, [self.page(bytes(committed))] * 2), ([], []))
+
+    def test_isolated_antialiasing_noise_passes(self):
+        committed, artwork = self.figure()
+        noisy = self.changed(committed, artwork[:30], PIXEL_TOLERANCE)
+        failures, notes = self.run_compare([self.page(committed)], [self.page(noisy)])
         self.assertEqual(failures, [])
         self.assertEqual(len(notes), 1)
+
+    def test_below_threshold_artwork_changes_fail(self):
+        """Each change moves no pixel more than 96 levels, the former tolerance."""
+        committed, artwork = self.figure()
+        left, top, right, bottom = self.BOX
+        gray_line = self.changed(committed, [(top + bottom) // 2 * self.WIDTH + x for x in range(left, right)], 96)
+        cases = {
+            "black artwork recolored to gray level 96": (self.changed(committed, artwork, 96), "per-pixel"),
+            "a #9f gray line drawn across the figure": (gray_line, "per-pixel"),
+            "artwork lightened within the per-pixel tolerance": (
+                self.changed(committed, artwork, PIXEL_TOLERANCE), "of the page changed"),
+            "a faint change to 101 pixels": (self.changed(committed, artwork[:101], 1), "of the page changed"),
+            "a change to 32 pixels near the per-pixel tolerance": (
+                self.changed(committed, artwork[:32], PIXEL_TOLERANCE), "mean delta above"),
+        }
+        for name, (fresh, bound) in cases.items():
+            with self.subTest(name):
+                self.assertLessEqual(max(abs(a - b) for a, b in zip(committed, fresh)), 96)
+                failures, _ = self.run_compare([self.page(committed)], [self.page(fresh)])
+                self.assertEqual(len(failures), 1)
+                self.assertIn(bound, failures[0])
+
+    def test_changes_at_the_bounds_pass(self):
+        committed, artwork = self.figure()
+        cases = {"100 pixels changed by 10 levels": (artwork[:100], 10, "100 of 200000 pixels changed, max delta 10"),
+                 "31 pixels changed by the tolerance": (artwork[:31], PIXEL_TOLERANCE, "31 of 200000 pixels changed")}
+        for name, (indices, delta, summary) in cases.items():
+            with self.subTest(name):
+                fresh = self.changed(committed, indices, delta)
+                failures, notes = self.run_compare([self.page(committed)], [self.page(fresh)])
+                self.assertEqual(failures, [])
+                self.assertIn(summary, notes[0])
 
     def test_changed_artwork_page_count_and_size_fail(self):
         white = (4, 2, [255] * 8)

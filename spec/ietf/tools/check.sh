@@ -68,8 +68,10 @@ if ! normalize "$out.prepped.xml" | cmp -s - "$tmp/$out.prepped.norm"; then
 fi
 # The PDF embeds a creation time and host-dependent font subsets, so compare
 # its extracted text and, because text does not cover figure artwork, its
-# pages rasterized at a low resolution. Reproducible layout uses the pinned
-# fonts selected by Makefile's FONTCONFIG_FILE.
+# pages rasterized at a low resolution, which may differ only by isolated
+# antialiasing noise (tools/compare_pages.py bounds the per-pixel change, the
+# changed-pixel fraction, and the mean change of each page). Reproducible
+# layout uses the pinned fonts selected by Makefile's FONTCONFIG_FILE.
 if command -v pdftotext >/dev/null 2>&1 && command -v pdftoppm >/dev/null 2>&1; then
   pdftotext -layout "$out.pdf" "$tmp/committed.pdf.txt"
   pdftotext -layout "$tmp/$out.pdf" "$tmp/fresh.pdf.txt"
