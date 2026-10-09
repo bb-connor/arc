@@ -148,18 +148,32 @@ impl PostgresFindingMarketStore {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+/// Parameters of `aggregate_event_digest`.
+pub(crate) struct AggregateEventDigestInput<'a> {
+    pub(crate) aggregate_kind: HostedAggregateKind,
+    pub(crate) aggregate_id: &'a str,
+    pub(crate) revision: u64,
+    pub(crate) event_id: &'a str,
+    pub(crate) event_kind: &'a str,
+    pub(crate) previous_event_sha256: Option<&'a str>,
+    pub(crate) payload_sha256: &'a str,
+    pub(crate) committed_at: u64,
+}
+
 pub(crate) fn aggregate_event_digest(
     tenant: &HostedTenantId,
-    aggregate_kind: HostedAggregateKind,
-    aggregate_id: &str,
-    revision: u64,
-    event_id: &str,
-    event_kind: &str,
-    previous_event_sha256: Option<&str>,
-    payload_sha256: &str,
-    committed_at: u64,
+    params: AggregateEventDigestInput<'_>,
 ) -> Result<String, HostedMarketStoreError> {
+    let AggregateEventDigestInput {
+        aggregate_kind,
+        aggregate_id,
+        revision,
+        event_id,
+        event_kind,
+        previous_event_sha256,
+        payload_sha256,
+        committed_at,
+    } = params;
     canonical_json_bytes(&AggregateEventDigest {
         domain: EVENT_DIGEST_DOMAIN,
         tenant_id: tenant.as_str(),
@@ -176,7 +190,6 @@ pub(crate) fn aggregate_event_digest(
     .map_err(|_| HostedMarketStoreError::Invalid("aggregate event digest"))
 }
 
-#[allow(clippy::too_many_arguments)]
 fn aggregate_head_from_row(
     tenant: &HostedTenantId,
     row: &sqlx::postgres::PgRow,
@@ -233,14 +246,16 @@ fn aggregate_event_from_row(
     }
     let expected_digest = aggregate_event_digest(
         tenant,
-        aggregate_kind,
-        &aggregate_id,
-        revision,
-        &event_id,
-        &event_kind,
-        previous_event_sha256.as_deref(),
-        &payload_sha256,
-        committed_at,
+        AggregateEventDigestInput {
+            aggregate_kind,
+            aggregate_id: &aggregate_id,
+            revision,
+            event_id: &event_id,
+            event_kind: &event_kind,
+            previous_event_sha256: previous_event_sha256.as_deref(),
+            payload_sha256: &payload_sha256,
+            committed_at,
+        },
     )?;
     if expected_digest != event_sha256 {
         return Err(HostedMarketStoreError::DigestMismatch);
@@ -452,14 +467,16 @@ mod tests {
         let digest = |revision, predecessor: Option<&str>| {
             aggregate_event_digest(
                 &tenant,
-                HostedAggregateKind::Challenge,
-                "challenge:1",
-                revision,
-                "event:1",
-                "challenge.submitted",
-                predecessor,
-                &"a".repeat(64),
-                1_700_000_000,
+                AggregateEventDigestInput {
+                    aggregate_kind: HostedAggregateKind::Challenge,
+                    aggregate_id: "challenge:1",
+                    revision,
+                    event_id: "event:1",
+                    event_kind: "challenge.submitted",
+                    previous_event_sha256: predecessor,
+                    payload_sha256: &"a".repeat(64),
+                    committed_at: 1_700_000_000,
+                },
             )
         };
         assert_ne!(digest(1, None).ok(), digest(2, None).ok());

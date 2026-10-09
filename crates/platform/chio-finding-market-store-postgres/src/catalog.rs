@@ -9,8 +9,9 @@ use chio_finding::{
 use sqlx::Row as _;
 
 use crate::{
-    aggregates::aggregate_event_digest, domain::validate_persisted_domain_payload, stored_u64,
-    unavailable, validate_digest, validate_identifier, HostedJobWriteOutcome,
+    aggregates::{aggregate_event_digest, AggregateEventDigestInput},
+    domain::validate_persisted_domain_payload,
+    stored_u64, unavailable, validate_digest, validate_identifier, HostedJobWriteOutcome,
     HostedMarketDomainArtifact, HostedMarketDomainEvent, HostedMarketDomainEventKind,
     HostedMarketDomainProjection, HostedMarketStoreError, HostedTenantId,
     PostgresFindingMarketStore,
@@ -492,14 +493,16 @@ fn projection_from_catalog_row(
     }
     let expected_event_sha256 = aggregate_event_digest(
         tenant,
-        event_kind.aggregate_kind(),
-        &aggregate_id,
-        revision,
-        &event_id,
-        event_kind.event_kind(),
-        previous_event_sha256.as_deref(),
-        &payload_sha256,
-        committed_at,
+        AggregateEventDigestInput {
+            aggregate_kind: event_kind.aggregate_kind(),
+            aggregate_id: &aggregate_id,
+            revision,
+            event_id: &event_id,
+            event_kind: event_kind.event_kind(),
+            previous_event_sha256: previous_event_sha256.as_deref(),
+            payload_sha256: &payload_sha256,
+            committed_at,
+        },
     )?;
     if expected_event_sha256 != event_sha256 {
         return Err(HostedMarketStoreError::DigestMismatch);

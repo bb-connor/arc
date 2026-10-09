@@ -83,6 +83,33 @@ pub enum HostedSecurityEventOutcome {
     ExactReplay,
 }
 
+/// Parameters of `put_api_key`.
+pub struct ApiKeyWrite<'a> {
+    pub key_id: &'a str,
+    pub principal_id: &'a str,
+    pub verifier_sha256: &'a str,
+    pub allowed_actions: &'a BTreeSet<String>,
+    pub active_from: u64,
+    pub expires_at: u64,
+    pub rotated_from_key_id: Option<&'a str>,
+    pub now: u64,
+}
+
+/// Parameters of `put_api_key_with_security_event`.
+pub struct ApiKeyWithSecurityEvent<'a> {
+    pub key_id: &'a str,
+    pub principal_id: &'a str,
+    pub verifier_sha256: &'a str,
+    pub allowed_actions: &'a BTreeSet<String>,
+    pub active_from: u64,
+    pub expires_at: u64,
+    pub rotated_from_key_id: Option<&'a str>,
+    pub event_id: &'a str,
+    pub event_kind: &'a str,
+    pub artifact_json: &'a [u8],
+    pub now: u64,
+}
+
 impl PostgresFindingMarketStore {
     pub async fn apply_principal_lifecycle(
         &self,
@@ -187,19 +214,21 @@ impl PostgresFindingMarketStore {
         row.map(|row| principal_from_row(tenant, &row)).transpose()
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub async fn put_api_key(
         &self,
         tenant: &HostedTenantId,
-        key_id: &str,
-        principal_id: &str,
-        verifier_sha256: &str,
-        allowed_actions: &BTreeSet<String>,
-        active_from: u64,
-        expires_at: u64,
-        rotated_from_key_id: Option<&str>,
-        now: u64,
+        params: ApiKeyWrite<'_>,
     ) -> Result<HostedJobWriteOutcome, HostedMarketStoreError> {
+        let ApiKeyWrite {
+            key_id,
+            principal_id,
+            verifier_sha256,
+            allowed_actions,
+            active_from,
+            expires_at,
+            rotated_from_key_id,
+            now,
+        } = params;
         validate_api_key_issue(
             key_id,
             principal_id,
@@ -216,14 +245,16 @@ impl PostgresFindingMarketStore {
         let outcome = put_api_key_tx(
             &mut transaction,
             tenant,
-            key_id,
-            principal_id,
-            verifier_sha256,
-            allowed_actions,
-            active_from,
-            expires_at,
-            rotated_from_key_id,
-            now,
+            ApiKeyTxWrite {
+                key_id,
+                principal_id,
+                verifier_sha256,
+                allowed_actions,
+                active_from,
+                expires_at,
+                rotated_from_key_id,
+                now,
+            },
         )
         .await?;
         transaction.commit().await.map_err(unavailable)?;
@@ -561,22 +592,24 @@ impl PostgresFindingMarketStore {
     }
 
     /// Atomically install an API key and its signed lifecycle event.
-    #[allow(clippy::too_many_arguments)]
     pub async fn put_api_key_with_security_event(
         &self,
         tenant: &HostedTenantId,
-        key_id: &str,
-        principal_id: &str,
-        verifier_sha256: &str,
-        allowed_actions: &BTreeSet<String>,
-        active_from: u64,
-        expires_at: u64,
-        rotated_from_key_id: Option<&str>,
-        event_id: &str,
-        event_kind: &str,
-        artifact_json: &[u8],
-        now: u64,
+        params: ApiKeyWithSecurityEvent<'_>,
     ) -> Result<HostedJobWriteOutcome, HostedMarketStoreError> {
+        let ApiKeyWithSecurityEvent {
+            key_id,
+            principal_id,
+            verifier_sha256,
+            allowed_actions,
+            active_from,
+            expires_at,
+            rotated_from_key_id,
+            event_id,
+            event_kind,
+            artifact_json,
+            now,
+        } = params;
         validate_api_key_issue(
             key_id,
             principal_id,
@@ -595,14 +628,16 @@ impl PostgresFindingMarketStore {
         let key_outcome = put_api_key_tx(
             &mut transaction,
             tenant,
-            key_id,
-            principal_id,
-            verifier_sha256,
-            allowed_actions,
-            active_from,
-            expires_at,
-            rotated_from_key_id,
-            now,
+            ApiKeyTxWrite {
+                key_id,
+                principal_id,
+                verifier_sha256,
+                allowed_actions,
+                active_from,
+                expires_at,
+                rotated_from_key_id,
+                now,
+            },
         )
         .await?;
         let event_outcome = append_security_event_tx(
@@ -723,19 +758,33 @@ pub(crate) fn validate_principal_lifecycle_event(
     Ok(envelope)
 }
 
-#[allow(clippy::too_many_arguments)]
+/// Parameters of `put_api_key_tx`.
+struct ApiKeyTxWrite<'a> {
+    key_id: &'a str,
+    principal_id: &'a str,
+    verifier_sha256: &'a str,
+    allowed_actions: &'a BTreeSet<String>,
+    active_from: i64,
+    expires_at: i64,
+    rotated_from_key_id: Option<&'a str>,
+    now: i64,
+}
+
 async fn put_api_key_tx(
     transaction: &mut Transaction<'_, Postgres>,
     tenant: &HostedTenantId,
-    key_id: &str,
-    principal_id: &str,
-    verifier_sha256: &str,
-    allowed_actions: &BTreeSet<String>,
-    active_from: i64,
-    expires_at: i64,
-    rotated_from_key_id: Option<&str>,
-    now: i64,
+    params: ApiKeyTxWrite<'_>,
 ) -> Result<HostedJobWriteOutcome, HostedMarketStoreError> {
+    let ApiKeyTxWrite {
+        key_id,
+        principal_id,
+        verifier_sha256,
+        allowed_actions,
+        active_from,
+        expires_at,
+        rotated_from_key_id,
+        now,
+    } = params;
     let principal_enabled = sqlx::query_scalar::<_, bool>(
         "SELECT enabled FROM chio_finding_market_principals WHERE tenant_id = $1 AND principal_id = $2",
     )
@@ -831,7 +880,6 @@ async fn revoke_api_key_tx(
     Ok(HostedJobWriteOutcome::Inserted)
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn append_security_event_tx(
     transaction: &mut Transaction<'_, Postgres>,
     tenant: &HostedTenantId,
@@ -887,7 +935,6 @@ fn auth_lock_key(domain: &str, tenant_id: &str, identifier: &str) -> String {
     )
 }
 
-#[allow(clippy::too_many_arguments)]
 fn validate_api_key_issue(
     key_id: &str,
     principal_id: &str,

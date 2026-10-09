@@ -46,7 +46,8 @@ pub(crate) use validation::{
 
 pub use aggregates::{HostedAggregateEvent, HostedAggregateHead, HostedAggregateHistoryPage};
 pub use auth::{
-    HostedPrincipalLifecycleBody, HostedPrincipalLifecycleOperation, HostedSecurityEventOutcome,
+    ApiKeyWithSecurityEvent, ApiKeyWrite, HostedPrincipalLifecycleBody,
+    HostedPrincipalLifecycleOperation, HostedSecurityEventOutcome,
     SignedHostedPrincipalLifecycleEvent, HOSTED_PRINCIPAL_LIFECYCLE_SCHEMA,
 };
 pub use catalog::{HostedDomainPage, HostedDomainWrite};

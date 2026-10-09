@@ -6,11 +6,11 @@ use sqlx::postgres::{PgPoolOptions, PgRow};
 use sqlx::{PgPool, Postgres, Row as _, Transaction};
 
 use super::{
-    aggregates::aggregate_event_digest, checked_i64, checked_nonnegative_i64, runtime_boundary,
-    stored_u64, unavailable, validate_digest, validate_identifier, HostedJobWriteOutcome,
-    HostedMarketDomainEvent, HostedMarketDomainEventKind, HostedMarketStoreError,
-    HostedPostgresConfig, HostedTenantId, PostgresFindingMarketStore,
-    SignedHostedPrincipalLifecycleEvent,
+    aggregates::{aggregate_event_digest, AggregateEventDigestInput},
+    checked_i64, checked_nonnegative_i64, runtime_boundary, stored_u64, unavailable,
+    validate_digest, validate_identifier, HostedJobWriteOutcome, HostedMarketDomainEvent,
+    HostedMarketDomainEventKind, HostedMarketStoreError, HostedPostgresConfig, HostedTenantId,
+    PostgresFindingMarketStore, SignedHostedPrincipalLifecycleEvent,
 };
 
 pub const HOSTED_REPLICATION_EVENT_SCHEMA: &str = "chio.finding.hosted-replication-event.v1";
@@ -355,14 +355,16 @@ impl PostgresFindingMarketReplicator {
             .ok_or(HostedMarketStoreError::Invalid("replication revision"))?;
         let domain_event_sha256 = aggregate_event_digest(
             tenant,
-            body.event_kind.aggregate_kind(),
-            &body.aggregate_id,
-            revision,
-            &body.event_id,
-            body.event_kind.event_kind(),
-            body.expected_event_sha256.as_deref(),
-            &payload_sha256,
-            body.committed_at,
+            AggregateEventDigestInput {
+                aggregate_kind: body.event_kind.aggregate_kind(),
+                aggregate_id: &body.aggregate_id,
+                revision,
+                event_id: &body.event_id,
+                event_kind: body.event_kind.event_kind(),
+                previous_event_sha256: body.expected_event_sha256.as_deref(),
+                payload_sha256: &payload_sha256,
+                committed_at: body.committed_at,
+            },
         )?;
         let envelope = signed_bytes(event, "replication event")?;
         let replication_event_sha256 = sha256_hex(&envelope);

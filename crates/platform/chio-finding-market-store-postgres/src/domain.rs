@@ -21,10 +21,10 @@ use serde::{Deserialize, Serialize};
 use sqlx::{Postgres, Row as _, Transaction};
 
 use super::{
-    aggregates::aggregate_event_digest, checked_i64, checked_nonnegative_i64, stored_u64,
-    unavailable, validate_canonical_json, validate_digest, validate_identifier,
-    HostedAggregateKind, HostedJobWriteOutcome, HostedMarketStoreError, HostedTenantId,
-    PostgresFindingMarketStore,
+    aggregates::{aggregate_event_digest, AggregateEventDigestInput},
+    checked_i64, checked_nonnegative_i64, stored_u64, unavailable, validate_canonical_json,
+    validate_digest, validate_identifier, HostedAggregateKind, HostedJobWriteOutcome,
+    HostedMarketStoreError, HostedTenantId, PostgresFindingMarketStore,
 };
 
 const MAX_AGGREGATE_ID_BYTES: usize = 256;
@@ -362,14 +362,16 @@ impl PostgresFindingMarketStore {
         let aggregate_kind = event.event_kind.aggregate_kind();
         let event_sha256 = aggregate_event_digest(
             tenant,
-            aggregate_kind,
-            &event.aggregate_id,
-            revision,
-            &event.event_id,
-            event.event_kind.event_kind(),
-            expected_event_sha256,
-            &payload_sha256,
-            committed_at,
+            AggregateEventDigestInput {
+                aggregate_kind,
+                aggregate_id: &event.aggregate_id,
+                revision,
+                event_id: &event.event_id,
+                event_kind: event.event_kind.event_kind(),
+                previous_event_sha256: expected_event_sha256,
+                payload_sha256: &payload_sha256,
+                committed_at,
+            },
         )?;
         if let Some(exact) = retained_event_matches(
             transaction,
@@ -558,14 +560,16 @@ fn domain_projection_from_row(
     }
     let expected_event_sha256 = aggregate_event_digest(
         tenant,
-        event_kind.aggregate_kind(),
-        aggregate_id,
-        revision,
-        &event_id,
-        event_kind.event_kind(),
-        previous_event_sha256.as_deref(),
-        &payload_sha256,
-        committed_at,
+        AggregateEventDigestInput {
+            aggregate_kind: event_kind.aggregate_kind(),
+            aggregate_id,
+            revision,
+            event_id: &event_id,
+            event_kind: event_kind.event_kind(),
+            previous_event_sha256: previous_event_sha256.as_deref(),
+            payload_sha256: &payload_sha256,
+            committed_at,
+        },
     )?;
     if expected_event_sha256 != event_sha256 {
         return Err(HostedMarketStoreError::DigestMismatch);
@@ -586,7 +590,6 @@ fn domain_projection_from_row(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn retained_event_matches(
     transaction: &mut Transaction<'_, Postgres>,
     tenant: &HostedTenantId,

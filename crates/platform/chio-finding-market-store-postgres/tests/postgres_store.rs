@@ -12,8 +12,8 @@ use chio_finding::{
     FindingGuaranteeClass, FindingOutcomeClass, FINDING_SCHEMA_V1,
 };
 use chio_finding_market_store_postgres::{
-    HostedAggregateCheckpointBody, HostedAggregateKind, HostedArchiveManifestBody,
-    HostedAuthorityTransitionBody, HostedAuthorityTransitionOperation,
+    ApiKeyWithSecurityEvent, ApiKeyWrite, HostedAggregateCheckpointBody, HostedAggregateKind,
+    HostedArchiveManifestBody, HostedAuthorityTransitionBody, HostedAuthorityTransitionOperation,
     HostedCapabilityAdmissionOutcome, HostedDomainWrite, HostedGcReceiptBody, HostedJobState,
     HostedJobWriteOutcome, HostedJournalCheckpointBody, HostedLegalHoldAction, HostedLegalHoldBody,
     HostedMarketAuthority, HostedMarketDomainArtifact, HostedMarketDomainEvent,
@@ -41,7 +41,9 @@ use support::{
     assert_multi_replica_leases_and_shutdown_refunds, assert_paged_aggregate_history,
     assert_prior_release_writes_keep_accumulators, assert_tenant_disablement_serializes,
     assert_terminal_job_retention_gc, assert_worker_job_boundary, migrate_legacy_fixture,
-    signed_domain_payload, signed_principal_replication_event, ReplicationCheckSpec,
+    put_buyer_api_key, rotate_buyer_api_key, signed_domain_payload,
+    signed_principal_replication_event, AuthorityTransition, CatalogRetractionCase,
+    ReplicationCheckSpec, TerminalJobRetentionCase,
 };
 
 #[tokio::test]
@@ -695,21 +697,7 @@ async fn tenant_isolation_exact_replay_and_lease_recovery() -> Result<(), Box<dy
         )
         .await?
         .is_some());
-    store
-        .put_api_key(
-            &tenant_a,
-            "key-a",
-            "buyer-a",
-            &"c".repeat(64),
-            &["finding.purchase".to_owned()]
-                .into_iter()
-                .collect::<BTreeSet<_>>(),
-            1_700_000_000,
-            1_700_003_600,
-            None,
-            1_700_000_000,
-        )
-        .await?;
+    put_buyer_api_key(&store, &tenant_a).await?;
     assert!(store
         .get_active_api_key(&tenant_a, "key-a", 1_700_000_001)
         .await?
@@ -718,26 +706,8 @@ async fn tenant_isolation_exact_replay_and_lease_recovery() -> Result<(), Box<dy
         .get_active_api_key(&tenant_b, "key-a", 1_700_000_001)
         .await?
         .is_none());
-    let actions = ["finding.purchase".to_owned()]
-        .into_iter()
-        .collect::<BTreeSet<_>>();
     assert_eq!(
-        store
-            .put_api_key_with_security_event(
-                &tenant_a,
-                "key-b",
-                "buyer-a",
-                &"e".repeat(64),
-                &actions,
-                1_700_000_000,
-                1_700_003_600,
-                Some("key-a"),
-                "event-key-b-issued",
-                "hosted.api_key.issued",
-                br#"{"event":"issue"}"#,
-                1_700_000_000,
-            )
-            .await?,
+        rotate_buyer_api_key(&store, &tenant_a).await?,
         HostedJobWriteOutcome::Inserted
     );
 
@@ -867,16 +837,18 @@ async fn tenant_isolation_exact_replay_and_lease_recovery() -> Result<(), Box<dy
     apply_authority_transition(
         &replicator,
         &tenant_a,
-        &source_signer,
-        HostedAuthorityTransitionOperation::Freeze,
-        HostedMarketAuthority::Sqlite,
-        HostedMarketAuthority::Sqlite,
-        1,
-        2,
-        3,
-        &projection_sha256,
-        None,
-        authority_now,
+        AuthorityTransition {
+            signer: &source_signer,
+            operation: HostedAuthorityTransitionOperation::Freeze,
+            from_authority: HostedMarketAuthority::Sqlite,
+            to_authority: HostedMarketAuthority::Sqlite,
+            from_epoch: 1,
+            to_epoch: 2,
+            through_sequence: 3,
+            checkpoint_sha256: &projection_sha256,
+            rollback_window_ends_at: None,
+            created_at: authority_now,
+        },
     )
     .await?;
     append_replication_check(
@@ -895,16 +867,18 @@ async fn tenant_isolation_exact_replay_and_lease_recovery() -> Result<(), Box<dy
     apply_authority_transition(
         &replicator,
         &tenant_a,
-        &source_signer,
-        HostedAuthorityTransitionOperation::Cutover,
-        HostedMarketAuthority::Sqlite,
-        HostedMarketAuthority::Postgres,
-        2,
-        3,
-        3,
-        &projection_sha256,
-        Some(authority_now + 604_800),
-        authority_now,
+        AuthorityTransition {
+            signer: &source_signer,
+            operation: HostedAuthorityTransitionOperation::Cutover,
+            from_authority: HostedMarketAuthority::Sqlite,
+            to_authority: HostedMarketAuthority::Postgres,
+            from_epoch: 2,
+            to_epoch: 3,
+            through_sequence: 3,
+            checkpoint_sha256: &projection_sha256,
+            rollback_window_ends_at: Some(authority_now + 604_800),
+            created_at: authority_now,
+        },
     )
     .await?;
     append_replication_check(
@@ -1121,12 +1095,14 @@ async fn tenant_isolation_exact_replay_and_lease_recovery() -> Result<(), Box<dy
     assert_catalog_retractions(
         &store,
         &tenant_a,
-        &tenant_b,
-        &domain_signer,
-        &market_finding_id,
-        &replicator,
-        &source_signer,
-        authority_now,
+        CatalogRetractionCase {
+            other_tenant: &tenant_b,
+            signer: &domain_signer,
+            finding_id: &market_finding_id,
+            replicator: &replicator,
+            source_signer: &source_signer,
+            authority_now,
+        },
     )
     .await?;
     let history = store
@@ -1983,11 +1959,13 @@ async fn tenant_isolation_exact_replay_and_lease_recovery() -> Result<(), Box<dy
         &admin_pool,
         &store,
         &tenant_a,
-        &retention_signer,
-        &retention_public_key,
-        authority_now,
-        &request,
-        payload_a,
+        TerminalJobRetentionCase {
+            retention_signer: &retention_signer,
+            retention_public_key: &retention_public_key,
+            authority_now,
+            request_sha256: &request,
+            payload: payload_a,
+        },
     )
     .await?;
     store.set_tenant_enabled(&tenant_a, false).await?;

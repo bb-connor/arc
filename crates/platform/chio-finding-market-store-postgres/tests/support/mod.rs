@@ -17,6 +17,9 @@
 //! assertions rely on are not tenant scoped.
 
 use super::*;
+
+mod cases;
+pub(crate) use cases::*;
 use std::time::Duration;
 
 use chio_core_types::capability::scope::MonetaryAmount;
@@ -28,17 +31,19 @@ use chio_finding::{
     FINDING_VOLUNTARY_RETRACTION_SCHEMA_V1,
 };
 
-#[allow(clippy::too_many_arguments)]
 pub(super) async fn assert_catalog_retractions(
     store: &PostgresFindingMarketStore,
     tenant: &HostedTenantId,
-    other_tenant: &HostedTenantId,
-    signer: &Keypair,
-    finding_id: &str,
-    replicator: &PostgresFindingMarketReplicator,
-    source_signer: &Keypair,
-    authority_now: u64,
+    params: CatalogRetractionCase<'_>,
 ) -> Result<(), Box<dyn Error>> {
+    let CatalogRetractionCase {
+        other_tenant,
+        signer,
+        finding_id,
+        replicator,
+        source_signer,
+        authority_now,
+    } = params;
     let foreign_signer = Keypair::from_seed(&[93_u8; 32]);
     let cross_seller_retraction = SignedExportEnvelope::sign(
         FindingVoluntaryRetraction {
@@ -194,18 +199,20 @@ pub(super) async fn assert_catalog_retractions(
     .await
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(super) async fn assert_terminal_job_retention_gc(
     retention: &PostgresFindingMarketRetention,
     admin_pool: &sqlx::PgPool,
     store: &PostgresFindingMarketStore,
     tenant: &HostedTenantId,
-    retention_signer: &Keypair,
-    retention_public_key: &chio_core_types::crypto::PublicKey,
-    authority_now: u64,
-    request_sha256: &str,
-    payload: &[u8],
+    params: TerminalJobRetentionCase<'_>,
 ) -> Result<(), Box<dyn Error>> {
+    let TerminalJobRetentionCase {
+        retention_signer,
+        retention_public_key,
+        authority_now,
+        request_sha256,
+        payload,
+    } = params;
     let terminal_commitment = retention.journal_commitment(tenant).await?;
     let terminal_checkpoint_body = HostedJournalCheckpointBody {
         schema: HOSTED_JOURNAL_CHECKPOINT_SCHEMA.to_owned(),
@@ -736,21 +743,23 @@ pub(super) struct ReplicationCheckSpec<'a> {
     pub(super) checked_at: u64,
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(super) async fn apply_authority_transition(
     replicator: &PostgresFindingMarketReplicator,
     tenant: &HostedTenantId,
-    signer: &Keypair,
-    operation: HostedAuthorityTransitionOperation,
-    from_authority: HostedMarketAuthority,
-    to_authority: HostedMarketAuthority,
-    from_epoch: u64,
-    to_epoch: u64,
-    through_sequence: u64,
-    checkpoint_sha256: &str,
-    rollback_window_ends_at: Option<u64>,
-    created_at: u64,
+    params: AuthorityTransition<'_>,
 ) -> Result<(), Box<dyn Error>> {
+    let AuthorityTransition {
+        signer,
+        operation,
+        from_authority,
+        to_authority,
+        from_epoch,
+        to_epoch,
+        through_sequence,
+        checkpoint_sha256,
+        rollback_window_ends_at,
+        created_at,
+    } = params;
     let transition = SignedExportEnvelope::sign(
         HostedAuthorityTransitionBody {
             schema: HOSTED_AUTHORITY_TRANSITION_SCHEMA.to_owned(),

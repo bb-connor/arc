@@ -6,6 +6,7 @@ use chio_finding_market_port::{
     HOSTED_API_KEY_REVOKED_EVENT_KIND,
 };
 
+use crate::auth::ApiKeyWithSecurityEvent;
 use crate::{HostedJobWriteOutcome, HostedMarketStoreError, PostgresFindingMarketStore};
 
 #[async_trait]
@@ -82,17 +83,19 @@ impl HostedApiKeyLifecyclePort for PostgresFindingMarketStore {
     ) -> Result<HostedPortWriteOutcome, HostedMarketPortError> {
         self.put_api_key_with_security_event(
             tenant,
-            key_id,
-            principal_id,
-            verifier_sha256,
-            allowed_actions,
-            active_from,
-            expires_at,
-            rotated_from_key_id,
-            event_id,
-            HOSTED_API_KEY_ISSUED_EVENT_KIND,
-            artifact_json,
-            now,
+            ApiKeyWithSecurityEvent {
+                key_id,
+                principal_id,
+                verifier_sha256,
+                allowed_actions,
+                active_from,
+                expires_at,
+                rotated_from_key_id,
+                event_id,
+                event_kind: HOSTED_API_KEY_ISSUED_EVENT_KIND,
+                artifact_json,
+                now,
+            },
         )
         .await
         .map(write_outcome)
