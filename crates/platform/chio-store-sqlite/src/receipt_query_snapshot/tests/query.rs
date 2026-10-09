@@ -1,4 +1,4 @@
-//! Task 2: owned storage and fixed query plans (C7, C16, C17, C18, C20).
+//! Owned snapshot storage, fixed query plans, work budgets and quotas.
 use std::cell::RefCell;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
@@ -93,7 +93,7 @@ fn queries() -> Vec<ReceiptQuery> {
 }
 
 #[test]
-fn c7_snapshot_selection_matches_the_per_call_path() {
+fn snapshot_selection_matches_the_per_call_path() {
     let (fixture, db) = built_fixture();
     for query in queries() {
         let expected = per_call(&fixture.store, &query);
@@ -111,7 +111,7 @@ fn c7_snapshot_selection_matches_the_per_call_path() {
 }
 
 #[test]
-fn c7_invalid_queries_fail_exactly_as_on_the_per_call_path() {
+fn invalid_queries_fail_exactly_as_on_the_per_call_path() {
     let (fixture, db) = built_fixture();
     let cases = [
         ReceiptQuery {
@@ -160,7 +160,7 @@ fn synthetic(seq: i64, long: usize) -> ProjectedToolRow {
 }
 
 #[test]
-fn c16_over_budget_selection_withholds_rows_and_count() {
+fn over_budget_selection_withholds_rows_and_count() {
     let mut db = SnapshotDb::open_memory(64 * 1024 * 1024).unwrap();
     db.commit(&SnapshotBatch {
         tools: (1..=3_000).map(|seq| synthetic(seq, 0)).collect(),
@@ -187,7 +187,7 @@ fn c16_over_budget_selection_withholds_rows_and_count() {
 }
 
 #[test]
-fn c17_quota_exhaustion_is_typed_and_leaves_the_snapshot_unchanged() {
+fn quota_exhaustion_is_typed_and_leaves_the_snapshot_unchanged() {
     let mut db = SnapshotDb::open_memory(512 * 1024).unwrap();
     let mut committed = 0_u64;
     let mut seq = 1_i64;
@@ -241,7 +241,7 @@ fn trace(event: rusqlite::trace::TraceEvent<'_>) {
 }
 
 #[test]
-fn c18_fixed_plans_never_use_a_temporary_btree() {
+fn fixed_plans_never_use_a_temporary_btree() {
     let (_fixture, mut db) = built_fixture();
     db.trace_for_test(Some(trace)).unwrap();
     for query in queries() {
@@ -345,7 +345,7 @@ fn grouped_rows(db: &SnapshotDb) -> Vec<(i64, i64, i64, i64, i64, i64)> {
 }
 
 #[test]
-fn c20_maintained_counts_equal_group_by_after_every_generation() {
+fn maintained_counts_equal_group_by_after_every_generation() {
     let mut db = SnapshotDb::open_memory(64 * 1024 * 1024).unwrap();
     let mut seq = 1_i64;
     for generation in 0..12 {
@@ -373,7 +373,7 @@ fn c20_maintained_counts_equal_group_by_after_every_generation() {
 }
 
 #[test]
-fn c20_a_changed_unsigned_subject_is_reported_as_drift() {
+fn a_changed_unsigned_subject_is_reported_as_drift() {
     let mut db = SnapshotDb::open_memory(64 * 1024 * 1024).unwrap();
     db.commit(&SnapshotBatch {
         tools: (1..=4).map(|seq| synthetic(seq, 0)).collect(),

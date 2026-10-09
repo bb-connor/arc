@@ -1,4 +1,5 @@
-//! Task 3: the build pass (C4, C5, C6, C8b, C9, C11b, C15, C17).
+//! The build pass: authentication, source checks, resource outcomes and
+//! quotas.
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -51,7 +52,7 @@ fn build_authenticates_archive_live_and_tail_once_per_entry() {
 }
 
 #[test]
-fn c4_a_rewritten_checkpointed_claim_fails_the_batch_root() {
+fn a_rewritten_checkpointed_claim_fails_the_batch_root() {
     let fixture = mixed_fixture();
     let original = Spec::varied(13).sign(&keypair());
     let replacement = {
@@ -66,7 +67,7 @@ fn c4_a_rewritten_checkpointed_claim_fails_the_batch_root() {
 }
 
 #[test]
-fn c4_an_edited_checkpoint_row_is_refused() {
+fn an_edited_checkpoint_row_is_refused() {
     let fixture = mixed_fixture();
     fixture
         .tamper()
@@ -79,7 +80,7 @@ fn c4_an_edited_checkpoint_row_is_refused() {
 }
 
 #[test]
-fn c4_archive_projection_drift_is_refused_at_build() {
+fn archive_projection_drift_is_refused_at_build() {
     let fixture = mixed_fixture();
     fixture
         .tamper_archive()
@@ -96,7 +97,7 @@ fn c4_archive_projection_drift_is_refused_at_build() {
 }
 
 #[test]
-fn c4_a_claim_log_gap_is_refused() {
+fn a_claim_log_gap_is_refused() {
     let fixture = mixed_fixture();
     fixture
         .tamper()
@@ -134,7 +135,7 @@ fn insert_orphan(fixture: &Fixture, id: &str) -> i64 {
 }
 
 #[test]
-fn c5_an_unlogged_source_row_past_the_last_logged_one_fails_the_build() {
+fn an_unlogged_source_row_past_the_last_logged_one_fails_the_build() {
     let fixture = mixed_fixture();
     let orphan = insert_orphan(&fixture, "orphan-tail");
     // The per-call path serves the unlogged row.
@@ -151,7 +152,7 @@ fn c5_an_unlogged_source_row_past_the_last_logged_one_fails_the_build() {
 }
 
 #[test]
-fn c5_an_unlogged_source_row_on_an_empty_history_fails_the_build() {
+fn an_unlogged_source_row_on_an_empty_history_fails_the_build() {
     let fixture = Fixture::new(4);
     insert_orphan(&fixture, "orphan-only");
     let message = integrity(build(&fixture));
@@ -159,7 +160,7 @@ fn c5_an_unlogged_source_row_on_an_empty_history_fails_the_build() {
 }
 
 #[test]
-fn c6_live_projection_drift_is_refused_where_the_per_call_filter_drops_the_row() {
+fn live_projection_drift_is_refused_where_the_per_call_filter_drops_the_row() {
     let fixture = mixed_fixture();
     let query = ReceiptQuery {
         tool_name: Some("bash".into()),
@@ -182,7 +183,7 @@ fn c6_live_projection_drift_is_refused_where_the_per_call_filter_drops_the_row()
 }
 
 #[test]
-fn c8b_corruption_late_in_a_large_batch_fails_without_publishing() {
+fn corruption_late_in_a_large_batch_fails_without_publishing() {
     let fixture = Fixture::new(8);
     fixture.append_varied(0..8);
     let corrupted = {
@@ -201,7 +202,7 @@ fn c8b_corruption_late_in_a_large_batch_fails_without_publishing() {
 }
 
 #[test]
-fn c9_a_receipt_signed_by_another_key_inside_a_checkpointed_batch_is_refused() {
+fn a_receipt_signed_by_another_key_inside_a_checkpointed_batch_is_refused() {
     let fixture = mixed_fixture();
     let original = Spec::varied(13).sign(&keypair());
     let replacement = Spec::varied(13).sign(&other_keypair());
@@ -214,7 +215,7 @@ fn c9_a_receipt_signed_by_another_key_inside_a_checkpointed_batch_is_refused() {
 }
 
 #[test]
-fn c9_a_signer_rollover_between_batches_is_accepted() {
+fn a_signer_rollover_between_batches_is_accepted() {
     let fixture = Fixture::new(4);
     fixture.append_varied(0..4);
     fixture
@@ -237,7 +238,7 @@ fn c9_a_signer_rollover_between_batches_is_accepted() {
 }
 
 #[test]
-fn c11b_a_checkpoint_appended_during_the_build_belongs_to_extension() {
+fn a_checkpoint_appended_during_the_build_belongs_to_extension() {
     let fixture = Fixture::new(4);
     fixture.append_varied(0..6);
     let cancel = Arc::new(AtomicBool::new(false));
@@ -274,7 +275,7 @@ fn c11b_a_checkpoint_appended_during_the_build_belongs_to_extension() {
 }
 
 #[test]
-fn c15_resource_limits_and_cancellation_are_not_integrity_outcomes() {
+fn resource_limits_and_cancellation_are_not_integrity_outcomes() {
     let fixture = mixed_fixture();
     let cancel = Arc::new(AtomicBool::new(false));
 
@@ -307,7 +308,7 @@ fn c15_resource_limits_and_cancellation_are_not_integrity_outcomes() {
 }
 
 #[test]
-fn c15_a_locked_archive_is_contention_and_the_step_succeeds_after_release() {
+fn a_locked_archive_is_contention_and_the_step_succeeds_after_release() {
     let fixture = mixed_fixture();
     let cancel = Arc::new(AtomicBool::new(false));
     let ctx = context(&fixture.store, &cancel, limits());
@@ -319,7 +320,7 @@ fn c15_a_locked_archive_is_contention_and_the_step_succeeds_after_release() {
 }
 
 #[test]
-fn c17_quota_exhaustion_during_the_build_is_typed() {
+fn quota_exhaustion_during_the_build_is_typed() {
     let fixture = Fixture::new(0);
     fixture.append_varied(0..200);
     let empty = SnapshotDb::open_memory(64 * 1024 * 1024)

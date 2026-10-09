@@ -1,4 +1,4 @@
-//! V25-MEMORY: every variable-length field a walker or fetch copies is
+//! Every variable-length field a walker or fetch copies is
 //! measured before it is allocated. A row over the per-row limit is a typed
 //! resource outcome, and a step never owns more than its byte budget except
 //! for its first row.

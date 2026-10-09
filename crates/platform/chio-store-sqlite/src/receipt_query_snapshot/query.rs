@@ -229,7 +229,8 @@ fn run_plan(
         None
     };
 
-    // Shapes S1 to S3 answer the total from maintained cardinalities.
+    // Unfiltered, single-equality and time-window shapes answer the total
+    // from maintained cardinalities.
     let maintained = match (equalities, window, ranges.has_cost()) {
         ([], None, false) => Some(
             db.count(count_scope, COUNT_TOTAL, 0)

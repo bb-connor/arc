@@ -1,5 +1,5 @@
-//! Tasks 4 and 5: the published service, extension, recertification, leases
-//! and leaf-bound fetch (C1, C2, C3, C8b, C10, C11, C12, C13, C14, C15).
+//! The published service: extension, recertification, read leases and
+//! leaf-bound fetch.
 use std::time::{Duration, Instant};
 
 use chio_kernel::receipt_query::{ReceiptQuery, ReceiptQuerySnapshotError, ReceiptReadContext};
@@ -106,7 +106,7 @@ fn served_pages_match_the_per_call_path_and_carry_a_watermark() {
 }
 
 #[test]
-fn c1_a_page_verifies_only_the_receipts_it_returns() {
+fn a_page_verifies_only_the_receipts_it_returns() {
     let fixture = mixed_fixture();
     let service = ready(&fixture, config());
     let mut query = ReceiptQuery {
@@ -151,7 +151,7 @@ fn extension_serves_new_receipts_and_accepts_new_checkpoints() {
 }
 
 #[test]
-fn c10_a_version_older_than_the_staleness_bound_is_refused_until_extension_resumes() {
+fn a_version_older_than_the_staleness_bound_is_refused_until_extension_resumes() {
     let fixture = mixed_fixture();
     let service = ready(
         &fixture,
@@ -180,7 +180,7 @@ fn c10_a_version_older_than_the_staleness_bound_is_refused_until_extension_resum
 }
 
 #[test]
-fn c11_a_regressed_claim_log_invalidates_the_snapshot() {
+fn a_regressed_claim_log_invalidates_the_snapshot() {
     let fixture = mixed_fixture();
     let service = ready(&fixture, config());
     fixture
@@ -203,7 +203,7 @@ fn c11_a_regressed_claim_log_invalidates_the_snapshot() {
 }
 
 #[test]
-fn c12_an_invalid_snapshot_is_never_revived_and_a_rebuild_starts_a_new_lineage() {
+fn an_invalid_snapshot_is_never_revived_and_a_rebuild_starts_a_new_lineage() {
     let fixture = mixed_fixture();
     let service = ready(&fixture, config());
     let first = service.query_receipts(&admin(1)).unwrap().snapshot.unwrap();
@@ -224,7 +224,7 @@ fn c12_an_invalid_snapshot_is_never_revived_and_a_rebuild_starts_a_new_lineage()
 }
 
 #[test]
-fn c13_a_lease_fails_on_invalidation_but_not_on_a_new_generation() {
+fn a_lease_fails_on_invalidation_but_not_on_a_new_generation() {
     let fixture = mixed_fixture();
     let service = ready(&fixture, config());
     let epoch = service.lease_for_test().unwrap();
@@ -252,7 +252,7 @@ fn substitute_varied(fixture: &Fixture, index: u64) {
 }
 
 #[test]
-fn c2_an_unreturned_mutation_never_changes_an_answer_and_recertification_detects_it() {
+fn an_unreturned_mutation_never_changes_an_answer_and_recertification_detects_it() {
     let fixture = mixed_fixture();
     let service = ready(
         &fixture,
@@ -280,7 +280,7 @@ fn c2_an_unreturned_mutation_never_changes_an_answer_and_recertification_detects
 }
 
 #[test]
-fn c2_an_in_place_byte_edit_is_detected_by_recertification() {
+fn an_in_place_byte_edit_is_detected_by_recertification() {
     let fixture = mixed_fixture();
     let service = ready(
         &fixture,
@@ -320,7 +320,7 @@ fn c2_an_in_place_byte_edit_is_detected_by_recertification() {
 }
 
 #[test]
-fn c3_a_substituted_returned_receipt_fails_the_leaf_check() {
+fn a_substituted_returned_receipt_fails_the_leaf_check() {
     let fixture = mixed_fixture();
     let service = ready(&fixture, config());
     substitute_varied(&fixture, 15);
@@ -337,7 +337,7 @@ fn c3_a_substituted_returned_receipt_fails_the_leaf_check() {
 }
 
 #[test]
-fn c3_a_substituted_uncheckpointed_receipt_fails_the_leaf_check() {
+fn a_substituted_uncheckpointed_receipt_fails_the_leaf_check() {
     let fixture = mixed_fixture();
     let service = ready(&fixture, config());
     // Receipt 17 is in the uncheckpointed tail, where the per-call path checks
@@ -352,7 +352,7 @@ fn c3_a_substituted_uncheckpointed_receipt_fails_the_leaf_check() {
 }
 
 #[test]
-fn c8b_reads_are_never_served_while_the_build_cannot_complete() {
+fn reads_are_never_served_while_the_build_cannot_complete() {
     let fixture = Fixture::new(8);
     fixture.append_varied(0..8);
     let corrupted = {
@@ -382,7 +382,7 @@ fn c8b_reads_are_never_served_while_the_build_cannot_complete() {
 }
 
 #[test]
-fn c14_reads_stay_correct_while_recertification_runs() {
+fn reads_stay_correct_while_recertification_runs() {
     let fixture = mixed_fixture();
     let service = ready(
         &fixture,
@@ -402,7 +402,7 @@ fn c14_reads_stay_correct_while_recertification_runs() {
 }
 
 #[test]
-fn c15_shutdown_stops_the_walker_and_refuses_reads() {
+fn shutdown_stops_the_walker_and_refuses_reads() {
     let fixture = mixed_fixture();
     let service = ready(&fixture, config());
     service.shutdown();
@@ -502,7 +502,7 @@ fn point_reads_are_scoped_and_negatives_require_the_head() {
 }
 
 #[test]
-fn c12_a_poisoned_writer_head_invalidates_reads_and_is_never_revived() {
+fn a_poisoned_writer_head_invalidates_reads_and_is_never_revived() {
     let fixture = mixed_fixture();
     let service = ready(&fixture, config());
     let published = service
@@ -711,7 +711,7 @@ fn hold_shutdown_during_a_large_settlement_stops_the_walker() {
 }
 
 #[test]
-fn c13_an_in_flight_read_racing_a_resource_outcome_refuses_as_unavailable() {
+fn an_in_flight_read_racing_a_resource_outcome_refuses_as_unavailable() {
     let fixture = mixed_fixture();
     let service = ready(&fixture, config());
     let epoch = service.lease_for_test().unwrap();
@@ -725,7 +725,7 @@ fn c13_an_in_flight_read_racing_a_resource_outcome_refuses_as_unavailable() {
 }
 
 #[test]
-fn c13_an_in_flight_read_racing_shutdown_refuses_as_unavailable() {
+fn an_in_flight_read_racing_shutdown_refuses_as_unavailable() {
     let fixture = mixed_fixture();
     let service = ready(&fixture, config());
     let epoch = service.lease_for_test().unwrap();
@@ -738,7 +738,7 @@ fn c13_an_in_flight_read_racing_shutdown_refuses_as_unavailable() {
 }
 
 #[test]
-fn c13_an_in_flight_read_across_a_healthy_rebuild_is_not_called_tamper() {
+fn an_in_flight_read_across_a_healthy_rebuild_is_not_called_tamper() {
     let fixture = mixed_fixture();
     let service = ready(&fixture, config());
     let first = service.query_receipts(&admin(1)).unwrap().snapshot.unwrap();
@@ -763,7 +763,7 @@ fn c13_an_in_flight_read_across_a_healthy_rebuild_is_not_called_tamper() {
 }
 
 #[test]
-fn c13_zero_or_overflowing_limits_are_refused_before_the_walker_starts() {
+fn zero_or_overflowing_limits_are_refused_before_the_walker_starts() {
     let fixture = mixed_fixture();
     let invalid: Vec<(&str, ReceiptQuerySnapshotConfig)> = vec![
         (
