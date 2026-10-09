@@ -1,10 +1,6 @@
-#[path = "types/authority.rs"]
 mod authority;
-#[path = "types/pheromone.rs"]
 mod pheromone;
-#[path = "types/runtime.rs"]
 mod runtime;
-#[path = "types/treaty.rs"]
 mod treaty;
 
 pub(crate) use self::authority::{ChioAuthorityCommands, ChioTrustBundleCommands};

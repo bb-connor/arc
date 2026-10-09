@@ -1,14 +1,8 @@
-#[path = "dispatch/authority.rs"]
 mod authority;
-#[path = "dispatch/buyer.rs"]
 mod buyer;
-#[path = "dispatch/io.rs"]
 mod io;
-#[path = "dispatch/pheromone.rs"]
 mod pheromone;
-#[path = "dispatch/runtime.rs"]
 mod runtime;
-#[path = "dispatch/treaty.rs"]
 mod treaty;
 
 pub(crate) use self::authority::{

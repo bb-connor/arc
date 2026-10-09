@@ -299,7 +299,7 @@ impl Config {
                 .launch_policy_signer
                 .as_deref()
                 .ok_or_else(|| error("native MCP servers require launch_policy_signer"))?;
-            crate::mcp_cli::parse_cage_policy_trust_root(signer)?;
+            crate::cli::mcp::parse_cage_policy_trust_root(signer)?;
             if !servers.insert(server.id.as_str())
                 || server.command.is_empty()
                 || server.command.len() > 128

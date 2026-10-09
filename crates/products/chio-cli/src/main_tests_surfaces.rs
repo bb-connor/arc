@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use super::cli_entrypoint_support::{fixture_path, parse_cli, render_error_json};
+use super::main_tests_support::{fixture_path, parse_cli, render_error_json};
 use super::*;
 
 #[test]

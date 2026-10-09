@@ -1102,5 +1102,4 @@ mod wrap_tests {
 }
 
 #[cfg(test)]
-#[path = "wrap/product_guard_tests.rs"]
 mod product_guard_tests;

@@ -13,7 +13,6 @@ use std::fmt;
 use super::super::probe::{Probe, ProbeConfig, ProbeReport, ProbeSeverity};
 
 #[cfg(target_os = "linux")]
-#[path = "platform/mount_id.rs"]
 mod mount_id;
 
 pub const MINIMUM_KERNEL: (u32, u32) = (6, 7);

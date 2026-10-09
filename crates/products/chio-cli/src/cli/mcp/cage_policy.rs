@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 pub(crate) const MCP_CAGE_LAUNCH_POLICY_SCHEMA: &str = "chio.mcp.cage-launch-policy.v2";
 const MAX_CAGE_POLICY_BYTES: usize = 4 * 1024 * 1024;
 
-#[path = "cage_policy/evidence.rs"]
 mod evidence;
 #[cfg(target_os = "linux")]
 pub(crate) use evidence::{
@@ -24,7 +23,6 @@ pub(crate) use evidence::{
 };
 
 #[cfg(all(test, target_os = "linux"))]
-#[path = "cage_receipt_tests.rs"]
 mod receipt_tests;
 
 #[derive(Clone)]
@@ -1412,5 +1410,4 @@ fn retain_prepared_policy_broker(
 }
 
 #[cfg(test)]
-#[path = "cage_policy/tests.rs"]
 mod tests;

@@ -64,7 +64,7 @@ pub(super) fn verify(
             .get(&receipt.tool_server)
             .ok_or_else(|| error("missing external native policy signer pin"))?;
         let mut window =
-            crate::mcp_cli::verify_native_launch_evidence(launch, &receipt.tool_server, key)?;
+            crate::cli::mcp::verify_native_launch_evidence(launch, &receipt.tool_server, key)?;
         let server = evidence
             .host_record
             .config
@@ -113,7 +113,7 @@ pub(super) fn verify(
 
 #[cfg(target_os = "linux")]
 pub(super) struct ExportedLaunches {
-    pub(super) confinement: BTreeMap<String, crate::mcp_cli::NativeLaunchEvidence>,
+    pub(super) confinement: BTreeMap<String, crate::cli::mcp::NativeLaunchEvidence>,
     pub(super) pins: BTreeMap<String, chio_core::TrustedPublicKey>,
 }
 
@@ -159,7 +159,7 @@ pub(super) fn export(
             .as_deref()
             .ok_or_else(|| error("missing configured native policy"))?;
         for (id, launch) in
-            crate::mcp_cli::export_native_launch_evidence(policy, &server_id, &key, &ids)?
+            crate::cli::mcp::export_native_launch_evidence(policy, &server_id, &key, &ids)?
         {
             require(
                 launches.insert(id, launch).is_none(),

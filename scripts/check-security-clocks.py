@@ -23,7 +23,7 @@ from security_clock_compositions import COMPOSITION_CONTRACTS
 ROOT = Path(__file__).resolve().parent.parent
 SCOPE_EVIDENCE = "docs/security/clock-scope-evidence-2026-10-02.json"
 SCOPE_EVIDENCE_SHA256 = (
-    "147bfd548e7b1a68e49a46f4f8fb62cd29c820eb3590b0270e57e63fb9dc4b5d"
+    "5d305af7654288c5f226c9e501beddefd3fab4e430788428c945e5869453699a"
 )
 INVENTORY = ROOT / "scripts/security-clock-inventory.json"
 LEGACY_ROOTS = (

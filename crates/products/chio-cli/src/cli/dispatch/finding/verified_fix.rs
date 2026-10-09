@@ -37,15 +37,12 @@ use chio_store_sqlite::{
     SqliteFindingOperatorBundleStore, SqliteFindingPayloadStore, TenantId, TenantKey,
 };
 
-use super::finding_operator::{load_profile, ResolvedOperatorPaths};
+use super::operator::{load_profile, ResolvedOperatorPaths};
 
-#[path = "verified_fix_admission_lock.rs"]
 mod admission_lock;
 use admission_lock::FindingAdmissionJobLock;
-#[path = "verified_fix_sandbox.rs"]
 mod sandbox;
 use sandbox::{require_sandbox, run_test_commands, runtime_fingerprint, PACKAGE_WORK_TIMEOUT};
-#[path = "verified_fix_repository_sandbox.rs"]
 mod repository_sandbox;
 use repository_sandbox::{
     approved_repository, isolated_git_stdout_bounded, isolated_repository_identity,
@@ -1457,7 +1454,6 @@ fn wait_until(timestamp: u64) -> Result<(), CliError> {
 
 #[cfg(all(test, unix))]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
-#[path = "verified_fix_tests.rs"]
 mod tests;
 
 fn unix_time() -> Result<u64, CliError> {

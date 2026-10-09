@@ -257,5 +257,4 @@ impl Evidence {
 }
 
 #[cfg(test)]
-#[path = "keyring/live_tests.rs"]
 mod live_tests;

@@ -14,7 +14,6 @@ use serde_json::{json, Value};
 
 use super::state::{Child, SpawnTemplate};
 
-#[path = "lifecycle/settlement.rs"]
 mod settlement;
 
 pub(super) const SERVER_ID: &str = "chio-process";

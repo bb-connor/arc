@@ -6,12 +6,10 @@ use chio_cage::{
 };
 use chio_core::receipt::body::ChioReceipt;
 
-#[path = "evidence_start.rs"]
 mod start;
 pub(crate) use start::verify_native_start_file;
 
 #[cfg(test)]
-#[path = "evidence_tests.rs"]
 mod tests;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

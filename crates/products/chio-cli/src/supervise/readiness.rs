@@ -154,5 +154,4 @@ mod tests {
 }
 
 #[cfg(test)]
-#[path = "readiness_security_tests.rs"]
 mod security_tests;

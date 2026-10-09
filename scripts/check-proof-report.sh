@@ -116,7 +116,7 @@ TRACE_TRACKED_ARTIFACTS = {
     "crates/products/chio-cli/src/cli/trust/trace_verify.rs",
     "crates/products/chio-cli/Cargo.toml",
     "crates/products/chio-cli/src/cli/dispatch/trust.rs",
-    "crates/products/chio-cli/src/cli/trust_commands.rs",
+    "crates/products/chio-cli/src/cli/trust.rs",
     "crates/products/chio-cli/src/cli/types.rs",
     "crates/products/chio-cli/src/cli/types/trust.rs",
     "crates/products/chio-cli/src/main.rs",

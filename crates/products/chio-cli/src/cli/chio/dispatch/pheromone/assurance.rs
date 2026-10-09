@@ -1,10 +1,6 @@
-#[path = "assurance/archive.rs"]
 mod archive;
-#[path = "assurance/package.rs"]
 mod package;
-#[path = "assurance/reports.rs"]
 mod reports;
-#[path = "assurance/support.rs"]
 mod support;
 
 pub(crate) use archive::{

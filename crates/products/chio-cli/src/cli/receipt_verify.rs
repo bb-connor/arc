@@ -96,7 +96,7 @@ pub(crate) fn verify_original_receipt(
             "receipt fields differ from the supported signed schema",
         ));
     }
-    let outcome = super::replay_cli::verify_receipt(&value, Some(key));
+    let outcome = super::replay::verify_receipt(&value, Some(key));
     if !outcome.ok {
         return Err(CliError::cli_other_error(format!(
             "receipt verification failed: {}",

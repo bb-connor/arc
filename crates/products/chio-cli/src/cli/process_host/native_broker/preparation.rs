@@ -13,7 +13,6 @@ use chio_secret_broker::{
 use serde_json::Value;
 
 #[cfg(test)]
-#[path = "preparation_tests.rs"]
 mod tests;
 
 #[derive(Clone, Serialize, Deserialize)]

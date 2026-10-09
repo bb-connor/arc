@@ -4,13 +4,11 @@
 
 use super::*;
 
-#[path = "diff/human.rs"]
-mod replay_diff_human;
-#[path = "diff/json.rs"]
-mod replay_diff_json;
+mod human;
+mod json;
 
-pub use replay_diff_human::render_traffic_diff_human;
-pub use replay_diff_json::render_traffic_diff_json;
+pub use human::render_traffic_diff_human;
+pub use json::render_traffic_diff_json;
 
 /// Stable schema identifier for `chio replay traffic --against --json`.
 pub const TRAFFIC_DIFF_SCHEMA_ID: &str = "chio.replay.traffic-diff/v1";

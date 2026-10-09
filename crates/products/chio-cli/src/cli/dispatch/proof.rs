@@ -1,8 +1,5 @@
-#[path = "proof/artifacts.rs"]
 mod artifacts;
-#[path = "proof/room.rs"]
 mod room;
-#[path = "proof/transaction_error.rs"]
 mod transaction_error;
 use super::*;
 use artifacts::*;
@@ -17,7 +14,6 @@ use chio_errors::_generated::error_codes::{
 use std::collections::{BTreeMap, BTreeSet};
 use transaction_error::map_proof_error;
 
-#[path = "proof/env.rs"]
 mod proof_env;
 use proof_env::{
     agent_web_replay_store_from_env_if_configured, agent_web_verifier_trust_from_env,
@@ -247,23 +243,14 @@ fn slug_negative_failure_code(code: &str) -> String {
     slug.trim_matches('-').to_string()
 }
 
-#[path = "proof/archive.rs"]
 mod archive;
-#[path = "proof/assemble.rs"]
 mod assemble;
-#[path = "proof/collect.rs"]
 mod collect;
-#[path = "proof/doctor.rs"]
 mod doctor;
-#[path = "proof/explain.rs"]
 mod explain;
-#[path = "proof/export.rs"]
 mod export;
-#[path = "proof/fixture.rs"]
 mod fixture;
-#[path = "proof/risk.rs"]
 mod risk;
-#[path = "proof/serve.rs"]
 mod serve;
 
 pub(crate) fn dispatch_proof(command: ProofCommands, json_output: bool) -> Result<(), CliError> {

@@ -14,7 +14,7 @@ use chio_finding::{
     SignedFindingChallenge, FINDING_CHALLENGE_SCHEMA_V1,
 };
 
-use super::finding_verify::{accept_finding_from_venue, AcceptedFinding};
+use super::verify::{accept_finding_from_venue, AcceptedFinding};
 
 const FINDING_CHALLENGE_SCHEMA_JSON: &str =
     include_str!("../../../../../../../spec/schemas/chio-finding/v1/challenge.schema.json");

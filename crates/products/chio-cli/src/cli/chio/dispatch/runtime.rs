@@ -1,14 +1,8 @@
-#[path = "runtime/admission.rs"]
 mod admission;
-#[path = "runtime/io.rs"]
 mod io;
-#[path = "runtime/loopback.rs"]
 mod loopback;
-#[path = "runtime/ops.rs"]
 mod ops;
-#[path = "runtime/orchestration.rs"]
 mod orchestration;
-#[path = "runtime/signing.rs"]
 mod signing;
 
 #[cfg(test)]

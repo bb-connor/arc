@@ -1,29 +1,21 @@
 use super::*;
 
-#[path = "types/runtime.rs"]
 mod runtime;
-pub(crate) use runtime::*;
-#[path = "types/trust.rs"]
+pub(crate) use self::runtime::*;
 mod trust;
-pub(crate) use trust::*;
-#[path = "types/receipt.rs"]
+pub(crate) use self::trust::*;
 mod receipt;
-pub(crate) use receipt::*;
-#[path = "types/passport.rs"]
-mod passport_types;
-pub(crate) use passport_types::*;
-#[path = "types/proof.rs"]
+pub(crate) use self::receipt::*;
+mod passport;
+pub(crate) use self::passport::*;
 mod proof;
-pub(crate) use proof::*;
-#[path = "types/workflow.rs"]
+pub(crate) use self::proof::*;
 mod workflow;
-pub(crate) use workflow::*;
-#[path = "types/replay.rs"]
+pub(crate) use self::workflow::*;
 mod replay;
-pub(crate) use replay::*;
-#[path = "types/finding.rs"]
+pub(crate) use self::replay::*;
 mod finding;
-pub(crate) use finding::*;
+pub(crate) use self::finding::*;
 
 /// Chio -- Chio.
 ///
@@ -973,7 +965,7 @@ pub(crate) enum SecurityCommands {
     /// enforcing migration stage: a static cage helper, the target's digest,
     /// argument list and working directory, the manifest's read and write
     /// grants, and a ledger promoted through Shadow to the requested stage.
-    ProvisionReferenceRuntime(crate::mcp_cli::ProvisionReferenceRuntimeArgs),
+    ProvisionReferenceRuntime(crate::cli::mcp::ProvisionReferenceRuntimeArgs),
     Preflight(crate::PreflightArgs),
     /// Run one service under systemd: credentials from the credentials
     /// directory, readiness on the notify socket, stop signals forwarded.

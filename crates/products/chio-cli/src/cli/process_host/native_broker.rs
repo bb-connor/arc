@@ -39,16 +39,12 @@ use serde::{Deserialize, Serialize};
 use super::state::{error, Config as HostConfig};
 use crate::CliError;
 
-#[path = "native_broker/classification.rs"]
 mod classification;
 
-#[path = "native_broker/config.rs"]
 mod config;
 pub(super) use config::Config;
 use config::RouteConfig;
-#[path = "native_broker/payload.rs"]
 mod payload;
-#[path = "native_broker/preparation.rs"]
 pub(super) mod preparation;
 
 fn now_ms(clock: &dyn Clock) -> Result<u64, CliError> {
@@ -200,7 +196,7 @@ fn native_binding(
 #[cfg(target_os = "linux")]
 struct RouteLaunch {
     registry: Arc<chio_manifest::VerifiedManifestRegistry>,
-    factory: Arc<crate::mcp_cli::SignedCagePolicyLaunchFactory>,
+    factory: Arc<crate::cli::mcp::SignedCagePolicyLaunchFactory>,
 }
 
 struct Components {
@@ -229,7 +225,7 @@ fn components(host: &HostConfig, clock: Arc<dyn Clock>) -> Result<Components, Cl
             .iter()
             .find(|server| server.id == route.quota.server_id)
             .ok_or_else(|| error("missing broker server"))?;
-        let factory = Arc::new(crate::mcp_cli::SignedCagePolicyLaunchFactory::new(
+        let factory = Arc::new(crate::cli::mcp::SignedCagePolicyLaunchFactory::new(
             server
                 .launch_policy
                 .clone()
@@ -424,6 +420,5 @@ pub(super) fn connect(
     Ok((connections, manifests, BTreeMap::new()))
 }
 
-#[path = "native_broker/authority.rs"]
 mod authority;
 pub(super) use authority::AuthorityService;

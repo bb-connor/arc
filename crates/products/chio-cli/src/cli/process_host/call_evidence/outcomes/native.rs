@@ -69,7 +69,7 @@ pub(super) fn verify(
             .get(&call.tool_server)
             .ok_or_else(|| error("missing external native policy signer pin"))?;
         let mut window =
-            crate::mcp_cli::verify_native_launch_observation(launch, &call.tool_server, key)?;
+            crate::cli::mcp::verify_native_launch_observation(launch, &call.tool_server, key)?;
         let server = run
             .host_record
             .config
@@ -144,7 +144,7 @@ pub(super) fn verify(
 
 #[cfg(target_os = "linux")]
 pub(super) struct Exported {
-    pub confinement: BTreeMap<String, crate::mcp_cli::NativeLaunchObservation>,
+    pub confinement: BTreeMap<String, crate::cli::mcp::NativeLaunchObservation>,
     pub pins: BTreeMap<String, chio_core::TrustedPublicKey>,
 }
 
@@ -186,7 +186,7 @@ pub(super) fn export(
             .as_deref()
             .ok_or_else(|| error("missing configured native policy"))?;
         for (id, launch) in
-            crate::mcp_cli::export_native_launch_observations(policy, &server_id, &key, &ids)?
+            crate::cli::mcp::export_native_launch_observations(policy, &server_id, &key, &ids)?
         {
             require(
                 confinement.insert(id, launch).is_none(),
@@ -221,17 +221,17 @@ mod tests {
     fn historical_signed_outcomes_do_not_qualify_current_enforcement(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let key = PublicKey::from_hex(
-            include_str!("../../../../tests/fixtures/process-worker-outcomes/v2-budget-kernel.pub")
+            include_str!("../../../../../tests/fixtures/process-worker-outcomes/v2-budget-kernel.pub")
                 .trim(),
         )?;
         // Preserve the original signed evidence. Its valid signature cannot
         // qualify a runtime with different reviewed enforcement dependencies.
         let signed = crate::receipt_verify::verify_original_receipt(
-            include_str!("../../../../tests/fixtures/process-worker-outcomes/v2-budget.json"),
+            include_str!("../../../../../tests/fixtures/process-worker-outcomes/v2-budget.json"),
             &key,
         )?;
         let selected: Value = crate::input::text(include_str!(
-            "../../../../tests/fixtures/process-worker-outcomes/v2-budget-pins.json"
+            "../../../../../tests/fixtures/process-worker-outcomes/v2-budget-pins.json"
         ))?;
         let pins: BTreeMap<String, chio_core::TrustedPublicKey> = selected["launch_policy_signers"]
             .as_object()
@@ -263,17 +263,17 @@ mod tests {
     fn retained_crash_outcomes_bind_actual_launches_without_inventing_exits(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let key = PublicKey::from_hex(
-            include_str!("../../../../tests/fixtures/process-worker-outcomes/current-native-budget-kernel.pub")
+            include_str!("../../../../../tests/fixtures/process-worker-outcomes/current-native-budget-kernel.pub")
                 .trim(),
         )?;
         let signed = crate::receipt_verify::verify_original_receipt(
             include_str!(
-                "../../../../tests/fixtures/process-worker-outcomes/current-native-budget.json"
+                "../../../../../tests/fixtures/process-worker-outcomes/current-native-budget.json"
             ),
             &key,
         )?;
         let selected: Value = crate::input::text(include_str!(
-            "../../../../tests/fixtures/process-worker-outcomes/current-native-budget-pins.json"
+            "../../../../../tests/fixtures/process-worker-outcomes/current-native-budget-pins.json"
         ))?;
         let pins: BTreeMap<String, chio_core::TrustedPublicKey> = selected["launch_policy_signers"]
             .as_object()

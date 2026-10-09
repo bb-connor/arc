@@ -15,15 +15,11 @@ use super::state::error;
 use crate::CliError;
 
 #[cfg(target_os = "linux")]
-#[path = "run_evidence/export.rs"]
 mod exporting;
 #[cfg(target_os = "linux")]
 pub(super) use exporting::export;
-#[path = "run_evidence/custody.rs"]
 mod custody;
-#[path = "run_evidence/native.rs"]
 mod native;
-#[path = "run_evidence/verify.rs"]
 mod verification;
 
 const SCHEMA: &str = "chio.process.completed-fanout.v3";
@@ -42,7 +38,7 @@ struct Evidence {
     results: BTreeMap<String, CompletedCall>,
     runner: Value,
     aggregate: AggregateUsage,
-    confinement: BTreeMap<String, crate::mcp_cli::NativeLaunchEvidence>,
+    confinement: BTreeMap<String, crate::cli::mcp::NativeLaunchEvidence>,
 }
 
 #[derive(Serialize, Deserialize)]

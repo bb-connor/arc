@@ -135,7 +135,6 @@ fn load_oid4vci_token(path: &Path) -> Result<Oid4vciTokenResponse, CliError> {
     Ok(crate::input::json(&crate::input::read(path)?)?)
 }
 
-#[path = "passport/http.rs"]
 mod http;
 use http::{fetch_json_url, fetch_text_url, post_form_url, post_json_url};
 
@@ -1230,7 +1229,6 @@ pub(crate) fn cmd_passport_issuance_credential_redeem(
     Ok(())
 }
 
-#[path = "passport/verifier.rs"]
 pub(crate) mod verifier;
 
 fn load_passport_verifier_policy(path: &Path) -> Result<PassportVerifierPolicy, CliError> {

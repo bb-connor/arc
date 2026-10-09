@@ -1,11 +1,8 @@
 //! Bounded process fan-out using the existing live runtime admission authority.
 //! Source activation happens once at initialization, never during recovery.
 
-#[path = "swarm/graph.rs"]
 mod graph;
-#[path = "swarm/plan.rs"]
 mod plan;
-#[path = "swarm/requests.rs"]
 mod requests;
 
 use plan::{Graph, Plan};

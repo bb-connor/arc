@@ -19,6 +19,7 @@ mod active_response_authority;
 mod admin;
 mod archive;
 mod cert;
+mod cli;
 mod commands {
     pub mod bind;
     pub mod guard_blocklist;
@@ -36,9 +37,8 @@ mod settle;
 mod supervise;
 
 // Shared imports for the CLI module tree. These live at the crate root so the
-// `cli/*` submodules (which each begin with `use super::*;`) inherit them,
-// matching the single coherent `#[path] mod` strategy. The `pub use`
-// re-exports keep `crate::CliError`, `crate::policy`, and the sibling
+// `cli/*` submodules (which each begin with `use super::*;`) inherit them
+// through `cli.rs`. The `pub use` re-exports keep `crate::CliError`, `crate::policy`, and the sibling
 // control-plane modules reachable from the standalone `src/*.rs` command
 // modules.
 pub use chio_control_plane::{
@@ -90,10 +90,8 @@ use chio_mcp_adapter::server::AdaptedMcpServer;
 
 use crate::policy::load_policy;
 
-#[path = "cli/types.rs"]
-mod types_cli;
 #[allow(unused_imports)]
-pub(crate) use types_cli::{
+pub(crate) use cli::types::{
     ApiCommands, ArenaCommands, AuthorityDeploymentCommands, AuthorityStoreCommands, CertCommands,
     CertifyCommands, CertifyRegistryCommands, CheckMode, ChioAttestCommands, ChioBuyerCommands,
     ChioFederationCommands, ChioRuntimeQuoteCommands, ChioSupplyChainCommands, Cli, Commands,
@@ -114,49 +112,22 @@ pub(crate) use types_cli::{
     TrustRuntimeAttestationAppraisalCommands, TrustUnderwritingAppealCommands,
     TrustUnderwritingDecisionCommands, TrustUnderwritingInputCommands, WorkflowCommands,
 };
-pub(crate) use types_cli::{
+pub(crate) use cli::types::{
     FindingChallengeClassArg, FindingCommands, FindingOperatorCommands, FindingPackageCommands,
 };
-#[path = "cli/chio/types.rs"]
-mod chio_types;
-use chio_types::{
-    ChioAuthorityCommands, ChioPheromoneCommands, ChioPheromoneRelayAlertAssuranceArchiveCommands,
-    ChioPheromoneRelayAlertAssuranceArchivePackageCommands,
-    ChioPheromoneRelayAlertAssuranceArchiveRestoreDrillCommands,
-    ChioPheromoneRelayAlertAssuranceCloseoutCommands, ChioPheromoneRelayAlertAssuranceCommands,
-    ChioPheromoneRelayAlertAssurancePhysicalDrillCommands,
-    ChioPheromoneRelayAlertAssuranceRetentionCommands,
-    ChioPheromoneRelayAlertAssuranceRetentionHandoffCommands, ChioPheromoneRelayAlertCommands,
-    ChioPheromoneRelayAlertDeliveryCommands, ChioPheromoneRelayCommands,
-    ChioPheromoneRelayDirectoryCommands, ChioPheromoneRelaySupervisorCommands, ChioRuntimeCommands,
-    ChioRuntimeOpsCommands, ChioRuntimeOpsRetentionCommands, ChioRuntimeOrchestrateCommands,
-    ChioRuntimePeerWeightsCommands, ChioRuntimePheromoneCommands, ChioRuntimePolicyCommands,
-    ChioTreatyCommands, ChioTrustBundleCommands,
-};
-#[path = "cli/doctor.rs"]
-mod doctor_cli;
-#[path = "cli/security_preflight.rs"]
-mod security_preflight_cli;
-pub(crate) use security_preflight_cli::{cmd_security_preflight, PreflightArgs, PreflightStores};
-#[path = "cli/security_supervise.rs"]
-mod security_supervise_cli;
+pub(crate) use cli::security_preflight::{cmd_security_preflight, PreflightArgs, PreflightStores};
 #[allow(unused_imports)]
-pub(crate) use doctor_cli::{
+pub(crate) use cli::doctor::{
     cmd_doctor, render_doctor_human, render_doctor_json, render_titled_human, write_doctor_report,
     DoctorArgs,
 };
-pub(crate) use security_supervise_cli::{cmd_security_supervise, SuperviseArgs};
-#[path = "cli/dispatch/mod.rs"]
-mod dispatch_cli;
+pub(crate) use cli::security_supervise::{cmd_security_supervise, SuperviseArgs};
 #[cfg(test)]
-pub(crate) use dispatch_cli::{cmd_chio_attest_runtime_quote_verify, write_cli_error};
-#[path = "cli/chio/dispatch.rs"]
-mod chio_dispatch;
-use chio_dispatch::*;
+pub(crate) use cli::dispatch::{cmd_chio_attest_runtime_quote_verify, write_cli_error};
 
 fn main() {
     #[cfg(not(windows))]
-    dispatch_cli::run();
+    cli::dispatch::run();
 
     // The Windows process main thread has a smaller default stack than the
     // generated clap parser needs as the command surface grows. Keep parsing
@@ -167,7 +138,7 @@ fn main() {
         let worker = match std::thread::Builder::new()
             .name("chio-cli-dispatch".to_owned())
             .stack_size(8 * 1024 * 1024)
-            .spawn(dispatch_cli::run)
+            .spawn(cli::dispatch::run)
         {
             Ok(worker) => worker,
             Err(error) => {
@@ -181,12 +152,8 @@ fn main() {
         }
     }
 }
-#[path = "cli/process_host.rs"]
-mod process_host;
-#[path = "cli/runtime.rs"]
-mod runtime_cli;
 #[allow(unused_imports)]
-pub(crate) use runtime_cli::{
+pub(crate) use cli::runtime::{
     cli_normalized_url_authority, cmd_api_protect, cmd_check, cmd_mcp_serve, cmd_mcp_serve_http,
     cmd_run, cmd_start, cmd_trust_revoke, cmd_trust_serve, cmd_trust_status,
     is_cli_ipv6_unicast_link_local, is_cli_ipv6_unique_local, load_roster_policy,
@@ -195,15 +162,11 @@ pub(crate) use runtime_cli::{
     require_receipt_db_path, require_revocation_db_path, verdict_label, CHIO_START_NO_UPSTREAM_URL,
     CHIO_START_SIDECAR_OPENAPI_SPEC,
 };
-#[path = "cli/runtime/trust_reports.rs"]
-mod runtime_trust_reports;
-#[path = "cli/trust_commands.rs"]
-mod trust_commands_cli;
 #[cfg(test)]
 #[allow(unused_imports)]
-pub(crate) use trust_commands_cli::select_receipt_for_explain;
+pub(crate) use cli::trust::select_receipt_for_explain;
 #[allow(unused_imports)]
-pub(crate) use trust_commands_cli::{
+pub(crate) use cli::trust::{
     bilateral_field, build_underwriting_policy_input_query, cmd_receipt_audit,
     cmd_receipt_checkpoint_create, cmd_receipt_checkpoint_status, cmd_receipt_checkpoint_verify,
     cmd_receipt_explain, cmd_receipt_flush, cmd_receipt_health, cmd_receipt_list,
@@ -262,57 +225,54 @@ pub(crate) use trust_commands_cli::{
     CHIO_CLI_RECEIPT_CHECKPOINT_VERIFY_SCHEMA, CHIO_CLI_RECEIPT_FLUSH_SCHEMA,
     CHIO_CLI_RECEIPT_HEALTH_SCHEMA,
 };
-#[path = "cli/session/mod.rs"]
-mod session_cli;
 #[allow(unused_imports)]
-pub(crate) use session_cli::{
+pub(crate) use cli::session::{
     control_request_id, handle_agent_message, normalize_agent_message, print_summary,
     select_capability_for_request, tool_response_messages, SessionStats,
 };
 #[cfg(test)]
 #[allow(unused_imports)]
-pub(crate) use session_cli::{StubSqlResultToolServer, StubStreamingToolServer, StubToolServer};
-#[path = "cli/conformance.rs"]
-mod conformance_cli;
+pub(crate) use cli::session::{StubSqlResultToolServer, StubStreamingToolServer, StubToolServer};
 #[allow(unused_imports)]
-pub(crate) use conformance_cli::{
+pub(crate) use cli::conformance::{
     cmd_conformance_fetch_peers, cmd_conformance_run, download_and_verify, extract_archive,
     parse_peer_selection, parse_report_format, resolve_peers_lock_path,
     validate_extracted_peer_binary, write_human_report, write_json_report,
     FETCH_PEERS_HTTP_TIMEOUT_SECS,
 };
-#[path = "cli/mcp.rs"]
-mod mcp_cli;
 #[allow(unused_imports)]
-pub(crate) use mcp_cli::{
+pub(crate) use cli::mcp::{
     cmd_mcp_governed_sim, cmd_mcp_wrap, cmd_mcp_wrap_e2e_fixture, cmd_mcp_wrap_run,
     load_tools_fixture, GovernedSimArgs, McpWrapArgs,
 };
-#[path = "cli/replay.rs"]
-mod replay_cli;
-pub(crate) use replay_cli::{cmd_replay, load_trusted_kernel_pubkey};
+pub(crate) use cli::replay::{cmd_replay, load_trusted_kernel_pubkey};
 
-#[path = "cli/arena.rs"]
-mod arena_cli;
-#[path = "cli/input.rs"]
-mod input;
-#[path = "cli/process_response_verify.rs"]
-mod process_response_verify;
-#[path = "cli/receipt_verify.rs"]
-mod receipt_verify;
-pub(crate) use arena_cli::{cmd_arena_evolve, cmd_arena_replay, cmd_arena_run};
-
-#[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
-#[path = "main_tests_support.rs"]
-mod cli_entrypoint_support;
-
-#[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
-#[path = "main_tests_parsing.rs"]
-mod cli_entrypoint_parsing_tests;
+pub(crate) use cli::{input, process_host, process_response_verify, receipt_verify};
+use cli::chio::types::{
+    ChioAuthorityCommands, ChioPheromoneCommands, ChioPheromoneRelayAlertAssuranceArchiveCommands,
+    ChioPheromoneRelayAlertAssuranceArchivePackageCommands,
+    ChioPheromoneRelayAlertAssuranceArchiveRestoreDrillCommands,
+    ChioPheromoneRelayAlertAssuranceCloseoutCommands, ChioPheromoneRelayAlertAssuranceCommands,
+    ChioPheromoneRelayAlertAssurancePhysicalDrillCommands,
+    ChioPheromoneRelayAlertAssuranceRetentionCommands,
+    ChioPheromoneRelayAlertAssuranceRetentionHandoffCommands, ChioPheromoneRelayAlertCommands,
+    ChioPheromoneRelayAlertDeliveryCommands, ChioPheromoneRelayCommands,
+    ChioPheromoneRelayDirectoryCommands, ChioPheromoneRelaySupervisorCommands, ChioRuntimeCommands,
+    ChioRuntimeOpsCommands, ChioRuntimeOpsRetentionCommands, ChioRuntimeOrchestrateCommands,
+    ChioRuntimePeerWeightsCommands, ChioRuntimePheromoneCommands, ChioRuntimePolicyCommands,
+    ChioTreatyCommands, ChioTrustBundleCommands,
+};
+use cli::chio::dispatch::*;
+pub(crate) use cli::arena::{cmd_arena_evolve, cmd_arena_replay, cmd_arena_run};
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
-#[path = "main_tests_surfaces.rs"]
-mod cli_entrypoint_surface_tests;
+mod main_tests_support;
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod main_tests_parsing;
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod main_tests_surfaces;

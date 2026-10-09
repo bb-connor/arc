@@ -2940,7 +2940,7 @@ dispatcher invocation, and the `chio-mcp-remote` introspection-bearer
 verifier. Two public-settlement verifier surfaces added after the initial
 rollout also belong to this inventory: the `chio-cli` proof verifier's
 independent-chain JSON-RPC caller
-(`crates/products/chio-cli/src/cli/dispatch/proof/env.rs`) and the Proof
+(`crates/products/chio-cli/src/cli/dispatch/proof/proof_env.rs`) and the Proof
 Room upload verifier's equivalent caller
 (`crates/products/chio-proof-room/src/lib.rs`). Both derive a
 single-authority `HttpEgressContract` from

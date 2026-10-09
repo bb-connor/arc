@@ -532,7 +532,6 @@ fn attachment_client(reason: &str) -> Option<&'static str> {
 }
 
 #[cfg(test)]
-#[path = "container_tests.rs"]
 mod tests;
 
 /// Supervision, including removal on timeout, runs in its own scheduler slot.

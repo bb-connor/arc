@@ -1,4 +1,4 @@
-use super::cli_entrypoint_support::parse_cli;
+use super::main_tests_support::parse_cli;
 use super::*;
 
 #[test]

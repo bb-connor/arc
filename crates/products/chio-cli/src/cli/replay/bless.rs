@@ -2,6 +2,9 @@
 
 use super::*;
 
+pub(crate) mod fixture_layout;
+pub(crate) mod strip;
+
 pub(crate) fn cmd_replay_bless(args: &ReplayArgs, log: &Path) -> Result<(), CliError> {
     let into = args.into.as_ref().ok_or_else(|| {
         CliError::cli_other_error("chio replay --bless requires --into <fixture-dir>".to_string())

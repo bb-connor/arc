@@ -13,8 +13,7 @@ use super::CliError;
 
 const MAX_DOCUMENT_BYTES: u64 = 16 * 1024 * 1024;
 
-#[path = "process_response_verify/json.rs"]
-mod checked_json;
+mod json;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -75,7 +74,7 @@ pub(crate) fn read_document<T: serde::de::DeserializeOwned>(path: &Path) -> Resu
     // Worker envelopes are ordinary JSON, including integer-valued floats.
     // Reject duplicate keys and lossy number parsing without changing the
     // stricter canonical signed-receipt parser.
-    crate::input::project(checked_json::parse(&text)?)
+    crate::input::project(json::parse(&text)?)
 }
 
 pub(crate) fn cmd_verify_process_response(
@@ -283,7 +282,7 @@ pub(crate) fn response_nonce(
         !text.is_empty() && text.len() <= 16_384,
         "execution nonce size",
     )?;
-    let value = checked_json::parse(text)?;
+    let value = json::parse(text)?;
     let nonce = serde_json::from_value(value.clone()).map_err(fail)?;
     require(
         serde_json::to_value(&nonce).map_err(fail)? == value,

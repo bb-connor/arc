@@ -132,5 +132,4 @@ fn relocated_path(path: &Path, sysroot: &Path) -> Result<PathBuf, String> {
 }
 
 #[cfg(test)]
-#[path = "verified_fix_rust_runtime_tests.rs"]
 mod tests;

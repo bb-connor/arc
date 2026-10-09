@@ -47,7 +47,7 @@ use chio_store_sqlite::{
 use subtle::ConstantTimeEq;
 use zeroize::Zeroize as _;
 
-use super::finding_verified_fix::{
+use super::verified_fix::{
     read_canonical_file, reconcile_admission_jobs, run_bounded_output_command_capture,
     write_private_atomic, write_private_new,
 };
@@ -63,10 +63,10 @@ const SELLER_SUBMISSION_JOB_MAX_BYTES: usize = 1024 * 1024;
 const MAX_RETAINED_SELLER_JOBS: usize = 256;
 const SELLER_SUBMISSION_STORAGE_CAP_BYTES: u64 = 8 * 1024 * 1024 * 1024;
 const SELLER_SUBMISSION_RESERVED_BYTES: u64 =
-    super::finding_verified_fix::REPOSITORY_STAGE_MAX_BYTES + 64 * 1024 * 1024;
+    super::verified_fix::REPOSITORY_STAGE_MAX_BYTES + 64 * 1024 * 1024;
 const SELLER_SUBMISSION_STORAGE_MAX_ENTRIES: u64 = 100_000;
 const SELLER_SUBMISSION_RESERVED_ENTRIES: u64 =
-    super::finding_verified_fix::REPOSITORY_STAGE_MAX_ENTRIES + 2;
+    super::verified_fix::REPOSITORY_STAGE_MAX_ENTRIES + 2;
 const SELLER_RETRACTION_JOB_SCHEMA: &str = "chio.finding.seller-retraction-job.v1";
 const SELLER_PACKAGE_COMMAND_TIMEOUT: Duration = Duration::from_secs(330);
 const SELLER_ADMISSION_COMMAND_TIMEOUT: Duration = Duration::from_secs(300);
@@ -1897,5 +1897,4 @@ fn set_operator_umask() {
 
 #[cfg(all(test, unix))]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
-#[path = "operator_tests.rs"]
 mod tests;

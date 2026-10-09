@@ -10,7 +10,6 @@ use chio_swarm_authority::verify_swarm_authority_bundle;
 
 use super::*;
 
-#[path = "verify_calls.rs"]
 mod calls;
 
 pub(super) fn verify(

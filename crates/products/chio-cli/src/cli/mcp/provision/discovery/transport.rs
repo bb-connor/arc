@@ -229,5 +229,4 @@ mod tests {
 }
 
 #[cfg(test)]
-#[path = "transport/document_tests.rs"]
 mod document_tests;

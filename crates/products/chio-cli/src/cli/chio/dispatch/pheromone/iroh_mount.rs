@@ -42,7 +42,6 @@
 //! With no `--iroh-relay-url`, the endpoint uses `RelayMode::Disabled` (direct
 //! addressing). The n0 free relays end 2026-12-31, so this NEVER defaults to n0.
 
-#[path = "iroh_mount/lane_parser.rs"]
 mod lane_parser;
 
 use std::net::SocketAddr;
@@ -1001,7 +1000,6 @@ fn next_reload_delay(
     }
 }
 
-#[path = "iroh_mount/reloader.rs"]
 mod reloader;
 pub(crate) use reloader::run_directory_reloader;
 

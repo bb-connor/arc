@@ -14,21 +14,14 @@ use super::cage_policy::{
     ProvisionedCeilings,
 };
 
-#[path = "provision/artifact_io.rs"]
 mod artifact_io;
-#[path = "provision/authority_paths.rs"]
 mod authority_paths;
 use artifact_io::{require_canonical_json, sync_directory, write_report_to_stdout};
-#[path = "provision/discovery.rs"]
 mod discovery;
-#[path = "provision/linkage.rs"]
 mod linkage;
-#[path = "provision/private_files.rs"]
 mod private_files;
 use private_files::{restrict_private_file, validate_private_handle};
-#[path = "provision/reference_runtime.rs"]
 mod reference_runtime;
-#[path = "provision/shared_objects.rs"]
 mod shared_objects;
 
 pub(crate) use reference_runtime::{
@@ -593,7 +586,6 @@ fn declared_runtime_interpreter(
 }
 
 #[cfg(all(test, unix))]
-#[path = "provision/runtime_linkage_tests.rs"]
 mod runtime_linkage_tests;
 
 fn provision_new(inputs: &ProvisionInputs) -> Result<(), CliError> {
@@ -1922,8 +1914,6 @@ fn tampered(message: &str) -> CliError {
 }
 
 #[cfg(test)]
-#[path = "provision/document_tests.rs"]
 mod document_tests;
 #[cfg(all(test, unix))]
-#[path = "provision/private_artifact_tests.rs"]
 mod private_artifact_tests;

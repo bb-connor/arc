@@ -5,12 +5,9 @@ mod attest;
 mod certify_cert;
 mod did_passport;
 mod federation;
-#[path = "finding.rs"]
-mod finding_cmd;
-#[path = "lineage.rs"]
-mod lineage_cmd;
-#[path = "market.rs"]
-mod market_cmd;
+mod finding;
+mod lineage;
+mod market;
 mod output;
 mod pheromone;
 mod policy_analysis;
@@ -19,8 +16,7 @@ mod receipt_evidence;
 mod reputation_guard;
 mod runtime;
 mod settle_arena;
-#[path = "trust.rs"]
-mod trust_cmd;
+mod trust;
 mod workflow;
 
 #[allow(unused_imports)]
@@ -40,9 +36,9 @@ pub(crate) use self::federation::{
     dispatch_chio_authority_command, dispatch_chio_federation_command, dispatch_chio_treaty_command,
 };
 #[allow(unused_imports)]
-pub(crate) use self::lineage_cmd::{dispatch_lineage, emit_lineage_report};
+pub(crate) use self::lineage::{dispatch_lineage, emit_lineage_report};
 #[allow(unused_imports)]
-pub(crate) use self::market_cmd::{
+pub(crate) use self::market::{
     cmd_market_info, cmd_market_install, cmd_market_list, parse_market_tier,
 };
 #[allow(unused_imports)]
@@ -52,14 +48,14 @@ pub(crate) use self::runtime::dispatch_chio_runtime_command;
 use api_mcp::{dispatch_api, dispatch_mcp};
 use certify_cert::{dispatch_cert, dispatch_certify};
 use did_passport::{dispatch_did, dispatch_passport};
-use finding_cmd::dispatch_finding;
+use finding::dispatch_finding;
 pub(crate) use output::write_cli_error;
 use policy_analysis::dispatch_policy;
 use proof::{dispatch_commerce, dispatch_proof};
 use receipt_evidence::{dispatch_evidence, dispatch_receipt};
 use reputation_guard::{dispatch_conformance, dispatch_guard, dispatch_reputation};
 use settle_arena::{dispatch_arena, dispatch_settle};
-use trust_cmd::dispatch_trust;
+use self::trust::dispatch_trust;
 use workflow::dispatch_workflow;
 
 /// Control-encode a log field so untrusted content cannot forge log lines.
@@ -371,7 +367,7 @@ pub(crate) fn run() {
                 server_id,
                 server_name,
                 server_version,
-            } => crate::mcp_cli::cmd_provision_native_mcp_demo(
+            } => crate::cli::mcp::cmd_provision_native_mcp_demo(
                 &output_dir,
                 runtime_security_dir.as_deref(),
                 &tools_fixture,
@@ -396,7 +392,7 @@ pub(crate) fn run() {
             ),
             SecurityCommands::Supervise(args) => crate::cmd_security_supervise(&args),
             SecurityCommands::ProvisionReferenceRuntime(args) => {
-                crate::mcp_cli::cmd_provision_reference_runtime(&args)
+                crate::cli::mcp::cmd_provision_reference_runtime(&args)
             }
         },
         Commands::Pheromone { command } => dispatch_chio_pheromone_command(command),

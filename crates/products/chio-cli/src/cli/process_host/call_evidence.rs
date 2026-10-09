@@ -23,7 +23,6 @@ use super::state::error;
 use crate::CliError;
 
 #[cfg(target_os = "linux")]
-#[path = "call_evidence/export.rs"]
 mod exporting;
 #[cfg(target_os = "linux")]
 pub(super) use exporting::export;
@@ -34,13 +33,10 @@ const BROKER_SCHEMA: &str = "chio.process.call-observation.v3";
 const LIMIT: u64 = 32 * 1024 * 1024;
 
 #[cfg(test)]
-#[path = "call_evidence/tests.rs"]
 mod tests;
 
-#[path = "call_evidence/broker.rs"]
 mod broker;
 
-#[path = "call_evidence/outcomes.rs"]
 mod outcomes;
 #[cfg(target_os = "linux")]
 pub(super) use outcomes::export as export_outcomes;

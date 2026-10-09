@@ -1476,5 +1476,4 @@ impl FileSync {
 }
 
 #[cfg(test)]
-#[path = "active_defense_migration_tests.rs"]
 mod tests;

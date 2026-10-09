@@ -1,4 +1,3 @@
-#[path = "fixture_catalog_paths.rs"]
 mod catalog_paths;
 use super::*;
 pub(super) use catalog_paths::negative_destination;
@@ -14,21 +13,17 @@ use std::{
     ffi::OsString,
 };
 
-#[path = "fixture_agent_web.rs"]
-mod fixture_agent_web;
-use fixture_agent_web::{
+mod agent_web;
+use agent_web::{
     normalize_agent_web_bilateral_in_toto_statement, refresh_agent_web_envelopes_for_subjects,
     resign_agent_web_receipts_for_policy,
 };
-#[path = "fixture_cleanup.rs"]
-mod fixture_cleanup;
-use fixture_cleanup::strip_collected_bundle_outputs;
-#[path = "fixture_public_settlement_runtime.rs"]
-mod fixture_public_settlement_runtime;
-use fixture_public_settlement_runtime::public_settlement_runtime_hashes;
-#[path = "fixture_paths.rs"]
-mod fixture_paths;
-use fixture_paths::proof_fixture_source_root;
+mod cleanup;
+use cleanup::strip_collected_bundle_outputs;
+mod public_settlement_runtime;
+use public_settlement_runtime::public_settlement_runtime_hashes;
+mod paths;
+use paths::proof_fixture_source_root;
 
 const PROOF_FIXTURE_ROOT_ENV: &str = "CHIO_PROOF_FIXTURE_ROOT";
 const PROOF_FIXTURE_CATALOG_FILE: &str = "catalog.json";

@@ -8,28 +8,23 @@ use chio_control_plane::trust_control::finding_purchase_routes::{
 };
 use chio_finding_verifier::MAX_RAW_FINDING_BYTES;
 
-#[path = "finding/verify.rs"]
-mod finding_verify;
-use finding_verify::cmd_finding_verify;
+mod verify;
+use verify::cmd_finding_verify;
 
-#[path = "finding/challenge.rs"]
-mod finding_challenge;
-use finding_challenge::cmd_finding_challenge;
+mod challenge;
+use challenge::cmd_finding_challenge;
 
-#[path = "finding/operator.rs"]
-mod finding_operator;
-use finding_operator::cmd_finding_operator_repair_challenge_retention;
-use finding_operator::{
+mod operator;
+use operator::cmd_finding_operator_repair_challenge_retention;
+use operator::{
     cmd_finding_operator_init, cmd_finding_operator_serve, cmd_finding_operator_tick,
 };
 
-#[path = "finding/hosted.rs"]
-mod finding_hosted;
-use finding_hosted::{cmd_finding_operator_evaluate_canary, cmd_finding_operator_validate_hosted};
+mod hosted;
+use hosted::{cmd_finding_operator_evaluate_canary, cmd_finding_operator_validate_hosted};
 
-#[path = "finding/verified_fix.rs"]
-mod finding_verified_fix;
-use finding_verified_fix::{
+mod verified_fix;
+use verified_fix::{
     cmd_finding_admit, cmd_finding_package_verified_fix, cmd_finding_verify_bundle,
     VerifiedFixPackageRequest,
 };
@@ -55,7 +50,6 @@ const FINDING_STATUS_SERVICE_BOND_MAX_BYTES: usize = 64 * 1024;
 /// separately projected signed epoch carrier.
 const FINDING_STATUS_RESPONSE_MAX_BYTES: usize = 512 * 1024;
 
-#[path = "finding/status_floor.rs"]
 mod status_floor;
 #[cfg(test)]
 use status_floor::read_status_floor;
@@ -326,7 +320,7 @@ fn cmd_finding_publish(
         CliError::cli_other_error(format!("{} is not valid UTF-8: {error}", file.display()))
     })?;
 
-    let accepted = finding_verify::strict_finding_ingress(artifact, "publish input")?;
+    let accepted = verify::strict_finding_ingress(artifact, "publish input")?;
     let endpoint = finding_endpoint(url, FINDING_PUBLISH_PATH);
     let response = match ureq::post(&endpoint)
         .timeout(std::time::Duration::from_secs(30))
@@ -587,7 +581,7 @@ fn cmd_finding_buy(
     // Resolve and verify the signed commitment before asking the venue to
     // reserve anything. This is a buyer usability check; the kernel remains
     // the authority for the reveal digest and media type.
-    let accepted = finding_verify::accept_finding_from_venue(url, finding_id)?;
+    let accepted = verify::accept_finding_from_venue(url, finding_id)?;
     if accepted.finding.finding_id != finding_id {
         return Err(CliError::cli_other_error(
             "venue returned a different finding than the requested id".to_owned(),
@@ -1173,7 +1167,6 @@ const AUTHORIZATION_HEADER: &str = "Authorization";
 
 #[cfg(test)]
 #[allow(clippy::expect_used, clippy::unwrap_used)]
-#[path = "finding/unit_tests.rs"]
 mod unit_tests;
 
 fn validate_publish_response(

@@ -33,7 +33,7 @@ pub fn load_launch(material: &LaunchMaterial) -> Result<(), String> {
     )
     .map_err(|error| format!("signed manifest: {error}"))?;
     let args: Vec<&str> = material.args.iter().map(String::as_str).collect();
-    let launch = crate::mcp_cli::load_native_mcp_launch(
+    let launch = crate::cli::mcp::load_native_mcp_launch(
         &material.cage_policy,
         &material.cage_policy_signer,
         &material.command,

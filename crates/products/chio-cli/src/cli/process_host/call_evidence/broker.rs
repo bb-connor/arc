@@ -9,7 +9,7 @@ use chio_secret_broker::protocol::{BrokerExecuteRequest, BrokerExecuteResponse};
 pub(super) struct Evidence {
     host_record: super::super::state::Record,
     capture: NativeBrokerCompletionEvidence,
-    confinement: crate::mcp_cli::NativeLaunchEvidence,
+    confinement: crate::cli::mcp::NativeLaunchEvidence,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub keyring: Option<super::super::keyring::Evidence>,
 }
@@ -154,7 +154,7 @@ pub(super) fn verify(
             .ok_or_else(|| error("missing external launch signer"))?,
     )
     .map_err(error)?;
-    let window = crate::mcp_cli::verify_broker_native_launch_evidence(
+    let window = crate::cli::mcp::verify_broker_native_launch_evidence(
         &evidence.confinement,
         &server.id,
         &signer,
@@ -209,7 +209,7 @@ pub(super) fn export(
             .ok_or_else(|| error("missing broker launch signer"))?,
     )
     .map_err(error)?;
-    let mut launches = crate::mcp_cli::export_broker_native_launch_evidence(
+    let mut launches = crate::cli::mcp::export_broker_native_launch_evidence(
         server
             .launch_policy
             .as_deref()

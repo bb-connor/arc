@@ -13,12 +13,10 @@ use chio_swarm_authority::{
 use super::*;
 
 #[cfg(target_os = "linux")]
-#[path = "outcomes_export.rs"]
 mod exporting;
 #[cfg(target_os = "linux")]
 pub(crate) use self::exporting::export;
 
-#[path = "outcomes_native.rs"]
 mod native;
 
 const OUTCOMES_SCHEMA: &str = "chio.process.worker-outcomes.v3";
@@ -37,7 +35,7 @@ struct Outcomes {
     aggregate: Usage,
     calls: BTreeMap<String, ChioReceipt>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    confinement: BTreeMap<String, crate::mcp_cli::NativeLaunchObservation>,
+    confinement: BTreeMap<String, crate::cli::mcp::NativeLaunchObservation>,
 }
 
 #[derive(Serialize, Deserialize)]

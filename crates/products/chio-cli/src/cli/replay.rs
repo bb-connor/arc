@@ -8,37 +8,19 @@
 
 use super::*;
 
-#[path = "replay/bless.rs"]
 mod bless;
-#[path = "replay/bless/fixture_layout.rs"]
-mod bless_fixture_layout;
-#[path = "replay/bless/strip.rs"]
-mod bless_strip;
-#[path = "replay/diff.rs"]
 mod diff;
-#[path = "replay/execute.rs"]
 mod execute;
-#[path = "replay/merkle.rs"]
 mod merkle;
-#[path = "replay/ndjson.rs"]
 mod ndjson;
-#[path = "replay/policy_ref.rs"]
 mod policy_ref;
-#[path = "replay/reader.rs"]
 mod reader;
-#[path = "replay/receipt_partition.rs"]
 mod receipt_partition;
-#[path = "replay/report.rs"]
 mod report;
-#[path = "replay/schema_gate.rs"]
 mod schema_gate;
-#[path = "replay/traffic.rs"]
 mod traffic;
-#[path = "replay/validate.rs"]
 mod validate;
-#[path = "replay/verdict.rs"]
 mod verdict;
-#[path = "replay/verify.rs"]
 mod verify;
 
 // Re-export every submodule's crate-internal surface so cross-file
@@ -46,8 +28,8 @@ mod verify;
 // re-exported from `main.rs`) resolve at this module scope. The submodules
 // carry no colliding public item names, so the globs are unambiguous.
 pub(crate) use self::bless::*;
-pub(crate) use self::bless_fixture_layout::*;
-pub(crate) use self::bless_strip::*;
+pub(crate) use self::bless::fixture_layout::*;
+pub(crate) use self::bless::strip::*;
 pub(crate) use self::diff::*;
 pub(crate) use self::execute::*;
 pub(crate) use self::merkle::*;

@@ -1,10 +1,10 @@
 use super::*;
 
-use super::finding_challenge::{
+use super::challenge::{
     load_challenge_evidence_document, prepare_challenge, FINDING_CHALLENGE_EVIDENCE_MAX_BYTES,
 };
-use super::finding_verify::{strict_finding_ingress, AcceptedFinding, CliFindingNonceResolver};
-use crate::cli_entrypoint_support::parse_cli;
+use super::verify::{strict_finding_ingress, AcceptedFinding, CliFindingNonceResolver};
+use crate::main_tests_support::parse_cli;
 use chio_core_types::capability::scope::MonetaryAmount;
 use chio_core_types::crypto::{sha256_hex, Keypair};
 use chio_core_types::message::{ExecutionNonce, NonceBinding, SignedExecutionNonce};
@@ -66,7 +66,7 @@ fn oversized_support_file(dir: &tempfile::TempDir, name: &str) -> PathBuf {
     write_temp(
         dir,
         name,
-        &"x".repeat(super::finding_verify::FINDING_VERIFY_SUPPORT_MAX_BYTES + 1),
+        &"x".repeat(super::verify::FINDING_VERIFY_SUPPORT_MAX_BYTES + 1),
     )
 }
 
@@ -527,7 +527,6 @@ fn status_requires_a_venue_url() {
     assert!(error.contains("--control-url"), "unexpected error: {error}");
 }
 
-#[path = "unit_tests/status_floor.rs"]
 mod status_floor;
 #[test]
 fn finding_ids_must_be_lowercase_content_addresses() {
@@ -674,7 +673,7 @@ fn verify_caps_every_support_file_before_parsing() {
         )
         .unwrap_err();
         let _ = kind;
-        input_boundary::assert_too_large(error, finding_verify::FINDING_VERIFY_SUPPORT_MAX_BYTES);
+        input_boundary::assert_too_large(error, verify::FINDING_VERIFY_SUPPORT_MAX_BYTES);
     }
 }
 
@@ -2137,5 +2136,4 @@ async fn buy_drives_the_authenticated_live_purchase_roundtrip() {
     .unwrap();
 }
 
-#[path = "unit_tests/input_boundary.rs"]
 mod input_boundary;

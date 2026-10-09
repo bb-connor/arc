@@ -3,10 +3,8 @@
 use super::{CliError, ProvisionInputs};
 
 #[cfg(unix)]
-#[path = "discovery/launch.rs"]
 mod launch;
 #[cfg(unix)]
-#[path = "discovery/transport.rs"]
 mod transport;
 
 pub(super) fn discover_tool_surface(

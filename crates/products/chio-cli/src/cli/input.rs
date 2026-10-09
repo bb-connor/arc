@@ -3,15 +3,10 @@ use chio_core::canonical::{UntrustedJsonError, UntrustedJsonText};
 use serde::de::DeserializeOwned;
 use std::{io::Read, path::Path};
 
-#[path = "input/collection.rs"]
 pub(crate) mod collection;
-#[path = "input/config.rs"]
 pub(crate) mod config;
-#[path = "input/private.rs"]
 pub(crate) mod private;
-#[path = "input/snapshot.rs"]
 pub(crate) mod snapshot;
-#[path = "input/time.rs"]
 pub(crate) mod time;
 
 pub(crate) const MAX_DOCUMENT_BYTES: usize = 16 * 1024 * 1024;
@@ -134,5 +129,4 @@ mod tests {
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
-#[path = "input/tests.rs"]
 mod boundary_tests;

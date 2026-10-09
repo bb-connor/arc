@@ -119,7 +119,7 @@ flowchart TD
 
 | Path | Responsibility |
 |---|---|
-| `src/bin/chio.rs`, `src/main.rs` | Binary entry point. `bin/chio.rs` is a two-line `include!` of `main.rs`. `main.rs` mounts every `cli/*` file as a crate-root sibling module via `#[path]` (not `mod cli;`), re-exports `chio-control-plane`'s policy/kernel helpers and `CliError` at the crate root, and defines `fn main()`. |
+| `src/bin/chio.rs`, `src/main.rs` | Binary entry point. `bin/chio.rs` is a two-line `include!` of `main.rs`. `main.rs` declares `mod cli;` (`src/cli.rs`, which mounts every `cli/*` module with default module resolution), re-exports `chio-control-plane`'s policy/kernel helpers and `CliError` at the crate root, and defines `fn main()`. |
 | `src/cli/types.rs` + `cli/types/{runtime,trust,receipt,passport,proof,workflow,replay}.rs` | The full `Cli`/`Commands` clap surface: ~29 top-level commands and their nested subcommand trees. Despite its name, `types/runtime.rs` defines Federation/Attest/Arena/Settle/Lineage/Conformance/Guard/Mcp/Api, not `chio runtime` (see next row). |
 | `src/cli/chio/types.rs` + `chio/types/{authority,runtime,treaty}.rs` + `chio/types/pheromone/*.rs` | Clap definitions for the `chio`-namespaced trees: `ChioRuntimeCommands` (`chio runtime`), `ChioPheromoneCommands` (`chio pheromone`, the deepest tree in the crate at 7 levels), `ChioAuthorityCommands`/`ChioTrustBundleCommands`/`ChioTreatyCommands` (nested under `chio federation`). |
 | `src/cli/dispatch/mod.rs` | `run()`: parses `Cli`, installs the redacting tracing subscriber, matches every `Commands` variant to a dispatch function, writes the terminal error and exit code. |
@@ -129,7 +129,7 @@ flowchart TD
 | `src/cli/chio/dispatch.rs` + `chio/dispatch/{authority,buyer,io,treaty}.rs` + `chio/dispatch/pheromone/*.rs` + `chio/dispatch/runtime/*.rs` | Implementation layer the previous row's routers call into, reached through a chain of `use super::*` glob re-exports rooted at `main.rs`'s `use chio_dispatch::*;`. Includes the optional iroh P2P transport lane for the pheromone relay (`pheromone/iroh_mount.rs`). |
 | `src/cli/runtime.rs` | `cmd_run`, `cmd_check`, `cmd_start`, `cmd_api_protect`, `cmd_mcp_serve[_http]`, `cmd_trust_{serve,status,revoke}`: the session and edge-hosting implementations. |
 | `src/cli/session/*.rs` | The `chio run` message loop: agent-message normalization, capability selection, tool-response mapping, session stats, a signed deny receipt on kernel-internal failure. |
-| `src/cli/trust_commands.rs` + `cli/trust/*.rs` + `cli/runtime/trust_reports.rs` | `chio trust` implementation: credit, liability, underwriting, runtime-attestation appraisal, capital/exposure/behavioral-feed reports. `cli/trust/receipt/*.rs` physically nests here but implements the separate top-level `chio receipt` command. |
+| `src/cli/trust.rs` + `cli/trust/*.rs` + `cli/runtime/trust_reports.rs` | `chio trust` implementation: credit, liability, underwriting, runtime-attestation appraisal, capital/exposure/behavioral-feed reports. `cli/trust/receipt/*.rs` physically nests here but implements the separate top-level `chio receipt` command. |
 | `src/cli/replay.rs` + `cli/replay/*.rs` | The `chio replay` pipeline: reader, schema/redaction gates, signature and Merkle verification, verdict rederivation, traffic replay/diff/bless. |
 | `src/cli/mcp.rs` + `cli/mcp/*.rs` | `chio mcp wrap`: manifest-gated stdio MCP wrapper (default-deny), IDE config emission, tool-scope classification. |
 | `src/cli/doctor.rs` + `doctor/*.rs` | `chio doctor`: six ordered environment probes (toolchain, OCI, cosign, OTEL, kernel `/metrics`, `chio.yaml`). |
@@ -148,7 +148,7 @@ flowchart TD
 
 ## Command dispatch flow
 
-1. `main()` calls `dispatch_cli::run()`.
+1. `main()` calls `cli::dispatch::run()`.
 2. `Cli::parse()` parses argv (clap derive on `Cli`/`Commands`); global flags
    (`--receipt-db`, `--control-url`, ...) are cloned out before the command is
    matched.
@@ -161,7 +161,7 @@ flowchart TD
 5. The dispatch function either implements the command inline (rare, for
    example `attest.rs`'s supply-chain and runtime-quote arms), forwards to a
    same-crate module (`admin`, `passport`, `market`, `settle`, `archive`,
-   `guard`, `doctor`, `cli/replay`, `cli/trust_commands`,
+   `guard`, `doctor`, `cli/replay`, `cli/trust`,
    `cli/dispatch/proof`), or calls an external `chio-*` crate.
 6. `Result<(), CliError>` propagates back to `run()`. `Err` writes a JSON or
    human error envelope (`write_cli_error`) to stderr and exits 1. `chio doctor`

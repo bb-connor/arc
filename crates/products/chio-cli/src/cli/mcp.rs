@@ -79,29 +79,19 @@ pub(crate) fn load_tools_fixture(
     Ok(tools)
 }
 
-// The sibling `mcp/*.rs` files are real submodules wired in with
-// `#[path] mod`; each begins with `use super::*;` to inherit the shared
+// The `mcp/*.rs` files are submodules; each begins with `use super::*;` to inherit the shared
 // imports from this parent and `cli/types.rs`/`cli/runtime.rs`. Their
-// crate-internal items are re-exported here so the parent (`mcp_cli` in
+// crate-internal items are re-exported here so the parent (`mcp` in
 // `main.rs`) keeps exposing the same surface (e.g. `McpWrapArgs`,
 // `cmd_mcp_wrap`).
-#[path = "mcp/cage_policy.rs"]
 mod cage_policy;
-#[path = "mcp/emit_config.rs"]
 mod emit_config;
-#[path = "mcp/governed_sim.rs"]
 mod governed_sim;
-#[path = "mcp/ide.rs"]
 mod ide;
-#[path = "mcp/manifest.rs"]
 mod manifest;
-#[path = "mcp/payment_config.rs"]
 pub mod payment_config;
-#[path = "mcp/provision.rs"]
 mod provision;
-#[path = "mcp/scope.rs"]
 mod scope;
-#[path = "mcp/wrap.rs"]
 mod wrap;
 
 #[cfg(target_os = "linux")]

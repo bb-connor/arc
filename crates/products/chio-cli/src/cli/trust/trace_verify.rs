@@ -1,5 +1,5 @@
 use super::*;
-use crate::types_cli::TrustTraceSpec;
+use crate::cli::types::TrustTraceSpec;
 
 pub(crate) fn cmd_trust_trace_verify(
     log: &Path,

@@ -826,5 +826,4 @@ mod tests {
     }
 }
 
-#[path = "archive/namespace.rs"]
 mod namespace;

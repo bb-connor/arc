@@ -16,7 +16,6 @@ use session_receipts::{certificate_entries, load_session_receipts, snapshot_refe
 mod profile;
 
 #[cfg(test)]
-#[path = "cert/session_receipts_tests.rs"]
 mod session_receipts_tests;
 
 /// `chio cert generate` -- walk the receipt store for a session and produce

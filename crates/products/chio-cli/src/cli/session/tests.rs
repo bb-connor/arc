@@ -1,8 +1,6 @@
 use super::*;
 use chio_kernel::ToolCallRequest as KernelToolCallRequest;
-#[path = "tests/failure_receipts.rs"]
 mod failure_receipts;
-#[path = "tests/pending_approval.rs"]
 mod pending_approval;
 use chio_core::capability::scope::{Operation, ToolGrant};
 use std::{
@@ -528,10 +526,10 @@ fn mcp_edge_kernel(policy: &policy::ChioPolicy, _kernel_kp: &Keypair) -> (ChioKe
     )
     .expect("open mcp edge admission runtime")
     .expect("enabled mcp edge admission runtime");
-    let kernel = crate::runtime_cli::build_mcp_edge_kernel(
+    let kernel = crate::cli::runtime::build_mcp_edge_kernel(
         loaded_policy,
         &durable_admission.kernel_keypair(),
-        &crate::runtime_cli::McpEdgeStores {
+        &crate::cli::runtime::McpEdgeStores {
             receipt_db_path: Some(&receipt_db_path),
             revocation_db_path: None,
             authority_seed_path: None,
@@ -1873,10 +1871,10 @@ fn inbound_authority_native_session_preserves_proof_and_authenticated_subject() 
     let agent = Keypair::generate();
     let scope:ChioScope=serde_json::from_value(serde_json::json!({"grants":[{"server_id":"proof-srv","tool_name":"read_file","operations":["invoke"],"dpop_required":true}]})).unwrap();
     let defaults = vec![policy::DefaultCapability { scope, ttl: 300 }];
-    assert!(crate::runtime_cli::resolve_agent_subject(None, &defaults).is_err());
-    assert!(crate::runtime_cli::resolve_agent_subject(Some("invalid"), &defaults).is_err());
+    assert!(crate::cli::runtime::resolve_agent_subject(None, &defaults).is_err());
+    assert!(crate::cli::runtime::resolve_agent_subject(Some("invalid"), &defaults).is_err());
     let pinned =
-        crate::runtime_cli::resolve_agent_subject(Some(&agent.public_key().to_hex()), &defaults)
+        crate::cli::runtime::resolve_agent_subject(Some(&agent.public_key().to_hex()), &defaults)
             .unwrap();
     let cap = issue_default_capabilities(&kernel, &pinned, &defaults)
         .unwrap()

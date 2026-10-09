@@ -6,7 +6,6 @@ use std::fs::File;
 use std::os::fd::AsRawFd as _;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-#[path = "verified_fix_rust_runtime.rs"]
 mod rust_runtime;
 
 const MAX_RUNTIME_TREE_ENTRIES: usize = 20_000;

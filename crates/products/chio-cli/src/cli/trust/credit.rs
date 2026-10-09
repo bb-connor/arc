@@ -1,5 +1,5 @@
 use super::*;
-use crate::runtime_trust_reports::build_credit_loss_lifecycle_query;
+use crate::cli::runtime::trust_reports::build_credit_loss_lifecycle_query;
 
 pub(crate) struct CreditLossLifecycleListArgs<'a> {
     pub(crate) event_id: Option<&'a str>,

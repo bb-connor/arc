@@ -1,15 +1,14 @@
 use super::*;
-#[path = "runtime/session_subject.rs"]
 mod session_subject;
+pub(crate) mod trust_reports;
 use chio_api_protect::DEFAULT_UPSTREAM_REQUEST_TIMEOUT;
 pub(crate) use session_subject::resolve_agent_subject;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::mcp_cli::payment_config::PaymentAdapterConfig;
+use crate::cli::mcp::payment_config::PaymentAdapterConfig;
 
 #[cfg(test)]
-#[path = "runtime/payload_maintenance_tests.rs"]
 mod payload_maintenance_tests;
 
 pub(crate) fn resolve_sidecar_payment_adapter(
@@ -1136,7 +1135,7 @@ pub(crate) fn cmd_mcp_serve(
         .ok_or_else(|| CliError::cli_other_error("empty MCP server command".to_string()))?;
     let wrapped_arg_refs = wrapped_args.iter().map(String::as_str).collect::<Vec<_>>();
 
-    let native_launch = crate::mcp_cli::load_native_mcp_launch(
+    let native_launch = crate::cli::mcp::load_native_mcp_launch(
         cage_policy_path,
         cage_policy_signer,
         wrapped_cmd,
@@ -1288,7 +1287,7 @@ pub(crate) fn cmd_mcp_serve_http(
         auth_jwt_issuer,
         auth_jwks_uri,
     )?;
-    let native_launch_factory = Arc::new(crate::mcp_cli::SignedCagePolicyLaunchFactory::new(
+    let native_launch_factory = Arc::new(crate::cli::mcp::SignedCagePolicyLaunchFactory::new(
         cage_policy_path.to_path_buf(),
         cage_policy_signer.to_string(),
     )?);
@@ -1869,7 +1868,7 @@ mod runtime_local_error_domain_tests {
     #[test]
     fn partial_credit_loss_lifecycle_amount_uses_cli_domain() {
         let error = must_err(
-            crate::runtime_trust_reports::build_credit_loss_lifecycle_query(
+            crate::cli::runtime::trust_reports::build_credit_loss_lifecycle_query(
                 "bond-1",
                 "delinquency",
                 Some(100),

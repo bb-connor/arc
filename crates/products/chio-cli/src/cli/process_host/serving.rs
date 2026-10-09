@@ -50,7 +50,7 @@ pub(super) fn connect(
     let mut launch_receipts = BTreeMap::new();
     for server in &config.servers {
         let arguments: Vec<_> = server.command[1..].iter().map(String::as_str).collect();
-        let launch = crate::mcp_cli::load_native_mcp_launch(
+        let launch = crate::cli::mcp::load_native_mcp_launch(
             server
                 .launch_policy
                 .as_deref()

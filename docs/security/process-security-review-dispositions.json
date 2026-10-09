@@ -313,17 +313,17 @@
       "checkpoint": "3b926837372f2a878169671911e613968455f553",
       "files": [
         "crates/products/chio-cli/src/cli/process_host/runner/container.rs",
-        "crates/products/chio-cli/src/cli/process_host/runner/container_tests.rs"
+        "crates/products/chio-cli/src/cli/process_host/runner/container/tests.rs"
       ],
       "evidence": "Only a positively observed owned, started worker exit is completion; created-zero and malformed start times refuse.",
       "regressions": [
         {
-          "path": "crates/products/chio-cli/src/cli/process_host/runner/container_tests.rs",
+          "path": "crates/products/chio-cli/src/cli/process_host/runner/container/tests.rs",
           "name": "observed_container_states"
         }
       ],
       "test_files": [
-        "crates/products/chio-cli/src/cli/process_host/runner/container_tests.rs"
+        "crates/products/chio-cli/src/cli/process_host/runner/container/tests.rs"
       ],
       "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
     },
@@ -334,17 +334,17 @@
       "checkpoint": "3b926837372f2a878169671911e613968455f553",
       "files": [
         "crates/products/chio-cli/src/cli/process_host/runner/container.rs",
-        "crates/products/chio-cli/src/cli/process_host/runner/container_tests.rs"
+        "crates/products/chio-cli/src/cli/process_host/runner/container/tests.rs"
       ],
       "evidence": "Persist observed completion before cleanup; unresolved ownership survives restart and blocks replacement/export.",
       "regressions": [
         {
-          "path": "crates/products/chio-cli/src/cli/process_host/runner/container_tests.rs",
+          "path": "crates/products/chio-cli/src/cli/process_host/runner/container/tests.rs",
           "name": "completion_survives_cleanup_debt_and_restart"
         }
       ],
       "test_files": [
-        "crates/products/chio-cli/src/cli/process_host/runner/container_tests.rs"
+        "crates/products/chio-cli/src/cli/process_host/runner/container/tests.rs"
       ],
       "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
     },
@@ -376,17 +376,17 @@
       "checkpoint": "3b926837372f2a878169671911e613968455f553",
       "files": [
         "crates/products/chio-cli/src/cli/process_host/runner/container.rs",
-        "crates/products/chio-cli/src/cli/process_host/runner/container_tests.rs"
+        "crates/products/chio-cli/src/cli/process_host/runner/container/tests.rs"
       ],
       "evidence": "Only exact positive missing-image rejection plus authoritative absence retires a create intent. Transport loss remains uncertain and preserves the original wait reason.",
       "regressions": [
         {
-          "path": "crates/products/chio-cli/src/cli/process_host/runner/container_tests.rs",
+          "path": "crates/products/chio-cli/src/cli/process_host/runner/container/tests.rs",
           "name": "create_rejection_requires_positive_empty_inventory"
         }
       ],
       "test_files": [
-        "crates/products/chio-cli/src/cli/process_host/runner/container_tests.rs"
+        "crates/products/chio-cli/src/cli/process_host/runner/container/tests.rs"
       ],
       "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
     },

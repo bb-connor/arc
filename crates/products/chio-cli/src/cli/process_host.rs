@@ -7,46 +7,32 @@ use clap::Subcommand;
 use crate::CliError;
 
 #[cfg(unix)]
-#[path = "process_host/call_evidence.rs"]
 mod call_evidence;
 #[cfg(unix)]
-#[path = "process_host/diagnostics.rs"]
 mod diagnostics;
 #[cfg(unix)]
-#[path = "process_host/keyring.rs"]
 mod keyring;
 #[cfg(unix)]
-#[path = "process_host/lifecycle.rs"]
 mod lifecycle;
 #[cfg(unix)]
-#[path = "process_host/native_broker.rs"]
 mod native_broker;
 #[cfg(unix)]
-#[path = "process_host/nonce_evidence.rs"]
 mod nonce_evidence;
 #[cfg(unix)]
-#[path = "process_host/provision.rs"]
 mod provision;
 #[cfg(unix)]
-#[path = "process_host/receipt_evidence.rs"]
 mod receipt_evidence;
 #[cfg(unix)]
-#[path = "process_host/relocation.rs"]
 mod relocation;
 #[cfg(unix)]
-#[path = "process_host/run_evidence.rs"]
 mod run_evidence;
 #[cfg(target_os = "linux")]
-#[path = "process_host/runner/mod.rs"]
 mod runner;
 #[cfg(unix)]
-#[path = "process_host/serving.rs"]
 mod serving;
 #[cfg(unix)]
-#[path = "process_host/state.rs"]
 mod state;
 #[cfg(unix)]
-#[path = "process_host/swarm.rs"]
 mod swarm;
 
 #[derive(Subcommand)]
@@ -420,5 +406,4 @@ pub(crate) fn dispatch(command: ProcessCommands) -> Result<(), CliError> {
 }
 
 #[cfg(test)]
-#[path = "process_host/state_clock_tests.rs"]
 mod state_clock_tests;
