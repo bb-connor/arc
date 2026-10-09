@@ -1,363 +1,381 @@
-# macOS native host integration annex
+# macOS native host annex
 
-Status: accepted platform direction; implementation and installed-runtime qualification unavailable. Date: 2026-10-07. Confidence: high in the ownership boundaries and cited source observations; moderate in platform choices and initial budgets; unknown in delivered macOS behavior.
+Status: approved platform direction, restructured 2026-10-09 around the
+[north-star flows](../2026-10-07-desktop-integration/NORTH-STAR-FLOWS.md).
+Implementation and installed-runtime qualification are unavailable.
+`planning_status: ready_after_adr` for HOST-M1 on macOS;
+`planning_status: deferred` for macOS HOST-M2 and the managed-endpoint track.
+`boundary_class` is stated per operation below and follows ADR-0011. Status
+terms follow [STATUS-GLOSSARY](../2026-10-07-desktop-integration/STATUS-GLOSSARY.md);
+acceptance cases are defined once in [CASES](../2026-10-07-desktop-integration/CASES.md).
 
-This annex implements [ADR-0038](../../../adr/ADR-0038-native-host-program.md), the [shared native host program](../2026-10-07-desktop-integration/README.md), [HOST-CONTRACT](../2026-10-07-desktop-integration/HOST-CONTRACT.md) and [CONSUMERS](../2026-10-07-desktop-integration/CONSUMERS.md). The [program map](../../../architecture/PROGRAM-MAP.md) and [shared qualification](../2026-10-07-desktop-integration/QUALIFICATION.md) own cross-platform semantics. The [operator projection](../2026-10-07-desktop-integration/OPERATOR.md) is an optional consumer contract. This document owns Darwin ports, native service deployment, platform experiments, permission handling and distribution evidence. It creates no new task, recovery, credential, event, approval, or stop contract.
+**Chio is a Rust kernel for agentic operating systems that coordinate work,
+share resources, and cooperate across organizational boundaries.**
 
-The previous numbered macOS specifications, plans, protocol schemas, and fixture catalog are superseded. Historical research remains source evidence only. In particular, `native-descendant-v1` is **retired**, not relaxed or renamed to Seatbelt. It cannot be selected, migrated into another profile, or advertised as qualified. Any future descendant-ES proposal needs a new decision and independent qualification including its original ES/NE and network-containment concerns.
+On macOS, Chio is a userspace authority and work-state kernel hosted by the OS,
+not an XNU replacement or a kernel extension. Isolation denies; Chio grants.
+This annex implements [ADR-0038](../../../adr/ADR-0038-native-host-program.md)
+and NORTH-STAR-FLOWS for Darwin. It owns Darwin ports, launchd service
+deployment, Keychain custody selection, permission handling and distribution
+evidence. It creates no new task, recovery, credential, event, approval or stop
+contract. [PROGRAM-MAP](../../../architecture/PROGRAM-MAP.md) pins the owners;
+F means `main` after the #1160 merge commit (experimental; broker Linux-only).
+[HOST-CONTRACT](../2026-10-07-desktop-integration/HOST-CONTRACT.md) owns the
+shared deployment profiles.
 
-Apply FIRST-CLASS-INTEGRATIONS' catalog scope explicitly: individual harness
-promotion uses its own H01-H05/H06a/H08a; a Herdr/harness tuple uses its own
-H07/H08b. H06b and the complete four-selection Herdr matrix gate aggregate
-completion only. M10 tests removal of unrelated records versus removal of the
-selected tuple's own mandatory subcase at the actual release owner.
+Flow IDs use the `HOST-` prefix (unified roadmap section 12). M0 to M11 are
+packet IDs in the [macOS plan](../../plans/2026-10-07-macos-integration/IMPLEMENTATION.md),
+not flows. The previous numbered macOS specifications and private protocol are
+superseded. `native-descendant-v1` is retired: it cannot be selected, migrated
+or renamed Seatbelt.
 
-Selected model routes also consume HOST-CONTRACT's model-provider resource
-boundary: any token/spend dimension required by grant, policy or profile needs
-an enforceable route bound and its actual-owner reservation/uncertainty tests.
-Missing bounds refuse before dispatch; a separately approved narrower profile
-cannot become an automatic fallback. OS confinement and provider accounting
-remain separate qualification dimensions.
-
-## Product and boundary
-
-**Chio is a Rust kernel for building agentic operating systems.** Applications and harnesses use it to coordinate work, share resources, and cooperate across organizational boundaries. On macOS, existing native owners and their Darwin ports provide the systems layer through supported bindings and services. They must work with every Chio graphical client absent. Applications, agent harnesses and Herdr own their frontend, planning and coordination strategy; Chio retains its authority, resource/process custody, governed work, recovery and evidence contracts.
-
-This is a userspace Rust kernel hosted by macOS, not an XNU replacement or a kernel-extension project. Native service installation does not claim universal interception of host processes. A signed GUI-less service bundle or installer package is a packaging choice, not a required menu bar application. Workbench, menu bar, Finder Services and browser clients are optional consumers. The sealed, single-owner unpaid W1 coding workflow remains an optional resource profile through actual qualified harness/resource owners. `chio-mini-swe` is an optional reference and conformance fixture; it is neither a default runner, a priority integration nor a prerequisite for any harness, native host, runtime selection or Herdr delivery.
-
-### Deployment contexts
-
-The complete Mac program includes both profiles below. These are planning labels, not released commands or new S7 enum values. Each native capability qualifies separately by deployment context, installed tuple and its own owner dependencies.
-
-| Context | Supported design direction | Mandatory boundary |
+| Operation or profile | `boundary_class` | `planning_status` |
 | --- | --- | --- |
-| User-session host | Headless per-user LaunchAgent/service, with no Chio frontend required | Existing user enrollment, current session, lock/logout, credential and freshness fences remain effective. GUI-free operation does not imply login independence. |
-| Service host | Separately enrolled service principal hosted by a system-domain LaunchDaemon, using a least-privileged service identity and narrowly privileged lifecycle operations | Explicit machine installation/authority scope, credential backend, resources, expiry, boot/restart, consent and recovery. No root impersonation or copying of a human login context. |
-| Presentation deployment | First-class Herdr workspace/plugin integration; separately optional workbench, menu bar, Finder Services or additional graphical diagnostic clients | Native services and harnesses remain usable without any frontend installed/running. First-class Herdr delivery has its own installed consumer gates and is required for the complete integration-program claim; every delivered client retains authentication, safe review and privacy gates. |
+| HOST-M1 door: `chio api protect` admission of a presented, federated capability | `prevent` at B's door only | `ready_after_adr` |
+| HOST-M1 evidence check at the requesting organization | `detect_only`; imported reputation `advisory_only` | `ready_after_adr` |
+| Optional review window, menu bar, notifications | `advisory_only` | `ready_after_adr`, optional |
+| Hook-mode harness sessions | `detect_only` | `ready_after_adr` |
+| Protected harness execution (Seatbelt or VM backend) | `prevent` for mediated tools; `cannot_see` inside a granted native shell | `deferred` (macOS HOST-M2) |
+| Managed endpoint ES/NE | `detect_only` for observations; `cannot_see` for unmediated effects | `deferred` |
+| Retired `native-descendant-v1` | `cannot_see` | `hard_skip` |
 
-A user-session host may qualify while service-host evidence remains unavailable, but that partial release cannot be described as login-independent or as completing both profiles. Service-host operation starts only after the OS and required protected storage are available; FileVault unlock, recoveryOS and unattended OS boot are distinct conditions. User-only credentials, current human endorsement and privacy consent do not become available merely because a machine daemon is running. Existing human-session actions retain their lock and revocation rules; unattended work needs separately scoped service authority. See the verified [native service research](research/native-host-services.md).
+Every row has `runtime_evidence: unavailable`. Historical component evidence
+does not change that.
 
-The first systems acceptance is an installed native host consumed by an external harness and an independent application without Chio frontends. An Observe-only host proves useful authenticated native reads and client continuity with work/recovery, approval and task-execution capabilities absent; selected work/resource capabilities add their own full consumer gates. [CAPABILITIES](../2026-10-07-desktop-integration/CAPABILITIES.md) maps the wider kernel program to existing owners; CONSUMERS supplies installed acceptance. Shared-resource and cross-organization claims additionally pass those exact owner contracts. Passport/current-admission, recursive delegation and runtime swarm claims have independent owner gates; a Mac port or a valid offline signature cannot qualify them. A two-user local test is not evidence of independently governed organizations, and a shared Mac daemon cannot share their private keys, databases or accounting authority.
+## HOST-M1 on macOS
 
-Isolation denies; Chio grants. The OS adapter restricts ambient access. Kernel-owned tools, gateway-routed calls, model relay, broker, approvals, work, and recovery retain their native owners. An isolation backend cannot grant Chio authority, and a successful gateway request does not prove that direct routes or descendants were confined.
+HOST-M1 is cut server-first (unified roadmap COOP-1): headless services, OS key
+custody and the door come first; desktop review moments are optional follow-ons
+(COOP-1.12). A Mac can play either organization in
+[NORTH-STAR-FLOWS section 3](../2026-10-07-desktop-integration/NORTH-STAR-FLOWS.md#3-flow-m1-cooperate-0).
+HOST-M1 cases: C09, Q05, Q06, Q24, Q28, Q29, with platform cases Q18, Q20 and
+Q31 for the delivered install and its time-bounded authority.
 
-| Profile or surface | `boundary_class` | `planning_status` | Mac-specific gate and honest presentation |
+**Services.** The Mac runs `chio trust serve --advertise-url` and, when it is
+the door (org B), the governed tool behind `chio api protect` with
+`CHIO_TRUSTED_ISSUER_KEY` set to B's trust-control authority key. Both are
+existing shared owners; macOS adds packaging and custody, not a listener,
+protocol or authority of its own. Their HTTP listeners keep the shared owners'
+pre-authentication and per-principal pressure bounds (Q10, Q16).
+
+| Context | Design direction | Mandatory boundary |
+| --- | --- | --- |
+| User-session host (default) | Per-user LaunchAgent registered through `SMAppService`, headless, no Chio frontend required | Session lock, logout, credential and freshness fences stay effective. GUI-free operation does not imply login independence. |
+| Service host (optional) | System-domain LaunchDaemon only for a separately enrolled service principal, least-privileged service identity | Explicit machine enrollment, its own credential backend, boot and recovery behaviour. No root impersonation and no copied human login context. |
+
+A user-session release cannot be described as login-independent. A service host
+starts only after the OS and its protected storage are available; FileVault
+unlock, recoveryOS and unattended boot are distinct conditions. User-only
+credentials and human endorsements never transfer into a service principal
+(Q29).
+
+**Key custody.** Every signing command takes a key reference through #1160's
+`signing_custody` (NORTH-STAR-FLOWS section 2 owner change, "custody provider
+behind `SigningBackend`"). On the user-session host the organization and domain
+keys live in a device-only, non-synchronizing data-protection Keychain item.
+Ed25519 cannot live in the Secure Enclave, so this is an OS-protected software
+key and the product says so. The service host selects its own backend (a
+reviewed system or file-based Keychain policy, or remote custody); it is never
+a fallback from a failed user store. Fail-closed rules:
+
+- Custody unavailable, locked or wrong user/code: the signing operation refuses.
+  There is no plaintext, legacy or weaker-accessibility fallback, and no
+  silent switch between user and service backends.
+- Plaintext seed files remain a labelled development profile only; a HOST-M1
+  run uses none (NORTH-STAR-FLOWS section 8).
+- Installed item class, access group, synchronization flag, accessibility,
+  audience and caller access are inspected on the installed tuple, not
+  inferred from the creation request.
+- Rotation or revocation that wins the owner's ordering before release stops
+  a stale cached key from signing. Earlier committed history is preserved.
+- Restoring app state or Keychain fixtures cannot revive spent or revoked
+  authority; freshness unavailable keeps affected signing fenced.
+
+**Operator approval.** B's operator approves federated issue (flow step 4).
+A passkey through Touch ID uses `chio-custody-hw` and the existing
+`PasskeyCapabilityVerifier`; Touch ID unlock or OS consent alone is not an
+approval. Until the S28 roster lands the approval record is labelled
+`SharedCredential` (NORTH-STAR-FLOWS section 3). Every approval intake
+compares the requested decision and approval ID before retaining a credential;
+deny and mismatched-ID responses retain nothing (Q05). Roster or verifier gaps
+keep attributable approval unavailable (Q06). The approval can be taken from
+the CLI; a review window is optional.
+
+**Optional desktop moments.** A notification that opens a native review window
+and a menu-bar item showing identity and the pending-review count are optional
+follow-ons (COOP-1.12), not HOST-M1 gates. When delivered they render owner
+data as `advisory_only`, clear sensitive content on lock or user switch, route
+notification clicks only to a neutral view that re-reads owner state, and keep
+their accessibility, privacy and exact-intent rendering obligations (Q17).
+Their absence never disables a native capability.
+
+**Distribution before the test.** Signed and notarized Apple silicon arm64
+binaries and a timed outsider install on macOS are required for G1 (unified
+roadmap sections 4 and 5). Packaging rules are in
+[Packaging and lifecycle](#packaging-and-lifecycle).
+
+**Exit.** The Mac side of a HOST-M1 run meets NORTH-STAR-FLOWS section 8:
+native user-session units, no plaintext seed file, a positive in-scope call with
+a receipt at the door, each listed negative refused before dispatch, and offline
+verification of the counterpart's evidence. Two people control the two
+machines.
+
+## HOST-M2 on macOS (after the success test)
+
+`planning_status: deferred`. macOS HOST-M2 starts after the success test
+(unified roadmap section 11; Lane SHARE "After the test": a Darwin process
+runner, a Keychain and XPC broker, and `LOCAL_PEERTOKEN` IPC). Until then a
+macOS-only organization takes part in HOST-M3 as the requesting (counterparty)
+organization, and the executing organization runs Linux
+(NORTH-STAR-FLOWS section 5, platform note). The detailed pre-restructure
+design of this annex at commit `620c703d8` is the starting point when this
+work resumes; nothing below is scheduled before G5.
+
+Scope when resumed (NORTH-STAR-FLOWS sections 4 and 9; cases C02 to C05, C10,
+C11, Q03, Q07, Q08, Q11 to Q13, Q15, Q19, Q22, Q23, Q25 to Q27, H01 to H08):
+
+- **Darwin process runner** in `chio-process`. Logical process identity stays
+  distinct from PID. The SDK lacks kqueue `NOTE_TRACK`/`NOTE_CHILD`, and
+  launchd process-group cleanup is not descendant custody, so closure needs
+  incarnation-safe tracking of fork, exec and reparent races or a qualified
+  backend (Q07, Q19). Live cancel and revoke are owner changes.
+- **Keychain and XPC broker** in `chio-secret-broker`, with separately
+  qualified user-session and service-principal custody and no controller-owned
+  credential proxy (Q13).
+- **Local peer identity** through `LOCAL_PEERTOKEN` and code-signing checks
+  (see [Services, custody and IPC](#services-custody-and-ipc)).
+- **Resource backend selection** among existing runtimes before any bespoke
+  Virtualization.framework supervisor: Apple Containerization (Apple silicon,
+  macOS 26, Xcode 26), OpenShell MicroVM (explicit `vm` selection, no guest
+  NIC) and Docker Desktop, with optional `chio-mini-swe` reference
+  comparisons. Selection requires the same fixed workload and the complete
+  matrix: zero direct egress, no host-directory share outside the captured
+  import, detached or immutable capture, fresh per-task writable state,
+  bounded output and bridge queues, and numeric per-VM and aggregate ceilings
+  for CPU, memory, disk, processes, storage I/O rates and host IPC objects with
+  native stop headroom (Q12, Q22, Q27). A vsock endpoint identifies a
+  transport, not a principal.
+- **Seatbelt launchers** as a thin, lower-assurance backend. The public Pi
+  launcher already uses a deny-default `sandbox-exec` policy with fork denied.
+  S7 must admit a `Seatbelt` kind first; until then the UI says "not confined
+  by Chio". Qualification covers Mach/XPC, Automation, Accessibility,
+  pasteboard, capture and Input Monitoring channels under real consent
+  attribution, hard-link aliases to outside canaries, fresh task-private
+  state, per-session and aggregate resource and object bounds, accelerator
+  routes and authentication of permitted loopback services. A policy that
+  fails to load or an expected denial that fails refuses; it never retries
+  unsandboxed (Q12, Q22).
+- **Required harness cells.** Claude Code, Codex, Pi and Hermes each need one
+  scoped protected Mac profile (H01 to H05, H06a, H08a), plus H06b composition
+  and the Herdr H07/H08b matrix, under
+  [FIRST-CLASS-INTEGRATIONS](../2026-10-07-desktop-integration/FIRST-CLASS-INTEGRATIONS.md).
+  None is available before macOS HOST-M2.
+- **Megastart** coordinates on the Mac only after its aggregate allowance moves
+  onto kernel holds (ADR-0038 amendment item 5).
+- **Kernel stop and per-task closure** (S8 phase 1, S4) stay separate gates;
+  fence acceptance, observed process death, outstanding effects and closure
+  are shown separately (Q07, Q08).
+
+## HOST-M3 on macOS
+
+Before macOS HOST-M2, a Mac takes part in
+[HOST-M3](../2026-10-07-desktop-integration/NORTH-STAR-FLOWS.md#5-flow-m3-work-that-crosses-an-organization-boundary-and-comes-back-verified)
+only as the requesting organization:
+
+- Its own agent proposes the work. Claude Code or Codex in MCP mode is enough;
+  hooks remain `detect_only` coverage, never enforcement.
+- Its operator co-signs the agreement with a passkey through the W2 remote
+  co-signer. No party holds both co-signer keys.
+- It verifies the executing organization's receipts, the co-signed agreement
+  and the evaluator's acceptance offline (`chio evidence verify` against the
+  pinned partner card) and may disclose a subset to a third party.
+
+These steps use HOST-M1 services and the shared W1/W2 owners; macOS adds no
+packet for them.
+
+### Optional sealed coding work, approvals, and safe artifacts
+
+The Mac becomes an executing owner (work inside its own HOST-M2 tree, an
+evaluator, artifact capture, review and apply or export) only after macOS
+HOST-M2. That executing role, including the optional sealed W1 coding resource
+profile, is `planning_status: deferred` with HOST-M2 (cases C06 to C08, Q01,
+Q02, Q14). When it resumes, its obligations are unchanged from the
+pre-restructure design at `620c703d8`: repository capture refuses
+repository-controlled execution, lazy fetching and external objects and bounds
+object parsing, special entries, mounts, sizes and whole-generation coherence
+before any dispatch; the evaluator runs in its own bounded boundary and
+candidate output cannot forge acceptance; review renders untrusted bytes inertly
+with bidi and terminal controls escaped; export publishes atomically without
+replacing an unexpected file; apply is qualified separately from export.
+Acceptance comes only from the configured evaluator, never from a human click.
+
+## Services, custody and IPC
+
+Native hosting composes existing owners; it requires no new universal daemon.
+A consumer or optional controller restart may lose cached presentation state.
+It must not lose native custody, restart an unknown operation, replenish
+capacity or create authority from a cache.
+
+| Responsibility | Owner and status | macOS delta | Flow |
 | --- | --- | --- | --- |
-| Observe hook-mode sessions | `detect_only` | `ready_after_adr` | Show source and gaps. Hook absence, crash, or timeout can miss activity; observation does not protect the session. |
-| Native/API and required CLI observation; optional workbench or menu bar display | `advisory_only` | `ready_after_adr` | Render owner data and freshness. The client cannot grant authority. |
-| Approve and stop for protected/sealed work | `prevent` at the owning pre-effect gate | `ready_after_adr` | Approval requires S28 roster, production passkey verification, exact intent binding and qualified installed approval intake; a route using the Pi utility also requires its installed repair. Independently, per-task stop requires S4/live process-host control and Kernel stop requires S8 phase 1 with its native route authorization. Missing approval prerequisites do not disable a qualified stop scope. |
-| Optional sealed W1 coding-resource profile | `prevent` for kernel-owned tool calls; `cannot_see` for shell effects inside a granted execution | `ready_after_adr` | W1, recovery fixes, qualified runner and selected S7 backend, independent artifact/acceptance oracle. No per-write receipt claim. |
-| Protected interactive, native shell removed | `prevent` for mediated tools | `ready_after_adr` | Each host independently passes doc 19 I01-I08, including alternate-tool and direct-route denial. |
-| Boundary interactive with native shell | `prevent` for gateway-routed requests and adapter-routed MCP calls authorized before dispatch; `cannot_see` for internal workspace activity | `deferred` | S7 backend evidence, direct-egress denial and descendant confinement. A permitted native write has no Chio decision or per-write receipt. |
-| Managed endpoint ES/NE | `detect_only` for observations; `cannot_see` for unmediated local effects | `deferred` | Administrator restrictions may deny OS activity, but are not Chio grants or receipts. Separate enterprise entitlement and deployment program. |
-| Retired `native-descendant-v1` | `cannot_see` (no available desktop profile) | `hard_skip` | Never admitted. Its former ES/NE gates are not satisfied by Seatbelt or a VM. |
-
-Every active row has `runtime_evidence: unavailable` for this native-host deliverable. Historical component evidence does not change that status. `ready_after_adr` records planning direction under ADR-0011, not delivery readiness.
-
-The [first-class integration contract](../2026-10-07-desktop-integration/FIRST-CLASS-INTEGRATIONS.md) requires Claude Code, Codex, Pi and Hermes as four first-class harnesses, plus a separate first-class Herdr workspace/plugin consumer. The target is at least one explicitly scoped protected profile per harness on macOS, with native installed qualification for every additional advertised tuple; none inherits another host's I01-I08 results, and no Pi-first or mini-swe-first dependency remains. The broader doc 19 six-host program still includes Cursor and OpenClaw with their own obligations; four first-class targets do not establish six-of-six completion. Hook observation remains `detect_only`, including Claude Code/Codex hook-mode paths; injection-safety claims additionally require their owning S11 work and are absent here. A required target that lacks a landed Mac owner/backend stays an explicit delivery gap, not a qualified integration.
-
-## First-class macOS integration acceptance
-
-All five rows are required delivery targets with `runtime_evidence: unavailable` until their own installed cases pass. FIRST-CLASS-INTEGRATIONS H01-H05/H06a/H08a apply to each of the four Mac harness cells; each must qualify at least one scoped protected profile. H06 additionally proves same-harness controls and mixed coordination involving all four, and H07 covers Herdr with each of the four selections. The harness rows bind exact executable/plugin/configuration, native service/API, principal/deployment context, backend and OS/CPU tuple. Observation, protected execution and any selected W1 capability remain distinct evidence cells. A narrower passing release may ship with named gaps; it cannot claim the complete first-class integration program.
-
-| Required target | Independent installed Mac acceptance |
-| --- | --- |
-| Claude Code | Run its actual installed harness and selected native bindings; prove useful authorized reads/work for the claimed profile, credential/model custody, direct-tool/alternate-route limits, restart and original-operation behavior. Observation cannot substitute for protected I01-I08. |
-| Codex | Repeat the complete applicable native/profile matrix through its own installed harness, configuration and adapter; use independent byte/effect/custody observers. Claude Code, Pi, mini-swe and source-only results cannot fill a missing Codex cell. |
-| Pi | Qualify its actual installed extension/launcher, native routes and selected backend; prior restricted-session evidence and a version increment do not qualify the new Mac tuple. It has no mandatory priority over the other three targets. |
-| Hermes | Qualify its actual installed harness, configuration and native binding with the same useful-operation and adversarial gates. A generic protocol client or another host's launcher cannot stand in for Hermes. |
-| Herdr workspace/plugin | Install the real consumer/plugin and discover, attach and reconnect to authenticated native workspace/host state through supported bindings or its accepted application API. Preserve the existing consumer contract, current authority, original IDs and uncertainty; pane/plugin lifecycle must not erase native custody or replay mutations. Native hosting still passes with Herdr absent. |
-
-M0 reconciles the existing Claude Code/Codex/Pi plugin repositories, Hermes `sdks/python/chio-hermes` owner and Megastart `herdr/` plugin/application contract from FIRST-CLASS-INTEGRATIONS. M7 has four separate harness lanes, H06 same/mixed-harness composition and H07/H08 Herdr selection/independent-use cases; M9 binds installed evidence; M10 checks each required target independently. Herdr is a workspace/plugin consumer, never a fifth harness, a native authority service or the process that must keep the host alive. Cursor/OpenClaw remain distinct doc 19 follow-on obligations and cannot be silently dropped or counted as already qualified.
-
-## Runtime composition and ownership
-
-Native hosting composes existing kernel, process, resource, credential, storage and transport owners; it does not require one universal new daemon. Reconcile their actual entrypoints and TCB placement before packaging. A native service may hold trusted custody only as declared by its existing owner. The optional shared controller is an S1 C-layer process outside the TCB, separate from gateway, authority services and agent hosts; it is not mandatory authority ingress or the machine service. Direct supported owner bindings remain available to qualified applications and harnesses. A consumer/controller restart may lose cached presentation state; it must not lose native task ownership, restart an unknown operation, replenish capacity or create authority from a cache.
-
-| Responsibility | Existing owner consumed on Mac | Platform delta |
-| --- | --- | --- |
-| Work identity and status | W1 `WorkHandleV1`, `WorkViewV1`, `WorkClient` and `WorkTransport` | Display execution, acceptance, result, recovery, settlement, and delivery separately. Do not invent `WorkPhase`. |
-| Recovery and retry | Original-operation recovery; `InspectWorkflow`, `SubmitApproval`, `ResumeWorkflow`, `CancelWorkflow`; S9 M20 | Lost reply is unknown until the owner resolves the original identity. Reusable/Retained/Terminal semantics come from S9. |
-| Events | S5 Part A fixes and Part B stable subscriptions | Mac is another consumer of hints. Re-read authoritative views on gaps; no desktop-private event log or routine `InspectWorkflow` polling. |
-| IPC | `chio-secure-ipc` | Add Darwin peer credentials to the existing crate; retain custody, framing, permission, replacement and lifecycle checks. |
-| Process/child custody | `chio-process`, `ProcessRegistry` | Integrate Darwin launch and termination evidence, including descendants and live cancel/revoke. Never use a numeric PID as durable task identity. |
-| Secrets and model release | `chio-secret-broker`, `chio-keyring`, existing host model relay | Independently qualified user-session and service-principal credential custody. No controller-owned credential proxy or cross-context fallback. |
-| Approvals | S8 S28 roster and native approval owners | Production integration/qualification of the existing passkey verifier and exact visible-intent binding. Touch ID unlock or OS consent alone is not an approval. |
-| Stop | S4 per-task closure; S8 phase 1 and S30 result kinds | Show fence acceptance, observed process death, outstanding effects and closure separately. `EmergencyControl` is not task stop. |
-| Confinement | S7 evidence and backend adapters | Proposed `Seatbelt` and Mac VM kinds must be added at S7 before use. Until then render “not confined by Chio”. |
-| Optional coding resource and review | M0-reconciled native resource and W1 acceptance owners used by the selected first-class harness; optional review clients | Extend actual source intake/export/acceptance owners and supported bindings without a required renderer. Mini-swe supplies optional reference/conformance cases only; no new Mac runner or acceptance ledger. |
-| Native deployment/lifecycle | Existing process/service owners and M0-reconciled shared release/install owner | Package user-session and service-host modes; bind installation, principal, active generation and original lifecycle operation. Missing owner APIs block that path, not justify a controller-owned authority. |
-
-The source baseline for this Mac branch does not contain every predecessor. [PROGRAM-MAP](../../../architecture/PROGRAM-MAP.md) is the retrieval and ownership reference. Implementation first integrates its dependency closures and verifies actual APIs. Do not rebuild missing owners in `integrations/macos/`. NK-01 to NK-03, W2-W4, M11, and witness topology are not blanket desktop prerequisites. S3 phase 1 supplies receipts for non-durable calls; S10 check-only reads in `SideEffecting` mode avoid imposing durable admission on every observation. Durability remains mandatory where the owning effect contract requires it.
-
-### Darwin IPC and native service lifecycle
-
-Transport selection is an M1 work packet in `chio-secure-ipc`. Evaluate authenticated AF_UNIX first: on the connected descriptor, initialize `socklen_t token_len = sizeof(audit_token_t)` and call `getsockopt(fd, SOL_LOCAL, LOCAL_PEERTOKEN, &token, &token_len)`, requiring success and the exact returned size. Preserve the kernel-returned token; derive user, process, audit-session and PID-version facts through the SDK accessors. Pass its exact bytes as `CFData` under `kSecGuestAttributeAudit` to `SecCodeCopyGuestWithAttributes(NULL, attributes, kSecCSDefaultFlags, &code)`, then require `SecCodeCheckValidity` against the locally pinned designated requirement for the intended peer. A peer-supplied requirement or mere signature validity is insufficient. [Apple code lookup](https://developer.apple.com/documentation/security/seccodecopyguestwithattributes(_:_:_:_:)), [dynamic requirement validation](https://developer.apple.com/documentation/security/seccodecheckvalidity(_:_:_:)).
-
-The inspected macOS 26.5 SDK exposes these APIs, but this is source evidence only. The pinned [Apple XNU implementation](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/kern/uipc_usrreq.c#L900-L934) obtains the token through the peer socket's `last_pid`, `proc_find` and `TASK_AUDIT_TOKEN`; acquisition is not thereby proved safe against every PID-reuse or descriptor-handoff race. Security's audit-token path retains PID-version checking, which must not be reduced to a PID-only lookup. M1 must establish the complete custody path on each selected OS/SDK tuple, including peer exit/exec/reuse, inherited or transferred descriptors, reconnect/endpoint replacement, and current-session binding. An audit session ID alone does not prove the current unlocked operator session. The [source and SDK record](research/apple-platform.md#darwin-local-peer-token-candidate-2026-10-07) records the distinction; no installed qualification has run.
-
-Compare XPC inside this crate's custody abstraction if AF_UNIX cannot establish the required facts and custody. Apple's XPC code-signing requirements validate received messages; they do not alone prevent a first outgoing private request from reaching an impostor. Qualify both directions before reusable credentials or private bytes flow, including non-sensitive negotiation, endpoint/reply custody, reconnect, exact accepted release and principal binding. [Apple DTS explanation](https://developer.apple.com/forums/thread/837286) and [native service research](research/native-host-services.md) record this limit. [Apple's archived `getpeereid` manual](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/getpeereid.3.html) supplies user/group facts only. Never fabricate UID/PID or incarnation facts, accept request-supplied identities as kernel evidence, or fall back to weaker admission when token, code-identity, session or lifecycle validation is unavailable.
-
-Use private state scoped to the selected user-session or service principal, and explicit native enrollment. Machine service scope is never inferred from the active console user. For an included browser client, the following browser obligations are mandatory; their absence from a headless package does not block independently qualified native bindings. Socket possession, loopback origin, UID equality, app signature, and an unlocked desktop are separate facts; none alone is approval authority. Authenticate browser access through the shared controller using its native non-ambient client proof and exact enrolled origin/session binding for each protected request and subscription handshake. Ambient cookies alone cannot authorize requests, including cross-origin form/fetch or WebSocket traffic against the genuine controller. Missing proof/origin binding disables the affected route. Browser-enforceable authentication of the intended controller must precede reusable credential or private request release. A same-user impostor taking over its permitted origin must receive no reusable session material; captured material cannot authenticate to the restored controller even with a forged allowed Origin. Missing native session/browser-delivery support disables the browser route. Deep links and Finder selection are untrusted requests for navigation/intake, never shell commands or grants. The secondary Finder Services handler validates the supplied pasteboard selection and submits only a proposal through authenticated owner intake; rejected or pending intake cannot capture a resource or issue authority. When Finder Services is delivered, its clean installed signed-app handoff is a gate for that consumer.
-
-Each delivered browser transport separately bounds pre-authentication connection/descriptor, buffer, worker, request-rate and absolute handshake/request lifetime consumption. HTTP/WebSocket partial, trickled and fragmented traffic must not evade bounds or starve the declared authenticated-client progress and native owner/stop headroom. Qualify actual transport saturation, exact/over-limit controls and restart/cleanup through M2/M9/M10; native AF_UNIX/XPC tests cannot qualify the browser listener. Unsupported bounds disable that optional route.
-
-Authentication does not waive request-pressure bounds. Every exposed native and selected browser/projection owner enforces per-authenticated-principal and aggregate request/cost/concurrency/queue, subscription, response-buffer and slow-reader limits with declared fairness and reserved control capacity. Valid-frame/expensive-read floods, reconnects, slow subscribers and restart must preserve bounded useful progress for another enrolled client and exposed stop/reconciliation routes. Actual owner observations, useful controls, retained dispatched uncertainty and explicit event gaps qualify M1/M9/M10 independently of pre-authentication limits; absent execution controls are not added to Observe.
-
-Native peer admission also binds authenticated dynamic code identity and applicable executable/library closure to the currently accepted release inventory/generation. A stable team/bundle designated requirement alone admits too many correctly signed builds. Fresh connections from old or alternate builds, exec/replacement and descriptor handoff must fail unless their exact tuple is accepted; unavailable identity or release custody keeps protected reads, events and commands closed. The native owner supplies both the release decision and process-derived evidence; UI version claims supply neither. Established IPC, subscription and browser sessions cannot retain admission across release fencing or activation solely because their opening handshake passed. The native owners close them or revalidate their exact accepted tuple and current authority before any further protected bytes or new dispatch; in-flight external outcomes remain separately reconciled.
-
-Native transport custody includes bounded pre-authentication connections, descriptors, authentication work/queues and buffered bytes, with non-renewing handshake/partial-frame deadlines and aggregate bounds independent of attacker identity claims. Wrong-code connection and slow-frame floods must preserve declared latency for both existing and fresh legitimate clients, native owner/control headroom and headroom for any included controller and any separately included stop path. Rejection of individual peers does not qualify listener availability; test the actual chosen transport and installed tuple.
-
-All helper operands remain literal resources, including leading-dash values and tool-specific pathspec syntax. Verify the actual helper's supported option terminator and literal mode or use a safe descriptor/stdin/typed API; an argv array or Git `--` alone does not establish literal pathspec semantics. Unsupported safe handling disables the route.
-
-Selected-resource intake must work through the actual signed native intake owner and selected client/helper access arrangement. A pathname is not an OS resource grant. Where App Sandbox/security-scoped bookmarks are used, qualify acquisition, resource identity, restart, stale-bookmark refusal and balanced release in the consuming process. Unsandboxed components still enforce the selected-resource boundary at the native owner. Selected capture must succeed while sibling/unselected requests release no bytes; neither retained scope nor a helper restart may widen intake authority.
-
-Every delivered filesystem owner binds its actual read/write/delete boundary to an approved root and filesystem/mount identity. Explicitly approved volume roots are valid only within their declared closure; a pathname never authorizes a replacement or nested mount. M0 inventories capture, package source/destination, artifact intake/apply/export, support source/staging/publication and removal as distinct applicable owners. Each needs pre-existing and raced root/ancestor/subtree mount cases, supported descriptor-bound enforcement or refusal, outside-data/access-policy/mount-state preservation, useful controls and interrupted original-operation recovery through M9/M10. No device-number-only check, automatic unmount, privilege fallback or another owner's test supplies this proof.
-
-Register the selected native user-session service through the supported per-user `SMAppService` LaunchAgent path. The service-host profile uses a separately qualified system LaunchDaemon deployment, with explicit service enrollment and no dependency on a controller or UI process. Prefer the least-privileged service identity compatible with the actual native owners; only narrowly scoped installation/lifecycle operations need elevation. Qualify either bundled SMAppService installation or an explicitly managed signed-package/launchd installation. The latter uses `Program`/`ProgramArguments`, not `BundleProgram`, and has one installation owner rather than competing app and managed updaters. Registration/authorization, running state, authenticated reachability, native owner health and qualified effects are separate results. Refused or revoked background authorization keeps affected service routes unavailable. A global ES/NE provider belongs only to the separately selected managed-endpoint track. [Apple registration semantics](https://developer.apple.com/documentation/servicemanagement/smappservice/register()), [GUI-less service package](https://developer.apple.com/documentation/servicemanagement/updating-your-app-package-installer-to-use-the-new-service-management-api), [managed daemon guidance](https://developer.apple.com/forums/thread/771162).
-
-Per-user data-protection Keychain access is unavailable in a daemon/system context. Keep the existing user-session credential policy; the service-host profile needs its own explicitly provisioned and qualified native broker backend, such as a reviewed system/file-based Keychain policy or existing remote custody. This is a separate policy selection, never a fallback from a failed user store. Store implementation, ACL/access group, service/audience, synchronization, caller identity, current authority and restore behavior are independently tested. A bundle or UID change cannot manufacture a user login context. [Apple TN3137](https://developer.apple.com/documentation/technotes/tn3137-on-mac-keychains).
-
-Each shipped user-session credential route also qualifies current-authority races at lookup, cache fill, secret release and dispatch, including cached values, reconnect and restart. If native rotation/revocation wins the owner's ordering before new release/dispatch admission, stale cached credentials authorize no fresh bytes/effects; successful earlier lookup is insufficient. Preserve previously committed release history and uncertain dispatched outcomes. Independent broker/dispatch observations, fresh-authority useful controls and M9/M10 evidence are required for the exposed boundaries; service-host and snapshot-rollback tests cannot substitute. Use the existing owner's generations/freshness and atomic fences, with no platform-only authority.
-
-Lock, fast user switching, logout, sleep/wake, service death and reboot invalidate sensitive user-session views and require fresh owner/session checks even with no graphical client. New affected actions stay unavailable while reconciliation runs. A separately qualified service principal follows its declared unattended scope and native freshness policy; human-session credentials or stale endorsements cannot transfer into it. Test machine-service cold start, no graphical users logged in, delayed/absent credential/storage/network owners, and reboot without any Chio frontend. Closing a frontend does not stop or erase native custody; deleting a presentation component is separate from unenrolling/removing native services. An already-dispatched remote effect can remain unresolved; a cleared UI cannot prove its cancellation. Native clients and any optional controller request the owners' closure/reconciliation behavior instead of defining a new resume or stop state machine.
-
-Per-task closure on descendant-capable backends must fence new creation or retain incarnation-safe custody for processes that spawn, exec or reparent during enumeration and termination. Independent process/handle observations must account for late members before completion; a one-time family snapshot cannot establish closure. Unresolved members keep original custody and pending status across restart.
-
-Darwin process observation and launchd process-group cleanup are not complete descendant custody. The installed Apple SDK does not support kqueue `NOTE_TRACK`/`NOTE_CHILD`; numeric PID snapshots, group kills and inherited per-process resource limits cannot substitute for incarnation-safe closure or independently enforced aggregate bounds. Missing native containment remains unavailable or requires a separately qualified backend; do not weaken the existing resource tests. See [source evidence](research/native-host-services.md).
-
-Selected execution profiles bind admitted lifetime to the native owner's
-boot/incarnation-associated timebase that advances through host sleep, alongside
-authority-issued absolute expiry. Suspend and realtime changes cannot extend or
-revive a task. Installed acceptance measures expired continuation/dispatch and
-remaining custody independently after wake, with original-operation recovery
-and no claim that a prior external effect was undone. A UI freshness refresh or
-guest-only timer cannot qualify this bound; unavailable native time semantics
-leave that execution profile unavailable without importing an execution-lifetime dependency into Observe.
-
-Q31 separately applies to every exposed expiring native read/session credential, subscription authority or service lease, including Observe-only delivery. Native owners qualify backward/forward wall-clock changes, uncertain freshness, sleep and boot transitions at protected-byte release and any selected approval/effect boundary. Expired authority never revives or receives a renewed lifetime; uncertain time refuses affected private bytes and new effects until owner reconciliation. A fresh bounded read/service binding supplies the positive control, with no W1, task/recovery or execution prerequisite. M0 records the actual time/boot/freshness owner; M8/M9 provide independent byte/effect and time observations, and M10 gates the selected capability.
-
-## Isolation adapters and runtime evaluation
-
-### Lower-assurance native Seatbelt adapter
-
-The restricted launchers already use `sandbox-exec`; the current public Pi source builds a deny-default Seatbelt policy with bounded runtime paths and gateway/model loopback destinations, and denies process fork and file links. That is concrete implementation evidence and must not be dismissed because App Sandbox serves a different packaged-app use case. It is not a promise of supported arbitrary sandbox APIs or a qualified desktop release. The current policy's fork denial also means a native-shell boundary profile needs different, independently measured descendant behavior. [Pinned Pi sandbox source](https://github.com/backbay-labs/chio-pi-plugin/blob/4214a5a8ddec776a5ff9ec78007442683fd8df03/src/sandbox.ts).
-
-Seatbelt qualification includes the agent's actual Mach/XPC, Automation, Accessibility, pasteboard and capture channels under its signed entitlements, inherited service rights and OS-attributed consent. A launching app's broader consent or a pre-opened service connection cannot supply an unqualified bypass. Independently demonstrate useful permitted services and denied sensitive channels; trusted-client privacy observations do not establish agent confinement.
-
-Input Monitoring is a distinct confinement surface: test event taps/HID and other reachable keyboard channels with applicable consent already granted to the exact responsible signed tuple, synthetic input to another application and independent input/canary observers. Include inherited/pre-opened channels, delegation and restart; deny unrelated keystrokes while preserving declared terminal/task input. M4/M9/M10 require this separately from Accessibility control, media capture and trusted-client privacy.
-
-Keep Seatbelt as a thin, lower-assurance Mac backend under the accepted layer decision. Pin the exact executable, libraries, host/plugin versions, policy bytes, OS build, allowed paths, inherited descriptors, and permitted endpoints. Fail if the selected policy cannot load or an expected denial fails; never retry unsandboxed. Adding `Seatbelt` to S7 is a prerequisite, not retrospective qualification.
-
-A permitted gateway/model loopback address or socket pathname is a routing constraint, not service identity. Authenticate the intended native service, accepted release/launch generation and session through the existing transport/authority owners before releasing private request bytes or authority, including on reconnect after endpoint replacement. A same-user fake listener at an allowed endpoint must receive neither prompts/source nor session material/routed requests. Missing authentication support keeps the selected execution route unavailable; no Seatbelt-only credential or alternate authorization service fills the gap.
-
-Workspace qualification separately challenges pre-existing and raced hard-link aliases to outside same-volume canaries. The actual native workspace/Seatbelt boundary must prevent disclosure and shared-inode mutation before access through an allowed alias or descriptor, including reuse/restart. Link-creation denial and one-time link-count scans cannot qualify this boundary; unsupported isolation keeps the affected Seatbelt profile unavailable.
-
-Seatbelt also requires fresh task-private session state independently of VM isolation. Native launcher/workspace/storage owners bind private workspace, temporary, cache, configuration, tool state and inherited paths/handles to the current task incarnation and authority. Sequential and concurrent same-user/cross-user sessions cannot read prior or other sessions' private source, prompts, results, credentials or tool/configuration mutations after normal completion, crash or interrupted cleanup. Explicitly shared resources remain usable only under their actual native owner's current audience/resource authorization and sharing contract; same UID or a cache label is not permission to reuse residual private data. Failed cleanup preserves bounded private, fenced unresolved custody and blocks unsafe state/channel reuse until owner reconciliation, without erasing historical evidence or unrelated authorized resources. M4 native regressions and M9 installed canary/positive-control observations gate M10 for each selected Seatbelt tuple; VM freshness cannot substitute.
-
-Qualify outside-workspace reads/writes, path replacement and symlink races, process execution and descendants, credential files, IPC endpoints, inherited files/sockets, IPv4/IPv6/UDP/direct DNS/loopback routes, host restart, revocation, and exact allowed useful work. Restricted sessions that deny descendants must prove fork/exec denial. Boundary sessions that allow descendants must prove the same restrictions follow them, including reparented workers and delegated services. Differences in those policies produce different qualification tuples.
-
-Seatbelt selection also requires independently enforced per-session and aggregate resource bounds with CPU/memory/storage/inode/thread/descriptor/IPC-object/output overload and concurrency probes, including native owner/control headroom and headroom for any included controller and bounded closure. File/pipe/socket/kqueue and Mach-port/right/message pressure receive class-specific bounds and independent saturation/cleanup observations; a file-descriptor cap does not establish every kernel-object bound. Fork denial is not a resource limit. Record actual supported Darwin enforcement mechanisms; unavailable quotas or failed pressure cases leave the execution profile unavailable rather than weakening the requirement or borrowing VM evidence.
-
-Seatbelt and VM execution also need separately proved sustained storage-I/O bounds, not just stored-byte/inode ceilings. Each actual backend/storage owner enforces per-session/per-VM and aggregate read/write throughput, operation rate and outstanding I/O with persistence/stop headroom across buffered/direct/mmap/flush and applicable guest/supervisor routes. Fixed-size repeated and concurrent pressure must demonstrate real device activity, useful controls and unrelated/native-control liveness through pending-write interruption and reconciliation. No generic Darwin I/O quota or priority-hint guarantee is assumed; unsupported selected routes are denied or the execution profile remains unavailable. Distinct M4/M5 owner and M9/M10 results are mandatory.
-
-For each selected backend, M0 inventories all reachable device/accelerator classes and supported native custody. Seatbelt denies unnecessary Metal/GPU/accelerator routes, including inherited/delegated access; an accelerator-capable profile instead needs actual enforceable per-session/aggregate memory, object/queue, submission and lifetime bounds with host/stop headroom. Independent allocation/submission saturation and cleanup/restart evidence gate M4/M9/M10, preserving outstanding-work uncertainty. No generic Darwin GPU quota is assumed and CPU/RSS tests cannot substitute. VM accelerator exposure, if any, requires its own owner evidence.
-
-### Higher-assurance VM candidates
-
-Evaluate existing runtimes before authoring a bespoke Virtualization.framework supervisor. Select on measured fit for the actual first-class harness workload and Chio authority boundary. Add W1 requirements only when that work capability is selected. A VM is a candidate for stronger host isolation; no VM candidate has desktop runtime evidence here.
-
-| Candidate | Current source-supported fact | Required selection evidence |
-| --- | --- | --- |
-| Apple Containerization | Swift package on Virtualization.framework; one lightweight VM per Linux container. Current upstream requires Apple silicon, macOS 26 and Xcode 26. | Pinned API and guest image; deny direct egress and host shares; preserve native ownership; usable runner, stop, import/export, lifecycle and resource limits. |
-| OpenShell MicroVM | Official source documents explicit `vm` selection, Apple Hypervisor support, no guest NIC, and traffic through the host supervisor. | Actual Mac boot, process and bridge identity, supervisor failure behavior, Chio-only grant route, model/broker integration, no competing approval grants, and pinned middleware compatibility. |
-| Optional `chio-mini-swe` Docker reference | Existing networkless coding-workspace and mediated `sandbox/execute` source for optional comparison/conformance. | If selected as a reference experiment, pin its Mac container-runtime/guest tuple and safe broker routes. Its absence cannot block another runtime or harness; its evidence cannot qualify a first-class harness or establish a dedicated per-task VM boundary. |
-| Bespoke VZ adapter | Apple's virtualization primitives can supply guest configuration, sockets, sharing and lifecycle control. | Consider only after documented fit gaps in the existing candidates justify a separately approved narrow adapter. No default guest/supervisor rewrite. |
-
-Source pins and primary links are in [Apple platform research](research/apple-platform.md). Apple Containerization's macOS 26 requirement does not raise the menu bar experiment's minimum by implication. It makes that backend unavailable on earlier release rows. ARM64 and x86_64/Rosetta evidence are distinct. Linux x86_64 cage qualification cannot cover an ARM64 guest or a Node agent host.
-
-The runtime-selection report evaluates the supported existing candidates, including Apple Containerization and OpenShell, against the actual selected first-class harness requirements; rejected OS/CPU rows need pinned compatibility evidence. Every runnable candidate receives the same fixed workload and complete safety matrix. Mini-swe is an optional reference/conformance comparison and cannot be a selection prerequisite or a fallback qualification result. Bespoke VZ work still needs evidence-backed fit gaps in the relevant existing runtime candidates and a separately approved narrow adapter.
-
-The VM experiment admits only explicit owner-controlled service routes. Prefer zero direct network devices; if an existing runtime differs, prove equivalent direct-egress denial instead of treating NAT as policy. No host-directory share outside explicit captured input, including read-only shares, host credential mount, runtime management socket, signing key, arbitrary device passthrough, or unbounded guest output. Inventory every mount/channel and prove outside-input read and write sentinels remain inaccessible; a read-only share can still disclose host data. Before selecting a VM, bound stdout/stderr retention, ingress byte rate, bridge frame size and queue depth; test useful output plus malicious output/bridge floods. Excess yields explicit bounded truncation of display payload or owner-directed stop, while authoritative messages are never truncated into valid results and unresolved custody remains retained. Imports are captured snapshots; exports are bounded untrusted artifacts. A vsock endpoint identifies a transport, not a Chio principal; bind it to the owning VM and launch generation. VM request-stop, observed termination, bridge closure, authority closure, and remote outcome are different facts.
-
-VM bridge qualification also bounds guest-driven host IPC objects: per-VM and aggregate descriptors, ports/rights where used, pending/active connections, listeners/backlogs, outstanding requests and allocation rates/lifetimes. Enforce before host allocation, reserve observation/stop headroom, and independently measure exact/over-limit, stalled-handshake, reconnect/churn and concurrent-VM saturation cases through bridge death and cleanup. Original custody and surviving reservations remain accounted for; fresh useful work follows proved reconciliation. M5 selection and M9/M10 require actual per-backend evidence independently of guest CPU/memory and output-queue limits.
-
-Captured input is detached or immutable, including the selected project itself. Guest edits, renames and deletions cannot change the original host generation before separately authorized delivery, and later host edits cannot change the already captured input. Each work item receives fresh writable guest and supervisor/channel state; same-user and cross-user successors cannot inherit prior task bytes, modified tools, credentials or authority. Only explicitly declared immutable caches verified against the current authorized input closure may be shared. Incomplete cleanup retains custody and prevents storage/channel reuse.
-
-Before runtime selection, freeze enforceable numeric per-VM and aggregate CPU/time, memory, disk, process and concurrency ceilings, supervisor costs and native owner/control headroom and headroom for any included controller. Silent CPU/memory/process exhaustion and combined overload must remain bounded under independent host measurement, keep native observation/stop responsive within the declared bounds and produce explicit refusal/throttling/termination with truthful closure. Output limits and ordinary useful-work benchmarks cannot substitute for these adversarial resource tests.
-
-## Optional sealed coding work, approvals, and safe artifacts
-
-This resource profile is optional. Its native capture, execution, evaluator, review-binding and selected delivery gates remain mandatory when exposed; it cannot become a universal host or promotion prerequisite. An included human-review client, including a terminal client, must provide the safe exact-intent review below. The entry flow is: select a project and fixed recipe through a supported application/harness/CLI binding, capture input through the existing coding-resource owner, create W1 single-owner work, run the pinned restricted host, review the resulting artifact, display evaluator-derived acceptance recorded by the W1 owner under the configured acceptance contract, and explicitly export or apply the reviewed result. Task submission cannot install an arbitrary host, substitute a runtime, add an ambient credential, or change its acceptance oracle.
-
-Reuse the existing coding-resource/worktree-per-task owners, with workbench rendering as an optional consumer. Capture source identity, dependencies, declared task inputs, recipe, budget, acceptance criteria and oracle identity. The acceptance oracle runs outside the agent's writable workspace and checks the produced artifact independently. Agent-written tests are useful output, not the independent acceptance verdict. Human patch-apply or export approval authorizes only that exact effect; it cannot set an acceptance boolean, replace the configured evaluator, or turn a rejected artifact into accepted W1 work. Useful-work qualification includes a known-good patch and a plausible but incorrect patch which must be rejected.
-
-Candidate imports/builds/tests used by the evaluator execute in a separately qualified bounded boundary without ambient host data, credentials, egress, unrelated process control or owner signing channels. Trusted result validation and acceptance commit remain outside candidate execution. Oracle immutability and agent confinement do not qualify this evaluator boundary; independent forbidden-effect, resource, cleanup and result-forgery probes are required, and failed/unknown evaluation cannot be accepted.
-
-Show `WorkViewV1` observations separately. A stopped worker may have produced an artifact, a completed execution may fail acceptance, accepted work may remain undelivered, and an unknown external outcome may prevent safe retry. Neither a green build nor a signed authorization receipt proves acceptance or delivery.
-
-An attributable approval requires the S28 roster and an integrated, installed and qualified production approval path using the existing `PasskeyCapabilityVerifier`. A route using the Pi `approval-decide` utility additionally requires that utility's installed repair; another route must qualify its actual native intake owner rather than inherit Pi evidence. The verifier is exported source; its presence does not establish production approval-path integration or installed qualification. Every selected approval intake must compare both requested decision and approval ID before retaining a credential, including the Pi utility when used; deny and mismatched-ID responses must retain none. A wrapper guard alone does not close that gate. The human reviews exact native intent, resource/result digest, destination, requested decision, authority scope and relevant current generations; owner verification consumes the bound approval. Native approval lookup/retention is atomic under simultaneous submissions of the same original operation and credential: exact duplicates reconcile to one transition/effect, while a concurrent changed intent with that ID conflicts before retention. UI changes or stale/superseded intent invalidate the review. No app-held signing key or generic Touch ID success substitutes for this chain.
-
-Every delivered human-endorsement renderer qualifies exact native intent independently of the optional coding/artifact workflow. Scan all owner-bounded untrusted fields before preview, visibly expose bidi/invisible controls and omissions, escape terminal control sequences, and render rich-client values as inert text. Bind any display derivative and later pages to unchanged canonical intent/version/digest; essential scope, recipient, destination and limits must be inspectable before endorsement. Test deceptive/truncated and changed intents, accessibility and safe copy with independent display/PTY/clipboard and native admission observations, alongside usable ordinary Unicode controls. M3/M9/M10 apply to approval-only clients with M6 and execution absent; crypto binding alone cannot qualify deceptive presentation.
-
-Roster authority remains current at native approval retention and continuation, including when revocation arrives after passkey verification. Revocation that wins the native transition ordering prevents new usable retention and dispatch; already committed historical custody remains recorded and cannot authorize later use or replay after revocation. Missing freshness refuses.
-
-Every exposed effecting mutation owner must pass concurrent exact-duplicate and changed-intent races, including resume, closure, publication and lifecycle operations where delivered; one representative owner cannot qualify another. Concurrent exact work-create commands must atomically reconcile to one native W1 transition and effect; a same-ID changed intent conflicts before new work or dispatch. Approval idempotency evidence cannot qualify task creation.
-
-Repository capture itself is an input boundary before confinement. The existing resource owner disables or rejects repository-controlled execution, lazy fetching, replacement refs, alternates and external object sources; selected configuration, attributes, hooks and helpers cannot cause unauthorized host reads, processes or egress. Capture requires its own independent negative observations and a useful self-contained repository control. Before untrusted object import, the existing owner enforces finite per-object and aggregate compressed/decompressed bytes, object counts, graph/delta depth and parser resource ceilings during processing. Malformed loose/pack objects, compression bombs and excessive graphs must refuse within measured bounds before model/work dispatch; later artifact or execution limits cannot qualify trusted pre-launch parsing.
-
-Working-tree capture separately probes tracked/untracked filesystem entries before launch: FIFOs, sockets/devices, outside file/directory symlinks and same-volume outside hard links, including replacement races between enumeration and descriptor reads. The actual capture owner rejects blocking/special entries and unproved input identity/authority before reading outside bytes, or uses its supported bounded authorized snapshot. One-time path/type/link-count checks cannot qualify a raced capture. Independent outside/captured-byte and native process/read observations pair with exact-byte ordinary working-tree controls; failed capture permits no model/runner/evaluator dispatch. M6 owner regressions and M9 installed repetition gate M10 independently of later confinement.
-
-Capture additionally rejects unapproved mounted subtrees and raced root/ancestor mount replacement before any outside read, including restart, chunk boundaries and retained-descriptor reuse. Patch application independently tests mounted reviewed targets across create/modify/delete/rename, interruption and recovery, preserving unrelated volume data and truthful partial custody. Both use their actual owners and remain separate M6/M9/M10 gates; later confinement and removal tests cannot qualify these boundaries.
-
-Ordinary regular-file capture has its own finite per-file/aggregate logical, captured-byte and allocated staging caps, plus entry/depth, CPU/time, memory and temporary-storage caps, enforced during traversal and reads before materialization. Huge/sparse tracked and approved untracked files, growing-file races, high counts/depth and exactly-at/one-over bounds require independent resource observations and exact-byte useful controls. Refusal precedes model/runner/evaluator dispatch; interruption retains bounded private non-executable preparation without accepting truncated input. M6 owner regressions, M9 installed cases and M10 evidence admission qualify this distinct parser boundary independently of Git objects or result archives.
-
-Working-tree capture must additionally prove a coherent selected whole generation under fixed-size overwrites, pre-opened mmap/descriptors, cross-file/chunk races and ABA restoration. Require an actual immutable atomic snapshot or proved writer-complete generation fence, otherwise refuse before dispatch; per-file hashes, stable sizes or advisory locks alone do not suffice. Independent whole-state/snapshot oracles compare exact captured manifests and distinguish legitimate source states from impossible mixtures. Quiescent and supported concurrent-snapshot controls, bounded interrupted preparation and M6/M9/M10 owner evidence retain this deferred resource gate without silently dropping dirty files or substituting another input.
-
-Selected patch application separately qualifies stable and raced hard-link aliases at its own native application owner. Refuse shared-inode mutation or change only authorized directory entries while preserving outside bytes, inode identity and access policy through partial apply and original-operation recovery; export/installer evidence cannot substitute.
-
-Safe artifact handling extends the selected native resource owners and every delivered review consumer. Optional mini-swe fixtures may contribute test vectors but cannot substitute for those installed owner results:
-
-- Resolve approved inputs without following attacker-replaced symlinks outside the captured scope. Reject special files, traversal, symlink/hardlink escapes, excessive entry counts, expansion size, and control-character filenames. Normalize Unicode/case collision checks for the actual target filesystem.
-- Work-result archive intake has its own finite compressed, per-member/aggregate expanded logical, allocated staging/extraction, entry-count, nesting/depth, CPU/time and memory caps enforced during parsing and before materialization. Exactly-at/one-over limits, high-ratio/sparse/nested bombs and malformed lengths need independent resource measurements beside useful supported controls. Missing or ineffective bounds keep that intake/review/export capability unavailable. Bounded private cleanup preserves original uncertainty without retaining oversized output. M6/M9/M10 require this actual owner's evidence; source-capture, support-export and package results cannot substitute.
-- Render code, diff text and filenames as untrusted text with bounded previews. Do not execute project scripts, HTML, Markdown resources, or shell escapes merely to display a review.
-- Scan the complete bounded artifact for bidirectional and invisible formatting controls before truncating its preview; visibly escape/annotate them in rendered and accessible review content. Show omitted ranges and control counts, preserve the original bytes/digest, and label the safe view as a derivative. Copy behavior must expose controls explicitly; essential unreviewable scope/content blocks approval. Ordinary Unicode/RTL text remains usable. Evaluator acceptance cannot replace safe human review.
-- For selected terminal/pager review, visibly escape artifact-origin ESC/CSI/OSC (including OSC 8 hyperlinks and OSC 52 clipboard commands), C0/C1 controls, carriage return, backspace and DEL before any untrusted bytes reach that terminal path. Keep trusted renderer layout separate and prohibit raw-control pass-through. Inspect the complete bounded artifact, including later preview chunks and split sequences; independent installed PTY/terminal/pager bytes, screen state and synthetic clipboard probes must show no injected command, forged hyperlink, clipboard change or concealed/rewritten review. Preserve raw artifact bytes/digest separately from the escaped derivative and safe copy behavior. Actual native review/client regressions, useful text controls and M9 installed results gate only that delivered review/approval capability through M10.
-- Verify captured base and reviewed artifact digests before apply/export. A changed target, unexpected existing file, stale base, altered artifact or changed destination invalidates the operation. Expected-absent publication requires an atomic no-replace operation at the native owner; a regular file created at the same path after review must survive unchanged. Overwrite requires a separately bound native intent and current target revalidation. A pre-existing hard-linked destination must be refused or replaced without mutating its shared inode; outside alias contents, inode identity and access policy remain unchanged, with only expected unlink bookkeeping permitted. Retain the original native operation identity across lost replies.
-- Separate local evidence export from effectful patch application or external delivery. Explicitly selected files and destination are required; overwrite needs the owner's exact operation binding. Creating a support archive never publishes code or sends a message.
-- Qualify effectful patch application at its native owner separately from export, including multi-file interruption, target changes, partial-state custody, conflict-preserving recovery and lost acknowledgements. Export-only delivery may ship while apply remains unavailable; export qualification never enables apply implicitly.
-- Redacted receipt derivatives identify omissions; preserve original signed bytes or verified commitments separately. An edited payload cannot retain the original signature claim.
-
-## Installation, signing, upgrade, and removal
-
-Package-admission mutations belong to the native release/installation/lifecycle-owner suite and run for headless candidates without a Swift UI target. An included menu client adds its Swift integration wrapper only for that client. Native tests and actual installed installer/updater cases remain mandatory independently of the wrapper.
-
-The distribution inventory includes the native service entrypoints and supported application/harness bindings, plus the required existing `chio` CLI consumer. Record compatibility with each consumed native owner; optional operator consumers additionally bind their controller/protocol tuple. The installed terminal/API clients pass native and cross-client conformance with no workbench, Swift menu app, browser or Herdr frontend installed/running. The four first-class harnesses each receive installed native conformance on the exact Mac tuple, and Herdr receives separate workspace/plugin conformance. Native availability remains testable with Herdr absent; complete first-class integration delivery includes its passing consumer lane. Other optional presentation artifacts receive their own conformance when shipped. These are delivery obligations, not claims of an existing service or operator subcommand.
-
-The initial native-service build experiment targets Apple silicon arm64 with `MACOSX_DEPLOYMENT_TARGET=15.0`; this is a product experiment, not an announced support matrix or a claim about runtime API minima. Release only exact OS/CPU/runtime rows that pass. Intel, Rosetta, older OS versions and each new OS update remain unavailable until separately qualified.
-
-Direct distribution starts with a Developer ID signed and notarized native-service artifact, using a GUI-less bundle and/or signed installer package appropriate to the selected deployment mode. A disk image and a separately selected menu app are optional delivery artifacts. An `.app`-shaped bundle can carry service binaries, launchd plists and provisioning without a graphical target. Include the actual native owner executables and only selected controller/helpers; bind every executable, native library, runtime artifact and policy to release provenance. The install manifest names user-session versus service-host mode, service principal, shared destinations, ownership, background authorization and sole lifecycle owner. Test both profiles independently with all Chio frontends absent. Managed packages do not bypass OS consent or substitute for Chio authority. Sign nested code with its reviewed identity and minimal entitlements, enable required hardened runtime settings, notarize with the supported toolchain, inspect notary output, and staple/validate the ticket. Notarization and Gatekeeper success are distribution checks, not runtime protection. [Apple notarization](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution).
-
-Permission presentation names the selected feature, needed permission, scope, and refused-permission behavior. Read-only viewing and sealed/VM work cannot require host-wide ES/NE access by default. Project access, model release, browser connection, login service authorization, passkey enrollment and enterprise provider activation are distinct actions. No request to disable SIP, bypass Gatekeeper, or weaken host security appears in normal installation.
-
-A release inventory binds source/lockfiles, unsigned build closure, final signed bytes, team/bundle identities, entitlements, notarization record, runtime image/policy hashes, active provider generations, protocol compatibility, and exact qualification reports. The proposed [shared RELEASE extension](../2026-10-07-desktop-integration/RELEASE.md), delivered by 2a-shared in `crates/tooling/chio-release-evidence` and 2a-macos wiring to the M0-mapped native lifecycle/activation owners, independently of 2a-linux, must reject ambiguous/noncanonical raw manifest bytes and exceeded decoding bounds before evidence admission, using one accepted decode for signature and semantic consumption. Its current self-signed artifact-manifest verification is not readiness evidence. The new verifier independently authenticates the requirement catalog, issuer policy and exact candidate-bound outcomes before returning typed/authenticated eligibility; authorized-signer malformed fixtures must exercise this independently of signature rejection. Reproducibility claims specify whether they cover unsigned build output, package contents, or final signed bytes.
-
-Every delivered package-container ingestion path qualifies bounded processing before validated staging. Application-controlled extraction rejects traversal, escaping links, special/colliding members and expansion/resource attacks without outside writes, script execution or privileged activation. OS-owned ingestion is identified explicitly; absence of application extraction must be demonstrated before omitting its fixtures, with actual boundary/resource observations retained. Interrupted staging cleanup preserves outside data and native custody. Notarization or later bundle admission cannot qualify unsafe container processing.
-
-Installer/updater admission requires the exact final package/component digests in the native release owner's authenticated authorized inventory. A correctly signed current-generation alternate build from the enrolled publisher is still refused before replacement/registration/activation if its bytes are absent; protocol, signer and generation equality do not qualify it.
-
-Publication binds both the validated source closure and the inventoried installation destination, including existing bundle/helper identities, parent and expected absence/replacement state. Destination or parent substitution after inventory must refuse without following links, overwriting unrelated bytes or activating a mixed tree. Interrupted/retried publication retains the original owner operation and independently verifies the preserved prior installation and outside sentinels.
-
-A validated installation target may still have an unrelated hard-link alias. Refuse shared-inode mutation or atomically replace only the authorized directory entry; preserve outside alias bytes, identity and access policy through update and recovery. Link-count/ctime changes intrinsic to authorized entry replacement are recorded separately from forbidden content, permission or ownership changes.
-
-Installer/updater destination qualification separately covers pre-existing and raced mounted app/helper/root/ancestor subtrees at every ordinary/elevated/direct-helper entrypoint. Bind actual traversal/publication to the approved mount closure or refuse before unrelated-volume mutation or unvalidated activation. Preserve the prior installation, outside data/access policy and mount state through interruption and original-operation recovery, with useful unchanged-destination controls and truthful partial custody. Staged-source, link and removal results cannot substitute.
-
-Each elevated lifecycle entrypoint, including direct helper invocation, authenticates and authorizes its caller for the exact installation/action/inventory before privileged state changes. Wrong-user/session/code, forged/replayed authority and stale authorization after logout refuse even with a valid current package. Package provenance and exclusive custody do not supply user/administrator authorization.
-
-The native installation owner serializes every mutating installer/updater/remover for the same installation, including elevated entrypoints and different users. A competing operation refuses before writes, migration or admission reopening; interrupted custody persists until the original operation is reconciled. No per-user lock may admit two writers to a shared destination.
-
-Updates stage and verify the complete signed set, fence affected new admission through native owners, reconcile active work, activate compatible components, and check effective installed generations before reopening. Incompatible store/protocol versions, failed migrations, old active extensions, denied replacement, stale runtime images, or failed health checks leave affected profiles unavailable. Rolling back service/app bytes, state and the selected user-session or machine credential fixtures cannot roll back authority history or revive a spent/revoked approval; restoring both custody domains while newer native authority or freshness access is unavailable must keep affected effects fenced. Never delete unresolved custody to make an upgrade pass.
-
-The native release-generation floor is scoped to the mutated installation, including a shared app/helper destination across users, and must survive supported restoration independently of the restored app/package/state snapshots. A second logged-in or logged-out user cannot downgrade that shared installation through an elevated updater using an absent or older per-user floor; unavailable cross-user custody refuses before privileged writes. If that custody or its current freshness cannot be established, package activation and affected profile admission stay unavailable. After each supported restoration, rerun signed older-package rejection through every shipped installer/updater and reject restored old peers at startup; credential rollback evidence alone does not qualify downgrade prevention.
-
-Receipt/checkpoint continuity is a separate restoration obligation from release-generation and spent-authority custody. The native receipt owner must detect restored older log/store snapshots, including restoration of any local anchor with them, against authenticated history/freshness outside the restored closure or keep affected admission unavailable until continuity is reconciled. Compare recorded heads, checkpoints and inclusion proofs before and after restoration; a valid old signature is not proof that no later history was lost. Preserve divergent evidence and unresolved custody rather than silently restarting the log.
-
-Removal distinguishes per-user unenrollment from shared-installation deletion. Per-user unenrollment requests native closure, preserves/exportably inventories unresolved work and unregisters only the selected user service, retaining shared bundle/helpers required by other enrollments. Shared deletion refuses while another enrollment remains unless the existing owner supports explicitly authorized machine-wide removal that inventories, reconciles and fences every affected user/service, including logged-out users and late enrollment/restart races, before deletion. Unknown or unavailable enrollment/custody keeps deletion unavailable. Global removal preserves each user's retained work and native authority; it cannot promise other affected services continue running from deleted bytes. Only the selected mode's authorized application artifacts are removed. Enterprise extension removal follows OS/MDM lifecycle and remains visible until externally confirmed. Credentials are removed/rotated through their owner; user projects, unrelated VMs, other users' state, and exported artifacts remain separate custody. A denied extension removal or unresolved external operation yields a precise remaining-state report, not “fully removed”.
-
-Removal separately qualifies pre-existing and raced hard-link aliases for every ordinary/elevated entrypoint. Unlink only authorized directory entries or refuse; never truncate, erase or rewrite shared-inode access policy as cleanup. Outside alias bytes, inode identity, ownership, ACL and mode survive interruption and original-operation recovery, except for expected link-count/ctime unlink bookkeeping. Update/apply evidence does not qualify removal.
-
-Removal preserves late ordinary files/directories and renamed-in entries absent from its exact approved inventory. At every remover mode/entrypoint, race insertion at each depth and repeat through interruption/recovery; unlink only reviewed identities or refuse, leaving newly nonempty parents and truthful partial custody. Never widen scope by rescanning or use a new retry identity to delete unexpected entries. The same actual-owner rule applies to destructive inventoried-tree cleanup when shipped by installation or artifact/export paths. Native regressions and M9/M10 require sentinel preservation plus normal removal controls.
-
-Removal also refuses unapproved mounted-subtree traversal, using the native owner's supported descriptor-bound filesystem/mount identity checks or disabling an unprovable path. Test writable sentinel volumes mounted before inventory and raced after inventory at every ordinary/elevated/helper entrypoint and removal mode, through interruption and original-operation recovery. Excluded mounted data, access policy and mount state remain intact; no automatic unmount or privilege fallback follows from authority over the parent. Retain truthful partial-removal status and useful ordinary-removal controls. M9 owner/installed evidence and M10 admission treat mounts separately from link safety.
-
-Removal and reinstall preserve native receipt/checkpoint continuity as owner-managed custody. Inventory and retain or transfer the accepted head/history and its supported freshness basis before removing application artifacts. Reinstallation cannot silently treat an empty store as the same current log; affected receipt-backed admission and current-history claims stay unavailable until the native owner reconciles against retained authenticated continuity.
-
-Removal must also fence retained processes, existing IPC/subscriptions and new connections against protected reads and dispatch. Unregistering services or deleting files does not terminate running code. Prove selected process/endpoint closure or retain explicitly fenced unresolved custody and incomplete status, including after interruption/restart; users/installations outside the authorized removal scope remain undisturbed, all affected enrollments follow the selected per-user/global mode, and already-dispatched external outcomes stay separate.
-
-## Managed endpoint and Clawdstrike reuse
-
-ES and NE form an independent managed-endpoint track. Entitlement eligibility, provisioning, installation, user/administrator approval, effective provider activation, task attribution, and actual denial are separate gates. Content-filter deployment follows Apple's provider-specific system-extension rules; global lifetime needs explicit multi-user isolation. An MDM policy is deployment configuration, not proof that a flow was blocked. [Apple TN3134](https://developer.apple.com/documentation/technotes/tn3134-network-extension-provider-deployment).
-
-Reuse Clawdstrike event conversion, bounded callback patterns, NE plumbing, selected detector fixtures and source-to-bundle evidence methods where the [pinned source review](research/clawdstrike.md) supports them. Its default-allow ES observer is not full process confinement. Its NE allow/drop code is real but does not prove deployed Chio task attribution or existing-flow revocation. Its PID-only signal path is not incarnation-safe termination. Neither its approval queue nor its policy compiler becomes the Chio authority owner.
-
-Before any enterprise claim, obtain actual team entitlements and provisioning, final SDK/OS identity, clean signed activation, scoped denial and restoration, and tests for callback deadline, queue overflow, provider death, policy change, open descriptors/flows, coexisting filters, wrong/missing audit tokens, fast user switching, and removal. Missing identity makes task-specific enforcement unavailable. Apple descendant/deadline documentation remains research relevant to this track; it does not reopen retired `native-descendant-v1`.
-
-## Privacy, resources, and performance budgets
-
-Support-export staging must remain private from both other users and an ordinary unrelated same-UID process without enrolled export authority, even in an Observe-only build. Qualify the native storage boundary before publication; restrictive user-file permissions alone cannot satisfy it. Missing protection disables support export while independent native receipt/hook observation can remain available. Qualified-agent probes add coverage when that execution profile is included.
-
-Export authority is also tenant/audience-specific within one OS user. Two same-user scopes with independent evidence/identifier/lineage canaries must remain separated through native selection, intermediate staging, joins, summaries, cursors, caches and final publication. Current A authority releases no B bytes/metadata; separately authorized useful A/B controls, changed-scope/replay/restart trials and M8/M9/M10 owner evidence qualify this independently of cross-user isolation.
-
-Default collection excludes whole-home scans, clipboard polling, screen recording, background code indexing, remote analytics and crash upload. Qualification covers every configured collection schedule across restart and wake, or proves the corresponding jobs absent/disabled, with independent file, pasteboard/capture and network observations; a fixed idle window alone is insufficient. Project read authority is distinct from model/support disclosure. Model payloads, source, paths, raw errors, credentials and bearer references stay out of diagnostics before persistence. OSLog privacy annotations are additional protection; Chio cannot erase OS-managed logs, backups or provider copies by purging its cache.
-
-Default microphone and camera access is also prohibited. Test the actual trusted native services/helpers and included clients with applicable OS consent already granted to the signed candidate, harmless synthetic audio/video canaries and independent device/API-access observers. Idle, scheduled, crash, restart and wake cases must show no attempts or sample consumption even without file/network effects; separate authorized probes prove observation. Denied/unobservable surfaces do not create a false pass. M8/M9/M10 apply to Observe as well; agent sandbox probes cannot qualify trusted-process privacy.
-
-Default global keyboard/input monitoring is likewise prohibited for trusted components, independently of agent confinement. Pre-consented exact signing/OS attribution, synthetic cross-application key canaries and live event-tap/HID observers cover idle, every schedule, crash, restart and wake, including inherited channels. Ordinary intentionally addressed client input remains a useful control. Source/configuration absence or measured zero ambient access supplies the relevant M8/M9/M10 evidence; silent file/network/media observers do not.
-
-Each native credential owner qualifies the implementation and caller policy for its deployment context. The user-session profile explicitly selects per-user data-protection storage, disables synchronization and requires the narrowest qualified device-local accessibility, without silent legacy/weaker/file fallback. Inspect actual item class, audience/access group, synchronization/accessibility and wrong-user/code, lock/logout, unavailable-policy and migration behavior. The service-host profile separately selects a supported machine backend and tests its actual ACL/access policy, principal, startup, logged-out access, revocation, freshness and restore behavior; it never inherits a human user's unlocked-store assumption. Native session or service-authority fencing remains mandatory. Apple distinguishes Mac protection-class enforcement from iOS, and macOS 26.4+ file-based keychains may depend on protected entropy beyond one copied file. Attribute names or partial backup fixtures do not establish lock/restore/anti-rollback guarantees. See [native service research](research/native-host-services.md) and [distribution research](research/distribution.md).
-
-Initial retention and bounds are product targets implemented at the existing data owners: task payloads seven days after resolved completion; resolved receipt view 90 days; diagnostics seven days/20 MiB; optional sensor ring 24 hours/50 MiB; aggregate samples 30 days/10 MiB. These presentation/payload defaults are subordinate to each native owner's retention, proof-dependency and numeric-domain rules. The first applicable time or size bound wins. Unresolved authority and proof dependencies are never silently pruned. A support export is explicit, local, previewed, bounded to 10 MiB encoded/compressed output plus the native owner's independently frozen expanded/logical, allocated-byte and entry-count caps, and a selected 15-minute default window; it excludes credentials, raw databases/WAL, unsafe archive members and unauthorized payloads. When necessary custody exceeds storage capacity, stop affected admission and report the retained obligation.
-
-Before support export is enabled, its native evidence-export/storage owner fixes finite numeric hard caps for per-member and aggregate expanded logical bytes, aggregate allocated staging/extraction bytes and member count in addition to the 10 MiB encoded/compressed ceiling; caller-provided values cannot override them. Bounded preflight and streaming production, reads and any supported extraction enforce actual counts before oversized data is materialized or retained, including sparse extents, high compression ratios and source changes after preflight. Unsupported nested/sparse forms refuse; otherwise their complete expansion participates in the same limits. Over-limit output cannot publish or become a silently truncated valid-looking bundle. Cleanup retains only bounded private, fenced staging and original-operation metadata, without deleting required native source evidence. M8 tests compressed/expanded/sparse/member-count bombs and exact-bound useful controls with independent resource/publication observations; actual owner regressions and M9 installed export/reader results gate M10. A small final archive alone is insufficient, including Observe builds that expose export; absent export adds no execution or reader prerequisite.
-
-Support-export preview binds an immutable native-owner selection with fixed absolute time window, audience/scope, record revisions/digests, redaction policy and output manifest. Staging stays private to that authorized audience from restrictive creation through final publication and interrupted recovery, with no exposed alternate pathname or readable partial archive. The native export owner enforces and tests that access boundary against other users and ordinary non-enrolled same-UID processes in every export-capable build, plus selected untrusted agent profiles when included; file mode alone is not isolation from arbitrary same-UID processes. Crash cleanup or retained private custody cannot expose pre-publication bytes. Publication uses exactly those still-authorized bytes; changed binding requires a new preview, and rerunning a rolling query cannot silently add records. The evidence-export owner separately qualifies atomic no-replace destination publication, parent/symlink/regular-file races, exact-target overwrite authorization and original-operation recovery. Mini-swe artifact export cannot stand in for this owner's support-export evidence.
-
-These are initial profile-specific experience budgets, not measurements. Rendered-frame/projection budgets apply only to delivered presentation clients; native IPC, resources, diagnostics, control and energy bounds remain applicable to the selected native services. Fix them in a pre-run report before testing; revision requires prospective rationale and a new run. Safety failures close the profile irrespective of good latency.
-
-| Measurement | Proposed release budget | Required distinction |
-| --- | --- | --- |
-| Cached 200-work list first usable frame | p95 <= 200 ms | Independent rendered UI timing |
-| Read-only local IPC | p95 <= 100 ms | Includes parsed reply; no repeated chargeable recovery polling |
-| Owner durable work acknowledgement | p95 <= 500 ms | Input capture, model time and final result reported separately |
-| Commit hint to visible projection | p95 <= 250 ms | Hints never stand in for the authoritative read |
-| Idle native service set, no execution backend | Mean <= 1% of one CPU core; combined RSS <= 200 MiB | Predeclare included owners; separately report optional controller/client, browser, VM/provider and total system costs |
-| Idle diagnostic writes | <= 1 MiB/hour | Separate authority writes and measurement overhead |
-| Deterministic broker incremental overhead | p95 <= 10 ms above identical direct stub | Same payload/durability/concurrency; full provider latency also reported |
-| S8 fence acknowledgement | p95 <= 500 ms when host schedulable | Not process death or external-effect closure |
-| Owned worker termination | <= 10 seconds when host schedulable | Otherwise unresolved closure and escalation, never false success |
-| Idle/useful-work energy increment | <= 5% / <= 15% versus paired equivalent baseline | Inconclusive if instrument resolution is insufficient |
-
-Measure five warmups and 30 latency samples at loads 1, 8 and 32; report p50, p95, maximum, errors and raw samples. Idle CPU/RSS uses ten minutes after five minutes settling. Energy uses at least five randomized paired 60-minute trials with fixed hardware, OS, display, power mode, battery/thermal range, network fixture, completion artifact, and calibrated units. Record all observer overhead. Coalesce subscriptions and stop idle collection; power savings never defer safety callbacks or authority fencing.
-
-## Failure modes and qualification handoff
-
-The [shared qualification owner](../2026-10-07-desktop-integration/QUALIFICATION.md) defines the evidence envelope. Mac adds the exact machine/OS/SDK tuple, signing/permission state, backend and guest identities, installed and active generations, filesystem characteristics, power conditions, and clean-host reproduction. Independent observers record actual file effects, network deliveries, process incarnations and rendered behavior. Synthetic fixtures or source inspection do not become installed proof.
-
-M0/M10 map and verify every consumed HOST-CONTRACT, CONSUMERS, FIRST-CLASS-INTEGRATIONS H01-H08, native owner and optional OPERATOR obligation and freeze-acceptance row, not only Q identifiers and platform cases. Every existing native adversarial stimulus stays attached to its exposed owner/profile; absence of a frontend removes only tests of that absent frontend. Browser, menu, Finder, notification and renderer cases are conditional on their inclusion, not gates on independent native service/API capabilities. Optional sealed coding, evaluator, apply/export and support-export routes retain all their tests when selected, without becoming prerequisites of unrelated native capabilities. This includes real owner changes between pages, snapshot expiry/retention gaps, initial/reconnect negotiation failures, precise cross-owner review invalidation, and exact hook-to-receipt attribution under replay/concurrent-call substitution. Read-only budget views additionally qualify their numeric/binding/state projection without depending on execution enforcement; an unqualified optional view remains unavailable. Removing any required case from a passing manifest must block the affected surface.
-
-The systems amendment adds Q23-Q31 to all applicable Q01-Q22 obligations. M0 maps each selected case to actual owner APIs and test commands; M2 source/binding work and M9 installed execution supply Mac evidence, and M10 gates the exact capability. Additional packet ownership is explicit below. These labels add no wire operations or parallel Mac authority.
-
-| Shared systems case | Mac handoff and acceptance |
-| --- | --- |
-| Q23 / C01, C02, C05: native host and independent consumers | M2/M7/M9 run useful authenticated reads and client continuity without any Chio UI/projection; Observe requires no W1, work/recovery or task execution. Exposed work/resource capabilities additionally preserve original IDs, custody, capacity and unknown outcomes under their complete C01/C02/C05 cases. |
-| Q24 / C09: passports and current admission | Selected credential/admission owners qualify holder/workload, issuer, audience, challenge, expiry and required revocation freshness. M1 binds the native caller; M2/M9 observe effects and private bytes. A valid passport without a resource grant remains insufficient. |
-| Q25 / C10: recursive authority | Selected authority/process/budget owners qualify useful child/grandchild work, narrowing, supported depth/allocation and effective ancestor revocation. M3 closure and M4/M5 confinement apply only to their claimed behavior. One-hop aggregate evidence cannot qualify recursive conservation. |
-| Q26 / C11: swarm runtime and accepted dependencies | Swarm/W1 owners qualify actual admission, atomic graph-head extension, durable replay, allocation and exact accepted-parent bindings; M2/M9 observe real effects. A signed graph or join does not prove accepted parent work. M6 applies only when coding is the chosen resource workload. |
-| Q27 / C03, C04: shared resources and capacity | Resource/budget owners atomically enforce caller, assignment/fence, version and original ID at mutation; M2/M9 race consumers and restart, with independent mutation and capacity records. OS resource ceilings remain distinct M4/M5 obligations. |
-| Q28 / C06, C07: independent cooperation | Federation/W2/recovery owners retain separate keys, policy, stores, local refusal and bilateral uncertainty. M2/M9 test actual separately administered counterparts for the organizational claim; local fixtures qualify only their named protocol branch. |
-| Q29: deployment principal | M1/M2/M8/M9 qualify user-session and service-host identity, credentials, expiry, boot, lock/logout and removal separately. No service registration, UID or root privilege converts human-session authority. |
-| Q30: architecture and evidence closure | M0/M9 compare actual trusted loaded code/stores with declared ownership; M10 removes every required native/consumer case and rejects missing or mismatched backend evidence. Optional projection removal does not disable a passing direct native binding. |
-| Q31: expiry under clock discontinuity | M0 identifies each actual authority clock/freshness owner; M8/M9 test backward/forward/uncertain time, sleep and boot changes at native protected-read/event release, time-bounded release-result reuse/activation and any selected approval/dispatch/export boundary. Expired authority cannot revive, unknown time refuses new protected bytes/effects, and a fresh native read/service binding succeeds. Observe qualifies exposed time-limited read/session/service authority without task execution; M10 rejects missing required cases. |
-
-A full Mac systems-program completion claim additionally requires Q23, the selected coordination paths Q25/Q26 and W1 acceptance, shared-resource Q27 and independent-cooperation Q28, with named independent consumers and counterpart custody. Q24/C09 is mandatory when passports are advertised or required by the peer policy; C10 and C11 are mandatory for their selected recursive/swarm claims. Missing dimensions stay open. A narrower qualified native capability can ship while those dimensions remain unavailable, and a pure Observe row does not inherit absent mutation, passport or cooperation dependencies.
-
-Every artifact used in a release decision needs authenticated provenance and current trust/freshness at that shared owner, either directly signed or included by identity/digest in its signed manifest. Consistent hashes alone cannot authenticate a report. Missing, unauthorized, invalid, expired or revoked endorsements and unavailable freshness block the affected decision. Raw logs may be bound manifest members; there is no Mac-only signer or qualification authority.
-
-Promote each native host, external consumer and resource capability from its own complete passing evidence. Protected-interactive promotion does not require a previous sealed-W1 release or any particular frontend. Removing only an unrelated optional client/coding profile must not disable an otherwise passing host; removing any of that host's actual native obligations must block it. Report user-session and service-host qualification separately, preserve their distinct identity/credential/lifecycle gates, and do not infer six-host or cross-organization completion from one passing host or a two-user local example.
-
-| Condition | Required result | Platform oracle |
-| --- | --- | --- |
-| Owner/IPC/backend missing, bad signature or wrong peer before admission | Refuse affected action and show reason; no unconfined fallback | No new child launch, secret release or protected dispatch from the refused request; prior operations remain separately reconciled |
-| Dropped subscription hints or native client/optional controller restart | Refresh owner's bounded views using stable cursor semantics | Native work identities unchanged; gaps visible; no duplicate work |
-| Lost approval/create/export reply | Resolve original operation under owner retry rules | Independent effect count remains correct |
-| Lock/logout/user switch | Reject stale human-session authority and reconcile; clear any delivered sensitive display. Separately scoped service work uses only its own current authority | Wrong-session native probes disclose no bytes/effects; included display and lock-screen captures disclose no task data |
-| No graphical login or all Chio frontends absent | Qualified service-host capabilities remain usable under their service principal; user-only or unreconciled capabilities stay unavailable | Independent authenticated harness/application calls plus native process, storage and effect evidence |
-| Worker escape/direct egress/descendant bypass | Deny and mark backend qualification failed | Outside sentinel unchanged, external sink receives no payload |
-| Stop accepted but child/remote effect survives | Separate fence from incomplete closure/unknown outcome | Process and network observer agree with reported uncertainty |
-| Disk full, queue saturation or clock/freshness unavailable before required pre-dispatch admission/persistence | Refuse affected new admission; preserve existing custody and bounded diagnostic gaps | No dispatch or effect from the rejected attempt; already-dispatched operations remain separately reconciled |
-| Output handling, receipt signing or persistence fails after dispatch | Preserve original-operation identity, evidence and native uncertainty; reconcile before retry | Independent effect marker may show a committed effect; original-ID lookup prevents duplicate dispatch/effects and no terminal receipt or effect-free result is fabricated |
-| Update crash/mixed versions/backup restore | Reconcile native owner; keep affected admission closed | No replayed spent grant or duplicated effect |
-| Wrong artifact/base/destination or malicious archive | Refuse apply/export; keep original custody | Independent destination inventory unchanged |
-| ES/NE entitlement denied or provider exits | Managed profile unavailable with explicit remaining state | Effective OS/provider inventory, flow and file probes |
-
-The [implementation plan](../../plans/2026-10-07-macos-integration/IMPLEMENTATION.md) maps these cases to dependency-gated packets. Delivery requires useful operations plus independent negative probes for the selected capabilities, installation/upgrade/removal, privacy and performance on the same exact candidate. Observe uses authenticated native reads and protected-byte/absent-mutation probes without importing work/recovery or task-execution dependencies; selected work profiles add useful work and their full effect/custody tests. This annex supplies planning direction only; no native Mac service profile, runtime candidate, signed package or enterprise provider was built or qualified in this consolidation.
+| Passports, challenge, federated issue | `chio passport`, `chio trust` (shipped) | Packaging and custody only | HOST-M1 |
+| Door admission | `chio api protect` evaluator (shipped) | Packaging and trusted-issuer configuration | HOST-M1 |
+| Signing keys | #1160 `signing_custody` (main, experimental) | Keychain backend selection per deployment context | HOST-M1 |
+| Evidence export and verify | `chio evidence` (shipped) | None | HOST-M1, HOST-M3 |
+| Approvals | `PasskeyCapabilityVerifier` (exported source); S28 roster (owner gap) | Touch ID passkey; `SharedCredential` label until S28 | HOST-M1, HOST-M3 |
+| Work identity and status | Planned W1 owner: `WorkHandleV1`, `WorkViewV1`, `WorkClient` and `WorkTransport` are design-only (PROGRAM-MAP) | Show execution, acceptance, result, recovery, settlement and delivery separately; no invented `WorkPhase` | HOST-M3 |
+| Recovery and retry | Original-operation recovery; S9 M20 (R not qualified) | A lost reply stays unknown until the owner resolves the original identity | HOST-M3 |
+| Events | S5 Part A and Part B | Re-read authoritative views on gaps; no Mac event log | Platform |
+| Local IPC | `chio-secure-ipc` (main, experimental) | Darwin peer identity (owner change) | HOST-M2, deferred |
+| Process custody | `chio-process` (main, experimental) | Darwin runner (owner change) | HOST-M2, deferred |
+| Secrets and model release | `chio-secret-broker` (main, experimental; Linux-only) | Keychain/XPC broker (owner change) | HOST-M2, deferred |
+| Confinement | S7 evidence kinds | `Seatbelt` and Mac VM kinds added at S7 first | HOST-M2, deferred |
+
+**IPC.** HOST-M1 needs only the shared HTTP services above; local operator IPC
+is not on its path. Darwin peer identity in `chio-secure-ipc` is a HOST-M2
+owner change (deferred). The candidate design, recorded in
+[Apple platform research](research/apple-platform.md#darwin-local-peer-token-candidate-2026-10-07):
+on the connected AF_UNIX descriptor call
+`getsockopt(fd, SOL_LOCAL, LOCAL_PEERTOKEN, ...)`, require success and the exact
+`audit_token_t` size, pass the kernel-returned token under
+`kSecGuestAttributeAudit` to `SecCodeCopyGuestWithAttributes`, and require
+`SecCodeCheckValidity` against a locally pinned designated requirement and the
+accepted release generation. Token acquisition is not proved race-free against
+PID reuse or descriptor handoff, so exit, exec, reuse, transferred descriptors,
+endpoint replacement and current-session binding are qualification cases. XPC
+is compared inside the same crate if AF_UNIX cannot establish these facts.
+`getpeereid` alone never fabricates process identity, and missing facts refuse
+rather than fall back (Q10).
+
+**Custody.** The HOST-M1 custody rules above apply to every delivered profile.
+The service-host backend is tested with every graphical user logged out, for
+wrong service, user or code, denied storage, revocation, freshness and restore
+behaviour. On macOS 26.4 and later, file-based keychains may depend on
+protected entropy beyond one copied file; attribute names and partial backup
+fixtures do not establish lock, restore or anti-rollback guarantees
+([native service research](research/native-host-services.md),
+[distribution research](research/distribution.md)).
+
+**Time.** Every exposed time-bounded authority (passport and capability
+validity, challenges, sessions, service leases, release results) is qualified
+against backward and forward wall-clock changes, sleep and boot. Expired
+authority never revives or renews; uncertain time refuses protected bytes and
+new effects until the owner reconciles (Q31). This applies to HOST-M1 with no
+task-execution prerequisite.
+
+**Privacy and diagnostics.** Default collection excludes whole-home scans,
+clipboard polling, screen recording, microphone, camera, global keyboard
+monitoring, background indexing, remote analytics and crash upload, across every
+configured schedule, restart and wake. Credentials, prompts, source, paths and
+bearer references are removed before any log or persistence sink receives
+them; OSLog privacy annotations are additional protection only. Observers prove
+liveness with an authorized probe; an unobservable surface is reported
+unqualified, not passed. Support export, when shipped, is explicit, local,
+previewed, scoped to the current audience and bounded at the export owner
+(Q14).
+
+## Packaging and lifecycle
+
+**Artifacts.** Direct distribution starts with a Developer ID signed and
+notarized GUI-less service bundle or installer package. It carries the native
+service entrypoints, the required `chio` CLI and launchd plists. A disk image
+and any menu app are optional. Nested code is signed with reviewed identities
+and minimal entitlements under the hardened runtime; the notary log is inspected
+and the ticket stapled. Notarization and Gatekeeper success are distribution
+checks, not runtime protection. The first build experiment targets Apple
+silicon arm64 with `MACOSX_DEPLOYMENT_TARGET=15.0`; Intel, Rosetta and older OS
+rows stay unavailable until qualified. Normal installation never asks to
+disable SIP or Gatekeeper.
+
+**Registration.** The user-session service registers through `SMAppService`
+(bundled `BundleProgram`). A managed signed package with launchd plists uses
+`Program`/`ProgramArguments` and has one installation owner. Registration,
+running state, authenticated reachability, owner health and qualified effects
+are separate results. Refused or revoked background authorization leaves the
+affected routes unavailable
+([registration semantics](https://developer.apple.com/documentation/servicemanagement/smappservice/register()),
+[GUI-less service package](https://developer.apple.com/documentation/servicemanagement/updating-your-app-package-installer-to-use-the-new-service-management-api)).
+
+**Release evidence.** A release inventory binds source and lockfiles, final
+signed bytes, team and bundle identities, entitlements, notarization record and
+qualification reports. The shared [RELEASE](../2026-10-07-desktop-integration/RELEASE.md)
+extension (packet 2a-shared in `crates/tooling/chio-release-evidence`, with
+2a-macos wiring, independent of 2a-linux) rejects ambiguous or noncanonical
+manifest bytes before admission (Q18). Its current self-signed manifest check
+is not readiness evidence.
+
+**Install and update** (Q20, Q02):
+
+- Admission requires the exact final package and component digests in the
+  release owner's authenticated inventory. A correctly signed alternate or older
+  build from the same publisher is refused before replacement or activation.
+- Validation-to-activation substitution of staged bundles, helpers or parents,
+  destination substitution, pre-existing or raced hard-link aliases and mounted
+  subtrees refuse without touching outside bytes.
+- Each elevated entrypoint authenticates and authorizes its caller for the exact
+  installation and action. One native owner serializes every mutating installer,
+  updater and remover for an installation, across users.
+- Updates stage and verify the full set, fence new admission, reconcile active
+  work, activate, verify effective generations and reopen. Established IPC,
+  subscription and browser sessions are closed or revalidated against the
+  accepted tuple at each fence. Incompatible stores, failed migrations or health
+  checks keep affected profiles closed.
+- The release-generation floor is scoped to the installation and survives
+  restoration of app bytes, state and credential fixtures. Receipt and
+  checkpoint continuity is checked against authenticated history outside the
+  restored snapshot; a valid old signature is not proof of no lost history.
+
+**Lifecycle.** Lock, fast user switching, logout, sleep, service death and
+reboot invalidate sensitive user-session views and require fresh owner checks,
+with or without a graphical client. Closing a frontend does not stop native
+custody; deleting a presentation component is separate from unenrolling a
+service.
+
+**Removal** distinguishes per-user unenrollment from shared-installation
+deletion. Shared deletion refuses while another enrollment remains, unless an
+authorized machine-wide removal reconciles every affected user and service.
+Unresolved work and receipt history are inventoried and retained or transferred
+before artifacts are removed. Removal unlinks only reviewed entries, preserves
+late or renamed-in entries, refuses mounted-subtree traversal and hard-link
+mutation, and fences retained processes and open connections. A denied removal
+yields a precise remaining-state report, not "fully removed".
+
+**Budgets.** The pre-restructure performance budgets at `620c703d8` (idle native
+services at or under 1% of one core and 200 MiB RSS; read-only local IPC p95 at
+or under 100 ms; diagnostics at or under 1 MiB per hour) are initial targets
+fixed in a pre-run report before testing. Safety failures close a profile
+regardless of latency.
+
+**Failure rules.** Fail closed. A missing owner, bad signature or wrong peer
+refuses before admission with no unconfined fallback. A lost reply resolves the
+original operation. Failures after dispatch keep the original identity and its
+uncertainty; a missing receipt is not evidence that no effect occurred. Disk
+full or unavailable freshness before admission refuses new work and preserves
+existing custody.
+
+## Managed endpoint (ES/NE)
+
+`planning_status: deferred`. HOST-M1 does not need it. Endpoint Security and
+Network Extension form a separately qualified, optional managed-endpoint track.
+Entitlement eligibility, provisioning, installation, user or administrator
+approval, provider activation, task attribution and actual denial are separate
+gates. An MDM policy is configuration, not proof that a flow was blocked
+([Apple TN3134](https://developer.apple.com/documentation/technotes/tn3134-network-extension-provider-deployment)).
+Observations are `detect_only`; administrator restrictions may deny OS activity
+but are not Chio grants or receipts. Read-only use and sealed or VM work never
+require host-wide ES/NE access.
+
+Clawdstrike is an earlier project. Its ES event conversion, bounded callback
+patterns, NE plumbing and detector fixtures are prior art and source material
+that Chio absorbs into its own host adapters, as recorded in the
+[source review](research/clawdstrike.md). Clawdstrike is never an integration
+target, a boundary, an owner or a peer. The reviewed observer is default-allow,
+its NE allow/drop path does not prove Chio task attribution, and its PID-only
+signal path is not incarnation-safe termination; none of those limits is
+inherited as a Chio claim.
+
+Before any enterprise claim: actual team entitlements, final SDK and OS
+identity, clean signed activation, scoped denial and restoration, callback
+deadlines, queue overflow, provider death, wrong or missing audit tokens, fast
+user switching and removal. Apple descendant documentation does not reopen
+`native-descendant-v1`.

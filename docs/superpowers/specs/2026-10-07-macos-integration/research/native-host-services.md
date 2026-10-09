@@ -6,7 +6,7 @@ Confidence: high in the cited platform distinctions and inspected source paths; 
 
 ## Native services without a required frontend
 
-Chio is a Rust kernel for building agentic operating systems. macOS hosts its userspace native services and OS adapters; this does not require an XNU replacement or kernel extension. Applications, agent harnesses and Herdr can consume the actual owner bindings without workbench, menu bar or browser. Their UX and orchestration strategy remain application responsibilities.
+Chio is a Rust kernel for agentic operating systems that coordinate work, share resources, and cooperate across organizational boundaries. macOS hosts its userspace native services and OS adapters; this does not require an XNU replacement or kernel extension. Applications, agent harnesses and Herdr can consume the actual owner bindings without workbench, menu bar or browser. Their UX and orchestration strategy remain application responsibilities.
 
 Current integration targets are the four native harness lanes Claude Code, Codex, Pi and Hermes and the separate Herdr workspace/plugin lane, as specified in [FIRST-CLASS-INTEGRATIONS](../../2026-10-07-desktop-integration/FIRST-CLASS-INTEGRATIONS.md). This is delivery direction, not observed Mac support. Mini-swe is optional reference/conformance only, and no frontend is a native service runtime prerequisite.
 
