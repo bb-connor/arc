@@ -8,12 +8,15 @@ STORE = "crates/platform/chio-store-sqlite/src/admission_operation_store/recover
 TEST = "crates/platform/chio-control-plane/src/recovery/tests.rs"
 MODEL = "docs/architecture/recoverable-agent-runtime/model/"
 # Each group covers the named transitions, not every instruction in its owner.
+# Repeated groups retain each required owner as a separate v1 entry.
 ROWS = [
     ("ownership.select/approve", "state.rs", STORE+"commands.rs", "apply", TEST, "recovery_two_coordinators_select_once_and_review_exact_payload"),
-    ("ownership.close/cancel", "state.rs", STORE+"native.rs", "begin_tx", TEST, "recovery_cancel_negative_lookup_fences_late_original_admission"),
+    ("ownership.close/cancel", "state.rs", STORE+"native.rs", "prepare_begin_tx", TEST, "recovery_cancel_negative_lookup_fences_late_original_admission"),
+    ("ownership.close/cancel", "state.rs", STORE+"native.rs", "publish_begin_tx", TEST, "recovery_cancel_negative_lookup_fences_late_original_admission"),
     ("ownership.acquire/capture/stale-epoch", "state.rs", STORE+"native.rs", "verify_capture_tx", TEST, "recovery_two_coordinators_select_once_and_review_exact_payload"),
     ("ownership.effect/crash/observe/terminal-close", "state.rs", STORE+"native.rs", "settle", TEST, "recovery_fresh_process_cutpoints_preserve_original_ownership"),
-    ("admission.intent/submit/native-project", "review_states.rs", STORE+"native.rs", "begin_tx", TEST, "recovery_fresh_process_cutpoints_preserve_original_ownership"),
+    ("admission.intent/submit/native-project", "review_states.rs", STORE+"native.rs", "prepare_begin_tx", TEST, "recovery_fresh_process_cutpoints_preserve_original_ownership"),
+    ("admission.intent/submit/native-project", "review_states.rs", STORE+"native.rs", "publish_begin_tx", TEST, "recovery_fresh_process_cutpoints_preserve_original_ownership"),
     ("admission.cancel/late-admission/capture", "review_states.rs", STORE+"native.rs", "verify_capture_tx", TEST, "recovery_cancel_negative_lookup_fences_late_original_admission"),
     ("knowledge.prepare/observation/release/delivery/fence", "review_states.rs", "crates/platform/chio-control-plane/src/knowledge.rs", "release_into", "crates/platform/chio-control-plane/src/recovery/tests/knowledge.rs", "artifacts_native_publication_and_taint_commit_before_first_byte"),
     ("replay.original-revision/fresh-authorization/cached-refusal", "review_states.rs", STORE+"commands.rs", "apply", TEST, "recovery_command_replay_conflict_rotation_and_revocation"),
