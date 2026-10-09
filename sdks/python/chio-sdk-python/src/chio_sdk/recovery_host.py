@@ -139,28 +139,52 @@ class RecoveryHostSession:
         return delivery.result()
 
     def _run_sync_worker(self, choice: str, delivery: Future[RecoveryHostOutcome]) -> None:
+        outcome = RecoveryHostOutcome(RecoveryHostCategory.UNAVAILABLE)
+        released = False
+
+        def release_admission() -> None:
+            nonlocal released
+            with self._lock:
+                if not released:
+                    released = True
+                    self._active_action = False
+                    self._sync_worker_active = False
+
         async def deliver_then_drain() -> None:
+            nonlocal outcome
             outcome = await self._execute_admitted(choice)
+            with self._lock:
+                unfinished = any(not task.done() for task in self._retained_tasks)
+            if not unfinished:
+                # Unrelated Runner teardown cannot delay a completed action.
+                # Return without draining tasks admitted by the next caller.
+                release_admission()
+                delivery.set_result(outcome)
+                return
+            # The action deadline bounds delivery even when owned work
+            # still retains admission.
             delivery.set_result(outcome)
             # A late request can create its close task after delivery. Drain
-            # every owned generation before Runner shutdown releases admission.
+            # every owned generation before releasing for unrelated teardown.
             while True:
                 with self._lock:
                     retained = tuple(self._retained_tasks)
                 if not retained:
-                    break
+                    release_admission()
+                    return
                 await asyncio.gather(*retained, return_exceptions=True)
 
         try:
             asyncio.run(deliver_then_drain())
         except BaseException:
             # A private worker never projects exception text to a framework.
-            if not delivery.done():
-                delivery.set_result(RecoveryHostOutcome(RecoveryHostCategory.UNAVAILABLE))
+            pass
         finally:
-            with self._lock:
-                self._active_action = False
-                self._sync_worker_active = False
+            # A completed action may already have admitted its successor while
+            # this private loop was shutting down. Release this worker only once.
+            release_admission()
+            if not delivery.done():
+                delivery.set_result(outcome)
 
     async def _execute_admitted(self, choice: str) -> RecoveryHostOutcome:
         deadline = asyncio.get_running_loop().time() + self._timeout_seconds
