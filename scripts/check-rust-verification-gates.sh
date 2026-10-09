@@ -15,13 +15,15 @@ do
   fi
 done
 
-python3 - <<'PY'
+# Validates every gate configuration and prints one notice per open proof
+# residual; the notices are repeated after the executed checks.
+open_residual_notices="$(python3 - <<'PY'
 import re
 import sys
 from pathlib import Path
 
 sys.path.insert(0, "scripts")
-from kani_open_residual import validate_open_residuals
+from kani_open_residual import FOLLOWUP, validate_open_residuals
 
 try:
     import tomllib
@@ -58,7 +60,7 @@ entries = multi.get("harness")
 if not isinstance(entries, list) or not entries:
     raise SystemExit(f"{multi_rel} must contain a non-empty harness array")
 try:
-    validate_open_residuals(entries, require_expected=True)
+    open_residuals = validate_open_residuals(entries, require_expected=True)
 except ValueError as error:
     raise SystemExit(str(error)) from error
 required_keys = {"crate", "harness", "default_unwind", "timeout_secs", "lane"}
@@ -181,13 +183,21 @@ if stale_symbols:
     raise SystemExit(
         "covered_symbols entries missing from contract_twin: " + ", ".join(stale_symbols)
     )
+for crate, harness in sorted(open_residuals):
+    print(f"OPEN/UNPROVED: {crate}::{harness} ({FOLLOWUP}); not executed or counted as passed")
 PY
+)"
+if [[ -z "${open_residual_notices}" ]]; then
+  echo "Rust verification lost the open proof residual notice" >&2
+  exit 1
+fi
 
 python3 scripts/check-kani-crypto-scope.py
 ./scripts/check-creusot-body-sync.sh
 
 if [[ "${CHIO_RUST_VERIFICATION_METADATA_ONLY:-0}" == "1" ]]; then
   echo "Rust verification gate metadata passed; strict Creusot/Kani execution explicitly disabled"
+  printf '%s\n' "${open_residual_notices}"
   exit 0
 fi
 
@@ -208,4 +218,7 @@ fi
 ./scripts/check-kani-public-core.sh
 ./scripts/run-kani-manifest.sh --lane pr --exclude-crate chio-kernel-core
 
-echo "Strict Rust verification tools and registered Kani checks passed"
+# Last, so a truncated output tail still separates executed checks from each
+# registered proof that is open and was not run.
+echo "Strict Rust verification tools and executed registered Kani checks passed"
+printf '%s\n' "${open_residual_notices}"

@@ -197,6 +197,12 @@ RUST_VERIFICATION_STATIC_INPUTS = [
     "scripts/check-kani-core.sh",
     "scripts/check-kani-public-core.sh",
     "scripts/run-kani-manifest.sh",
+    "scripts/kani_open_residual.py",
+    "scripts/run-kani-with-cover.sh",
+    "scripts/check-kani-cover.py",
+    "scripts/check-kani-function-bound.py",
+    "scripts/check-kani-crypto-scope.py",
+    "formal/rust-verification/crypto-proof-scope.toml",
 ]
 
 

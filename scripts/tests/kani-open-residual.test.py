@@ -13,6 +13,14 @@ ROOT = Path(__file__).resolve().parents[2]
 TARGET = "public_expect_report_data_determinism_and_binding"
 PAIR = f"chio-attest-verify::{TARGET}"
 MARKER = 'open_residual = "KANI-ATTEST-DECOMP"'
+NOTICE = f"OPEN/UNPROVED: {PAIR} (KANI-ATTEST-DECOMP); not executed or counted as passed"
+ORDINARY = """[[harness]]
+crate = "fake-crate"
+harness = "ordinary_proof"
+lane = "pr"
+default_unwind = 8
+timeout_secs = 10
+"""
 
 
 class OpenResidualTests(unittest.TestCase):
@@ -29,6 +37,29 @@ class OpenResidualTests(unittest.TestCase):
                 ["bash", str(ROOT / "scripts/run-kani-manifest.sh"), *args],
                 cwd=ROOT, env=env, capture_output=True, text=True, check=False,
             )
+
+    def execute_manifest(self, body, *args):
+        """Run the manifest for real with an inert cargo that records each call."""
+        with tempfile.TemporaryDirectory() as raw:
+            manifest = Path(raw) / "manifest.toml"
+            manifest.write_text(body)
+            log = Path(raw) / "cargo.log"
+            bin_dir = Path(raw) / "bin"
+            bin_dir.mkdir()
+            cargo = bin_dir / "cargo"
+            cargo.write_text('#!/usr/bin/env bash\nprintf "%s\\n" "$*" >>"$FAKE_CARGO_LOG"\n')
+            cargo.chmod(0o755)
+            env = os.environ.copy()
+            env.update(
+                KANI_MANIFEST=str(manifest),
+                FAKE_CARGO_LOG=str(log),
+                PATH=f"{bin_dir}{os.pathsep}{env['PATH']}",
+            )
+            result = subprocess.run(
+                ["bash", str(ROOT / "scripts/run-kani-manifest.sh"), *args],
+                cwd=ROOT, env=env, capture_output=True, text=True, check=False,
+            )
+            return result, log.read_text() if log.exists() else ""
 
     def fixture(self, marker=MARKER, harness=TARGET, crate="chio-attest-verify"):
         return f'''schema = "chio.kani.multi-crate.v1"
@@ -79,6 +110,46 @@ timeout_secs = 10
         self.assertIn("ordinary_proof", result.stdout)
         self.assertNotIn(TARGET, result.stdout)
         self.assertIn("OPEN/UNPROVED", result.stderr)
+
+    def test_execution_summary_ends_by_naming_the_unexecuted_residual(self):
+        result, calls = self.execute_manifest(self.fixture() + ORDINARY)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn(TARGET, calls)
+        self.assertIn("ordinary_proof", calls)
+        lines = [line for line in result.stdout.splitlines() if line.strip()]
+        self.assertEqual(
+            lines[-2:],
+            ["run-kani-manifest.sh: 1 harnesses passed (lane=pr)", NOTICE],
+        )
+
+    def test_execution_summary_omits_a_residual_outside_the_selection(self):
+        result, calls = self.execute_manifest(self.fixture() + ORDINARY, "--crate", "fake-crate")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn(TARGET, calls)
+        self.assertNotIn(NOTICE, result.stdout)
+        lines = [line for line in result.stdout.splitlines() if line.strip()]
+        self.assertEqual(lines[-1], "run-kani-manifest.sh: 1 harnesses passed (lane=pr crate=fake-crate)")
+
+    def test_ordinary_crates_named_like_record_tags_stay_enrolled(self):
+        body = 'schema = "chio.kani.multi-crate.v1"\n'
+        for crate in ("OPEN_RESIDUAL", "HARNESS", "ordinary-crate"):
+            body += f"""[[harness]]
+crate = "{crate}"
+harness = "ordinary_proof"
+lane = "pr"
+default_unwind = 8
+timeout_secs = 10
+"""
+        result = self.run_manifest(body, "--list")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            result.stdout.splitlines(),
+            [
+                "OPEN_RESIDUAL::ordinary_proof",
+                "HARNESS::ordinary_proof",
+                "ordinary-crate::ordinary_proof",
+            ],
+        )
 
     def test_wrong_id_or_value_type_refused(self):
         for marker in ('open_residual = "different"', 'open_residual = true', 'open_residual = ""'):

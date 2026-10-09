@@ -44,6 +44,7 @@ except ModuleNotFoundError:
 
 
 COVERAGE_COMMAND = "cargo xtask gen proof-coverage --check"
+RUST_VERIFICATION_COMMAND = "./scripts/check-rust-verification-gates.sh"
 EVIDENCE_BOUNDARY = (
     "gate statuses attest the trusted generator process; this checker validates "
     "structure and source binding but does not replay proof commands"
@@ -188,6 +189,12 @@ RUST_VERIFICATION_STATIC_INPUTS = {
     "scripts/check-kani-core.sh",
     "scripts/check-kani-public-core.sh",
     "scripts/run-kani-manifest.sh",
+    "scripts/kani_open_residual.py",
+    "scripts/run-kani-with-cover.sh",
+    "scripts/check-kani-cover.py",
+    "scripts/check-kani-function-bound.py",
+    "scripts/check-kani-crypto-scope.py",
+    "formal/rust-verification/crypto-proof-scope.toml",
 }
 TOOL_COMMANDS = {
     "lean": "cd formal/lean4/Chio && lean --version",
@@ -204,6 +211,23 @@ TOOL_COMMANDS = {
 
 def fail(message: str) -> None:
     raise SystemExit(f"proof-report: {message}")
+
+
+def open_residual_notices(repo: Path) -> list[str]:
+    """Notices the strict Rust verification gate must print last, one per open residual."""
+    sys.path.insert(0, str(repo / "scripts"))
+    from kani_open_residual import FOLLOWUP, validate_open_residuals
+
+    manifest_path = repo / ".kani/harnesses.toml"
+    try:
+        entries = tomllib.loads(manifest_path.read_text(encoding="utf-8")).get("harness", [])
+        residuals = validate_open_residuals(entries, require_expected=True)
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError, ValueError) as exc:
+        fail(f"cannot determine open proof residuals from .kani/harnesses.toml: {exc}")
+    return [
+        f"OPEN/UNPROVED: {crate}::{harness} ({FOLLOWUP}); not executed or counted as passed"
+        for crate, harness in sorted(residuals)
+    ]
 
 
 def discover_adapter_gate_sources(repo: Path) -> list[str]:
@@ -710,6 +734,22 @@ if mode == "strict":
     for result in gate_results:
         if result["status"] != "passed":
             fail(f"strict gate did not pass: {result['command']} status={result['status']}")
+    # A passed Rust verification gate attests only the checks it executed. Its
+    # retained tail must end by naming every open residual, so the report
+    # cannot be read as a proof of them.
+    notices = open_residual_notices(repo)
+    rust_results = [
+        result for result in gate_results if result["command"] == RUST_VERIFICATION_COMMAND
+    ]
+    if len(rust_results) != 1:
+        fail(f"strict proof report must record {RUST_VERIFICATION_COMMAND} exactly once")
+    for result in rust_results:
+        tail = [line for line in result["outputTail"].splitlines() if line.strip()]
+        if tail[-len(notices):] != notices:
+            fail(
+                "strict Rust verification output must end by naming each open proof "
+                "residual as not executed or counted as passed"
+            )
 else:
     for result in gate_results:
         expected_status = "passed" if result["command"] == COVERAGE_COMMAND else "not_run"

@@ -99,10 +99,13 @@ if [[ ! -f "$MANIFEST" ]]; then
   exit 1
 fi
 
-# Emit one TSV row per matching harness:
-#   crate, harness, default_unwind, timeout_secs, features, unwinding_checks,
-#   require_cover, memcmp_unwind, public_key_eq_unwind, public_key_hex_unwind
-ROWS=$(python3 - "$MANIFEST" "$LANE_FILTER" "$CRATE_FILTER" "$EXCLUDE_CRATES" <<'PY'
+# Emit one tagged TSV record per matching harness:
+#   HARNESS, crate, harness, default_unwind, timeout_secs, features,
+#   unwinding_checks, require_cover, memcmp_unwind, public_key_eq_unwind,
+#   public_key_hex_unwind, p256_encoder_bounds
+# and one `OPEN_RESIDUAL<TAB>notice` record per open residual this selection
+# would otherwise have run. The tag, not any manifest value, decides the kind.
+MANIFEST_ROWS=$(python3 - "$MANIFEST" "$LANE_FILTER" "$CRATE_FILTER" "$EXCLUDE_CRATES" <<'PY'
 import sys
 from pathlib import Path
 
@@ -152,8 +155,12 @@ try:
     )
 except ValueError as error:
     raise SystemExit(f"run-kani-manifest.sh: {error}") from error
+def residual_notice(crate, harness):
+    return f"OPEN/UNPROVED: {crate}::{harness} ({FOLLOWUP}); not executed or counted as passed"
+
+
 for crate, harness in sorted(residuals):
-    print(f"OPEN/UNPROVED: {crate}::{harness} ({FOLLOWUP}); not executed or counted as passed", file=sys.stderr)
+    print(residual_notice(crate, harness), file=sys.stderr)
 
 required = ("crate", "harness", "default_unwind", "timeout_secs", "lane")
 allowed = set(required) | {
@@ -183,6 +190,12 @@ for idx, entry in enumerate(entries):
         )
         sys.exit(2)
     if pair in residuals:
+        if (
+            entry["lane"] == lane_filter
+            and (not crate_filter or entry["crate"] == crate_filter)
+            and entry["crate"] not in exclude_set
+        ):
+            print("OPEN_RESIDUAL\t" + residual_notice(*pair))
         continue
     if entry["lane"] != lane_filter:
         continue
@@ -242,6 +255,7 @@ for idx, entry in enumerate(entries):
     print(
         "\t".join(
             [
+                "HARNESS",
                 str(entry["crate"]),
                 str(entry["harness"]),
                 str(int(entry["default_unwind"])),
@@ -258,6 +272,12 @@ for idx, entry in enumerate(entries):
     )
 PY
 )
+OPEN_RESIDUALS=$(printf '%s\n' "$MANIFEST_ROWS" | awk -F'\t' '$1 == "OPEN_RESIDUAL" { print $2 }')
+ROWS=$(printf '%s\n' "$MANIFEST_ROWS" | awk '/^HARNESS\t/ { print substr($0, 9) }')
+if [[ -n "$(printf '%s\n' "$MANIFEST_ROWS" | awk 'NF && !/^(HARNESS|OPEN_RESIDUAL)\t/')" ]]; then
+  echo "run-kani-manifest.sh: manifest reader produced an untagged record" >&2
+  exit 1
+fi
 
 if [[ -z "$ROWS" ]]; then
   # Empty-match policy: informational modes (--list, --dry-run) and
@@ -361,4 +381,9 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
   echo "run-kani-manifest.sh: ${COUNT} harnesses matched (dry-run)"
 else
   echo "run-kani-manifest.sh: ${COUNT} harnesses passed (lane=${LANE_FILTER}${CRATE_FILTER:+ crate=${CRATE_FILTER}})"
+  # The count covers executed harnesses only; each selected open residual is
+  # named last so a truncated log tail still shows what was not proved.
+  if [[ -n "$OPEN_RESIDUALS" ]]; then
+    printf '%s\n' "$OPEN_RESIDUALS"
+  fi
 fi

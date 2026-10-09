@@ -65,7 +65,14 @@ if [[ "$(cat "${log}")" != "check-creusot-body-sync.sh " ]]; then
 fi
 
 : >"${log}"
-bash "${fixture}/scripts/check-rust-verification-gates.sh"
+bash "${fixture}/scripts/check-rust-verification-gates.sh" >"${tmp_dir}/strict.out"
+expected_summary="Strict Rust verification tools and executed registered Kani checks passed
+OPEN/UNPROVED: chio-attest-verify::public_expect_report_data_determinism_and_binding (KANI-ATTEST-DECOMP); not executed or counted as passed"
+if [[ "$(grep -v '^[[:space:]]*$' "${tmp_dir}/strict.out" | tail -n 2)" != "${expected_summary}" ]]; then
+  echo "strict Rust verification summary does not end by naming the unexecuted open residual" >&2
+  cat "${tmp_dir}/strict.out" >&2
+  exit 1
+fi
 if [[ "$(grep -c '^run-kani-manifest.sh --lane pr --exclude-crate chio-kernel-core$' "${log}")" -ne 1 ]]; then
   echo "strict Rust verification did not execute the non-core manifest runner exactly once" >&2
   cat "${log}" >&2

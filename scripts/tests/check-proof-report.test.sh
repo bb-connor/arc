@@ -547,6 +547,12 @@ for required in (
     "scripts/check-creusot-smoke.sh",
     "scripts/check-kani-smoke.sh",
     "scripts/run-kani-manifest.sh",
+    "scripts/kani_open_residual.py",
+    "scripts/run-kani-with-cover.sh",
+    "scripts/check-kani-cover.py",
+    "scripts/check-kani-function-bound.py",
+    "scripts/check-kani-crypto-scope.py",
+    "formal/rust-verification/crypto-proof-scope.toml",
     "scripts/lean-assumption-audit.lean",
     "scripts/tests/lean-assumption-audit.test.sh",
     "xtask/src/adapter_no_bypass.rs",
@@ -784,6 +790,12 @@ report["mode"] = "strict"
 for result in report["gateResults"]:
     result["status"] = "passed"
     result["exitCode"] = 0
+    if result["command"] == "./scripts/check-rust-verification-gates.sh":
+        result["outputTail"] = (
+            "Strict Rust verification tools and executed registered Kani checks passed\n"
+            "OPEN/UNPROVED: chio-attest-verify::public_expect_report_data_determinism_and_binding "
+            "(KANI-ATTEST-DECOMP); not executed or counted as passed\n"
+        )
 generated_paths = [
     "target/formal/aeneas-production/llbc/formal_aeneas.llbc",
     "target/formal/aeneas-production/lean/Funs.lean",
@@ -862,6 +874,25 @@ def write(name, mutate):
     mutate(report)
     (output / f"{name}.json").write_text(json.dumps(report), encoding="utf-8")
 
+def rust_verification_tail(tail):
+    def mutate(report):
+        for result in report["gateResults"]:
+            if result["command"] == "./scripts/check-rust-verification-gates.sh":
+                result["outputTail"] = tail
+    return mutate
+
+write(
+    "residual-unnamed",
+    rust_verification_tail("Strict Rust verification tools and registered Kani checks passed\n"),
+)
+write(
+    "residual-not-last",
+    rust_verification_tail(
+        "OPEN/UNPROVED: chio-attest-verify::public_expect_report_data_determinism_and_binding "
+        "(KANI-ATTEST-DECOMP); not executed or counted as passed\n"
+        "Strict Rust verification tools and registered Kani checks passed\n"
+    ),
+)
 write("wrong-command", lambda report: report["gateResults"][0].update(command="echo pass"))
 write(
     "status-exit",
@@ -939,6 +970,8 @@ expect_failure() {
   grep -Fq "${expected}" "${tmp_dir}/${fixture}.out"
 }
 
+expect_failure residual-unnamed 'must end by naming each open proof residual'
+expect_failure residual-not-last 'must end by naming each open proof residual'
 expect_failure wrong-command 'exact unique manifest command order'
 expect_failure status-exit 'passed gate has nonzero exitCode'
 expect_failure dummy-hash 'hash does not match disk'
