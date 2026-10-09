@@ -231,6 +231,34 @@ pub(super) fn overlay_apply_request(
         .unwrap_or_else(|| current_unix_ms().saturating_add(120_000));
     overlay_apply_request_with_expiry(
         current,
+        OverlayApplyExpiry {
+            session_id,
+            action_id,
+            effect_id,
+            posture_rank,
+            scheduler_fencing_token,
+            idempotency_suffix,
+            expires_at_unix_ms,
+        },
+    )
+}
+
+/// Parameters of `overlay_apply_request_with_expiry`.
+pub(super) struct OverlayApplyExpiry<'a> {
+    pub(super) session_id: &'a str,
+    pub(super) action_id: ActionId,
+    pub(super) effect_id: EffectId,
+    pub(super) posture_rank: u32,
+    pub(super) scheduler_fencing_token: u64,
+    pub(super) idempotency_suffix: &'a str,
+    pub(super) expires_at_unix_ms: u64,
+}
+
+pub(super) fn overlay_apply_request_with_expiry(
+    current: &OverlaySnapshot,
+    params: OverlayApplyExpiry<'_>,
+) -> OverlayApplyRequest {
+    let OverlayApplyExpiry {
         session_id,
         action_id,
         effect_id,
@@ -238,20 +266,7 @@ pub(super) fn overlay_apply_request(
         scheduler_fencing_token,
         idempotency_suffix,
         expires_at_unix_ms,
-    )
-}
-
-#[allow(clippy::too_many_arguments)]
-pub(super) fn overlay_apply_request_with_expiry(
-    current: &OverlaySnapshot,
-    session_id: &str,
-    action_id: ActionId,
-    effect_id: EffectId,
-    posture_rank: u32,
-    scheduler_fencing_token: u64,
-    idempotency_suffix: &str,
-    expires_at_unix_ms: u64,
-) -> OverlayApplyRequest {
+    } = params;
     let contribution_bytes = format!("{{\"posture_rank\":{posture_rank}}}").into_bytes();
     let contribution_hash = digest(&contribution_bytes);
     let request = EffectRequest {
@@ -1733,14 +1748,16 @@ fn injected_clock_controls_scheduler_lease_and_overlay_mutations() {
     let empty = empty_overlay(overlay_target(overlay_session));
     let first_apply = overlay_apply_request_with_expiry(
         &empty,
-        overlay_session,
-        action_id.clone(),
-        EffectId::new("trusted-clock-effect-a")
-            .unwrap_or_else(|error| panic!("effect id: {error}")),
-        3,
-        fencing_token,
-        "trusted-clock-apply-a",
-        55_000,
+        OverlayApplyExpiry {
+            session_id: overlay_session,
+            action_id: action_id.clone(),
+            effect_id: EffectId::new("trusted-clock-effect-a")
+                .unwrap_or_else(|error| panic!("effect id: {error}")),
+            posture_rank: 3,
+            scheduler_fencing_token: fencing_token,
+            idempotency_suffix: "trusted-clock-apply-a",
+            expires_at_unix_ms: 55_000,
+        },
     );
     let applied = store
         .apply_contribution(&first_apply)
@@ -1763,14 +1780,16 @@ fn injected_clock_controls_scheduler_lease_and_overlay_mutations() {
 
     let second_apply = overlay_apply_request_with_expiry(
         &removed,
-        overlay_session,
-        action_id.clone(),
-        EffectId::new("trusted-clock-effect-b")
-            .unwrap_or_else(|error| panic!("effect id: {error}")),
-        2,
-        fencing_token,
-        "trusted-clock-apply-b",
-        65_000,
+        OverlayApplyExpiry {
+            session_id: overlay_session,
+            action_id: action_id.clone(),
+            effect_id: EffectId::new("trusted-clock-effect-b")
+                .unwrap_or_else(|error| panic!("effect id: {error}")),
+            posture_rank: 2,
+            scheduler_fencing_token: fencing_token,
+            idempotency_suffix: "trusted-clock-apply-b",
+            expires_at_unix_ms: 65_000,
+        },
     );
     let second_applied = store
         .apply_contribution(&second_apply)

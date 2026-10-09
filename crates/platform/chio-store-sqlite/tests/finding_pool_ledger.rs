@@ -295,89 +295,115 @@ fn debit_at_with_status(
         purchase_id,
         amount_units,
         now_unix_ms,
-        status_verifier,
-        status_proof_b64,
-        Arc::new(AtomicU64::new(0)),
-        false,
+        DebitStatusPolicy {
+            status_verifier,
+            status_proof_b64,
+            purchase_admissions: Arc::new(AtomicU64::new(0)),
+            reject_purchase_admission: false,
+        },
     )
 }
 
-#[allow(clippy::too_many_arguments)]
+/// Parameters of `debit_at_with_policy`.
+struct DebitStatusPolicy<'a> {
+    status_verifier: Option<Arc<dyn FindingStatusProofVerifier>>,
+    status_proof_b64: Option<&'a str>,
+    purchase_admissions: Arc<AtomicU64>,
+    reject_purchase_admission: bool,
+}
+
 fn debit_at_with_policy(
     ledger: &SqliteFindingPoolLedger,
     fixture: &PoolFixture,
     purchase_id: &str,
     amount_units: u64,
     now_unix_ms: u64,
-    status_verifier: Option<Arc<dyn FindingStatusProofVerifier>>,
-    status_proof_b64: Option<&str>,
-    purchase_admissions: Arc<AtomicU64>,
-    reject_purchase_admission: bool,
+    params: DebitStatusPolicy<'_>,
 ) -> Result<chio_kernel::finding_pool::FindingPoolDebitReceipt, FindingPoolDebitError> {
+    let DebitStatusPolicy {
+        status_verifier,
+        status_proof_b64,
+        purchase_admissions,
+        reject_purchase_admission,
+    } = params;
     debit_at_with_policy_and_kernel_key(
         ledger,
         fixture,
         purchase_id,
         amount_units,
         now_unix_ms,
-        status_verifier,
-        status_proof_b64,
-        purchase_admissions,
-        reject_purchase_admission,
-        Keypair::from_seed(&[99_u8; 32]),
+        DebitKernelPolicy {
+            status_verifier,
+            status_proof_b64,
+            purchase_admissions,
+            reject_purchase_admission,
+            kernel_key: Keypair::from_seed(&[99_u8; 32]),
+        },
     )
 }
 
-#[allow(clippy::too_many_arguments)]
+/// Parameters of `debit_at_with_policy_and_kernel_key`.
+struct DebitKernelPolicy<'a> {
+    status_verifier: Option<Arc<dyn FindingStatusProofVerifier>>,
+    status_proof_b64: Option<&'a str>,
+    purchase_admissions: Arc<AtomicU64>,
+    reject_purchase_admission: bool,
+    kernel_key: Keypair,
+}
+
 fn debit_at_with_policy_and_kernel_key(
     ledger: &SqliteFindingPoolLedger,
     fixture: &PoolFixture,
     purchase_id: &str,
     amount_units: u64,
     now_unix_ms: u64,
-    status_verifier: Option<Arc<dyn FindingStatusProofVerifier>>,
-    status_proof_b64: Option<&str>,
-    purchase_admissions: Arc<AtomicU64>,
-    reject_purchase_admission: bool,
-    kernel_key: Keypair,
+    params: DebitKernelPolicy<'_>,
 ) -> Result<chio_kernel::finding_pool::FindingPoolDebitReceipt, FindingPoolDebitError> {
+    let DebitKernelPolicy {
+        status_verifier,
+        status_proof_b64,
+        purchase_admissions,
+        reject_purchase_admission,
+        kernel_key,
+    } = params;
     debit_at_with_policy_and_authority(
         ledger,
         fixture,
         purchase_id,
         amount_units,
         now_unix_ms,
-        status_verifier,
-        status_proof_b64,
-        purchase_admissions,
-        reject_purchase_admission,
-        kernel_key,
-        fixture.authority.public_key(),
-        false,
+        DebitAuthorityPolicy {
+            status_verifier,
+            status_proof_b64,
+            purchase_admissions,
+            reject_purchase_admission,
+            kernel_key,
+            allocation_authority: fixture.authority.public_key(),
+            reject_purchase_verification: false,
+        },
     )
 }
 
-#[allow(clippy::too_many_arguments)]
+/// Parameters of `debit_at_with_policy_and_authority`.
+struct DebitAuthorityPolicy<'a> {
+    status_verifier: Option<Arc<dyn FindingStatusProofVerifier>>,
+    status_proof_b64: Option<&'a str>,
+    purchase_admissions: Arc<AtomicU64>,
+    reject_purchase_admission: bool,
+    kernel_key: Keypair,
+    allocation_authority: PublicKey,
+    reject_purchase_verification: bool,
+}
+
 fn debit_at_with_policy_and_authority(
     ledger: &SqliteFindingPoolLedger,
     fixture: &PoolFixture,
     purchase_id: &str,
     amount_units: u64,
     now_unix_ms: u64,
-    status_verifier: Option<Arc<dyn FindingStatusProofVerifier>>,
-    status_proof_b64: Option<&str>,
-    purchase_admissions: Arc<AtomicU64>,
-    reject_purchase_admission: bool,
-    kernel_key: Keypair,
-    allocation_authority: PublicKey,
-    reject_purchase_verification: bool,
+    params: DebitAuthorityPolicy<'_>,
 ) -> Result<chio_kernel::finding_pool::FindingPoolDebitReceipt, FindingPoolDebitError> {
-    debit_at_with_policy_and_authority_and_tenant(
-        ledger,
-        fixture,
-        purchase_id,
-        amount_units,
-        now_unix_ms,
+    let DebitAuthorityPolicy {
         status_verifier,
         status_proof_b64,
         purchase_admissions,
@@ -385,28 +411,59 @@ fn debit_at_with_policy_and_authority(
         kernel_key,
         allocation_authority,
         reject_purchase_verification,
-        None,
-        SessionState::Ready,
+    } = params;
+    debit_at_with_policy_and_authority_and_tenant(
+        ledger,
+        fixture,
+        purchase_id,
+        amount_units,
+        now_unix_ms,
+        DebitPolicy {
+            status_verifier,
+            status_proof_b64,
+            purchase_admissions,
+            reject_purchase_admission,
+            kernel_key,
+            allocation_authority,
+            reject_purchase_verification,
+            tenant_id: None,
+            session_state: SessionState::Ready,
+        },
     )
 }
 
-#[allow(clippy::too_many_arguments)]
+/// Parameters of `debit_at_with_policy_and_authority_and_tenant`.
+struct DebitPolicy<'a> {
+    status_verifier: Option<Arc<dyn FindingStatusProofVerifier>>,
+    status_proof_b64: Option<&'a str>,
+    purchase_admissions: Arc<AtomicU64>,
+    reject_purchase_admission: bool,
+    kernel_key: Keypair,
+    allocation_authority: PublicKey,
+    reject_purchase_verification: bool,
+    tenant_id: Option<&'a str>,
+    session_state: SessionState,
+}
+
 fn debit_at_with_policy_and_authority_and_tenant(
     ledger: &SqliteFindingPoolLedger,
     fixture: &PoolFixture,
     purchase_id: &str,
     amount_units: u64,
     now_unix_ms: u64,
-    status_verifier: Option<Arc<dyn FindingStatusProofVerifier>>,
-    status_proof_b64: Option<&str>,
-    purchase_admissions: Arc<AtomicU64>,
-    reject_purchase_admission: bool,
-    kernel_key: Keypair,
-    allocation_authority: PublicKey,
-    reject_purchase_verification: bool,
-    tenant_id: Option<&str>,
-    session_state: SessionState,
+    params: DebitPolicy<'_>,
 ) -> Result<chio_kernel::finding_pool::FindingPoolDebitReceipt, FindingPoolDebitError> {
+    let DebitPolicy {
+        status_verifier,
+        status_proof_b64,
+        purchase_admissions,
+        reject_purchase_admission,
+        kernel_key,
+        allocation_authority,
+        reject_purchase_verification,
+        tenant_id,
+        session_state,
+    } = params;
     let verified_purchase = VerifiedFindingPurchase {
         finding_id: "a".repeat(64),
         listing_id: "listing:cognition-market:1".to_string(),
@@ -644,15 +701,17 @@ fn cognition_market_debit_rejects_non_ready_sessions_before_reservation() {
             &purchase_id,
             10,
             2_000,
-            None,
-            None,
-            Arc::clone(&purchase_admissions),
-            false,
-            Keypair::from_seed(&[99_u8; 32]),
-            fixture.authority.public_key(),
-            false,
-            Some("tenant-A"),
-            state,
+            DebitPolicy {
+                status_verifier: None,
+                status_proof_b64: None,
+                purchase_admissions: Arc::clone(&purchase_admissions),
+                reject_purchase_admission: false,
+                kernel_key: Keypair::from_seed(&[99_u8; 32]),
+                allocation_authority: fixture.authority.public_key(),
+                reject_purchase_verification: false,
+                tenant_id: Some("tenant-A"),
+                session_state: state,
+            },
         )
         .test_expect_err("non-ready sessions must not reserve pool allocation");
         assert!(
@@ -944,11 +1003,13 @@ fn cognition_market_pool_receipts_survive_ordinary_kernel_key_rotation() {
         "purchase:after-rotation",
         10,
         2_001,
-        None,
-        None,
-        Arc::new(AtomicU64::new(0)),
-        false,
-        Keypair::from_seed(&[100_u8; 32]),
+        DebitKernelPolicy {
+            status_verifier: None,
+            status_proof_b64: None,
+            purchase_admissions: Arc::new(AtomicU64::new(0)),
+            reject_purchase_admission: false,
+            kernel_key: Keypair::from_seed(&[100_u8; 32]),
+        },
     )
     .test_expect("reserve after ordinary kernel key rotation");
 
@@ -1266,13 +1327,15 @@ fn cognition_market_pool_replays_after_allocation_authority_rotation() {
         "purchase:before-authority-rotation",
         10,
         2_001,
-        None,
-        None,
-        Arc::new(AtomicU64::new(0)),
-        false,
-        Keypair::from_seed(&[99_u8; 32]),
-        rotated_authority.clone(),
-        false,
+        DebitAuthorityPolicy {
+            status_verifier: None,
+            status_proof_b64: None,
+            purchase_admissions: Arc::new(AtomicU64::new(0)),
+            reject_purchase_admission: false,
+            kernel_key: Keypair::from_seed(&[99_u8; 32]),
+            allocation_authority: rotated_authority.clone(),
+            reject_purchase_verification: false,
+        },
     )
     .test_expect("replay debit signed by the prior allocation authority");
     assert!(replay.replayed);
@@ -1283,13 +1346,15 @@ fn cognition_market_pool_replays_after_allocation_authority_rotation() {
             "purchase:new-after-authority-rotation",
             10,
             2_001,
-            None,
-            None,
-            Arc::new(AtomicU64::new(0)),
-            false,
-            Keypair::from_seed(&[99_u8; 32]),
-            rotated_authority,
-            false,
+            DebitAuthorityPolicy {
+                status_verifier: None,
+                status_proof_b64: None,
+                purchase_admissions: Arc::new(AtomicU64::new(0)),
+                reject_purchase_admission: false,
+                kernel_key: Keypair::from_seed(&[99_u8; 32]),
+                allocation_authority: rotated_authority,
+                reject_purchase_verification: false
+            }
         ),
         Err(FindingPoolDebitError::Allocation(_))
     ));
@@ -1310,31 +1375,20 @@ fn cognition_market_pool_replays_after_purchase_verifier_rotation() {
         "purchase:before-verifier-rotation",
         10,
         2_001,
-        None,
-        None,
-        Arc::new(AtomicU64::new(0)),
-        false,
-        Keypair::from_seed(&[99_u8; 32]),
-        fixture.authority.public_key(),
-        true,
+        DebitAuthorityPolicy {
+            status_verifier: None,
+            status_proof_b64: None,
+            purchase_admissions: Arc::new(AtomicU64::new(0)),
+            reject_purchase_admission: false,
+            kernel_key: Keypair::from_seed(&[99_u8; 32]),
+            allocation_authority: fixture.authority.public_key(),
+            reject_purchase_verification: true,
+        },
     )
     .test_expect("replay debit without consulting the retired purchase verifier");
     assert!(replay.replayed);
     assert!(matches!(
-        debit_at_with_policy_and_authority(
-            &ledger,
-            &fixture,
-            "purchase:new-after-verifier-rotation",
-            10,
-            2_001,
-            None,
-            None,
-            Arc::new(AtomicU64::new(0)),
-            false,
-            Keypair::from_seed(&[99_u8; 32]),
-            fixture.authority.public_key(),
-            true,
-        ),
+        debit_at_with_policy_and_authority(&ledger, &fixture, "purchase:new-after-verifier-rotation", 10, 2_001, DebitAuthorityPolicy { status_verifier: None, status_proof_b64: None, purchase_admissions: Arc::new(AtomicU64::new(0)), reject_purchase_admission: false, kernel_key: Keypair::from_seed(&[99_u8; 32]), allocation_authority: fixture.authority.public_key(), reject_purchase_verification: true }),
         Err(FindingPoolDebitError::Allocation(denial))
             if denial.detail().contains("purchase verifier key is retired")
     ));
@@ -1353,10 +1407,12 @@ fn cognition_market_pool_replay_skips_mutable_purchase_admission() {
         "purchase:committed",
         10,
         2_000,
-        None,
-        None,
-        Arc::clone(&admissions),
-        false,
+        DebitStatusPolicy {
+            status_verifier: None,
+            status_proof_b64: None,
+            purchase_admissions: Arc::clone(&admissions),
+            reject_purchase_admission: false,
+        },
     )
     .test_expect("commit live pool debit");
     assert_eq!(admissions.load(Ordering::SeqCst), 1);
@@ -1367,10 +1423,12 @@ fn cognition_market_pool_replay_skips_mutable_purchase_admission() {
         "purchase:committed",
         10,
         2_001,
-        None,
-        None,
-        Arc::clone(&admissions),
-        true,
+        DebitStatusPolicy {
+            status_verifier: None,
+            status_proof_b64: None,
+            purchase_admissions: Arc::clone(&admissions),
+            reject_purchase_admission: true,
+        },
     )
     .test_expect("replay after mutable purchase admission expires");
     assert!(replay.replayed);
@@ -1382,10 +1440,12 @@ fn cognition_market_pool_replay_skips_mutable_purchase_admission() {
             "purchase:new-after-admission-expiry",
             10,
             2_001,
-            None,
-            None,
-            Arc::clone(&admissions),
-            true,
+            DebitStatusPolicy {
+                status_verifier: None,
+                status_proof_b64: None,
+                purchase_admissions: Arc::clone(&admissions),
+                reject_purchase_admission: true
+            }
         ),
         Err(FindingPoolDebitError::Allocation(_))
     ));

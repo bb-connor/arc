@@ -14,15 +14,17 @@ fn cognition_market_debit_resolves_tenant_from_authenticated_session_context() {
         purchase_id,
         10,
         2_000,
-        None,
-        None,
-        Arc::new(AtomicU64::new(0)),
-        false,
-        Keypair::from_seed(&[99_u8; 32]),
-        fixture.authority.public_key(),
-        false,
-        Some("tenant-A"),
-        SessionState::Ready,
+        DebitPolicy {
+            status_verifier: None,
+            status_proof_b64: None,
+            purchase_admissions: Arc::new(AtomicU64::new(0)),
+            reject_purchase_admission: false,
+            kernel_key: Keypair::from_seed(&[99_u8; 32]),
+            allocation_authority: fixture.authority.public_key(),
+            reject_purchase_verification: false,
+            tenant_id: Some("tenant-A"),
+            session_state: SessionState::Ready,
+        },
     )
     .test_expect("reserve against authenticated tenant context");
 
@@ -45,15 +47,17 @@ fn cognition_market_debit_resolves_tenant_from_authenticated_session_context() {
             purchase_id,
             10,
             2_000,
-            None,
-            None,
-            Arc::new(AtomicU64::new(0)),
-            false,
-            Keypair::from_seed(&[99_u8; 32]),
-            fixture.authority.public_key(),
-            false,
-            Some(tenant),
-            SessionState::Ready,
+            DebitPolicy {
+                status_verifier: None,
+                status_proof_b64: None,
+                purchase_admissions: Arc::new(AtomicU64::new(0)),
+                reject_purchase_admission: false,
+                kernel_key: Keypair::from_seed(&[99_u8; 32]),
+                allocation_authority: fixture.authority.public_key(),
+                reject_purchase_verification: false,
+                tenant_id: Some(tenant),
+                session_state: SessionState::Ready,
+            },
         );
         if tenant == "tenant-B" {
             assert!(matches!(
