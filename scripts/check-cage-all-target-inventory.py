@@ -27,6 +27,7 @@ EXPECTED_INTEGRATION_TARGETS = {
     "enforcement_evidence.rs",
     "linux_compile.rs",
     "linux_enforcement.rs",
+    "support/broker_status.rs",
 }
 TEST_DECLARATION = re.compile(
     r"(?P<attrs>(?:\s*#\[[^\]]+\]\s*)+)" r"(?:async\s+)?fn\s+(?P<name>[A-Za-z0-9_]+)"
