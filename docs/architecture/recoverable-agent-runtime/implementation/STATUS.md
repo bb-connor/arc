@@ -16,9 +16,12 @@ The second review's three P1 findings and its P2/P3 findings remain historical
 review results. The first review's four P1 repair results do not establish
 completion of later reviews or findings introduced during remediation.
 
-Current per-ID dispositions are maintained in
+The [tracked review register](review-register.md) reconciles current per-ID
+status, historical scoped dispositions, later findings and candidate-only
+defects. The [execution procedure](remediation-execution.md) governs integration
+and closure. Original independent dispositions remain in
 `target/recovery-pr/current-review-followup/current-reviewed-dispositions.json`.
-Each row retains its exact immutable catalog path and JSON pointer, current
+The register retains their exact immutable catalog paths and JSON pointers,
 source/evidence references, accepted local dimensions and remaining obligations.
 The original canonical catalog and earlier progress captures remain immutable.
 Source-only finding closure and scoped native passes do not establish whole-tree
