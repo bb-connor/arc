@@ -15,18 +15,18 @@ provider, formal, hosted, or release qualification.
 | Supplemental PR obligations | 1 | 0 | 1 |
 | Current or executed-support total | 348 | 117 | 231 |
 | Prevented candidate issues, counted separately | 31 | Not combined | Not combined |
-| Additional uninstalled candidate follow-ups | 2 | Not combined | Not combined |
+| Additional uninstalled candidate follow-ups | 5 | Not combined | Not combined |
 | Provenance prerequisite, excluded from implementation findings | 1 | Not applicable | Not applicable |
 
 The canonical 99 recorded closures comprise 92 source-only and seven scoped
 local closures. The additional 18 comprise seven source-only and eleven scoped
 local closures. These are recorded review classifications, not new acceptance.
 
-There are **381 findings or candidate issues**, plus the excluded provenance
-prerequisite, for **382 records**. The original prevented inventory retains 23
-assigned IDs and eight unassigned records. The two candidate follow-ups have
+There are **384 findings or candidate issues**, plus the excluded provenance
+prerequisite, for **385 records**. The original prevented inventory retains 23
+assigned IDs and eight unassigned records. The five candidate follow-ups have
 register keys and null finding IDs. There are still 371 assigned finding IDs,
-or 372 IDs including the provenance prerequisite, and ten null IDs. Every
+or 372 IDs including the provenance prerequisite, and thirteen null IDs. Every
 original ID and exact unassigned reviewer label remains preserved.
 
 The current status counts are:
@@ -36,7 +36,7 @@ The current status counts are:
 | `open` | 231 | No complete independent disposition is recorded. |
 | `needs_revalidation` | 47 | Historical closure remains, but cited source or document pins differ without an accepted current continuity review. |
 | `recorded_scoped_closed` | 70 | The recorded scoped disposition is retained, with the limits stated per record. |
-| `candidate_only` | 33 | The defective candidate was uninstalled when found; corrected successors may have separate evidence. |
+| `candidate_only` | 36 | The defective candidate was uninstalled when found; corrected successors may have separate evidence. |
 | `prerequisite_only` | 1 | Provenance work, not a proved implementation defect. |
 
 The 47 remaining revalidation flags are part of the 117 historical scoped closures. They
@@ -48,18 +48,27 @@ subsequently confirmed that the README change for `A-planner-07` adds navigation
 only and preserves its original source-only obligation. Its historical pin
 difference remains recorded, alongside the current review and its scope.
 
+The installed SDK changes affect six direct pin pairs across `H-SDK-03`,
+`H-SDK-08`, `H-SDK-09` and `SDK-INDEPENDENT-03`. The independent
+[installed SDK continuity audit](reviews/installed-sdk-continuity.md) maps the
+bounded reviews and maintained tests to their original scoped contracts. Each
+record now states that its pins changed and links `current_continuity`. Its
+historical `pin_check`, disposition and classification remain unchanged. These
+four changes add no revalidation flag or runtime qualification.
+
 ## Candidate follow-ups
 
 Two independently reviewed source units have subsequently been installed and
 verified locally: [SDK state projection](reviews/sdk-recovery-state-projection.md)
 and [explicit authority provisioning](reviews/native-authority-provisioning.md).
 Their evidence and remaining obligations are recorded in `current_updates`.
-H-SDK-01 remains open and provisioning is a prerequisite. All 382 inventory
-records and every count above remain unchanged; the historical pin audit has not
-been promoted to current qualification.
+H-SDK-01 remains open and provisioning is a prerequisite. Those installations
+did not change finding classifications or grant qualification. The subsequent
+foundation reviews add the three candidate records below.
 
-The two additive `candidate_followup` records preserve the original 380 entries
-and do not change canonical closure counts or installed-finding totals. Their
+The five additive `candidate_followup` records do not change canonical closure
+counts or installed-finding totals. The initial two preserve their prior failure
+and successor evidence; the latest three remain open. Their
 exact local evidence hashes and accounting time are in `candidate_review_evidence`.
 
 - `candidate:checkpoint-receipt-confirmation-envelope` records the third real
@@ -79,8 +88,23 @@ exact local evidence hashes and accounting time are in `candidate_review_evidenc
   also compiled and passed the two local cases. The candidate remains uninstalled
   and unqualified; source review and local execution retain their separate scopes.
 
-Neither record invents an original review ID, changes the earlier failure, or
-claims retained Native Prepared-debt coverage from the receipt fault test.
+- `candidate:kernel-foundation-ordinary-durable-original` is the P1 source-review
+  finding that a legitimately absent retained request denies ordinary durable
+  admission before Native selection is checked. Runtime reproduction was not
+  performed by the reviewer; correction and owning acceptance remain pending.
+- `candidate:kernel-foundation-loom-runtime-gate` is the P2 missing configuration
+  gate. The actual pre-fix loom compilation failed with 30 compiler errors and
+  executed no tests. Correction and corrected compilation remain pending.
+- `candidate:process-foundation-missing-test-suppliers` is the P2 registration
+  defect affecting thirteen enrollment-dependent and two lifetime acceptance
+  cases. The source reviewer ran no tests. Preserve all future positive
+  obligations while making the supported default target executable.
+
+All five records use register keys with null assigned finding IDs. The three
+foundation findings are uninstalled and open; they do not claim a production
+runtime failure or a corrected pass. Earlier failure and review evidence remains
+unchanged. The original two-case receipt fault evidence is not retrospectively
+credited with the later, distinct retained-reservation test.
 
 ## Source-pin audit
 
@@ -123,7 +147,7 @@ Each `records` entry has:
 
 - `key`: unique register identity. Assigned IDs are used verbatim. The eight
   `unassigned-prevented:<index>` values are register keys, not invented finding
-  IDs; the index resolves to the unchanged addendum record. The two descriptive
+  IDs; the index resolves to the unchanged addendum record. The five descriptive
   `candidate:<behavior>` keys also identify records without assigned review IDs.
 - `id`, `severity`, `title`, and `dependency_group`: original identity and review
   priority, plus the execution workstream. A null severity means the reviewer
@@ -186,8 +210,11 @@ inventories; exact additional, supplemental, prevented and provenance row
 identity; original recorded closure IDs and counts; unique keys and non-null
 IDs; source file hashes; local pin hashes; and absence of absolute user paths,
 IP addresses and em dashes in the tracked JSON. The original source inventories
-remain unchanged. The additive update also checked exact equality of all 380
-prior records, both authentic quality reports, the observed run and candidate
-evidence hashes, and the reconciled 382-record counts. The historical pin audit
-was not rerun for this accounting update. Confidence is high for the inventory
-and recorded evidence; current integrated behavior remains unqualified.
+remain unchanged. The latest update verifies all 382 prior records are exact
+apart from the four explicitly authorized `current_reason` and
+`current_continuity` amendments. It checks the sealed foundation reviews, full
+source-manifest references and actual loom failure, unique IDs and the derived
+385-record counts. Historical closure IDs and all source pins remain unchanged.
+The installation-specific SDK continuity audit supplements the historical pin
+audit; it does not rerun unrelated flags. Confidence is high for this accounting;
+current integrated behavior remains unqualified.
