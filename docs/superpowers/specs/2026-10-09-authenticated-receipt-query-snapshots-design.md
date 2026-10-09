@@ -696,36 +696,67 @@ Resource policy:
 
 **Kernel.**
 
-- New `ReceiptSnapshotWatermark { snapshot_id, through_entry_seq,
-  checkpoint_seq, observed_at_unix_ms, recertified_at_unix_ms }`.
+- New `ReceiptSnapshotWatermark { snapshot_id: String, through_entry_seq: u64,
+  checkpoint_seq: Option<u64>, observed_at_unix_ms: u64,
+  recertified_at_unix_ms: u64 }`.
 - New `ReceiptQueryResult.snapshot: Option<_>`. It is `None` on the per-call
   path.
 - New `ReceiptStoreError::QuerySnapshot(ReceiptQuerySnapshotError)`. Variants:
   `Building`, `Stale`, `Invalid`, `Unavailable`, `Busy` and
   `WorkBudgetExhausted`, each with a stable `code()`.
 
-**HTTP.** The response gains an optional `snapshot` object:
-`{id, throughEntrySeq, checkpointSeq, observedAt, recertifiedAt}`. It applies to
-`/v1/receipts/query`, `/v1/agents/{subject}/receipts` and `/v1/receipts`,
-including point reads. Errors become `{error, code}`, where `code` is added to
-today's body (`policy_support.rs:995-997`).
+**HTTP wire contract.** This is the exact shape Root builds the SDKs against.
 
-| Code | Status | Retry-After |
+The `snapshot` object is added as an optional field on three response bodies:
+
+- `ReceiptQueryResponse`, returned by `GET /v1/receipts/query` and
+  `GET /v1/agents/{subject}/receipts`;
+- `ReceiptListResponse`, returned by `GET /v1/receipts`, including point reads
+  by `receiptId`.
+
+Servers with this change always include it on those routes. Clients must treat
+an absent field as "unknown" so they keep working against older servers.
+
+```json
+"snapshot": {
+  "id": "5f0c...e1:42",
+  "throughEntrySeq": 120345,
+  "checkpointSeq": 1203,
+  "observedAt": 1760000000123,
+  "recertifiedAt": 1759996400456
+}
+```
+
+| Field | JSON type | Meaning |
 |---|---|---|
-| `receipt_query_snapshot_building` | 503 | yes |
-| `receipt_query_snapshot_stale` | 503 | yes |
-| `receipt_query_busy` | 503 | yes |
-| `receipt_query_snapshot_unavailable` | 503 | no |
-| `receipt_query_snapshot_invalid` | 500, as a457 for integrity failures | no |
-| `receipt_query_work_budget_exhausted` | 422 | no |
+| `id` | string | Opaque version id. Informational only: never a request parameter and never a cursor |
+| `throughEntrySeq` | integer, unsigned 64-bit | Every claim-log entry at or below this is included, and none above |
+| `checkpointSeq` | integer, unsigned 64-bit, or `null` | Newest verified checkpoint in this version; `null` when the store has none. Entries above its range are signature-only |
+| `observedAt` | integer, Unix milliseconds | Observation time of the newest head target this version fully covers (the as-of time) |
+| `recertifiedAt` | integer, Unix milliseconds | Completion time of the last full authentication pass, build or recertification. Rows a response does not return may have been mutated since, undetected until the next pass, but that never alters an answer |
 
-- **No new request parameters.** Seq cursors are unchanged.
-- **Short pages.** A page with fewer than `limit` receipts may still carry a
-  non-null `nextCursor`.
-- **`throughEntrySeq` and `observedAt`** state the as-of point.
-- **`recertifiedAt`** states when the whole history was last re-checked.
-  Mutation of rows not returned can go undetected for up to the
-  recertification interval plus one pass, but never alters an answer.
+**Typed errors.** Only the new snapshot outcomes carry `code`. Their body is
+`{"error": string, "code": string}`. Every existing error (400, 403, 409, 500)
+keeps today's `{"error": string}` body unchanged. `Retry-After` is an integer
+number of seconds.
+
+| `code` | HTTP status | `Retry-After` | Client action |
+|---|---|---|---|
+| `receipt_query_snapshot_building` | 503 | 5 | retry |
+| `receipt_query_snapshot_stale` | 503 | 2 | retry |
+| `receipt_query_busy` | 503 | 1 | retry |
+| `receipt_query_snapshot_unavailable` | 503 | absent | do not retry; operator action needed (capacity, row cap, walker budget, stopped) |
+| `receipt_query_snapshot_invalid` | 500 | absent | do not retry; integrity failure (same status a457 returns) |
+| `receipt_query_work_budget_exhausted` | 422 | absent | do not retry; narrow the filter |
+
+**Request side.**
+
+- No new request parameters.
+- `cursor` keeps today's semantics: forward-only, by seq.
+- A page may hold fewer than `limit` receipts while `nextCursor` is non-null.
+  Clients continue until `nextCursor` is null.
+- `totalCount` is exact for the version named by `snapshot.id`. It may change
+  between pages, as it does today.
 
 **Spec and docs.**
 
@@ -736,11 +767,15 @@ today's body (`policy_support.rs:995-997`).
 
 **SDKs.**
 
-| Client | Old behavior | New behavior |
+Root owns the TypeScript and Python clients and the dashboard types
+(coordinator, 06:12Z).
+
+| Client | Old SDK against the new server | New SDK |
 |---|---|---|
-| TypeScript, Python | ignore `snapshot`; 503 and 422 throw the existing status error; `paginate` handles short pages | typed `snapshot`; parse `code`; bounded retry of building, stale and busy honoring Retry-After (default 30 s total); never retry 422 or 500 |
-| C++ | raw body; status errors | unchanged |
-| Rust control-plane client and dashboard | no `deny_unknown_fields` | field added with `#[serde(default)]`, or type only |
+| TypeScript `ReceiptQueryClient`, Python `ReceiptQueryClient` | `snapshot` is ignored; 503, 422 and 500 throw the existing status error with no retry; `paginate` already continues on a short page with a non-null `nextCursor` | `snapshot?` typed as above; `code` parsed into the error; `paginate` retries only `building`, `stale` and `busy`, sleeping for `Retry-After` up to a configurable total (default 30 s), then throws with `code`; it never retries `unavailable`, `invalid` or the budget code; against an old server, a missing `snapshot` and `code` are tolerated |
+| C++ client | raw body; status errors | unchanged |
+| Rust control-plane client (`service_runtime/client/operations.rs:527`) | no `deny_unknown_fields` | `snapshot` added with `#[serde(default)]` |
+| Dashboard (`chio-cli/dashboard/src/api.ts`) | ignores the field | optional type only |
 
 ## 12. Evidence export (Q3)
 

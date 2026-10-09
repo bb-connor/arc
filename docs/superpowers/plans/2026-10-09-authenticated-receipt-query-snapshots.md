@@ -174,18 +174,11 @@ All paths are under `crates/`.
 
 ## Task 7: Spec, docs and SDKs
 
-- **Contract:** spec 11, including the plain as-of and recertification-lag
+- **Ownership.** Root owns the TypeScript and Python clients and the dashboard
+  types (coordinator 06:12Z), built against the wire contract in spec 11. This
+  lane owns the `spec/` and `docs/reference/` edits.
+- **Contract.** Spec 11, including the plain as-of and recertification-lag
   statement.
-- **RED:** today's TypeScript and Python clients neither retry a 503 building
-  response nor expose `code`.
-- **GREEN:**
-  - bounded retry honoring Retry-After;
-  - 422 surfaced without retry;
-  - old-shape responses still parse;
-  - short pages continue.
-- **Commands:**
-  - `cd sdks/typescript/chio-ts && npm test`
-  - `cd sdks/python/chio-py && uv run pytest tests/test_receipt_query.py`
 
 ## Task 8: Capacity evidence (`#[ignore]`, labeled)
 
