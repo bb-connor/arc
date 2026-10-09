@@ -192,13 +192,13 @@ process's custody. Until the backend is accepted, `memory` is the only backend.
   estimate that depends on value lengths (10).
 - **SQLite heap outside the page quota.** The page quota does not cap other
   SQLite heap allocations, so the plans are written to avoid them:
-  - Fixed query plans walk an index in cursor order, so no sorter is used.
-  - The one exception is the S5 cost-range plan. Its sorter always runs under
-    `LIMIT L`, which keeps it to at most L rows.
-  - No plan uses a temporary b-tree for `DISTINCT` or `GROUP BY`.
-  - A control asserts every fixed plan's `EXPLAIN QUERY PLAN`.
-  - The capacity fixture measures process memory, so sorter and statement
-    allocations are counted.
+  - Every fixed query plan walks an index in cursor order, so no plan uses a
+    sorter. Cost bounds are checked per row on the currency index.
+  - No plan uses a temporary b-tree for `ORDER BY`, `DISTINCT` or `GROUP BY`.
+  - Control C18 asserts this from `EXPLAIN QUERY PLAN` for every traced
+    plan.
+  - The capacity fixture measures process memory, so statement allocations
+    are counted.
 - **Per-row resource limit.** A receipt row larger than `max_receipt_bytes`
   (default 128 MiB, the ingress cap at `json_ingress.rs:137`) is outside the
   walker's resource limit. It yields `Unavailable(row_cap { entry_seq, bytes })`.
@@ -277,6 +277,9 @@ Each step has four phases. Every limit below is enforced, not a timing target.
 
 Further rules for every step:
 
+- **Fresh reads for full passes.** The build and every recertification read
+  through a fresh read-only connection, so a page cache cannot hide an
+  in-place edit made on disk. Extension and fetch use pooled connections.
 - **Cancellation.** Each `SqlWorkBudget` progress handler also checks the
   cancel flag, so it interrupts SQL at its next progress callback (every 1,000
   VM steps). Shutdown sets the flag and waits for the current phase to stop.
@@ -454,9 +457,10 @@ fixed when the pass starts. Extension keeps running alongside it.
 
 ### 6.1 Request flow
 
-1. Take a permit from `receipt_query_lane` (default 4). The lane is non-queued;
-   without a permit the request returns 503 `busy`.
-2. Move to the blocking pool, moving the permit into the closure.
+1. Take one of the service's non-queued read permits
+   (`max_concurrent_reads`, default 4). Without one, the request returns 503
+   `busy`.
+2. The control plane calls the service on the blocking pool.
 3. Validate exactly as today: outcome, currency rules and `effective_read_scope`
    (`chio-kernel/src/receipt_query.rs:200-250`).
 4. Apply the freshness rule (7.2).
@@ -475,7 +479,7 @@ with `total_count` 0. Plans are fixed with `INDEXED BY`.
 | S2 scope plus one equality filter: capabilityId, toolServer, toolName, the toolServer and toolName pair, outcome, agentSubject, or costCurrency without bounds | `(tenant, D, seq)` from the cursor | maintained `(scope, D, value)` |
 | S3 scope plus a time window | a seq window [s_lo, s_hi] from hour buckets, then a `(tenant, seq)` scan with a ts check | whole-hour sums plus two boundary-hour index counts |
 | S4 point read | unique `receipt_id` | none |
-| S5 everything else | the index of the equality filter with the smallest maintained count, clipped to the S3 window if present; otherwise the S3 window or the cost index | the same range |
+| S5 everything else | the index of the equality filter with the smallest maintained count, clipped to the S3 window if present; cost bounds always come with a currency filter and are checked per row | the same range |
 
 How S3 builds its window:
 
@@ -619,9 +623,9 @@ detected at the recertification cadence rather than on the next page (Q1).
     Its anchored startup must meet the same no-hard-cutoff rule (Codex 05:21).
     Both are V25-PRE's to implement.
   - This design adds `TrustServiceState.receipt_query_snapshots:
-    Option<Arc<ReceiptQuerySnapshots>>` and `receipt_query_lane`, starts the
-    service once after the store exists, and stops it before the store is
-    dropped. The exact hunks are agreed with the V25-PRE lane before Task 6.
+    Option<Arc<ReceiptQuerySnapshots>>`. It starts the service once after the
+    store exists and stops it before the store is dropped. Read admission
+    lives in the service. The exact hunks are agreed with the V25-PRE lane before Task 6.
 - **Start, asynchronously.**
   - `ReceiptQuerySnapshots::start` returns at once in
     `Building(waiting_for_writer_seed)`.
@@ -758,6 +762,20 @@ number of seconds.
 - `totalCount` is exact for the version named by `snapshot.id`. It may change
   between pages, as it does today.
 
+**New SDK retry contract** (Codex 06:17Z):
+- Bounded retry lives in the query call itself, and `paginate` delegates to
+  it, so direct query callers recover too.
+- The default 30 s is a retry budget per query call, which means per page. It
+  is not a budget for a whole pagination, which may be unbounded.
+- Only `building`, `stale` and `busy` are retried, each after the server's
+  `Retry-After`.
+- There is no retry on 422, on 500, on `unavailable`, or on a 503 without a
+  known code.
+- TypeScript keeps its local `code = query_error` and exposes the server's code
+  as `serverCode`. Python exposes it as `server_code`.
+- `snapshot` is typed as optional, and `checkpointSeq` is null before the
+  store's first checkpoint.
+
 **Spec and docs.**
 
 - `spec/WIRE_PROTOCOL.md` section 4.3 (`:394-425`): the response field, codes,
@@ -772,7 +790,7 @@ Root owns the TypeScript and Python clients and the dashboard types
 
 | Client | Old SDK against the new server | New SDK |
 |---|---|---|
-| TypeScript `ReceiptQueryClient`, Python `ReceiptQueryClient` | `snapshot` is ignored; 503, 422 and 500 throw the existing status error with no retry; `paginate` already continues on a short page with a non-null `nextCursor` | `snapshot?` typed as above; `code` parsed into the error; `paginate` retries only `building`, `stale` and `busy`, sleeping for `Retry-After` up to a configurable total (default 30 s), then throws with `code`; it never retries `unavailable`, `invalid` or the budget code; against an old server, a missing `snapshot` and `code` are tolerated |
+| TypeScript `ReceiptQueryClient`, Python `ReceiptQueryClient` | `snapshot` is ignored; 503, 422 and 500 throw the existing status error with no retry; `paginate` already continues on a short page with a non-null `nextCursor` | see the retry contract above |
 | C++ client | raw body; status errors | unchanged |
 | Rust control-plane client (`service_runtime/client/operations.rs:527`) | no `deny_unknown_fields` | `snapshot` added with `#[serde(default)]` |
 | Dashboard (`chio-cli/dashboard/src/api.ts`) | ignores the field | optional type only |
