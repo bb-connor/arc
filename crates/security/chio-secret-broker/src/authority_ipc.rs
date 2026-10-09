@@ -695,17 +695,17 @@ fn verify_authority_request(
     maximum_clock_skew_seconds: u64,
 ) -> Result<()> {
     validate_authority_operation(&request.body.operation)?;
-    validate_signed_frame_identity(
-        &request.body.schema,
-        &request.body.request_id,
-        request.body.issued_at_unix_seconds,
-        &request.body.broker,
-        request.algorithm,
-        request.signature.algorithm(),
-        trusted_broker,
+    validate_signed_frame_identity(SignedFrameIdentity {
+        schema: &request.body.schema,
+        request_id: &request.body.request_id,
+        issued_at_unix_seconds: request.body.issued_at_unix_seconds,
+        signer: &request.body.broker,
+        algorithm: request.algorithm,
+        signature_algorithm: request.signature.algorithm(),
+        trusted_signer: trusted_broker,
         now,
         maximum_clock_skew_seconds,
-    )?;
+    })?;
     let input = AuthoritySigningInput {
         domain: AUTHORITY_REQUEST_DOMAIN,
         body: &request.body,
@@ -809,17 +809,17 @@ fn verify_authority_response(
     maximum_clock_skew_seconds: u64,
 ) -> Result<()> {
     validate_digest(&response.body.request_digest, "authority request digest")?;
-    validate_signed_frame_identity(
-        &response.body.schema,
-        &response.body.request_id,
-        response.body.issued_at_unix_seconds,
-        &response.body.authority,
-        response.algorithm,
-        response.signature.algorithm(),
-        trusted_authority,
+    validate_signed_frame_identity(SignedFrameIdentity {
+        schema: &response.body.schema,
+        request_id: &response.body.request_id,
+        issued_at_unix_seconds: response.body.issued_at_unix_seconds,
+        signer: &response.body.authority,
+        algorithm: response.algorithm,
+        signature_algorithm: response.signature.algorithm(),
+        trusted_signer: trusted_authority,
         now,
         maximum_clock_skew_seconds,
-    )?;
+    })?;
     if response.body.request_id != expected_request_id
         || response.body.request_digest != expected_request_digest
     {
@@ -846,21 +846,31 @@ fn verify_authority_response(
     Ok(())
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-)]
-fn validate_signed_frame_identity(
-    schema: &str,
-    request_id: &str,
+/// Parameters of `validate_signed_frame_identity`.
+struct SignedFrameIdentity<'a> {
+    schema: &'a str,
+    request_id: &'a str,
     issued_at_unix_seconds: u64,
-    signer: &PublicKey,
+    signer: &'a PublicKey,
     algorithm: SigningAlgorithm,
     signature_algorithm: SigningAlgorithm,
-    trusted_signer: &PublicKey,
+    trusted_signer: &'a PublicKey,
     now: u64,
     maximum_clock_skew_seconds: u64,
-) -> Result<()> {
+}
+
+fn validate_signed_frame_identity(params: SignedFrameIdentity<'_>) -> Result<()> {
+    let SignedFrameIdentity {
+        schema,
+        request_id,
+        issued_at_unix_seconds,
+        signer,
+        algorithm,
+        signature_algorithm,
+        trusted_signer,
+        now,
+        maximum_clock_skew_seconds,
+    } = params;
     validate_identifier(request_id, "authority request id", 512)?;
     let earliest = issued_at_unix_seconds.saturating_sub(maximum_clock_skew_seconds);
     let latest = issued_at_unix_seconds
