@@ -15,8 +15,11 @@ records four required obligations. Every earlier requirement and source is
 preserved; replaced current-state entries remain in dated observations:
 
 - **V25-ARCHIVE-LATE-LINEAGE (P1):** supported archived history must keep serving
-  authenticated reads after valid later capability lineage is recorded. Claude
-  owns the isolated repair; composition and affected qualification are pending.
+  authenticated reads after valid later capability lineage is recorded. Repair
+  `fe4ef22b90` is composed as `77d94e11dc`, with 216 expected affected tests,
+  strict owning all-target Clippy, formatting and four static gates passing.
+  Seven explicit test ignores remain separate. The [qualification record](audits/receipt-late-lineage-qualification-20261009.json)
+  preserves six Original failures, the refusal controls and source-bound evidence.
 - **KANI-DOMAIN-BINDING (P2):** bind mandatory proof modules and fixtures to the
   accepted domains. The isolated guard has twelve genuine Original mutation
   failures and 15 repaired test methods passing. Whole-batch composition and the
@@ -44,12 +47,23 @@ The full control-plane suite at predecessor `0fd8aa21ff` finished with
 failed despite the later focused fixture repair. The same-host 150k capacity runs
 passed on contended Original, final source and quieter Original, but measured
 tail settlement rather than large unpublished checkpoint-covered staging.
-The required 100k covered-range measurement is pending. No performance gain,
-current full-suite pass or final candidate qualification is claimed.
+The additional 100k covered-range measurement passed on `873f1367f3`: at most
+256 leaves per staging/publication hold, exact admin and tenant page/count/cursor
+parity, rotation of all 101k entries during publication, and completed shutdown
+during the next covered range. The receipt source matches the composition apart
+from the test-only observer repair; separately qualified authority files differ.
+This is source-family capacity evidence. No performance gain, current full-suite
+pass or final candidate qualification is claimed. The per-call operator/export
+subject fallback still scans the archive per chunk of matching late capabilities;
+HTTP snapshot request budgets are unchanged.
 
 The mandatory unchanged-domain proof remains pending; diagnostic and component
-results do not replace a terminal proof. The Z3 attempt stopped in CBMC's SMT
-type converter before solver execution and remains a tool error. Main
+results do not replace a terminal proof. The initial Z3 attempt stopped in CBMC's
+SMT type converter. A later private-tool diagnostic reached Z3 but exhausted its
+14 GiB address-space limit (exit 101), leaving 26 solver errors including the
+mandatory assertions and completion cover. Its zero failed-assertion count is
+not success. Both attempts and the earlier prepared-model mismatch are preserved.
+A bounded memory retry is unqualified until its complete result is reviewed. Main
 `3af65d2d23` is merged into the stage with both histories preserved; its changed
 conformance fixture and affected tooling pass. Source remains `3b0760cfe7` and the
 published PR remains `fd8bfdc947`; exact protected checks and protected merge

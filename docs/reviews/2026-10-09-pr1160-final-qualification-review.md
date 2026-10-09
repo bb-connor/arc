@@ -36,6 +36,24 @@ source and log are in the coordinator's `vfix/v25/c20-sequence` evidence,
 with hashes `7f92355b70da4e96bc4049d9a9ee26b4d5530dc61b65f90c74c22fbe7eba30de`
 and `a4e81e0290e86c48dc5acee9bb47ae63b82bfcd862ca73255b87643f0321a434`.
 
+### Late-lineage disposition at 77d94e11dc
+
+Producer `fe4ef22b90` is composed as `77d94e11dc`. The final tests fail six
+cases on Original while five refusal controls pass. All eleven pass with the
+repair; controls also detect overlapping attribution branches and loss of the
+second capability chunk. The composed source passes all 216 expected affected
+tests, strict owning all-target Clippy, formatting and four static gates. Seven
+default ignores remain explicit. [The qualification record](../security/audits/receipt-late-lineage-qualification-20261009.json)
+binds those results, source hashes and the full covered-range measurement.
+
+Absent unsigned attribution in an archive is accepted only when its lineage row
+is absent too. Present or signed mismatches still refuse. A stripped unsigned
+projection becomes answer-neutral through canonical live lineage; the tests
+explicitly retain that contract. The operator/export subject fallback performs
+repeated archive scans per 256 matching late capabilities. This is a disclosed
+performance limitation and indexing follow-up, not bounded work independent of
+history. HTTP snapshot request budgets are unaffected.
+
 ## KANI-DOMAIN-BINDING: P2, required before landing
 
 The crypto scope gate previously bound the research harnesses without binding
@@ -55,6 +73,15 @@ review and exact candidate acceptance remain pending. The latest full-domain
 attestation run timed out after 1,803.225 seconds without a final assertion or
 completion-cover verdict. Encoder correspondence and native controls are
 component evidence only. Solver-free SSA analysis is diagnostic evidence.
+
+Later diagnostics preserve the initial SMT type-converter error and a private
+same-version tool attempt that exhausted Z3's 14 GiB address-space allowance
+(solver exit 101). Its structured result has 2,959 successes, 136 unreachable
+checks and 26 solver errors, including determinism, context binding and the
+completion cover. The earlier cover-only interpretation is incorrect. The
+prepared-model mismatch from that attempt remains recorded separately. A new
+bounded memory retry retains the domain, assertions and source; it supplies no
+acceptance before terminal verification and reproducible tool qualification.
 
 ## V25-C20-OBSERVER-CANCELLATION: P2, required before landing
 
@@ -149,3 +176,19 @@ then resume and demonstrate actual staging and reread, bounded holds,
 authenticated page/count parity and measured resource use. Claude owns this
 test-only acceptance lane. Earlier one-million and ten-million measurements
 remain predecessor evidence.
+
+The additional measurement is now terminal on `873f1367f3`, with the final
+late-lineage production repair and the capacity test: one pass in 220.63 seconds.
+After a 1k prefix, 100k unpublished covered receipts were staged with at most 256
+leaves per hold. Root validation preceded authenticated reread and publication,
+while rotation archived all 101k receipts. Admin total 101k and tenant total
+50,500 match the per-call page/count/cursor results. Ten stale refusals and zero
+invalid outcomes were recorded during publication. Shutdown during a second 10k
+covered range completed in 14.74 ms and reached `Stopped`. Default quotas and
+work limits were retained. Proc sampling and process high-water memory readings
+remain distinct measurements in the audit.
+
+Relevant receipt source bytes match `77d94e11dc` except the test-only observer
+repair; separately qualified authority/custody files also differ. This accepts
+the previously missing source-family staging/reread capacity observation, without
+claiming an exact whole-candidate run or renewing the earlier 1M/10M campaigns.
