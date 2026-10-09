@@ -69,6 +69,9 @@ fn metrics_state(service_token: &str) -> TrustServiceState {
         budget_store: None,
         revocation_store: None,
         receipt_store: None,
+        receipt_query_snapshots: None,
+        receipt_query_lane: Arc::new(tokio::sync::Semaphore::new(4)),
+        evidence_export_lane: Arc::new(tokio::sync::Semaphore::new(1)),
         enterprise_provider_registry: None,
         verifier_policy_registry: None,
         federation_admission_rate_limiter: Arc::new(Mutex::new(
@@ -924,3 +927,6 @@ async fn receipt_append_routes_accept_bodies_above_the_service_body_cap() {
         "a route without the receipt-append override must still cap at 1 MiB"
     );
 }
+
+#[path = "router_tests/receipt_query_snapshot_tests.rs"]
+mod receipt_query_snapshot_tests;

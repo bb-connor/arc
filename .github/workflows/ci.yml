@@ -213,6 +213,8 @@ jobs:
           run_gate python3 scripts/check-security-clocks.py
           run_gate python3 scripts/tests/check-security-clocks.test.py
           run_gate python3 scripts/check-trust-boundaries.py
+          run_gate python3 scripts/check-receipt-query-http.py
+          run_gate python3 scripts/tests/check-receipt-query-http.test.py
           run_gate python3 scripts/tests/check-trust-boundaries.test.py
           run_gate python3 scripts/check-negative-assertions.py
           run_gate bash scripts/tests/check-negative-assertions.test.sh

@@ -26,6 +26,7 @@ async fn handle_health(State(state): State<TrustServiceState>) -> Response {
         "clustered": state.cluster.is_some(),
         "authority": trust_authority_health_snapshot(&state),
         "stores": trust_store_health_snapshot(&state.config),
+        "receiptQuerySnapshot": super::receipt_query_service::health(&state).await,
         "federation": federation,
         "cluster": trust_cluster_health_snapshot(&state, consensus, leader_url, self_url),
     }))

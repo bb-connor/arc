@@ -21,6 +21,13 @@ pub(crate) struct TrustServiceState {
     /// serving. Handlers share it and its one writer instead of opening a store
     /// (and seeding a writer) per request.
     pub(crate) receipt_store: Option<Arc<SqliteReceiptStore>>,
+    /// One authenticated projection and walker for the service-owned store.
+    pub(crate) receipt_query_snapshots:
+        Option<Arc<chio_store_sqlite::receipt_query_snapshot::ReceiptQuerySnapshots>>,
+    /// Bound submissions before entering the blocking pool, without queuing.
+    pub(crate) receipt_query_lane: Arc<tokio::sync::Semaphore>,
+    /// Full-history exports have an independent single-worker budget.
+    pub(crate) evidence_export_lane: Arc<tokio::sync::Semaphore>,
     pub(crate) enterprise_provider_registry: Option<Arc<EnterpriseProviderRegistry>>,
     pub(crate) verifier_policy_registry: Option<Arc<VerifierPolicyRegistry>>,
     pub(crate) federation_admission_rate_limiter: Arc<Mutex<FederationAdmissionRateLimiter>>,

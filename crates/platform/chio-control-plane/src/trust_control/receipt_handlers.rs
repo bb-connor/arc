@@ -26,10 +26,6 @@ pub(crate) async fn handle_list_tool_receipts(
         Ok(principal) => principal,
         Err(response) => return response,
     };
-    let store = match state.receipt_store() {
-        Ok(store) => store,
-        Err(response) => return response,
-    };
     // Point-load by receipt id: resolve exactly one receipt from the durable
     // store (bounded to one row) so a bounded in-memory mirror eviction on the
     // kernel does not cause a false denial of a governed call-chain
@@ -43,21 +39,24 @@ pub(crate) async fn handle_list_tool_receipts(
                 "receipt point-load by id requires the admin service token",
             );
         }
-        let receipts = match store
-            .load_chio_receipt_with_context(receipt_id, &principal.receipt_read_context())
+        let (receipt, watermark) = match super::receipt_query_service::load(
+            &state,
+            receipt_id.to_string(),
+            principal.receipt_read_context(),
+        )
+        .await
         {
-            Ok(Some(receipt)) => match serde_json::to_value(receipt) {
-                Ok(value) => vec![value],
-                Err(error) => {
-                    return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-                }
-            },
-            Ok(None) => Vec::new(),
+            Ok(result) => result,
+            Err(response) => return response,
+        };
+        let receipts = match receipt.map(serde_json::to_value).transpose() {
+            Ok(receipt) => receipt.into_iter().collect::<Vec<_>>(),
             Err(error) => {
-                return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+                return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
             }
         };
         return Json(ReceiptListResponse {
+            snapshot: Some(watermark),
             configured: true,
             backend: "sqlite".to_string(),
             kind: "tool".to_string(),
@@ -83,11 +82,9 @@ pub(crate) async fn handle_list_tool_receipts(
         tenant_filter: None,
         read_context: Some(principal.receipt_read_context()),
     };
-    let result = match store.query_receipts(&kernel_query) {
+    let result = match super::receipt_query_service::query(&state, kernel_query).await {
         Ok(result) => result,
-        Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-        }
+        Err(response) => return response,
     };
     let receipts = match result
         .receipts
@@ -102,6 +99,7 @@ pub(crate) async fn handle_list_tool_receipts(
     };
 
     Json(ReceiptListResponse {
+        snapshot: result.snapshot,
         configured: true,
         backend: "sqlite".to_string(),
         kind: "tool".to_string(),
@@ -209,6 +207,7 @@ pub(crate) async fn handle_list_child_receipts(
             configured: true,
             backend: "sqlite".to_string(),
             kind: "child".to_string(),
+            snapshot: None,
             count: receipts.len(),
             filters: json!({ "receiptId": receipt_id }),
             receipts,
@@ -245,6 +244,7 @@ pub(crate) async fn handle_list_child_receipts(
         configured: true,
         backend: "sqlite".to_string(),
         kind: "child".to_string(),
+        snapshot: None,
         count: receipts.len(),
         filters: json!({
             "sessionId": query.session_id,
@@ -267,10 +267,6 @@ pub(crate) async fn handle_query_receipts(
         Ok(principal) => principal,
         Err(response) => return response,
     };
-    let store = match state.receipt_store() {
-        Ok(store) => store,
-        Err(response) => return response,
-    };
     let kernel_query = ReceiptQuery {
         capability_id: query.capability_id.clone(),
         tool_server: query.tool_server.clone(),
@@ -290,11 +286,9 @@ pub(crate) async fn handle_query_receipts(
     if let Err(error) = kernel_query.validated_cost_currency() {
         return plain_http_error(StatusCode::BAD_REQUEST, &error);
     }
-    let result = match store.query_receipts(&kernel_query) {
+    let result = match super::receipt_query_service::query(&state, kernel_query).await {
         Ok(result) => result,
-        Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-        }
+        Err(response) => return response,
     };
     let receipts = match result
         .receipts
@@ -308,6 +302,7 @@ pub(crate) async fn handle_query_receipts(
         }
     };
     Json(ReceiptQueryResponse {
+        snapshot: result.snapshot,
         total_count: result.total_count,
         next_cursor: result.next_cursor,
         receipts,
@@ -378,24 +373,27 @@ pub(crate) async fn handle_evidence_export(
         Ok(query) => query,
         Err(response) => return response,
     };
-    let (bundle, transparency) = match store.build_evidence_export_bundle_with_transparency(&query)
-    {
-        Ok(result) => result,
-        Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-        }
-    };
-    if let Err(error) =
-        evidence_export::validate_evidence_bundle_requirements(&bundle, prepared.require_proofs)
-    {
-        return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
-    }
-    Json(evidence_export::RemoteEvidenceExportResponse {
-        bundle,
-        transparency: Some(transparency),
-        federation_policy: prepared.federation_policy,
-    })
-    .into_response()
+    super::receipt_query_service::run_bounded_response(
+        Arc::clone(&state.evidence_export_lane),
+        move || {
+            let (bundle, transparency) = store
+                .build_evidence_export_bundle_with_transparency(&query)
+                .map_err(|error| {
+                    plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+                })?;
+            evidence_export::validate_evidence_bundle_requirements(
+                &bundle,
+                prepared.require_proofs,
+            )
+            .map_err(|error| plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()))?;
+            Ok::<_, Response>(Json(evidence_export::RemoteEvidenceExportResponse {
+                bundle,
+                transparency: Some(transparency),
+                federation_policy: prepared.federation_policy,
+            }))
+        },
+    )
+    .await
 }
 
 pub(crate) async fn handle_evidence_import(
@@ -954,10 +952,6 @@ pub(crate) async fn handle_agent_receipts(
         Ok(principal) => principal,
         Err(response) => return response,
     };
-    let store = match state.receipt_store() {
-        Ok(store) => store,
-        Err(response) => return response,
-    };
     let kernel_query = ReceiptQuery {
         agent_subject: Some(subject_key),
         cursor: query.cursor,
@@ -965,11 +959,9 @@ pub(crate) async fn handle_agent_receipts(
         read_context: Some(principal.receipt_read_context()),
         ..Default::default()
     };
-    let result = match store.query_receipts(&kernel_query) {
+    let result = match super::receipt_query_service::query(&state, kernel_query).await {
         Ok(result) => result,
-        Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-        }
+        Err(response) => return response,
     };
     let receipts = match result
         .receipts
@@ -983,6 +975,7 @@ pub(crate) async fn handle_agent_receipts(
         }
     };
     Json(ReceiptQueryResponse {
+        snapshot: result.snapshot,
         total_count: result.total_count,
         next_cursor: result.next_cursor,
         receipts,

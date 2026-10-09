@@ -1009,6 +1009,7 @@ fn sample_child_receipt(id: &str) -> ChildRequestReceipt {
 
 fn receipt_list_response_body(kind: &str, receipts: Vec<serde_json::Value>) -> String {
     serde_json::to_string(&ReceiptListResponse {
+        snapshot: None,
         configured: true,
         backend: "sqlite".to_string(),
         kind: kind.to_string(),

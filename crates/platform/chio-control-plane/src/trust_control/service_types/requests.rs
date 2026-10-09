@@ -520,6 +520,8 @@ pub struct ReputationCompareRequest {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReceiptQueryResponse {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub snapshot: Option<chio_kernel::receipt_query::ReceiptSnapshotWatermark>,
     pub total_count: u64,
     pub next_cursor: Option<u64>,
     pub receipts: Vec<Value>,

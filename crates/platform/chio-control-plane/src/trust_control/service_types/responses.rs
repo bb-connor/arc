@@ -267,6 +267,8 @@ pub struct RevocationListResponse {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReceiptListResponse {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub snapshot: Option<chio_kernel::receipt_query::ReceiptSnapshotWatermark>,
     pub configured: bool,
     pub backend: String,
     pub kind: String,

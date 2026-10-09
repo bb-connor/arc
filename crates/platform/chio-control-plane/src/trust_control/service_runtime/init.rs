@@ -194,6 +194,27 @@ async fn serve_async_inner(
         }
     };
     let receipt_store_owner = receipt_store.clone();
+    let receipt_query_snapshots = receipt_store
+        .as_ref()
+        .map(|store| {
+            chio_store_sqlite::receipt_query_snapshot::ReceiptQuerySnapshots::start(
+                Arc::clone(store),
+                chio_store_sqlite::receipt_query_snapshot::ReceiptQuerySnapshotConfig {
+                    quota_bytes: config.receipt_query_snapshot_quota_bytes,
+                    ..chio_store_sqlite::receipt_query_snapshot::ReceiptQuerySnapshotConfig::default()
+                },
+            )
+            .map(Arc::new)
+        })
+        .transpose()
+        .map_err(|source| {
+            CliError::with_public_source(
+                &chio_errors::_generated::error_codes::CLI_OTHER,
+                "trust-control receipt query snapshot startup failed",
+                source,
+            )
+        })?;
+    let receipt_query_owner = receipt_query_snapshots.clone();
     // Thread the operator-configured memory budget into the admission guard so a
     // lowered `admission_key_cap` actually tightens it. Read the cap before
     // `config` is moved into the state.
@@ -211,6 +232,9 @@ async fn serve_async_inner(
         budget_store,
         revocation_store,
         receipt_store,
+        receipt_query_snapshots,
+        receipt_query_lane: Arc::new(tokio::sync::Semaphore::new(4)),
+        evidence_export_lane: Arc::new(tokio::sync::Semaphore::new(1)),
         enterprise_provider_registry,
         verifier_policy_registry,
         federation_admission_rate_limiter,
@@ -307,6 +331,13 @@ async fn serve_async_inner(
                 source,
             )
         })?;
+    }
+
+    // Stop the walker off the async runtime before flushing its store.
+    if let Some(snapshots) = receipt_query_owner {
+        if let Err(error) = tokio::task::spawn_blocking(move || snapshots.shutdown()).await {
+            warn!(%error, "trust-control receipt query snapshot shutdown task failed");
+        }
     }
 
     // Make queued receipt work durable before returning. Whichever owner

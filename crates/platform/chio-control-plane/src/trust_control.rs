@@ -354,6 +354,8 @@ pub mod finding_verified_fix;
 mod passport_handlers;
 #[path = "trust_control/receipt_handlers.rs"]
 mod receipt_handlers;
+#[path = "trust_control/receipt_query_service.rs"]
+mod receipt_query_service;
 #[path = "trust_control/report_rendering.rs"]
 pub(crate) mod report_rendering;
 #[path = "trust_control/report_validation.rs"]

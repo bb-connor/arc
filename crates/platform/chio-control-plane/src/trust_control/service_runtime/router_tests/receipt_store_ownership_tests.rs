@@ -10,7 +10,7 @@ use chio_core::receipt::body::{ChioReceipt, ChioReceiptBody};
 use chio_core::receipt::decision::{Decision, ToolCallAction};
 use tower::ServiceExt;
 
-fn signed_receipt(keypair: &Keypair) -> Result<ChioReceipt, Box<dyn std::error::Error>> {
+pub(super) fn signed_receipt(keypair: &Keypair) -> Result<ChioReceipt, Box<dyn std::error::Error>> {
     Ok(ChioReceipt::sign(
         ChioReceiptBody {
             id: "shared-store-receipt".to_string(),
@@ -57,6 +57,21 @@ async fn receipt_routes_share_the_service_store_and_never_open_the_configured_pa
     let mut state = metrics_state("service-secret");
     state.config.receipt_db_path = Some(unopenable.clone());
     state.receipt_store = Some(Arc::clone(&store));
+    let snapshots = Arc::new(
+        chio_store_sqlite::receipt_query_snapshot::ReceiptQuerySnapshots::start(
+            Arc::clone(&store),
+            Default::default(),
+        )?,
+    );
+    tokio::time::timeout(Duration::from_secs(10), async {
+        while snapshots.status().state
+            != chio_store_sqlite::receipt_query_snapshot::ReceiptQuerySnapshotState::Ready
+        {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await?;
+    state.receipt_query_snapshots = Some(snapshots);
     let router = super::super::build_router(state);
 
     let receipt = signed_receipt(&Keypair::generate())?;

@@ -50,6 +50,9 @@ pub(super) fn challenge_route_state(
         budget_store: None,
         revocation_store: None,
         receipt_store: None,
+        receipt_query_snapshots: None,
+        receipt_query_lane: Arc::new(tokio::sync::Semaphore::new(4)),
+        evidence_export_lane: Arc::new(tokio::sync::Semaphore::new(1)),
         enterprise_provider_registry: None,
         verifier_policy_registry: None,
         federation_admission_rate_limiter: Arc::new(Mutex::new(

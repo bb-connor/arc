@@ -985,3 +985,32 @@ pub(crate) fn plain_http_error(status: StatusCode, message: &str) -> Response {
 #[cfg(test)]
 #[path = "policy_support_tests.rs"]
 mod tests;
+
+/// Snapshot availability has a stable code; legacy errors keep their body.
+pub(crate) fn snapshot_error_response(error: ReceiptStoreError) -> Response {
+    let ReceiptStoreError::QuerySnapshot(error) = error else {
+        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+    };
+    use chio_kernel::receipt_query::ReceiptQuerySnapshotError;
+    let status = match &error {
+        ReceiptQuerySnapshotError::Invalid(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        ReceiptQuerySnapshotError::WorkBudgetExhausted(_) => StatusCode::UNPROCESSABLE_ENTITY,
+        ReceiptQuerySnapshotError::Building { .. }
+        | ReceiptQuerySnapshotError::Stale
+        | ReceiptQuerySnapshotError::Busy
+        | ReceiptQuerySnapshotError::Unavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
+    };
+    let mut response = (
+        status,
+        Json(json!({"error": error.to_string(), "code": error.wire_code()})),
+    )
+        .into_response();
+    if let Some(seconds) = error.retry_after_seconds() {
+        if let Ok(value) = axum::http::HeaderValue::from_str(&seconds.to_string()) {
+            response
+                .headers_mut()
+                .insert(axum::http::header::RETRY_AFTER, value);
+        }
+    }
+    response
+}

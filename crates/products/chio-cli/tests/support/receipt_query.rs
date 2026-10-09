@@ -363,6 +363,18 @@ pub(crate) fn spawn_trust_service_without_receipt_db(
     }
 }
 
+fn receipt_query_health_ready(response: reqwest::blocking::Response) -> bool {
+    if response.status() != reqwest::StatusCode::OK {
+        return false;
+    }
+    response.json::<serde_json::Value>().is_ok_and(|body| {
+        !body["stores"]["receiptsConfigured"]
+            .as_bool()
+            .unwrap_or(false)
+            || body["receiptQuerySnapshot"]["state"] == "ready"
+    })
+}
+
 pub(crate) fn wait_for_trust_service_result(
     client: &Client,
     base_url: &str,
@@ -376,8 +388,13 @@ pub(crate) fn wait_for_trust_service_result(
             ));
         }
         match client.get(format!("{base_url}/health")).send() {
-            Ok(response) if response.status() == reqwest::StatusCode::OK => return Ok(()),
-            Ok(_) | Err(_) => thread::sleep(Duration::from_millis(100)),
+            Ok(response) => {
+                if receipt_query_health_ready(response) {
+                    return Ok(());
+                }
+                thread::sleep(Duration::from_millis(100));
+            }
+            Err(_) => thread::sleep(Duration::from_millis(100)),
         }
     }
     Err("trust service did not become ready before timeout".to_string())
@@ -387,9 +404,12 @@ pub(crate) fn wait_for_trust_service(client: &Client, base_url: &str) {
     let mut last_error = None;
     for _ in 0..900 {
         match client.get(format!("{base_url}/health")).send() {
-            Ok(response) if response.status() == reqwest::StatusCode::OK => return,
             Ok(response) => {
-                last_error = Some(format!("health returned {}", response.status()));
+                let observed_status = response.status();
+                if receipt_query_health_ready(response) {
+                    return;
+                }
+                last_error = Some(format!("health not query-ready (HTTP {observed_status})"));
                 thread::sleep(Duration::from_millis(100));
             }
             Err(error) => {
