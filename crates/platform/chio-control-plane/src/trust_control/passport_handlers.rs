@@ -720,6 +720,19 @@ pub(crate) async fn handle_public_get_passport_challenge(
     }
 }
 
+/// Public holder submissions this node verifies at once: an explicit bound on
+/// the blocking-pool threads this unauthenticated route can hold.
+const PUBLIC_PASSPORT_CHALLENGE_VERIFY_PERMITS: usize = 16;
+
+/// Admission for local verification of public holder submissions. No other
+/// route draws on it, so this route can exhaust only its own permits.
+static PUBLIC_PASSPORT_CHALLENGE_VERIFY_LANE: LazyLock<Arc<tokio::sync::Semaphore>> =
+    LazyLock::new(|| {
+        Arc::new(tokio::sync::Semaphore::new(
+            PUBLIC_PASSPORT_CHALLENGE_VERIFY_PERMITS,
+        ))
+    });
+
 pub(crate) async fn handle_public_verify_passport_challenge(
     State(state): State<TrustServiceState>,
     Json(payload): Json<VerifyPassportChallengeRequest>,
@@ -733,6 +746,55 @@ pub(crate) async fn handle_public_verify_passport_challenge(
         Ok(None) => {}
         Err(response) => return response,
     }
+    verify_public_passport_challenge_in_lane(
+        &PUBLIC_PASSPORT_CHALLENGE_VERIFY_LANE,
+        state,
+        payload,
+        clock_now,
+    )
+    .await
+}
+
+/// Verifies one public holder submission on the blocking pool under a permit
+/// from `lane`.
+///
+/// Admission never waits: without a free permit the submission is refused at
+/// once with 503. The permit moves into the blocking closure and is released
+/// only after the response is built, so a submission dropped mid-verification
+/// keeps its permit until that work has ended.
+pub(super) async fn verify_public_passport_challenge_in_lane(
+    lane: &Arc<tokio::sync::Semaphore>,
+    state: TrustServiceState,
+    payload: VerifyPassportChallengeRequest,
+    clock_now: u64,
+) -> Response {
+    let Ok(permit) = Arc::clone(lane).try_acquire_owned() else {
+        return plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "public passport challenge verification is at capacity",
+        );
+    };
+    tokio::task::spawn_blocking(move || {
+        let response = verify_public_passport_challenge(&state, &payload, clock_now);
+        drop(permit);
+        response
+    })
+    .await
+    .unwrap_or_else(|_| {
+        plain_http_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "public passport challenge verification did not complete",
+        )
+    })
+}
+
+/// Checks one public holder submission against its stored challenge and
+/// builds the response.
+fn verify_public_passport_challenge(
+    state: &TrustServiceState,
+    payload: &VerifyPassportChallengeRequest,
+    clock_now: u64,
+) -> Response {
     let challenge_id = match payload
         .presentation
         .challenge
@@ -774,7 +836,7 @@ pub(crate) async fn handle_public_verify_passport_challenge(
             );
         }
     }
-    match verify_passport_challenge_payload(&state, &payload, Some(&stored_challenge), true) {
+    match verify_passport_challenge_payload(state, payload, Some(&stored_challenge), true) {
         Ok(verification) => Json(verification).into_response(),
         Err(response) => response,
     }

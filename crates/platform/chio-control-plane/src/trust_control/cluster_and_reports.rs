@@ -18,6 +18,8 @@ mod cluster_and_reports_tests {
     mod budget_replay_lease_renewal;
     #[path = "cluster_fence.rs"]
     mod cluster_fence;
+    #[path = "public_passport_challenge_admission.rs"]
+    mod public_passport_challenge_admission;
     #[path = "replication_heads.rs"]
     mod replication_heads;
     #[path = "revocation_replication.rs"]
