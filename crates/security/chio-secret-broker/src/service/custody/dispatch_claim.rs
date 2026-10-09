@@ -174,7 +174,6 @@ impl DispatchCommitPoint<'_, '_> {
 
 impl CommittedDispatch<'_> {
     /// Fails after dispatch with the outcome recorded as unknown.
-    #[cfg_attr(not(test), expect(dead_code))]
     pub(in super::super) fn unknown(
         mut self,
         error: BrokerError,

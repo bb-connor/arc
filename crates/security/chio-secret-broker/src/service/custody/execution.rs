@@ -6,14 +6,24 @@ use super::super::{
     BrokerError, BrokerExecuteFailure, BrokerExecuteOutcome, BrokerExecuteRequest,
     BrokerExecuteResponse, BrokerExecutionEvidence, BrokerExecutionOutcome, BrokerFailureOutcome,
     BrokerFailureStage, BrokerReceiptBody, BrokerRevocationRequest, BrokerService,
-    CaptureExecutionHoldRequest, ExecutionFailure, ExecutionHoldState, ExecutionResult,
-    FailureOrigin, FailureProjection, HttpsDispatchFailure, Result, TrustedExecutionContext,
+    CaptureExecutionHoldRequest, ExecutionHoldState, ExecutionResult, FailureOrigin,
+    FailureProjection, HttpsDispatchFailure, Result, TrustedExecutionContext,
     BROKER_EVIDENCE_SCHEMA, BROKER_RECEIPT_SCHEMA,
 };
 use super::dispatch_claim::ClaimedCapture;
 
+const DISPATCH_UNKNOWN: FailureProjection = FailureProjection {
+    stage: BrokerFailureStage::Dispatch,
+    outcome: BrokerFailureOutcome::Unknown,
+    dispatch_knowledge: BrokerDispatchKnowledge::Unknown,
+};
 const RESPONSE_FAILED: FailureProjection = FailureProjection {
     stage: BrokerFailureStage::Response,
+    outcome: BrokerFailureOutcome::Failed,
+    dispatch_knowledge: BrokerDispatchKnowledge::Committed,
+};
+const RECEIPT_PERSISTENCE_FAILED: FailureProjection = FailureProjection {
+    stage: BrokerFailureStage::ReceiptPersistence,
     outcome: BrokerFailureOutcome::Failed,
     dispatch_knowledge: BrokerDispatchKnowledge::Committed,
 };
@@ -437,7 +447,7 @@ impl BrokerService {
             self.attempts.as_ref(),
             &ids.attempt_id,
             self.next_dispatch_claim_id()?,
-            capture_evidence.clone(),
+            capture_evidence,
             now_unix_seconds,
         )?;
 
@@ -539,38 +549,10 @@ impl BrokerService {
         ) {
             Ok(response) => response,
             Err(HttpsDispatchFailure::Transport(error)) => {
-                let _ = self.attempts.transition(
-                    &ids.attempt_id,
-                    AttemptState::DispatchCommitted,
-                    AttemptState::UnknownOutcome,
-                    &capture_evidence,
-                    now_unix_seconds,
-                );
-                return Err(ExecutionFailure::at(
-                    error,
-                    FailureProjection {
-                        stage: BrokerFailureStage::Dispatch,
-                        outcome: BrokerFailureOutcome::Unknown,
-                        dispatch_knowledge: BrokerDispatchKnowledge::Unknown,
-                    },
-                ));
+                return Err(committed.unknown(error, DISPATCH_UNKNOWN, now_unix_seconds));
             }
             Err(HttpsDispatchFailure::Response(error)) => {
-                let _ = self.attempts.transition(
-                    &ids.attempt_id,
-                    AttemptState::DispatchCommitted,
-                    AttemptState::UnknownOutcome,
-                    &capture_evidence,
-                    now_unix_seconds,
-                );
-                return Err(ExecutionFailure::at(
-                    error,
-                    FailureProjection {
-                        stage: BrokerFailureStage::Response,
-                        outcome: BrokerFailureOutcome::Failed,
-                        dispatch_knowledge: BrokerDispatchKnowledge::Committed,
-                    },
-                ));
+                return Err(committed.unknown(error, RESPONSE_FAILED, now_unix_seconds));
             }
         };
         drop(retained.credential);
@@ -658,57 +640,27 @@ impl BrokerService {
         let receipt_reference = match self.receipt_sink.persist_completed(&response) {
             Ok(reference) => reference,
             Err(error) => {
-                let _ = self.attempts.transition(
-                    &ids.attempt_id,
-                    AttemptState::DispatchCommitted,
-                    AttemptState::UnknownOutcome,
-                    &capture_evidence,
-                    terminal_unix_seconds,
-                );
-                return Err(ExecutionFailure::at(
+                return Err(committed.unknown(
                     error,
-                    FailureProjection {
-                        stage: BrokerFailureStage::ReceiptPersistence,
-                        outcome: BrokerFailureOutcome::Failed,
-                        dispatch_knowledge: BrokerDispatchKnowledge::Committed,
-                    },
+                    RECEIPT_PERSISTENCE_FAILED,
+                    terminal_unix_seconds,
                 ));
             }
         };
         if let Err(error) = validate_identifier(&receipt_reference, "receipt reference", 512) {
-            let _ = self.attempts.transition(
-                &ids.attempt_id,
-                AttemptState::DispatchCommitted,
-                AttemptState::UnknownOutcome,
-                &capture_evidence,
-                terminal_unix_seconds,
-            );
-            return Err(ExecutionFailure::at(
+            return Err(committed.unknown(
                 error,
-                FailureProjection {
-                    stage: BrokerFailureStage::ReceiptPersistence,
-                    outcome: BrokerFailureOutcome::Failed,
-                    dispatch_knowledge: BrokerDispatchKnowledge::Committed,
-                },
+                RECEIPT_PERSISTENCE_FAILED,
+                terminal_unix_seconds,
             ));
         }
         if receipt_reference != expected_receipt_reference {
-            let _ = self.attempts.transition(
-                &ids.attempt_id,
-                AttemptState::DispatchCommitted,
-                AttemptState::UnknownOutcome,
-                &capture_evidence,
-                terminal_unix_seconds,
-            );
-            return Err(ExecutionFailure::at(
+            return Err(committed.unknown(
                 BrokerError::Invariant(
                     "broker receipt sink returned an unbound receipt reference".to_string(),
                 ),
-                FailureProjection {
-                    stage: BrokerFailureStage::ReceiptPersistence,
-                    outcome: BrokerFailureOutcome::Failed,
-                    dispatch_knowledge: BrokerDispatchKnowledge::Committed,
-                },
+                RECEIPT_PERSISTENCE_FAILED,
+                terminal_unix_seconds,
             ));
         }
         committed.complete(response_body_sha256, terminal_unix_seconds)?;
