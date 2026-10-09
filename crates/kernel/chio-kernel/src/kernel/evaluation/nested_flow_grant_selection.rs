@@ -54,6 +54,7 @@ impl ChioKernel {
         } = selection;
         let mut budget_error = None;
         let mut budget_error_metadata = None;
+        let mut runtime_release_retained = false;
         let mut governed_error = None;
         let mut guard_denial = None;
         let mut selected = None;
@@ -245,6 +246,7 @@ impl ChioKernel {
                             "runtime admission reservation retained on pending approval",
                         ));
                         budget_error_metadata = runtime_admission_metadata;
+                        runtime_release_retained = true;
                         break;
                     }
                     return self
@@ -277,6 +279,7 @@ impl ChioKernel {
                     );
                     if !runtime_release_confirmed {
                         budget_error_metadata = runtime_admission_metadata;
+                        runtime_release_retained = true;
                         break;
                     }
                 }
@@ -357,10 +360,14 @@ impl ChioKernel {
                 )
             });
             let msg = error.to_string();
-            if durable_admission.as_ref().is_some_and(|admission| {
-                admission.state()
+            // An unconfirmed runtime release keeps the operation on its
+            // recovery path, as at every other pre-dispatch denial.
+            if !runtime_release_retained
+                && durable_admission.as_ref().is_some_and(|admission| {
+                    admission.state()
                     == crate::admission_operation::AdmissionOperationState::BrokerAttemptRegistered
-            }) {
+                })
+            {
                 self.compensate_durable_admission_after_pre_dispatch_cleanup(
                     durable_operation(durable_admission.as_ref()),
                     None,
