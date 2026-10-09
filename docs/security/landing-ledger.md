@@ -48,6 +48,14 @@ retain authenticated filter and count completeness, including empty queries,
 and distinguish initializing, stale and invalid state. This decision does not
 relax the receipt trust boundary or claim unlimited capacity in bounded memory.
 
+The snapshot SDK component is integrated at `7381a4bd4d` and `69dc420874`:
+135 TypeScript and 62 Python tests, SDK/dashboard type checks and scoped
+Python lint pass on the composition. Retry metadata remains compatible with
+legacy responses; only the three transient snapshot HTTP 503 codes retry.
+Python blocking reads retain transport timeout semantics; the monotonic
+budget controls retry admission and delays. Server wiring, Linux custody,
+capacity and final candidate qualification remain open.
+
 The refreshed published state is still `fd8bfdc947`: 117 successful, eight
 failed and 16 skipped hosted checks. No local repair has been promoted to
 hosted qualification. Local source also includes current main `002b4d14e5`,
@@ -69,8 +77,13 @@ loop-role selector has 30 passing controls after the old selector failed eight.
 The four-owner runtime suite passed 929 tests, with one existing ignored
 doctest. An initial strict Clippy failure in the allocation-test fixture was
 repaired with a named struct; the allocation tests and strict four-owner
-Clippy then passed. The renewed strict attestation proof started at 06:17 UTC
-and remains in progress. Earlier weights, encoder and receipt proof results
+Clippy then passed. The renewed strict attestation proof timed out at
+06:47:51 UTC after 1,805.61 seconds without a verdict (peak process-group RSS
+11,406,088 KiB). Its source-bound result is retained under
+`/tmp/pr1160-kani-concrete-20261009/attest-borrowed/RESULT.json`. The next
+minimal repair replaces two checked mutable output accesses with an exact
+pair pattern, retaining both checked digit lookups. No speedup or proof
+verdict is claimed. Earlier weights, encoder and receipt proof results
 predate this shared-filler change and need applicable renewal. All
 original symbolic inputs and full unwinding assertions remain. Cancelled diagnostic runs and
 original noncollision timeouts remain separate failed or incomplete evidence.
