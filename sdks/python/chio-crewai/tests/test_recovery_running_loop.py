@@ -15,6 +15,6 @@ def test_sync_tool_in_running_loop_returns_one_native_outcome():
                                   transport=httpx.MockTransport(serve))
     tool = RecoveryTool(session=session)
     async def run():
-        assert json.loads(tool.run(choice="resume")) == {"category": "reconciliation_required"}
+        assert json.loads(tool.run(choice="resume")) == {"category": "reconciliation_required", "error_code": "recovery.unknown_effect"}
     asyncio.run(run())
     assert len(requests) == session.attempts == 1

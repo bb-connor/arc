@@ -5,7 +5,7 @@ from chio_sdk.recovery_host import RecoveryHostSession
 
 
 def recovery_node(session: RecoveryHostSession) -> Callable[[Mapping[str, object]], Awaitable[dict[str, object]]]:
-    """Reauthorize every invocation through Rust; retain categories and IDs only.
+    """Reauthorize through Rust; retain closed native state, error codes and IDs.
 
     Invoke again with the same choice to request native exact replay. A saved
     category is historical advice, not permission to execute a fallback tool.

@@ -4,95 +4,13 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Mapping
 from concurrent.futures import Future
-from dataclasses import dataclass
-from enum import StrEnum
 import re
 from threading import Lock, Thread
 from types import MappingProxyType
 import httpx
 from .recovery import RecoveryClient
-from .recovery_errors import RecoveryError, RecoveryErrorCode
-
-
-class RecoveryHostCategory(StrEnum):
-    COMPLETE = "complete"
-    COMPLETED_WITH_EFFECTS = "completed_with_effects"
-    WAITING_FOR_APPROVAL = "waiting_for_approval"
-    WAITING_FOR_OUTCOME = "waiting_for_outcome"
-    RECONCILIATION_REQUIRED = "reconciliation_required"
-    CLOSED_WITHOUT_EFFECT = "closed_without_effect"
-    WITHHELD = "withheld"
-    QUARANTINED = "quarantined"
-    CANCEL_REQUESTED = "cancel_requested"
-    CANCELLED = "cancelled"
-    REFUSED = "refused"
-    UNAVAILABLE = "unavailable"
-    RESTART_REQUIRED = "restart_required"
-    CONFLICT = "conflict"
-    UNSUPPORTED_PROFILE = "unsupported_profile"
-    UNCOVERED_MEDIATION = "uncovered_mediation"
-    PROBE_EXPIRED = "probe_expired"
-    ORIGIN_REFUSED = "origin_refused"
-    BUSY = "busy"
-    PROJECTION_TOO_LARGE = "projection_too_large"
-    BUDGET_EXHAUSTED = "budget_exhausted"
-    INVALID_CHOICE = "invalid_choice"
-
-
-_EFFECT_CATEGORIES = {
-    "complete": RecoveryHostCategory.COMPLETE,
-    "partial": RecoveryHostCategory.COMPLETED_WITH_EFFECTS,
-    "failed_after_effect": RecoveryHostCategory.COMPLETED_WITH_EFFECTS,
-    "awaiting_approval": RecoveryHostCategory.WAITING_FOR_APPROVAL,
-    "in_flight": RecoveryHostCategory.WAITING_FOR_OUTCOME,
-    "awaiting_caller_report": RecoveryHostCategory.WAITING_FOR_OUTCOME,
-    "unknown": RecoveryHostCategory.RECONCILIATION_REQUIRED,
-    "admission_unresolved": RecoveryHostCategory.RECONCILIATION_REQUIRED,
-    "never_admitted": RecoveryHostCategory.CLOSED_WITHOUT_EFFECT,
-    "closed_before_effect": RecoveryHostCategory.CLOSED_WITHOUT_EFFECT,
-}
-_ERROR_CATEGORIES = {
-    RecoveryErrorCode.UNKNOWN_EFFECT: RecoveryHostCategory.RECONCILIATION_REQUIRED,
-    RecoveryErrorCode.UNAVAILABLE: RecoveryHostCategory.UNAVAILABLE,
-    RecoveryErrorCode.RESTART_REQUIRED: RecoveryHostCategory.RESTART_REQUIRED,
-    RecoveryErrorCode.CONFLICT: RecoveryHostCategory.CONFLICT,
-    RecoveryErrorCode.UNSUPPORTED_PROFILE: RecoveryHostCategory.UNSUPPORTED_PROFILE,
-    RecoveryErrorCode.UNCOVERED_MEDIATION: RecoveryHostCategory.UNCOVERED_MEDIATION,
-    RecoveryErrorCode.PROBE_EXPIRED: RecoveryHostCategory.PROBE_EXPIRED,
-    RecoveryErrorCode.ORIGIN_REFUSED: RecoveryHostCategory.ORIGIN_REFUSED,
-    RecoveryErrorCode.BUSY: RecoveryHostCategory.BUSY,
-    RecoveryErrorCode.PROJECTION_TOO_LARGE: RecoveryHostCategory.PROJECTION_TOO_LARGE,
-}
-
-
-def _status_category(status: dict) -> RecoveryHostCategory:
-    # A completed effect cannot override current custody or release restrictions.
-    if status["control"] != "active":
-        return RecoveryHostCategory(status["control"])
-    if status["release"]["kind"] in {"withheld", "denied"}:
-        return RecoveryHostCategory.WITHHELD
-    return _EFFECT_CATEGORIES[status["effect"]["kind"]]
-
-
-@dataclass(frozen=True, slots=True)
-class RecoveryHostOutcome:
-    """Historical advisory category and opaque references, without raw results."""
-    category: RecoveryHostCategory
-    command_id: str = ""
-    workflow_id: str = ""
-
-    def __post_init__(self) -> None:
-        # Preserve the existing string constructor while refusing an open
-        # diagnostic string in this public, persistable result type.
-        object.__setattr__(self, "category", RecoveryHostCategory(self.category))
-
-    def as_dict(self) -> dict[str, str]:
-        result = {"category": self.category.value}
-        if self.command_id:
-            result["command_id"] = self.command_id
-        if self.workflow_id:
-            result["workflow_id"] = self.workflow_id
-        return result
+from .recovery_errors import RecoveryError
+from .recovery_host_outcome import RecoveryHostCategory, RecoveryHostOutcome
 
 
 class RecoveryHostSession:
@@ -278,13 +196,11 @@ class RecoveryHostSession:
             # No cached result can bypass fresh authorization on replay.
             client = RecoveryClient(self._endpoint, transport=self._transport, timeout_seconds=self._timeout_seconds)
             response = await client.execute(self._capability, self._commands[choice])
-            status = response.status.model_dump(mode="json", by_alias=True)
-            category = _status_category(status)
-            outcome = RecoveryHostOutcome(category, status["command_id"], status["workflow_id"])
+            outcome = RecoveryHostOutcome.from_status(response.status)
         except TimeoutError:
             outcome = RecoveryHostOutcome(RecoveryHostCategory.UNAVAILABLE)
         except RecoveryError as error:
-            outcome = RecoveryHostOutcome(_ERROR_CATEGORIES.get(error.code, RecoveryHostCategory.REFUSED))
+            outcome = RecoveryHostOutcome.from_error(error)
         except Exception:
             # SDK/network/provider errors may carry secrets. Frameworks receive
             # a fixed category, never exception text or an original response.

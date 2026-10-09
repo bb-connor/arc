@@ -65,7 +65,10 @@ def test_tool_delivery_does_not_wait_for_cancellation_resistant_loop_shutdown(ru
     elapsed = time.monotonic() - started
     assert elapsed < 1.3
     assert outcome == {"category": "complete", "command_id": native_response()["status"]["command_id"],
-                       "workflow_id": native_response()["status"]["workflow_id"]}
+                       "workflow_id": native_response()["status"]["workflow_id"],
+                       "effect": native_response()["status"]["effect"]["kind"],
+                       "control": native_response()["status"]["control"],
+                       "release": native_response()["status"]["release"]["kind"]}
     assert session.attempts == transport.calls == 1
     # Observe worker drain separately from the selected native action wait.
     assert transport.completed.wait(timeout=3)

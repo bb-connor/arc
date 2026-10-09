@@ -54,7 +54,7 @@ class RecoveryTool(BaseTool):
     a task-owned choice; it cannot approve a report or issue new authority.
     """
     name: str = "recovery"
-    description: str = "Submit one selected native recovery command. Input: choice. Return: bounded category and opaque references."
+    description: str = "Submit one selected native recovery command. Input: choice. Return: closed native state, error codes and opaque references."
     args_schema: type[BaseModel] = RecoveryChoice
     _session: RecoveryHostSession = PrivateAttr()
 
