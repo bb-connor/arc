@@ -1,3 +1,7 @@
+#[path = "authority_admission.rs"]
+mod authority_admission;
+pub(crate) use authority_admission::inspect_authority_state;
+
 use super::cluster::{
     cluster_authority_lease_view, cluster_authority_read_role, ClusterAuthorityReadRole,
 };

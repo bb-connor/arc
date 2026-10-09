@@ -102,6 +102,7 @@ mod cluster_and_reports_tests {
             cluster_progress,
             leader_forward_lane: Arc::new(tokio::sync::Semaphore::new(LEADER_FORWARD_PERMITS)),
             authority_health_lane: Arc::new(tokio::sync::Semaphore::new(1)),
+            authority_inspection_lane: Arc::new(tokio::sync::Semaphore::new(8)),
             public_passport_challenge_lane: Arc::new(tokio::sync::Semaphore::new(
                 crate::trust_control::report_rendering::PUBLIC_PASSPORT_CHALLENGE_PERMITS,
             )),

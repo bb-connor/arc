@@ -8,9 +8,10 @@ use super::report_rendering::{
     forward_scim_post_to_leader,
 };
 use super::report_validation::{
-    enforce_authority_mutation_fence, load_authority_status_for_state, load_capability_authority,
-    refresh_authority_mutation_fence, rotate_authority_for_state, validate_authority_issue_auth,
-    validate_authority_mutation_auth, validate_authority_workload_auth, validate_service_auth,
+    enforce_authority_mutation_fence, inspect_authority_state, load_authority_status_for_state,
+    load_capability_authority, refresh_authority_mutation_fence, rotate_authority_for_state,
+    validate_authority_issue_auth, validate_authority_mutation_auth,
+    validate_authority_workload_auth, validate_service_auth,
 };
 use super::*;
 
@@ -21,7 +22,7 @@ pub(crate) async fn handle_authority_status(
     if let Err(response) = validate_authority_workload_auth(&headers, &state.config) {
         return response;
     }
-    match load_authority_status_for_state(&state) {
+    match inspect_authority_state(&state, load_authority_status_for_state).await {
         Ok(status) => Json(status).into_response(),
         Err(response) => response,
     }

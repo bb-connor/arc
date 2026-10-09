@@ -46,6 +46,8 @@ pub(crate) struct TrustServiceState {
     pub(crate) public_passport_challenge_lane: Arc<tokio::sync::Semaphore>,
     /// Independent non-queued admission for public authority health inspection.
     pub(crate) authority_health_lane: Arc<tokio::sync::Semaphore>,
+    /// Eight non-queued process permits for authenticated blocking authority inspection.
+    pub(crate) authority_inspection_lane: Arc<tokio::sync::Semaphore>,
     /// Evidenced rail seam for finding-market fee collection;
     /// `None` fails activation closed.
     pub(crate) finding_rail: Option<Arc<dyn super::super::finding_handlers::FindingRailObserver>>,

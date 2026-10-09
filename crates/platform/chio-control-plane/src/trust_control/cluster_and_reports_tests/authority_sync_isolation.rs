@@ -642,3 +642,142 @@ async fn final_f11_known_stale_follower_refuses_authority_reads_and_reports_heal
     assert_eq!(health["cluster"]["degradedPeers"], 1);
     assert_eq!(health["cluster"]["healthyPeers"], 0);
 }
+
+async fn assert_inspection_refused<T>(result: Result<T, Response>, reason: &str) {
+    let response = match result {
+        Err(response) => response,
+        Ok(_) => panic!("authority inspection unexpectedly succeeded"),
+    };
+    assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    let body: Value = serde_json::from_slice(
+        &to_bytes(response.into_body(), 64 * 1024)
+            .await
+            .test_unwrap(),
+    )
+    .test_unwrap();
+    assert_eq!(body.get("error").and_then(Value::as_str), Some(reason));
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn final_f11_inspection_capacity_is_nonqueued_and_independent() {
+    let state = state_with_cluster(IMPORTER_URL, &[], None, None, None);
+    let held = state
+        .authority_inspection_lane
+        .clone()
+        .acquire_many_owned(8)
+        .await
+        .test_unwrap();
+    assert_inspection_refused(
+        inspect_authority_state(&state, |_| -> Result<(), Response> {
+            panic!("capacity refusal must precede work")
+        })
+        .await,
+        "authority inspection is at capacity",
+    )
+    .await;
+    assert_eq!(state.authority_health_lane.available_permits(), 1);
+    assert_eq!(state.public_passport_challenge_lane.available_permits(), 16);
+    assert_eq!(state.leader_forward_lane.available_permits(), 64);
+    assert_eq!(state.receipt_query_lane.available_permits(), 4);
+    drop(held);
+    assert_eq!(
+        inspect_authority_state(&state, |_| Ok(7))
+            .await
+            .test_unwrap(),
+        7
+    );
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn final_f11_inspection_cancellation_keeps_blocking_work_admitted() {
+    let state = state_with_cluster(IMPORTER_URL, &[], None, None, None);
+    let (entered_tx, mut entered) = tokio::sync::mpsc::unbounded_channel();
+    let (release, released) = std::sync::mpsc::channel();
+    let worker_state = state.clone();
+    let worker = tokio::spawn(async move {
+        inspect_authority_state(&worker_state, move |_| {
+            entered_tx.send(()).test_unwrap();
+            released.recv_timeout(Duration::from_secs(30)).test_unwrap();
+            Ok(())
+        })
+        .await
+    });
+    tokio::time::timeout(Duration::from_secs(30), entered.recv())
+        .await
+        .test_unwrap()
+        .test_unwrap();
+    assert!(
+        !worker.is_finished(),
+        "blocking inspection occupied the async worker"
+    );
+    assert_eq!(state.authority_inspection_lane.available_permits(), 7);
+    worker.abort();
+    assert!(worker.await.test_unwrap_err().is_cancelled());
+    assert_eq!(state.authority_inspection_lane.available_permits(), 7);
+    release.send(()).test_unwrap();
+    let returned = tokio::time::timeout(
+        Duration::from_secs(30),
+        state
+            .authority_inspection_lane
+            .clone()
+            .acquire_many_owned(8),
+    )
+    .await
+    .test_unwrap()
+    .test_unwrap();
+    drop(returned);
+    assert_eq!(state.authority_inspection_lane.available_permits(), 8);
+}
+
+#[tokio::test]
+async fn final_f11_inspection_rechecks_election_term_after_work() {
+    let peer_url = "http://127.0.0.2:3301";
+    let state = state_with_cluster(IMPORTER_URL, &[peer_url], None, None, None);
+    update_peer_reachable(&state, peer_url);
+    assert_inspection_refused(
+        inspect_authority_state(&state, |state| {
+            state
+                .cluster
+                .as_ref()
+                .test_unwrap()
+                .lock()
+                .test_unwrap()
+                .election_term += 1;
+            Ok(())
+        })
+        .await,
+        "cluster authority context changed during inspection",
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn final_f11_inspection_rechecks_authority_head_after_work() {
+    let directory = chio_test_support::private_tempdir().test_unwrap();
+    let mut state = state_with_cluster(IMPORTER_URL, &[], None, None, None);
+    let path = directory.path().join("authority.sqlite3");
+    SqliteCapabilityAuthority::open_with_clock(&path, state.finding_challenge_clock.clone())
+        .test_unwrap();
+    state.config.authority_db_path = Some(path);
+    assert_inspection_refused(
+        inspect_authority_state(&state, |state| {
+            SqliteCapabilityAuthority::open_with_clock(
+                state.config.authority_db_path.as_ref().test_unwrap(),
+                state.finding_challenge_clock.clone(),
+            )
+            .test_unwrap()
+            .rotate()
+            .test_unwrap();
+            Ok(())
+        })
+        .await,
+        "authority state changed during inspection",
+    )
+    .await;
+    assert_eq!(
+        load_authority_status_for_state(&state)
+            .test_unwrap()
+            .generation,
+        Some(2)
+    );
+}

@@ -245,6 +245,7 @@ async fn serve_async_inner(
         cluster_progress,
         leader_forward_lane: Arc::new(tokio::sync::Semaphore::new(LEADER_FORWARD_PERMITS)),
         authority_health_lane: Arc::new(tokio::sync::Semaphore::new(1)),
+        authority_inspection_lane: Arc::new(tokio::sync::Semaphore::new(8)),
         public_passport_challenge_lane: Arc::new(tokio::sync::Semaphore::new(
             PUBLIC_PASSPORT_CHALLENGE_PERMITS,
         )),
