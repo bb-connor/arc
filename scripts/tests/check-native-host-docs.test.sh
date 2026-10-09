@@ -224,6 +224,44 @@ printf '\nSee [flows][north-star] and [cases][cases-ref].\n\n[north-star]: MISSI
 expect "reference link with a missing target" 1 "links: docs/superpowers/specs/2026-10-07-desktop-integration/README.md: missing target MISSING.md" -- --rule links
 expect "undefined reference label" 1 "links: docs/superpowers/specs/2026-10-07-desktop-integration/README.md: undefined reference [cases-ref]" -- --rule links
 
+# A link title does not hide a broken destination, whatever its quoting.
+new_fixture link-titles
+cat >>"$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/README.md" <<'EOF'
+
+See [double](MISSING.md "Missing"), [single](SINGLE.md 'Single') and [paren](PAREN.md (Paren)).
+EOF
+expect "broken link with a double-quoted title" 1 "links: docs/superpowers/specs/2026-10-07-desktop-integration/README.md: missing target MISSING.md" -- --rule links
+expect "broken link with a single-quoted title" 1 "links: docs/superpowers/specs/2026-10-07-desktop-integration/README.md: missing target SINGLE.md" -- --rule links
+expect "broken link with a parenthesized title" 1 "links: docs/superpowers/specs/2026-10-07-desktop-integration/README.md: missing target PAREN.md" -- --rule links
+
+# Angle-bracket destinations may contain spaces and are checked.
+new_fixture angle-links
+cat >>"$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/README.md" <<'EOF'
+
+See [spaced](<NO SUCH FILE.md> "Title") and [ref][spaced-ref].
+
+[spaced-ref]: <ALSO MISSING.md> "Title"
+EOF
+expect "broken angle-bracket destination with spaces" 1 "links: docs/superpowers/specs/2026-10-07-desktop-integration/README.md: missing target NO SUCH FILE.md" -- --rule links
+expect "broken angle-bracket reference definition" 1 "links: docs/superpowers/specs/2026-10-07-desktop-integration/README.md: missing target ALSO MISSING.md" -- --rule links
+
+# Valid titled, angle-bracket and percent-encoded links pass.
+new_fixture valid-link-forms
+printf '# Spaced\n' >"$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/Spaced Name.md"
+cat >>"$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/README.md" <<'EOF'
+
+See [a](CASES.md#cases "Cases"), [b](<Spaced Name.md> 'Spaced'), [c](Spaced%20Name.md#spaced) and [d](#7-program-restructure (Back)).
+EOF
+expect "valid link forms pass" 0 "-" -- --rule links
+
+# An unterminated inline link is reported instead of skipped.
+new_fixture malformed-link
+cat >>"$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/README.md" <<'EOF'
+
+See [broken](MISSING.md "unterminated title).
+EOF
+expect "unterminated link" 1 "links: docs/superpowers/specs/2026-10-07-desktop-integration/README.md: malformed link at line 9" -- --rule links
+
 # Links inside code are not checked.
 new_fixture code-link
 # shellcheck disable=SC2016 # literal backticks are the fixture
@@ -236,6 +274,38 @@ new_fixture missing-case
 printf '\nAlso Q02 and H06a.\n' >>"$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/README.md"
 expect "missing case ID" 1 "case-ids: docs/superpowers/specs/2026-10-07-desktop-integration/README.md: references Q02, not defined in CASES.md" -- --rule case-ids
 expect "missing case subcase ID" 1 "case-ids: docs/superpowers/specs/2026-10-07-desktop-integration/README.md: references H06a, not defined in CASES.md" -- --rule case-ids
+
+# Every well-formed Q, C or H identifier is a case reference, not only the
+# ranges CASES.md happened to use when the checker was written.
+new_fixture case-namespace
+printf '\nAlso H09, C20, Q99 and H06c.\n' >>"$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/README.md"
+expect "undefined H09" 1 "case-ids: docs/superpowers/specs/2026-10-07-desktop-integration/README.md: references H09, not defined in CASES.md" -- --rule case-ids
+expect "undefined C20" 1 "case-ids: docs/superpowers/specs/2026-10-07-desktop-integration/README.md: references C20, not defined in CASES.md" -- --rule case-ids
+expect "undefined Q99" 1 "case-ids: docs/superpowers/specs/2026-10-07-desktop-integration/README.md: references Q99, not defined in CASES.md" -- --rule case-ids
+expect "undefined subcase H06c" 1 "case-ids: docs/superpowers/specs/2026-10-07-desktop-integration/README.md: references H06c, not defined in CASES.md" -- --rule case-ids
+
+# A range references every case inside it, not only its endpoints.
+new_fixture case-range
+printf '| Q11 | HOST-M1 | Eleven. | W | Observer | specified | |\n| Q13 | HOST-M1 | Thirteen. | W | Observer | specified | |\n' \
+  >>"$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/CASES.md"
+printf '\nSee Q11-Q13.\n' >>"$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/README.md"
+expect "hyphen range with a missing member" 1 "case-ids: docs/superpowers/specs/2026-10-07-desktop-integration/README.md: references Q12, not defined in CASES.md" -- --rule case-ids
+new_fixture case-range-words
+printf '| Q11 | HOST-M1 | Eleven. | W | Observer | specified | |\n| Q13 | HOST-M1 | Thirteen. | W | Observer | specified | |\n' \
+  >>"$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/CASES.md"
+printf '\nSee Q11\nto Q13.\n' >>"$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/README.md"
+expect "worded range across a line break with a missing member" 1 "case-ids: docs/superpowers/specs/2026-10-07-desktop-integration/README.md: references Q12, not defined in CASES.md" -- --rule case-ids
+new_fixture case-range-complete
+printf '| Q11 | HOST-M1 | Eleven. | W | Observer | specified | |\n| Q12 | HOST-M1 | Twelve. | W | Observer | specified | |\n| Q13 | HOST-M1 | Thirteen. | W | Observer | specified | |\n' \
+  >>"$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/CASES.md"
+printf '\nSee Q11-Q13 and Q11 to Q13.\n' >>"$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/README.md"
+expect "complete range passes" 0 "-" -- --rule case-ids
+new_fixture case-range-malformed
+printf '| Q11 | HOST-M1 | Eleven. | W | Observer | specified | |\n| Q13 | HOST-M1 | Thirteen. | W | Observer | specified | |\n' \
+  >>"$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/CASES.md"
+printf '\nSee Q13-Q11 and Q01-C01.\n' >>"$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/README.md"
+expect "reversed range" 1 "case-ids: docs/superpowers/specs/2026-10-07-desktop-integration/README.md: malformed range Q13-Q11" -- --rule case-ids
+expect "mixed-prefix range" 1 "case-ids: docs/superpowers/specs/2026-10-07-desktop-integration/README.md: malformed range Q01-C01" -- --rule case-ids
 
 # A duplicate CASES row is reported.
 new_fixture duplicate-case

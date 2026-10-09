@@ -4,13 +4,18 @@
 Rules (NORTH-STAR-FLOWS section 7, unified roadmap section 9):
 
 - links: relative Markdown links and anchors in the program set resolve.
+  Inline destinations are parsed per CommonMark (titles in any quoting,
+  angle-bracket destinations with spaces, percent-encoding); an inline link
+  that does not parse is reported rather than skipped.
 - retired-phrases: retired positioning phrases do not appear in the program
   set or the public copy (README, AGENTS, the ADR index, docs/start-here,
   the competitive landscape, spec/PROTOCOL.md and docs/assets SVGs). SVG text nodes and alt/aria-label/title attributes
   are scanned with tags removed, so a phrase split across elements is found.
 - em-dash: no U+2014 in the program set or the public copy.
 - case-ids: every Q, C and H case referenced in the program set is defined
-  exactly once in CASES.md.
+  exactly once in CASES.md. Any two-digit Q, C or H identifier (with an
+  optional letter) is a reference, and a range such as Q11-Q13 or
+  "H01 to H08" references every case inside it.
 - budgets: word budgets for the shared spec set, each annex and each plan.
 
 Output is one `RULE: path: message` line per violation. Exit 0 when clean,
@@ -27,6 +32,7 @@ import argparse
 import re
 import sys
 from pathlib import Path
+from urllib.parse import unquote
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -36,11 +42,14 @@ RETIRED = (
     "only protocol",
     "kernel for building agentic operating systems",
 )
-CASE_ID = re.compile(r"\b(Q(?:0[1-9]|[1-9][0-9])|C(?:0[1-9]|1[0-9])|H0[1-8][ab]?)\b")
-CASE_ROW = re.compile(r"^\|\s*(Q\d\d|C\d\d|H0[1-8][ab]?)\s*\|", re.M)
-LINK = re.compile(r"\]\(([^)\s]+)\)")
-REF_DEF = re.compile(r"^ {0,3}\[([^\]]+)\]:\s*<?([^\s>]+)>?", re.M)
-REF_USE = re.compile(r"\[[^\]]*\]\[([^\]]*)\]")
+# The whole case namespace, not only the identifiers CASES.md uses today, so
+# a reference to an undefined case is never silently ignored.
+CASE_ID = re.compile(r"\b([QCH]\d\d[a-z]?)\b")
+CASE_RANGE = re.compile(r"\b([QCH])(\d\d)[a-z]?\s*(?:-|\u2013|\bto\b|\bthrough\b)\s*([QCH])(\d\d)[a-z]?\b")
+CASE_ROW = re.compile(r"^\|\s*([QCH]\d\d[a-z]?)\s*\|", re.M)
+LINK_OPEN = re.compile(r"\]\(")
+REF_DEF = re.compile(r"^ {0,3}\[([^\]]+)\]:[ \t]*\n?[ \t]*(?:<([^<>\n]*)>|(\S+))", re.M)
+REF_USE = re.compile(r"\[([^\]]*)\]\[([^\]]*)\]")
 HEADING = re.compile(r"^ {0,3}#{1,6}\s+(.+?)\s*#*\s*$", re.M)
 SETEXT = re.compile(r"^ {0,3}(\S[^\n]*?)\s*\n {0,3}(?:=+|-+)\s*$", re.M)
 FENCE = re.compile(r"^([ \t]*)(```|~~~)[^\n]*\n.*?^[ \t]*\2[^\n]*$", re.M | re.S)
@@ -169,8 +178,79 @@ def anchors(text: str) -> set[str]:
 
 
 def prose(text: str) -> str:
-    """Markdown with fenced blocks and inline code removed."""
-    return INLINE_CODE.sub("", FENCE.sub("", text))
+    """Markdown with fenced blocks and inline code blanked, line numbers kept."""
+    text = FENCE.sub(lambda m: "\n" * m.group(0).count("\n"), text)
+    return INLINE_CODE.sub(lambda m: " " * len(m.group(0)), text)
+
+
+def _skip_space(text: str, i: int) -> int:
+    """Skip spaces and tabs with at most one line ending (CommonMark)."""
+    newline = False
+    while i < len(text) and text[i] in " \t\n":
+        if text[i] == "\n":
+            if newline:
+                break
+            newline = True
+        i += 1
+    return i
+
+
+def _link_destination(text: str, start: int) -> str | None:
+    """Parse `(destination "title")` after `](`; None when it is not a link."""
+    n = len(text)
+    i = _skip_space(text, start)
+    if i < n and text[i] == "<":
+        j = i + 1
+        while j < n and text[j] not in "<>\n":
+            j += 2 if text[j] == "\\" else 1
+        if j >= n or text[j] != ">":
+            return None
+        dest, i = text[i + 1 : j], j + 1
+    else:
+        depth, j = 0, i
+        while j < n:
+            char = text[j]
+            if char == "\\" and j + 1 < n:
+                j += 2
+                continue
+            if char.isspace() or ord(char) < 0x20:
+                break
+            if char == "(":
+                depth += 1
+            elif char == ")":
+                if depth == 0:
+                    break
+                depth -= 1
+            j += 1
+        if depth:
+            return None
+        dest, i = text[i:j], j
+    k = _skip_space(text, i)
+    if k > i and k < n and text[k] in "\"'(":
+        close = ")" if text[k] == "(" else text[k]
+        m = k + 1
+        while m < n and text[m] != close:
+            if text.startswith("\n\n", m):
+                return None  # a title never spans a blank line
+            m += 2 if text[m] == "\\" else 1
+        if m >= n:
+            return None
+        k = _skip_space(text, m + 1)
+    if k < n and text[k] == ")":
+        return re.sub(r"\\(.)", r"\1", dest)
+    return None
+
+
+def inline_links(text: str) -> tuple[list[str], list[int]]:
+    """Inline link and image destinations, and the lines of unparsable ones."""
+    targets, malformed = [], []
+    for match in LINK_OPEN.finditer(text):
+        dest = _link_destination(text, match.end())
+        if dest is None:
+            malformed.append(text.count("\n", 0, match.start()) + 1)
+        else:
+            targets.append(dest)
+    return targets, malformed
 
 
 def missing_inputs(layout: Layout, rule: str, public: bool) -> list[str]:
@@ -193,14 +273,21 @@ def check_links(layout: Layout) -> list[str]:
     out = missing_inputs(layout, "links", public=False)
     for path in layout.program:
         text = prose(read(path))
-        definitions = {label.strip().lower(): target for label, target in REF_DEF.findall(text)}
-        for label in REF_USE.findall(text):
-            if label and label.strip().lower() not in definitions:
+        definitions = {
+            label.strip().lower(): angle or bare for label, angle, bare in REF_DEF.findall(text)
+        }
+        for link_text, label in REF_USE.findall(text):
+            label = label or link_text  # a collapsed reference uses its text
+            if label.strip() and label.strip().lower() not in definitions:
                 out.append(f"links: {layout.rel(path)}: undefined reference [{label}]")
-        for target in LINK.findall(text) + list(definitions.values()):
+        targets, malformed = inline_links(text)
+        for line in malformed:
+            out.append(f"links: {layout.rel(path)}: malformed link at line {line}")
+        for target in targets + list(definitions.values()):
             if re.match(r"^[a-z][a-z0-9+.-]*:", target, re.I):
                 continue
             file_part, _, anchor = target.partition("#")
+            file_part = unquote(file_part)
             dest = (path.parent / file_part).resolve() if file_part else path
             if file_part and not dest.exists():
                 out.append(f"links: {layout.rel(path)}: missing target {target}")
@@ -262,7 +349,16 @@ def check_case_ids(layout: Layout) -> list[str]:
     for path in layout.program:
         if path == layout.cases or {"research", "reviews"} & set(path.relative_to(layout.root).parts):
             continue
-        for ref in sorted(set(CASE_ID.findall(read(path)))):
+        text = read(path)
+        refs = set(CASE_ID.findall(text))
+        for match in CASE_RANGE.finditer(text):
+            first_prefix, first, last_prefix, last = match.groups()
+            if first_prefix != last_prefix or int(first) > int(last):
+                span = re.sub(r"\s+", " ", match.group(0))
+                out.append(f"case-ids: {layout.rel(path)}: malformed range {span}")
+                continue
+            refs.update(f"{first_prefix}{number:02d}" for number in range(int(first), int(last) + 1))
+        for ref in sorted(refs):
             if ref not in defined:
                 out.append(f"case-ids: {layout.rel(path)}: references {ref}, not defined in CASES.md")
     return out
