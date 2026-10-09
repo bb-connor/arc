@@ -3,7 +3,7 @@
 Status: accepted planning direction, amended 2026-10-08 UTC. Implementation and
 installed qualification remain open. This contract supplements the existing
 kernel and owner interfaces; it defines no new wire operation, signer, store or
-universal daemon. [ADR-0038](../../../adr/ADR-0038-desktop-operator-program.md)
+universal daemon. [ADR-0038](../../../adr/ADR-0038-native-host-program.md)
 owns the decision; [PROGRAM-MAP](../../../architecture/PROGRAM-MAP.md) owns exact
 source and dependency reconciliation.
 

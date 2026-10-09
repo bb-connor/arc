@@ -1,6 +1,6 @@
 # Current Chio kernel readiness for macOS
 
-> Historical research snapshot retained for provenance. [ADR-0038](../../../../adr/ADR-0038-desktop-operator-program.md), the [program map](../../../../architecture/PROGRAM-MAP.md) and [macOS annex](../ANNEX.md) supersede this document's former implementation choices. Old NK identifiers and platform methods below are historical proposal labels, not current APIs or blanket desktop prerequisites. The shared program retains the needed admission, crossing and ABI safety properties through their owning contracts; it does not require all three redesign keystones before the first product.
+> Historical research snapshot retained for provenance. [ADR-0038](../../../../adr/ADR-0038-native-host-program.md), the [program map](../../../../architecture/PROGRAM-MAP.md) and [macOS annex](../ANNEX.md) supersede this document's former implementation choices. Old NK identifiers and platform methods below are historical proposal labels, not current APIs or blanket desktop prerequisites. The shared program retains the needed admission, crossing and ABI safety properties through their owning contracts; it does not require all three redesign keystones before the first product.
 
 Status: inspected source, not runtime qualification. Confidence: high for the named presence/absence findings; unknown for a delivered Mac execution profile. Inspected 2026-10-07. This report supersedes older research assumptions about what exists on main, without promoting candidate designs to implementation.
 

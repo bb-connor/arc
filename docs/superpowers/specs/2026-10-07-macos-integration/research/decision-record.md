@@ -1,6 +1,6 @@
 # Research decision record
 
-> Historical research snapshot retained for provenance. [ADR-0038](../../../../adr/ADR-0038-desktop-operator-program.md), the [program map](../../../../architecture/PROGRAM-MAP.md) and [macOS annex](../ANNEX.md) supersede this document's former implementation choices. Old NK identifiers and platform methods below are historical proposal labels, not current APIs or blanket desktop prerequisites. The shared program retains the needed admission, crossing and ABI safety properties through their owning contracts; it does not require all three redesign keystones before the first product.
+> Historical research snapshot retained for provenance. [ADR-0038](../../../../adr/ADR-0038-native-host-program.md), the [program map](../../../../architecture/PROGRAM-MAP.md) and [macOS annex](../ANNEX.md) supersede this document's former implementation choices. Old NK identifiers and platform methods below are historical proposal labels, not current APIs or blanket desktop prerequisites. The shared program retains the needed admission, crossing and ABI safety properties through their owning contracts; it does not require all three redesign keystones before the first product.
 
 Researched 2026-10-07. This program expands the user-approved Mac research direction and the Omarchy specification method. The earlier local research brief is an input, not a current runtime qualification or normative specification. Current source findings below and in the sibling research files take precedence over that earlier snapshot.
 

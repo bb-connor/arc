@@ -6,7 +6,7 @@
 
 The [first-class integration contract](../2026-10-07-desktop-integration/FIRST-CLASS-INTEGRATIONS.md) requires Claude Code, Codex, Pi and Hermes as four independent native installed Mac harness integrations, each with at least one scoped protected profile, plus a separate Herdr workspace/plugin integration with all four selections. H01-H08 include individual harness, mixed-harness and independent-use acceptance. Native services remain usable with Herdr absent; complete integration delivery requires its own passing consumer result. Mini-swe is optional reference/conformance code only, without default-runner, priority or prerequisite status. Cursor and OpenClaw retain the broader doc 19 six-host obligations. Required targets remain unqualified until their exact installed cases pass.
 
-The [shared native host program](../2026-10-07-desktop-integration/README.md) and [ADR-0038](../../../adr/ADR-0038-desktop-operator-program.md) own the accepted planning direction. This branch depends on the shared-program branch; it does not redefine common native contracts.
+The [shared native host program](../2026-10-07-desktop-integration/README.md) and [ADR-0038](../../../adr/ADR-0038-native-host-program.md) own the accepted planning direction. This branch depends on the shared-program branch; it does not redefine common native contracts.
 
 - [Platform design and qualification](ANNEX.md)
 - [Implementation plan](../../plans/2026-10-07-macos-integration/IMPLEMENTATION.md)

@@ -1,6 +1,6 @@
 # Linux native host and Omarchy platform annex
 
-Status: accepted platform direction under [ADR-0038](../../../adr/ADR-0038-desktop-operator-program.md), amended for native host integration. Implementation and installed qualification remain open. Confidence: high in ownership and source findings; moderate in platform feasibility; unknown for the complete installed composition.
+Status: accepted platform direction under [ADR-0038](../../../adr/ADR-0038-native-host-program.md), amended for native host integration. Implementation and installed qualification remain open. Confidence: high in ownership and source findings; moderate in platform feasibility; unknown for the complete installed composition.
 
 Chio is a Rust kernel for agentic operating systems that coordinate work, share resources, and cooperate across organizational boundaries. This annex delivers reusable Linux host bindings and native services for existing harnesses, applications and Herdr. The Omarchy shell and browser workbench are optional consumers. A Linux host must install and perform every advertised systems capability with all Chio graphical clients absent.
 

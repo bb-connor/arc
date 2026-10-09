@@ -4,7 +4,7 @@
 
 Chio is a Rust kernel for agentic operating systems that coordinate work, share resources, and cooperate across organizational boundaries. This platform work supplies reusable Linux bindings and native services for existing harnesses, applications and Herdr. Omarchy QML and workbench are optional consumers; installation and advertised native capabilities must work with all Chio graphical clients absent.
 
-The [required first-class integrations](../2026-10-07-desktop-integration/FIRST-CLASS-INTEGRATIONS.md), [native host contract](../2026-10-07-desktop-integration/HOST-CONTRACT.md) and [ADR-0038](../../../adr/ADR-0038-desktop-operator-program.md) govern the direction. Headless user-session operation retains lock/logout/enrollment fences. Login-independent service operation requires a distinct native service principal, credentials and boot/restart acceptance. Neither lingering nor root grants authority.
+The [required first-class integrations](../2026-10-07-desktop-integration/FIRST-CLASS-INTEGRATIONS.md), [native host contract](../2026-10-07-desktop-integration/HOST-CONTRACT.md) and [ADR-0038](../../../adr/ADR-0038-native-host-program.md) govern the direction. Headless user-session operation retains lock/logout/enrollment fences. Login-independent service operation requires a distinct native service principal, credentials and boot/restart acceptance. Neither lingering nor root grants authority.
 
 - [Linux host and Omarchy annex](ANNEX.md)
 - [Implementation packets and independent profile gates](../../plans/2026-10-07-omarchy-integration/IMPLEMENTATION.md)

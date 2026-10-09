@@ -1,6 +1,6 @@
 # Native host and kernel program ownership map
 
-Internal design reference, amended 2026-10-08 UTC. Governed by [ADR-0038](../adr/ADR-0038-desktop-operator-program.md) and the [native host contract](../superpowers/specs/2026-10-07-desktop-integration/HOST-CONTRACT.md). Chio is a Rust kernel for agentic operating systems that coordinate work, share resources, and cooperate across organizational boundaries. Applications and agent harnesses consume the existing native owners directly; graphical clients and the optional operator projection are independent consumers. Current composed runtime qualification is not established. Consumer projections are `advisory_only`; `planning_status: ready_after_adr` grants no runtime authority or public release status.
+Internal design reference, amended 2026-10-08 UTC. Governed by [ADR-0038](../adr/ADR-0038-native-host-program.md) and the [native host contract](../superpowers/specs/2026-10-07-desktop-integration/HOST-CONTRACT.md). Chio is a Rust kernel for agentic operating systems that coordinate work, share resources, and cooperate across organizational boundaries. Applications and agent harnesses consume the existing native owners directly; graphical clients and the optional operator projection are independent consumers. Current composed runtime qualification is not established. Consumer projections are `advisory_only`; `planning_status: ready_after_adr` grants no runtime authority or public release status.
 
 ## Pinned source register
 

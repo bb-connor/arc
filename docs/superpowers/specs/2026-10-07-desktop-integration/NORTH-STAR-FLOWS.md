@@ -1,14 +1,20 @@
 # North-star flows
 
-Status: proposed governing design, 2026-10-08. It awaits the program owner's
-review. It was approved section by section in conversation, and it is written
-here for review as a whole. Once approved, it governs the native host program.
-The ADR-0038 amendment and the document restructure in [section 7](#7-program-restructure)
-follow as separate, reviewable changes. This document qualifies no
-implementation, installed profile or release.
+Status: approved by the program owner on 2026-10-08. It governs the native
+host program. The [ADR-0038 amendment](../../../adr/ADR-0038-native-host-program.md#amendment-2026-10-08-north-star-and-flows)
+records the decision, and the unified roadmap (#1196) schedules the flows. The
+document restructure in [section 7](#7-program-restructure) follows as
+separate, reviewable changes. This document qualifies no implementation,
+installed profile or release.
 
-`planning_status: ready_after_adr` once approved. `boundary_class` is stated per
-operation below and follows [ADR-0011](../../../adr/ADR-0011-boundary-taxonomy-product-wording.md).
+`planning_status: ready_after_adr`. `boundary_class` is stated per operation
+below and follows [ADR-0011](../../../adr/ADR-0011-boundary-taxonomy-product-wording.md).
+
+M1, M2 and M3 in this program are HOST-M1, HOST-M2 and HOST-M3 in other
+documents (unified roadmap section 12). HOST-M1 is re-cut server-first in the
+roadmap's Lane COOP (COOP-1). macOS HOST-M2 comes after the success test
+(roadmap section 11); until then the executing organization of a HOST-M3 run
+uses Linux.
 
 > **Agents working on this branch:** this document sets the spine of the
 > program. Restructure the other documents to reference it. Do not restate its
@@ -75,7 +81,9 @@ system's kernel services:
   agents at its own door, under its own policy. The steps are a passport
   challenge, then federated issue, then a local capability. Evidence travels
   back for offline verification, and neither side holds the other's keys. No
-  competing stack claims this verb.
+  shipped product combines all four of: separately operated owners
+  who each admit at their own door, attenuation-only grants, evidence the
+  counterparty verifies offline, and durable work identity.
   - NVIDIA's Secure Agent Workspace, OpenShell, Microsoft AGT, AWS AgentCore and
     Entra each stop at their own trust domain (N: `05-competitive-analysis.md`).
 
@@ -159,14 +167,14 @@ First run creates the organization key in OS custody, or imports it there.
 
 **Scenario.** Org A, a developer on **Omarchy**, has an agent that needs a
 capability Org B provides. Org B runs a **Mac** and exposes a governed tool
-through `chio mcp serve-http`. There are two machines, two human operators and
+behind `chio api protect`. There are two machines, two human operators and
 no shared keys. Every command below ships today (T:
 `docs/reference/AGENT_PASSPORT_GUIDE.md`, sections Federated Issuance, Holder
 Transport and Remote Verifier Surface).
 
 | Step | Who | Action | `boundary_class` |
 | --- | --- | --- | --- |
-| 0 | Both | Native host services: `chio trust serve --advertise-url`, plus `chio mcp serve-http` on B. Both run as user-session units (section 6), with keys in OS custody (section 2). | n/a |
+| 0 | Both | Native host services: `chio trust serve --advertise-url`, plus, on B, the governed tool behind `chio api protect` with `CHIO_TRUSTED_ISSUER_KEY` set to B's trust-control authority key. Both run as user-session units (section 6), with keys in OS custody (section 2). | n/a |
 | 1 | A | `chio passport create` for the agent subject, then `chio passport status publish`. Optionally `chio trust federated-delegation-policy-create` to cap scope and TTL. | Sets A's ceiling |
 | 2 | B | `chio passport policy create`, which allowlists A's DID and sets receipt thresholds. Then `chio passport challenge create`, which returns public challenge and submit URLs. | n/a |
 | 3 | A's agent | `chio passport challenge respond --challenge-url`, then `chio passport challenge submit`. | n/a |
@@ -174,6 +182,15 @@ Transport and Remote Verifier Surface).
 | 5 | A's agent | Calls B's tool. **B's kernel admits or denies at B's door** and signs receipts, deny receipts included. | `prevent`, at B only |
 | 6 | B | `chio evidence export`, and the package goes to A. | n/a |
 | 7 | A | `chio evidence verify` offline, then `chio evidence import`, then `chio reputation compare`. Imported trust is shown separately and weighted down. | `detect_only` for A; reputation `advisory_only` |
+
+Step 5 uses `chio api protect` rather than `chio mcp serve-http`. The API
+protect evaluator accepts a capability presented in the `X-Chio-Capability`
+header from issuers named in `CHIO_TRUSTED_ISSUER_KEY(S)` (T:
+`crates/products/chio-api-protect/src/evaluator.rs` `extract_presented_capability`,
+lines 463-469; `crates/products/chio-cli/src/cli/runtime.rs`
+`parse_trusted_capability_issuers_from_env`, line 576). `serve-http` issues
+session capabilities from its own policy and does not accept externally issued
+ones.
 
 ### Desktop moments
 
@@ -188,7 +205,7 @@ Both surfaces start thin: a native notification opens a review view.
 
 ### Owner changes for M1
 
-- Native service packaging for `chio trust serve` and `chio mcp serve-http`.
+- Native service packaging for `chio trust serve` and `chio api protect`.
   This is the user-session profile in [HOST-CONTRACT](HOST-CONTRACT.md).
 - TLS reachability. HTTPS lanes exist; iroh is not needed for M1.
 - An end-to-end test of steps 5 and 6 across two hosts. Today steps 1 to 4 are
@@ -273,7 +290,8 @@ and its holds.
   keeps it in memory today.
 - A token or spend dimension at the model relay. The relay counts requests
   only today.
-- A Darwin process runner and a broker backed by Keychain and XPC.
+- After the success test (roadmap section 11): a Darwin process runner and a
+  broker backed by Keychain and XPC.
 - Megastart's allowance on kernel holds, and a Megastart Linux port.
 - Linux restricted launchers for Claude Code, Codex and Hermes, following Pi's
   bubblewrap profile.
@@ -357,7 +375,9 @@ on Omarchy with A on the Mac.
    custody and packaging.
 2. **M2 on Omarchy with Pi first,** then Linux launchers added one host at a
    time. Each host is promoted only on its own doc 19 I01 to I08 evidence.
-3. **M2 on macOS** after the Darwin runner, broker and resource backend land.
+3. **M2 on macOS** after the success test (roadmap section 11), once the Darwin
+   runner, broker and resource backend land. `planning_status: deferred` until
+   then.
 4. **M3** pairs whichever platforms have reached M2.
 
 Native surfaces stay thin: notifications, bar or menu-bar status, and review
@@ -387,16 +407,15 @@ commit.
 | Each annex | 6,000 words or fewer |
 | Each implementation plan | 8,000 words or fewer |
 
-### Positioning copy in this PR
+### Positioning copy
 
-- `README.md` and `docs/assets/subhead*.svg` use the north-star sentence and the
-  supporting line.
-- Remove "The kernel your agents answer to" from `README.md`.
-- Remove "Agents that pay each other" from `README.md` and
-  `docs/assets/subhead.svg` / `subhead-mobile.svg`.
-- Remove the "only protocol" claims from
-  `docs/reference/COMPETITIVE_LANDSCAPE.md` and
-  `docs/start-here/FLAGSHIP_WALL_STOPS_MONEY.md`.
+The public copy (`README.md`, `AGENTS.md`, `docs/assets/*.svg`,
+`docs/reference/COMPETITIVE_LANDSCAPE.md`,
+`docs/start-here/FLAGSHIP_WALL_STOPS_MONEY.md`, the ADR index) is owned by the
+roadmap's positioning items (U3), not by this program's documents.
+`scripts/check-native-host-docs.py --rule retired-phrases` reports what remains.
+Within the program set:
+
 - Replace "kernel for building agentic operating systems" with the north-star
   sentence in:
   - `HOST-CONTRACT.md`;
@@ -446,7 +465,8 @@ Megastart Linux port lands.
 - Live cancel stops new admissions within a stated bound.
 - Uncertain outcomes are flagged per node.
 
-macOS meets the same criteria once its runner, broker and backend exist.
+macOS meets the same criteria once its runner, broker and backend exist, after
+the success test (roadmap section 11).
 
 ### M3 is complete when
 
@@ -481,7 +501,7 @@ Each row becomes a tracked issue after this document is approved, linked from
 | Change | Owner | Needed by |
 | --- | --- | --- |
 | Custody provider behind `SigningBackend` (Keychain, Secret Service, `systemd-creds`) | Kernel signing and CLI | M1 |
-| Native service packaging for `chio trust serve` and `chio mcp serve-http` | CLI and release | M1 |
+| Native service packaging for `chio trust serve` and `chio api protect` | CLI and release | M1 |
 | Two-host federated-issue and evidence end-to-end test | Trust plane | M1 |
 | Lifecycle-status check in the portable passport verifier | `chio-kernel-core` | M1, embedded hosts |
 | Durable revocation oracle | `chio-revocation-oracle` | M1 hardening |
@@ -491,8 +511,8 @@ Each row becomes a tracked issue after this document is approved, linked from
 | Token and spend dimension at the model relay | Relay and broker (F) | M2 |
 | Linux launchers for Claude Code, Codex and Hermes | Plugin repositories | M2 Omarchy |
 | Megastart allowance on kernel holds; Megastart Linux port | Megastart (G) | M2 |
-| Darwin process runner, broker and peer identity | `chio-process`, broker, `chio-secure-ipc` | M2 macOS |
-| macOS resource backend selection | macOS annex owner | M2 macOS |
+| Darwin process runner, broker and peer identity | `chio-process`, broker, `chio-secure-ipc` | M2 macOS, after the success test |
+| macOS resource backend selection | macOS annex owner | M2 macOS, after the success test |
 | W1 facade | W | M3 |
 | W2 owner services and remote co-signer | W | M3 |
 | Receiver-owned admission in a serving path | `chio-runtime-core` | M3 |

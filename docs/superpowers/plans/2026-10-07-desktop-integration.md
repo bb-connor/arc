@@ -18,7 +18,7 @@ external containment. QML, SwiftUI and browser surfaces apply only to selected
 presentation packages. Concrete owner paths are pinned in
 [PROGRAM-MAP](../../architecture/PROGRAM-MAP.md).
 
-`planning_status: ready_after_adr` under [ADR-0038](../../adr/ADR-0038-desktop-operator-program.md).
+`planning_status: ready_after_adr` under [ADR-0038](../../adr/ADR-0038-native-host-program.md).
 Native operations retain their actual boundary; projections are `advisory_only`.
 No implementation or installed release is qualified by this plan.
 

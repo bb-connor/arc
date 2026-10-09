@@ -1,6 +1,6 @@
 # Architecture review: Chio desktop integration (Omarchy and macOS)
 
-> Historical review input. The owner has since approved consolidation, recorded in [ADR-0038](../../../../adr/ADR-0038-desktop-operator-program.md). Its decision and the shared program supersede the pending-decision language below. Source verification also corrects S8 phase 1 to kernel scope only (tenant phase 4, recovery phase 5), and treats old recovery finding counts as historical, not current unresolved totals.
+> Historical review input. The owner has since approved consolidation, recorded in [ADR-0038](../../../../adr/ADR-0038-native-host-program.md). Its decision and the shared program supersede the pending-decision language below. Source verification also corrects S8 phase 1 to kernel scope only (tenant phase 4, recovery phase 5), and treats old recovery finding counts as historical, not current unresolved totals.
 
 > Integration-direction supersession, 2026-10-08: [FIRST-CLASS-INTEGRATIONS](../../2026-10-07-desktop-integration/FIRST-CLASS-INTEGRATIONS.md) and the current Mac annex/plan require Claude Code, Codex, Pi and Hermes plus the separate Herdr workspace/plugin lane. The Pi-first and mandatory mini-swe reuse/evaluation recommendations below are historical. Mini-swe is optional reference/conformance only; original source observations remain preserved.
 

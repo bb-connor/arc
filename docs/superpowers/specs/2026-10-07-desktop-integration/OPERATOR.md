@@ -7,7 +7,7 @@ Confidence: high in the verified ownership map; moderate in integration design;
 platform and runtime qualification remains unestablished by this document.
 The [program map](../../../architecture/PROGRAM-MAP.md) and
 [native host contract](HOST-CONTRACT.md) and
-[ADR](../../../adr/ADR-0038-desktop-operator-program.md) govern sequencing.
+[ADR](../../../adr/ADR-0038-native-host-program.md) govern sequencing.
 Normative MUST/REJECT statements below are acceptance obligations for the named
 owners, not claims that their proposed interfaces have shipped.
 

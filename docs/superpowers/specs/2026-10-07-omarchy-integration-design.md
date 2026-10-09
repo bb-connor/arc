@@ -6,7 +6,7 @@ Status: accepted planning direction, amended 2026-10-08 UTC; no runtime qualific
 The [shared native host program](2026-10-07-desktop-integration/README.md) implements
 the product ambition: Chio is a Rust kernel for agentic operating systems that
 coordinate work, share resources, and cooperate across organizational boundaries.
-[ADR-0038](../../adr/ADR-0038-desktop-operator-program.md) records the headless
+[ADR-0038](../../adr/ADR-0038-native-host-program.md) records the headless
 systems-layer direction and optional presentation scope.
 
 Start with the [native host contract](2026-10-07-desktop-integration/HOST-CONTRACT.md),

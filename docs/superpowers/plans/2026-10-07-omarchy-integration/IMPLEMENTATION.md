@@ -6,7 +6,7 @@
 
 **Tech Stack:** Existing Rust owners and supported SDK/protocol bindings, Linux peer/process identity and systemd units, qualified bubblewrap/container backends, Arch devtools/pacman for the initial distribution candidate, and owner/shared native qualification tools. Omarchy QML/Quickshell and browser tooling apply only to selected add-ons.
 
-Status: dependency-gated planning under [ADR-0038](../../../adr/ADR-0038-desktop-operator-program.md), amended for systems-layer delivery. No packet is implemented by this document. Confidence: high in source/ownership distinctions; moderate in platform feasibility; unknown in installed qualification. Checkboxes remain open.
+Status: dependency-gated planning under [ADR-0038](../../../adr/ADR-0038-native-host-program.md), amended for systems-layer delivery. No packet is implemented by this document. Confidence: high in source/ownership distinctions; moderate in platform feasibility; unknown in installed qualification. Checkboxes remain open.
 
 Read [FIRST-CLASS-INTEGRATIONS](../../specs/2026-10-07-desktop-integration/FIRST-CLASS-INTEGRATIONS.md), [the annex](../../specs/2026-10-07-omarchy-integration/ANNEX.md), [shared program](../../specs/2026-10-07-desktop-integration/README.md), [CONSUMERS](../../specs/2026-10-07-desktop-integration/CONSUMERS.md), [qualification](../../specs/2026-10-07-desktop-integration/QUALIFICATION.md), optional [operator projection](../../specs/2026-10-07-desktop-integration/OPERATOR.md), [program map](../../../architecture/PROGRAM-MAP.md) and dated [native Linux findings](../../specs/2026-10-07-omarchy-integration/research/native-host-services.md) before implementation.
 

@@ -10,4 +10,4 @@ The Mac plan retains M0-M11 identifiers. M2 delivers separately qualified user-s
 
 M0/M10 bind [CAPABILITIES](../../specs/2026-10-07-desktop-integration/CAPABILITIES.md), Q23-Q31 and selected C09-C11 passport, recursive-delegation and swarm cases to actual owners and installed evidence. Shared packet 4a supplies the direct native-owner CLI; a projection controller is optional. Release claims distinguish exact passing capabilities from completion of the coordination, resource-sharing and independent-cooperation program.
 
-[ADR-0038](../../../adr/ADR-0038-desktop-operator-program.md) owns the accepted planning direction. Implementation depends on reconciled native owners and exact installed qualification. Historical tests, source compatibility, package signing and bot approval do not enable a runtime profile.
+[ADR-0038](../../../adr/ADR-0038-native-host-program.md) owns the accepted planning direction. Implementation depends on reconciled native owners and exact installed qualification. Historical tests, source compatibility, package signing and bot approval do not enable a runtime profile.

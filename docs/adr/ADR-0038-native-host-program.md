@@ -1,4 +1,4 @@
-# ADR-0038: Native host integration for the Chio kernel
+# ADR-0038: Native host program
 
 - Status: Accepted for planning, 2026-10-07; amended 2026-10-08 UTC after the product-direction review. Not implemented or qualified.
 - Decision owner: program owner, who approved the combined program and then explicitly required the systems-layer direction grounded in Chio's public documentation and kernel roadmaps.
@@ -161,3 +161,40 @@ packet IDs remain for continuity and do not imply a desktop-led architecture.
 Documentation review, hosted CI, runtime qualification and public release remain
 separate. The shared/Omarchy change owns this decision; macOS remains a dependent
 annex. No merge, runtime rollout or public-site publication follows from this ADR.
+
+## Amendment 2026-10-08: north star and flows
+
+Status: accepted by the program owner on 2026-10-08, together with the unified
+roadmap (#1196) that schedules this program.
+
+**Chio is a Rust kernel for agentic operating systems that coordinate work,
+share resources, and cooperate across organizational boundaries.** Supporting
+line: **Authority that only narrows. Work that survives. Evidence that travels.**
+
+1. **Kernel.** Chio is a userspace authority and work-state kernel. Isolation
+   always comes from the host (bubblewrap, Seatbelt, containers or VMs) and is
+   credited per S7 evidence kind: isolation denies, Chio grants.
+2. **Retired phrases.** "The kernel your agents answer to", "Agents that pay
+   each other", "only protocol" claims, "kernel for building agentic operating
+   systems" and unscoped "every call" are retired.
+3. **Identity.** The units are organization principal, then domain, then agent
+   subject, then operator. Key custody uses OS-native storage through key
+   references, built on #1160's `signing_custody`; plaintext seed files are a
+   labelled development profile.
+4. **Order.** Cooperate comes first. Cross-document references use the
+   `HOST-` prefix (roadmap section 12):
+   - HOST-M1 Cooperate-0 runs on two independently operated hosts. It is cut
+     server-first: headless services and the door first, desktop review
+     moments as optional follow-ons.
+   - HOST-M2 runs one root grant across Claude Code, Codex, Pi and Hermes on
+     Linux, Omarchy first. macOS HOST-M2 (Darwin process runner, Keychain and
+     XPC broker, `LOCAL_PEERTOKEN` IPC) comes after the success test (roadmap
+     section 11); macOS keeps HOST-M1 scope until then.
+   - HOST-M3 is co-signed cross-organization work under #1173 W1/W2.
+5. **Megastart.** Its aggregate allowance moves onto kernel holds.
+6. **Isolation layer scope.** Thin OS adapters are allowed. The credential
+   broker, `chio-cage` and the harness launchers are not frozen. #1170's
+   candidate ADR-0023 is scoped to this decision.
+7. **Governance.** [NORTH-STAR-FLOWS](../superpowers/specs/2026-10-07-desktop-integration/NORTH-STAR-FLOWS.md)
+   governs the program. Other program documents reference it instead of
+   restating it.
