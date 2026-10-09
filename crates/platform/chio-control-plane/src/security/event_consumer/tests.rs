@@ -1802,6 +1802,8 @@ impl AttestedFindingResponseOutboxStore for RejectingGlobalScanOutboxStore {
 }
 mod planner_readiness_reads_the_recorded_audit_verdict;
 
+mod scheduled_store_reaudit;
+
 mod synchronous_batch_recovery_targets_its_batch_instead_of_the_global_backlog;
 
 mod synchronous_batch_recovery_processes_every_binding_and_preserves_the_first_error;

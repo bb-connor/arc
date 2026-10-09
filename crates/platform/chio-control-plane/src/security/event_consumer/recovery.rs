@@ -25,7 +25,10 @@ pub struct DurableAttestedFindingBatchPlanner {
     coordinator: Arc<dyn AttestedFindingResponseCoordinator>,
     clock: Arc<dyn Clock>,
     health: Mutex<PlannerHealth>,
+    audit_interval_ms: u64,
 }
+
+mod reaudit;
 
 /// Longest age at which a successful dependency probe (response authority and
 /// policy) is reused by the hot-path readiness check.
@@ -42,6 +45,7 @@ enum StoreAuditVerdict {
 
 struct PlannerHealth {
     audit: StoreAuditVerdict,
+    audited_at_ms: Option<u64>,
     liveness_verified_at_ms: Option<u64>,
 }
 
@@ -137,8 +141,10 @@ impl DurableAttestedFindingBatchPlanner {
             clock,
             health: Mutex::new(PlannerHealth {
                 audit: StoreAuditVerdict::NotRun,
+                audited_at_ms: None,
                 liveness_verified_at_ms: None,
             }),
+            audit_interval_ms: reaudit::DEFAULT_STORE_AUDIT_INTERVAL_MS,
         };
         planner.run_store_audit()?;
         Ok(planner)
@@ -161,7 +167,13 @@ impl DurableAttestedFindingBatchPlanner {
                 self.outbox_store
                     .ensure_attested_finding_response_outbox_ready()
             });
+        let audited_at_ms = self
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)
+            .ok();
         let mut health = self.lock_health()?;
+        health.audited_at_ms = audited_at_ms;
         health.audit = match &outcome {
             Ok(()) => StoreAuditVerdict::Passed,
             Err(error) => StoreAuditVerdict::Failed(error.clone()),
@@ -371,6 +383,7 @@ impl DurableAttestedFindingBatchPlanner {
         if max_records == 0 || max_records > MAX_ATTESTED_FINDING_RESPONSE_OUTBOX_SCAN {
             return Err(PortError::invalid_data());
         }
+        self.run_scheduled_store_audit()?;
         self.ensure_recovery_ready()?;
         let now_unix_ms = self
             .clock
