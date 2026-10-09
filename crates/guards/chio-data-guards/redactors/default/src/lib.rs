@@ -375,7 +375,6 @@ fn collect(
     )
 }
 
-#[allow(clippy::too_many_arguments)]
 fn collect_with_filter(
     payload: &[u8],
     re: &Regex,
