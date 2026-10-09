@@ -414,26 +414,40 @@ fn verify_not_applied(
     verify_not_applied_with(
         fixture,
         canonical,
+        ObservedObligationState {
+            observed_disposition,
+            observed_settlement,
+            observed_snapshot_version,
+            observed_resource_fence,
+            offer: &fixture.offer,
+            status_proof: &fixture.status_proof,
+        },
+    )
+}
+
+/// Parameters of `verify_not_applied_with`.
+struct ObservedObligationState<'a> {
+    observed_disposition: &'a ObligationDispositionRecordV1,
+    observed_settlement: &'a ObligationSettlementLifecycleV1,
+    observed_snapshot_version: u64,
+    observed_resource_fence: u64,
+    offer: &'a AssignmentOfferV1,
+    status_proof: &'a VerifiedObligationStatusProofV1,
+}
+
+fn verify_not_applied_with(
+    fixture: &Fixture,
+    canonical: &[u8],
+    params: ObservedObligationState<'_>,
+) -> Result<chio_credit::factor::VerifiedAssignmentNotAppliedV1, FactorError> {
+    let ObservedObligationState {
         observed_disposition,
         observed_settlement,
         observed_snapshot_version,
         observed_resource_fence,
-        &fixture.offer,
-        &fixture.status_proof,
-    )
-}
-
-#[allow(clippy::too_many_arguments)]
-fn verify_not_applied_with(
-    fixture: &Fixture,
-    canonical: &[u8],
-    observed_disposition: &ObligationDispositionRecordV1,
-    observed_settlement: &ObligationSettlementLifecycleV1,
-    observed_snapshot_version: u64,
-    observed_resource_fence: u64,
-    offer: &AssignmentOfferV1,
-    status_proof: &VerifiedObligationStatusProofV1,
-) -> Result<chio_credit::factor::VerifiedAssignmentNotAppliedV1, FactorError> {
+        offer,
+        status_proof,
+    } = params;
     verify_assignment_not_applied(
         canonical,
         &AssignmentNotAppliedVerificationV1 {
@@ -835,12 +849,14 @@ fn not_applied_rejects_an_unrelated_expired_offer() -> TestResult {
         require_factor_error(verify_not_applied_with(
             &fixture,
             &canonical,
-            &fixture.prior_disposition,
-            &fixture.settlement_lifecycle,
-            SNAPSHOT_VERSION,
-            RESOURCE_FENCE,
-            &unrelated_offer,
-            &fixture.status_proof,
+            ObservedObligationState {
+                observed_disposition: &fixture.prior_disposition,
+                observed_settlement: &fixture.settlement_lifecycle,
+                observed_snapshot_version: SNAPSHOT_VERSION,
+                observed_resource_fence: RESOURCE_FENCE,
+                offer: &unrelated_offer,
+                status_proof: &fixture.status_proof
+            }
         )),
         FactorError::BindingMismatch
     );
@@ -866,12 +882,14 @@ fn not_applied_rejects_a_status_proof_for_another_obligation() -> TestResult {
         require_factor_error(verify_not_applied_with(
             &fixture,
             &canonical,
-            &fixture.prior_disposition,
-            &fixture.settlement_lifecycle,
-            SNAPSHOT_VERSION + 1,
-            RESOURCE_FENCE,
-            &fixture.offer,
-            &other_status,
+            ObservedObligationState {
+                observed_disposition: &fixture.prior_disposition,
+                observed_settlement: &fixture.settlement_lifecycle,
+                observed_snapshot_version: SNAPSHOT_VERSION + 1,
+                observed_resource_fence: RESOURCE_FENCE,
+                offer: &fixture.offer,
+                status_proof: &other_status
+            }
         )),
         FactorError::BindingMismatch
     );
