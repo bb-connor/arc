@@ -15,18 +15,18 @@ provider, formal, hosted, or release qualification.
 | Supplemental PR obligations | 1 | 0 | 1 |
 | Current or executed-support total | 348 | 117 | 231 |
 | Prevented candidate issues, counted separately | 31 | Not combined | Not combined |
-| Additional uninstalled candidate follow-ups | 5 | Not combined | Not combined |
+| Additional findings in uninstalled candidates | 6 | Not combined | Not combined |
 | Provenance prerequisite, excluded from implementation findings | 1 | Not applicable | Not applicable |
 
 The canonical 99 recorded closures comprise 92 source-only and seven scoped
 local closures. The additional 18 comprise seven source-only and eleven scoped
 local closures. These are recorded review classifications, not new acceptance.
 
-There are **384 findings or candidate issues**, plus the excluded provenance
-prerequisite, for **385 records**. The original prevented inventory retains 23
-assigned IDs and eight unassigned records. The five candidate follow-ups have
+There are **385 findings or candidate issues**, plus the excluded provenance
+prerequisite, for **386 records**. The original prevented inventory retains 23
+assigned IDs and eight unassigned records. The six candidate follow-ups have
 register keys and null finding IDs. There are still 371 assigned finding IDs,
-or 372 IDs including the provenance prerequisite, and thirteen null IDs. Every
+or 372 IDs including the provenance prerequisite, and fourteen null IDs. Every
 original ID and exact unassigned reviewer label remains preserved.
 
 The current status counts are:
@@ -36,7 +36,7 @@ The current status counts are:
 | `open` | 231 | No complete independent disposition is recorded. |
 | `needs_revalidation` | 47 | Historical closure remains, but cited source or document pins differ without an accepted current continuity review. |
 | `recorded_scoped_closed` | 70 | The recorded scoped disposition is retained, with the limits stated per record. |
-| `candidate_only` | 36 | The defective candidate was uninstalled when found; corrected successors may have separate evidence. |
+| `candidate_only` | 37 | The defective candidate was uninstalled when found; corrected successors may have separate evidence. |
 | `prerequisite_only` | 1 | Provenance work, not a proved implementation defect. |
 
 The 47 remaining revalidation flags are part of the 117 historical scoped closures. They
@@ -64,11 +64,11 @@ and [explicit authority provisioning](reviews/native-authority-provisioning.md).
 Their evidence and remaining obligations are recorded in `current_updates`.
 H-SDK-01 remains open and provisioning is a prerequisite. Those installations
 did not change finding classifications or grant qualification. The subsequent
-foundation reviews add the three candidate records below.
+foundation reviews add the four candidate records below.
 
-The five additive `candidate_followup` records do not change canonical closure
-counts or installed-finding totals. The initial two preserve their prior failure
-and successor evidence; the latest three remain open. Their
+The six additive `candidate_followup` records do not change canonical closure
+counts or installed-finding totals. All preserve their original finding evidence;
+the two Kernel records now add independently approved corrective successors. Their
 exact local evidence hashes and accounting time are in `candidate_review_evidence`.
 
 - `candidate:checkpoint-receipt-confirmation-envelope` records the third real
@@ -90,21 +90,42 @@ exact local evidence hashes and accounting time are in `candidate_review_evidenc
 
 - `candidate:kernel-foundation-ordinary-durable-original` is the P1 source-review
   finding that a legitimately absent retained request denies ordinary durable
-  admission before Native selection is checked. Runtime reproduction was not
-  performed by the reviewer; correction and owning acceptance remain pending.
+  admission before Native selection is checked. A subsequent corrected pre-fix
+  control reproduced that exact denial. The approved successor checks actual
+  Native selection; both owning eligibility controls passed locally.
 - `candidate:kernel-foundation-loom-runtime-gate` is the P2 missing configuration
   gate. The actual pre-fix loom compilation failed with 30 compiler errors and
-  executed no tests. Correction and corrected compilation remain pending.
+  executed no tests. The approved successor adds `cfg(not(loom))`; all 18 local
+  Session-only Loom controls passed with `LOOM_MAX_PREEMPTIONS=3`.
 - `candidate:process-foundation-missing-test-suppliers` is the P2 registration
   defect affecting thirteen enrollment-dependent and two lifetime acceptance
   cases. The source reviewer ran no tests. Preserve all future positive
   obligations while making the supported default target executable.
+- `candidate:receipt-owner-borrowed-backend-lifetime` is the P2 public trait
+  compatibility regression: adding `Any` to the base `ReceiptStore` trait excludes
+  ordinary non-static borrowed backends. Maintained `receipt_store.rs` remains
+  unchanged and compatible. A subsequent genuine compile reproduction exited
+  101 with `E0478`, `E0803` and `E0597`; repair acceptance remains pending.
+  Concrete configured-owner identity and
+  unsupported Native refusal must survive the repair.
 
-All five records use register keys with null assigned finding IDs. The three
-foundation findings are uninstalled and open; they do not claim a production
-runtime failure or a corrected pass. Earlier failure and review evidence remains
-unchanged. The original two-case receipt fault evidence is not retrospectively
-credited with the later, distinct retained-reservation test.
+All six records use register keys with null assigned finding IDs. The
+[Kernel foundation successor](reviews/kernel-foundation.md) also records 1,469
+passing Kernel library cases on the composed candidate. That candidate includes
+the separately approved atomic-ledger overlay, while the foundation source
+selection uses frozen preimages for two overlapping files. Candidate runs do not
+establish a separately executed foundation-only or maintained installation build.
+The reviewed 22-path foundation was subsequently installed at `b7d71059c` and
+separately passed 1,468 maintained library cases, 25 doctests, 18 bounded Loom
+controls, format, names, boundaries and strict library-only Kernel Clippy. The
+excluded atomic-ledger callback test exactly explains the library count difference.
+All-targets strict Clippy remains failed with 248 Store development-dependency
+diagnostics whose exact primary signatures match the prior maintained run.
+These installed results are separate from candidate results. The Process supplier
+finding has no accepted successor here. Earlier failures, original dispositions and all
+candidate-only classifications remain unchanged. The original two-case receipt
+fault evidence is not retrospectively credited with the later, distinct
+retained-reservation test.
 
 ## Source-pin audit
 
@@ -147,7 +168,7 @@ Each `records` entry has:
 
 - `key`: unique register identity. Assigned IDs are used verbatim. The eight
   `unassigned-prevented:<index>` values are register keys, not invented finding
-  IDs; the index resolves to the unchanged addendum record. The five descriptive
+  IDs; the index resolves to the unchanged addendum record. The six descriptive
   `candidate:<behavior>` keys also identify records without assigned review IDs.
 - `id`, `severity`, `title`, and `dependency_group`: original identity and review
   priority, plus the execution workstream. A null severity means the reviewer
@@ -168,6 +189,9 @@ Each `records` entry has:
   actually accepted or left open, separately from today's source applicability.
 - `current_status`, `current_reason`, and, where available, `pin_check`: current
   inventory adjudication and its limits. They do not overwrite source records.
+- `current_successor`, where present: additive corrective review and execution
+  scope, including the exact previous `current_reason`, source evidence and
+  installation boundary. Original disposition and status remain separate.
 
 Source aliases resolve to repository-relative files in `source_inventory`.
 Those files remain local historical evidence under `target/`; a fresh checkout
@@ -210,11 +234,27 @@ inventories; exact additional, supplemental, prevented and provenance row
 identity; original recorded closure IDs and counts; unique keys and non-null
 IDs; source file hashes; local pin hashes; and absence of absolute user paths,
 IP addresses and em dashes in the tracked JSON. The original source inventories
-remain unchanged. The latest update verifies all 382 prior records are exact
+remain unchanged. The preceding foundation inventory update verified all 382
+prior records were exact
 apart from the four explicitly authorized `current_reason` and
-`current_continuity` amendments. It checks the sealed foundation reviews, full
+`current_continuity` amendments. It checked the sealed foundation reviews, full
 source-manifest references and actual loom failure, unique IDs and the derived
 385-record counts. Historical closure IDs and all source pins remain unchanged.
+The Kernel corrective successor update preserves 383 records exactly and changes
+only the two Kernel `current_reason` fields, retaining both prior values verbatim
+inside additive `current_successor` objects. All original record fields are
+recoverable exactly. Fourteen new evidence pins retain the source reviews,
+manifest, diff, earlier fixture failure, actual regression and three local passes.
+That successor changes no count, original evidence pin, failure or historical
+closure. The subsequent ReceiptStore P2 adds one candidate-only record, its
+sealed review/manifest and actual compile failure: 386 total records, six candidate follow-ups,
+37 candidate-only statuses and fourteen null IDs. All 385 preceding records are
+unchanged by that addition. The 348 current or executed-support findings, 117
+historical scoped closures and 231 historically unclosed findings remain exact.
+The installed Kernel successor adds its sealed selection, applied snapshot,
+maintained verification and two exact comparison records. All eight maintained
+gate records and logs match the verification hashes, including the retained lint
+failure. Its installation changes no finding classification or qualification.
 The installation-specific SDK continuity audit supplements the historical pin
 audit; it does not rerun unrelated flags. Confidence is high for this accounting;
 current integrated behavior remains unqualified.

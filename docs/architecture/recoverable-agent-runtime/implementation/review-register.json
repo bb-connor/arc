@@ -52,12 +52,12 @@
     "current_or_executed_support_findings": 348,
     "implementation_recorded_scoped_closed": 117,
     "implementation_recorded_not_closed": 231,
-    "findings_and_prevented_candidates": 384,
-    "all_records_including_provenance": 385,
+    "findings_and_prevented_candidates": 385,
+    "all_records_including_provenance": 386,
     "assigned_finding_ids_excluding_provenance": 371,
     "qualified": 0,
     "current_status": {
-      "candidate_only": 36,
+      "candidate_only": 37,
       "needs_revalidation": 47,
       "open": 231,
       "prerequisite_only": 1,
@@ -92,15 +92,15 @@
       },
       "candidate_followup": {
         "P1": 1,
-        "P2": 2,
+        "P2": 3,
         "P3": 1,
         "unassigned": 1
       }
     },
     "candidate_followup": {
-      "total": 5,
+      "total": 6,
       "assigned_ids": 0,
-      "unassigned_records": 5
+      "unassigned_records": 6
     }
   },
   "pin_audit": {
@@ -8869,12 +8869,65 @@
       ],
       "recorded_disposition": "open_candidate_source_review_finding",
       "current_status": "candidate_only",
-      "current_reason": "The independent 20-path Kernel review proves that the unconditional finishing hook rejects a legitimately absent retained request before checking ordinary selection. No runtime reproduction was executed by the reviewer. A corrective successor is in progress and has no accepted disposition here; the source is uninstalled.",
+      "current_reason": "The original source finding is retained. A corrected pre-fix control reproduced ordinary Deny versus expected Allow; the selected-Native missing-original refusal passed. The independently reviewed successor checks actual Native selection before accepting ordinary absence. Both eligibility controls and all 1469 Kernel library tests passed on the composed local candidate. The reviewed 22-path foundation is installed with 1468 maintained library tests, 25 doctests, 18 bounded Loom controls and library-only strict Clippy passing. All-targets strict Clippy retains 248 unchanged Store development-dependency diagnostics. The original finding remains candidate-only; installed scope is recorded separately and the runtime remains unqualified.",
       "installed_when_found": false,
       "current_implementation_finding": false,
       "candidate_source": "target/recovery-pr/current-review-followup/local-native-process-owner-composition-20261009T0610/source",
       "confidence": "High for the reviewed branch/caller proof; runtime reproduction and corrective acceptance are not claimed.",
-      "qualified": false
+      "qualified": false,
+      "current_successor": {
+        "recorded_at_utc": "2026-10-09T16:12:59.747075+00:00",
+        "recorded_disposition": "candidate_source_correction_approved",
+        "previous_current_reason": "The independent 20-path Kernel review proves that the unconditional finishing hook rejects a legitimately absent retained request before checking ordinary selection. No runtime reproduction was executed by the reviewer. A corrective successor is in progress and has no accepted disposition here; the source is uninstalled.",
+        "review_ref": "docs/architecture/recoverable-agent-runtime/implementation/reviews/kernel-foundation.md",
+        "evidence_refs": [
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/compatibility-spec-review.md",
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/quality-review.md",
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/compatibility-repair/postimage-manifest.json",
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/compatibility-repair/repair.diff"
+        ],
+        "source_review": {
+          "spec": "SPEC_PASS for the bounded source successor",
+          "quality": "APPROVE for the bounded 22-path source composition"
+        },
+        "local_validation": [
+          {
+            "result_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/compatibility-repair/eligibility-after.json",
+            "log_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/compatibility-repair/eligibility-after.log",
+            "exit_code": 0,
+            "passed": 2,
+            "failed": 0,
+            "ignored": 0
+          },
+          {
+            "result_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/compatibility-repair/kernel-library-after.json",
+            "log_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/compatibility-repair/kernel-library-after.log",
+            "exit_code": 0,
+            "passed": 1469,
+            "failed": 0,
+            "ignored": 0
+          }
+        ],
+        "scope": "Runs used the full composed candidate, including the separately approved atomic-ledger successor in admission_operation.rs and admission_operation/store.rs. The 22-path foundation source selection uses frozen preimages for those overlaps. These runs do not establish a separately executed foundation-only or maintained installation build. Unsupported producer defaults remain; funded Capture and whole-runtime qualification are not established.",
+        "installation_status": "installed_with_bounded_local_passes_and_all_targets_lint_gap",
+        "confidence": "High for the exact source reviews, composed-candidate results and separately recorded maintained installation checks; no whole-runtime qualification is credited.",
+        "qualified": false,
+        "pre_fix_validation": {
+          "result_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/compatibility-repair/eligibility-corrected-before.json",
+          "log_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/compatibility-repair/eligibility-corrected-before.log",
+          "exit_code": 101,
+          "passed": 1,
+          "failed": 1,
+          "ignored": 0,
+          "scope": "Ordinary admission failed with the exact missing-original denial; selected-Native missing-original refusal passed.",
+          "earlier_fixture_failure_refs": [
+            "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/compatibility-repair/eligibility-before.json",
+            "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/compatibility-repair/eligibility-before.log"
+          ],
+          "earlier_fixture_failure_scope": "Preserved setup failure, not credited as reproducing the ordinary admission defect."
+        },
+        "installation_ref": "#/candidate_review_evidence/kernel_foundation_installation"
+      }
     },
     {
       "key": "candidate:kernel-foundation-loom-runtime-gate",
@@ -8892,7 +8945,7 @@
       ],
       "recorded_disposition": "open_candidate_compile_failure_source_review_finding",
       "current_status": "candidate_only",
-      "current_reason": "The independent Kernel review identifies the missing cfg(not(loom)) gate. The separate actual pre-fix loom compilation exited 101 with 30 compiler errors; no tests executed. A corrective successor is in progress and remains unaccepted here; the source is uninstalled.",
+      "current_reason": "The original pre-fix loom failure remains recorded: exit 101, 30 compiler errors, no tests executed. The independently reviewed successor adds the missing cfg(not(loom)) gate. All 18 Session-only loom controls passed with LOOM_MAX_PREEMPTIONS=3, and all 1469 normal Kernel library tests passed on the composed local candidate. The reviewed 22-path foundation is installed with 1468 maintained library tests, 25 doctests, 18 bounded Loom controls and library-only strict Clippy passing. All-targets strict Clippy retains 248 unchanged Store development-dependency diagnostics. The original finding remains candidate-only; installed scope is recorded separately and the runtime remains unqualified.",
       "installed_when_found": false,
       "current_implementation_finding": false,
       "candidate_source": "target/recovery-pr/current-review-followup/local-native-process-owner-composition-20261009T0610/source",
@@ -8903,7 +8956,50 @@
         "tests_executed": false
       },
       "confidence": "High for the source finding and recorded compilation failure; corrected compilation and normal-build continuity remain required.",
-      "qualified": false
+      "qualified": false,
+      "current_successor": {
+        "recorded_at_utc": "2026-10-09T16:12:59.747075+00:00",
+        "recorded_disposition": "candidate_source_correction_approved",
+        "previous_current_reason": "The independent Kernel review identifies the missing cfg(not(loom)) gate. The separate actual pre-fix loom compilation exited 101 with 30 compiler errors; no tests executed. A corrective successor is in progress and remains unaccepted here; the source is uninstalled.",
+        "review_ref": "docs/architecture/recoverable-agent-runtime/implementation/reviews/kernel-foundation.md",
+        "evidence_refs": [
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/compatibility-spec-review.md",
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/quality-review.md",
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/compatibility-repair/postimage-manifest.json",
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/compatibility-repair/repair.diff"
+        ],
+        "source_review": {
+          "spec": "SPEC_PASS for the bounded source successor",
+          "quality": "APPROVE for the bounded 22-path source composition"
+        },
+        "local_validation": [
+          {
+            "result_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/compatibility-repair/loom-after.json",
+            "log_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/compatibility-repair/loom-after.log",
+            "exit_code": 0,
+            "passed": 18,
+            "failed": 0,
+            "ignored": 0,
+            "configuration": {
+              "RUSTFLAGS": "--cfg loom",
+              "LOOM_MAX_PREEMPTIONS": "3"
+            }
+          },
+          {
+            "result_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/compatibility-repair/kernel-library-after.json",
+            "log_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/compatibility-repair/kernel-library-after.log",
+            "exit_code": 0,
+            "passed": 1469,
+            "failed": 0,
+            "ignored": 0
+          }
+        ],
+        "scope": "Runs used the full composed candidate, including the separately approved atomic-ledger successor in admission_operation.rs and admission_operation/store.rs. The 22-path foundation source selection uses frozen preimages for those overlaps. These runs do not establish a separately executed foundation-only or maintained installation build. Unsupported producer defaults remain; funded Capture and whole-runtime qualification are not established.",
+        "installation_status": "installed_with_bounded_local_passes_and_all_targets_lint_gap",
+        "confidence": "High for the exact source reviews, composed-candidate results and separately recorded maintained installation checks; no whole-runtime qualification is credited.",
+        "qualified": false,
+        "installation_ref": "#/candidate_review_evidence/kernel_foundation_installation"
+      }
     },
     {
       "key": "candidate:process-foundation-missing-test-suppliers",
@@ -8930,6 +9026,44 @@
       },
       "confidence": "High for deterministic missing-supplier source relationships; runtime behavior beyond earlier scoped evidence is not established.",
       "qualified": false
+    },
+    {
+      "key": "candidate:receipt-owner-borrowed-backend-lifetime",
+      "id": null,
+      "category": "candidate_followup",
+      "severity": "P2",
+      "title": "Optional Native receipt owner discovery excludes ordinary borrowed backends",
+      "dependency_group": "historical_custody",
+      "obligation": "Preserve the base ReceiptStore: Send + Sync contract for ordinary non-static borrowed implementations and default Native refusal. Keep concrete type and configured-instance checks at a separate optional owning registration boundary; never trust independently supplied owner pairs, forwarded discovery or vtable addresses. Prove borrowed-backend compilation, genuine configured SQLite ownership, forwarding-wrapper and foreign-owner refusal, and registration replacement/lifetime coherence on the exact successor.",
+      "evidence_refs": [
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/source-manifest.json",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/spec-review.md",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/borrowed-backend-before.json",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/borrowed-backend-before.log"
+      ],
+      "recorded_disposition": "open_candidate_source_review_finding",
+      "current_status": "candidate_only",
+      "current_reason": "The independent seven-file review proves that adding Any to the base ReceiptStore trait imposes a new static implementation requirement on ordinary borrowed backends. A subsequent owning compile reproduction exited 101 with E0478, E0803 and E0597 against source pinned stable for that run. Maintained receipt_store.rs remains unchanged and compatible. Repair and owning acceptance remain pending; this is an uninstalled candidate regression.",
+      "installed_when_found": false,
+      "current_implementation_finding": false,
+      "candidate_source": "target/recovery-pr/current-review-followup/local-native-process-owner-composition-20261009T0610/source",
+      "confidence": "High for the reviewed public trait lifetime regression and the recorded owning compile failure; no corrective acceptance is credited.",
+      "qualified": false,
+      "observed_validation": {
+        "kind": "actual_compile_failure",
+        "result_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/borrowed-backend-before.json",
+        "log_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/borrowed-backend-before.log",
+        "exit_code": 101,
+        "compiler_errors": 3,
+        "error_codes": [
+          "E0478",
+          "E0803",
+          "E0597"
+        ],
+        "tests_executed": false,
+        "source_stable_during_run": true,
+        "scope": "The genuine borrowed ordinary backend cannot implement or use the candidate ReceiptStore Any contract; no corrected successor is accepted."
+      }
     }
   ],
   "inventory_confidence": "high: exact ID, row-count and recorded-disposition joins; current behavior is not requalified",
@@ -8994,6 +9128,45 @@
       ],
       "at_utc": "2026-10-09T15:58:10.931448+00:00",
       "scope": "Three open uninstalled foundation candidate findings from sealed independent reviews; only the loom case carries actual compilation-failure evidence.",
+      "qualified": false
+    },
+    {
+      "findings": [
+        "candidate:kernel-foundation-ordinary-durable-original",
+        "candidate:kernel-foundation-loom-runtime-gate"
+      ],
+      "at_utc": "2026-10-09T16:12:59.747075+00:00",
+      "review": "docs/architecture/recoverable-agent-runtime/implementation/reviews/kernel-foundation.md",
+      "review_sha256": "bf86d89084a871733fab295fcc5465c30cfdc0ad38108289ded98daa49e9288f",
+      "scope": "Two Kernel foundation source findings have independently approved corrective successors and bounded composed-candidate passes. Original findings, failures, statuses and counts remain intact; maintained foundation installation is pending.",
+      "qualified": false
+    },
+    {
+      "findings": [
+        "candidate:receipt-owner-borrowed-backend-lifetime"
+      ],
+      "at_utc": "2026-10-09T16:15:34.571407+00:00",
+      "scope": "Added one uninstalled candidate P2 borrowed-backend ReceiptStore compatibility finding from its sealed seven-file review. Maintained ReceiptStore remains unchanged; no corrective acceptance or canonical closure.",
+      "qualified": false
+    },
+    {
+      "findings": [
+        "candidate:kernel-foundation-ordinary-durable-original",
+        "candidate:kernel-foundation-loom-runtime-gate"
+      ],
+      "at_utc": "2026-10-09T16:22:42.241224+00:00",
+      "installed_commit": "b7d71059ccefa740f0036b7e0734d2dd280fc37c",
+      "review": "docs/architecture/recoverable-agent-runtime/implementation/reviews/kernel-foundation.md",
+      "scope": "Reviewed 22-path Kernel foundation installed with separate maintained local results. Candidate-only classifications and historical closures preserved; all-targets strict Clippy remains failed with 248 unchanged Store development-dependency diagnostics.",
+      "qualified": false,
+      "review_sha256": "bf86d89084a871733fab295fcc5465c30cfdc0ad38108289ded98daa49e9288f"
+    },
+    {
+      "findings": [
+        "candidate:receipt-owner-borrowed-backend-lifetime"
+      ],
+      "at_utc": "2026-10-09T16:22:42.241224+00:00",
+      "scope": "Owning candidate compile reproduces the borrowed-backend regression with E0478, E0803 and E0597, exit 101. Maintained ReceiptStore unchanged; repair acceptance pending.",
       "qualified": false
     }
   ],
@@ -9080,10 +9253,137 @@
       "process_foundation_spec_review": {
         "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/process-foundation/spec-review.md",
         "sha256": "11972dbc815f4a3610b2bf97f4a904793dbf5a3d0b3b4c64e06267c57e72c777"
+      },
+      "kernel_foundation_compatibility_spec_review": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/compatibility-spec-review.md",
+        "sha256": "d7c611243d42860fbb05ec32a907b58b64b2ab2999ebceac4d7434e852b94a6d"
+      },
+      "kernel_foundation_quality_review": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/quality-review.md",
+        "sha256": "b828a2dd14208861149ea7d5227fa67e566858b2f9f83263aa66d492f7baa241"
+      },
+      "kernel_foundation_compatibility_postimage_manifest": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/compatibility-repair/postimage-manifest.json",
+        "sha256": "89ed5eb1158f123df1f409cc2c11b2fb5a4342a77ad074871aed5141425f26f2"
+      },
+      "kernel_foundation_compatibility_diff": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/compatibility-repair/repair.diff",
+        "sha256": "135a6fe14474e300a18f79ea143a43a77cd2f8991ff18ac2fa9c7c0522e4c609"
+      },
+      "kernel_foundation_eligibility_fixture_before_result": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/compatibility-repair/eligibility-before.json",
+        "sha256": "55615ca02d6300446bbcbbbcf4d7ea80df5a894452bfb124ea1d184de4f43278"
+      },
+      "kernel_foundation_eligibility_fixture_before_log": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/compatibility-repair/eligibility-before.log",
+        "sha256": "bafa638b81d1813e679e5347061c353155068e381cc292267e621b83ee813620"
+      },
+      "kernel_foundation_eligibility_corrected_before_result": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/compatibility-repair/eligibility-corrected-before.json",
+        "sha256": "bdb1b44c58887c8a7cfdfeb9096e929f6093bd6c7cdbca1ab4af2b84aac7bdeb"
+      },
+      "kernel_foundation_eligibility_corrected_before_log": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/compatibility-repair/eligibility-corrected-before.log",
+        "sha256": "4b773d289a892355f29bfab1416b8ab5ec449083b092d0e7e97eb62b89ef4dd9"
+      },
+      "kernel_foundation_eligibility_after_result": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/compatibility-repair/eligibility-after.json",
+        "sha256": "77594f9550a09bb2bffd7c1e301f19af65b43ffb2720d92dee4263e8d3db540d"
+      },
+      "kernel_foundation_eligibility_after_log": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/compatibility-repair/eligibility-after.log",
+        "sha256": "b0652829a734cf2599aed0ed6ae693d6fa464e454c64240f75f63dbdec20f1d0"
+      },
+      "kernel_foundation_library_after_result": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/compatibility-repair/kernel-library-after.json",
+        "sha256": "1a853980f318999e1e8a730cc3e7f227c385a6d5bf69f07a07c5398af9f7e030"
+      },
+      "kernel_foundation_library_after_log": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/compatibility-repair/kernel-library-after.log",
+        "sha256": "016e6ae5051b7eb26131c37b8d85c251384156d3f353b10253242778ea88330b"
+      },
+      "kernel_foundation_loom_after_result": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/compatibility-repair/loom-after.json",
+        "sha256": "4594990eacd47e5269bf4d3ff56d77acdf8168b7b384187b22e93cee65dd186d"
+      },
+      "kernel_foundation_loom_after_log": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/compatibility-repair/loom-after.log",
+        "sha256": "0c5b4b375f690f9245a45183660551500d17e5023fe9f26c371d3f8b87ebd43f"
+      },
+      "receipt_owner_foundation_source_manifest": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/source-manifest.json",
+        "sha256": "a22a0bc7725d1e200f91bbe214b39a6de40eb7fa1b53076c5217ef7ec887db42"
+      },
+      "receipt_owner_foundation_spec_review": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/spec-review.md",
+        "sha256": "3f1869f2afd5c441b625c490718c4780de2ceb31ec59f96ca624eca622ea14d5"
+      },
+      "kernel_foundation_installation_selection": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/installation/selection-manifest.json",
+        "sha256": "70703f1e5f9f65cda2fa6be898c4937c8286151e8810f5c97245763040af68c7"
+      },
+      "kernel_foundation_applied_selection": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/installation/applied-selection.json",
+        "sha256": "0e062a5abfa492e2aa4ce49ecf87427ce807e01ef50f59dc3601fbb07bc9211a"
+      },
+      "kernel_foundation_maintained_verification": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/installation/maintained-verification.json",
+        "sha256": "4b84c8ec0c147f49fa914933e7b7e3596a8c7caa87ada4b978085f46d8ac479d"
+      },
+      "kernel_foundation_library_scope_comparison": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/installation/library-scope-comparison.json",
+        "sha256": "a02ddfb4e0969834a3061aa3e76780e6f468951e2b7ae3349d9798b8fe9c7b3c"
+      },
+      "kernel_foundation_clippy_comparison": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/installation/clippy-comparison.json",
+        "sha256": "d9ab4d9489107ae4269875ad1faf64e7f93f24e7c4e70ae2f1d7202c242e1e6e"
+      },
+      "receipt_owner_borrowed_backend_before_result": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/borrowed-backend-before.json",
+        "sha256": "e10683e239c5062e15eee19fcc73a1cb81b3fe0eed38622b603e505ae2782a96"
+      },
+      "receipt_owner_borrowed_backend_before_log": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/borrowed-backend-before.log",
+        "sha256": "4fe260fb1f8f4b82f365ef9d2a17871f5ba626a4c518ec5594dc297b59f07c1c"
       }
     },
     "local_pass_recorded_at_utc": "2026-10-09T14:45:26.431181+00:00",
     "spec_review_recorded_at_utc": "2026-10-09T14:46:39.681718+00:00",
-    "foundation_findings_recorded_at_utc": "2026-10-09T15:58:10.931448+00:00"
+    "foundation_findings_recorded_at_utc": "2026-10-09T15:58:10.931448+00:00",
+    "kernel_foundation_successor_recorded_at_utc": "2026-10-09T16:12:59.747075+00:00",
+    "receipt_owner_finding_recorded_at_utc": "2026-10-09T16:15:34.571407+00:00",
+    "kernel_foundation_installation": {
+      "recorded_at_utc": "2026-10-09T16:22:42.241224+00:00",
+      "installed_commit": "b7d71059ccefa740f0036b7e0734d2dd280fc37c",
+      "source_paths": 22,
+      "selection_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/installation/selection-manifest.json",
+      "applied_selection_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/installation/applied-selection.json",
+      "verification_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/installation/maintained-verification.json",
+      "local_passes": {
+        "kernel_library": 1468,
+        "kernel_doctests": 25,
+        "session_only_loom": 18,
+        "failed": 0,
+        "ignored": 0,
+        "format": true,
+        "source_names": true,
+        "recovery_boundaries": true,
+        "kernel_library_strict_clippy": true
+      },
+      "loom_configuration": {
+        "RUSTFLAGS": "--cfg loom",
+        "LOOM_MAX_PREEMPTIONS": "3"
+      },
+      "all_targets_strict_clippy": {
+        "exit_code": 101,
+        "store_development_dependency_diagnostics": 248,
+        "comparison_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/installation/clippy-comparison.json",
+        "comparison": "Exact multiset of message/file/line/column primary signatures matches the prior maintained Store run; no additions or removals."
+      },
+      "candidate_scope_comparison_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-foundation/installation/library-scope-comparison.json",
+      "scope": "The 22-path maintained foundation uses the selected frozen preimages for two atomic-ledger overlaps. It passes 1468 library tests, including both eligibility controls; the separately excluded atomic-ledger callback regression is the sole additional test among the composed candidate 1469. ReceiptStore remains unchanged. No Store or Process implementation or atomic overlay was installed by this unit. Unsupported producer defaults and all-targets strict lint gap remain; funded Capture and whole-runtime qualification are not established.",
+      "confidence": "High for sealed source selection and actual maintained check records; bounded local acceptance only.",
+      "qualified": false
+    }
   }
 }
