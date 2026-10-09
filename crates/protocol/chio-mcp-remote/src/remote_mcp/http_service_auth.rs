@@ -1,4 +1,6 @@
-fn should_emit_post_stream_event(
+use super::*;
+
+pub(super) fn should_emit_post_stream_event(
     event: &RemoteSessionEvent,
     request_id: Option<&Value>,
     notification_stream_attached: bool,
@@ -15,13 +17,13 @@ fn should_emit_post_stream_event(
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum McpSessionIdHeader {
+pub(super) enum McpSessionIdHeader {
     Missing,
     Invalid,
     Valid(String),
 }
 
-fn mcp_session_id_header(headers: &HeaderMap) -> McpSessionIdHeader {
+pub(super) fn mcp_session_id_header(headers: &HeaderMap) -> McpSessionIdHeader {
     let Some(value) = headers.get(HeaderName::from_static(MCP_SESSION_ID_HEADER)) else {
         return McpSessionIdHeader::Missing;
     };
@@ -34,7 +36,7 @@ fn mcp_session_id_header(headers: &HeaderMap) -> McpSessionIdHeader {
     McpSessionIdHeader::Valid(session_id.to_owned())
 }
 
-fn jsonrpc_session_id_from_headers(
+pub(super) fn jsonrpc_session_id_from_headers(
     headers: &HeaderMap,
     missing_message: &str,
 ) -> Result<String, Response> {
@@ -53,7 +55,7 @@ fn jsonrpc_session_id_from_headers(
     }
 }
 
-fn plain_session_id_from_headers(
+pub(super) fn plain_session_id_from_headers(
     headers: &HeaderMap,
     missing_message: &str,
 ) -> Result<String, Response> {
@@ -69,7 +71,7 @@ fn plain_session_id_from_headers(
     }
 }
 
-async fn resolve_session_entry(
+pub(super) async fn resolve_session_entry(
     state: &RemoteAppState,
     session_id: &str,
 ) -> Option<RemoteSessionEntry> {
@@ -80,7 +82,7 @@ async fn resolve_session_entry(
     state.sessions.lookup(session_id).await
 }
 
-async fn session_reaper_loop(
+pub(super) async fn session_reaper_loop(
     state: RemoteAppState,
     mut shutdown: tokio::sync::watch::Receiver<bool>,
 ) {
@@ -102,7 +104,7 @@ async fn session_reaper_loop(
     }
 }
 
-fn build_remote_auth_state(
+pub(super) fn build_remote_auth_state(
     config: &RemoteServeHttpConfig,
     local_addr: SocketAddr,
     discovered_identity_provider: Option<&DiscoveredIdentityProvider>,
@@ -124,7 +126,7 @@ fn build_remote_auth_state(
 /// never promoted to the admin role, so a bearer-authenticated edge refuses to
 /// launch without a dedicated admin token or with one that repeats the session
 /// token.
-fn admin_bearer_token(config: &RemoteServeHttpConfig) -> Result<Arc<str>, CliError> {
+pub(super) fn admin_bearer_token(config: &RemoteServeHttpConfig) -> Result<Arc<str>, CliError> {
     let Some(admin_token) = config.admin_token.as_deref() else {
         return Err(CliError::cli_other_error(
             "bearer-authenticated remote MCP edge requires --admin-token; the admin routes never run on the session credential"
@@ -140,7 +142,7 @@ fn admin_bearer_token(config: &RemoteServeHttpConfig) -> Result<Arc<str>, CliErr
     Ok(admin_token)
 }
 
-fn validated_static_bearer_token(token: &str, flag: &str) -> Result<Arc<str>, CliError> {
+pub(super) fn validated_static_bearer_token(token: &str, flag: &str) -> Result<Arc<str>, CliError> {
     if token.trim().is_empty() || token.trim() != token || token.chars().any(char::is_control) {
         return Err(CliError::cli_other_error(format!(
             "{flag} must be non-empty, unpadded, and control-free"
@@ -149,7 +151,7 @@ fn validated_static_bearer_token(token: &str, flag: &str) -> Result<Arc<str>, Cl
     Ok(Arc::<str>::from(token.to_string()))
 }
 
-fn build_chio_oauth_authorization_profile_metadata() -> Result<Value, CliError> {
+pub(super) fn build_chio_oauth_authorization_profile_metadata() -> Result<Value, CliError> {
     let mut value =
         serde_json::to_value(ChioOAuthAuthorizationProfile::default()).map_err(|error| {
             CliError::cli_other_error(format!(
@@ -160,7 +162,7 @@ fn build_chio_oauth_authorization_profile_metadata() -> Result<Value, CliError> 
     Ok(value)
 }
 
-fn validate_chio_oauth_authorization_profile_metadata(
+pub(super) fn validate_chio_oauth_authorization_profile_metadata(
     value: &Value,
     source: &str,
 ) -> Result<(), CliError> {
@@ -225,7 +227,7 @@ fn validate_chio_oauth_authorization_profile_metadata(
     Ok(())
 }
 
-fn validate_chio_oauth_discovery_metadata_pair(
+pub(super) fn validate_chio_oauth_discovery_metadata_pair(
     protected_resource_metadata: &ProtectedResourceMetadata,
     authorization_server_metadata: &AuthorizationServerMetadata,
 ) -> Result<(), CliError> {
@@ -273,7 +275,7 @@ fn validate_chio_oauth_discovery_metadata_pair(
     Ok(())
 }
 
-fn build_protected_resource_metadata(
+pub(super) fn build_protected_resource_metadata(
     config: &RemoteServeHttpConfig,
     local_addr: SocketAddr,
     discovered_identity_provider: Option<&DiscoveredIdentityProvider>,
@@ -310,7 +312,7 @@ fn build_protected_resource_metadata(
     }))
 }
 
-fn build_authorization_server_metadata(
+pub(super) fn build_authorization_server_metadata(
     config: &RemoteServeHttpConfig,
     local_addr: SocketAddr,
     discovered_identity_provider: Option<&DiscoveredIdentityProvider>,
@@ -440,7 +442,7 @@ fn build_authorization_server_metadata(
     }))
 }
 
-fn build_remote_auth_mode(
+pub(super) fn build_remote_auth_mode(
     config: &RemoteServeHttpConfig,
     local_addr: Option<SocketAddr>,
     discovered_identity_provider: Option<&DiscoveredIdentityProvider>,
@@ -625,7 +627,7 @@ fn build_remote_auth_mode(
     })
 }
 
-fn build_sender_dpop_runtime(
+pub(super) fn build_sender_dpop_runtime(
     clock: &RemoteClock,
 ) -> Result<(Arc<DpopNonceStore>, DpopConfig), CliError> {
     let config = DpopConfig::default();
@@ -642,7 +644,7 @@ fn build_sender_dpop_runtime(
     Ok((store, config))
 }
 
-fn resolve_local_auth_issuer(
+pub(super) fn resolve_local_auth_issuer(
     config: &RemoteServeHttpConfig,
     local_addr: SocketAddr,
 ) -> Result<Option<String>, CliError> {
@@ -656,7 +658,7 @@ fn resolve_local_auth_issuer(
     Ok(Some(format!("{base_url}/oauth")))
 }
 
-fn build_local_auth_server(
+pub(super) fn build_local_auth_server(
     config: &RemoteServeHttpConfig,
     local_addr: SocketAddr,
 ) -> Result<Option<LocalAuthorizationServer>, CliError> {
@@ -685,7 +687,7 @@ fn build_local_auth_server(
     }))
 }
 
-fn normalize_public_base_url(
+pub(super) fn normalize_public_base_url(
     public_base_url: Option<&str>,
     local_addr: SocketAddr,
 ) -> Result<String, CliError> {
@@ -700,13 +702,13 @@ fn normalize_public_base_url(
     Ok(parsed.to_string().trim_end_matches('/').to_string())
 }
 
-fn same_origin(left: &Url, right: &Url) -> bool {
+pub(super) fn same_origin(left: &Url, right: &Url) -> bool {
     left.scheme() == right.scheme()
         && left.host_str() == right.host_str()
         && left.port_or_known_default() == right.port_or_known_default()
 }
 
-fn metadata_path_for_issuer(issuer: &Url) -> String {
+pub(super) fn metadata_path_for_issuer(issuer: &Url) -> String {
     let issuer_path = issuer.path().trim_matches('/');
     if issuer_path.is_empty() {
         AUTHORIZATION_SERVER_METADATA_PATH.to_string()
@@ -715,14 +717,17 @@ fn metadata_path_for_issuer(issuer: &Url) -> String {
     }
 }
 
-fn effective_resource_indicator(config: &RemoteServeHttpConfig, base_url: &str) -> String {
+pub(super) fn effective_resource_indicator(
+    config: &RemoteServeHttpConfig,
+    base_url: &str,
+) -> String {
     config
         .auth_jwt_audience
         .clone()
         .unwrap_or_else(|| format!("{base_url}{MCP_ENDPOINT_PATH}"))
 }
 
-fn parse_request_time_authorization_details_from_value(
+pub(super) fn parse_request_time_authorization_details_from_value(
     value: Value,
 ) -> Result<Vec<GovernedAuthorizationDetail>, Response> {
     let details: Vec<GovernedAuthorizationDetail> =
@@ -741,7 +746,7 @@ fn parse_request_time_authorization_details_from_value(
     Ok(details)
 }
 
-fn parse_request_time_authorization_details(
+pub(super) fn parse_request_time_authorization_details(
     raw: Option<&str>,
 ) -> Result<Option<Vec<GovernedAuthorizationDetail>>, Response> {
     let Some(raw) = raw else {
@@ -760,7 +765,7 @@ fn parse_request_time_authorization_details(
     parse_request_time_authorization_details_from_value(value).map(Some)
 }
 
-fn parse_request_time_transaction_context_from_value(
+pub(super) fn parse_request_time_transaction_context_from_value(
     clock: &RemoteClock,
     value: Value,
 ) -> Result<GovernedAuthorizationTransactionContext, Response> {
@@ -780,7 +785,7 @@ fn parse_request_time_transaction_context_from_value(
     Ok(context)
 }
 
-fn parse_request_time_transaction_context(
+pub(super) fn parse_request_time_transaction_context(
     clock: &RemoteClock,
     raw: Option<&str>,
 ) -> Result<Option<GovernedAuthorizationTransactionContext>, Response> {
@@ -800,7 +805,7 @@ fn parse_request_time_transaction_context(
     parse_request_time_transaction_context_from_value(clock, value).map(Some)
 }
 
-fn validate_request_time_authorization_details(
+pub(super) fn validate_request_time_authorization_details(
     details: &[GovernedAuthorizationDetail],
 ) -> Result<(), Response> {
     if details.is_empty() {
@@ -911,7 +916,7 @@ fn validate_request_time_authorization_details(
     Ok(())
 }
 
-fn validate_request_time_transaction_context(
+pub(super) fn validate_request_time_transaction_context(
     clock: &RemoteClock,
     context: &GovernedAuthorizationTransactionContext,
 ) -> Result<(), Response> {
@@ -1025,7 +1030,7 @@ fn validate_request_time_transaction_context(
     Ok(())
 }
 
-fn validate_identity_assertion_binding(
+pub(super) fn validate_identity_assertion_binding(
     identity_assertion: &ChioIdentityAssertion,
     expected_verifier_id: &str,
     expected_bound_request_id: Option<&str>,
@@ -1059,7 +1064,7 @@ fn validate_identity_assertion_binding(
     Ok(())
 }
 
-fn validate_request_time_transaction_context_binding(
+pub(super) fn validate_request_time_transaction_context_binding(
     context: Option<&GovernedAuthorizationTransactionContext>,
     expected_verifier_id: &str,
     expected_bound_request_id: Option<&str>,
@@ -1075,7 +1080,7 @@ fn validate_request_time_transaction_context_binding(
     )
 }
 
-fn normalize_optional_sender_value(
+pub(super) fn normalize_optional_sender_value(
     value: Option<&str>,
     field: &str,
 ) -> Result<Option<String>, Response> {
@@ -1090,7 +1095,7 @@ fn normalize_optional_sender_value(
     }
 }
 
-fn build_request_sender_constraint(
+pub(super) fn build_request_sender_constraint(
     dpop_public_key: Option<&str>,
     mtls_thumbprint_sha256: Option<&str>,
     attestation_sha256: Option<&str>,

@@ -1,7 +1,7 @@
 use super::*;
 
 impl ProtectedResourceMetadata {
-    pub(super) fn bearer_challenge(&self) -> String {
+    pub(crate) fn bearer_challenge(&self) -> String {
         let mut challenge = format!(
             "Bearer resource_metadata=\"{}\"",
             self.resource_metadata_url
@@ -13,7 +13,7 @@ impl ProtectedResourceMetadata {
     }
 }
 
-pub(super) async fn authenticate_session_request<'a>(
+pub(crate) async fn authenticate_session_request<'a>(
     headers: impl Into<SenderRequest<'a>>,
     auth_mode: &RemoteAuthMode,
     protected_resource_metadata: Option<&ProtectedResourceMetadata>,
@@ -65,7 +65,7 @@ pub(super) async fn authenticate_session_request<'a>(
     }
 }
 
-pub(super) fn remote_auth_mode_label(auth_mode: &RemoteAuthMode) -> &'static str {
+pub(crate) fn remote_auth_mode_label(auth_mode: &RemoteAuthMode) -> &'static str {
     match auth_mode {
         RemoteAuthMode::StaticBearer { .. } => "static_bearer",
         RemoteAuthMode::JwtBearer { .. } => "jwt_bearer",
@@ -73,7 +73,7 @@ pub(super) fn remote_auth_mode_label(auth_mode: &RemoteAuthMode) -> &'static str
     }
 }
 
-pub(super) fn validate_session_auth_context(
+pub(crate) fn validate_session_auth_context(
     request_auth_context: &SessionAuthContext,
     session_auth_context: &SessionAuthContext,
 ) -> Result<(), Response> {
@@ -152,7 +152,7 @@ pub(super) fn validate_session_auth_context(
     }
 }
 
-pub(super) fn validate_session_lifecycle(session: &RemoteSession) -> Result<(), Response> {
+pub(crate) fn validate_session_lifecycle(session: &RemoteSession) -> Result<(), Response> {
     match session.lifecycle_snapshot().state {
         RemoteSessionState::Ready => Ok(()),
         RemoteSessionState::Initializing => Err(plain_http_error(
@@ -178,7 +178,7 @@ pub(super) fn validate_session_lifecycle(session: &RemoteSession) -> Result<(), 
     }
 }
 
-pub(super) fn serialize_session_lifecycle(
+pub(crate) fn serialize_session_lifecycle(
     lifecycle: &RemoteSessionLifecycleSnapshot,
     protocol_version: Option<String>,
 ) -> Value {
@@ -198,7 +198,7 @@ pub(super) fn serialize_session_lifecycle(
     })
 }
 
-pub(super) fn serialize_session_diagnostic_record(record: &RemoteSessionDiagnosticRecord) -> Value {
+pub(crate) fn serialize_session_diagnostic_record(record: &RemoteSessionDiagnosticRecord) -> Value {
     json!({
         "sessionId": record.session_id,
         "authContext": record.auth_context,
@@ -212,7 +212,7 @@ pub(super) fn serialize_session_diagnostic_record(record: &RemoteSessionDiagnost
     })
 }
 
-pub(super) fn extract_bearer_token(
+pub(crate) fn extract_bearer_token(
     headers: &HeaderMap,
     protected_resource_metadata: Option<&ProtectedResourceMetadata>,
 ) -> Result<String, Response> {
@@ -232,7 +232,7 @@ pub(super) fn extract_bearer_token(
         })
 }
 
-pub(super) fn unauthorized_bearer_response(
+pub(crate) fn unauthorized_bearer_response(
     message: &str,
     protected_resource_metadata: Option<&ProtectedResourceMetadata>,
 ) -> Response {
@@ -247,7 +247,7 @@ pub(super) fn unauthorized_bearer_response(
     response
 }
 
-pub(super) fn validate_origin(headers: &HeaderMap) -> Result<(), Response> {
+pub(crate) fn validate_origin(headers: &HeaderMap) -> Result<(), Response> {
     let Some(origin) = headers.get(ORIGIN).and_then(|value| value.to_str().ok()) else {
         return Ok(());
     };
@@ -270,7 +270,7 @@ pub(super) fn validate_origin(headers: &HeaderMap) -> Result<(), Response> {
     ))
 }
 
-pub(super) fn validate_post_accept_header(headers: &HeaderMap) -> Result<(), Response> {
+pub(crate) fn validate_post_accept_header(headers: &HeaderMap) -> Result<(), Response> {
     let accept = headers
         .get(ACCEPT)
         .and_then(|value| value.to_str().ok())
@@ -285,7 +285,7 @@ pub(super) fn validate_post_accept_header(headers: &HeaderMap) -> Result<(), Res
     ))
 }
 
-pub(super) fn validate_get_accept_header(headers: &HeaderMap) -> Result<(), Response> {
+pub(crate) fn validate_get_accept_header(headers: &HeaderMap) -> Result<(), Response> {
     let accept = headers
         .get(ACCEPT)
         .and_then(|value| value.to_str().ok())
@@ -300,7 +300,7 @@ pub(super) fn validate_get_accept_header(headers: &HeaderMap) -> Result<(), Resp
     ))
 }
 
-pub(super) fn validate_content_type(headers: &HeaderMap) -> Result<(), Response> {
+pub(crate) fn validate_content_type(headers: &HeaderMap) -> Result<(), Response> {
     let content_type = headers
         .get(CONTENT_TYPE)
         .and_then(|value| value.to_str().ok())
@@ -315,7 +315,7 @@ pub(super) fn validate_content_type(headers: &HeaderMap) -> Result<(), Response>
     ))
 }
 
-pub(super) fn validate_protocol_version(
+pub(crate) fn validate_protocol_version(
     headers: &HeaderMap,
     session: &RemoteSession,
 ) -> Result<(), Response> {
@@ -339,7 +339,7 @@ pub(super) fn validate_protocol_version(
     }
 }
 
-pub(super) fn build_static_bearer_session_auth_context(
+pub(crate) fn build_static_bearer_session_auth_context(
     headers: &HeaderMap,
     expected_token: &str,
 ) -> SessionAuthContext {
@@ -357,7 +357,7 @@ pub(super) fn build_static_bearer_session_auth_context(
 }
 
 impl JwtBearerVerifier {
-    pub(super) fn authenticate_token<'a>(
+    pub(crate) fn authenticate_token<'a>(
         &self,
         token: &str,
         headers: impl Into<SenderRequest<'a>>,
@@ -551,18 +551,18 @@ impl JwtBearerVerifier {
     }
 }
 
-pub(super) struct IntrospectionSessionAuthInput<'a> {
-    pub(super) token: &'a str,
-    pub(super) headers: SenderRequest<'a>,
-    pub(super) introspection: OAuthIntrospectionResponse,
-    pub(super) origin: Option<String>,
-    pub(super) protected_resource_metadata: Option<&'a ProtectedResourceMetadata>,
-    pub(super) expected_method: &'a str,
-    pub(super) expected_target: &'a str,
+pub(crate) struct IntrospectionSessionAuthInput<'a> {
+    pub(crate) token: &'a str,
+    pub(crate) headers: SenderRequest<'a>,
+    pub(crate) introspection: OAuthIntrospectionResponse,
+    pub(crate) origin: Option<String>,
+    pub(crate) protected_resource_metadata: Option<&'a ProtectedResourceMetadata>,
+    pub(crate) expected_method: &'a str,
+    pub(crate) expected_target: &'a str,
 }
 
 impl IntrospectionBearerVerifier {
-    pub(super) async fn authenticate_token<'a>(
+    pub(crate) async fn authenticate_token<'a>(
         &self,
         token: &str,
         headers: impl Into<SenderRequest<'a>>,
@@ -627,7 +627,7 @@ impl IntrospectionBearerVerifier {
         })
     }
 
-    pub(super) fn session_auth_context_from_introspection(
+    pub(crate) fn session_auth_context_from_introspection(
         &self,
         input: IntrospectionSessionAuthInput<'_>,
     ) -> Result<SessionAuthContext, Response> {

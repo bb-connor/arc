@@ -1,7 +1,7 @@
 use super::*;
 
 impl RemoteSessionLedger {
-    pub(super) fn new(
+    pub(crate) fn new(
         clock: RemoteClock,
         lifecycle_policy: SessionLifecyclePolicy,
         tombstone_db_path: Option<PathBuf>,
@@ -29,18 +29,18 @@ impl RemoteSessionLedger {
         })
     }
 
-    pub(super) async fn insert_active(&self, session: Arc<RemoteSession>) {
+    pub(crate) async fn insert_active(&self, session: Arc<RemoteSession>) {
         self.active
             .lock()
             .await
             .insert(session.session_id.clone(), session);
     }
 
-    pub(super) async fn remove_active(&self, session_id: &str) -> Option<Arc<RemoteSession>> {
+    pub(crate) async fn remove_active(&self, session_id: &str) -> Option<Arc<RemoteSession>> {
         self.active.lock().await.remove(session_id)
     }
 
-    pub(super) async fn lookup(&self, session_id: &str) -> Option<RemoteSessionEntry> {
+    pub(crate) async fn lookup(&self, session_id: &str) -> Option<RemoteSessionEntry> {
         if let Some(session) = self.active.lock().await.get(session_id).cloned() {
             return Some(RemoteSessionEntry::Active(session));
         }
@@ -53,7 +53,7 @@ impl RemoteSessionLedger {
             .map(RemoteSessionEntry::Terminal)
     }
 
-    pub(super) async fn snapshot(
+    pub(crate) async fn snapshot(
         &self,
     ) -> (
         Vec<RemoteSessionDiagnosticRecord>,
@@ -76,27 +76,27 @@ impl RemoteSessionLedger {
         (active, terminal)
     }
 
-    pub(super) async fn mark_deleted(&self, session: &Arc<RemoteSession>) -> Result<(), CliError> {
+    pub(crate) async fn mark_deleted(&self, session: &Arc<RemoteSession>) -> Result<(), CliError> {
         self.transition_to_terminal(session, RemoteSessionState::Deleted)
             .await
     }
 
-    pub(super) async fn mark_draining(&self, session: &Arc<RemoteSession>) -> Result<(), CliError> {
+    pub(crate) async fn mark_draining(&self, session: &Arc<RemoteSession>) -> Result<(), CliError> {
         let session = session.clone();
         blocking_cli(move || session.begin_draining()).await
     }
 
-    pub(super) async fn mark_closed(&self, session: &Arc<RemoteSession>) -> Result<(), CliError> {
+    pub(crate) async fn mark_closed(&self, session: &Arc<RemoteSession>) -> Result<(), CliError> {
         self.transition_to_terminal(session, RemoteSessionState::Closed)
             .await
     }
 
-    pub(super) async fn mark_expired(&self, session: &Arc<RemoteSession>) -> Result<(), CliError> {
+    pub(crate) async fn mark_expired(&self, session: &Arc<RemoteSession>) -> Result<(), CliError> {
         self.transition_to_terminal(session, RemoteSessionState::Expired)
             .await
     }
 
-    pub(super) async fn cleanup_due_sessions(&self) -> Result<(), CliError> {
+    pub(crate) async fn cleanup_due_sessions(&self) -> Result<(), CliError> {
         let now = self.clock.millis()?;
         let sessions = {
             let guard = self.active.lock().await;
@@ -150,7 +150,7 @@ impl RemoteSessionLedger {
         Ok(())
     }
 
-    pub(super) async fn shutdown_all_active(&self) -> Result<(), CliError> {
+    pub(crate) async fn shutdown_all_active(&self) -> Result<(), CliError> {
         let sessions = {
             let guard = self.active.lock().await;
             guard.values().cloned().collect::<Vec<_>>()
@@ -175,7 +175,7 @@ impl RemoteSessionLedger {
         }
     }
 
-    pub(super) async fn transition_to_terminal(
+    pub(crate) async fn transition_to_terminal(
         &self,
         session: &Arc<RemoteSession>,
         state: RemoteSessionState,
@@ -223,9 +223,9 @@ impl RemoteSessionLedger {
                 let shutdown_result = session.shutdown_upstream_transport();
                 let (finalization_result, finalized) = match durable_tombstone {
                     Some(tombstone) => {
-                        let result = session.ensure_session_store_owned().and_then(|()| {
-                            ledger.finalize_terminal(&tombstone, terminal_at)
-                        });
+                        let result = session
+                            .ensure_session_store_owned()
+                            .and_then(|()| ledger.finalize_terminal(&tombstone, terminal_at));
                         (result, Some(tombstone.record))
                     }
                     None => (Ok(()), None),
@@ -301,8 +301,12 @@ impl RemoteSessionLedger {
                 ))
             })?;
             let terminal_epoch = session.next_terminal_persistence_epoch()?;
-            let (tombstone, fence) =
-                sign_terminal_session_records(keyring, record.clone(), terminal_epoch, terminal_epoch)?;
+            let (tombstone, fence) = sign_terminal_session_records(
+                keyring,
+                record.clone(),
+                terminal_epoch,
+                terminal_epoch,
+            )?;
             prepare_terminal_session_transition(path, &fence, keyring, terminal_at)?;
             Some(tombstone)
         } else {
@@ -338,7 +342,7 @@ impl RemoteSessionLedger {
         }
     }
 
-    pub(super) async fn purge_old_terminal_records(&self, now: u64) {
+    pub(crate) async fn purge_old_terminal_records(&self, now: u64) {
         let retention = self.lifecycle_policy.tombstone_retention_millis;
         let Some(cutoff) = now.checked_sub(retention) else {
             return;
@@ -348,8 +352,8 @@ impl RemoteSessionLedger {
             .await
             .retain(|_, record| record.terminal_at >= cutoff);
         if let Some(path) = self.tombstone_db_path.clone() {
-            let purged = blocking_cli(move || purge_terminal_session_records_before(&path, cutoff))
-                .await;
+            let purged =
+                blocking_cli(move || purge_terminal_session_records_before(&path, cutoff)).await;
             if let Err(error) = purged {
                 warn!(
                     cutoff,

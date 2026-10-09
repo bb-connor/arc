@@ -1,5 +1,10 @@
+use super::*;
+
 #[cfg(unix)]
-fn stable_file_metadata_matches(first: &std::fs::Metadata, second: &std::fs::Metadata) -> bool {
+pub(super) fn stable_file_metadata_matches(
+    first: &std::fs::Metadata,
+    second: &std::fs::Metadata,
+) -> bool {
     use std::os::unix::fs::MetadataExt;
 
     first.dev() == second.dev()
@@ -14,11 +19,14 @@ fn stable_file_metadata_matches(first: &std::fs::Metadata, second: &std::fs::Met
 }
 
 #[cfg(not(unix))]
-fn stable_file_metadata_matches(first: &std::fs::Metadata, second: &std::fs::Metadata) -> bool {
+pub(super) fn stable_file_metadata_matches(
+    first: &std::fs::Metadata,
+    second: &std::fs::Metadata,
+) -> bool {
     first.len() == second.len() && first.modified().ok() == second.modified().ok()
 }
 
-fn sha256_reader(file: &mut std::fs::File, label: &str) -> Result<String, CliError> {
+pub(super) fn sha256_reader(file: &mut std::fs::File, label: &str) -> Result<String, CliError> {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut hasher = Sha256::new();
     let mut buffer = [0_u8; 64 * 1_024];
@@ -40,7 +48,7 @@ fn sha256_reader(file: &mut std::fs::File, label: &str) -> Result<String, CliErr
     Ok(encoded)
 }
 
-fn stable_upstream_file_hash(path: &FsPath, label: &str) -> Result<String, CliError> {
+pub(super) fn stable_upstream_file_hash(path: &FsPath, label: &str) -> Result<String, CliError> {
     let path_metadata = std::fs::symlink_metadata(path).map_err(|error| {
         CliError::cli_other_error(format!(
             "inspect {label} path `{}`: {error}",
@@ -103,7 +111,7 @@ fn stable_upstream_file_hash(path: &FsPath, label: &str) -> Result<String, CliEr
     Ok(digest)
 }
 
-fn resolve_remote_upstream_executable(command: &str) -> Result<PathBuf, CliError> {
+pub(super) fn resolve_remote_upstream_executable(command: &str) -> Result<PathBuf, CliError> {
     if command.is_empty() {
         return Err(CliError::cli_other_error(
             "remote MCP upstream command is empty".to_string(),
@@ -159,7 +167,7 @@ fn resolve_remote_upstream_executable(command: &str) -> Result<PathBuf, CliError
     Ok(canonical)
 }
 
-fn canonicalize_remote_upstream_command(
+pub(super) fn canonicalize_remote_upstream_command(
     config: &mut RemoteServeHttpConfig,
 ) -> Result<(), CliError> {
     let executable = resolve_remote_upstream_executable(&config.wrapped_command)?;
@@ -174,7 +182,7 @@ fn canonicalize_remote_upstream_command(
     Ok(())
 }
 
-fn upstream_argument_file_identities(
+pub(super) fn upstream_argument_file_identities(
     config: &RemoteServeHttpConfig,
 ) -> Result<Vec<Value>, CliError> {
     let current_directory = std::env::current_dir().map_err(|error| {
@@ -220,7 +228,7 @@ fn upstream_argument_file_identities(
     Ok(identities)
 }
 
-fn fingerprint_remote_runtime_contract(
+pub(super) fn fingerprint_remote_runtime_contract(
     config: &RemoteServeHttpConfig,
     manifest_registry: &chio_manifest::VerifiedManifestRegistry,
 ) -> Result<String, CliError> {
@@ -307,20 +315,22 @@ fn fingerprint_remote_runtime_contract(
 }
 
 #[derive(Serialize)]
-struct RemoteAuthContractFingerprint {
-    mode: &'static str,
-    issuer: Option<String>,
-    audience: Option<String>,
-    required_scopes: Vec<String>,
-    provider_profile: String,
-    static_token_fingerprint: Option<String>,
-    verification_key_identity: Option<String>,
-    discovery_url: Option<String>,
-    introspection_url: Option<String>,
-    enterprise_provider_registry_hash: Option<String>,
+pub(super) struct RemoteAuthContractFingerprint {
+    pub(super) mode: &'static str,
+    pub(super) issuer: Option<String>,
+    pub(super) audience: Option<String>,
+    pub(super) required_scopes: Vec<String>,
+    pub(super) provider_profile: String,
+    pub(super) static_token_fingerprint: Option<String>,
+    pub(super) verification_key_identity: Option<String>,
+    pub(super) discovery_url: Option<String>,
+    pub(super) introspection_url: Option<String>,
+    pub(super) enterprise_provider_registry_hash: Option<String>,
 }
 
-fn enterprise_provider_registry_hash(path: Option<&FsPath>) -> Result<Option<String>, CliError> {
+pub(super) fn enterprise_provider_registry_hash(
+    path: Option<&FsPath>,
+) -> Result<Option<String>, CliError> {
     let Some(path) = path else {
         return Ok(None);
     };
@@ -328,7 +338,9 @@ fn enterprise_provider_registry_hash(path: Option<&FsPath>) -> Result<Option<Str
     Ok(Some(sha256_hex(&bytes)))
 }
 
-fn fingerprint_remote_auth_contract(config: &RemoteServeHttpConfig) -> Result<String, CliError> {
+pub(super) fn fingerprint_remote_auth_contract(
+    config: &RemoteServeHttpConfig,
+) -> Result<String, CliError> {
     let provider_profile = config
         .auth_jwt_provider_profile
         .unwrap_or(JwtProviderProfile::Generic);
@@ -402,7 +414,9 @@ fn fingerprint_remote_auth_contract(config: &RemoteServeHttpConfig) -> Result<St
     Ok(sha256_hex(&encoded))
 }
 
-fn fingerprint_remote_policy_contract(loaded_policy: &LoadedPolicy) -> Result<String, CliError> {
+pub(super) fn fingerprint_remote_policy_contract(
+    loaded_policy: &LoadedPolicy,
+) -> Result<String, CliError> {
     let fingerprint = json!({
         "format": loaded_policy.format_name(),
         "identity": {
@@ -421,7 +435,7 @@ fn fingerprint_remote_policy_contract(loaded_policy: &LoadedPolicy) -> Result<St
     Ok(sha256_hex(&encoded))
 }
 
-fn derive_session_agent_public_key(
+pub(super) fn derive_session_agent_public_key(
     config: &RemoteServeHttpConfig,
     auth_context: &SessionAuthContext,
     proof_required: bool,
@@ -446,7 +460,7 @@ fn derive_session_agent_public_key(
     }
 }
 
-fn authenticated_sender_key(auth_context: &SessionAuthContext) -> Option<&PublicKey> {
+pub(super) fn authenticated_sender_key(auth_context: &SessionAuthContext) -> Option<&PublicKey> {
     match &auth_context.method {
         SessionAuthMethod::OAuthBearer {
             federated_claims, ..
@@ -456,54 +470,54 @@ fn authenticated_sender_key(auth_context: &SessionAuthContext) -> Option<&Public
 }
 
 #[derive(Serialize)]
-struct RemoteSessionResumeIntegrityEnvelope<'a> {
-    schema: &'static str,
-    session_id: &'a str,
-    agent_id: &'a str,
-    auth_context: &'a SessionAuthContext,
-    auth_mode_fingerprint: Option<&'a str>,
-    policy_fingerprint: Option<&'a str>,
-    runtime_contract_fingerprint: &'a str,
-    hosted_isolation: RemoteHostedIsolationMode,
-    lifecycle: &'a RemoteSessionLifecycleSnapshot,
-    protocol_version: Option<&'a str>,
-    peer_capabilities: &'a PeerCapabilities,
-    initialize_params: &'a Value,
-    issued_capabilities: &'a [CapabilityToken],
-    resume_generation: u64,
-    key_id: &'a str,
-    key_version: u64,
+pub(super) struct RemoteSessionResumeIntegrityEnvelope<'a> {
+    pub(super) schema: &'static str,
+    pub(super) session_id: &'a str,
+    pub(super) agent_id: &'a str,
+    pub(super) auth_context: &'a SessionAuthContext,
+    pub(super) auth_mode_fingerprint: Option<&'a str>,
+    pub(super) policy_fingerprint: Option<&'a str>,
+    pub(super) runtime_contract_fingerprint: &'a str,
+    pub(super) hosted_isolation: RemoteHostedIsolationMode,
+    pub(super) lifecycle: &'a RemoteSessionLifecycleSnapshot,
+    pub(super) protocol_version: Option<&'a str>,
+    pub(super) peer_capabilities: &'a PeerCapabilities,
+    pub(super) initialize_params: &'a Value,
+    pub(super) issued_capabilities: &'a [CapabilityToken],
+    pub(super) resume_generation: u64,
+    pub(super) key_id: &'a str,
+    pub(super) key_version: u64,
 }
 
 #[derive(Serialize)]
-struct RemoteSessionTombstoneIntegrityEnvelope<'a> {
-    schema: &'static str,
-    record: &'a RemoteSessionDiagnosticRecord,
-    resume_generation: u64,
-    terminal_epoch: u64,
-    key_id: &'a str,
-    key_version: u64,
+pub(super) struct RemoteSessionTombstoneIntegrityEnvelope<'a> {
+    pub(super) schema: &'static str,
+    pub(super) record: &'a RemoteSessionDiagnosticRecord,
+    pub(super) resume_generation: u64,
+    pub(super) terminal_epoch: u64,
+    pub(super) key_id: &'a str,
+    pub(super) key_version: u64,
 }
 
 #[derive(Serialize)]
-struct RemoteSessionTerminalFenceIntegrityEnvelope<'a> {
-    schema: &'static str,
-    session_id: &'a str,
-    terminal_at: u64,
-    terminal_state: RemoteSessionState,
-    resume_generation: u64,
-    terminal_epoch: u64,
-    key_id: &'a str,
-    key_version: u64,
+pub(super) struct RemoteSessionTerminalFenceIntegrityEnvelope<'a> {
+    pub(super) schema: &'static str,
+    pub(super) session_id: &'a str,
+    pub(super) terminal_at: u64,
+    pub(super) terminal_state: RemoteSessionState,
+    pub(super) resume_generation: u64,
+    pub(super) terminal_epoch: u64,
+    pub(super) key_id: &'a str,
+    pub(super) key_version: u64,
 }
 
 #[cfg(unix)]
-fn resume_hmac_keyring_owner_is_trusted(owner_uid: u32, effective_uid: u32) -> bool {
+pub(super) fn resume_hmac_keyring_owner_is_trusted(owner_uid: u32, effective_uid: u32) -> bool {
     owner_uid == effective_uid || owner_uid == 0
 }
 
 #[cfg(unix)]
-fn read_resume_hmac_keyring_file(path: &FsPath) -> Result<Zeroizing<Vec<u8>>, CliError> {
+pub(super) fn read_resume_hmac_keyring_file(path: &FsPath) -> Result<Zeroizing<Vec<u8>>, CliError> {
     use std::os::unix::fs::{MetadataExt, PermissionsExt};
 
     use rustix::fs::{Mode, OFlags};
@@ -625,20 +639,20 @@ fn read_resume_hmac_keyring_file(path: &FsPath) -> Result<Zeroizing<Vec<u8>>, Cl
 }
 
 #[cfg(not(unix))]
-fn read_resume_hmac_keyring_file(path: &FsPath) -> Result<Zeroizing<Vec<u8>>, CliError> {
+pub(super) fn read_resume_hmac_keyring_file(path: &FsPath) -> Result<Zeroizing<Vec<u8>>, CliError> {
     Err(CliError::cli_other_error(format!(
         "remote MCP resume HMAC keyring {} cannot be loaded securely on this platform",
         path.display()
     )))
 }
 
-fn load_resume_hmac_keyring(
+pub(super) fn load_resume_hmac_keyring(
     config: &RemoteServeHttpConfig,
 ) -> Result<Option<Arc<RemoteSessionHmacKeyring>>, CliError> {
     load_resume_hmac_keyring_at(config, config.clock.millis()?)
 }
 
-fn load_resume_hmac_keyring_at(
+pub(super) fn load_resume_hmac_keyring_at(
     config: &RemoteServeHttpConfig,
     now: u64,
 ) -> Result<Option<Arc<RemoteSessionHmacKeyring>>, CliError> {
@@ -729,7 +743,7 @@ fn load_resume_hmac_keyring_at(
     })))
 }
 
-fn decode_resume_hmac_key(
+pub(super) fn decode_resume_hmac_key(
     key_id: &str,
     version: u64,
     key_base64: &str,
@@ -776,7 +790,7 @@ fn decode_resume_hmac_key(
     })
 }
 
-fn expected_resume_agent_id(
+pub(super) fn expected_resume_agent_id(
     config: &RemoteServeHttpConfig,
     auth_context: &SessionAuthContext,
 ) -> Result<Option<String>, CliError> {
@@ -799,7 +813,7 @@ fn expected_resume_agent_id(
     }
 }
 
-fn compute_resume_record_integrity_tag(
+pub(super) fn compute_resume_record_integrity_tag(
     key: &RemoteSessionHmacKey,
     record: &RemoteSessionResumeRecord,
 ) -> Result<String, CliError> {
@@ -829,7 +843,7 @@ fn compute_resume_record_integrity_tag(
     )
 }
 
-fn validate_resume_record_integrity_with_keyring(
+pub(super) fn validate_resume_record_integrity_with_keyring(
     keyring: &RemoteSessionHmacKeyring,
     record: &RemoteSessionResumeRecord,
     now: u64,
@@ -860,7 +874,7 @@ fn validate_resume_record_integrity_with_keyring(
 }
 
 impl RemoteSessionHmacKeyring {
-    fn verification_key(
+    pub(super) fn verification_key(
         &self,
         integrity: &RemoteSessionIntegrityTag,
         now: u64,
@@ -876,7 +890,7 @@ impl RemoteSessionHmacKeyring {
         })
     }
 
-    fn empty_tag_for_current(&self) -> RemoteSessionIntegrityTag {
+    pub(super) fn empty_tag_for_current(&self) -> RemoteSessionIntegrityTag {
         RemoteSessionIntegrityTag {
             key_id: self.current.key_id.clone(),
             key_version: self.current.version,
@@ -885,7 +899,7 @@ impl RemoteSessionHmacKeyring {
     }
 }
 
-fn compute_remote_session_hmac<T: Serialize>(
+pub(super) fn compute_remote_session_hmac<T: Serialize>(
     label: &[u8],
     key: &[u8],
     envelope: &T,
@@ -901,7 +915,7 @@ fn compute_remote_session_hmac<T: Serialize>(
     Ok(URL_SAFE_NO_PAD.encode(mac.finalize().into_bytes()))
 }
 
-fn verify_remote_session_hmac(
+pub(super) fn verify_remote_session_hmac(
     expected: &str,
     stored: &str,
     session_id: &str,
@@ -932,7 +946,7 @@ fn verify_remote_session_hmac(
     Ok(())
 }
 
-fn sign_terminal_session_records(
+pub(super) fn sign_terminal_session_records(
     keyring: &RemoteSessionHmacKeyring,
     record: RemoteSessionDiagnosticRecord,
     resume_generation: u64,
@@ -964,7 +978,7 @@ fn sign_terminal_session_records(
     Ok((tombstone, fence))
 }
 
-fn compute_terminal_tombstone_integrity_tag(
+pub(super) fn compute_terminal_tombstone_integrity_tag(
     key: &RemoteSessionHmacKey,
     tombstone: &RemoteSessionTombstoneRecord,
 ) -> Result<String, CliError> {
@@ -984,7 +998,7 @@ fn compute_terminal_tombstone_integrity_tag(
     )
 }
 
-fn compute_terminal_fence_integrity_tag(
+pub(super) fn compute_terminal_fence_integrity_tag(
     key: &RemoteSessionHmacKey,
     fence: &RemoteSessionTerminalFence,
 ) -> Result<String, CliError> {
@@ -1006,7 +1020,7 @@ fn compute_terminal_fence_integrity_tag(
     )
 }
 
-fn validate_terminal_tombstone_integrity(
+pub(super) fn validate_terminal_tombstone_integrity(
     keyring: &RemoteSessionHmacKeyring,
     tombstone: &RemoteSessionTombstoneRecord,
     now: u64,
@@ -1041,7 +1055,7 @@ fn validate_terminal_tombstone_integrity(
     )
 }
 
-fn validate_terminal_fence_integrity(
+pub(super) fn validate_terminal_fence_integrity(
     keyring: &RemoteSessionHmacKeyring,
     fence: &RemoteSessionTerminalFence,
     now: u64,
@@ -1076,7 +1090,7 @@ fn validate_terminal_fence_integrity(
     )
 }
 
-fn validate_restored_peer_capabilities(
+pub(super) fn validate_restored_peer_capabilities(
     record: &RemoteSessionResumeRecord,
 ) -> Result<PeerCapabilities, CliError> {
     let mut derived = parse_remote_session_peer_capabilities(&record.initialize_params);

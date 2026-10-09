@@ -1,7 +1,7 @@
 use super::*;
 
 impl RemoteSessionFactory {
-    pub(super) fn new(mut config: RemoteServeHttpConfig) -> Result<Self, CliError> {
+    pub(crate) fn new(mut config: RemoteServeHttpConfig) -> Result<Self, CliError> {
         session_core_authority_mode::validate_remote_authority_config(&config)?;
         if let Some(proxy) = &config.trusted_proxy {
             proxy.validate_separation(&config)?;
@@ -131,7 +131,7 @@ impl RemoteSessionFactory {
 
     /// Revalidate pending approvals against the same authority and policy as a
     /// live session without reserving admission state or dispatching a tool.
-    pub(super) fn bind_approval_intent(
+    pub(crate) fn bind_approval_intent(
         &self,
         session: &RemoteSession,
         request: &chio_kernel::ToolCallRequest,
@@ -254,7 +254,7 @@ impl RemoteSessionFactory {
         )
     }
 
-    pub(super) fn build_session_upstream_server(&self) -> Result<Arc<AdaptedMcpServer>, CliError> {
+    pub(crate) fn build_session_upstream_server(&self) -> Result<Arc<AdaptedMcpServer>, CliError> {
         let wrapped_arg_refs = self
             .config
             .wrapped_args
@@ -304,7 +304,7 @@ impl RemoteSessionFactory {
         Ok(Arc::new(adapted_server))
     }
 
-    pub(super) fn shared_upstream_owner(&self) -> Result<Arc<SharedUpstreamOwner>, CliError> {
+    pub(crate) fn shared_upstream_owner(&self) -> Result<Arc<SharedUpstreamOwner>, CliError> {
         let mut guard = self.shared_upstream_owner.lock().map_err(|error| {
             CliError::cli_other_error(format!(
                 "failed to lock shared remote MCP upstream owner cache: {error}"
@@ -326,7 +326,7 @@ impl RemoteSessionFactory {
         Ok(owner)
     }
 
-    pub(super) fn shutdown_shared_upstream_owner(&self) -> Result<(), CliError> {
+    pub(crate) fn shutdown_shared_upstream_owner(&self) -> Result<(), CliError> {
         let owner = self
             .shared_upstream_owner
             .lock()
@@ -339,7 +339,7 @@ impl RemoteSessionFactory {
         owner.map_or(Ok(()), |owner| owner.shutdown())
     }
 
-    pub(super) fn configured_hosted_isolation(&self) -> RemoteHostedIsolationMode {
+    pub(crate) fn configured_hosted_isolation(&self) -> RemoteHostedIsolationMode {
         if self.config.shared_hosted_owner {
             RemoteHostedIsolationMode::SharedHostedOwnerCompatibility
         } else {
@@ -347,7 +347,7 @@ impl RemoteSessionFactory {
         }
     }
 
-    pub(super) fn spawn_session(
+    pub(crate) fn spawn_session(
         &self,
         auth_context: SessionAuthContext,
     ) -> Result<Arc<RemoteSession>, CliError> {
@@ -513,7 +513,7 @@ impl RemoteSessionFactory {
 
     /// Incompatible authenticated sessions remain inactive (`None`). A failed
     /// dependency or recovery step is an error, not evidence of invalidity.
-    pub(super) fn restore_session(
+    pub(crate) fn restore_session(
         &self,
         record: &RemoteSessionResumeRecord,
     ) -> Result<Option<Arc<RemoteSession>>, CliError> {

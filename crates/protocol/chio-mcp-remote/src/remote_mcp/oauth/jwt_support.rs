@@ -1,7 +1,7 @@
 use super::*;
 
 impl JwtVerificationKeySource {
-    pub(super) fn verify(
+    pub(crate) fn verify(
         &self,
         alg: JwtSignatureAlgorithm,
         header: &JwtHeader,
@@ -98,7 +98,7 @@ impl JwtResolvedJwkPublicKey {
         )
     }
 
-    pub(super) fn verify(
+    pub(crate) fn verify(
         &self,
         alg: JwtSignatureAlgorithm,
         signed_input: &[u8],
@@ -189,7 +189,7 @@ impl JwtResolvedJwkPublicKey {
 }
 
 impl JwtClaims {
-    pub(super) fn scopes(&self) -> Vec<String> {
+    pub(crate) fn scopes(&self) -> Vec<String> {
         let mut scopes = self
             .scope
             .as_deref()
@@ -204,7 +204,7 @@ impl JwtClaims {
         scopes
     }
 
-    pub(super) fn includes_audience(&self, expected: &str) -> bool {
+    pub(crate) fn includes_audience(&self, expected: &str) -> bool {
         match &self.aud {
             Some(JwtAudience::Single(audience)) => audience == expected,
             Some(JwtAudience::Multiple(audiences)) => audiences.iter().any(|aud| aud == expected),
@@ -212,11 +212,11 @@ impl JwtClaims {
         }
     }
 
-    pub(super) fn includes_audience_or_resource(&self, expected: &str) -> bool {
+    pub(crate) fn includes_audience_or_resource(&self, expected: &str) -> bool {
         self.includes_audience(expected) || self.resource.as_deref() == Some(expected)
     }
 
-    pub(super) fn primary_audience(&self) -> Option<String> {
+    pub(crate) fn primary_audience(&self) -> Option<String> {
         match &self.aud {
             Some(JwtAudience::Single(audience)) => Some(audience.clone()),
             Some(JwtAudience::Multiple(audiences)) => audiences.first().cloned(),
@@ -225,7 +225,7 @@ impl JwtClaims {
     }
 }
 
-pub(super) fn decode_jwt_parts(
+pub(crate) fn decode_jwt_parts(
     token: &str,
     protected_resource_metadata: Option<&ProtectedResourceMetadata>,
 ) -> Result<(JwtHeader, JwtClaims, String, Vec<u8>), Response> {

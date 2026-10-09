@@ -3,16 +3,16 @@ use super::*;
 /// The owning enqueue path returned before a message entered the MCP inbox.
 /// No fallible operation follows a successful inbox send on this path.
 #[derive(Debug)]
-pub(super) struct NotEnqueued(CliError);
+pub(crate) struct NotEnqueued(CliError);
 
 impl NotEnqueued {
-    pub(super) fn into_error(self) -> CliError {
+    pub(crate) fn into_error(self) -> CliError {
         self.0
     }
 }
 
 impl RemoteSession {
-    pub(super) fn new(init: RemoteSessionInit) -> Result<Self, CliError> {
+    pub(crate) fn new(init: RemoteSessionInit) -> Result<Self, CliError> {
         let reading = init.clock.read()?;
         let now = reading.unix_millis().get();
         let mut lifecycle_snapshot =
@@ -69,7 +69,7 @@ impl RemoteSession {
     }
 
     #[cfg(test)]
-    pub(super) fn send(&self, message: Value) -> Result<(), CliError> {
+    pub(crate) fn send(&self, message: Value) -> Result<(), CliError> {
         {
             let mut lifecycle = self.lifecycle.lock().map_err(|_| ClockError::Unavailable)?;
             self.check_enqueue_lifecycle(&message, &mut lifecycle)?;
@@ -79,7 +79,7 @@ impl RemoteSession {
             .map_err(NotEnqueued::into_error)
     }
 
-    pub(super) fn send_accounted(&self, message: AccountedMessage) -> Result<(), NotEnqueued> {
+    pub(crate) fn send_accounted(&self, message: AccountedMessage) -> Result<(), NotEnqueued> {
         remote_mcp_approvals::validate_redemption(self, &message).map_err(NotEnqueued)?;
         // Redemption can inspect lifecycle itself. Take the lock afterward and
         // retain it through enqueue, serializing with drain/terminal transitions.
@@ -94,7 +94,7 @@ impl RemoteSession {
             .map_err(|error| NotEnqueued(error.into()))
     }
 
-    pub(super) fn record_protocol_refusal(
+    pub(crate) fn record_protocol_refusal(
         &self,
         message: AccountedMessage,
         summary: chio_kernel::ProtocolRefusalSummary,
@@ -148,11 +148,11 @@ impl RemoteSession {
         Ok(())
     }
 
-    pub(super) fn subscribe(&self) -> broadcast::Receiver<RemoteSessionEvent> {
+    pub(crate) fn subscribe(&self) -> broadcast::Receiver<RemoteSessionEvent> {
         self.event_tx.subscribe()
     }
 
-    pub(super) fn register_request(
+    pub(crate) fn register_request(
         &self,
         generation: McpRequestGeneration,
     ) -> Result<RequestEvents, NotEnqueued> {
@@ -162,7 +162,7 @@ impl RemoteSession {
     }
 
     /// Admits `message` and registers its lossless route before enqueue.
-    pub(super) fn send_routed(&self, message: Value) -> Result<RequestEvents, CliError> {
+    pub(crate) fn send_routed(&self, message: Value) -> Result<RequestEvents, CliError> {
         {
             let mut lifecycle = self.lifecycle.lock().map_err(|_| ClockError::Unavailable)?;
             self.check_enqueue_lifecycle(&message, &mut lifecycle)?;
@@ -176,31 +176,31 @@ impl RemoteSession {
         Ok(events)
     }
 
-    pub(super) fn next_stream_event_id(&self) -> Result<String, ClockError> {
+    pub(crate) fn next_stream_event_id(&self) -> Result<String, ClockError> {
         let next = crate::clock::next_counter(&self.next_event_id)?;
         Ok(format!("{}-{next}", self.session_id))
     }
 
-    pub(super) fn has_active_notification_stream(&self) -> bool {
+    pub(crate) fn has_active_notification_stream(&self) -> bool {
         self.notification_stream_attached.load(Ordering::SeqCst)
     }
 
-    pub(super) fn has_active_request_stream(&self) -> bool {
+    pub(crate) fn has_active_request_stream(&self) -> bool {
         self.active_request_stream.try_lock().is_err()
     }
 
-    pub(super) fn try_attach_notification_stream(&self) -> bool {
+    pub(crate) fn try_attach_notification_stream(&self) -> bool {
         self.notification_stream_attached
             .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
             .is_ok()
     }
 
-    pub(super) fn detach_notification_stream(&self) {
+    pub(crate) fn detach_notification_stream(&self) {
         self.notification_stream_attached
             .store(false, Ordering::SeqCst);
     }
 
-    pub(super) fn replay_notifications_after(
+    pub(crate) fn replay_notifications_after(
         &self,
         last_event_id: Option<&str>,
     ) -> Result<(u64, Vec<RemoteSessionEvent>), Response> {
@@ -267,14 +267,14 @@ impl RemoteSession {
         Ok((replay_after, replay))
     }
 
-    pub(super) fn protocol_version(&self) -> Option<String> {
+    pub(crate) fn protocol_version(&self) -> Option<String> {
         self.protocol_version
             .lock()
             .ok()
             .and_then(|guard| guard.clone())
     }
 
-    pub(super) fn lifecycle_snapshot(&self) -> RemoteSessionLifecycleSnapshot {
+    pub(crate) fn lifecycle_snapshot(&self) -> RemoteSessionLifecycleSnapshot {
         self.lifecycle
             .lock()
             .map(|guard| guard.clone())
@@ -288,7 +288,7 @@ impl RemoteSession {
             })
     }
 
-    pub(super) fn resume_record(&self) -> Result<Option<RemoteSessionResumeRecord>, CliError> {
+    pub(crate) fn resume_record(&self) -> Result<Option<RemoteSessionResumeRecord>, CliError> {
         let lifecycle = self
             .lifecycle
             .lock()
@@ -407,7 +407,7 @@ impl RemoteSession {
         persist_active_session_record(path, record, keyring, now)
     }
 
-    pub(super) fn remove_resumable_record(&self) -> Result<(), CliError> {
+    pub(crate) fn remove_resumable_record(&self) -> Result<(), CliError> {
         let Some(path) = self.session_db_path.as_deref() else {
             return Ok(());
         };
@@ -415,7 +415,7 @@ impl RemoteSession {
         delete_active_session_record(path, &self.session_id)
     }
 
-    pub(super) fn ensure_session_store_owned(&self) -> Result<(), CliError> {
+    pub(crate) fn ensure_session_store_owned(&self) -> Result<(), CliError> {
         match self.session_store_lease.as_deref() {
             Some(lease) => lease.ensure_owned(),
             None if self.session_db_path.is_some() => Err(CliError::cli_other_error(
@@ -425,11 +425,11 @@ impl RemoteSession {
         }
     }
 
-    pub(super) fn next_terminal_persistence_epoch(&self) -> Result<u64, CliError> {
+    pub(crate) fn next_terminal_persistence_epoch(&self) -> Result<u64, CliError> {
         Ok(crate::clock::next_counter(&self.resume_generation)?)
     }
 
-    pub(super) fn shutdown_upstream_transport(&self) -> Result<(), CliError> {
+    pub(crate) fn shutdown_upstream_transport(&self) -> Result<(), CliError> {
         self.upstream_transport.inner.shutdown().map_err(|error| {
             CliError::cli_other_error(format!(
                 "MCP session {} terminal receipt persistence failed: {error}",
@@ -438,7 +438,7 @@ impl RemoteSession {
         })
     }
 
-    pub(super) fn mark_ready(
+    pub(crate) fn mark_ready(
         &self,
         protocol_version: Option<String>,
         initialize_params: Value,
@@ -491,7 +491,7 @@ impl RemoteSession {
         Ok(())
     }
 
-    pub(super) fn touch(&self) -> Result<(), CliError> {
+    pub(crate) fn touch(&self) -> Result<(), CliError> {
         let mut lifecycle = self.lifecycle.lock().map_err(|_| ClockError::Unavailable)?;
         if lifecycle.state != RemoteSessionState::Ready {
             return Ok(());
@@ -522,7 +522,7 @@ impl RemoteSession {
         Ok(())
     }
 
-    pub(super) fn begin_draining(&self) -> Result<(), CliError> {
+    pub(crate) fn begin_draining(&self) -> Result<(), CliError> {
         let mut guard = self.lifecycle.lock().map_err(|_| ClockError::Unavailable)?;
         if guard.state != RemoteSessionState::Ready {
             return Ok(());
@@ -541,7 +541,7 @@ impl RemoteSession {
         Ok(())
     }
 
-    pub(super) fn deadline_expired(&self) -> Result<bool, CliError> {
+    pub(crate) fn deadline_expired(&self) -> Result<bool, CliError> {
         let mut lifecycle = self.lifecycle.lock().map_err(|_| ClockError::Unavailable)?;
         let reading = self.clock.read()?;
         match lifecycle
@@ -555,7 +555,7 @@ impl RemoteSession {
         }
     }
 
-    pub(super) fn mark_terminal(&self, state: RemoteSessionState, now: u64) {
+    pub(crate) fn mark_terminal(&self, state: RemoteSessionState, now: u64) {
         // Terminal intent is already durable. Poison cannot restore dispatch authority.
         let mut guard = self
             .lifecycle
@@ -567,11 +567,11 @@ impl RemoteSession {
         guard.deadline = None;
     }
 
-    pub(super) fn auth_context(&self) -> &SessionAuthContext {
+    pub(crate) fn auth_context(&self) -> &SessionAuthContext {
         &self.auth_context
     }
 
-    pub(super) fn diagnostic_record(&self) -> RemoteSessionDiagnosticRecord {
+    pub(crate) fn diagnostic_record(&self) -> RemoteSessionDiagnosticRecord {
         RemoteSessionDiagnosticRecord {
             session_id: self.session_id.clone(),
             auth_context: self.auth_context.clone(),
@@ -583,7 +583,7 @@ impl RemoteSession {
         }
     }
 
-    pub(super) fn ownership_snapshot(&self) -> RemoteSessionOwnershipSnapshot {
+    pub(crate) fn ownership_snapshot(&self) -> RemoteSessionOwnershipSnapshot {
         let notification_stream_attached = self.has_active_notification_stream();
         RemoteSessionOwnershipSnapshot {
             hosted_isolation: self.hosted_isolation,

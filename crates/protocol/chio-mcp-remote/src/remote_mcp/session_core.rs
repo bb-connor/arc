@@ -1,143 +1,68 @@
-#[cfg(test)]
-use chio_mcp_adapter::edge::ingress::McpInboxReceiver;
-use std::collections::{BTreeMap, HashMap, VecDeque};
-use std::convert::Infallible;
-use std::io::{self, Read, Write};
-use std::net::SocketAddr;
-use std::path::{Path as FsPath, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex as StdMutex, Weak};
-use std::thread;
-use std::time::Duration;
+use super::*;
 
-use async_stream::stream;
-use axum::extract::{Form, Path as AxumPath, Query, Request, State};
-use axum::http::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, ORIGIN, WWW_AUTHENTICATE};
-use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
-use axum::response::sse::{Event, Sse};
-use axum::response::{Html, IntoResponse, Redirect, Response};
-use axum::routing::{get, post};
-use axum::{Json, Router};
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use base64::Engine;
-use chio_core::canonical::canonical_json_bytes;
-use chio_core::capability::token::CapabilityToken;
-use chio_core::crypto::{sha256_hex, Keypair, PublicKey, Signature as Ed25519Signature};
-use chio_core::session::{
-    ChioIdentityAssertion, EnterpriseFederationMethod, EnterpriseIdentityContext,
-    OAuthBearerFederatedClaims, RequestOwnershipSnapshot, SessionAuthContext, SessionAuthMethod,
-    SessionId,
-};
-use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
-use chio_kernel::operator_report::{
-    CHIO_OAUTH_REQUEST_TIME_AUTHORIZATION_DETAILS_CLAIM,
-    CHIO_OAUTH_REQUEST_TIME_TRANSACTION_CONTEXT_CLAIM,
-};
-use chio_kernel::{
-    is_supported_dpop_schema, ChioKernel, ChioOAuthAuthorizationProfile, DpopConfig,
-    DpopNonceStore, DpopProof, GovernedAuthorizationDetail,
-    GovernedAuthorizationTransactionContext, KernelError, PeerCapabilities, RevocationStore,
-    ToolServerConnection, CHIO_OAUTH_AUTHORIZATION_COMMERCE_DETAIL_TYPE,
-    CHIO_OAUTH_AUTHORIZATION_METERED_BILLING_DETAIL_TYPE, CHIO_OAUTH_AUTHORIZATION_PROFILE_ID,
-    CHIO_OAUTH_AUTHORIZATION_PROFILE_SCHEMA, CHIO_OAUTH_AUTHORIZATION_TOOL_DETAIL_TYPE,
-    CHIO_OAUTH_SENDER_BINDING_CAPABILITY_SUBJECT, CHIO_OAUTH_SENDER_PROOF_CHIO_DPOP,
-};
-use chio_mcp_adapter::adapter::{McpAdapter, McpAdapterConfig, SerializedMcpTransport};
-use chio_mcp_adapter::edge::ingress::{
-    mcp_inbox, AccountedMessage, McpInboxSender, McpRequestGeneration, McpResponseContext,
-};
-use chio_mcp_adapter::edge::{AdapterError, ChioMcpEdge, McpEdgeConfig, McpTransport};
-use chio_mcp_adapter::server::AdaptedMcpServer;
-use chio_mcp_adapter::transport::StdioMcpTransport;
-use hmac::{Hmac, Mac};
-use p256::ecdsa::{Signature as P256Signature, VerifyingKey as P256VerifyingKey};
-use p384::ecdsa::{Signature as P384Signature, VerifyingKey as P384VerifyingKey};
-use reqwest::Client as HttpClient;
-use rsa::pkcs1v15::{Signature as RsaPkcs1v15Signature, VerifyingKey as RsaPkcs1v15VerifyingKey};
-use rsa::pss::{Signature as RsaPssSignature, VerifyingKey as RsaPssVerifyingKey};
-use rsa::signature::Verifier as _;
-use rsa::{BigUint, RsaPublicKey as JwtRsaPublicKey};
-use serde::de::{DeserializeOwned, Deserializer};
-use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
-use sha2::{Digest, Sha256};
-use subtle::ConstantTimeEq;
-use tokio::sync::{broadcast, Mutex};
-use tracing::{error, info, warn};
-use url::Url;
-use zeroize::{Zeroize, Zeroizing};
+pub(super) const MCP_ENDPOINT_PATH: &str = "/mcp";
+pub(super) const ADMIN_HEALTH_PATH: &str = "/admin/health";
+pub(super) const ADMIN_AUTHORITY_PATH: &str = "/admin/authority";
+pub(super) const ADMIN_TOOL_RECEIPTS_PATH: &str = "/admin/receipts/tools";
+pub(super) const ADMIN_CHILD_RECEIPTS_PATH: &str = "/admin/receipts/children";
+pub(super) const ADMIN_REVOCATIONS_PATH: &str = "/admin/revocations";
+pub(super) const ADMIN_BUDGETS_PATH: &str = "/admin/budgets";
+pub(super) const ADMIN_SESSIONS_PATH: &str = "/admin/sessions";
+pub(super) const AUTHORIZATION_SERVER_METADATA_PATH: &str =
+    "/.well-known/oauth-authorization-server";
+pub(super) const LOCAL_AUTHORIZATION_PATH: &str = "/oauth/authorize";
+pub(super) const LOCAL_TOKEN_PATH: &str = "/oauth/token";
+pub(super) const LOCAL_JWKS_PATH: &str = "/oauth/jwks.json";
+pub(super) const DPOP_HEADER: &str = "dpop";
+pub(super) const HTTP_DPOP_ACTION_HASH_EMPTY: &[u8] = b"";
+pub(super) const CHIO_MTLS_THUMBPRINT_HEADER: &str = "x-chio-mtls-thumbprint-sha256";
+pub(super) const CHIO_RUNTIME_ATTESTATION_HEADER: &str = "x-chio-runtime-attestation-sha256";
+pub(super) const CHIO_SENDER_DPOP_PUBLIC_KEY_PARAMETER: &str = "chio_sender_dpop_public_key";
+pub(super) const CHIO_SENDER_MTLS_THUMBPRINT_PARAMETER: &str = "chio_sender_mtls_thumbprint_sha256";
+pub(super) const CHIO_SENDER_ATTESTATION_PARAMETER: &str = "chio_sender_attestation_sha256";
+pub(super) const ADMIN_SESSION_TRUST_PATH: &str = "/admin/sessions/{session_id}/trust";
+pub(super) const ADMIN_SESSION_DRAIN_PATH: &str = "/admin/sessions/{session_id}/drain";
+pub(super) const ADMIN_SESSION_SHUTDOWN_PATH: &str = "/admin/sessions/{session_id}/shutdown";
+pub(super) const PROTECTED_RESOURCE_METADATA_ROOT_PATH: &str =
+    "/.well-known/oauth-protected-resource";
+pub(super) const PROTECTED_RESOURCE_METADATA_MCP_PATH: &str =
+    "/.well-known/oauth-protected-resource/mcp";
+pub(super) const MCP_SESSION_ID_HEADER: &str = "mcp-session-id";
+pub(super) const MCP_PROTOCOL_VERSION_HEADER: &str = "mcp-protocol-version";
+pub(super) const CHIO_RESPONSE_MODE_HEADER: &str = "x-chio-mcp-response-mode";
+pub(super) const CHIO_TOOL_STREAMING_CAPABILITY_KEY: &str = "chioToolStreaming";
+pub(super) const DEFAULT_STREAM_RETRY_MILLIS: u64 = 1_000;
+pub(super) const DEFAULT_NOTIFICATION_REPLAY_WINDOW: usize = 64;
+pub(super) const DEFAULT_SHARED_NOTIFICATION_POLL_MILLIS: u64 = 25;
+pub(super) const DEFAULT_ADMIN_LIST_LIMIT: usize = 50;
+pub(super) const MAX_ADMIN_LIST_LIMIT: usize = 200;
+pub(super) const DEFAULT_SESSION_IDLE_EXPIRY_MILLIS: u64 = 15 * 60 * 1000;
+pub(super) const DEFAULT_SESSION_DRAIN_GRACE_MILLIS: u64 = 5 * 1000;
+pub(super) const DEFAULT_SESSION_REAPER_INTERVAL_MILLIS: u64 = 250;
+pub(super) const DEFAULT_SESSION_TOMBSTONE_RETENTION_MILLIS: u64 = 30 * 60 * 1000;
+pub(super) const IDENTITY_PROVIDER_FETCH_TIMEOUT_SECS: u64 = 5;
+pub(super) const TOKEN_INTROSPECTION_TIMEOUT_SECS: u64 = 5;
+pub(super) const IDENTITY_FEDERATION_DERIVATION_LABEL: &[u8] = b"chio.identity_federation.v1";
+pub(super) const REMOTE_SESSION_RESUME_RECORD_HMAC_LABEL: &[u8] =
+    b"chio.remote_mcp.resume_record_hmac.v2";
+pub(super) const REMOTE_SESSION_TOMBSTONE_HMAC_LABEL: &[u8] =
+    b"chio.remote_mcp.terminal_tombstone_hmac.v2";
+pub(super) const REMOTE_SESSION_TERMINAL_FENCE_HMAC_LABEL: &[u8] =
+    b"chio.remote_mcp.terminal_fence_hmac.v2";
+pub(super) const REMOTE_SESSION_HMAC_KEYRING_SCHEMA: &str =
+    "chio.remote-mcp.resume-hmac-keyring.v1";
+pub(super) const MAX_REMOTE_SESSION_HMAC_PREVIOUS_KEYS: usize = 4;
+pub(super) const MAX_REMOTE_SESSION_HMAC_GRACE_MILLIS: u64 = 7 * 24 * 60 * 60 * 1_000;
+pub(super) const SESSION_IDLE_EXPIRY_ENV: &str = "CHIO_MCP_SESSION_IDLE_EXPIRY_MILLIS";
+pub(super) const SESSION_DRAIN_GRACE_ENV: &str = "CHIO_MCP_SESSION_DRAIN_GRACE_MILLIS";
+pub(super) const SESSION_REAPER_INTERVAL_ENV: &str = "CHIO_MCP_SESSION_REAPER_INTERVAL_MILLIS";
+pub(super) const SESSION_TOMBSTONE_RETENTION_ENV: &str =
+    "CHIO_MCP_SESSION_TOMBSTONE_RETENTION_MILLIS";
+pub(super) const SESSION_TOUCH_PERSIST_INTERVAL_MILLIS: u64 = 5_000;
 
-use chio_control_plane::policy::{load_policy, LoadedPolicy};
-use chio_control_plane::trust_control::service_runtime::remote_authority::build_pinned_remote_capability_authority_with_clock;
-use chio_control_plane::trust_control::{
-    self, ChildReceiptQuery, RevocationQuery, ToolReceiptQuery,
-};
-use chio_control_plane::{
-    authority_public_key_from_seed_file, configure_budget_store, configure_capability_authority,
-    configure_receipt_store, configure_revocation_store, durable_admission_sidecar_path,
-    enterprise_federation::{
-        EnterpriseProviderKind, EnterpriseProviderRecord, EnterpriseProviderRegistry,
-    },
-    issue_default_capabilities, load_or_create_authority_keypair, open_durable_admission_runtime,
-    require_control_token, rotate_authority_keypair, validate_distinct_database_paths,
-    validate_durable_admission_participant_paths, DurableAdmissionRuntime,
-};
-
-const MCP_ENDPOINT_PATH: &str = "/mcp";
-const ADMIN_HEALTH_PATH: &str = "/admin/health";
-const ADMIN_AUTHORITY_PATH: &str = "/admin/authority";
-const ADMIN_TOOL_RECEIPTS_PATH: &str = "/admin/receipts/tools";
-const ADMIN_CHILD_RECEIPTS_PATH: &str = "/admin/receipts/children";
-const ADMIN_REVOCATIONS_PATH: &str = "/admin/revocations";
-const ADMIN_BUDGETS_PATH: &str = "/admin/budgets";
-const ADMIN_SESSIONS_PATH: &str = "/admin/sessions";
-const AUTHORIZATION_SERVER_METADATA_PATH: &str = "/.well-known/oauth-authorization-server";
-const LOCAL_AUTHORIZATION_PATH: &str = "/oauth/authorize";
-const LOCAL_TOKEN_PATH: &str = "/oauth/token";
-const LOCAL_JWKS_PATH: &str = "/oauth/jwks.json";
-const DPOP_HEADER: &str = "dpop";
-const HTTP_DPOP_ACTION_HASH_EMPTY: &[u8] = b"";
-const CHIO_MTLS_THUMBPRINT_HEADER: &str = "x-chio-mtls-thumbprint-sha256";
-const CHIO_RUNTIME_ATTESTATION_HEADER: &str = "x-chio-runtime-attestation-sha256";
-const CHIO_SENDER_DPOP_PUBLIC_KEY_PARAMETER: &str = "chio_sender_dpop_public_key";
-const CHIO_SENDER_MTLS_THUMBPRINT_PARAMETER: &str = "chio_sender_mtls_thumbprint_sha256";
-const CHIO_SENDER_ATTESTATION_PARAMETER: &str = "chio_sender_attestation_sha256";
-const ADMIN_SESSION_TRUST_PATH: &str = "/admin/sessions/{session_id}/trust";
-const ADMIN_SESSION_DRAIN_PATH: &str = "/admin/sessions/{session_id}/drain";
-const ADMIN_SESSION_SHUTDOWN_PATH: &str = "/admin/sessions/{session_id}/shutdown";
-const PROTECTED_RESOURCE_METADATA_ROOT_PATH: &str = "/.well-known/oauth-protected-resource";
-const PROTECTED_RESOURCE_METADATA_MCP_PATH: &str = "/.well-known/oauth-protected-resource/mcp";
-const MCP_SESSION_ID_HEADER: &str = "mcp-session-id";
-const MCP_PROTOCOL_VERSION_HEADER: &str = "mcp-protocol-version";
-const CHIO_RESPONSE_MODE_HEADER: &str = "x-chio-mcp-response-mode";
-const CHIO_TOOL_STREAMING_CAPABILITY_KEY: &str = "chioToolStreaming";
-const DEFAULT_STREAM_RETRY_MILLIS: u64 = 1_000;
-const DEFAULT_NOTIFICATION_REPLAY_WINDOW: usize = 64;
-const DEFAULT_SHARED_NOTIFICATION_POLL_MILLIS: u64 = 25;
-const DEFAULT_ADMIN_LIST_LIMIT: usize = 50;
-const MAX_ADMIN_LIST_LIMIT: usize = 200;
-const DEFAULT_SESSION_IDLE_EXPIRY_MILLIS: u64 = 15 * 60 * 1000;
-const DEFAULT_SESSION_DRAIN_GRACE_MILLIS: u64 = 5 * 1000;
-const DEFAULT_SESSION_REAPER_INTERVAL_MILLIS: u64 = 250;
-const DEFAULT_SESSION_TOMBSTONE_RETENTION_MILLIS: u64 = 30 * 60 * 1000;
-const IDENTITY_PROVIDER_FETCH_TIMEOUT_SECS: u64 = 5;
-const TOKEN_INTROSPECTION_TIMEOUT_SECS: u64 = 5;
-const IDENTITY_FEDERATION_DERIVATION_LABEL: &[u8] = b"chio.identity_federation.v1";
-const REMOTE_SESSION_RESUME_RECORD_HMAC_LABEL: &[u8] = b"chio.remote_mcp.resume_record_hmac.v2";
-const REMOTE_SESSION_TOMBSTONE_HMAC_LABEL: &[u8] = b"chio.remote_mcp.terminal_tombstone_hmac.v2";
-const REMOTE_SESSION_TERMINAL_FENCE_HMAC_LABEL: &[u8] = b"chio.remote_mcp.terminal_fence_hmac.v2";
-const REMOTE_SESSION_HMAC_KEYRING_SCHEMA: &str = "chio.remote-mcp.resume-hmac-keyring.v1";
-const MAX_REMOTE_SESSION_HMAC_PREVIOUS_KEYS: usize = 4;
-const MAX_REMOTE_SESSION_HMAC_GRACE_MILLIS: u64 = 7 * 24 * 60 * 60 * 1_000;
-const SESSION_IDLE_EXPIRY_ENV: &str = "CHIO_MCP_SESSION_IDLE_EXPIRY_MILLIS";
-const SESSION_DRAIN_GRACE_ENV: &str = "CHIO_MCP_SESSION_DRAIN_GRACE_MILLIS";
-const SESSION_REAPER_INTERVAL_ENV: &str = "CHIO_MCP_SESSION_REAPER_INTERVAL_MILLIS";
-const SESSION_TOMBSTONE_RETENTION_ENV: &str = "CHIO_MCP_SESSION_TOMBSTONE_RETENTION_MILLIS";
-const SESSION_TOUCH_PERSIST_INTERVAL_MILLIS: u64 = 5_000;
-
-type NotificationTapQueue = Arc<StdMutex<VecDeque<Value>>>;
-type NotificationTapWeak = Weak<StdMutex<VecDeque<Value>>>;
-type NotificationSubscriberList = Arc<StdMutex<Vec<NotificationTapWeak>>>;
+pub(super) type NotificationTapQueue = Arc<StdMutex<VecDeque<Value>>>;
+pub(super) type NotificationTapWeak = Weak<StdMutex<VecDeque<Value>>>;
+pub(super) type NotificationSubscriberList = Arc<StdMutex<Vec<NotificationTapWeak>>>;
 
 #[derive(Clone)]
 pub struct RemoteServeHttpConfig {
@@ -216,114 +141,114 @@ pub struct RemoteServeHttpConfig {
 }
 
 #[derive(Clone)]
-struct RemoteAppState {
-    sessions: Arc<RemoteSessionLedger>,
-    factory: Arc<RemoteSessionFactory>,
-    auth_mode: Arc<RemoteAuthMode>,
-    enterprise_provider_registry: Option<Arc<EnterpriseProviderRegistry>>,
-    admin_token: Option<Arc<str>>,
-    protected_resource_metadata: Option<Arc<ProtectedResourceMetadata>>,
-    authorization_server_metadata: Option<Arc<AuthorizationServerMetadata>>,
-    local_auth_server: Option<Arc<LocalAuthorizationServer>>,
+pub(super) struct RemoteAppState {
+    pub(super) sessions: Arc<RemoteSessionLedger>,
+    pub(super) factory: Arc<RemoteSessionFactory>,
+    pub(super) auth_mode: Arc<RemoteAuthMode>,
+    pub(super) enterprise_provider_registry: Option<Arc<EnterpriseProviderRegistry>>,
+    pub(super) admin_token: Option<Arc<str>>,
+    pub(super) protected_resource_metadata: Option<Arc<ProtectedResourceMetadata>>,
+    pub(super) authorization_server_metadata: Option<Arc<AuthorizationServerMetadata>>,
+    pub(super) local_auth_server: Option<Arc<LocalAuthorizationServer>>,
 }
 
-struct RemoteSessionFactory {
-    config: RemoteServeHttpConfig,
-    manifest_registry: Arc<chio_manifest::VerifiedManifestRegistry>,
-    runtime_contract_fingerprint: String,
-    durable_admission: Option<DurableAdmissionRuntime>,
-    session_store_lease: Option<Arc<RemoteSessionStoreLifecycleLease>>,
-    resume_hmac_keyring: Option<Arc<RemoteSessionHmacKeyring>>,
-    shared_upstream_owner: Arc<StdMutex<Option<Arc<SharedUpstreamOwner>>>>,
-    lifecycle_policy: SessionLifecyclePolicy,
+pub(super) struct RemoteSessionFactory {
+    pub(super) config: RemoteServeHttpConfig,
+    pub(super) manifest_registry: Arc<chio_manifest::VerifiedManifestRegistry>,
+    pub(super) runtime_contract_fingerprint: String,
+    pub(super) durable_admission: Option<DurableAdmissionRuntime>,
+    pub(super) session_store_lease: Option<Arc<RemoteSessionStoreLifecycleLease>>,
+    pub(super) resume_hmac_keyring: Option<Arc<RemoteSessionHmacKeyring>>,
+    pub(super) shared_upstream_owner: Arc<StdMutex<Option<Arc<SharedUpstreamOwner>>>>,
+    pub(super) lifecycle_policy: SessionLifecyclePolicy,
 }
 
 #[derive(Clone, Debug)]
-struct SessionLifecyclePolicy {
-    idle_expiry_millis: u64,
-    drain_grace_millis: u64,
-    reaper_interval_millis: u64,
-    tombstone_retention_millis: u64,
+pub(super) struct SessionLifecyclePolicy {
+    pub(super) idle_expiry_millis: u64,
+    pub(super) drain_grace_millis: u64,
+    pub(super) reaper_interval_millis: u64,
+    pub(super) tombstone_retention_millis: u64,
 }
 
 impl SessionLifecyclePolicy {
-    fn from_env() -> Self {
+    pub(super) fn from_env() -> Self {
         read_session_lifecycle_policy()
     }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct RemoteSessionDiagnosticRecord {
-    session_id: String,
-    auth_context: SessionAuthContext,
-    capabilities: Vec<RemoteSessionCapability>,
-    lifecycle: RemoteSessionLifecycleSnapshot,
-    protocol_version: Option<String>,
+pub(super) struct RemoteSessionDiagnosticRecord {
+    pub(super) session_id: String,
+    pub(super) auth_context: SessionAuthContext,
+    pub(super) capabilities: Vec<RemoteSessionCapability>,
+    pub(super) lifecycle: RemoteSessionLifecycleSnapshot,
+    pub(super) protocol_version: Option<String>,
     #[serde(default)]
-    ownership: RemoteSessionOwnershipSnapshot,
-    terminal_at: u64,
+    pub(super) ownership: RemoteSessionOwnershipSnapshot,
+    pub(super) terminal_at: u64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct RemoteSessionResumeRecord {
-    session_id: String,
-    agent_id: String,
-    auth_context: SessionAuthContext,
+pub(super) struct RemoteSessionResumeRecord {
+    pub(super) session_id: String,
+    pub(super) agent_id: String,
+    pub(super) auth_context: SessionAuthContext,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    auth_mode_fingerprint: Option<String>,
+    pub(super) auth_mode_fingerprint: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    policy_fingerprint: Option<String>,
-    runtime_contract_fingerprint: String,
-    hosted_isolation: RemoteHostedIsolationMode,
-    lifecycle: RemoteSessionLifecycleSnapshot,
-    protocol_version: Option<String>,
-    peer_capabilities: PeerCapabilities,
-    initialize_params: Value,
-    issued_capabilities: Vec<CapabilityToken>,
-    resume_generation: u64,
-    resume_integrity: RemoteSessionIntegrityTag,
+    pub(super) policy_fingerprint: Option<String>,
+    pub(super) runtime_contract_fingerprint: String,
+    pub(super) hosted_isolation: RemoteHostedIsolationMode,
+    pub(super) lifecycle: RemoteSessionLifecycleSnapshot,
+    pub(super) protocol_version: Option<String>,
+    pub(super) peer_capabilities: PeerCapabilities,
+    pub(super) initialize_params: Value,
+    pub(super) issued_capabilities: Vec<CapabilityToken>,
+    pub(super) resume_generation: u64,
+    pub(super) resume_integrity: RemoteSessionIntegrityTag,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-struct RemoteSessionIntegrityTag {
-    key_id: String,
-    key_version: u64,
-    tag: String,
+pub(super) struct RemoteSessionIntegrityTag {
+    pub(super) key_id: String,
+    pub(super) key_version: u64,
+    pub(super) tag: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct RemoteSessionTombstoneRecord {
-    record: RemoteSessionDiagnosticRecord,
-    resume_generation: u64,
-    terminal_epoch: u64,
-    resume_integrity: RemoteSessionIntegrityTag,
+pub(super) struct RemoteSessionTombstoneRecord {
+    pub(super) record: RemoteSessionDiagnosticRecord,
+    pub(super) resume_generation: u64,
+    pub(super) terminal_epoch: u64,
+    pub(super) resume_integrity: RemoteSessionIntegrityTag,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct RemoteSessionTerminalFence {
-    session_id: String,
-    terminal_at: u64,
-    terminal_state: RemoteSessionState,
-    resume_generation: u64,
-    terminal_epoch: u64,
-    resume_integrity: RemoteSessionIntegrityTag,
+pub(super) struct RemoteSessionTerminalFence {
+    pub(super) session_id: String,
+    pub(super) terminal_at: u64,
+    pub(super) terminal_state: RemoteSessionState,
+    pub(super) resume_generation: u64,
+    pub(super) terminal_epoch: u64,
+    pub(super) resume_integrity: RemoteSessionIntegrityTag,
 }
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-struct RemoteSessionHmacKeyringFile {
-    schema: String,
-    current: RemoteSessionHmacKeyFile,
+pub(super) struct RemoteSessionHmacKeyringFile {
+    pub(super) schema: String,
+    pub(super) current: RemoteSessionHmacKeyFile,
     #[serde(default)]
-    previous: Vec<RemoteSessionPreviousHmacKeyFile>,
+    pub(super) previous: Vec<RemoteSessionPreviousHmacKeyFile>,
 }
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-struct RemoteSessionHmacKeyFile {
-    key_id: String,
-    version: u64,
-    key_base64: String,
+pub(super) struct RemoteSessionHmacKeyFile {
+    pub(super) key_id: String,
+    pub(super) version: u64,
+    pub(super) key_base64: String,
 }
 
 impl Drop for RemoteSessionHmacKeyFile {
@@ -334,11 +259,11 @@ impl Drop for RemoteSessionHmacKeyFile {
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-struct RemoteSessionPreviousHmacKeyFile {
-    key_id: String,
-    version: u64,
-    key_base64: String,
-    verify_until_millis: u64,
+pub(super) struct RemoteSessionPreviousHmacKeyFile {
+    pub(super) key_id: String,
+    pub(super) version: u64,
+    pub(super) key_base64: String,
+    pub(super) verify_until_millis: u64,
 }
 
 impl Drop for RemoteSessionPreviousHmacKeyFile {
@@ -347,16 +272,16 @@ impl Drop for RemoteSessionPreviousHmacKeyFile {
     }
 }
 
-struct RemoteSessionHmacKey {
-    key_id: String,
-    version: u64,
-    key: Zeroizing<[u8; 32]>,
-    verify_until_millis: Option<u64>,
+pub(super) struct RemoteSessionHmacKey {
+    pub(super) key_id: String,
+    pub(super) version: u64,
+    pub(super) key: Zeroizing<[u8; 32]>,
+    pub(super) verify_until_millis: Option<u64>,
 }
 
-struct RemoteSessionHmacKeyring {
-    current: RemoteSessionHmacKey,
-    previous: Vec<RemoteSessionHmacKey>,
+pub(super) struct RemoteSessionHmacKeyring {
+    pub(super) current: RemoteSessionHmacKey,
+    pub(super) previous: Vec<RemoteSessionHmacKey>,
 }
 
 impl std::fmt::Debug for RemoteSessionHmacKeyring {
@@ -371,98 +296,98 @@ impl std::fmt::Debug for RemoteSessionHmacKeyring {
 }
 
 #[derive(Clone, Debug)]
-enum RemoteSessionEntry {
+pub(super) enum RemoteSessionEntry {
     Active(Arc<RemoteSession>),
     Terminal(Arc<RemoteSessionDiagnosticRecord>),
 }
 
-struct TerminalIntent {
-    record: RemoteSessionDiagnosticRecord,
-    terminal_at: u64,
-    durable_tombstone: Option<RemoteSessionTombstoneRecord>,
+pub(super) struct TerminalIntent {
+    pub(super) record: RemoteSessionDiagnosticRecord,
+    pub(super) terminal_at: u64,
+    pub(super) durable_tombstone: Option<RemoteSessionTombstoneRecord>,
 }
 
 #[derive(Clone)]
-struct RemoteSessionLedger {
-    clock: RemoteClock,
-    active: Arc<Mutex<HashMap<String, Arc<RemoteSession>>>>,
-    terminal: Arc<Mutex<HashMap<String, Arc<RemoteSessionDiagnosticRecord>>>>,
-    lifecycle_policy: SessionLifecyclePolicy,
-    tombstone_db_path: Option<PathBuf>,
-    resume_hmac_keyring: Option<Arc<RemoteSessionHmacKeyring>>,
+pub(super) struct RemoteSessionLedger {
+    pub(super) clock: RemoteClock,
+    pub(super) active: Arc<Mutex<HashMap<String, Arc<RemoteSession>>>>,
+    pub(super) terminal: Arc<Mutex<HashMap<String, Arc<RemoteSessionDiagnosticRecord>>>>,
+    pub(super) lifecycle_policy: SessionLifecyclePolicy,
+    pub(super) tombstone_db_path: Option<PathBuf>,
+    pub(super) resume_hmac_keyring: Option<Arc<RemoteSessionHmacKeyring>>,
 }
 
 #[derive(Clone)]
-struct SharedUpstreamToolServer {
-    upstream: Arc<AdaptedMcpServer>,
-    server_id: String,
-    tool_names: Vec<String>,
+pub(super) struct SharedUpstreamToolServer {
+    pub(super) upstream: Arc<AdaptedMcpServer>,
+    pub(super) server_id: String,
+    pub(super) tool_names: Vec<String>,
 }
 
-struct SharedUpstreamOwner {
-    upstream_server: Arc<AdaptedMcpServer>,
-    notification_subscribers: NotificationSubscriberList,
-    notification_stats: Arc<SharedUpstreamNotificationStats>,
-    notification_pump_stop: Arc<AtomicBool>,
-    notification_pump_thread: StdMutex<Option<thread::JoinHandle<()>>>,
+pub(super) struct SharedUpstreamOwner {
+    pub(super) upstream_server: Arc<AdaptedMcpServer>,
+    pub(super) notification_subscribers: NotificationSubscriberList,
+    pub(super) notification_stats: Arc<SharedUpstreamNotificationStats>,
+    pub(super) notification_pump_stop: Arc<AtomicBool>,
+    pub(super) notification_pump_thread: StdMutex<Option<thread::JoinHandle<()>>>,
 }
 
-struct SharedUpstreamNotificationTap {
-    queue: NotificationTapQueue,
+pub(super) struct SharedUpstreamNotificationTap {
+    pub(super) queue: NotificationTapQueue,
 }
 
 #[derive(Default)]
-struct SharedUpstreamNotificationStats {
-    fanout_batches: AtomicU64,
-    fanout_notifications: AtomicU64,
-    fanout_targets: AtomicU64,
-    pruned_subscribers: AtomicU64,
-    queue_lock_skips: AtomicU64,
-    subscriber_lock_failures: AtomicU64,
+pub(super) struct SharedUpstreamNotificationStats {
+    pub(super) fanout_batches: AtomicU64,
+    pub(super) fanout_notifications: AtomicU64,
+    pub(super) fanout_targets: AtomicU64,
+    pub(super) pruned_subscribers: AtomicU64,
+    pub(super) queue_lock_skips: AtomicU64,
+    pub(super) subscriber_lock_failures: AtomicU64,
 }
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct SharedUpstreamNotificationStatsSnapshot {
-    fanout_batches: u64,
-    fanout_notifications: u64,
-    fanout_targets: u64,
-    pruned_subscribers: u64,
-    queue_lock_skips: u64,
-    subscriber_lock_failures: u64,
+pub(super) struct SharedUpstreamNotificationStatsSnapshot {
+    pub(super) fanout_batches: u64,
+    pub(super) fanout_notifications: u64,
+    pub(super) fanout_targets: u64,
+    pub(super) pruned_subscribers: u64,
+    pub(super) queue_lock_skips: u64,
+    pub(super) subscriber_lock_failures: u64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct RetainedRemoteSessionEvent {
-    seq: u64,
-    event_id: String,
-    message: Value,
+pub(super) struct RetainedRemoteSessionEvent {
+    pub(super) seq: u64,
+    pub(super) event_id: String,
+    pub(super) message: Value,
 }
 
 #[derive(Clone, Debug)]
-struct RemoteSessionEvent {
-    seq: u64,
-    event_id: String,
-    kind: RemoteSessionEventKind,
-    request_generation: Option<McpRequestGeneration>,
-    message: Value,
+pub(super) struct RemoteSessionEvent {
+    pub(super) seq: u64,
+    pub(super) event_id: String,
+    pub(super) kind: RemoteSessionEventKind,
+    pub(super) request_generation: Option<McpRequestGeneration>,
+    pub(super) message: Value,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum RemoteSessionEventKind {
+pub(super) enum RemoteSessionEventKind {
     Notification,
     StandaloneRequest,
     RequestCorrelated,
 }
 
 impl RemoteSessionEventKind {
-    fn is_session_owned(self) -> bool {
+    pub(super) fn is_session_owned(self) -> bool {
         matches!(self, Self::Notification | Self::StandaloneRequest)
     }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-enum RemoteSessionState {
+pub(super) enum RemoteSessionState {
     Initializing,
     Ready,
     Draining,
@@ -472,7 +397,7 @@ enum RemoteSessionState {
 }
 
 impl RemoteSessionState {
-    fn as_str(self) -> &'static str {
+    pub(super) fn as_str(self) -> &'static str {
         match self {
             Self::Initializing => "initializing",
             Self::Ready => "ready",
@@ -483,44 +408,44 @@ impl RemoteSessionState {
         }
     }
 
-    fn is_terminal(self) -> bool {
+    pub(super) fn is_terminal(self) -> bool {
         matches!(self, Self::Deleted | Self::Expired | Self::Closed)
     }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct RemoteSessionLifecycleSnapshot {
+pub(super) struct RemoteSessionLifecycleSnapshot {
     #[serde(skip)]
-    deadline: Option<AuthorityDeadline>,
-    state: RemoteSessionState,
-    created_at: u64,
-    last_seen_at: u64,
-    idle_expires_at: u64,
-    drain_deadline_at: Option<u64>,
+    pub(super) deadline: Option<AuthorityDeadline>,
+    pub(super) state: RemoteSessionState,
+    pub(super) created_at: u64,
+    pub(super) last_seen_at: u64,
+    pub(super) idle_expires_at: u64,
+    pub(super) drain_deadline_at: Option<u64>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-enum RemoteRequestStreamOwner {
+pub(super) enum RemoteRequestStreamOwner {
     ExclusiveRequestStream,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-enum RemoteNotificationStreamOwner {
+pub(super) enum RemoteNotificationStreamOwner {
     SessionNotificationStream,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-enum RemoteNotificationDelivery {
+pub(super) enum RemoteNotificationDelivery {
     PostResponseFallback,
     GetSse,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
-enum RemoteHostedIsolationMode {
+pub(super) enum RemoteHostedIsolationMode {
     #[default]
     DedicatedPerSession,
     SharedHostedOwnerCompatibility,
@@ -528,14 +453,14 @@ enum RemoteHostedIsolationMode {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
-enum RemoteHostedIdentityProfile {
+pub(super) enum RemoteHostedIdentityProfile {
     #[default]
     StrongDedicatedSession,
     WeakSharedHostedOwnerCompatibility,
 }
 
 impl RemoteHostedIsolationMode {
-    fn identity_profile(self) -> RemoteHostedIdentityProfile {
+    pub(super) fn identity_profile(self) -> RemoteHostedIdentityProfile {
         match self {
             Self::DedicatedPerSession => RemoteHostedIdentityProfile::StrongDedicatedSession,
             Self::SharedHostedOwnerCompatibility => {
@@ -544,7 +469,10 @@ impl RemoteHostedIsolationMode {
         }
     }
 
-    fn snapshot_auth_context(self, auth_context: SessionAuthContext) -> SessionAuthContext {
+    pub(super) fn snapshot_auth_context(
+        self,
+        auth_context: SessionAuthContext,
+    ) -> SessionAuthContext {
         match (self, auth_context) {
             (
                 Self::SharedHostedOwnerCompatibility,
@@ -596,17 +524,17 @@ impl RemoteHostedIsolationMode {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct RemoteSessionOwnershipSnapshot {
-    request_ownership: RequestOwnershipSnapshot,
+pub(super) struct RemoteSessionOwnershipSnapshot {
+    pub(super) request_ownership: RequestOwnershipSnapshot,
     #[serde(default)]
-    hosted_isolation: RemoteHostedIsolationMode,
+    pub(super) hosted_isolation: RemoteHostedIsolationMode,
     #[serde(default)]
-    hosted_identity_profile: RemoteHostedIdentityProfile,
-    request_stream_owner: RemoteRequestStreamOwner,
-    notification_stream_owner: RemoteNotificationStreamOwner,
-    notification_delivery: RemoteNotificationDelivery,
-    request_stream_active: bool,
-    notification_stream_attached: bool,
+    pub(super) hosted_identity_profile: RemoteHostedIdentityProfile,
+    pub(super) request_stream_owner: RemoteRequestStreamOwner,
+    pub(super) notification_stream_owner: RemoteNotificationStreamOwner,
+    pub(super) notification_delivery: RemoteNotificationDelivery,
+    pub(super) request_stream_active: bool,
+    pub(super) notification_stream_attached: bool,
 }
 
 impl Default for RemoteSessionOwnershipSnapshot {
@@ -625,40 +553,40 @@ impl Default for RemoteSessionOwnershipSnapshot {
 }
 
 #[derive(Debug)]
-struct RemoteSession {
-    clock: RemoteClock,
-    session_id: String,
-    agent_id: String,
-    capabilities: Vec<RemoteSessionCapability>,
-    issued_capabilities: Vec<CapabilityToken>,
-    auth_context: SessionAuthContext,
-    auth_mode_fingerprint: String,
-    policy_fingerprint: String,
-    runtime_contract_fingerprint: String,
-    hosted_isolation: RemoteHostedIsolationMode,
-    lifecycle_policy: SessionLifecyclePolicy,
-    protocol_version: StdMutex<Option<String>>,
-    peer_capabilities: StdMutex<Option<PeerCapabilities>>,
-    initialize_params: StdMutex<Option<Value>>,
-    lifecycle: StdMutex<RemoteSessionLifecycleSnapshot>,
-    input_tx: McpInboxSender,
-    event_tx: SessionEventBus,
-    retained_notification_events: Arc<StdMutex<VecDeque<RetainedRemoteSessionEvent>>>,
-    active_request_stream: Arc<Mutex<()>>,
-    worker_serving_closed: tokio::sync::watch::Sender<bool>,
-    notification_stream_attached: Arc<AtomicBool>,
-    next_event_id: Arc<AtomicU64>,
-    session_db_path: Option<PathBuf>,
-    approval_redemption: Option<remote_mcp_approvals::ApprovalRedemption>,
-    session_store_lease: Option<Arc<RemoteSessionStoreLifecycleLease>>,
-    resume_hmac_keyring: Option<Arc<RemoteSessionHmacKeyring>>,
-    resume_generation: AtomicU64,
-    terminalization: Mutex<()>,
-    upstream_transport: RemoteSessionUpstreamTransport,
+pub(super) struct RemoteSession {
+    pub(super) clock: RemoteClock,
+    pub(super) session_id: String,
+    pub(super) agent_id: String,
+    pub(super) capabilities: Vec<RemoteSessionCapability>,
+    pub(super) issued_capabilities: Vec<CapabilityToken>,
+    pub(super) auth_context: SessionAuthContext,
+    pub(super) auth_mode_fingerprint: String,
+    pub(super) policy_fingerprint: String,
+    pub(super) runtime_contract_fingerprint: String,
+    pub(super) hosted_isolation: RemoteHostedIsolationMode,
+    pub(super) lifecycle_policy: SessionLifecyclePolicy,
+    pub(super) protocol_version: StdMutex<Option<String>>,
+    pub(super) peer_capabilities: StdMutex<Option<PeerCapabilities>>,
+    pub(super) initialize_params: StdMutex<Option<Value>>,
+    pub(super) lifecycle: StdMutex<RemoteSessionLifecycleSnapshot>,
+    pub(super) input_tx: McpInboxSender,
+    pub(super) event_tx: SessionEventBus,
+    pub(super) retained_notification_events: Arc<StdMutex<VecDeque<RetainedRemoteSessionEvent>>>,
+    pub(super) active_request_stream: Arc<Mutex<()>>,
+    pub(super) worker_serving_closed: tokio::sync::watch::Sender<bool>,
+    pub(super) notification_stream_attached: Arc<AtomicBool>,
+    pub(super) next_event_id: Arc<AtomicU64>,
+    pub(super) session_db_path: Option<PathBuf>,
+    pub(super) approval_redemption: Option<remote_mcp_approvals::ApprovalRedemption>,
+    pub(super) session_store_lease: Option<Arc<RemoteSessionStoreLifecycleLease>>,
+    pub(super) resume_hmac_keyring: Option<Arc<RemoteSessionHmacKeyring>>,
+    pub(super) resume_generation: AtomicU64,
+    pub(super) terminalization: Mutex<()>,
+    pub(super) upstream_transport: RemoteSessionUpstreamTransport,
 }
 
-struct RemoteSessionUpstreamTransport {
-    inner: Arc<dyn McpTransport>,
+pub(super) struct RemoteSessionUpstreamTransport {
+    pub(super) inner: Arc<dyn McpTransport>,
 }
 
 impl std::fmt::Debug for RemoteSessionUpstreamTransport {
@@ -669,36 +597,36 @@ impl std::fmt::Debug for RemoteSessionUpstreamTransport {
     }
 }
 
-struct RemoteSessionInit {
-    clock: RemoteClock,
-    session_id: String,
-    agent_id: String,
-    capabilities: Vec<RemoteSessionCapability>,
-    issued_capabilities: Vec<CapabilityToken>,
-    auth_context: SessionAuthContext,
-    auth_mode_fingerprint: String,
-    policy_fingerprint: String,
-    runtime_contract_fingerprint: String,
-    hosted_isolation: RemoteHostedIsolationMode,
-    lifecycle_policy: SessionLifecyclePolicy,
-    protocol_version: Option<String>,
-    peer_capabilities: Option<PeerCapabilities>,
-    initialize_params: Option<Value>,
-    lifecycle_snapshot: Option<RemoteSessionLifecycleSnapshot>,
-    input_tx: McpInboxSender,
-    event_tx: SessionEventBus,
-    retained_notification_events: Arc<StdMutex<VecDeque<RetainedRemoteSessionEvent>>>,
-    next_event_id: Arc<AtomicU64>,
-    session_db_path: Option<PathBuf>,
-    approval_redemption: Option<remote_mcp_approvals::ApprovalRedemption>,
-    session_store_lease: Option<Arc<RemoteSessionStoreLifecycleLease>>,
-    resume_hmac_keyring: Option<Arc<RemoteSessionHmacKeyring>>,
-    resume_generation: u64,
-    upstream_transport: Arc<dyn McpTransport>,
+pub(super) struct RemoteSessionInit {
+    pub(super) clock: RemoteClock,
+    pub(super) session_id: String,
+    pub(super) agent_id: String,
+    pub(super) capabilities: Vec<RemoteSessionCapability>,
+    pub(super) issued_capabilities: Vec<CapabilityToken>,
+    pub(super) auth_context: SessionAuthContext,
+    pub(super) auth_mode_fingerprint: String,
+    pub(super) policy_fingerprint: String,
+    pub(super) runtime_contract_fingerprint: String,
+    pub(super) hosted_isolation: RemoteHostedIsolationMode,
+    pub(super) lifecycle_policy: SessionLifecyclePolicy,
+    pub(super) protocol_version: Option<String>,
+    pub(super) peer_capabilities: Option<PeerCapabilities>,
+    pub(super) initialize_params: Option<Value>,
+    pub(super) lifecycle_snapshot: Option<RemoteSessionLifecycleSnapshot>,
+    pub(super) input_tx: McpInboxSender,
+    pub(super) event_tx: SessionEventBus,
+    pub(super) retained_notification_events: Arc<StdMutex<VecDeque<RetainedRemoteSessionEvent>>>,
+    pub(super) next_event_id: Arc<AtomicU64>,
+    pub(super) session_db_path: Option<PathBuf>,
+    pub(super) approval_redemption: Option<remote_mcp_approvals::ApprovalRedemption>,
+    pub(super) session_store_lease: Option<Arc<RemoteSessionStoreLifecycleLease>>,
+    pub(super) resume_hmac_keyring: Option<Arc<RemoteSessionHmacKeyring>>,
+    pub(super) resume_generation: u64,
+    pub(super) upstream_transport: Arc<dyn McpTransport>,
 }
 
-struct NotificationStreamAttachment {
-    session: Arc<RemoteSession>,
+pub(super) struct NotificationStreamAttachment {
+    pub(super) session: Arc<RemoteSession>,
 }
 
 impl Drop for NotificationStreamAttachment {
@@ -709,7 +637,7 @@ impl Drop for NotificationStreamAttachment {
 
 #[allow(clippy::enum_variant_names)]
 #[derive(Clone)]
-enum RemoteAuthMode {
+pub(super) enum RemoteAuthMode {
     StaticBearer {
         token: Arc<str>,
     },
@@ -732,7 +660,7 @@ impl std::fmt::Debug for RemoteAuthMode {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum JwtSignatureAlgorithm {
+pub(super) enum JwtSignatureAlgorithm {
     EdDsa,
     Rs256,
     Rs384,
@@ -745,88 +673,88 @@ enum JwtSignatureAlgorithm {
 }
 
 #[derive(Clone, Debug)]
-enum JwtVerificationKeySource {
+pub(super) enum JwtVerificationKeySource {
     Static(PublicKey),
     Jwks(JwtJwksKeySet),
 }
 
 #[derive(Clone)]
-struct JwtBearerVerifier {
-    clock: RemoteClock,
-    key_source: JwtVerificationKeySource,
-    issuer: Option<String>,
-    audience: Option<String>,
-    required_scopes: Vec<String>,
-    provider_profile: JwtProviderProfile,
-    enterprise_provider_registry: Option<Arc<EnterpriseProviderRegistry>>,
-    sender_dpop_nonce_store: Arc<DpopNonceStore>,
-    sender_dpop_config: DpopConfig,
+pub(super) struct JwtBearerVerifier {
+    pub(super) clock: RemoteClock,
+    pub(super) key_source: JwtVerificationKeySource,
+    pub(super) issuer: Option<String>,
+    pub(super) audience: Option<String>,
+    pub(super) required_scopes: Vec<String>,
+    pub(super) provider_profile: JwtProviderProfile,
+    pub(super) enterprise_provider_registry: Option<Arc<EnterpriseProviderRegistry>>,
+    pub(super) sender_dpop_nonce_store: Arc<DpopNonceStore>,
+    pub(super) sender_dpop_config: DpopConfig,
 }
 
 #[derive(Clone)]
-struct IntrospectionBearerVerifier {
-    clock: RemoteClock,
-    client: HttpClient,
-    introspection_url: Url,
-    client_id: Option<String>,
-    client_secret: Option<String>,
-    issuer: Option<String>,
-    audience: Option<String>,
-    required_scopes: Vec<String>,
-    provider_profile: JwtProviderProfile,
-    enterprise_provider_registry: Option<Arc<EnterpriseProviderRegistry>>,
-    sender_dpop_nonce_store: Arc<DpopNonceStore>,
-    sender_dpop_config: DpopConfig,
+pub(super) struct IntrospectionBearerVerifier {
+    pub(super) clock: RemoteClock,
+    pub(super) client: HttpClient,
+    pub(super) introspection_url: Url,
+    pub(super) client_id: Option<String>,
+    pub(super) client_secret: Option<String>,
+    pub(super) issuer: Option<String>,
+    pub(super) audience: Option<String>,
+    pub(super) required_scopes: Vec<String>,
+    pub(super) provider_profile: JwtProviderProfile,
+    pub(super) enterprise_provider_registry: Option<Arc<EnterpriseProviderRegistry>>,
+    pub(super) sender_dpop_nonce_store: Arc<DpopNonceStore>,
+    pub(super) sender_dpop_config: DpopConfig,
     /// Typed HTTP egress contract that gates every introspection-endpoint
     /// dispatch. Production deployments must populate this; without a
     /// contract the verifier substrate will fail closed if introspection is
     /// invoked.
     #[allow(dead_code)]
-    egress_contract: Option<HttpEgressContract>,
+    pub(super) egress_contract: Option<HttpEgressContract>,
 }
 
 #[derive(Clone)]
-struct ProtectedResourceMetadata {
-    resource: String,
-    resource_metadata_url: String,
-    authorization_servers: Vec<String>,
-    scopes_supported: Vec<String>,
-    chio_authorization_profile: Value,
+pub(super) struct ProtectedResourceMetadata {
+    pub(super) resource: String,
+    pub(super) resource_metadata_url: String,
+    pub(super) authorization_servers: Vec<String>,
+    pub(super) scopes_supported: Vec<String>,
+    pub(super) chio_authorization_profile: Value,
 }
 
 #[derive(Clone)]
-struct AuthorizationServerMetadata {
-    metadata_path: String,
-    document: Value,
+pub(super) struct AuthorizationServerMetadata {
+    pub(super) metadata_path: String,
+    pub(super) document: Value,
 }
 
 #[derive(Clone)]
-struct LocalAuthorizationServer {
-    clock: RemoteClock,
-    signing_key: Keypair,
-    issuer: String,
-    default_audience: String,
-    supported_scopes: Vec<String>,
-    subject: String,
-    code_ttl_secs: u64,
-    access_token_ttl_secs: u64,
-    codes: Arc<StdMutex<HashMap<String, AuthorizationCodeGrant>>>,
-    sender_dpop_nonce_store: Arc<DpopNonceStore>,
-    sender_dpop_config: DpopConfig,
+pub(super) struct LocalAuthorizationServer {
+    pub(super) clock: RemoteClock,
+    pub(super) signing_key: Keypair,
+    pub(super) issuer: String,
+    pub(super) default_audience: String,
+    pub(super) supported_scopes: Vec<String>,
+    pub(super) subject: String,
+    pub(super) code_ttl_secs: u64,
+    pub(super) access_token_ttl_secs: u64,
+    pub(super) codes: Arc<StdMutex<HashMap<String, AuthorizationCodeGrant>>>,
+    pub(super) sender_dpop_nonce_store: Arc<DpopNonceStore>,
+    pub(super) sender_dpop_config: DpopConfig,
 }
 
 impl RemoteAppState {
     // Retained for enterprise-provider validation paths shared with the local
     // trust-control surface even though the current remote flow does not call it.
     #[allow(dead_code)]
-    fn enterprise_provider_registry(&self) -> Option<&EnterpriseProviderRegistry> {
+    pub(super) fn enterprise_provider_registry(&self) -> Option<&EnterpriseProviderRegistry> {
         self.enterprise_provider_registry.as_deref()
     }
 
     // Retained for enterprise-provider validation paths shared with the local
     // trust-control surface even though the current remote flow does not call it.
     #[allow(dead_code)]
-    fn validated_enterprise_provider(
+    pub(super) fn validated_enterprise_provider(
         &self,
         provider_id: &str,
     ) -> Option<&EnterpriseProviderRecord> {
@@ -836,19 +764,19 @@ impl RemoteAppState {
 }
 
 #[derive(Clone, Debug)]
-struct AuthorizationCodeGrant {
-    deadline: AuthorityDeadline,
-    client_id: String,
-    redirect_uri: String,
-    resource: String,
-    scopes: Vec<String>,
-    subject: String,
-    code_challenge: String,
-    code_challenge_method: String,
-    expires_at: u64,
-    authorization_details: Option<Vec<GovernedAuthorizationDetail>>,
-    transaction_context: Option<GovernedAuthorizationTransactionContext>,
-    sender_constraint: Option<ChioSenderConstraintClaims>,
+pub(super) struct AuthorizationCodeGrant {
+    pub(super) deadline: AuthorityDeadline,
+    pub(super) client_id: String,
+    pub(super) redirect_uri: String,
+    pub(super) resource: String,
+    pub(super) scopes: Vec<String>,
+    pub(super) subject: String,
+    pub(super) code_challenge: String,
+    pub(super) code_challenge_method: String,
+    pub(super) expires_at: u64,
+    pub(super) authorization_details: Option<Vec<GovernedAuthorizationDetail>>,
+    pub(super) transaction_context: Option<GovernedAuthorizationTransactionContext>,
+    pub(super) sender_constraint: Option<ChioSenderConstraintClaims>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -856,25 +784,25 @@ struct AuthorizationCodeGrant {
     rename_all = "camelCase",
     try_from = "sender_constraint::ConfirmationWire"
 )]
-struct ChioSenderConstraintClaims {
+pub(super) struct ChioSenderConstraintClaims {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
         rename = "chioSenderKey"
     )]
-    chio_sender_key: Option<String>,
+    pub(super) chio_sender_key: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "x5t#S256")]
-    mtls_thumbprint_sha256: Option<String>,
+    pub(super) mtls_thumbprint_sha256: Option<String>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
         rename = "chioAttestationSha256"
     )]
-    chio_attestation_sha256: Option<String>,
+    pub(super) chio_attestation_sha256: Option<String>,
 }
 
 impl ChioSenderConstraintClaims {
-    fn is_empty(&self) -> bool {
+    pub(super) fn is_empty(&self) -> bool {
         self.chio_sender_key.is_none()
             && self.mtls_thumbprint_sha256.is_none()
             && self.chio_attestation_sha256.is_none()
@@ -882,143 +810,143 @@ impl ChioSenderConstraintClaims {
 }
 
 #[derive(Clone, Debug)]
-struct JwtJwksKeySet {
-    keys_by_kid: HashMap<String, JwtResolvedJwkPublicKey>,
-    anonymous_keys: Vec<JwtResolvedJwkPublicKey>,
+pub(super) struct JwtJwksKeySet {
+    pub(super) keys_by_kid: HashMap<String, JwtResolvedJwkPublicKey>,
+    pub(super) anonymous_keys: Vec<JwtResolvedJwkPublicKey>,
 }
 
 #[derive(Clone, Debug)]
-struct DiscoveredIdentityProvider {
-    issuer: String,
-    authorization_endpoint: Option<String>,
-    token_endpoint: Option<String>,
-    registration_endpoint: Option<String>,
-    jwks_uri: Option<String>,
-    jwks_keys: Option<JwtJwksKeySet>,
+pub(super) struct DiscoveredIdentityProvider {
+    pub(super) issuer: String,
+    pub(super) authorization_endpoint: Option<String>,
+    pub(super) token_endpoint: Option<String>,
+    pub(super) registration_endpoint: Option<String>,
+    pub(super) jwks_uri: Option<String>,
+    pub(super) jwks_keys: Option<JwtJwksKeySet>,
 }
 
 #[derive(Debug, Deserialize)]
-struct JwtHeader {
-    alg: String,
+pub(super) struct JwtHeader {
+    pub(super) alg: String,
     #[serde(default)]
-    kid: Option<String>,
+    pub(super) kid: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
-struct JwtClaims {
+pub(super) struct JwtClaims {
     #[serde(default)]
-    iss: Option<String>,
+    pub(super) iss: Option<String>,
     #[serde(default)]
-    sub: Option<String>,
+    pub(super) sub: Option<String>,
     #[serde(default)]
-    aud: Option<JwtAudience>,
+    pub(super) aud: Option<JwtAudience>,
     #[serde(default)]
-    scope: Option<String>,
+    pub(super) scope: Option<String>,
     #[serde(default)]
-    scp: Vec<String>,
+    pub(super) scp: Vec<String>,
     #[serde(default)]
-    client_id: Option<String>,
+    pub(super) client_id: Option<String>,
     #[serde(default)]
-    jti: Option<String>,
+    pub(super) jti: Option<String>,
     #[serde(default)]
-    oid: Option<String>,
+    pub(super) oid: Option<String>,
     #[serde(default)]
-    azp: Option<String>,
+    pub(super) azp: Option<String>,
     #[serde(default)]
-    appid: Option<String>,
+    pub(super) appid: Option<String>,
     #[serde(default)]
-    tid: Option<String>,
+    pub(super) tid: Option<String>,
     #[serde(default)]
-    tenant_id: Option<String>,
+    pub(super) tenant_id: Option<String>,
     #[serde(default)]
-    org_id: Option<String>,
+    pub(super) org_id: Option<String>,
     #[serde(default)]
-    organization_id: Option<String>,
+    pub(super) organization_id: Option<String>,
     #[serde(default, deserialize_with = "deserialize_string_vec")]
-    groups: Vec<String>,
+    pub(super) groups: Vec<String>,
     #[serde(default, deserialize_with = "deserialize_string_vec")]
-    roles: Vec<String>,
+    pub(super) roles: Vec<String>,
     #[serde(default)]
-    resource: Option<String>,
+    pub(super) resource: Option<String>,
     #[serde(default)]
-    authorization_details: Option<Value>,
+    pub(super) authorization_details: Option<Value>,
     #[serde(default)]
-    chio_transaction_context: Option<Value>,
+    pub(super) chio_transaction_context: Option<Value>,
     #[serde(
         default,
         deserialize_with = "sender_constraint::deserialize_confirmation"
     )]
-    cnf: Option<ChioSenderConstraintClaims>,
+    pub(super) cnf: Option<ChioSenderConstraintClaims>,
     #[serde(default)]
-    exp: Option<u64>,
+    pub(super) exp: Option<u64>,
     #[serde(default)]
-    nbf: Option<u64>,
+    pub(super) nbf: Option<u64>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
-enum JwtAudience {
+pub(super) enum JwtAudience {
     Single(String),
     Multiple(Vec<String>),
 }
 
 #[derive(Debug, Deserialize)]
-struct OidcDiscoveryDocument {
-    issuer: String,
+pub(super) struct OidcDiscoveryDocument {
+    pub(super) issuer: String,
     #[serde(default)]
-    authorization_endpoint: Option<String>,
+    pub(super) authorization_endpoint: Option<String>,
     #[serde(default)]
-    token_endpoint: Option<String>,
+    pub(super) token_endpoint: Option<String>,
     #[serde(default)]
-    registration_endpoint: Option<String>,
+    pub(super) registration_endpoint: Option<String>,
     #[serde(default)]
-    jwks_uri: Option<String>,
+    pub(super) jwks_uri: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
-struct OAuthIntrospectionResponse {
-    active: bool,
+pub(super) struct OAuthIntrospectionResponse {
+    pub(super) active: bool,
     #[serde(default)]
-    token_type: Option<String>,
+    pub(super) token_type: Option<String>,
     #[serde(flatten)]
-    claims: JwtClaims,
+    pub(super) claims: JwtClaims,
 }
 
 #[derive(Debug, Deserialize)]
-struct JwksDocument {
+pub(super) struct JwksDocument {
     #[serde(default)]
-    keys: Vec<JwkDocumentKey>,
+    pub(super) keys: Vec<JwkDocumentKey>,
 }
 
 #[derive(Debug, Deserialize)]
-struct JwkDocumentKey {
-    kty: String,
+pub(super) struct JwkDocumentKey {
+    pub(super) kty: String,
     #[serde(default)]
-    crv: Option<String>,
+    pub(super) crv: Option<String>,
     #[serde(default)]
-    alg: Option<String>,
+    pub(super) alg: Option<String>,
     #[serde(default, rename = "use")]
-    key_use: Option<String>,
+    pub(super) key_use: Option<String>,
     #[serde(default)]
-    kid: Option<String>,
+    pub(super) kid: Option<String>,
     #[serde(default)]
-    x: Option<String>,
+    pub(super) x: Option<String>,
     #[serde(default)]
-    y: Option<String>,
+    pub(super) y: Option<String>,
     #[serde(default)]
-    n: Option<String>,
+    pub(super) n: Option<String>,
     #[serde(default)]
-    e: Option<String>,
+    pub(super) e: Option<String>,
 }
 
 #[derive(Clone, Debug)]
-struct JwtResolvedJwkPublicKey {
-    key: JwtResolvedPublicKey,
-    alg_hint: Option<String>,
+pub(super) struct JwtResolvedJwkPublicKey {
+    pub(super) key: JwtResolvedPublicKey,
+    pub(super) alg_hint: Option<String>,
 }
 
 #[derive(Clone, Debug)]
-enum JwtResolvedPublicKey {
+pub(super) enum JwtResolvedPublicKey {
     Ed25519(PublicKey),
     Rsa(JwtRsaPublicKey),
     P256(P256VerifyingKey),
@@ -1026,30 +954,30 @@ enum JwtResolvedPublicKey {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct RemoteSessionCapability {
-    id: String,
-    issuer_public_key: String,
-    subject_public_key: String,
+pub(super) struct RemoteSessionCapability {
+    pub(super) id: String,
+    pub(super) issuer_public_key: String,
+    pub(super) subject_public_key: String,
 }
 
 #[path = "session_core/authority_mode.rs"]
-mod session_core_authority_mode;
+pub(super) mod session_core_authority_mode;
 #[path = "session_core/events.rs"]
-mod session_core_events;
-use session_core_events::{RequestEvents, RequestEventsError, SessionEventBus};
+pub(super) mod session_core_events;
+pub(super) use session_core_events::{RequestEvents, RequestEventsError, SessionEventBus};
 #[path = "session_core/factory.rs"]
-mod session_core_factory;
+pub(super) mod session_core_factory;
 #[path = "session_core/ledger.rs"]
-mod session_core_ledger;
+pub(super) mod session_core_ledger;
 #[path = "session_core/session.rs"]
-mod session_core_session;
+pub(super) mod session_core_session;
 
 #[path = "session_core/writer.rs"]
-mod session_core_writer;
-use session_core_writer::BroadcastJsonRpcWriter;
+pub(super) mod session_core_writer;
+pub(super) use session_core_writer::BroadcastJsonRpcWriter;
 
 impl RemoteServeHttpConfig {
-    fn lifecycle_policy(&self) -> SessionLifecyclePolicy {
+    pub(super) fn lifecycle_policy(&self) -> SessionLifecyclePolicy {
         #[cfg(test)]
         if let Some(policy) = &self.test_lifecycle_policy {
             return policy.clone();

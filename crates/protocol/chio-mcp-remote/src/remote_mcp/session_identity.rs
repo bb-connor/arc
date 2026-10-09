@@ -1,4 +1,6 @@
-fn canonicalize_federated_issuer(issuer: &str) -> String {
+use super::*;
+
+pub(super) fn canonicalize_federated_issuer(issuer: &str) -> String {
     let trimmed = issuer.trim();
     match Url::parse(trimmed) {
         Ok(url) => url.to_string().trim_end_matches('/').to_string(),
@@ -7,7 +9,7 @@ fn canonicalize_federated_issuer(issuer: &str) -> String {
 }
 
 impl JwtSignatureAlgorithm {
-    fn from_header(
+    pub(super) fn from_header(
         header: &JwtHeader,
         protected_resource_metadata: Option<&ProtectedResourceMetadata>,
     ) -> Result<Self, Response> {
@@ -28,7 +30,7 @@ impl JwtSignatureAlgorithm {
         }
     }
 
-    fn as_str(self) -> &'static str {
+    pub(super) fn as_str(self) -> &'static str {
         match self {
             Self::EdDsa => "EdDSA",
             Self::Rs256 => "RS256",
@@ -43,7 +45,7 @@ impl JwtSignatureAlgorithm {
     }
 }
 
-fn verify_ed25519_jwt_signature(
+pub(super) fn verify_ed25519_jwt_signature(
     public_key: &PublicKey,
     signed_input: &[u8],
     signature_bytes: &[u8],
@@ -56,7 +58,7 @@ fn verify_ed25519_jwt_signature(
     public_key.verify(signed_input, &Ed25519Signature::from_bytes(&signature))
 }
 
-fn validate_identity_provider_url(url: &Url, field_name: &str) -> Result<(), CliError> {
+pub(super) fn validate_identity_provider_url(url: &Url, field_name: &str) -> Result<(), CliError> {
     let scheme = url.scheme();
     let host = url.host_str().unwrap_or_default();
     let localhost = matches!(host, "localhost" | "127.0.0.1" | "::1");
@@ -69,7 +71,7 @@ fn validate_identity_provider_url(url: &Url, field_name: &str) -> Result<(), Cli
     }
 }
 
-fn parse_identity_provider_url(value: &str, field_name: &str) -> Result<Url, CliError> {
+pub(super) fn parse_identity_provider_url(value: &str, field_name: &str) -> Result<Url, CliError> {
     let url = Url::parse(value).map_err(|error| {
         CliError::cli_other_error(format!("{field_name} is not a valid URL: {error}"))
     })?;
@@ -77,7 +79,7 @@ fn parse_identity_provider_url(value: &str, field_name: &str) -> Result<Url, Cli
     Ok(url)
 }
 
-fn derive_oidc_discovery_url_from_issuer(issuer: &str) -> Result<Url, CliError> {
+pub(super) fn derive_oidc_discovery_url_from_issuer(issuer: &str) -> Result<Url, CliError> {
     let issuer = parse_identity_provider_url(issuer, "--auth-jwt-issuer")?;
     let mut path = issuer.path().trim_end_matches('/').to_string();
     path.push_str("/.well-known/openid-configuration");
@@ -108,7 +110,7 @@ pub fn enforce_oidc_egress_contract(
         })
 }
 
-async fn fetch_identity_provider_json<T: DeserializeOwned>(
+pub(super) async fn fetch_identity_provider_json<T: DeserializeOwned>(
     url: &Url,
     field_name: &str,
     egress_contract: Option<&HttpEgressContract>,
@@ -149,7 +151,7 @@ async fn fetch_identity_provider_json<T: DeserializeOwned>(
     })
 }
 
-fn resolve_identity_provider_discovery_url(
+pub(super) fn resolve_identity_provider_discovery_url(
     config: &RemoteServeHttpConfig,
 ) -> Result<Option<Url>, CliError> {
     if let Some(discovery_url) = config.auth_jwt_discovery_url.as_deref() {
@@ -167,7 +169,7 @@ fn resolve_identity_provider_discovery_url(
     Ok(None)
 }
 
-async fn resolve_jwks_key_set(
+pub(super) async fn resolve_jwks_key_set(
     jwks_uri: &Url,
     field_name: &str,
     egress_contract: Option<&HttpEgressContract>,
@@ -207,7 +209,7 @@ async fn resolve_jwks_key_set(
     })
 }
 
-fn decode_jwk_component(
+pub(super) fn decode_jwk_component(
     value: &str,
     component_name: &str,
     jwks_uri: &Url,
@@ -221,7 +223,7 @@ fn decode_jwk_component(
     })
 }
 
-fn decode_fixed_jwk_component<const N: usize>(
+pub(super) fn decode_fixed_jwk_component<const N: usize>(
     value: &str,
     component_name: &str,
     jwks_uri: &Url,
@@ -241,7 +243,7 @@ fn decode_fixed_jwk_component<const N: usize>(
     Ok(out)
 }
 
-fn resolve_jwk_public_key(
+pub(super) fn resolve_jwk_public_key(
     key: JwkDocumentKey,
     jwks_uri: &Url,
     field_name: &str,
@@ -316,7 +318,7 @@ fn resolve_jwk_public_key(
     }))
 }
 
-async fn resolve_discovered_identity_provider(
+pub(super) async fn resolve_discovered_identity_provider(
     config: &RemoteServeHttpConfig,
 ) -> Result<Option<DiscoveredIdentityProvider>, CliError> {
     let Some(discovery_url) = resolve_identity_provider_discovery_url(config)? else {
@@ -371,7 +373,7 @@ async fn resolve_discovered_identity_provider(
     }))
 }
 
-fn build_federated_principal(
+pub(super) fn build_federated_principal(
     claims: &JwtClaims,
     expected_issuer: Option<&str>,
     protected_resource_metadata: Option<&ProtectedResourceMetadata>,
@@ -425,7 +427,7 @@ fn build_federated_principal(
     }
 }
 
-fn build_federated_claims(
+pub(super) fn build_federated_claims(
     claims: &JwtClaims,
     _provider_profile: JwtProviderProfile,
 ) -> Result<OAuthBearerFederatedClaims, chio_core::Error> {
@@ -453,7 +455,7 @@ fn build_federated_claims(
     })
 }
 
-fn matched_bearer_enterprise_provider<'a>(
+pub(super) fn matched_bearer_enterprise_provider<'a>(
     registry: Option<&'a EnterpriseProviderRegistry>,
     issuer: Option<&str>,
     kind: EnterpriseProviderKind,
@@ -471,7 +473,10 @@ fn matched_bearer_enterprise_provider<'a>(
     })
 }
 
-fn derive_enterprise_subject_key(provider_scope: &str, canonical_principal: &str) -> String {
+pub(super) fn derive_enterprise_subject_key(
+    provider_scope: &str,
+    canonical_principal: &str,
+) -> String {
     let mut hasher = Sha256::new();
     hasher.update(IDENTITY_FEDERATION_DERIVATION_LABEL);
     hasher.update([1u8]);
@@ -482,7 +487,7 @@ fn derive_enterprise_subject_key(provider_scope: &str, canonical_principal: &str
     sha256_hex(digest.as_slice())
 }
 
-fn build_enterprise_identity_context(
+pub(super) fn build_enterprise_identity_context(
     claims: &JwtClaims,
     federated_claims: &OAuthBearerFederatedClaims,
     principal: &str,
@@ -565,7 +570,7 @@ fn build_enterprise_identity_context(
     }
 }
 
-fn enterprise_provider_kind_name(kind: &EnterpriseProviderKind) -> &'static str {
+pub(super) fn enterprise_provider_kind_name(kind: &EnterpriseProviderKind) -> &'static str {
     match kind {
         EnterpriseProviderKind::OidcJwks => "oidc_jwks",
         EnterpriseProviderKind::OauthIntrospection => "oauth_introspection",
@@ -574,7 +579,9 @@ fn enterprise_provider_kind_name(kind: &EnterpriseProviderKind) -> &'static str 
     }
 }
 
-fn enterprise_federation_method(kind: &EnterpriseProviderKind) -> EnterpriseFederationMethod {
+pub(super) fn enterprise_federation_method(
+    kind: &EnterpriseProviderKind,
+) -> EnterpriseFederationMethod {
     match kind {
         EnterpriseProviderKind::OidcJwks => EnterpriseFederationMethod::Jwt,
         EnterpriseProviderKind::OauthIntrospection => EnterpriseFederationMethod::Introspection,
@@ -583,7 +590,7 @@ fn enterprise_federation_method(kind: &EnterpriseProviderKind) -> EnterpriseFede
     }
 }
 
-fn bearer_principal_source_field(
+pub(super) fn bearer_principal_source_field(
     claims: &JwtClaims,
     provider_profile: JwtProviderProfile,
 ) -> Option<&'static str> {
@@ -615,7 +622,7 @@ fn bearer_principal_source_field(
     }
 }
 
-fn bearer_client_id_source_field(claims: &JwtClaims) -> Option<&'static str> {
+pub(super) fn bearer_client_id_source_field(claims: &JwtClaims) -> Option<&'static str> {
     if claims.client_id.is_some() {
         Some("client_id")
     } else if claims.azp.is_some() {
@@ -627,7 +634,7 @@ fn bearer_client_id_source_field(claims: &JwtClaims) -> Option<&'static str> {
     }
 }
 
-fn bearer_tenant_source_field(claims: &JwtClaims) -> Option<&'static str> {
+pub(super) fn bearer_tenant_source_field(claims: &JwtClaims) -> Option<&'static str> {
     if claims.tid.is_some() {
         Some("tid")
     } else if claims.tenant_id.is_some() {
@@ -637,7 +644,7 @@ fn bearer_tenant_source_field(claims: &JwtClaims) -> Option<&'static str> {
     }
 }
 
-fn bearer_organization_source_field(claims: &JwtClaims) -> Option<&'static str> {
+pub(super) fn bearer_organization_source_field(claims: &JwtClaims) -> Option<&'static str> {
     if claims.org_id.is_some() {
         Some("org_id")
     } else if claims.organization_id.is_some() {
@@ -647,7 +654,7 @@ fn bearer_organization_source_field(claims: &JwtClaims) -> Option<&'static str> 
     }
 }
 
-fn normalize_claim_list(values: &[String]) -> Vec<String> {
+pub(super) fn normalize_claim_list(values: &[String]) -> Vec<String> {
     let mut normalized = values
         .iter()
         .map(|value| value.trim())
@@ -659,7 +666,7 @@ fn normalize_claim_list(values: &[String]) -> Vec<String> {
     normalized
 }
 
-fn deserialize_string_vec<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+pub(super) fn deserialize_string_vec<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -678,7 +685,7 @@ where
     })
 }
 
-fn derive_federated_agent_keypair(
+pub(super) fn derive_federated_agent_keypair(
     seed_path: &FsPath,
     federated_principal: &str,
 ) -> Result<Keypair, CliError> {

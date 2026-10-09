@@ -23,7 +23,7 @@ fn lock_routes(
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum RequestRouteError {
+pub(crate) enum RequestRouteError {
     Duplicate,
 }
 
@@ -39,36 +39,36 @@ impl From<RequestRouteError> for CliError {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum RequestEventsError {
+pub(crate) enum RequestEventsError {
     Closed,
 }
 
 #[derive(Clone, Debug)]
-pub(super) struct SessionEventBus {
+pub(crate) struct SessionEventBus {
     broadcast: broadcast::Sender<RemoteSessionEvent>,
     routes: RouteTable,
 }
 
 impl SessionEventBus {
-    pub(super) fn new(capacity: usize) -> Self {
+    pub(crate) fn new(capacity: usize) -> Self {
         Self {
             broadcast: broadcast::channel(capacity).0,
             routes: Arc::new(StdMutex::new(Vec::new())),
         }
     }
 
-    pub(super) fn subscribe(&self) -> broadcast::Receiver<RemoteSessionEvent> {
+    pub(crate) fn subscribe(&self) -> broadcast::Receiver<RemoteSessionEvent> {
         self.broadcast.subscribe()
     }
 
     #[cfg(test)]
-    pub(super) fn receiver_count(&self) -> usize {
+    pub(crate) fn receiver_count(&self) -> usize {
         self.broadcast.receiver_count()
     }
 
     /// Registers the lossless route for one admitted request. A generation that
     /// already has a live route is refused.
-    pub(super) fn register_request(
+    pub(crate) fn register_request(
         &self,
         generation: McpRequestGeneration,
     ) -> Result<RequestEvents, RequestRouteError> {
@@ -87,7 +87,7 @@ impl SessionEventBus {
 
     /// Request-correlated events reach their registered route before the
     /// observer broadcast, so a lagging observer cannot affect them.
-    pub(super) fn send(
+    pub(crate) fn send(
         &self,
         event: RemoteSessionEvent,
     ) -> Result<usize, broadcast::error::SendError<RemoteSessionEvent>> {
@@ -104,21 +104,19 @@ impl SessionEventBus {
 }
 
 /// Receiving half of one request's route. Dropping it removes the route.
-pub(super) struct RequestEvents {
+pub(crate) struct RequestEvents {
     generation: McpRequestGeneration,
     rx: mpsc::UnboundedReceiver<RemoteSessionEvent>,
     routes: RouteTable,
 }
 
 impl RequestEvents {
-    pub(super) async fn recv(&mut self) -> Result<RemoteSessionEvent, RequestEventsError> {
+    pub(crate) async fn recv(&mut self) -> Result<RemoteSessionEvent, RequestEventsError> {
         self.rx.recv().await.ok_or(RequestEventsError::Closed)
     }
 
-    pub(super) fn try_recv(&mut self) -> Result<RemoteSessionEvent, RequestEventsError> {
-        self.rx
-            .try_recv()
-            .map_err(|_| RequestEventsError::Closed)
+    pub(crate) fn try_recv(&mut self) -> Result<RemoteSessionEvent, RequestEventsError> {
+        self.rx.try_recv().map_err(|_| RequestEventsError::Closed)
     }
 }
 

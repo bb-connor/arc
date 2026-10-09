@@ -3,18 +3,18 @@ use chio_test_support::ctx::TestUnwrap;
 
 use super::*;
 
-pub(super) fn pkce_s256(verifier: &str) -> String {
+pub(crate) fn pkce_s256(verifier: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(verifier.as_bytes());
     URL_SAFE_NO_PAD.encode(hasher.finalize())
 }
 
-pub(super) fn generate_authorization_code() -> String {
+pub(crate) fn generate_authorization_code() -> String {
     let entropy = Keypair::generate().public_key().to_hex();
     format!("code-{}", sha256_hex(entropy.as_bytes()))
 }
 
-pub(super) fn sign_jwt(keypair: &Keypair, claims: &serde_json::Value) -> Result<String, Response> {
+pub(crate) fn sign_jwt(keypair: &Keypair, claims: &serde_json::Value) -> Result<String, Response> {
     let encode = |value: &Value| {
         canonical_json_bytes(value)
             .map(|bytes| URL_SAFE_NO_PAD.encode(bytes))
@@ -37,12 +37,12 @@ pub(super) fn sign_jwt(keypair: &Keypair, claims: &serde_json::Value) -> Result<
     Ok(format!("{signing_input}.{signature}"))
 }
 
-pub(super) fn jwk_key_id(public_key: &PublicKey) -> String {
+pub(crate) fn jwk_key_id(public_key: &PublicKey) -> String {
     let hex = public_key.to_hex();
     format!("chio-{}", &hex[..hex.len().min(16)])
 }
 
-pub(super) fn redirect_oauth_error(
+pub(crate) fn redirect_oauth_error(
     redirect_uri: &str,
     error: OAuthError,
     description: &str,
@@ -66,7 +66,7 @@ pub(super) fn redirect_oauth_error(
     )
 }
 
-pub(super) fn oauth_token_error(
+pub(crate) fn oauth_token_error(
     status: StatusCode,
     error: OAuthError,
     description: &str,
@@ -85,7 +85,7 @@ pub(super) fn oauth_token_error(
     crate::input::with_source(response, OAuthRejection::new(error, description))
 }
 
-pub(super) fn html_escape(value: &str) -> String {
+pub(crate) fn html_escape(value: &str) -> String {
     value
         .replace('&', "&amp;")
         .replace('<', "&lt;")
@@ -95,15 +95,15 @@ pub(super) fn html_escape(value: &str) -> String {
 }
 
 #[cfg(test)]
-pub(super) fn unix_now() -> u64 {
+pub(crate) fn unix_now() -> u64 {
     RemoteClock::default().seconds().test_unwrap("test clock")
 }
 #[cfg(test)]
-pub(super) fn session_now_millis() -> u64 {
+pub(crate) fn session_now_millis() -> u64 {
     RemoteClock::default().millis().test_unwrap("test clock")
 }
 
-pub(super) fn read_session_lifecycle_policy() -> SessionLifecyclePolicy {
+pub(crate) fn read_session_lifecycle_policy() -> SessionLifecyclePolicy {
     SessionLifecyclePolicy {
         idle_expiry_millis: read_env_u64(
             SESSION_IDLE_EXPIRY_ENV,
@@ -124,7 +124,7 @@ pub(super) fn read_session_lifecycle_policy() -> SessionLifecyclePolicy {
     }
 }
 
-pub(super) fn read_env_u64(name: &str, default: u64) -> u64 {
+pub(crate) fn read_env_u64(name: &str, default: u64) -> u64 {
     std::env::var(name)
         .ok()
         .and_then(|value| value.parse::<u64>().ok())
@@ -132,7 +132,7 @@ pub(super) fn read_env_u64(name: &str, default: u64) -> u64 {
         .unwrap_or(default)
 }
 
-pub(super) fn terminal_session_response(state: RemoteSessionState) -> Response {
+pub(crate) fn terminal_session_response(state: RemoteSessionState) -> Response {
     match state {
         RemoteSessionState::Initializing => {
             plain_http_error(StatusCode::CONFLICT, "MCP session is still initializing")
@@ -160,11 +160,11 @@ pub(super) fn terminal_session_response(state: RemoteSessionState) -> Response {
     }
 }
 
-pub(super) fn plain_http_error(status: StatusCode, message: &str) -> Response {
+pub(crate) fn plain_http_error(status: StatusCode, message: &str) -> Response {
     (status, message.to_string()).into_response()
 }
 
-pub(super) fn jsonrpc_http_error(status: StatusCode, code: i64, message: &str) -> Response {
+pub(crate) fn jsonrpc_http_error(status: StatusCode, code: i64, message: &str) -> Response {
     let mut response = (
         status,
         Json(json!({

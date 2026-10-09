@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) fn validate_authorization_request(
+pub(crate) fn validate_authorization_request(
     clock: &RemoteClock,
     request: &AuthorizationRequest,
     supported_scopes: &[String],
@@ -63,7 +63,7 @@ pub(super) fn validate_authorization_request(
     Ok(resource)
 }
 
-pub(super) fn validate_redirect_uri(redirect_uri: &str) -> Result<(), Response> {
+pub(crate) fn validate_redirect_uri(redirect_uri: &str) -> Result<(), Response> {
     let redirect = Url::parse(redirect_uri).map_err(|source| {
         crate::input::with_source(
             oauth_token_error(
@@ -93,7 +93,7 @@ pub(super) fn validate_redirect_uri(redirect_uri: &str) -> Result<(), Response> 
     }
 }
 
-pub(super) fn resolve_requested_scopes(
+pub(crate) fn resolve_requested_scopes(
     requested_scope: Option<&str>,
     supported_scopes: &[String],
 ) -> Result<Vec<String>, Response> {
@@ -125,7 +125,7 @@ pub(super) fn resolve_requested_scopes(
     }
 }
 
-pub(super) fn resolve_exchange_scopes(
+pub(crate) fn resolve_exchange_scopes(
     requested_scope: Option<&str>,
     subject_scopes: &[String],
     supported_scopes: &[String],

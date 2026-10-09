@@ -1,3 +1,5 @@
+use super::*;
+
 pub fn serve_http(config: RemoteServeHttpConfig) -> Result<(), CliError> {
     let runtime = tokio::runtime::Runtime::new().map_err(|error| {
         CliError::cli_other_error(format!("failed to start async runtime: {error}"))
@@ -5,9 +7,9 @@ pub fn serve_http(config: RemoteServeHttpConfig) -> Result<(), CliError> {
     runtime.block_on(async move { serve_http_async(config).await })
 }
 
-const MCP_MAX_POST_BODY_BYTES: usize = 8 * 1024 * 1024;
+pub(super) const MCP_MAX_POST_BODY_BYTES: usize = 8 * 1024 * 1024;
 
-fn load_enterprise_provider_registry(
+pub(super) fn load_enterprise_provider_registry(
     path: Option<&FsPath>,
     surface: &str,
 ) -> Result<Option<Arc<EnterpriseProviderRegistry>>, CliError> {
@@ -28,7 +30,7 @@ fn load_enterprise_provider_registry(
     Ok(Some(Arc::new(registry)))
 }
 
-async fn serve_http_async(mut config: RemoteServeHttpConfig) -> Result<(), CliError> {
+pub(super) async fn serve_http_async(mut config: RemoteServeHttpConfig) -> Result<(), CliError> {
     let transport =
         chio_control_plane::server_transport::prepare(&config.transport, config.listen)?;
     let tls = transport.is_tls();
@@ -215,12 +217,12 @@ async fn serve_http_async(mut config: RemoteServeHttpConfig) -> Result<(), CliEr
     .map_err(|error| CliError::cli_other_error(format!("remote MCP edge server failed: {error}")))
 }
 
-async fn touch_off_runtime(session: &Arc<RemoteSession>) -> Result<(), CliError> {
+pub(super) async fn touch_off_runtime(session: &Arc<RemoteSession>) -> Result<(), CliError> {
     let session = session.clone();
     blocking_cli(move || session.touch()).await
 }
 
-type AdmittedRequest = (
+pub(super) type AdmittedRequest = (
     RequestEvents,
     Option<Box<remote_mcp_session_credentials::CredentialCall>>,
 );
@@ -228,7 +230,7 @@ type AdmittedRequest = (
 /// Synchronous admission for one request: credential reservation, route
 /// registration, enqueue, and the exact rollback of a reservation that was not
 /// enqueued.
-fn admit_request(
+pub(super) fn admit_request(
     state: &RemoteAppState,
     session: &Arc<RemoteSession>,
     credential: Option<&remote_mcp_session_credentials::SessionCredential>,
@@ -260,7 +262,7 @@ fn admit_request(
     }
 }
 
-async fn fail_closed_session_after_persistence_error(
+pub(super) async fn fail_closed_session_after_persistence_error(
     state: &RemoteAppState,
     session: &Arc<RemoteSession>,
     persistence_error: CliError,
@@ -303,7 +305,7 @@ async fn fail_closed_session_after_persistence_error(
     )
 }
 
-async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> Response {
+pub(super) async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> Response {
     if let Err(response) = validate_origin(request.headers()) {
         return response;
     }
@@ -626,7 +628,7 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
     response_with_mode(Sse::new(stream).into_response(), "post_request_sse")
 }
 
-async fn handle_initialize_post(
+pub(super) async fn handle_initialize_post(
     state: RemoteAppState,
     auth_context: SessionAuthContext,
     headers: &HeaderMap,
@@ -719,7 +721,7 @@ async fn handle_initialize_post(
     }
 }
 
-fn sse_response_from_events(
+pub(super) fn sse_response_from_events(
     session: &RemoteSession,
     buffered_events: Vec<RemoteSessionEvent>,
     session_header: Option<&str>,
@@ -754,7 +756,7 @@ fn sse_response_from_events(
     response_with_mode(response, response_mode)
 }
 
-async fn handle_get(State(state): State<RemoteAppState>, request: Request) -> Response {
+pub(super) async fn handle_get(State(state): State<RemoteAppState>, request: Request) -> Response {
     if let Err(response) = validate_origin(request.headers()) {
         return response;
     }
@@ -889,7 +891,9 @@ async fn handle_get(State(state): State<RemoteAppState>, request: Request) -> Re
     )
 }
 
-async fn handle_protected_resource_metadata(State(state): State<RemoteAppState>) -> Response {
+pub(super) async fn handle_protected_resource_metadata(
+    State(state): State<RemoteAppState>,
+) -> Response {
     let Some(metadata) = state.protected_resource_metadata.as_deref() else {
         return plain_http_error(
             StatusCode::NOT_FOUND,
@@ -907,7 +911,7 @@ async fn handle_protected_resource_metadata(State(state): State<RemoteAppState>)
     .into_response()
 }
 
-async fn handle_authorization_server_metadata(
+pub(super) async fn handle_authorization_server_metadata(
     State(state): State<RemoteAppState>,
     request: Request,
 ) -> Response {
@@ -927,7 +931,7 @@ async fn handle_authorization_server_metadata(
     Json(metadata.document.clone()).into_response()
 }
 
-async fn handle_authorization_endpoint(
+pub(super) async fn handle_authorization_endpoint(
     State(state): State<RemoteAppState>,
     Query(request): Query<AuthorizationRequest>,
 ) -> Response {
@@ -943,7 +947,7 @@ async fn handle_authorization_endpoint(
     }
 }
 
-async fn handle_authorization_approval(
+pub(super) async fn handle_authorization_approval(
     State(state): State<RemoteAppState>,
     Form(form): Form<AuthorizationApprovalForm>,
 ) -> Response {
@@ -959,7 +963,7 @@ async fn handle_authorization_approval(
     }
 }
 
-async fn handle_token_endpoint(
+pub(super) async fn handle_token_endpoint(
     State(state): State<RemoteAppState>,
     headers: HeaderMap,
     transport: Option<axum::Extension<TransportIdentity>>,
@@ -980,7 +984,7 @@ async fn handle_token_endpoint(
     }
 }
 
-async fn handle_local_jwks(State(state): State<RemoteAppState>) -> Response {
+pub(super) async fn handle_local_jwks(State(state): State<RemoteAppState>) -> Response {
     let Some(auth_server) = state.local_auth_server.as_deref() else {
         return plain_http_error(
             StatusCode::NOT_FOUND,
@@ -990,7 +994,10 @@ async fn handle_local_jwks(State(state): State<RemoteAppState>) -> Response {
     Json(auth_server.jwks()).into_response()
 }
 
-async fn handle_delete(State(state): State<RemoteAppState>, request: Request) -> Response {
+pub(super) async fn handle_delete(
+    State(state): State<RemoteAppState>,
+    request: Request,
+) -> Response {
     if let Err(response) = validate_origin(request.headers()) {
         return response;
     }
@@ -1052,7 +1059,7 @@ async fn handle_delete(State(state): State<RemoteAppState>, request: Request) ->
     StatusCode::NO_CONTENT.into_response()
 }
 
-fn is_initialize_request(message: &Value) -> bool {
+pub(super) fn is_initialize_request(message: &Value) -> bool {
     message.get("method").and_then(Value::as_str) == Some("initialize")
 }
 
@@ -1060,9 +1067,14 @@ fn is_initialize_request(message: &Value) -> bool {
 /// member. `None` for any other method or a body that does not parse; those
 /// keep the accounted decode. Members other than `method` and `id` are skipped
 /// without building a document.
-fn initialize_request_shape(body: &[u8]) -> Option<bool> {
+pub(super) fn initialize_request_shape(body: &[u8]) -> Option<bool> {
     chio_core::canonical::UntrustedJsonText::from_wire(body, MCP_MAX_POST_BODY_BYTES).ok()?;
-    if body.iter().copied().find(|byte| !byte.is_ascii_whitespace()) != Some(b'{') {
+    if body
+        .iter()
+        .copied()
+        .find(|byte| !byte.is_ascii_whitespace())
+        != Some(b'{')
+    {
         return None;
     }
     #[derive(Default)]
@@ -1091,7 +1103,7 @@ fn initialize_request_shape(body: &[u8]) -> Option<bool> {
     (method == "initialize").then_some(shape.id.0)
 }
 
-fn initialize_without_id_refusal() -> Response {
+pub(super) fn initialize_without_id_refusal() -> Response {
     jsonrpc_http_error(
         StatusCode::BAD_REQUEST,
         -32600,
@@ -1099,7 +1111,7 @@ fn initialize_without_id_refusal() -> Response {
     )
 }
 
-fn initialize_session_header_refusal() -> Response {
+pub(super) fn initialize_session_header_refusal() -> Response {
     jsonrpc_http_error(
         StatusCode::BAD_REQUEST,
         -32600,
@@ -1107,15 +1119,15 @@ fn initialize_session_header_refusal() -> Response {
     )
 }
 
-fn is_terminal_response_for_request(message: &Value, request_id: &Value) -> bool {
+pub(super) fn is_terminal_response_for_request(message: &Value, request_id: &Value) -> bool {
     message.get("id") == Some(request_id) && message.get("method").is_none()
 }
 
-fn is_successful_initialize_response(message: &Value, request_id: &Value) -> bool {
+pub(super) fn is_successful_initialize_response(message: &Value, request_id: &Value) -> bool {
     is_terminal_response_for_request(message, request_id) && message.get("result").is_some()
 }
 
-fn classify_remote_session_event(
+pub(super) fn classify_remote_session_event(
     message: &Value,
     request_stream_active: bool,
 ) -> RemoteSessionEventKind {
@@ -1128,7 +1140,10 @@ fn classify_remote_session_event(
     }
 }
 
-fn parse_session_event_id(event_id: &str, expected_session_id: &str) -> Result<u64, String> {
+pub(super) fn parse_session_event_id(
+    event_id: &str,
+    expected_session_id: &str,
+) -> Result<u64, String> {
     let Some((session_id, seq)) = event_id.rsplit_once('-') else {
         return Err("invalid Last-Event-ID format for MCP session".to_string());
     };
@@ -1139,7 +1154,7 @@ fn parse_session_event_id(event_id: &str, expected_session_id: &str) -> Result<u
         .map_err(|_| "invalid Last-Event-ID sequence for MCP session".to_string())
 }
 
-fn response_with_mode(mut response: Response, response_mode: &'static str) -> Response {
+pub(super) fn response_with_mode(mut response: Response, response_mode: &'static str) -> Response {
     response.headers_mut().insert(
         HeaderName::from_static(CHIO_RESPONSE_MODE_HEADER),
         HeaderValue::from_static(response_mode),
@@ -1147,12 +1162,12 @@ fn response_with_mode(mut response: Response, response_mode: &'static str) -> Re
     response
 }
 
-fn restored_kernel_session_id(session_id: &str) -> SessionId {
+pub(super) fn restored_kernel_session_id(session_id: &str) -> SessionId {
     let fingerprint = sha256_hex(session_id.as_bytes());
     SessionId::new(format!("sess-restore-{}", &fingerprint[..16]))
 }
 
-fn declared_peer_capability(capabilities: Option<&Value>, key: &str) -> bool {
+pub(super) fn declared_peer_capability(capabilities: Option<&Value>, key: &str) -> bool {
     match capabilities.and_then(|value| value.get(key)) {
         Some(Value::Bool(enabled)) => *enabled,
         Some(Value::Object(_)) => true,
@@ -1160,7 +1175,7 @@ fn declared_peer_capability(capabilities: Option<&Value>, key: &str) -> bool {
     }
 }
 
-fn parse_remote_session_peer_capabilities(params: &Value) -> PeerCapabilities {
+pub(super) fn parse_remote_session_peer_capabilities(params: &Value) -> PeerCapabilities {
     let capabilities = params.get("capabilities");
     let experimental = params
         .get("capabilities")
@@ -1382,7 +1397,7 @@ mod http_service_tests {
     }
 }
 
-fn remote_session_send_error(error: CliError) -> Response {
+pub(super) fn remote_session_send_error(error: CliError) -> Response {
     match error {
         CliError::Adapter(AdapterError::IngressCapacity) => jsonrpc_http_error(
             StatusCode::TOO_MANY_REQUESTS,
@@ -1411,7 +1426,10 @@ mod initialize_shape_controls {
         ] {
             assert_eq!(initialize_request_shape(wire), Some(true));
         }
-        assert_eq!(initialize_request_shape(br#"{"method":"initialize"}"#), Some(false));
+        assert_eq!(
+            initialize_request_shape(br#"{"method":"initialize"}"#),
+            Some(false)
+        );
         for wire in [
             br#"["initialize",null]"#.as_slice(),
             br#"{"method":"ping","params":{"method":"initialize"}}"#,
@@ -1431,11 +1449,18 @@ mod initialize_shape_controls {
     fn skipped_rejected_members_never_become_a_document_or_authority() {
         let duplicate_and_numbers = br#"{"method":"initialize","id":18446744073709551615,"params":{"x":1,"x":2,"decimal":0.50,"huge":1e9999}}"#;
         assert_eq!(initialize_request_shape(duplicate_and_numbers), Some(true));
-        let deep = format!("{{\"method\":\"initialize\",\"id\":1,\"params\":{}0{}}}", "[".repeat(256), "]".repeat(256));
+        let deep = format!(
+            "{{\"method\":\"initialize\",\"id\":1,\"params\":{}0{}}}",
+            "[".repeat(256),
+            "]".repeat(256)
+        );
         assert_eq!(initialize_request_shape(deep.as_bytes()), Some(true));
         let non_initialize = format!("{{\"method\":\"{}\",\"id\":1}}", "x".repeat(63));
         assert_eq!(initialize_request_shape(non_initialize.as_bytes()), None);
-        let too_large = format!("{{\"method\":\"initialize\",\"id\":1,\"params\":\"{}\"}}", "x".repeat(MCP_MAX_POST_BODY_BYTES));
+        let too_large = format!(
+            "{{\"method\":\"initialize\",\"id\":1,\"params\":\"{}\"}}",
+            "x".repeat(MCP_MAX_POST_BODY_BYTES)
+        );
         assert_eq!(initialize_request_shape(too_large.as_bytes()), None);
     }
 }

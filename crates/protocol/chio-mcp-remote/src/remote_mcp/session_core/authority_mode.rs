@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) fn uses_pinned_remote_authority(config: &RemoteServeHttpConfig) -> bool {
+pub(crate) fn uses_pinned_remote_authority(config: &RemoteServeHttpConfig) -> bool {
     config.control_url.is_some()
 }
 
@@ -42,7 +42,7 @@ fn validate_hosted_bearer_roles(
     Ok(())
 }
 
-pub(super) fn validate_remote_authority_config(
+pub(crate) fn validate_remote_authority_config(
     config: &RemoteServeHttpConfig,
 ) -> Result<(), CliError> {
     let remote_only_configured = config.remote_authority_workload_token.is_some()
@@ -91,11 +91,15 @@ pub(super) fn validate_remote_authority_config(
         ));
     }
     validate_hosted_bearer_roles(config, service_token)?;
-    let current = config.control_authority_public_key.as_ref().ok_or_else(|| {
-        CliError::cli_other_error(
-            "remote MCP capability issuance requires --control-authority-public-key".to_string(),
-        )
-    })?;
+    let current = config
+        .control_authority_public_key
+        .as_ref()
+        .ok_or_else(|| {
+            CliError::cli_other_error(
+                "remote MCP capability issuance requires --control-authority-public-key"
+                    .to_string(),
+            )
+        })?;
     let mut trusted = config.control_authority_trusted_public_keys.clone();
     trusted.push(current.clone());
     trusted.sort_by_key(PublicKey::to_hex);

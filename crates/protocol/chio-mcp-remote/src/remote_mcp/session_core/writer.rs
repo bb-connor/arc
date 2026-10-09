@@ -2,7 +2,7 @@
 
 use super::*;
 
-pub(super) struct BroadcastJsonRpcWriter {
+pub(crate) struct BroadcastJsonRpcWriter {
     event_tx: SessionEventBus,
     retained_notification_events: Arc<StdMutex<VecDeque<RetainedRemoteSessionEvent>>>,
     next_event_id: Arc<AtomicU64>,
@@ -12,7 +12,7 @@ pub(super) struct BroadcastJsonRpcWriter {
 }
 
 impl BroadcastJsonRpcWriter {
-    pub(super) fn new(
+    pub(crate) fn new(
         event_tx: SessionEventBus,
         retained_notification_events: Arc<StdMutex<VecDeque<RetainedRemoteSessionEvent>>>,
         next_event_id: Arc<AtomicU64>,
@@ -29,7 +29,7 @@ impl BroadcastJsonRpcWriter {
         }
     }
 
-    pub(super) fn next_event(&self, message: Value) -> std::io::Result<RemoteSessionEvent> {
+    pub(crate) fn next_event(&self, message: Value) -> std::io::Result<RemoteSessionEvent> {
         let next =
             crate::clock::next_counter(&self.next_event_id).map_err(std::io::Error::other)?;
         let event_id = format!("{}-{next}", self.session_id);

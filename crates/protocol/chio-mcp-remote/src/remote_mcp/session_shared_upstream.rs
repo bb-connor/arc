@@ -1,5 +1,7 @@
+use super::*;
+
 impl SharedUpstreamToolServer {
-    fn new(upstream: Arc<AdaptedMcpServer>) -> Self {
+    pub(super) fn new(upstream: Arc<AdaptedMcpServer>) -> Self {
         let manifest = upstream.manifest_clone();
         Self {
             server_id: manifest.server_id,
@@ -63,7 +65,7 @@ impl ToolServerConnection for SharedUpstreamToolServer {
 }
 
 impl SharedUpstreamOwner {
-    fn new(
+    pub(super) fn new(
         config: &RemoteServeHttpConfig,
         manifest_registry: Arc<chio_manifest::VerifiedManifestRegistry>,
     ) -> Result<Self, CliError> {
@@ -144,11 +146,11 @@ impl SharedUpstreamOwner {
         })
     }
 
-    fn upstream_server(&self) -> Arc<AdaptedMcpServer> {
+    pub(super) fn upstream_server(&self) -> Arc<AdaptedMcpServer> {
         self.upstream_server.clone()
     }
 
-    fn notification_tap(&self) -> Arc<dyn McpTransport> {
+    pub(super) fn notification_tap(&self) -> Arc<dyn McpTransport> {
         let queue = Arc::new(StdMutex::new(VecDeque::new()));
         if let Ok(mut subscribers) = self.notification_subscribers.lock() {
             subscribers.push(Arc::downgrade(&queue));
@@ -156,7 +158,7 @@ impl SharedUpstreamOwner {
         Arc::new(SharedUpstreamNotificationTap { queue })
     }
 
-    fn notification_stats_snapshot(&self) -> SharedUpstreamNotificationStatsSnapshot {
+    pub(super) fn notification_stats_snapshot(&self) -> SharedUpstreamNotificationStatsSnapshot {
         SharedUpstreamNotificationStatsSnapshot {
             fanout_batches: self
                 .notification_stats
@@ -185,7 +187,7 @@ impl SharedUpstreamOwner {
         }
     }
 
-    fn shutdown(&self) -> Result<(), CliError> {
+    pub(super) fn shutdown(&self) -> Result<(), CliError> {
         self.notification_pump_stop.store(true, Ordering::SeqCst);
         let mut failures = Vec::new();
         match self.notification_pump_thread.lock() {
@@ -242,7 +244,7 @@ impl McpTransport for SharedUpstreamNotificationTap {
     }
 }
 
-fn fan_out_shared_upstream_notifications(
+pub(super) fn fan_out_shared_upstream_notifications(
     subscribers: &NotificationSubscriberList,
     stats: &SharedUpstreamNotificationStats,
     notifications: Vec<Value>,

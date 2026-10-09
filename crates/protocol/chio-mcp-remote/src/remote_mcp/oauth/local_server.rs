@@ -22,11 +22,11 @@ struct SignedAccessTokenInput<'a> {
 }
 
 impl LocalAuthorizationServer {
-    pub(super) fn token_endpoint_url(&self) -> String {
+    pub(crate) fn token_endpoint_url(&self) -> String {
         format!("{}/token", self.issuer.trim_end_matches('/'))
     }
 
-    pub(super) fn authorization_page(
+    pub(crate) fn authorization_page(
         &self,
         request: &AuthorizationRequest,
     ) -> Result<String, Response> {
@@ -128,7 +128,7 @@ impl LocalAuthorizationServer {
         ))
     }
 
-    pub(super) fn approve_authorization(
+    pub(crate) fn approve_authorization(
         &self,
         form: AuthorizationApprovalForm,
     ) -> Result<Redirect, Response> {
@@ -251,7 +251,7 @@ impl LocalAuthorizationServer {
         Ok(Redirect::to(redirect_uri.as_str()))
     }
 
-    pub(super) fn exchange_token<'a>(
+    pub(crate) fn exchange_token<'a>(
         &self,
         headers: impl Into<SenderRequest<'a>>,
         form: TokenRequestForm,
@@ -270,7 +270,7 @@ impl LocalAuthorizationServer {
         }
     }
 
-    pub(super) fn exchange_authorization_code(
+    pub(crate) fn exchange_authorization_code(
         &self,
         headers: SenderRequest<'_>,
         form: TokenRequestForm,
@@ -394,7 +394,7 @@ impl LocalAuthorizationServer {
         Ok(response)
     }
 
-    pub(super) fn exchange_subject_token(
+    pub(crate) fn exchange_subject_token(
         &self,
         headers: SenderRequest<'_>,
         form: TokenRequestForm,
@@ -599,7 +599,7 @@ impl LocalAuthorizationServer {
         sign_jwt(&self.signing_key, &claims)
     }
 
-    pub(super) fn jwks(&self) -> Value {
+    pub(crate) fn jwks(&self) -> Value {
         json!({
             "keys": [{
                 "kty": "OKP",

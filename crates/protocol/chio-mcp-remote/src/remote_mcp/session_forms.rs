@@ -1,123 +1,125 @@
-#[derive(Debug, Default, Deserialize)]
-struct AdminToolReceiptQuery {
-    #[serde(default)]
-    capability_id: Option<String>,
-    #[serde(default)]
-    tool_server: Option<String>,
-    #[serde(default)]
-    tool_name: Option<String>,
-    #[serde(default)]
-    decision: Option<String>,
-    #[serde(default)]
-    limit: Option<usize>,
-}
-#[derive(Debug, Default, Deserialize)]
-struct AdminChildReceiptQuery {
-    #[serde(default)]
-    session_id: Option<String>,
-    #[serde(default)]
-    parent_request_id: Option<String>,
-    #[serde(default)]
-    request_id: Option<String>,
-    #[serde(default)]
-    operation_kind: Option<String>,
-    #[serde(default)]
-    terminal_state: Option<String>,
-    #[serde(default)]
-    limit: Option<usize>,
-}
+use super::*;
 
 #[derive(Debug, Default, Deserialize)]
-struct AdminRevocationQuery {
+pub(super) struct AdminToolReceiptQuery {
     #[serde(default)]
-    capability_id: Option<String>,
+    pub(super) capability_id: Option<String>,
     #[serde(default)]
-    limit: Option<usize>,
+    pub(super) tool_server: Option<String>,
+    #[serde(default)]
+    pub(super) tool_name: Option<String>,
+    #[serde(default)]
+    pub(super) decision: Option<String>,
+    #[serde(default)]
+    pub(super) limit: Option<usize>,
+}
+#[derive(Debug, Default, Deserialize)]
+pub(super) struct AdminChildReceiptQuery {
+    #[serde(default)]
+    pub(super) session_id: Option<String>,
+    #[serde(default)]
+    pub(super) parent_request_id: Option<String>,
+    #[serde(default)]
+    pub(super) request_id: Option<String>,
+    #[serde(default)]
+    pub(super) operation_kind: Option<String>,
+    #[serde(default)]
+    pub(super) terminal_state: Option<String>,
+    #[serde(default)]
+    pub(super) limit: Option<usize>,
 }
 
 #[derive(Debug, Default, Deserialize)]
-struct AdminBudgetQuery {
+pub(super) struct AdminRevocationQuery {
     #[serde(default)]
-    capability_id: Option<String>,
+    pub(super) capability_id: Option<String>,
     #[serde(default)]
-    limit: Option<usize>,
+    pub(super) limit: Option<usize>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub(super) struct AdminBudgetQuery {
+    #[serde(default)]
+    pub(super) capability_id: Option<String>,
+    #[serde(default)]
+    pub(super) limit: Option<usize>,
 }
 
 #[derive(Debug, Deserialize)]
-struct AdminRevokeCapabilityRequest {
-    capability_id: String,
+pub(super) struct AdminRevokeCapabilityRequest {
+    pub(super) capability_id: String,
 }
 
 #[derive(Debug, Deserialize)]
-struct AuthorizationRequest {
-    response_type: String,
-    client_id: String,
-    redirect_uri: String,
+pub(super) struct AuthorizationRequest {
+    pub(super) response_type: String,
+    pub(super) client_id: String,
+    pub(super) redirect_uri: String,
     #[serde(default)]
-    state: Option<String>,
+    pub(super) state: Option<String>,
     #[serde(default)]
-    scope: Option<String>,
+    pub(super) scope: Option<String>,
     #[serde(default)]
-    resource: Option<String>,
+    pub(super) resource: Option<String>,
     #[serde(default)]
-    authorization_details: Option<String>,
+    pub(super) authorization_details: Option<String>,
     #[serde(default)]
-    chio_transaction_context: Option<String>,
+    pub(super) chio_transaction_context: Option<String>,
     #[serde(default)]
-    code_challenge: Option<String>,
+    pub(super) code_challenge: Option<String>,
     #[serde(default)]
-    code_challenge_method: Option<String>,
+    pub(super) code_challenge_method: Option<String>,
     #[serde(default)]
-    chio_sender_dpop_public_key: Option<String>,
+    pub(super) chio_sender_dpop_public_key: Option<String>,
     #[serde(default)]
-    chio_sender_mtls_thumbprint_sha256: Option<String>,
+    pub(super) chio_sender_mtls_thumbprint_sha256: Option<String>,
     #[serde(default)]
-    chio_sender_attestation_sha256: Option<String>,
+    pub(super) chio_sender_attestation_sha256: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
-struct AuthorizationApprovalForm {
-    response_type: String,
-    client_id: String,
-    redirect_uri: String,
+pub(super) struct AuthorizationApprovalForm {
+    pub(super) response_type: String,
+    pub(super) client_id: String,
+    pub(super) redirect_uri: String,
     #[serde(default)]
-    state: Option<String>,
+    pub(super) state: Option<String>,
     #[serde(default)]
-    scope: Option<String>,
+    pub(super) scope: Option<String>,
     #[serde(default)]
-    resource: Option<String>,
+    pub(super) resource: Option<String>,
     #[serde(default)]
-    authorization_details: Option<String>,
+    pub(super) authorization_details: Option<String>,
     #[serde(default)]
-    chio_transaction_context: Option<String>,
-    code_challenge: String,
-    code_challenge_method: String,
+    pub(super) chio_transaction_context: Option<String>,
+    pub(super) code_challenge: String,
+    pub(super) code_challenge_method: String,
     #[serde(default)]
-    chio_sender_dpop_public_key: Option<String>,
+    pub(super) chio_sender_dpop_public_key: Option<String>,
     #[serde(default)]
-    chio_sender_mtls_thumbprint_sha256: Option<String>,
+    pub(super) chio_sender_mtls_thumbprint_sha256: Option<String>,
     #[serde(default)]
-    chio_sender_attestation_sha256: Option<String>,
-    decision: String,
+    pub(super) chio_sender_attestation_sha256: Option<String>,
+    pub(super) decision: String,
 }
 
 #[derive(Debug, Deserialize)]
-struct TokenRequestForm {
-    grant_type: String,
+pub(super) struct TokenRequestForm {
+    pub(super) grant_type: String,
     #[serde(default)]
-    code: Option<String>,
+    pub(super) code: Option<String>,
     #[serde(default)]
-    redirect_uri: Option<String>,
+    pub(super) redirect_uri: Option<String>,
     #[serde(default)]
-    client_id: Option<String>,
+    pub(super) client_id: Option<String>,
     #[serde(default)]
-    code_verifier: Option<String>,
+    pub(super) code_verifier: Option<String>,
     #[serde(default)]
-    resource: Option<String>,
+    pub(super) resource: Option<String>,
     #[serde(default)]
-    scope: Option<String>,
+    pub(super) scope: Option<String>,
     #[serde(default)]
-    subject_token: Option<String>,
+    pub(super) subject_token: Option<String>,
     #[serde(default)]
-    subject_token_type: Option<String>,
+    pub(super) subject_token_type: Option<String>,
 }

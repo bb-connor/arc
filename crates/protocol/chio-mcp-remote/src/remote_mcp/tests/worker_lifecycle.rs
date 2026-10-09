@@ -3,7 +3,6 @@ use super::*;
 use crate::session_core_events::RequestRouteError;
 use axum::body::{Body, HttpBody};
 use std::future::Future;
-use std::io::Write as _;
 use std::pin::Pin;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Condvar;
