@@ -3836,6 +3836,7 @@ dependencies = [
  "sha2 0.10.9",
  "tempfile",
  "thiserror 1.0.69",
+ "zeroize",
 ]
 
 [[package]]
@@ -4514,6 +4515,7 @@ dependencies = [
  "serde",
  "tempfile",
  "thiserror 1.0.69",
+ "zeroize",
 ]
 
 [[package]]
