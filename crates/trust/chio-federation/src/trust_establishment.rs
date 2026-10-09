@@ -315,6 +315,14 @@ pub struct PeerHandshakeEnvelope {
     pub signature: Signature,
 }
 
+/// Parameters of `sign_with_backend_capabilities_and_ladder_ref`.
+pub struct BackendSigning<'a> {
+    pub conformance_tier: ConformanceTier,
+    pub local_backend: &'a dyn SigningBackend,
+    pub capabilities: CapabilityNegotiation,
+    pub ladder_manifest_ref: Option<LadderManifestRef>,
+}
+
 impl PeerHandshakeEnvelope {
     /// Build a signed handshake envelope from `local` addressed to `remote`.
     pub fn sign(
@@ -372,24 +380,28 @@ impl PeerHandshakeEnvelope {
             remote_kernel_id,
             nonce,
             timestamp,
-            conformance_tier,
-            local_backend,
-            capabilities,
-            None,
+            BackendSigning {
+                conformance_tier,
+                local_backend,
+                capabilities,
+                ladder_manifest_ref: None,
+            },
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub fn sign_with_backend_capabilities_and_ladder_ref(
         local_kernel_id: &str,
         remote_kernel_id: &str,
         nonce: &str,
         timestamp: u64,
-        conformance_tier: ConformanceTier,
-        local_backend: &dyn SigningBackend,
-        capabilities: CapabilityNegotiation,
-        ladder_manifest_ref: Option<LadderManifestRef>,
+        params: BackendSigning<'_>,
     ) -> Result<Self, PeerHandshakeError> {
+        let BackendSigning {
+            conformance_tier,
+            local_backend,
+            capabilities,
+            ladder_manifest_ref,
+        } = params;
         capabilities
             .validate()
             .map_err(|e| PeerHandshakeError::CapabilityNegotiation(e.to_string()))?;
@@ -714,10 +726,12 @@ impl KernelTrustExchange {
             remote_kernel_id,
             nonce,
             now,
-            self.local_conformance_tier,
-            self.local_signing_backend.as_ref(),
-            self.local_capabilities.clone(),
-            self.local_ladder_manifest_ref.clone(),
+            BackendSigning {
+                conformance_tier: self.local_conformance_tier,
+                local_backend: self.local_signing_backend.as_ref(),
+                capabilities: self.local_capabilities.clone(),
+                ladder_manifest_ref: self.local_ladder_manifest_ref.clone(),
+            },
         )
     }
 
@@ -734,10 +748,12 @@ impl KernelTrustExchange {
             remote_kernel_id,
             nonce,
             now,
-            self.local_conformance_tier,
-            self.local_signing_backend.as_ref(),
-            capabilities,
-            self.local_ladder_manifest_ref.clone(),
+            BackendSigning {
+                conformance_tier: self.local_conformance_tier,
+                local_backend: self.local_signing_backend.as_ref(),
+                capabilities,
+                ladder_manifest_ref: self.local_ladder_manifest_ref.clone(),
+            },
         )
     }
 
