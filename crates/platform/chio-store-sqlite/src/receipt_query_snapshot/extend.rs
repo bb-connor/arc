@@ -189,11 +189,12 @@ fn publish_verified(
 }
 
 /// A lineage row the canonical local reader refuses attributes nothing. When
-/// the snapshot holds receipts of its capability, the build and
-/// recertification projections of those receipts consult the same reader and
-/// refuse, so the snapshot cannot stand either. A row for a capability the
-/// snapshot does not hold is checked again when that capability's first
-/// receipt is authenticated.
+/// the snapshot holds receipts of its capability, the snapshot is refused.
+/// This is deliberately conservative: a build or recertification consults
+/// lineage only for a receipt whose signed subject or issuer is absent, so it
+/// would refuse the same row for those receipts but not for a capability
+/// whose receipts are all fully signed. A row for a capability the snapshot
+/// does not hold is validated again when a receipt first needs it.
 fn refuse_lineage(published: &Published, capability: &str, reason: &str) -> Result<(), WalkError> {
     let held = published.with_db(|db| Ok(db.dim_id(DIM_CAPABILITY, capability).is_some()))?;
     if held {
