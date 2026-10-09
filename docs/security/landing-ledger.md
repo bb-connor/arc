@@ -1,5 +1,60 @@
 # Security and process landing ledger
 
+## Current landing repair wave (October 9)
+
+The independent whole-PR review of `fd8bfdc947` is preserved in
+[the October 9 review report](../reviews/2026-10-09-pr1160-landing-review.md).
+It records two P1 and 20 confirmed P2 findings, six plausible P2 findings,
+and one separately tracked pre-existing issue. Ten are required for this
+foundation landing. The report names the remaining 18 follow-up items;
+they remain open and must not be reported as repaired by this wave.
+
+All ten repairs start from local source `a457a89c75`. Root remains the sole
+integration writer. Claude owns eight isolated Rust repair lanes; Root owns
+the two workflow boundaries. Every row requires a regression that fails on
+the original source, focused owning verification, review of the composed
+change, and final candidate checks. No feature additions are admitted.
+
+| Requirement | Owner | Source repair | Verification evidence | Remaining acceptance | Landing |
+| --- | --- | --- | --- | --- | --- |
+| V01 P1 | Claude | Isolate revocation replication from authority-sync failure; require startup pin | Original and repair pending | Signed authority and revocation failure/recovery controls, owning tests and review | #1160 |
+| V02 P1 | Claude | Compact authenticated dead native transition/fence current rows at automatic checkpoints; retain immutable replay journals | Design accepted; regression pending | Sustained traffic, live cap, replay, retry, crash rollback and reopen controls | #1160 |
+| V03 P2 | Root | Qualify exact source before every canonical release signature; bind consumer verification to expected source SHA | Isolated repair in progress | Real certificate positive and wrong/missing-SHA controls, all signing lanes and review | #1160 |
+| V04 P2 | Root | `625f7ae17f`: check committed event ranges early in CI | Original 11 failures; repaired 13 real-Git tests, 11 independent controls, source CI contract, Ruff and format pass | Composed CI contract regression suite and hosted candidate | #1160 |
+| V06 P2 | Claude | Bound registry writes before replacement and safely retire expired offers | Original and repair pending | Prior readable state preserved on refusal; live/redeemed offer and replay controls | #1160 |
+| V08 P2 | Claude | Separate monotonic resilience timing from fenced authority wall time | Original and repair pending | Backward-clock control through production dependencies; authority fence unchanged | #1160 |
+| V17 P2 | Claude | Decode classification payload lazily once and reuse it for field paths | Original and repair pending | Parse-work bound, strict JSON and finding-boundary controls | #1160 |
+| V22 P2 | Claude | Exclude authenticated inactive historical sets from the active suspension budget | Original and repair pending | More than 1,024 retired sets, active cap, generation/replay and orphan controls | #1160 |
+| V24 P2 | Claude | Refuse retained-export reimport over a destination that has served | Original and repair pending | Prior anchor/markers unchanged, legitimate import and crash retry controls | #1160 |
+| V25 P2 | Claude | Bound authenticated receipt-query work without denying healthy large stores | Design and regression pending | Authentication, concurrency, rollback and bounded-page controls | #1160 |
+
+The refreshed published state is still `fd8bfdc947`: 117 successful, eight
+failed and 16 skipped hosted checks. No local repair has been promoted to
+hosted qualification. Local source also includes current main `002b4d14e5`,
+the reviewed read-only workflow-cache syntax compatibility repair, and the
+package-only SQLite dev/test optimization. The latter retains workspace
+debug assertions and overflow checks.
+
+The user-approved cryptographic scope below remains in force. The complete
+real-SHA weights determinism/shape proof passed in 948.40 seconds with Kissat
+and a reachable exact completion cover. Both typed receipt proofs passed
+(mismatch 226.68 seconds, match 488.34 seconds). The attestation proof remains
+in progress under checked encoder and SHA loop bounds, with all original
+symbolic inputs and full unwinding assertions. Cancelled diagnostic runs and
+original noncollision timeouts remain separate failed or incomplete evidence.
+Generated coverage, explicit crypto-scope controls and the security CI
+contract mutation suite passed on their recorded staged snapshots; later
+composition still needs its applicable renewals.
+
+The prior combined runtime evidence has been renewed for the later retry,
+budget and dual-clock boundaries. Exact commands, source hashes, failures
+and successful resumptions remain under
+`/tmp/pr1160-integrated-check-20261009/attempt3` through `attempt5`.
+These focused results do not replace the four required protected hosted
+checks, review-thread dispositions, or the final independent review delta.
+Native/trusted and product release acceptance remain separate prerequisites
+to release under the lean landing agreement below.
+
 ## Current qualification checkpoint (October 9, 03:34 UTC)
 
 Published #1160 remains `fd8bfdc947`: 117 hosted checks succeeded, eight failed
