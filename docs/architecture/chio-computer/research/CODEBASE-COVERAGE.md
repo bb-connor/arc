@@ -277,4 +277,4 @@ Inventory date: 2026-10-09. This is a repository architecture coverage map, not 
 | #1179 `crates/kernel/chio-kernel/src/recovery/ports.rs` | Actual recovery owner port names and responsibilities. |
 | #1160 security crate module roots | Existing cage, broker, keyring, IPC, flow and active-response ownership. |
 
-For selected source and inventoried manifest hashes, see [source-evidence.json](source-evidence.json). For conclusions and proposed changes, see [PROPOSAL.md](PROPOSAL.md).
+For selected source and inventoried manifest hashes, see [source-evidence.json](source-evidence.json). For conclusions and proposed changes, see [PROPOSAL.md](../PROPOSAL.md).

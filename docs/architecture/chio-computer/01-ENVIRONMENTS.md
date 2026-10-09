@@ -1,6 +1,6 @@
 # C1: Versioned resource environments
 
-Status: proposed contract, revision 2. Parent: [Computer proposal](PROPOSAL.md).
+Status: proposed contract, revision 3. Parent: [Computer proposal](PROPOSAL.md).
 Assumes the completed predecessor contracts in [the crosswalk](ROADMAP-CROSSWALK.md).
 
 ## Purpose and owner
@@ -22,7 +22,7 @@ Wire versions are allocated through the unified contract/schema process.
 | ComputerRevision | ComputerId, immutable revision identity, namespace digest, boot/input references, resource version vector, policy/profile basis, creation operation |
 | ResourceBinding | Namespace entry, resource identity and owner, binding generation, provider/profile, supported operations, exact version or explicit live-binding mode |
 | ComputerImage | Exact revision, boot bundle/expression, input/artifact references, resource binding manifest, execution/transfer requirements |
-| ComputerHandle | Computer reference and authenticated client connection; the session authority is supplied by verified ingress |
+| ComputerHandle | Computer reference and authenticated client connection. Verified ingress supplies the session authority. A remote handle resolves through the receiver's partner card (COOP-2). |
 
 Revision identity commits to canonical descriptors and their domain/version.
 Equal bytes in two resources or tenants do not make their resource identities,
@@ -50,9 +50,13 @@ through operator-configured catalogs/registries under current metadata access.
   unrestricted credentials, authority/replay/hold databases, sockets, arbitrary
   environment variables and live process memory. Private references require
   governed resolution and cannot direct arbitrary URL/path fetches.
-- **ENV-07, current predicates.** Historical profile/policy references explain
-  the original basis. Mutable authority, stop, revocation, recipient and held
-  reservation predicates are rechecked by the relevant owner at commitment.
+- **ENV-07, current predicates.** The owner rules apply:
+  - REC's HistoricalFact, CurrentPredicate and HeldReservation vocabulary;
+  - the KSPEC-08 durable stop;
+  - COOP-2 lifecycle status.
+
+  Computer adds one rule. It never caches a current predicate in a revision or
+  image record, and it never replays one from such a record.
 - **ENV-08, one mutating family.** The initial candidate profile admits one
   mutating execution family through an atomic owner claim. Duplicate launch
   requests recover that claim; another launch cannot reuse it. An abandoned

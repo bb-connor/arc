@@ -1,6 +1,6 @@
 # C4: Binding a computer to admitted work
 
-Status: proposed contract, revision 2. Parent: [Computer proposal](PROPOSAL.md).
+Status: proposed contract, revision 3. Parent: [Computer proposal](PROPOSAL.md).
 
 ## Purpose and owner
 
@@ -18,7 +18,8 @@ independent effect journal.
 | Independent organizations | Source owns its resources/revisions; receiver issues its own local authority and owns its process tree. Co-signed work binds their obligations and evidence. |
 
 The second profile is part of the initial architecture and its complete
-acceptance demonstration. Computer must not assume a common key, database,
+acceptance demonstration. Computer-0 runs it with an unpaid agreement (roadmap
+decision D5), and only the receiver-local overlay realization (C2). Computer must not assume a common key, database,
 operator, issuer, physical host, or globally controlled process tree.
 
 `ProcessRuntime::create_root` rejects an incoming delegated chain. Do not strip
@@ -86,6 +87,17 @@ listener cannot become the remote protocol just by exposing it over TCP.
 
 ## Consumption and funding
 
+**Resources are charged at their owner's door (roadmap decision D21).** A
+grant over a source-owned resource, such as `/models/default`, is enforced and
+charged where that resource is served. That is the source's door: the source's
+own hold ledger, reached through the source's broker.
+
+- The hero's `USD(5)` therefore needs no money to move between organizations,
+  and no hold store that spans both.
+- The receiver's own compute, harness and model use stay with the receiver,
+  under its own ledger, unless a paid agreement binds them.
+- Sender-funded holds that cross organizations remain post-test scope.
+
 The SHARE kernel hold ledger remains the sole consumption authority within its
 qualified scope. D1 allocations, S1 commitments and other counters retain their
 roles as commitments or views. Computer stores references, not another mutable
@@ -103,6 +115,13 @@ effects and retained reservations remain accountable. Reconciliation and later
 source reads require their own currently valid authority, not revived work rights.
 `delegable=True` permits only the admitted attenuation/depth path; it does not
 give application code signing custody or let a foreign issuer extend source rights.
+
+Under Computer-0, delegation stays inside the receiver:
+
+- The receiver's broker holds the source's grant as a single hop.
+- Receiver helpers reach the source's door through that broker.
+- A helper that presents the source's grant directly is making a second hop.
+  It is refused until COOP's multi-hop work lands after the success test.
 
 Model profiles reserve worst-case exposure before dispatch and reconcile down
 after a known outcome. Unknown replies retain exposure. Token quotas, money,
@@ -133,12 +152,20 @@ Payable accepted child work survives parent failure or rejection of a patch.
   input, recipient, resource/profile generations or sealed selection.
 - **EXE-04:** native consumption includes all admitted relevant descendants;
   restart, fork, new handles and provider sessions cannot replenish it.
-- **EXE-05:** private inputs and results cross only after current release checks;
-  acceptance, signatures and settlement are not release authority.
-- **EXE-06:** stop/revocation/closure fence future commitments; already dispatched
-  effects and stranded exposure retain their native dispositions.
+- **EXE-05:** REC-P4 release governs inputs and results that cross the
+  boundary. Computer adds that acceptance, signatures and settlement are never
+  release authority.
+- **EXE-06:** KSPEC-04 and KSPEC-08 fences and native dispositions apply
+  unchanged. Computer adds only the binding of its execution family to those
+  fences.
 - **EXE-07:** a changed request uses a separately admitted linked continuation
   within existing limits. Uncertain work cannot be retried as new work to evade
   the unresolved-effect rule.
+- **EXE-08, door-charged resources:** a grant over a source-owned resource is
+  enforced and charged only by that resource's owner, at its door. No
+  receiver-side counter can substitute for it.
+- **EXE-09, delegation inside the receiver:** under Computer-0 the foreign grant
+  is held only in the receiver's broker custody, as one hop. Any further
+  presentation of it is refused.
 
 Acceptance: **C4-01 through C4-08** in [ACCEPTANCE.md](ACCEPTANCE.md).

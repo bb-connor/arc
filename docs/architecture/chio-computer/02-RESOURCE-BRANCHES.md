@@ -1,6 +1,6 @@
 # C2: Resource branching and publication
 
-Status: proposed contract, revision 2. Parent: [Computer proposal](PROPOSAL.md).
+Status: proposed contract, revision 3. Parent: [Computer proposal](PROPOSAL.md).
 
 ## Purpose and owner
 
@@ -9,9 +9,24 @@ provide snapshot, branch, merge or transactional apply. This contract adds
 qualified backend behavior through existing native admission and custody owners.
 It does not add unrestricted mutation to the read interface.
 
-The first backend owns a managed workspace snapshot and atomically published
-revision pointer. It may use repository snapshot/review code as implementation
-input, while preserving the existing security, artifact and store boundaries.
+## First backend: git-native
+
+Computer-0 uses a git-native managed workspace:
+
+- a snapshot is a tree object;
+- a branch is a ref;
+- the revision head is a ref the resource owner publishes;
+- diff is a release-checked read of two exact trees.
+
+Apply is a compare-and-swap of the project ref against the expected base, under
+the resource owner's commit fence. A moved base is a conflict. Apply adopts
+KSPEC-10 crossing records when they land after the success test.
+
+The backend may reuse the worktree and patch-review code salvaged from #1164
+(roadmap COMP-2). It keeps the existing security, artifact and store
+boundaries. Content-addressed object identity is storage identity only. It
+never substitutes for the resource, label, producer or acceptance bindings
+that RES-02 requires.
 
 ## Resource classes
 
@@ -61,12 +76,12 @@ Blob storage and metadata publication are not implicitly one transaction.
   records commit. Recover interrupted stages by original identity. Partial or
   unverifiable imports stay withheld or quarantined; error paths do not release
   raw bytes for debugging.
-- **RES-05, current release.** Reads, chunks, diff metadata, filenames, logs and
-  artifact transfer use governed release. Commit the required recipient knowledge
-  transition before the first visible byte under the selected release contract.
-- **RES-06, preserved knowledge.** Artifacts retain confidentiality/influence.
-  Existing process observation history survives restore. Ordinary branching is
-  not declassification, endorsement, or a new clean observation boundary.
+- **RES-05, current release.** REC-P4's release contract governs every channel.
+  Computer adds that diff metadata, filenames, logs and status are channels
+  too.
+- **RES-06, preserved knowledge.** REC-P4 and KSPEC-11 label and influence rules
+  apply unchanged. Computer adds that a branch or restore never creates a clean
+  observation boundary.
 - **RES-07, exact publication.** Apply compares the exact expected source revision
   and affected bindings at the authoritative commit point. A changed source is
   a conflict. There is no silent overwrite, rebase or reuse of old acceptance
@@ -86,12 +101,17 @@ Blob storage and metadata publication are not implicitly one transaction.
 
 The execution profile selects one of two realizations:
 
-1. Source-owned branch service. Remote operations bind the source resource
-   authority and receiver-local execution identity through the admitted work.
-2. Receiver-local execution overlay. Authorized immutable input is materialized
-   at the receiver; writes remain in its confined overlay. A sealed labeled
-   result is imported into the source-owned candidate under the original work
-   and branch bindings.
+1. **Receiver-local execution overlay.** This is the default between independent
+   organizations, and the only realization Computer-0 allows there.
+   - Authorized immutable input is materialized at the receiver.
+   - Writes stay in the receiver's confined overlay.
+   - A sealed, labeled result is imported into the source-owned candidate under
+     the original work and branch bindings.
+2. **Source-owned branch service.** This is for same-domain placement only.
+   - Remote operations bind the source resource authority and the
+     receiver-local execution identity through the admitted work.
+   - Between independent organizations it would let the receiver's processes
+     write into the source's storage, so it is not offered there.
 
 The second profile does not transfer project ownership to the temporary remote
 filesystem. The first does not promise a Chio receipt for every ordinary syscall
