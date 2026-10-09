@@ -3,7 +3,6 @@
 //! mutable store and accepted only when their signature verifies and their
 //! canonical leaf equals the owned leaf.
 use chio_core::receipt::body::ChioReceipt;
-use chio_kernel::receipt_query::ReceiptReadError;
 use chio_kernel::{ReceiptStoreError, StoredToolReceipt};
 use rusqlite::{Connection, OptionalExtension};
 
@@ -82,10 +81,14 @@ pub(super) fn fetch(
                 row.entry_seq
             )));
         }
+        // The receipt is the one the snapshot authenticated, so a tenant
+        // other than the one it was selected under means the owned
+        // projection is wrong. The reason names no tenant.
         if tenant.is_some_and(|tenant| receipt.tenant_id.as_deref() != Some(tenant)) {
-            return Err(FetchError::Store(
-                ReceiptReadError::TenantProjectionMismatch.into(),
-            ));
+            return Err(FetchError::Mismatch(format!(
+                "claim entry {} is projected to another tenant than its receipt names",
+                row.entry_seq
+            )));
         }
         receipts.push(StoredToolReceipt {
             seq: row.seq,

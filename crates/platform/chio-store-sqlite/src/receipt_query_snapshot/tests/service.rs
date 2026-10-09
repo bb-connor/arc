@@ -2,7 +2,9 @@
 //! leaf-bound fetch.
 use std::time::{Duration, Instant};
 
-use chio_kernel::receipt_query::{ReceiptQuery, ReceiptQuerySnapshotError, ReceiptReadContext};
+use chio_kernel::receipt_query::{
+    ReceiptQuery, ReceiptQuerySnapshotError, ReceiptReadContext, ReceiptSnapshotWatermark,
+};
 use chio_kernel::ReceiptStoreError;
 
 use super::super::db::SnapshotDbError;
@@ -830,43 +832,23 @@ fn a_custody_mismatch_in_a_walker_hold_stays_invalid() {
     );
 }
 
-/// Fail one public read on the published lineage's custody: the backing
-/// file's mode is changed for the read and restored afterwards. The lineage
-/// that failed custody must stay dropped although its storage checks out
-/// again, and an admitted lease must stay refused, until a new lineage is
-/// authenticated.
-#[cfg(target_os = "linux")]
-fn custody_failure_drops_the_lineage(
-    read: impl FnOnce(&ReceiptQuerySnapshots) -> Result<(), ReceiptQuerySnapshotError>,
+/// Once `refused` reported an integrity failure of the served lineage, that
+/// lineage stays dropped although nothing is wrong with it any more, an
+/// admitted lease stays refused, and only a new authenticated lineage serves.
+fn assert_lineage_dropped(
+    service: &ReceiptQuerySnapshots,
+    epoch: u64,
+    first: &ReceiptSnapshotWatermark,
+    refused: ReceiptQuerySnapshotError,
 ) {
-    use std::os::unix::fs::PermissionsExt;
-    let fixture = mixed_fixture();
-    let service = ready(
-        &fixture,
-        ReceiptQuerySnapshotConfig {
-            invalid_retry_backoff: Duration::from_secs(3),
-            ..config()
-        },
-    );
-    let first = service.query_receipts(&admin(1)).unwrap().snapshot.unwrap();
-    service.pause_extension_for_test(true);
-    let epoch = service.lease_for_test().unwrap();
-    let path = service
-        .backing_path_for_test()
-        .expect("a Linux snapshot has a private backing file");
-    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o640)).unwrap();
-    let refused = read(&service);
-    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
-    let refused = refused.unwrap_err();
     assert!(
         matches!(refused, ReceiptQuerySnapshotError::Invalid(_)),
-        "a custody failure refused as {refused:?}"
+        "an integrity failure refused as {refused:?}"
     );
-
     let state = service.status().state;
     assert!(
         matches!(state, ReceiptQuerySnapshotState::Invalid { .. }),
-        "after a custody failure the lineage is {state:?}"
+        "after an integrity failure the lineage is {state:?}"
     );
     let served = service.query_receipts(&admin(1));
     assert!(
@@ -876,14 +858,14 @@ fn custody_failure_drops_the_lineage(
                 ReceiptQuerySnapshotError::Invalid(_)
             ))
         ),
-        "the lineage that failed custody served again: {:?}",
+        "the lineage that failed served again: {:?}",
         served.map(|page| page.snapshot)
     );
     let lease = snapshot_error(service.recheck_lease_for_test(epoch).unwrap_err());
     assert!(matches!(lease, ReceiptQuerySnapshotError::Invalid(_)));
 
     service.pause_extension_for_test(false);
-    wait_for(&service, "a new lineage", |state| {
+    wait_for(service, "a new lineage", |state| {
         *state == ReceiptQuerySnapshotState::Ready
     });
     let rebuilt = service.query_receipts(&admin(1)).unwrap().snapshot.unwrap();
@@ -891,6 +873,125 @@ fn custody_failure_drops_the_lineage(
     assert_ne!(lineage(&first.snapshot_id), lineage(&rebuilt.snapshot_id));
     let lease = snapshot_error(service.recheck_lease_for_test(epoch).unwrap_err());
     assert!(matches!(lease, ReceiptQuerySnapshotError::Invalid(_)));
+}
+
+/// A ready service with extension paused, the watermark of its first
+/// lineage and a lease admitted under it.
+fn paused_with_lease(fixture: &Fixture) -> (ReceiptQuerySnapshots, ReceiptSnapshotWatermark, u64) {
+    let service = ready(
+        fixture,
+        ReceiptQuerySnapshotConfig {
+            invalid_retry_backoff: Duration::from_secs(3),
+            ..config()
+        },
+    );
+    let first = service.query_receipts(&admin(1)).unwrap().snapshot.unwrap();
+    service.pause_extension_for_test(true);
+    let epoch = service.lease_for_test().unwrap();
+    (service, first, epoch)
+}
+
+/// Fail one public read on the published lineage's custody: the backing
+/// file's mode is changed for the read and restored afterwards.
+#[cfg(target_os = "linux")]
+fn custody_failure_drops_the_lineage(
+    read: impl FnOnce(&ReceiptQuerySnapshots) -> Result<(), ReceiptQuerySnapshotError>,
+) {
+    use std::os::unix::fs::PermissionsExt;
+    let fixture = mixed_fixture();
+    let (service, first, epoch) = paused_with_lease(&fixture);
+    let path = service
+        .backing_path_for_test()
+        .expect("a Linux snapshot has a private backing file");
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o640)).unwrap();
+    let refused = read(&service);
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+    assert_lineage_dropped(&service, epoch, &first, refused.unwrap_err());
+    service.shutdown();
+}
+
+/// Project a tenant-a receipt into tenant-b in the owned snapshot, then read
+/// it as tenant-b. The receipt itself still verifies and matches its leaf,
+/// so only the owned projection is wrong.
+fn tenant_projection_tamper_drops_the_lineage(
+    read: impl FnOnce(&ReceiptQuerySnapshots, &str) -> Result<(), ReceiptStoreError>,
+) {
+    let fixture = mixed_fixture();
+    let (service, first, epoch) = paused_with_lease(&fixture);
+    let tenant_a = Spec::varied(1).sign(&keypair()).id;
+    let tenant_b = Spec::varied(3).sign(&keypair()).id;
+    let changed = service.execute_on_snapshot_for_test(
+        "UPDATE snapshot_tool_receipt \
+         SET tenant = (SELECT tenant FROM snapshot_tool_receipt WHERE receipt_id = ?2) \
+         WHERE receipt_id = ?1",
+        rusqlite::params![tenant_a, tenant_b],
+    );
+    assert_eq!(changed, 1);
+    let refused = read(&service, &tenant_a).unwrap_err();
+    let refused = match refused {
+        ReceiptStoreError::QuerySnapshot(refused) => refused,
+        other => panic!("a tenant projection mismatch surfaced untyped: {other:?}"),
+    };
+    assert_lineage_dropped(&service, epoch, &first, refused);
+    service.shutdown();
+}
+
+#[test]
+fn a_tenant_projection_mismatch_on_a_page_read_drops_the_lineage() {
+    tenant_projection_tamper_drops_the_lineage(|service, _| {
+        let tenant_b = ReceiptQuery {
+            limit: 100,
+            ..ReceiptQuery::default().authenticated_tenant("tenant-b")
+        };
+        service.query_receipts(&tenant_b).map(drop)
+    });
+}
+
+#[test]
+fn a_tenant_projection_mismatch_on_a_point_read_drops_the_lineage() {
+    tenant_projection_tamper_drops_the_lineage(|service, tenant_a| {
+        service
+            .load_receipt(
+                tenant_a,
+                &ReceiptReadContext::authenticated_tenant("tenant-b"),
+            )
+            .map(drop)
+    });
+}
+
+#[test]
+fn the_integrity_backoff_resets_once_a_rebuilt_lineage_serves() {
+    let fixture = mixed_fixture();
+    let base = Duration::from_millis(50);
+    let service = ready(
+        &fixture,
+        ReceiptQuerySnapshotConfig {
+            invalid_retry_backoff: base,
+            ..config()
+        },
+    );
+    let lineage = |id: &str| id.split(':').next().unwrap().to_string();
+    for _ in 0..4 {
+        let before = service.query_receipts(&admin(1)).unwrap().snapshot.unwrap();
+        service.invalidate_for_test("integrity failure");
+        let deadline = Instant::now() + Duration::from_secs(60);
+        loop {
+            if let Ok(page) = service.query_receipts(&admin(1)) {
+                let after = page.snapshot.unwrap();
+                if lineage(&after.snapshot_id) != lineage(&before.snapshot_id) {
+                    break;
+                }
+            }
+            assert!(
+                Instant::now() < deadline,
+                "no rebuild after an integrity failure"
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+    // Each failure follows a lineage that served, so none waits longer than
+    // the first.
+    assert_eq!(service.integrity_waits_for_test(), vec![base; 4]);
     service.shutdown();
 }
 

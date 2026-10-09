@@ -507,6 +507,12 @@ struct Inner {
     last_recertification_ms: AtomicU64,
     #[cfg(test)]
     pause_extension: AtomicBool,
+    /// Whether a lineage was published since the walker's last integrity
+    /// failure.
+    published_since_failure: AtomicBool,
+    /// Every wait the walker chose after an integrity failure.
+    #[cfg(test)]
+    integrity_waits: Mutex<Vec<Duration>>,
 }
 
 /// Owner of the authenticated receipt query snapshot of one store.
@@ -550,6 +556,9 @@ impl ReceiptQuerySnapshots {
             last_recertification_ms: AtomicU64::new(0),
             #[cfg(test)]
             pause_extension: AtomicBool::new(false),
+            published_since_failure: AtomicBool::new(false),
+            #[cfg(test)]
+            integrity_waits: Mutex::new(Vec::new()),
         });
         let walker = Arc::clone(&inner);
         let handle = std::thread::Builder::new()
@@ -577,9 +586,9 @@ impl ReceiptQuerySnapshots {
                 self.inner.config.query_sql_steps,
             ),
         )?;
-        let page = self
-            .inner
-            .fetch_page(&selection.rows, selection.tenant.as_deref())?;
+        let page =
+            self.inner
+                .fetch_page(&published, &selection.rows, selection.tenant.as_deref())?;
         self.inner.recheck_lease(epoch)?;
         let full = selection.rows.len() == selection.limit;
         let next_cursor = if page.short || full {
@@ -622,7 +631,9 @@ impl ReceiptQuerySnapshots {
         let receipt = match located {
             None => None,
             Some(row) => {
-                let page = self.inner.fetch_page(std::slice::from_ref(&row), tenant)?;
+                let page = self
+                    .inner
+                    .fetch_page(&published, std::slice::from_ref(&row), tenant)?;
                 page.receipts
                     .into_iter()
                     .next()
@@ -633,8 +644,10 @@ impl ReceiptQuerySnapshots {
             if receipt.id != receipt_id {
                 let error =
                     format!("retained receipt identity differs from the requested ID {receipt_id}");
-                self.inner.invalidate(&error);
-                return Err(ReceiptQuerySnapshotError::Invalid(error).into());
+                return self.inner.owned_read(
+                    &published,
+                    Err(ReceiptQuerySnapshotError::Invalid(error).into()),
+                );
             }
         }
         self.inner.recheck_lease(epoch)?;
@@ -806,7 +819,7 @@ impl Inner {
         }
     }
 
-    /// The outcome of a read of an owned snapshot. A typed `Invalid` drops
+    /// The outcome of a read served from `published`. A typed `Invalid` drops
     /// that lineage; every other outcome passes through unchanged.
     fn owned_read<T>(
         &self,
@@ -978,8 +991,11 @@ impl Inner {
         }
     }
 
+    /// Fetch the receipts behind selected rows of `published`. A mismatch
+    /// with what that lineage authenticated drops it.
     fn fetch_page(
         &self,
+        published: &Arc<Published>,
         rows: &[SelectedRow],
         tenant: Option<&str>,
     ) -> Result<FetchedPage, ReceiptStoreError> {
@@ -990,10 +1006,10 @@ impl Inner {
         };
         match fetch(&self.store, rows, tenant, limits) {
             Ok(page) => Ok(page),
-            Err(FetchError::Mismatch(reason)) => {
-                self.invalidate(&reason);
-                Err(ReceiptQuerySnapshotError::Invalid(reason).into())
-            }
+            Err(FetchError::Mismatch(reason)) => self.owned_read(
+                published,
+                Err(ReceiptQuerySnapshotError::Invalid(reason).into()),
+            ),
             Err(FetchError::Budget) => Err(ReceiptQuerySnapshotError::Unavailable(
                 "receipt query fetch exhausted its SQL work budget".into(),
             )
@@ -1049,8 +1065,17 @@ fn run(inner: &Arc<Inner>) {
             ),
             Err(error @ (WalkError::Integrity(_) | WalkError::Regressed(_))) => {
                 inner.set_phase(Phase::Invalid(error.to_string()));
+                // Backoff grows only across failures with no lineage
+                // published between them.
+                if inner.published_since_failure.swap(false, Ordering::SeqCst) {
+                    backoff = inner.config.invalid_retry_backoff;
+                }
                 let wait = backoff;
                 backoff = (backoff * 2).min(Duration::from_secs(3_600));
+                #[cfg(test)]
+                if let Ok(mut waits) = inner.integrity_waits.lock() {
+                    waits.push(wait);
+                }
                 Some(wait)
             }
             Err(error @ (WalkError::Capacity { .. } | WalkError::RowCap { .. })) => {
@@ -1186,6 +1211,7 @@ fn build_and_serve(inner: &Arc<Inner>) -> Result<(), WalkError> {
         status_fault: Mutex::new(None),
     });
     inner.set_phase(Phase::Ready(Arc::clone(&published)));
+    inner.published_since_failure.store(true, Ordering::SeqCst);
     serve(inner, &extension_ctx, &ctx, &published)
 }
 
@@ -1312,6 +1338,34 @@ impl ReceiptQuerySnapshots {
                 *slot = Some(fault);
             }
         }
+    }
+
+    pub(super) fn integrity_waits_for_test(&self) -> Vec<Duration> {
+        self.inner
+            .integrity_waits
+            .lock()
+            .map(|waits| waits.clone())
+            .unwrap_or_default()
+    }
+
+    /// Run one statement on the published snapshot's own storage.
+    pub(super) fn execute_on_snapshot_for_test(
+        &self,
+        sql: &str,
+        params: impl rusqlite::Params,
+    ) -> usize {
+        let Phase::Ready(published) = self.inner.phase() else {
+            return 0;
+        };
+        let Ok(owned) = published.owned.lock() else {
+            return 0;
+        };
+        owned
+            .db
+            .connection()
+            .ok()
+            .and_then(|connection| connection.execute(sql, params).ok())
+            .unwrap_or(0)
     }
 
     /// Make the next status hold fail with `fault`.
