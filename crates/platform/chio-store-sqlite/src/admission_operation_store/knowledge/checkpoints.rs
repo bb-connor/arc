@@ -6,6 +6,8 @@ mod watermark;
 pub(in crate::admission_operation_store) use head_write::VerifiedCheckpointHeadWrite;
 #[cfg(feature = "admission-test-support")]
 mod history_trace;
+#[cfg(feature = "admission-test-support")]
+mod legacy_test_support;
 mod reference_source;
 mod restore;
 #[cfg(feature = "admission-test-support")]

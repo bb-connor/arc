@@ -34,7 +34,17 @@ impl KnowledgeFixture {
     fn new() -> TestResult<Self> {
         Self::from(RecoveryFixture::new(false)?)
     }
-    fn from(mut f: RecoveryFixture) -> TestResult<Self> {
+    fn from(f: RecoveryFixture) -> TestResult<Self> {
+        Self::from_before_activation(f, |_, _, _| Ok(()))
+    }
+    fn from_before_activation(
+        mut f: RecoveryFixture,
+        before_activation: impl FnOnce(
+            &RecoveryFixture,
+            &NativeKnowledgeInstallationV1,
+            &chio_process::ProcessArtifactBroker,
+        ) -> TestResult,
+    ) -> TestResult<Self> {
         let mut deployment = f.kernel.recovery_deployment(f.runtime.scope())?;
         let mut permissions = deployment.actors.as_slice()[0]
             .permissions
@@ -110,6 +120,7 @@ impl KnowledgeFixture {
             contract: ContractDigest::from_bytes(*deployment.contract_digest.as_bytes()),
         };
         let broker = Arc::new(f.process.enable_durable_knowledge()?);
+        before_activation(&f, &profile, &broker)?;
         let runtime = NativeKnowledgeRuntime::new(
             f.kernel.clone(),
             store,

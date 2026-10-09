@@ -1,6 +1,8 @@
 //! Checkpoint history retains exact identities and bytes through ordinary writes.
 use super::*;
 
+mod retirement_source;
+
 fn assert_restored_checkpoint(
     sink: &RecordingSink,
     id: &str,
@@ -1774,12 +1776,19 @@ fn checkpoint_chunk_phase_error_class<E: 'static>(error: &E) -> &'static str {
 #[test]
 fn memory_checkpoint_chunked_restore_preserves_exact_custody_and_reopen() -> TestResult {
     use std::collections::{BTreeMap, BTreeSet};
+    let _clock = scope_synchronous_fixture_clock(now_ms()? / 1_000);
     let mut f = checkpoint_chunk_phase!(
         None,
         "chunk_custody_fixture_open",
         None,
         KnowledgeFixture::new()
     )?;
+    let original_process_capability = chio_core::canonical_json_bytes(&f.f.seed.capability)?;
+    let original_process_id = f.profile.scope.process_id.clone();
+    assert_eq!(
+        f.f.seed.capability.expires_at - f.f.seed.capability.issued_at,
+        600
+    );
     let historical = checkpoint_chunk_phase!(
         Some(&f),
         "chunk_custody_historical_label",
@@ -2831,6 +2840,11 @@ fn memory_checkpoint_chunked_restore_preserves_exact_custody_and_reopen() -> Tes
         broker,
         certificate: Keypair::from_seed(&[217; 32]),
     };
+    assert_eq!(reopened.profile.scope.process_id, original_process_id);
+    assert_eq!(
+        chio_core::canonical_json_bytes(&reopened.f.seed.capability)?,
+        original_process_capability
+    );
     let replay_sink = reopened.sink();
     let replay = checkpoint_chunk_phase!(
         Some(&reopened),

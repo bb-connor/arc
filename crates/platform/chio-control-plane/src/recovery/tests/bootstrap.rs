@@ -65,12 +65,111 @@ pub(super) fn open_kernel(
 }
 
 pub(super) fn now_ms() -> PortResult<u64> {
+    if SYNCHRONOUS_FIXTURE_CLOCK.with(std::cell::Cell::get) {
+        return chio_kernel::fixed_runtime_unix_secs_for_current_thread()
+            .and_then(|seconds| seconds.checked_mul(1_000))
+            .ok_or_else(PortError::unavailable);
+    }
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_err(|_| PortError::unavailable())?
         .as_millis()
         .try_into()
         .map_err(|_| PortError::unavailable())
+}
+
+thread_local! {
+    static SYNCHRONOUS_FIXTURE_CLOCK: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Share the existing kernel clock with synchronous fixture setup, native
+/// resolver and direct Store calls. The kernel guard is thread-bound and does
+/// not select or reset receipt IDs. Ordinary fixtures retain wall-clock time.
+pub(super) struct SynchronousFixtureClockScope {
+    previous_opt_in: bool,
+    _kernel_clock: chio_kernel::FixedRuntimeClockScope,
+}
+
+impl Drop for SynchronousFixtureClockScope {
+    fn drop(&mut self) {
+        SYNCHRONOUS_FIXTURE_CLOCK.with(|enabled| enabled.set(self.previous_opt_in));
+    }
+}
+
+pub(super) fn scope_synchronous_fixture_clock(seconds: u64) -> SynchronousFixtureClockScope {
+    let kernel_clock = chio_kernel::scope_fixed_runtime_clock_for_current_thread(seconds);
+    SynchronousFixtureClockScope {
+        previous_opt_in: SYNCHRONOUS_FIXTURE_CLOCK.with(|enabled| enabled.replace(true)),
+        _kernel_clock: kernel_clock,
+    }
+}
+
+#[test]
+fn synchronous_fixture_clock_is_thread_local_and_restores_nested_scopes() -> TestResult {
+    let prior_clock = chio_kernel::fixed_runtime_unix_secs_for_current_thread();
+    assert!(!SYNCHRONOUS_FIXTURE_CLOCK.with(std::cell::Cell::get));
+    let before = now_ms()?;
+    {
+        let _kernel_only = chio_kernel::scope_fixed_runtime_clock_for_current_thread(7);
+        assert!(now_ms()? >= before, "ordinary fixture time does not opt in");
+    }
+    {
+        let _outer = scope_synchronous_fixture_clock(11);
+        assert_eq!(now_ms()?, 11_000);
+        assert_eq!(Clock::default().now_unix_ms()?, 11_000);
+        {
+            let _inner = scope_synchronous_fixture_clock(22);
+            assert_eq!(now_ms()?, 22_000);
+        }
+        assert_eq!(now_ms()?, 11_000);
+        let isolated = std::thread::spawn(|| {
+            assert!(!SYNCHRONOUS_FIXTURE_CLOCK.with(std::cell::Cell::get));
+            assert_eq!(
+                chio_kernel::fixed_runtime_unix_secs_for_current_thread(),
+                None
+            );
+            now_ms()
+        })
+        .join()
+        .map_err(|_| "isolated fixture clock thread panicked")??;
+        assert!(isolated >= before);
+    }
+    assert!(!SYNCHRONOUS_FIXTURE_CLOCK.with(std::cell::Cell::get));
+    assert_eq!(
+        chio_kernel::fixed_runtime_unix_secs_for_current_thread(),
+        prior_clock
+    );
+    assert!(now_ms()? >= before);
+    Ok(())
+}
+
+#[test]
+fn synchronous_fixture_clock_restores_opt_in_and_kernel_time_after_unwind() -> TestResult {
+    let prior_clock = chio_kernel::fixed_runtime_unix_secs_for_current_thread();
+    let outer = scope_synchronous_fixture_clock(33);
+    let unwound = std::panic::catch_unwind(|| {
+        let _inner = scope_synchronous_fixture_clock(44);
+        assert_eq!(now_ms().ok(), Some(44_000));
+        panic!("unwind fixture clock scope");
+    });
+    assert!(unwound.is_err());
+    assert_eq!(now_ms()?, 33_000);
+    assert_eq!(
+        chio_kernel::fixed_runtime_unix_secs_for_current_thread(),
+        Some(33)
+    );
+    drop(outer);
+    let unwound = std::panic::catch_unwind(|| {
+        let _outer = scope_synchronous_fixture_clock(55);
+        panic!("unwind outer fixture clock scope");
+    });
+    assert!(unwound.is_err());
+    assert!(!SYNCHRONOUS_FIXTURE_CLOCK.with(std::cell::Cell::get));
+    assert_eq!(
+        chio_kernel::fixed_runtime_unix_secs_for_current_thread(),
+        prior_clock
+    );
+    Ok(())
 }
 
 #[derive(Default)]

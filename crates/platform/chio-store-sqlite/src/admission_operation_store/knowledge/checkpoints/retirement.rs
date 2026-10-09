@@ -122,20 +122,26 @@ impl SqliteAdmissionOperationStore {
             return Err(refused("checkpoint retirement authority"));
         }
         mutate_retained_admin(self, actor, fence, now, |tx, _, now| {
-            let latest = load_checkpoint(&tx, actor.scope(), id, 0)?;
-            let checkpoint =
-                if let Some(latest) = latest.filter(|latest| latest.revision.get() == revision) {
-                    latest
-                } else {
-                    // This administrative ownership change grants no read.
-                    // Authentic pre-reset history above visible latest can be
-                    // retired without making that history restorable.
-                    load_checkpoint(&tx, actor.scope(), id, revision)?
-                        .ok_or_else(|| refused("checkpoint retirement absent"))?
-                };
+            let latest = head::load_checkpoint_with_key(&tx, actor.scope(), id, 0)?;
+            let (checkpoint, source_key) = if let Some(latest) =
+                latest.filter(|(latest, _)| latest.revision.get() == revision)
+            {
+                latest
+            } else {
+                // This administrative ownership change grants no read.
+                // Authentic pre-reset history above visible latest can be
+                // retired without making that history restorable.
+                head::load_checkpoint_with_key(&tx, actor.scope(), id, revision)?
+                    .ok_or_else(|| refused("checkpoint retirement absent"))?
+            };
             traversal::ensure_audience(&tx, actor, &checkpoint.label)?;
             if revision_is_retired(&tx, &checkpoint)? {
                 return Ok((tx, ()));
+            }
+            let source = checkpoint_reference_source(&tx, &source_key)?
+                .ok_or_else(|| refused("checkpoint retirement source absent"))?;
+            if source.canonical_envelope()? != protected::encode(&checkpoint)? {
+                return Err(refused("checkpoint retirement selected envelope changed"));
             }
             let key = retirement_key(actor.scope(), id, revision)?;
             save(
@@ -154,27 +160,11 @@ impl SqliteAdmissionOperationStore {
                     retired_at: SafeInteger::new(now).map_err(refused)?,
                 },
             )?;
-            let source_key = if protected::raw_checked(
-                &tx,
-                &head::checkpoint_revision_key(actor.scope(), id, revision)?,
-            )?
-            .is_some()
-            {
-                head::checkpoint_revision_key(actor.scope(), id, revision)?
-            } else {
-                // Preserve the exact authentic legacy source when no modern
-                // historical alias was retained before this retirement.
-                let legacy = head::legacy_checkpoint_key(actor.scope(), id, revision)?;
-                if protected::raw_checked(&tx, &legacy)?.is_some() {
-                    legacy
-                } else {
-                    head::legacy_checkpoint_key(actor.scope(), id, 0)?
-                }
-            };
+            protected::verify_source_reference(&tx, source.source())?;
             super::super::reference_retirement::retire_checkpoint_references(
                 &tx,
                 &self.serving_owner,
-                &source_key,
+                source.source().record_key(),
             )?;
             Ok((tx, ()))
         })
