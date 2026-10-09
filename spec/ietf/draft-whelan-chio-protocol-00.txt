@@ -127,41 +127,41 @@ Internet-Draft                Chio Protocol               September 2026
      5.6.  Attenuation . . . . . . . . . . . . . . . . . . . . . . .  19
      5.7.  Chain Binding . . . . . . . . . . . . . . . . . . . . . .  21
      5.8.  Verification  . . . . . . . . . . . . . . . . . . . . . .  22
-     5.9.  Feature Negotiation . . . . . . . . . . . . . . . . . . .  22
+     5.9.  Feature Negotiation . . . . . . . . . . . . . . . . . . .  23
    6.  Receipts  . . . . . . . . . . . . . . . . . . . . . . . . . .  23
      6.1.  Receipt Structure . . . . . . . . . . . . . . . . . . . .  23
-     6.2.  Receipt Kinds and Boundaries  . . . . . . . . . . . . . .  24
-     6.3.  Decisions . . . . . . . . . . . . . . . . . . . . . . . .  25
-     6.4.  Content Binding . . . . . . . . . . . . . . . . . . . . .  25
-     6.5.  Receipt Identifier  . . . . . . . . . . . . . . . . . . .  26
-     6.6.  Signing . . . . . . . . . . . . . . . . . . . . . . . . .  26
-     6.7.  Receipt Lineage . . . . . . . . . . . . . . . . . . . . .  27
+     6.2.  Receipt Kinds and Boundaries  . . . . . . . . . . . . . .  25
+     6.3.  Decisions . . . . . . . . . . . . . . . . . . . . . . . .  26
+     6.4.  Content Binding . . . . . . . . . . . . . . . . . . . . .  26
+     6.5.  Receipt Identifier  . . . . . . . . . . . . . . . . . . .  27
+     6.6.  Signing . . . . . . . . . . . . . . . . . . . . . . . . .  27
+     6.7.  Receipt Lineage . . . . . . . . . . . . . . . . . . . . .  28
      6.8.  Child Receipts  . . . . . . . . . . . . . . . . . . . . .  28
-     6.9.  Verification  . . . . . . . . . . . . . . . . . . . . . .  28
-   7.  Budgets and Metering  . . . . . . . . . . . . . . . . . . . .  29
-     7.1.  Monetary Amounts  . . . . . . . . . . . . . . . . . . . .  29
+     6.9.  Verification  . . . . . . . . . . . . . . . . . . . . . .  29
+   7.  Budgets and Metering  . . . . . . . . . . . . . . . . . . . .  30
+     7.1.  Monetary Amounts  . . . . . . . . . . . . . . . . . . . .  30
      7.2.  Grant Ceilings  . . . . . . . . . . . . . . . . . . . . .  30
-     7.3.  Budget Holds  . . . . . . . . . . . . . . . . . . . . . .  30
+     7.3.  Budget Holds  . . . . . . . . . . . . . . . . . . . . . .  31
      7.4.  Delegated Budget Shares . . . . . . . . . . . . . . . . .  32
-     7.5.  Aggregate Invocation Budgets  . . . . . . . . . . . . . .  32
-     7.6.  Guarantee Levels  . . . . . . . . . . . . . . . . . . . .  35
+     7.5.  Aggregate Invocation Budgets  . . . . . . . . . . . . . .  33
+     7.6.  Guarantee Levels  . . . . . . . . . . . . . . . . . . . .  36
      7.7.  Authoritative Spend . . . . . . . . . . . . . . . . . . .  36
      7.8.  Metering Metadata . . . . . . . . . . . . . . . . . . . .  39
-   8.  Governed Transactions . . . . . . . . . . . . . . . . . . . .  43
-     8.1.  Applying the Checks . . . . . . . . . . . . . . . . . . .  44
-     8.2.  Governed Intent . . . . . . . . . . . . . . . . . . . . .  44
-       8.2.1.  Intent Hash . . . . . . . . . . . . . . . . . . . . .  47
-       8.2.2.  Intent Checks . . . . . . . . . . . . . . . . . . . .  48
-       8.2.3.  Metered Billing . . . . . . . . . . . . . . . . . . .  49
-     8.3.  Intent Constraints  . . . . . . . . . . . . . . . . . . .  51
-     8.4.  Approval Tokens . . . . . . . . . . . . . . . . . . . . .  52
-     8.5.  Threshold Approval  . . . . . . . . . . . . . . . . . . .  55
-       8.5.1.  Proposal  . . . . . . . . . . . . . . . . . . . . . .  56
-       8.5.2.  Verifying a Threshold Set . . . . . . . . . . . . . .  58
-       8.5.3.  Kernel-Issued Proposals . . . . . . . . . . . . . . .  60
-     8.6.  Provenance Classes  . . . . . . . . . . . . . . . . . . .  60
-     8.7.  Call-Chain Continuation . . . . . . . . . . . . . . . . .  62
-     8.8.  Governed Context in Receipts  . . . . . . . . . . . . . .  65
+   8.  Governed Transactions . . . . . . . . . . . . . . . . . . . .  44
+     8.1.  Applying the Checks . . . . . . . . . . . . . . . . . . .  45
+     8.2.  Governed Intent . . . . . . . . . . . . . . . . . . . . .  45
+       8.2.1.  Intent Hash . . . . . . . . . . . . . . . . . . . . .  48
+       8.2.2.  Intent Checks . . . . . . . . . . . . . . . . . . . .  49
+       8.2.3.  Metered Billing . . . . . . . . . . . . . . . . . . .  50
+     8.3.  Intent Constraints  . . . . . . . . . . . . . . . . . . .  52
+     8.4.  Approval Tokens . . . . . . . . . . . . . . . . . . . . .  53
+     8.5.  Threshold Approval  . . . . . . . . . . . . . . . . . . .  56
+       8.5.1.  Proposal  . . . . . . . . . . . . . . . . . . . . . .  57
+       8.5.2.  Verifying a Threshold Set . . . . . . . . . . . . . .  59
+       8.5.3.  Kernel-Issued Proposals . . . . . . . . . . . . . . .  61
+     8.6.  Provenance Classes  . . . . . . . . . . . . . . . . . . .  61
+     8.7.  Call-Chain Continuation . . . . . . . . . . . . . . . . .  63
+     8.8.  Governed Context in Receipts  . . . . . . . . . . . . . .  66
 
 
 
@@ -170,54 +170,54 @@ Whelan                    Expires 3 April 2027                  [Page 3]
 Internet-Draft                Chio Protocol               September 2026
 
 
-   9.  Receipt Checkpoints . . . . . . . . . . . . . . . . . . . . .  66
-     9.1.  Checkpoint Statement  . . . . . . . . . . . . . . . . . .  66
-     9.2.  Merkle Trees  . . . . . . . . . . . . . . . . . . . . . .  69
-     9.3.  Predecessor and Consistency Proofs  . . . . . . . . . . .  70
-     9.4.  Inclusion Proofs  . . . . . . . . . . . . . . . . . . . .  74
-     9.5.  Checkpoint Verification . . . . . . . . . . . . . . . . .  76
-     9.6.  Claim Limits  . . . . . . . . . . . . . . . . . . . . . .  76
-   10. Native Transport  . . . . . . . . . . . . . . . . . . . . . .  77
-     10.1.  Native Framing . . . . . . . . . . . . . . . . . . . . .  77
-     10.2.  Native Messages  . . . . . . . . . . . . . . . . . . . .  78
-     10.3.  Tool Call Results  . . . . . . . . . . . . . . . . . . .  81
-     10.4.  Native Errors  . . . . . . . . . . . . . . . . . . . . .  84
-     10.5.  Receiver Behavior  . . . . . . . . . . . . . . . . . . .  86
-   11. Hosted MCP Binding  . . . . . . . . . . . . . . . . . . . . .  87
-     11.1.  Endpoints and Headers  . . . . . . . . . . . . . . . . .  87
-     11.2.  Session Admission  . . . . . . . . . . . . . . . . . . .  90
-     11.3.  Initialization . . . . . . . . . . . . . . . . . . . . .  91
-     11.4.  Session States . . . . . . . . . . . . . . . . . . . . .  92
-     11.5.  Notification Stream and Replay . . . . . . . . . . . . .  93
-     11.6.  Tool Calls . . . . . . . . . . . . . . . . . . . . . . .  94
-     11.7.  Model Metadata . . . . . . . . . . . . . . . . . . . . .  97
-   12. Trust-Control Interface . . . . . . . . . . . . . . . . . . .  98
-     12.1.  Capability Issuance  . . . . . . . . . . . . . . . . . .  98
-     12.2.  Delegated Issuance . . . . . . . . . . . . . . . . . . . 100
-     12.3.  Receipt Query  . . . . . . . . . . . . . . . . . . . . . 104
-       12.3.1.  Paging . . . . . . . . . . . . . . . . . . . . . . . 106
-     12.4.  Revocation . . . . . . . . . . . . . . . . . . . . . . . 106
-   13. Versioning and Negotiation  . . . . . . . . . . . . . . . . . 107
-   14. Error Model . . . . . . . . . . . . . . . . . . . . . . . . . 107
-     14.1.  Error Registry . . . . . . . . . . . . . . . . . . . . . 108
-     14.2.  Surface Mappings . . . . . . . . . . . . . . . . . . . . 108
-   15. Security Considerations . . . . . . . . . . . . . . . . . . . 108
-     15.1.  Assets and Trust Boundaries  . . . . . . . . . . . . . . 108
-     15.2.  Transport Security . . . . . . . . . . . . . . . . . . . 109
-     15.3.  Token Theft and Replay . . . . . . . . . . . . . . . . . 110
-     15.4.  Kernel Impersonation and Receipt Trust . . . . . . . . . 110
-     15.5.  Delegation Abuse . . . . . . . . . . . . . . . . . . . . 111
-     15.6.  Signature Algorithm Downgrade  . . . . . . . . . . . . . 111
-     15.7.  Canonicalization . . . . . . . . . . . . . . . . . . . . 112
-     15.8.  Tool Server Confinement  . . . . . . . . . . . . . . . . 112
-     15.9.  Resource Exhaustion  . . . . . . . . . . . . . . . . . . 112
-     15.10. Budgets and Approvals  . . . . . . . . . . . . . . . . . 112
-     15.11. Checkpoint Equivocation  . . . . . . . . . . . . . . . . 113
-     15.12. Provenance Inflation . . . . . . . . . . . . . . . . . . 113
-     15.13. Attestation  . . . . . . . . . . . . . . . . . . . . . . 113
-     15.14. Clock Skew . . . . . . . . . . . . . . . . . . . . . . . 113
-   16. Privacy Considerations  . . . . . . . . . . . . . . . . . . . 113
-   17. IANA Considerations . . . . . . . . . . . . . . . . . . . . . 114
+   9.  Receipt Checkpoints . . . . . . . . . . . . . . . . . . . . .  67
+     9.1.  Checkpoint Statement  . . . . . . . . . . . . . . . . . .  67
+     9.2.  Merkle Trees  . . . . . . . . . . . . . . . . . . . . . .  70
+     9.3.  Predecessor and Consistency Proofs  . . . . . . . . . . .  71
+     9.4.  Inclusion Proofs  . . . . . . . . . . . . . . . . . . . .  75
+     9.5.  Checkpoint Verification . . . . . . . . . . . . . . . . .  77
+     9.6.  Claim Limits  . . . . . . . . . . . . . . . . . . . . . .  77
+   10. Native Transport  . . . . . . . . . . . . . . . . . . . . . .  78
+     10.1.  Native Framing . . . . . . . . . . . . . . . . . . . . .  78
+     10.2.  Native Messages  . . . . . . . . . . . . . . . . . . . .  79
+     10.3.  Tool Call Results  . . . . . . . . . . . . . . . . . . .  82
+     10.4.  Native Errors  . . . . . . . . . . . . . . . . . . . . .  85
+     10.5.  Receiver Behavior  . . . . . . . . . . . . . . . . . . .  87
+   11. Hosted MCP Binding  . . . . . . . . . . . . . . . . . . . . .  88
+     11.1.  Endpoints and Headers  . . . . . . . . . . . . . . . . .  88
+     11.2.  Session Admission  . . . . . . . . . . . . . . . . . . .  91
+     11.3.  Initialization . . . . . . . . . . . . . . . . . . . . .  92
+     11.4.  Session States . . . . . . . . . . . . . . . . . . . . .  93
+     11.5.  Notification Stream and Replay . . . . . . . . . . . . .  94
+     11.6.  Tool Calls . . . . . . . . . . . . . . . . . . . . . . .  95
+     11.7.  Model Metadata . . . . . . . . . . . . . . . . . . . . .  98
+   12. Trust-Control Interface . . . . . . . . . . . . . . . . . . .  99
+     12.1.  Capability Issuance  . . . . . . . . . . . . . . . . . .  99
+     12.2.  Delegated Issuance . . . . . . . . . . . . . . . . . . . 101
+     12.3.  Receipt Query  . . . . . . . . . . . . . . . . . . . . . 105
+       12.3.1.  Paging . . . . . . . . . . . . . . . . . . . . . . . 107
+     12.4.  Revocation . . . . . . . . . . . . . . . . . . . . . . . 107
+   13. Versioning and Negotiation  . . . . . . . . . . . . . . . . . 108
+   14. Error Model . . . . . . . . . . . . . . . . . . . . . . . . . 108
+     14.1.  Error Registry . . . . . . . . . . . . . . . . . . . . . 109
+     14.2.  Surface Mappings . . . . . . . . . . . . . . . . . . . . 109
+   15. Security Considerations . . . . . . . . . . . . . . . . . . . 109
+     15.1.  Assets and Trust Boundaries  . . . . . . . . . . . . . . 109
+     15.2.  Transport Security . . . . . . . . . . . . . . . . . . . 110
+     15.3.  Token Theft and Replay . . . . . . . . . . . . . . . . . 111
+     15.4.  Kernel Impersonation and Receipt Trust . . . . . . . . . 111
+     15.5.  Delegation Abuse . . . . . . . . . . . . . . . . . . . . 112
+     15.6.  Signature Algorithm Downgrade  . . . . . . . . . . . . . 112
+     15.7.  Canonicalization . . . . . . . . . . . . . . . . . . . . 113
+     15.8.  Tool Server Confinement  . . . . . . . . . . . . . . . . 113
+     15.9.  Resource Exhaustion  . . . . . . . . . . . . . . . . . . 113
+     15.10. Budgets and Approvals  . . . . . . . . . . . . . . . . . 113
+     15.11. Checkpoint Equivocation  . . . . . . . . . . . . . . . . 114
+     15.12. Provenance Inflation . . . . . . . . . . . . . . . . . . 114
+     15.13. Attestation  . . . . . . . . . . . . . . . . . . . . . . 114
+     15.14. Clock Skew . . . . . . . . . . . . . . . . . . . . . . . 114
+   16. Privacy Considerations  . . . . . . . . . . . . . . . . . . . 114
+   17. IANA Considerations . . . . . . . . . . . . . . . . . . . . . 115
 
 
 
@@ -226,35 +226,35 @@ Whelan                    Expires 3 April 2027                  [Page 4]
 Internet-Draft                Chio Protocol               September 2026
 
 
-     17.1.  Chio Error Codes . . . . . . . . . . . . . . . . . . . . 115
-     17.2.  Chio Signature Suites  . . . . . . . . . . . . . . . . . 118
-     17.3.  Chio Native Message Types  . . . . . . . . . . . . . . . 118
-     17.4.  Chio Signed Artifact Schemas . . . . . . . . . . . . . . 119
-   18. Implementation Status . . . . . . . . . . . . . . . . . . . . 120
-   19. References  . . . . . . . . . . . . . . . . . . . . . . . . . 121
-     19.1.  Normative References . . . . . . . . . . . . . . . . . . 121
-     19.2.  Informative References . . . . . . . . . . . . . . . . . 123
-   Appendix A.  Examples . . . . . . . . . . . . . . . . . . . . . . 125
-     A.1.  Capability Token  . . . . . . . . . . . . . . . . . . . . 125
-     A.2.  Tool Call Request Frame . . . . . . . . . . . . . . . . . 127
-     A.3.  Receipt . . . . . . . . . . . . . . . . . . . . . . . . . 128
-   Appendix B.  Test Vectors . . . . . . . . . . . . . . . . . . . . 130
-     B.1.  Canonical JSON  . . . . . . . . . . . . . . . . . . . . . 130
-     B.2.  SHA-256 Digests . . . . . . . . . . . . . . . . . . . . . 131
-     B.3.  Ed25519 Signatures  . . . . . . . . . . . . . . . . . . . 132
-     B.4.  Capability Token Verification . . . . . . . . . . . . . . 133
-     B.5.  Receipt Verification  . . . . . . . . . . . . . . . . . . 136
-   Appendix C.  Relationship to Other Work . . . . . . . . . . . . . 139
-     C.1.  Agent Communication Protocols . . . . . . . . . . . . . . 139
-     C.2.  Delegated Authorization . . . . . . . . . . . . . . . . . 139
-     C.3.  Capability Tokens . . . . . . . . . . . . . . . . . . . . 140
-     C.4.  Workload Identity and Attestation . . . . . . . . . . . . 140
-     C.5.  Signed Evidence and Transparency  . . . . . . . . . . . . 140
-     C.6.  Verifiable Credentials  . . . . . . . . . . . . . . . . . 140
-     C.7.  Candidate Companion Documents . . . . . . . . . . . . . . 141
-   Appendix D.  Document History . . . . . . . . . . . . . . . . . . 141
-   Acknowledgments . . . . . . . . . . . . . . . . . . . . . . . . . 141
-   Author's Address  . . . . . . . . . . . . . . . . . . . . . . . . 141
+     17.1.  Chio Error Codes . . . . . . . . . . . . . . . . . . . . 116
+     17.2.  Chio Signature Suites  . . . . . . . . . . . . . . . . . 119
+     17.3.  Chio Native Message Types  . . . . . . . . . . . . . . . 119
+     17.4.  Chio Signed Artifact Schemas . . . . . . . . . . . . . . 120
+   18. Implementation Status . . . . . . . . . . . . . . . . . . . . 121
+   19. References  . . . . . . . . . . . . . . . . . . . . . . . . . 122
+     19.1.  Normative References . . . . . . . . . . . . . . . . . . 122
+     19.2.  Informative References . . . . . . . . . . . . . . . . . 124
+   Appendix A.  Examples . . . . . . . . . . . . . . . . . . . . . . 126
+     A.1.  Capability Token  . . . . . . . . . . . . . . . . . . . . 126
+     A.2.  Tool Call Request Frame . . . . . . . . . . . . . . . . . 128
+     A.3.  Receipt . . . . . . . . . . . . . . . . . . . . . . . . . 129
+   Appendix B.  Test Vectors . . . . . . . . . . . . . . . . . . . . 131
+     B.1.  Canonical JSON  . . . . . . . . . . . . . . . . . . . . . 131
+     B.2.  SHA-256 Digests . . . . . . . . . . . . . . . . . . . . . 132
+     B.3.  Ed25519 Signatures  . . . . . . . . . . . . . . . . . . . 133
+     B.4.  Capability Token Verification . . . . . . . . . . . . . . 134
+     B.5.  Receipt Verification  . . . . . . . . . . . . . . . . . . 137
+   Appendix C.  Relationship to Other Work . . . . . . . . . . . . . 140
+     C.1.  Agent Communication Protocols . . . . . . . . . . . . . . 140
+     C.2.  Delegated Authorization . . . . . . . . . . . . . . . . . 140
+     C.3.  Capability Tokens . . . . . . . . . . . . . . . . . . . . 141
+     C.4.  Workload Identity and Attestation . . . . . . . . . . . . 141
+     C.5.  Signed Evidence and Transparency  . . . . . . . . . . . . 141
+     C.6.  Verifiable Credentials  . . . . . . . . . . . . . . . . . 141
+     C.7.  Candidate Companion Documents . . . . . . . . . . . . . . 142
+   Appendix D.  Document History . . . . . . . . . . . . . . . . . . 142
+   Acknowledgments . . . . . . . . . . . . . . . . . . . . . . . . . 142
+   Author's Address  . . . . . . . . . . . . . . . . . . . . . . . . 142
 
 1.  Introduction
 
@@ -1178,6 +1178,20 @@ Whelan                    Expires 3 April 2027                 [Page 21]
 Internet-Draft                Chio Protocol               September 2026
 
 
+   Open issue: multi-hop across independent keys.  The one-link limit is
+   a restriction of this profile, flagged here rather than resolved.  A
+   proof-bearing token with two or more delegation links fails the
+   chain-binding step of Section 5.8, and the verifier resolves a single
+   trust-root scope hash from the token issuer.  Authority that passes
+   through more than one delegating key, such as keys held by
+   independent operators, therefore cannot be carried as a scope-bound
+   chain.  Lifting the limit needs per-hop child-scope witnesses, a set
+   of partner keys distinct from the issuing authority's keys, and a
+   chain-binding resolver at each receiving boundary.  This document
+   does not specify them; cross-operator delegation is candidate
+   companion work (Appendix C), and the reference implementation's
+   roadmap defers it (lane COOP, After the test).
+
 5.8.  Verification
 
    Portable full verification checks, in order: peer profile validity;
@@ -1186,7 +1200,9 @@ Internet-Draft                Chio Protocol               September 2026
    supplied direct-root capability, if present; aggregate and cumulative
    budget bindings; chain shape; chain binding; and sibling-share
    admission.  Time is valid exactly when issued_at <= now < expires_at,
-   with no capability clock-skew allowance.
+   with no capability clock-skew allowance.  The chain-binding step
+   rejects a proof-bearing token with more than one delegation link; see
+   the open issue in Section 5.7.
 
    Failures deny admission.  They distinguish untrusted issuer, invalid
    signature, rejected cryptographic floor, not-yet-valid, expired,
@@ -1202,6 +1218,21 @@ Internet-Draft                Chio Protocol               September 2026
    immediate dispatch revalidation.  Checks can repeat across that
    boundary.  A token verified earlier is not exempt from later
    revocation or changed state.
+
+
+
+
+
+
+
+
+
+
+
+Whelan                    Expires 3 April 2027                 [Page 22]
+
+Internet-Draft                Chio Protocol               September 2026
+
 
 5.9.  Feature Negotiation
 
@@ -1226,14 +1257,6 @@ Internet-Draft                Chio Protocol               September 2026
    absent chain- binding flag defaults to enabled; explicitly disabling
    it rejects tokens that require it.  A feature flag describes
    supported validation behavior, not permission to skip a constraint
-
-
-
-Whelan                    Expires 3 April 2027                 [Page 22]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
    whose evaluation is unsupported.  The reference local kernel
    configures this profile locally; the separately specified federation
    handshake carries signed capability negotiation and a pinned
@@ -1254,6 +1277,18 @@ Internet-Draft                Chio Protocol               September 2026
    chio.receipt.v1 names the artifact and signing projection, rather
    than a field to insert into the wire object.  All names below are
    case-sensitive.
+
+
+
+
+
+
+
+
+Whelan                    Expires 3 April 2027                 [Page 23]
+
+Internet-Draft                Chio Protocol               September 2026
+
 
    +=====================+==============================+=============+
    | Field               | Type                         | Presence    |
@@ -1282,14 +1317,6 @@ Internet-Draft                Chio Protocol               September 2026
    +---------------------+------------------------------+-------------+
    | observation_outcome | Outcome string               | Other kinds |
    +---------------------+------------------------------+-------------+
-
-
-
-Whelan                    Expires 3 April 2027                 [Page 23]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
    | content_hash        | SHA-256 hex string           | Always      |
    +---------------------+------------------------------+-------------+
    | policy_hash         | Policy identifier string     | Always      |
@@ -1311,6 +1338,14 @@ Internet-Draft                Chio Protocol               September 2026
    | kernel_key          | Encoded public key           | Always      |
    +---------------------+------------------------------+-------------+
    | algorithm           | Algorithm hint               | When non-   |
+
+
+
+Whelan                    Expires 3 April 2027                 [Page 24]
+
+Internet-Draft                Chio Protocol               September 2026
+
+
    |                     |                              | default     |
    +---------------------+------------------------------+-------------+
    | signature           | Encoded signature            | Always      |
@@ -1339,13 +1374,6 @@ Internet-Draft                Chio Protocol               September 2026
    before signing.  A receipt verifier MUST reject a record that
    violates them.
 
-
-
-Whelan                    Expires 3 April 2027                 [Page 24]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
    +=====================+=============+========+=====================+
    | Kind                |Boundary     |Trust   | Outcome member      |
    +=====================+=============+========+=====================+
@@ -1364,6 +1392,15 @@ Internet-Draft                Chio Protocol               September 2026
    is not a signable receipt boundary in this version.  The word
    verified in a trust label describes the observation class; it does
    not prove preventive enforcement.
+
+
+
+
+
+Whelan                    Expires 3 April 2027                 [Page 25]
+
+Internet-Draft                Chio Protocol               September 2026
+
 
 6.3.  Decisions
 
@@ -1394,14 +1431,6 @@ Internet-Draft                Chio Protocol               September 2026
    separators.  The concatenated values are ASCII hexadecimal strings,
    not raw 32-octet digests.  Stream metadata records chunk hashes,
    count, and canonical byte count.  A delivery-mismatch denial uses the
-
-
-
-Whelan                    Expires 3 April 2027                 [Page 25]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
    distinct redacted commitment H(UTF8("chio.delivery-
    mismatch.redacted.v1") || 0x00 || ASCII(expected_digest)) and omits
    public stream metadata.  A verifier MUST select that producer profile
@@ -1418,6 +1447,16 @@ Internet-Draft                Chio Protocol               September 2026
    A verifier therefore needs the producer's content profile and the
    actual content to check content_hash; the signature alone does not
    perform this check.
+
+
+
+
+
+
+Whelan                    Expires 3 April 2027                 [Page 26]
+
+Internet-Draft                Chio Protocol               September 2026
+
 
 6.5.  Receipt Identifier
 
@@ -1450,14 +1489,6 @@ Internet-Draft                Chio Protocol               September 2026
    Absent metadata becomes an object.  Non-object metadata is preserved
    under original_metadata before the nonce is inserted.  An empty pre-
    binding identifier does not insert a nonce.  A verifier cannot assume
-
-
-
-Whelan                    Expires 3 April 2027                 [Page 26]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
    every receipt carries one.
 
    Without selective-disclosure extension material, the signature input
@@ -1472,6 +1503,16 @@ Internet-Draft                Chio Protocol               September 2026
    The optional algorithm hint is outside the signed projection.
    Section 4.4 defines the self-describing signature encodings.
    Appendix A contains a generated receipt and its exact signing input.
+
+
+
+
+
+
+Whelan                    Expires 3 April 2027                 [Page 27]
+
+Internet-Draft                Chio Protocol               September 2026
+
 
 6.7.  Receipt Lineage
 
@@ -1502,18 +1543,6 @@ Internet-Draft                Chio Protocol               September 2026
    no acyclicity or child-ordinal claim for ordinary receipt
    verification.
 
-
-
-
-
-
-
-
-Whelan                    Expires 3 April 2027                 [Page 27]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
 6.8.  Child Receipts
 
    A child operation can end without being a mediated tool decision.
@@ -1533,6 +1562,14 @@ Internet-Draft                Chio Protocol               September 2026
    and excluding algorithm and signature.  It has no ordinary receipt
    wrapper or signing nonce.  A successful child outcome hashes
    canonical JSON of {"outcome":"result","result":value}; an error
+
+
+
+Whelan                    Expires 3 April 2027                 [Page 28]
+
+Internet-Draft                Chio Protocol               September 2026
+
+
    hashes {"outcome":"error","message":text}. An ordinary operation
    error can be a completed child operation.  Child completion therefore
    does not mean that its result succeeded or was authorized.  A child
@@ -1563,13 +1600,6 @@ Internet-Draft                Chio Protocol               September 2026
        trusted set.  A self-consistent record signed by an untrusted key
        is not accepted as evidence of that verifier's kernel.
 
-
-
-Whelan                    Expires 3 April 2027                 [Page 28]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
    5.  If checking action integrity, recompute parameter_hash from
        action.parameters.  If checking content integrity, obtain the
        output and its producer profile, then recompute its content
@@ -1583,6 +1613,18 @@ Internet-Draft                Chio Protocol               September 2026
    and signer membership.  Freshness, external content, and the
    operational meaning of metadata remain separate checks.  A field
    named trust_level or evidenceClass never replaces those checks.
+
+
+
+
+
+
+
+
+Whelan                    Expires 3 April 2027                 [Page 29]
+
+Internet-Draft                Chio Protocol               September 2026
+
 
 7.  Budgets and Metering
 
@@ -1614,18 +1656,6 @@ Internet-Draft                Chio Protocol               September 2026
    deployments that require those properties apply a separate currency
    policy.
 
-
-
-
-
-
-
-
-Whelan                    Expires 3 April 2027                 [Page 29]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
    Budget-store additions MUST fail on integer overflow rather than
    wrap.  A store whose integer range is narrower MUST reject values
    outside that range.  The reference SQLite store supports nonnegative
@@ -1643,6 +1673,14 @@ Internet-Draft                Chio Protocol               September 2026
 
    *  The grant's reserved plus captured invocation count is less than
       max_invocations.  A maximum of zero admits no invocation.
+
+
+
+
+Whelan                    Expires 3 April 2027                 [Page 30]
+
+Internet-Draft                Chio Protocol               September 2026
+
 
    *  Requested exposure is no greater than max_cost_per_invocation.
 
@@ -1671,17 +1709,6 @@ Internet-Draft                Chio Protocol               September 2026
    The admission lifecycle is authorize exposure and reserve invocation
    quotas, capture before dispatch, then reconcile measured spend.
 
-
-
-
-
-
-
-Whelan                    Expires 3 April 2027                 [Page 30]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
    authorize              dispatch fence                  terminal
        |                        |                            |
        v                        v                            v
@@ -1697,6 +1724,19 @@ Internet-Draft                Chio Protocol               September 2026
    exposure, and realized units do not exceed that exposure.  Successful
    reconciliation removes that exposure and adds realized units; the
    unused portion returns to headroom.  Realized units can be zero.
+
+
+
+
+
+
+
+
+
+Whelan                    Expires 3 April 2027                 [Page 31]
+
+Internet-Draft                Chio Protocol               September 2026
+
 
    A hold store MUST reject a monetary release unless the release is
    positive, does not exceed remaining exposure, the monetary state is
@@ -1726,18 +1766,6 @@ Internet-Draft                Chio Protocol               September 2026
    no minted nonce.  That path does not satisfy the authoritative-spend
    profile.
 
-
-
-
-
-
-
-
-Whelan                    Expires 3 April 2027                 [Page 31]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
 7.4.  Delegated Budget Shares
 
    The signed token member budget_share_bps is an unsigned 16-bit value
@@ -1758,6 +1786,14 @@ Internet-Draft                Chio Protocol               September 2026
    The registry compares parent and child shares on one basis-point
    scale.  It does not scale max_invocations, max_cost_per_invocation,
    or max_total_cost, and the share alone does not establish a shared
+
+
+
+Whelan                    Expires 3 April 2027                 [Page 32]
+
+Internet-Draft                Chio Protocol               September 2026
+
+
    monetary balance.  The reference hosted implementation keeps this
    registry in process-local memory.  Hosted admissions use reference-
    counted holder leases and release the child edge when its last holder
@@ -1787,13 +1823,6 @@ Internet-Draft                Chio Protocol               September 2026
 
    *  root_expires_at: unsigned 64-bit Unix seconds.
 
-
-
-Whelan                    Expires 3 April 2027                 [Page 32]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
    Let C(x) denote the typed canonical UTF-8 JSON bytes in Section 4.1,
    and H(x) denote SHA-256 rendered as 64 lowercase hexadecimal
    characters without 0x.  A domain string below is UTF-8 followed by
@@ -1812,6 +1841,14 @@ Internet-Draft                Chio Protocol               September 2026
      "aggregate_scope": "delegation_family",
      "max_invocations": N
    }
+
+
+
+
+Whelan                    Expires 3 April 2027                 [Page 33]
+
+Internet-Draft                Chio Protocol               September 2026
+
 
    Here the expressions R.id and similar expressions denote copied
    values, not JSON strings. root_capability_hash is:
@@ -1842,14 +1879,6 @@ Internet-Draft                Chio Protocol               September 2026
    hint when supplied.  A verifier MUST reject an unsupported body
    schema, a present algorithm hint inconsistent with the signature, or
    a failed signature under B.root_issuer.  A verifier comparing the
-
-
-
-Whelan                    Expires 3 April 2027                 [Page 33]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
    binding with R MUST require equality of root_capability_id,
    root_capability_hash, root_issuer, root_subject, max_invocations,
    root_expires_at, and root_scope_hash with their recomputed root
@@ -1867,6 +1896,15 @@ Internet-Draft                Chio Protocol               September 2026
    The owner hashes the body, while the marker digest hashes the
    complete binding.  Neither the aggregate object nor B has an epoch
    member.
+
+
+
+
+
+Whelan                    Expires 3 April 2027                 [Page 34]
+
+Internet-Draft                Chio Protocol               September 2026
+
 
    A capability-scoped aggregate object MUST omit root_binding and MUST
    NOT authorize delegation.  A delegation-family object MUST carry
@@ -1898,14 +1936,6 @@ Internet-Draft                Chio Protocol               September 2026
       maximum.  When an attenuation witness is present, it carries the
       same marker as aggregateBudget.
 
-
-
-
-Whelan                    Expires 3 April 2027                 [Page 34]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
    An aggregate-feature verifier MUST reject aggregate evidence when
    aggregate_invocation_budget was not negotiated.  An enforcement path
    without the required durable composite admission MUST reject the
@@ -1924,6 +1954,14 @@ Internet-Draft                Chio Protocol               September 2026
    The reference portable evaluator rejects aggregate invocation
    enforcement, and the ordinary capability issuance validator does not
    issue this feature.  The supplied v1 token JSON schema also lacks the
+
+
+
+Whelan                    Expires 3 April 2027                 [Page 35]
+
+Internet-Draft                Chio Protocol               September 2026
+
+
    aggregate marker members in its closed delegation-link and witness
    definitions.  Passing that schema is therefore not acceptance
    evidence for a family descendant described here.  This schema
@@ -1953,19 +1991,32 @@ Internet-Draft                Chio Protocol               September 2026
    epoch on a hold authority is distinct from an aggregate invocation
    budget.
 
-
-
-
-
-Whelan                    Expires 3 April 2027                 [Page 35]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
 7.7.  Authoritative Spend
 
    An execution nonce has exactly the JSON-schema profile envelope
    members nonce and signature.  The nonce body and its binding are:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Whelan                    Expires 3 April 2027                 [Page 36]
+
+Internet-Draft                Chio Protocol               September 2026
+
 
        +======================+=========================+==========+
        | Member               | Type                    | Presence |
@@ -1996,28 +2047,6 @@ Internet-Draft                Chio Protocol               September 2026
 
                                   Table 6
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Whelan                    Expires 3 April 2027                 [Page 36]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
          +=================+==========================+==========+
          | bound_to member | Type                     | Presence |
          +=================+==========================+==========+
@@ -2036,6 +2065,14 @@ Internet-Draft                Chio Protocol               September 2026
          +-----------------+--------------------------+----------+
 
                                   Table 7
+
+
+
+
+Whelan                    Expires 3 April 2027                 [Page 37]
+
+Internet-Draft                Chio Protocol               September 2026
+
 
    For this JSON-schema profile, a receiver MUST reject missing required
    members, unknown members at any of the three object levels, and
@@ -2064,16 +2101,6 @@ Internet-Draft                Chio Protocol               September 2026
    or replay-store failure.  The consumed marker remains needed through
    the signed expiry.
 
-
-
-
-
-
-Whelan                    Expires 3 April 2027                 [Page 37]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
    Reconciliation by a caller-reserved nonce is a distinct path.  The
    reference implementation validates the nonce using its own signed
    binding, then separately checks the presented arguments hash, the
@@ -2094,6 +2121,14 @@ Internet-Draft                Chio Protocol               September 2026
    2.  receipt_kind is mediated_decision, boundary_class is prevent,
        trust_level is mediated, the decision is allow, and
        observation_outcome is absent.
+
+
+
+
+Whelan                    Expires 3 April 2027                 [Page 38]
+
+Internet-Draft                Chio Protocol               September 2026
+
 
    3.  metadata.budget_authority contains a nonempty hold_id and
        mediated_spend.profile equal to chio.mediated_spend.v1.
@@ -2117,18 +2152,6 @@ Internet-Draft                Chio Protocol               September 2026
    financial.cost_charged.  Execution-time nonce verification and
    guarantee-floor checking are separate checks; successful evaluation
    of this predicate alone does not establish them.
-
-
-
-
-
-
-
-
-Whelan                    Expires 3 April 2027                 [Page 38]
-
-Internet-Draft                Chio Protocol               September 2026
-
 
 7.8.  Metering Metadata
 
@@ -2155,6 +2178,14 @@ Internet-Draft                Chio Protocol               September 2026
     |                    |          |          | zero-exposure        |
     |                    |          |          | invocation           |
     |                    |          |          | reconciliation uses  |
+
+
+
+Whelan                    Expires 3 April 2027                 [Page 39]
+
+Internet-Draft                Chio Protocol               September 2026
+
+
     |                    |          |          | an empty string.     |
     +--------------------+----------+----------+----------------------+
     | budget_remaining   | unsigned | required | Recorded remaining   |
@@ -2178,14 +2209,6 @@ Internet-Draft                Chio Protocol               September 2026
     |                    |          |          | ceiling exists.      |
     +--------------------+----------+----------+----------------------+
     | delegation_depth   | unsigned | required | Recorded delegation- |
-
-
-
-Whelan                    Expires 3 April 2027                 [Page 39]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
     |                    | 32-bit   |          | chain depth.         |
     |                    | integer  |          |                      |
     +--------------------+----------+----------+----------------------+
@@ -2211,6 +2234,14 @@ Internet-Draft                Chio Protocol               September 2026
     +--------------------+----------+----------+----------------------+
     | oracle_evidence    | object   | omitted  | Optional conversion  |
     |                    |          | when     | evidence;            |
+
+
+
+Whelan                    Expires 3 April 2027                 [Page 40]
+
+Internet-Draft                Chio Protocol               September 2026
+
+
     |                    |          | absent   | verification of that |
     |                    |          |          | evidence is outside  |
     |                    |          |          | this section.        |
@@ -2237,7 +2268,32 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 40]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Whelan                    Expires 3 April 2027                 [Page 41]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -2293,7 +2349,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 41]
+Whelan                    Expires 3 April 2027                 [Page 42]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -2349,7 +2405,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 42]
+Whelan                    Expires 3 April 2027                 [Page 43]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -2405,7 +2461,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 43]
+Whelan                    Expires 3 April 2027                 [Page 44]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -2461,7 +2517,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 44]
+Whelan                    Expires 3 April 2027                 [Page 45]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -2517,7 +2573,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 45]
+Whelan                    Expires 3 April 2027                 [Page 46]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -2573,7 +2629,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 46]
+Whelan                    Expires 3 April 2027                 [Page 47]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -2629,7 +2685,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 47]
+Whelan                    Expires 3 April 2027                 [Page 48]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -2685,7 +2741,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 48]
+Whelan                    Expires 3 April 2027                 [Page 49]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -2741,7 +2797,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 49]
+Whelan                    Expires 3 April 2027                 [Page 50]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -2797,7 +2853,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 50]
+Whelan                    Expires 3 April 2027                 [Page 51]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -2853,7 +2909,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 51]
+Whelan                    Expires 3 April 2027                 [Page 52]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -2909,7 +2965,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 52]
+Whelan                    Expires 3 April 2027                 [Page 53]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -2965,7 +3021,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 53]
+Whelan                    Expires 3 April 2027                 [Page 54]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -3021,7 +3077,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 54]
+Whelan                    Expires 3 April 2027                 [Page 55]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -3077,7 +3133,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 55]
+Whelan                    Expires 3 April 2027                 [Page 56]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -3133,7 +3189,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 56]
+Whelan                    Expires 3 April 2027                 [Page 57]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -3189,7 +3245,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 57]
+Whelan                    Expires 3 April 2027                 [Page 58]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -3245,7 +3301,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 58]
+Whelan                    Expires 3 April 2027                 [Page 59]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -3301,7 +3357,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 59]
+Whelan                    Expires 3 April 2027                 [Page 60]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -3357,7 +3413,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 60]
+Whelan                    Expires 3 April 2027                 [Page 61]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -3413,7 +3469,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 61]
+Whelan                    Expires 3 April 2027                 [Page 62]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -3469,7 +3525,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 62]
+Whelan                    Expires 3 April 2027                 [Page 63]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -3525,7 +3581,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 63]
+Whelan                    Expires 3 April 2027                 [Page 64]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -3581,7 +3637,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 64]
+Whelan                    Expires 3 April 2027                 [Page 65]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -3637,7 +3693,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 65]
+Whelan                    Expires 3 April 2027                 [Page 66]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -3693,7 +3749,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 66]
+Whelan                    Expires 3 April 2027                 [Page 67]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -3749,7 +3805,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 67]
+Whelan                    Expires 3 April 2027                 [Page 68]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -3805,7 +3861,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 68]
+Whelan                    Expires 3 April 2027                 [Page 69]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -3861,7 +3917,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 69]
+Whelan                    Expires 3 April 2027                 [Page 70]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -3917,7 +3973,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 70]
+Whelan                    Expires 3 April 2027                 [Page 71]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -3973,7 +4029,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 71]
+Whelan                    Expires 3 April 2027                 [Page 72]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -4029,7 +4085,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 72]
+Whelan                    Expires 3 April 2027                 [Page 73]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -4085,7 +4141,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 73]
+Whelan                    Expires 3 April 2027                 [Page 74]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -4141,7 +4197,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 74]
+Whelan                    Expires 3 April 2027                 [Page 75]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -4197,7 +4253,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 75]
+Whelan                    Expires 3 April 2027                 [Page 76]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -4253,7 +4309,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 76]
+Whelan                    Expires 3 April 2027                 [Page 77]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -4309,7 +4365,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 77]
+Whelan                    Expires 3 April 2027                 [Page 78]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -4365,7 +4421,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 78]
+Whelan                    Expires 3 April 2027                 [Page 79]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -4421,7 +4477,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 79]
+Whelan                    Expires 3 April 2027                 [Page 80]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -4477,7 +4533,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 80]
+Whelan                    Expires 3 April 2027                 [Page 81]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -4533,7 +4589,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 81]
+Whelan                    Expires 3 April 2027                 [Page 82]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -4589,7 +4645,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 82]
+Whelan                    Expires 3 April 2027                 [Page 83]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -4645,7 +4701,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 83]
+Whelan                    Expires 3 April 2027                 [Page 84]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -4701,7 +4757,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 84]
+Whelan                    Expires 3 April 2027                 [Page 85]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -4757,7 +4813,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 85]
+Whelan                    Expires 3 April 2027                 [Page 86]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -4813,7 +4869,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 86]
+Whelan                    Expires 3 April 2027                 [Page 87]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -4869,7 +4925,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 87]
+Whelan                    Expires 3 April 2027                 [Page 88]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -4925,7 +4981,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 88]
+Whelan                    Expires 3 April 2027                 [Page 89]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -4981,7 +5037,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 89]
+Whelan                    Expires 3 April 2027                 [Page 90]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -5037,7 +5093,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 90]
+Whelan                    Expires 3 April 2027                 [Page 91]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -5093,7 +5149,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 91]
+Whelan                    Expires 3 April 2027                 [Page 92]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -5149,7 +5205,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 92]
+Whelan                    Expires 3 April 2027                 [Page 93]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -5205,7 +5261,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 93]
+Whelan                    Expires 3 April 2027                 [Page 94]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -5261,7 +5317,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 94]
+Whelan                    Expires 3 April 2027                 [Page 95]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -5317,7 +5373,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 95]
+Whelan                    Expires 3 April 2027                 [Page 96]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -5373,7 +5429,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 96]
+Whelan                    Expires 3 April 2027                 [Page 97]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -5429,7 +5485,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 97]
+Whelan                    Expires 3 April 2027                 [Page 98]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -5485,7 +5541,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 98]
+Whelan                    Expires 3 April 2027                 [Page 99]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -5541,7 +5597,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                 [Page 99]
+Whelan                    Expires 3 April 2027                [Page 100]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -5597,7 +5653,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 100]
+Whelan                    Expires 3 April 2027                [Page 101]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -5653,7 +5709,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 101]
+Whelan                    Expires 3 April 2027                [Page 102]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -5709,7 +5765,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 102]
+Whelan                    Expires 3 April 2027                [Page 103]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -5765,7 +5821,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 103]
+Whelan                    Expires 3 April 2027                [Page 104]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -5821,7 +5877,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 104]
+Whelan                    Expires 3 April 2027                [Page 105]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -5877,7 +5933,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 105]
+Whelan                    Expires 3 April 2027                [Page 106]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -5933,7 +5989,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 106]
+Whelan                    Expires 3 April 2027                [Page 107]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -5989,7 +6045,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 107]
+Whelan                    Expires 3 April 2027                [Page 108]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -6045,7 +6101,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 108]
+Whelan                    Expires 3 April 2027                [Page 109]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -6101,7 +6157,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 109]
+Whelan                    Expires 3 April 2027                [Page 110]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -6157,7 +6213,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 110]
+Whelan                    Expires 3 April 2027                [Page 111]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -6213,7 +6269,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 111]
+Whelan                    Expires 3 April 2027                [Page 112]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -6269,7 +6325,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 112]
+Whelan                    Expires 3 April 2027                [Page 113]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -6325,7 +6381,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 113]
+Whelan                    Expires 3 April 2027                [Page 114]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -6381,7 +6437,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 114]
+Whelan                    Expires 3 April 2027                [Page 115]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -6437,7 +6493,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 115]
+Whelan                    Expires 3 April 2027                [Page 116]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -6493,7 +6549,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 116]
+Whelan                    Expires 3 April 2027                [Page 117]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -6549,7 +6605,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 117]
+Whelan                    Expires 3 April 2027                [Page 118]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -6605,7 +6661,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 118]
+Whelan                    Expires 3 April 2027                [Page 119]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -6661,7 +6717,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 119]
+Whelan                    Expires 3 April 2027                [Page 120]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -6717,7 +6773,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 120]
+Whelan                    Expires 3 April 2027                [Page 121]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -6773,7 +6829,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 121]
+Whelan                    Expires 3 April 2027                [Page 122]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -6829,7 +6885,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 122]
+Whelan                    Expires 3 April 2027                [Page 123]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -6885,7 +6941,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 123]
+Whelan                    Expires 3 April 2027                [Page 124]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -6941,7 +6997,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 124]
+Whelan                    Expires 3 April 2027                [Page 125]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -6997,7 +7053,7 @@ A.1.  Capability Token
 
 
 
-Whelan                    Expires 3 April 2027                [Page 125]
+Whelan                    Expires 3 April 2027                [Page 126]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -7053,7 +7109,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 126]
+Whelan                    Expires 3 April 2027                [Page 127]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -7109,7 +7165,7 @@ A.2.  Tool Call Request Frame
 
 
 
-Whelan                    Expires 3 April 2027                [Page 127]
+Whelan                    Expires 3 April 2027                [Page 128]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -7165,7 +7221,7 @@ A.3.  Receipt
 
 
 
-Whelan                    Expires 3 April 2027                [Page 128]
+Whelan                    Expires 3 April 2027                [Page 129]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -7221,7 +7277,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 129]
+Whelan                    Expires 3 April 2027                [Page 130]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -7277,7 +7333,7 @@ B.1.  Canonical JSON
 
 
 
-Whelan                    Expires 3 April 2027                [Page 130]
+Whelan                    Expires 3 April 2027                [Page 131]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -7333,7 +7389,7 @@ B.2.  SHA-256 Digests
 
 
 
-Whelan                    Expires 3 April 2027                [Page 131]
+Whelan                    Expires 3 April 2027                [Page 132]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -7389,7 +7445,7 @@ B.3.  Ed25519 Signatures
 
 
 
-Whelan                    Expires 3 April 2027                [Page 132]
+Whelan                    Expires 3 April 2027                [Page 133]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -7445,7 +7501,7 @@ B.4.  Capability Token Verification
 
 
 
-Whelan                    Expires 3 April 2027                [Page 133]
+Whelan                    Expires 3 April 2027                [Page 134]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -7501,7 +7557,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 134]
+Whelan                    Expires 3 April 2027                [Page 135]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -7557,7 +7613,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 135]
+Whelan                    Expires 3 April 2027                [Page 136]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -7613,7 +7669,7 @@ B.5.  Receipt Verification
 
 
 
-Whelan                    Expires 3 April 2027                [Page 136]
+Whelan                    Expires 3 April 2027                [Page 137]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -7669,7 +7725,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 137]
+Whelan                    Expires 3 April 2027                [Page 138]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -7725,7 +7781,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 138]
+Whelan                    Expires 3 April 2027                [Page 139]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -7781,7 +7837,7 @@ C.2.  Delegated Authorization
 
 
 
-Whelan                    Expires 3 April 2027                [Page 139]
+Whelan                    Expires 3 April 2027                [Page 140]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -7837,7 +7893,7 @@ C.6.  Verifiable Credentials
 
 
 
-Whelan                    Expires 3 April 2027                [Page 140]
+Whelan                    Expires 3 April 2027                [Page 141]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -7893,4 +7949,4 @@ Author's Address
 
 
 
-Whelan                    Expires 3 April 2027                [Page 141]
+Whelan                    Expires 3 April 2027                [Page 142]

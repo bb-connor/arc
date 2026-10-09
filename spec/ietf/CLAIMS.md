@@ -2,13 +2,26 @@
 
 Implementation baseline: `f5566d9a765c21cb36652a99c79de64968a656bf`.
 Review date: 2026-09-30.
-Final draft source SHA-256: `96d5daac0b256f37407335667d82021d91f84685a639cf7327aadeb39593920e`.
+Reviewed draft source SHA-256: `96d5daac0b256f37407335667d82021d91f84685a639cf7327aadeb39593920e`. Later edits are listed under "Post-review changes" below.
 
 The following eight independent source reviews cover the abstract, all numbered sections, related-work claims, every BCP 14 obligation, and concrete wire fields, signature inputs, limits, ordering, and error mappings. The generated examples and vectors are separately checked against their source bytes by the build gate.
 
 Supported means the inspected implementation supplies the stated behavior. Qualified means the statement is a bounded profile, a caller/operator/consumer obligation, or a documented difference between typed parsing, schema validation, and runtime enforcement. A qualified row is not proof of automatic runtime enforcement or public availability. No unresolved required source-claim correction remains.
 
 Individual reviews retain their own frozen snapshot hashes and line pointers. Subsequent edits in other sections can shift line numbers without changing the reviewed claim. The final formatting pass dedented diagrams, wrapped one mathematical expression, and removed trailing whitespace; it did not change the reviewed wire values. Repository-relative citations are internal verification provenance, not public checkout instructions.
+
+## Open issue: multi-hop across independent keys
+
+Added 2026-10-09, after the eight reviews. This flags a profile limit; it does not change the rule or any reviewed claim.
+
+The chain-binding rule ("This proof-bearing profile accepts at most one link", section Chain Binding) and its place in the verification order (section Verification) are the single-key multi-hop rule. A token that triggers chain binding and carries more than one delegation link is rejected, and the verifier resolves one trust-root scope hash from the token issuer (`crates/core/chio-core-types/src/capability/attenuation.rs:301-305`; `crates/kernel/chio-kernel-core/src/capability_verify.rs:579-598`). OV-A02, OV-I05, OV-G02, and encoding ledger row 87 already record the limit. The draft now states it as an open issue in section Chain Binding and points to it from section Verification.
+
+Lifting the limit needs per-hop child-scope witnesses, a partner-key set separate from authority keys, and a chain-binding resolver at the HTTP door, which today rejects any token carrying `attenuation_proof` (`crates/platform/chio-http-core/src/authority.rs:1250-1254`). The unified roadmap (`docs/operations/UNIFIED_ROADMAP.md`, lane COOP, "After the test") defers that work. Until then, cross-operator delegation stays candidate companion work and the draft makes no multi-hop claim.
+
+## Post-review changes
+
+- Section Chain Binding gains the open-issue note above, and section Verification gains one sentence pointing to it. No wire value, field, or ordering changed.
+- Appendix A now builds its token and request frame from corpus case `valid_no_delegation_chain`. The previous case, `valid_delegated_capability`, delegates to a key other than its subject, so full verification (final delegatee equals subject; `crates/kernel/chio-kernel-core/src/capability_verify.rs:549-565`) rejects it. Appendix B keeps that case as a vector and now states that its expected result covers only signatures, link connectivity, timestamps, and time.
 
 ## Abstract and Sections 1-3
 

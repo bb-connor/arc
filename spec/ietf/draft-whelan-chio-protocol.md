@@ -849,6 +849,20 @@ Root scope hash             Parent scope hash       Child scope hash
 ~~~
 {: #fig-delegation title="One-Hop Scope-Bound Delegation"}
 
+Open issue: multi-hop across independent keys. The one-link limit is a
+restriction of this profile, flagged here rather than resolved. A
+proof-bearing token with two or more delegation links fails the
+chain-binding step of {{capability-verification}}, and the verifier
+resolves a single trust-root scope hash from the token issuer. Authority
+that passes through more than one delegating key, such as keys held by
+independent operators, therefore cannot be carried as a scope-bound
+chain. Lifting the limit needs per-hop child-scope witnesses, a set of
+partner keys distinct from the issuing authority's keys, and a
+chain-binding resolver at each receiving boundary. This document does
+not specify them; cross-operator delegation is candidate companion work
+({{related-work}}), and the reference implementation's roadmap defers
+it (lane COOP, After the test).
+
 ## Verification {#capability-verification}
 
 Portable full verification checks, in order: peer profile validity;
@@ -857,6 +871,8 @@ and cryptographic floor; schema and signature; time; supplied direct-root
 capability, if present; aggregate and cumulative budget bindings; chain shape; chain
 binding; and sibling-share admission. Time is valid exactly when
 `issued_at <= now < expires_at`, with no capability clock-skew allowance.
+The chain-binding step rejects a proof-bearing token with more than one
+delegation link; see the open issue in {{chain-binding}}.
 
 Failures deny admission. They distinguish untrusted issuer, invalid
 signature, rejected cryptographic floor, not-yet-valid, expired,
