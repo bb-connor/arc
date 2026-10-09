@@ -28,7 +28,7 @@ use crate::authority_ipc::{
     AuthorityRpcClient, AuthorityRpcClientConfig, BrokerAdmissionAuthority,
 };
 use crate::budget::BrokerExecutionBudget;
-use crate::daemon::{BrokerDaemonHandler, Clock, SystemClock};
+use crate::daemon::{BrokerDaemonHandler, BrokerDaemonParts, Clock, SystemClock};
 use crate::generic_https::GenericHttpsExecutor;
 use crate::migration::{BrokerMigrationEnforcer, ProductionBrokerMigrationEnforcer};
 #[cfg(unix)]
@@ -779,19 +779,20 @@ impl BrokerDaemonRuntime {
             config.ipc_read_timeout_ms,
             config.ipc_write_timeout_ms,
         )?;
-        let handler: Arc<dyn BrokerIpcHandler> = Arc::new(BrokerDaemonHandler::new(
-            config.tenant_scope.clone(),
-            config.broker_audience.clone(),
-            config.trusted_capability_issuer.clone(),
-            config.trusted_authority.clone(),
-            config.maximum_clock_skew_seconds,
-            Arc::clone(&service),
-            admission,
-            Arc::clone(&admin),
-            Arc::clone(&signing_backend),
-            backend,
-            Arc::clone(&daemon_clock),
-        )?);
+        let handler: Arc<dyn BrokerIpcHandler> =
+            Arc::new(BrokerDaemonHandler::new(BrokerDaemonParts {
+                tenant_scope: config.tenant_scope.clone(),
+                audience: config.broker_audience.clone(),
+                trusted_issuer: config.trusted_capability_issuer.clone(),
+                trusted_authority: config.trusted_authority.clone(),
+                maximum_clock_skew_seconds: config.maximum_clock_skew_seconds,
+                service: Arc::clone(&service),
+                admission,
+                admin: Arc::clone(&admin),
+                admin_receipt_signer: Arc::clone(&signing_backend),
+                backend,
+                clock: Arc::clone(&daemon_clock),
+            })?);
         migration_enforcer.ensure_ready()?;
         let endpoint = UnixBrokerEndpoint::bind_with_deadlines(
             &config.ipc_socket_path,

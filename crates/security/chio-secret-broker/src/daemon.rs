@@ -335,24 +335,36 @@ pub struct BrokerDaemonHandler {
     clock: Arc<dyn Clock>,
 }
 
+/// Identity, trust anchors and collaborators for a [`BrokerDaemonHandler`].
+pub struct BrokerDaemonParts {
+    pub tenant_scope: String,
+    pub audience: String,
+    pub trusted_issuer: chio_core_types::PublicKey,
+    pub trusted_authority: chio_core_types::PublicKey,
+    pub maximum_clock_skew_seconds: u64,
+    pub service: Arc<BrokerService>,
+    pub admission: Arc<dyn BrokerAdmissionAuthority>,
+    pub admin: Arc<GovernedAdminAuthorizer>,
+    pub admin_receipt_signer: Arc<dyn SigningBackend>,
+    pub backend: Arc<EncryptedBlobSecretBackend>,
+    pub clock: Arc<dyn Clock>,
+}
+
 impl BrokerDaemonHandler {
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-    )]
-    pub fn new(
-        tenant_scope: String,
-        audience: String,
-        trusted_issuer: chio_core_types::PublicKey,
-        trusted_authority: chio_core_types::PublicKey,
-        maximum_clock_skew_seconds: u64,
-        service: Arc<BrokerService>,
-        admission: Arc<dyn BrokerAdmissionAuthority>,
-        admin: Arc<GovernedAdminAuthorizer>,
-        admin_receipt_signer: Arc<dyn SigningBackend>,
-        backend: Arc<EncryptedBlobSecretBackend>,
-        clock: Arc<dyn Clock>,
-    ) -> Result<Self> {
+    pub fn new(params: BrokerDaemonParts) -> Result<Self> {
+        let BrokerDaemonParts {
+            tenant_scope,
+            audience,
+            trusted_issuer,
+            trusted_authority,
+            maximum_clock_skew_seconds,
+            service,
+            admission,
+            admin,
+            admin_receipt_signer,
+            backend,
+            clock,
+        } = params;
         validate_identifier(&tenant_scope, "daemon tenant scope", 512)?;
         validate_identifier(&audience, "daemon broker audience", 512)?;
         if maximum_clock_skew_seconds == 0 || maximum_clock_skew_seconds > 30 {
@@ -1598,19 +1610,19 @@ mod tests {
             .test_expect("admin"),
         );
         let admission: Arc<dyn BrokerAdmissionAuthority> = authority.clone();
-        let handler = BrokerDaemonHandler::new(
-            "tenant-production".to_string(),
-            "broker-service-production".to_string(),
-            issuer.public_key(),
-            authority_signer.public_key(),
-            1,
+        let handler = BrokerDaemonHandler::new(BrokerDaemonParts {
+            tenant_scope: "tenant-production".to_string(),
+            audience: "broker-service-production".to_string(),
+            trusted_issuer: issuer.public_key(),
+            trusted_authority: authority_signer.public_key(),
+            maximum_clock_skew_seconds: 1,
             service,
             admission,
-            Arc::clone(&admin),
-            receipt_signing_backend,
-            Arc::clone(&backend),
-            Arc::new(FixedClock(100)),
-        )
+            admin: Arc::clone(&admin),
+            admin_receipt_signer: receipt_signing_backend,
+            backend: Arc::clone(&backend),
+            clock: Arc::new(FixedClock(100)),
+        })
         .test_expect("handler");
 
         let credential = CredentialRef {

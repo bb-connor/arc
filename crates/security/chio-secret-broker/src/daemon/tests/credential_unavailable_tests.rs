@@ -134,19 +134,19 @@ impl Fixture {
         let admission: Arc<dyn BrokerAdmissionAuthority> = Arc::new(
             execute_cause_tests::ExecuteAdmissionAuthority::new(authority.clone()),
         );
-        let handler = BrokerDaemonHandler::new(
-            "tenant-production".to_string(),
-            "broker-service-production".to_string(),
-            issuer.public_key(),
-            authority_signer.public_key(),
-            1,
-            service.clone(),
+        let handler = BrokerDaemonHandler::new(BrokerDaemonParts {
+            tenant_scope: "tenant-production".to_string(),
+            audience: "broker-service-production".to_string(),
+            trusted_issuer: issuer.public_key(),
+            trusted_authority: authority_signer.public_key(),
+            maximum_clock_skew_seconds: 1,
+            service: service.clone(),
             admission,
-            Arc::clone(&admin),
-            receipt_signing_backend,
-            Arc::clone(&backend),
-            Arc::new(FixedClock(100)),
-        )
+            admin: Arc::clone(&admin),
+            admin_receipt_signer: receipt_signing_backend,
+            backend: Arc::clone(&backend),
+            clock: Arc::new(FixedClock(100)),
+        })
         .test_expect("handler");
 
         let uid = rustix::process::geteuid().as_raw();
