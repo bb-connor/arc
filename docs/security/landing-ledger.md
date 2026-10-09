@@ -63,7 +63,12 @@ SMT type converter. A later private-tool diagnostic reached Z3 but exhausted its
 14 GiB address-space limit (exit 101), leaving 26 solver errors including the
 mandatory assertions and completion cover. Its zero failed-assertion count is
 not success. Both attempts and the earlier prepared-model mismatch are preserved.
-A bounded memory retry is unqualified until its complete result is reviewed. Main
+The 26 GiB retry also ended with explicit out-of-memory stderr after 1,410.09
+seconds, with all source, model and tool hashes stable. Its 26 solver errors
+remain unproved. The exact solver input is retained for bounded diagnostics
+with another supported backend; no private tool is enrolled in CI. The 11
+receipt HTTP tests passed on `1ba2c4628b`, and an independent read-only review
+found no P0/P1/P2 defect in the nine-file late-lineage repair. Main
 `3af65d2d23` is merged into the stage with both histories preserved; its changed
 conformance fixture and affected tooling pass. Source remains `3b0760cfe7` and the
 published PR remains `fd8bfdc947`; exact protected checks and protected merge

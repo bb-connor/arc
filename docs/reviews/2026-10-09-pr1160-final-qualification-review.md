@@ -80,8 +80,12 @@ same-version tool attempt that exhausted Z3's 14 GiB address-space allowance
 checks and 26 solver errors, including determinism, context binding and the
 completion cover. The earlier cover-only interpretation is incorrect. The
 prepared-model mismatch from that attempt remains recorded separately. A new
-bounded memory retry retains the domain, assertions and source; it supplies no
-acceptance before terminal verification and reproducible tool qualification.
+bounded memory retry retained the domain, assertions and source but exhausted
+its 26 GiB address-space allowance too. It finished after 1,410.09 seconds with
+26 solver errors and no completed proof; source, model and tool hashes stayed
+stable and all owned children exited. The exact 582,631,570-byte solver input
+is preserved for supported-backend diagnostics. More memory alone has not
+closed the local proof or made the configuration suitable for hosted CI.
 
 ## V25-C20-OBSERVER-CANCELLATION: P2, required before landing
 
