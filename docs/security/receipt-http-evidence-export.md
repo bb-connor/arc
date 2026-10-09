@@ -21,6 +21,15 @@ known, deleting its current lineage refuses the export. Originally unknown
 unsigned attribution retains the existing empty-lineage behavior. Tenant exports
 omit child payloads that have no tenant join path, as in the local export.
 
+A transport-ineligible live lineage (including a supported legacy projection,
+a cycle, excessive depth or a missing parent) refuses only that export with a
+typed conflict. Unauthenticated publication enrichment has the same request-only
+boundary. These refusals do not invalidate the shared authenticated snapshot or
+interrupt another tenant's receipt reads. In contrast, missing or altered owned
+checkpoint data, incomplete proof hashes, changed selected payloads, and a
+mismatch or deletion of captured unsigned attribution invalidate that served
+snapshot. The service must rebuild authenticated state before serving it again.
+
 The existing unpaginated HTTP response has these request ceilings:
 
 - 4,096 selected tool and child receipts combined.

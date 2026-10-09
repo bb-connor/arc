@@ -2809,6 +2809,17 @@
       "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
     },
     {
+      "owner": "sessions",
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/compaction.rs",
+      "sha256": "f4d4565f1878219c11325f51ca081021ef155df0292a9c3bf052d82f0c2b33ac",
+      "sql": "SELECT DISTINCT tenant_id, principal_id, session_id, isolation_epoch_id FROM security_participant_state_egress_fences WHERE security_authority_id = ?1",
+      "tables": [
+        "security_participant_state_egress_fences"
+      ],
+      "principal": "security-runtime",
+      "contract": "Authority-bound internal retirement planner enumerates existing fences so no retained session fence can be deleted. Existing tenant port predicates remain unchanged."
+    },
+    {
       "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/integrity.rs",
       "owner": "verify_coverage",
       "sha256": "cbe36578ccb5173bc7e6997bcfde935fbb526d1dc1e57e643afb0f7ec1fda7e4",
@@ -3066,6 +3077,28 @@
       "sql": "SELECT (SELECT COUNT(*) FROM security_participant_state_initializations), (SELECT COUNT(*) FROM security_participant_state_mutations), (SELECT COUNT(*) FROM security_participant_egress_events), (SELECT COUNT(*) FROM security_participant_output_events), (SELECT COUNT(*) FROM authority_global_commits)",
       "principal": "kernel-admission",
       "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "owner": "preflight_recorded",
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/storage.rs",
+      "sha256": "5886e7e7ee5e1638aed7c31fed3a4a8f71a0793164e0db962c4c77a658f2015f",
+      "sql": "SELECT EXISTS(SELECT 1 FROM security_participant_nonce_preflight_events WHERE operation_id = ?1)",
+      "tables": [
+        "security_participant_nonce_preflight_events"
+      ],
+      "principal": "security-runtime",
+      "contract": "Internal global operation-id membership lookup determines whether this operation already holds a completion reservation. It is not a tenant read API and yields only a boolean to admission logic."
+    },
+    {
+      "owner": "unfinished_operations",
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/storage.rs",
+      "sha256": "9db60bc58d8c3b8fbc252c9069931f7b9af26c6d8c91cc4da24bb94199b5bc68",
+      "sql": "SELECT COUNT(*) FROM (SELECT operation_id FROM admission_operations WHERE terminal = 0 LIMIT ?1) AS operation WHERE EXISTS(SELECT 1 FROM security_participant_state_mutations AS joined WHERE joined.operation_id = operation.operation_id){preflight}",
+      "tables": [
+        "security_participant_state_mutations"
+      ],
+      "principal": "security-runtime",
+      "contract": "Global resource accounting counts nonterminal operations with native history to reserve rows across the whole store. Bounded 65537-row scan refuses incomplete evidence. No payload or tenant data leaves this accounting function; scope is deliberately global because the current-row cap is global."
     },
     {
       "path": "crates/platform/chio-store-sqlite/src/encrypted_blob.rs",
@@ -17859,7 +17892,8 @@
       "transparency_public_certifications_across_network::shared-reader::crates/platform/chio-control-plane/src/trust_control/service_runtime/public_registry.rs::resolve_public_certification_transparency"
     ],
     "crates/platform/chio-control-plane/src/certify/registry.rs": [
-      "load::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::decode"
+      "load::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::decode",
+      "update::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::update_registry"
     ],
     "crates/platform/chio-control-plane/src/economic_state_anchor.rs": [
       "post#2::original-json-reader::UntrustedJsonText"
@@ -17943,7 +17977,8 @@
       "load#1::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::decode",
       "load#2::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::decode",
       "load#3::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::decode",
-      "snapshot::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::decode"
+      "snapshot::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::decode",
+      "update::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::update_registry"
     ],
     "crates/platform/chio-control-plane/src/policy/loader.rs": [
       "load_policy::format-yaml::from_str",
@@ -18056,7 +18091,10 @@
     ],
     "crates/platform/chio-control-plane/src/signed_input.rs": [
       "decode::original-json-reader::UntrustedJsonText",
-      "read::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::decode"
+      "read::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::decode",
+      "reserved_size_on_disk::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::decode",
+      "update_registry::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::write_reserving_registry",
+      "write_reserving_registry::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::reserved_size_on_disk"
     ],
     "crates/platform/chio-control-plane/src/transaction_passport_risk.rs": [
       "graph_bound_signed_risk_report::original-json-reader::UntrustedJsonText",
@@ -22253,8 +22291,18 @@
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/compaction.rs": [
       "compact::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::compact_native_rows",
+      "imported_sessions::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::decode_retained_security_row",
+      "imported_sessions::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::retained_security_columns",
+      "plan::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/compaction.rs::sessions",
       "plan::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::encode_retained_security_values",
-      "plan::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::retained_security_columns"
+      "plan::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::retained_security_columns",
+      "sessions::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/compaction.rs::imported_sessions",
+      "sessions::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/compaction.rs::visit_session_rows",
+      "sessions::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/compaction.rs::visit_session_rows",
+      "sessions::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/compaction.rs::visit_session_rows",
+      "sessions::shared-reader::crates/platform/chio-store-sqlite/src/security_state/flow_state.rs::native_session_dominated",
+      "visit_session_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::encode_retained_security_values",
+      "visit_session_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::retained_security_columns"
     ],
     "crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs": [
       "check_apply::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::verified_marker",
@@ -22295,17 +22343,25 @@
     ],
     "crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs": [
       "cell::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::retained_security_columns",
-      "compact_native_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::text",
+      "compact_native_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::session_key",
+      "compact_native_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::session_key",
+      "compact_native_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::session_key",
       "compact_native_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::text",
       "compact_native_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::validate_dead",
+      "compact_native_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::validate_sessions",
       "compact_native_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::decode_retained_security_row",
       "record::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::encode_retained_security_values",
       "record::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::retained_security_columns",
+      "session_key::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::text",
+      "session_key::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::text",
+      "session_key::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::text",
+      "session_key::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::text",
       "text::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::cell",
       "validate_dead::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::cell",
       "validate_dead::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::cell",
       "validate_dead::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::cell",
-      "validate_dead::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::text"
+      "validate_dead::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::text",
+      "validate_sessions::shared-reader::crates/platform/chio-store-sqlite/src/security_state/flow_state.rs::native_session_dominated"
     ],
     "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export.rs": [
       "build_export::shared-reader::crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export.rs::collect_tools",
@@ -22319,6 +22375,10 @@
     ],
     "crates/platform/chio-control-plane/src/trust_control/receipt_snapshot_admin.rs": [
       "handle_receipt_query_snapshot_recovery::request-json::ReceiptQuerySnapshotRecoveryRequest"
+    ],
+    "crates/platform/chio-store-sqlite/src/security_state/flow_state.rs": [
+      "native_session_dominated::shared-reader::crates/platform/chio-store-sqlite/src/security_state/codec.rs::decode_label",
+      "native_session_dominated::shared-reader::crates/platform/chio-store-sqlite/src/security_state/codec.rs::decode_label"
     ]
   },
   "retired_direct_readers": {
