@@ -95,28 +95,16 @@ pub(super) async fn health(state: &TrustServiceState) -> Value {
     let Some(snapshots) = state.receipt_query_snapshots.clone() else {
         return json!({"configured": state.receipt_store.is_some(), "state": if state.receipt_store.is_some() { "unavailable" } else { "unconfigured" }});
     };
-    // Process-owned telemetry only: public polls never borrow receipt admission
-    // or a snapshot database hold. The watermark identifies the sampled version.
-    let status = snapshots.health_status();
-    let (phase, reason, progress) = match status.state {
-        ReceiptQuerySnapshotState::WaitingForWriterSeed => ("waiting_for_writer_seed", None, None),
-        ReceiptQuerySnapshotState::Building {
-            authenticated_entries,
-            target_entries,
-        } => (
-            "building",
-            None,
-            Some(
-                json!({"authenticatedEntries": authenticated_entries, "targetEntries": target_entries}),
-            ),
-        ),
-        ReceiptQuerySnapshotState::Ready => ("ready", None, None),
-        ReceiptQuerySnapshotState::Invalid { reason } => ("invalid", Some(reason), None),
-        ReceiptQuerySnapshotState::Unavailable { reason } => ("unavailable", Some(reason), None),
-        ReceiptQuerySnapshotState::Stopped => ("stopped", None, None),
+    // Public telemetry discloses readiness only. Counts, source watermarks and
+    // raw diagnostics stay in the trusted owner status API. Polling takes no
+    // receipt admission permit or snapshot database hold.
+    let phase = match snapshots.health_status().state {
+        ReceiptQuerySnapshotState::WaitingForWriterSeed => "waiting_for_writer_seed",
+        ReceiptQuerySnapshotState::Building { .. } => "building",
+        ReceiptQuerySnapshotState::Ready => "ready",
+        ReceiptQuerySnapshotState::Invalid { .. } => "invalid",
+        ReceiptQuerySnapshotState::Unavailable { .. } => "unavailable",
+        ReceiptQuerySnapshotState::Stopped => "stopped",
     };
-    json!({"configured": true, "state": phase, "reason": reason, "progress": progress,
-        "watermark": status.watermark, "usedBytes": status.used_bytes, "quotaBytes": status.quota_bytes,
-        "toolReceipts": status.tool_receipts, "dimensions": status.dimensions, "dimensionBytes": status.dimension_bytes,
-        "lastRecertificationMs": status.last_recertification_ms})
+    json!({"configured": true, "state": phase})
 }

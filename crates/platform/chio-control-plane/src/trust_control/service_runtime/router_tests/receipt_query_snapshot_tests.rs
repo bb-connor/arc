@@ -78,13 +78,15 @@ async fn every_receipt_read_route_reports_an_authenticated_watermark() -> TestRe
 }
 
 #[tokio::test]
-async fn health_reports_snapshot_readiness_and_resource_usage() -> TestResult {
+async fn health_reports_snapshot_readiness() -> TestResult {
     let (_directory, state) = fixture().await?;
     let (status, body) = response_body(state, "/health").await?;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["receiptQuerySnapshot"]["state"], "ready", "{body}");
-    assert!(body["receiptQuerySnapshot"]["usedBytes"].as_u64().is_some());
-    assert!(body["receiptQuerySnapshot"]["watermark"]["id"].is_string());
+    assert_eq!(
+        body["receiptQuerySnapshot"],
+        json!({"configured": true, "state": "ready"})
+    );
     Ok(())
 }
 
@@ -100,8 +102,27 @@ async fn public_health_is_independent_of_receipt_read_admission() -> TestResult 
     let bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024).await?;
     let body: Value = serde_json::from_slice(&bytes)?;
     assert_eq!(body["receiptQuerySnapshot"]["state"], "ready", "{body}");
-    assert!(body["receiptQuerySnapshot"]["watermark"]["id"].is_string());
+    assert_eq!(
+        body["receiptQuerySnapshot"],
+        json!({"configured": true, "state": "ready"})
+    );
     assert_eq!(state.receipt_query_lane.available_permits(), 0);
+    Ok(())
+}
+
+#[tokio::test]
+async fn public_snapshot_health_discloses_only_configuration_and_readiness() -> TestResult {
+    let (_directory, state) = fixture().await?;
+    let request = Request::builder().uri("/health").body(Body::empty())?;
+    let response = super::super::build_router(state).oneshot(request).await?;
+    assert_eq!(response.status(), StatusCode::OK);
+    let bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024).await?;
+    let body: Value = serde_json::from_slice(&bytes)?;
+    assert_eq!(
+        body["receiptQuerySnapshot"],
+        json!({"configured": true, "state": "ready"}),
+        "public health must not disclose receipt counts, watermarks or diagnostic details"
+    );
     Ok(())
 }
 
@@ -490,3 +511,6 @@ async fn cancelled_page_materialization_keeps_read_admission() -> TestResult {
 async fn cancelled_point_materialization_keeps_read_admission() -> TestResult {
     finalization_retains_admission(SnapshotReadKind::Point).await
 }
+
+#[path = "receipt_snapshot_recovery_tests.rs"]
+mod recovery;

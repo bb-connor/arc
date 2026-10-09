@@ -1,14 +1,12 @@
 # Authenticated receipt query snapshots
 
-- **Status.** Revision 4, aligned with the implemented runtime on the V25 stage
-  (557d396c30 plus Root's Task 6 HTTP wiring). Revision 3 was written for Root
-  review of finding V25 on PR #1160; Root accepted the core architecture and
-  authorized Tasks 0-5 at 06:09:22Z, starting with the memory backend. The
-  Linux private-file backend has since been delivered and is the production
-  backend on Linux (4.2). Two rules here lead the code at 557d396c30 and are
-  approved changes in flight: the tenant projection mismatch is a latched
-  Invalid outcome (6.4), and the rebuild backoff resets after a successful
-  publication (7.1).
+- **Status.** Revision 5 reconciles the implemented V25 snapshot design with
+  FINAL-F04/F09 recovery and health contracts. The original V25 stage was
+  `557d396c30` plus Root's HTTP wiring; `d9e3359e3a` supplies bounded resource
+  retries, explicit owner quota growth and sampled telemetry. The public
+  disclosure restriction is a final-review follow-up and remains subject to
+  its source-bound acceptance record. The Linux private-file backend remains
+  the production backend on Linux (4.2).
 - **Base.** a457a89c75.
 - **Prerequisite.** V25-PRE: one persistent trust-control receipt store, owned
   by `TrustServiceState`. Section 9 lists what this design needs from it.
@@ -88,15 +86,17 @@ Runtime rulings recorded against the implementation:
 
 - **Lease re-check.** A read lease is refused as `invalid` only after an actual
   invalidation. A rebuild, a resource outcome or a stop keeps its own class.
-- **Capacity and row-cap recovery.** Restart only, after the operator raises the
-  configured quota. The service never rebuilds in a loop against an unchanged
-  insufficient limit.
+- **Capacity and row-cap recovery.** Bounded exponential retry preserves the
+  finite quota. An explicit trusted-owner quota increase wakes the walker and
+  takes effect in-process; source repairs or restored backing space recover
+  through the same retry path. No request silently raises the budget.
 - **Point reads while building.** They return the retryable `building` outcome.
 - **Request order.** State and head readiness may precede query validation. HTTP
   authentication and tenant authorization always precede snapshot admission.
-- **Health.** The snapshot health summary takes one of the outer HTTP read
-  permits, because its custody, file and SQL work runs on the blocking pool. It
-  reports `busy` under saturation. Top-level health is unchanged.
+- **Health.** The public snapshot summary reads nonblocking process telemetry
+  and discloses only configuration and readiness. It never takes HTTP read
+  admission or a database hold. Detailed resource and integrity diagnostics
+  remain in the trusted owner status API.
 - **Extension trigger.** A fixed 250 ms poll plus a read-triggered wake replaces
   the coalesced writer-commit signal of the earlier plan. It keeps the explicit
   head wait and staleness refusal with no writer-notification dependency, at
@@ -225,16 +225,17 @@ process's custody. If `/tmp` is a `tmpfs`, the file occupies system memory.
     other temporary unavailability and SQL work-budget outcomes keep the existing
     fixed retry interval capped at 30 seconds. Quotas never grow automatically.
     Cancellation interrupts either wait.
-- **Accounting.** `status()` and `/health` report:
+- **Accounting.** The trusted owner `status()` and sampled `health_status()` APIs report:
   - `quota_bytes`;
   - `used_bytes` (`page_count * page_size`);
   - row count;
   - distinct dimension count;
   - dimension value bytes.
-  The inspecting `status()` API checks owned storage. Public `/health` instead
-  reads a coherent walker-maintained sample using nonblocking memory locks. It
-  never acquires receipt-read admission or a database connection. Its watermark
-  identifies the sampled version; it is not a fresh payload integrity check.
+  The inspecting `status()` API checks owned storage. The sampled
+  `health_status()` API reads a coherent walker-maintained sample with
+  nonblocking memory locks. Its watermark identifies the sampled version; it
+  is not a fresh payload integrity check. Public `/health` discloses only the
+  configuration and readiness state, omitting the detailed sample.
 - **Default quota and operator setting.** The quota defaults to 2 GiB
   (2147483648 bytes) on both backends. Operators set it with
   `chio trust serve --receipt-query-snapshot-quota-bytes <BYTES>`
@@ -659,7 +660,7 @@ All limits are enforced, and each has a typed outcome.
 
 | Limit | Default | Outcome |
 |---|---|---|
-| HTTP read lane permits, non-queued (also used by the `/health` snapshot summary) | 4 | 503 `busy` |
+| HTTP receipt read lane permits, non-queued (public health does not use this lane) | 4 | 503 `busy` |
 | Core service read permits (`max_concurrent_reads`), non-queued | 4 | 503 `busy` |
 | `query_sql_steps` (snapshot) | 10,000,000 | 422 |
 | L signature checks and leaf hashes | at most 200 | none |
@@ -702,16 +703,18 @@ brackets.
   integrity ones. Reads get 503 `unavailable` without `Retry-After`.
   - `walker_budget` and a busy store end the lineage, and the walker rebuilds
     after `min(invalid_retry_backoff, 30 s)`.
-  - `capacity` and `row_cap` persist until the process restarts. The service
-    never rebuilds on its own after them, and its configuration is fixed at
-    start, so a larger quota takes effect only through a restart with a new
-    `--receipt-query-snapshot-quota-bytes`.
+  - `capacity` and `row_cap` retry after exponential backoff, starting at
+    `min(invalid_retry_backoff, 30 s)` and capped at one hour. Successful
+    publication resets the backoff. An explicit owner call to
+    `increase_quota_bytes` wakes the walker; quotas never grow automatically.
+    The CLI option sets the startup quota. There is no HTTP quota mutation
+    endpoint.
 - **`Stopped` (`stopped`).** Entered after cancellation. Reads get 503
   `unavailable`.
 
-`/health` also reports `unconfigured` without a receipt store, `busy` when the
-HTTP read lane has no free permit, and `unavailable` without a reason when the
-service was not started (9).
+`/health` also reports `unconfigured` without a receipt store, and `unavailable`
+when the service was not started or a telemetry lock is temporarily held. It
+never borrows HTTP receipt admission and never exposes raw failure reasons.
 
 An invalid or superseded snapshot is dropped. It is never published again.
 
@@ -782,14 +785,11 @@ detected at the recertification cadence rather than on the next page (Q1).
     state becomes `Invalid("receipt writer failed to seed a verified head")`.
     Otherwise the build starts.
   - HTTP serves from the beginning and reports the state.
-  - `/health` carries `receiptQuerySnapshot`: `configured`, `state` (7.1),
-    `reason`, `progress` (`authenticatedEntries`, `targetEntries` while
-    building), `watermark` (the snapshot object of 11 while ready), `usedBytes`,
-    `quotaBytes`, `toolReceipts`, `dimensions`, `dimensionBytes` and
-    `lastRecertificationMs` (the duration of the last full pass). The summary
-    takes an HTTP read lane permit, and reports only `configured` and
-    `state: "busy"` when none is free. The HTTP status and top-level `ok` do
-    not depend on it.
+  - `/health` carries `receiptQuerySnapshot` with only `configured` and
+    `state` (7.1). The sampled observation is read without receipt admission
+    or database work. Counts, resource use, progress, watermarks and error
+    details are omitted. The snapshot summary alone does not determine the
+    top-level HTTP status or `ok`; other service readiness checks still apply.
 - **Shutdown.**
   1. The server drains.
   2. `shutdown()` runs in `spawn_blocking`. It sets the cancel flag, wakes the
@@ -1005,3 +1005,12 @@ budgets, and export is bounded only in concurrency.
   restarts with a larger `--receipt-query-snapshot-quota-bytes`. Repeated failed
   rebuilds back off rather than permanently latching or repeatedly allocating
   a larger projection. These limits remain typed and reported.
+
+### Public health disclosure boundary
+
+The unauthenticated snapshot health response contains only `configured` and
+`state`. It does not publish sampled receipt or dimension counts, resource usage,
+watermarks, raw error reasons, paths or host details. The trusted owner status
+API retains the detailed, source-bound observation for diagnosis. Public polling
+continues to use nonblocking telemetry and never acquires receipt admission or
+a snapshot database hold.

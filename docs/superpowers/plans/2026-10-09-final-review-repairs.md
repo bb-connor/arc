@@ -44,11 +44,15 @@ KANI-PROOF-QUAL remains OPEN/UNPROVED under the recorded owner amendment.
 2. Add walker-maintained resource telemetry and a nonblocking health read;
    retain the existing inspecting status API for operators and integrity tests.
 3. Test held snapshot locks, exhausted admission, invalid/stopped phases, and
-   coherent sampled watermarks without timing-based success claims.
+   coherent sampled watermarks without timing-based success claims. Public HTTP
+   exposes only configured/state; detailed watermarks, counts, paths and raw
+   diagnostics stay in the trusted owner status API.
 4. Reproduce SQLite FULL misclassification without filling the host filesystem,
    and reproduce failure to resume after a one-shot capacity fault clears.
 5. Implement explicit bounded resource retry/recovery. Test transient recovery,
    actual quota refusal, cancellation during backoff, and unchanged tamper refusal.
+   Exercise HTTP refusal then successful reads after owner quota growth, followed
+   by rejection of altered selected receipt data on the recovered service.
    SQLite FULL is ambiguous even when post-rollback usage is below the quota;
    report both possible resource causes instead of asserting quota exhaustion.
    Capacity/per-row-limit backoff starts at the configured retry interval capped
