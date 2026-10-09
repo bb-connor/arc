@@ -16,6 +16,5 @@
 //! the input shapes local to this crate also avoids a
 //! `chio-reputation -> chio-arena` dependency cycle and lets audits
 //! reproduce feeds offline against fixture data.
-
 pub mod arena_survival;
 pub mod cross_provider_equality;

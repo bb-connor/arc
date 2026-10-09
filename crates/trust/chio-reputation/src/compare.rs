@@ -1,4 +1,19 @@
-fn compute_history_depth(
+use crate::issuance::{
+    bool_to_score, budget_reduced, clamp01, decay_weight, scope_reduced, weighted_average,
+};
+use crate::model::{
+    DelegationHygieneMetrics, HistoryDepthMetrics, ImportedIssuerIdentity,
+    ImportedReputationProvenance, ImportedReputationSignal, ImportedTrustMode, ImportedTrustPolicy,
+    IncidentCorrelationMetrics, LocalReputationCorpus, MetricValue, ReliabilityMetrics,
+    ReputationConfig, SpecializationMetrics,
+};
+use crate::score::compute_local_scorecard;
+use crate::{receipt_authority_valid, CapabilityLineageRecord, SECONDS_PER_DAY};
+use chio_core::receipt::body::ChioReceipt;
+use chio_core::receipt::decision::Decision;
+use std::collections::{BTreeMap, BTreeSet};
+
+pub(super) fn compute_history_depth(
     receipts: &[&ChioReceipt],
     config: &ReputationConfig,
 ) -> HistoryDepthMetrics {
@@ -49,7 +64,7 @@ fn compute_history_depth(
     }
 }
 
-fn compute_specialization(
+pub(super) fn compute_specialization(
     receipts: &[&ChioReceipt],
     now: u64,
     config: &ReputationConfig,
@@ -94,7 +109,7 @@ fn compute_specialization(
     }
 }
 
-fn compute_delegation_hygiene(
+pub(super) fn compute_delegation_hygiene(
     delegations: &[&CapabilityLineageRecord],
     capability_map: &BTreeMap<&str, &CapabilityLineageRecord>,
     now: u64,
@@ -157,7 +172,7 @@ fn compute_delegation_hygiene(
     }
 }
 
-fn compute_reliability(
+pub(super) fn compute_reliability(
     receipts: &[&ChioReceipt],
     now: u64,
     config: &ReputationConfig,
@@ -211,7 +226,7 @@ fn compute_reliability(
     }
 }
 
-fn compute_incident_correlation(
+pub(super) fn compute_incident_correlation(
     _subject_key: &str,
     now: u64,
     corpus: &LocalReputationCorpus,

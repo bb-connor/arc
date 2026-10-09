@@ -508,12 +508,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "cross-protocol test suite assembled from include! fragments; capped until the fragments become modules",
         max_fragments=1,
     ),
-    "crates/trust/chio-reputation/src/lib.rs": allow(
-        "2026-10-31",
-        "reputation surface assembled from include! fragments; capped until the fragments become modules",
-        max_lines=1_718,
-        max_fragments=5,
-    ),
     "crates/platform/chio-agent-web-interop/src/lib.rs": allow(
         "2026-10-31",
         "agent-web interop surface assembled from include! fragments; capped until the fragments become modules",

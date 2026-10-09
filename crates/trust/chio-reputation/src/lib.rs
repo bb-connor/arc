@@ -8,15 +8,10 @@
 
 #![forbid(unsafe_code)]
 
-use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
 use chio_core::receipt::body::chio_receipt_id;
-use chio_core::receipt::{
-    body::ChioReceipt, decision::Decision, metadata::ReceiptAttributionMetadata,
-};
-use serde::{Deserialize, Serialize};
+use chio_core::receipt::body::ChioReceipt;
 
 const SECONDS_PER_DAY: u64 = 86_400;
 const DEFAULT_HISTORY_RECEIPT_TARGET: u64 = 1_000;
@@ -76,13 +71,25 @@ fn receipt_integrity_valid(receipt: &ChioReceipt, config: &ReputationConfig) -> 
 fn receipt_authority_valid(receipt: &ChioReceipt, config: &ReputationConfig) -> bool {
     receipt_integrity_valid(receipt, config) && receipt.is_allowed()
 }
+pub use compare::build_imported_reputation_signal;
+pub use model::{
+    BoundaryPressureMetrics, BudgetUsageRecord, CapabilityLineageRecord,
+    CapabilityLineageScopeJsonInput, DelegationHygieneMetrics, HistoryDepthMetrics,
+    ImportedIssuerIdentity, ImportedReputationProvenance, ImportedReputationSignal,
+    ImportedTrustMode, ImportedTrustPolicy, IncidentCorrelationMetrics, IncidentRecord,
+    LeastPrivilegeMetrics, LocalReputationCorpus, LocalReputationScorecard, MetricValue,
+    ReliabilityMetrics, ReputationConfig, ReputationError, ReputationWeights,
+    ResourceStewardshipMetrics, SpecializationMetrics,
+};
+pub use score::compute_local_scorecard;
 
+mod compare;
 mod input;
-include!("model.rs");
-include!("score.rs");
-include!("compare.rs");
-include!("issuance.rs");
-include!("tests.rs");
+mod issuance;
+mod model;
+mod score;
+#[cfg(test)]
+mod tests;
 
 pub mod feed;
 pub mod feeds;

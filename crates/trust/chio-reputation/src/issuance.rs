@@ -1,4 +1,10 @@
-fn contribute_metric(
+use crate::{CapabilityLineageRecord, SECONDS_PER_DAY};
+use chio_core::capability::scope::{ChioScope, ToolGrant};
+use chio_core::receipt::body::ChioReceipt;
+use chio_core::receipt::metadata::ReceiptAttributionMetadata;
+use std::collections::BTreeMap;
+
+pub(super) fn contribute_metric(
     metric: Option<f64>,
     weight: f64,
     weighted_sum: &mut f64,
@@ -10,7 +16,7 @@ fn contribute_metric(
     }
 }
 
-fn receipt_subject_key(
+pub(super) fn receipt_subject_key(
     receipt: &ChioReceipt,
     capability_map: &BTreeMap<&str, &CapabilityLineageRecord>,
 ) -> Option<String> {
@@ -29,7 +35,7 @@ fn receipt_attribution(receipt: &ChioReceipt) -> Option<ReceiptAttributionMetada
     serde_json::from_value(attribution.clone()).ok()
 }
 
-fn weighted_average(values: &[(f64, f64)]) -> f64 {
+pub(super) fn weighted_average(values: &[(f64, f64)]) -> f64 {
     let total_weight = values.iter().map(|(_, weight)| weight).sum::<f64>();
     if total_weight == 0.0 {
         0.0
@@ -42,7 +48,7 @@ fn weighted_average(values: &[(f64, f64)]) -> f64 {
     }
 }
 
-fn decay_weight(now: u64, timestamp: u64, half_life_days: u32) -> f64 {
+pub(super) fn decay_weight(now: u64, timestamp: u64, half_life_days: u32) -> f64 {
     if half_life_days == 0 {
         return 1.0;
     }
@@ -51,7 +57,7 @@ fn decay_weight(now: u64, timestamp: u64, half_life_days: u32) -> f64 {
     2f64.powf(-age_seconds / half_life_seconds)
 }
 
-fn scope_reduced(parent: &ChioScope, child: &ChioScope) -> bool {
+pub(super) fn scope_reduced(parent: &ChioScope, child: &ChioScope) -> bool {
     if child
         .grants
         .iter()
@@ -74,7 +80,7 @@ fn scope_reduced(parent: &ChioScope, child: &ChioScope) -> bool {
     })
 }
 
-fn budget_reduced(parent: &ChioScope, child: &ChioScope) -> bool {
+pub(super) fn budget_reduced(parent: &ChioScope, child: &ChioScope) -> bool {
     child.grants.iter().any(|child_grant| {
         parent_grant_for(child_grant, parent)
             .map(|parent_grant| {
@@ -97,7 +103,7 @@ fn parent_grant_for<'a>(child: &ToolGrant, parent: &'a ChioScope) -> Option<&'a 
         .or_else(|| parent.grants.iter().find(|grant| child.is_subset_of(grant)))
 }
 
-fn grant_scope_reduced(parent: &ToolGrant, child: &ToolGrant) -> bool {
+pub(super) fn grant_scope_reduced(parent: &ToolGrant, child: &ToolGrant) -> bool {
     if child
         .operations
         .iter()
@@ -149,7 +155,7 @@ fn monetary_cap_reduced(
     }
 }
 
-fn bool_to_score(value: bool) -> f64 {
+pub(super) fn bool_to_score(value: bool) -> f64 {
     if value {
         1.0
     } else {
@@ -157,7 +163,6 @@ fn bool_to_score(value: bool) -> f64 {
     }
 }
 
-fn clamp01(value: f64) -> f64 {
+pub(super) fn clamp01(value: f64) -> f64 {
     value.clamp(0.0, 1.0)
 }
-

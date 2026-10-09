@@ -1,3 +1,10 @@
+use crate::issuance::clamp01;
+use crate::{DEFAULT_HISTORY_DAY_TARGET, DEFAULT_HISTORY_RECEIPT_TARGET, DEFAULT_INCIDENT_PENALTY};
+use chio_core::capability::scope::ChioScope;
+use chio_core::receipt::body::ChioReceipt;
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
+
 #[derive(Debug, thiserror::Error)]
 pub enum ReputationError {
     #[error("failed to decode capability scope json: {0}")]
@@ -68,7 +75,7 @@ pub enum MetricValue {
 }
 
 impl MetricValue {
-    fn known(value: f64) -> Self {
+    pub(super) fn known(value: f64) -> Self {
         Self::Known(clamp01(value))
     }
 

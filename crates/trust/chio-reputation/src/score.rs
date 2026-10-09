@@ -1,3 +1,20 @@
+use crate::compare::{
+    compute_delegation_hygiene, compute_history_depth, compute_incident_correlation,
+    compute_reliability, compute_specialization,
+};
+use crate::issuance::{
+    clamp01, contribute_metric, decay_weight, receipt_subject_key, weighted_average,
+};
+use crate::model::{
+    BoundaryPressureMetrics, BudgetUsageRecord, LeastPrivilegeMetrics, LocalReputationCorpus,
+    LocalReputationScorecard, MetricValue, ReputationConfig, ResourceStewardshipMetrics,
+};
+use crate::{receipt_authority_valid, receipt_integrity_valid, CapabilityLineageRecord};
+use chio_core::capability::scope::Operation;
+use chio_core::receipt::body::ChioReceipt;
+use chio_core::receipt::decision::Decision;
+use std::collections::{BTreeMap, BTreeSet};
+
 /// Compute the local reputation scorecard for one agent.
 #[must_use]
 pub fn compute_local_scorecard(
