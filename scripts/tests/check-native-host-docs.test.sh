@@ -87,6 +87,16 @@ EOF
   printf '# Protocol\n' >"$fixture/spec/PROTOCOL.md"
   printf '<svg xmlns="http://www.w3.org/2000/svg" aria-label="Evidence that travels"><text>Evidence that travels</text></svg>\n' \
     >"$fixture/docs/assets/subhead.svg"
+  # Every budgeted single document exists; a missing one is a violation.
+  mkdir -p "$fixture/docs/superpowers/specs/2026-10-07-macos-integration" \
+    "$fixture/docs/superpowers/plans/2026-10-07-omarchy-integration" \
+    "$fixture/docs/superpowers/plans/2026-10-07-macos-integration"
+  local doc
+  for doc in specs/2026-10-07-omarchy-integration/ANNEX.md specs/2026-10-07-macos-integration/ANNEX.md \
+    plans/2026-10-07-desktop-integration.md plans/2026-10-07-omarchy-integration/IMPLEMENTATION.md \
+    plans/2026-10-07-macos-integration/IMPLEMENTATION.md; do
+    printf '# Document\n' >"$fixture/docs/superpowers/$doc"
+  done
 }
 
 # A clean tree passes every rule.
@@ -110,6 +120,24 @@ printf '<svg xmlns="http://www.w3.org/2000/svg"><text><tspan>Agents that pay</ts
   >"$fixture/docs/assets/subhead.svg"
 expect "retired phrase split across SVG spans" 1 "retired-phrases: docs/assets/subhead.svg: contains 'Agents that pay each other'" -- --rule retired-phrases
 
+# A plural retired claim is still a retired claim.
+new_fixture plural-retired
+printf 'Chio is one of the only protocols that does this.\n' >>"$fixture/docs/reference/COMPETITIVE_LANDSCAPE.md"
+expect "plural only protocols" 1 "retired-phrases: docs/reference/COMPETITIVE_LANDSCAPE.md: contains 'only protocol'" -- --rule retired-phrases
+
+# --scope program ignores the public copy; --scope public ignores the program set.
+new_fixture scopes
+printf '\nThe kernel your agents answer to.\n' >>"$fixture/README.md"
+printf '\nAgents that pay each other.\n' >>"$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/README.md"
+expect "--scope program skips public copy" 1 "retired-phrases: docs/superpowers/specs/2026-10-07-desktop-integration/README.md: contains 'Agents that pay each other'" -- --scope program --rule retired-phrases
+expect "--scope public skips the program set" 1 "retired-phrases: README.md: contains 'The kernel your agents answer to'" -- --scope public --rule retired-phrases
+new_fixture scope-public-only
+printf '\nThe kernel your agents answer to.\n' >>"$fixture/README.md"
+expect "--scope program ignores a public-copy violation" 0 "-" -- --scope program
+new_fixture scope-program-only
+printf '\nAgents that pay each other.\n' >>"$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/README.md"
+expect "--scope public ignores a program violation" 0 "-" -- --scope public
+
 # "verify-only protocol" is a projection name, not an "only protocol" claim.
 new_fixture verify-only
 printf 'Payments use the verify-only protocol projections.\n' >>"$fixture/docs/start-here/FLAGSHIP.md"
@@ -127,10 +155,13 @@ printf '# Review\n\nThe old README said "only protocol".\n' \
   >"$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/reviews/2026-10-08-notes.md"
 expect "non-allowlisted program file is checked" 1 "retired-phrases: docs/superpowers/specs/2026-10-07-desktop-integration/reviews/2026-10-08-notes.md: contains 'only protocol'" -- --rule retired-phrases
 
-# An em dash is reported with its line.
+# An em dash is reported with its line, also as an HTML entity.
 new_fixture em-dash
 printf 'Second line \xe2\x80\x94 with an em dash.\n' >>"$fixture/AGENTS.md"
 expect "em dash" 1 "em-dash: AGENTS.md: line 2 contains U+2014" -- --rule em-dash
+new_fixture em-dash-entity
+printf 'Second line &mdash; as an entity.\n' >>"$fixture/AGENTS.md"
+expect "em dash entity" 1 "em-dash: AGENTS.md: line 2 contains U+2014" -- --rule em-dash
 
 # A broken relative link and a broken anchor are reported.
 new_fixture broken-link
@@ -138,6 +169,19 @@ printf '\nSee [the plan](PLAN.md) and [flows](CASES.md#flows).\n' \
   >>"$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/README.md"
 expect "broken relative link" 1 "links: docs/superpowers/specs/2026-10-07-desktop-integration/README.md: missing target PLAN.md" -- --rule links
 expect "broken anchor" 1 "links: docs/superpowers/specs/2026-10-07-desktop-integration/README.md: missing anchor CASES.md#flows" -- --rule links
+
+# Setext headings provide anchors.
+new_fixture setext
+printf '\nSetext title\n============\n\nSee [it](#setext-title).\n' \
+  >>"$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/README.md"
+expect "setext heading anchor" 0 "-" -- --rule links
+
+# Links inside an indented fence (a fence nested in a list) are not checked.
+new_fixture indented-fence
+# shellcheck disable=SC2016 # literal backticks are the fixture
+printf '\n- Step:\n\n  ```markdown\n  [example](MISSING.md)\n  ```\n' \
+  >>"$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/README.md"
+expect "links in an indented fence are ignored" 0 "-" -- --rule links
 
 # Links inside code are not checked.
 new_fixture code-link
@@ -169,13 +213,19 @@ mkdir -p "$fixture/docs/superpowers/specs/2026-10-07-macos-integration"
 python3 -I -c 'print("word " * 6001)' >"$fixture/docs/superpowers/specs/2026-10-07-macos-integration/ANNEX.md"
 expect "annex budget" 1 "budgets: docs/superpowers/specs/2026-10-07-macos-integration/ANNEX.md: macos annex has 6001 words, exceeds 6000" -- --rule budgets
 
-# --only limits the report to one path.
+# --only limits the report to one path and keeps violations under it.
 expect "--only filters other paths" 0 "-" -- --rule budgets --only docs/superpowers/specs/2026-10-07-desktop-integration
+expect "--only keeps matching paths" 1 "budgets: docs/superpowers/specs/2026-10-07-macos-integration/ANNEX.md: macos annex has 6001 words, exceeds 6000" -- --rule budgets --only docs/superpowers/specs/2026-10-07-macos-integration
+
+# A missing budgeted document fails closed.
+new_fixture missing-budget-doc
+rm "$fixture/docs/superpowers/plans/2026-10-07-omarchy-integration/IMPLEMENTATION.md"
+expect "missing budgeted document" 1 "budgets: docs/superpowers/plans/2026-10-07-omarchy-integration/IMPLEMENTATION.md: omarchy plan file missing" -- --rule budgets
 
 # Repository baseline: every public-copy violation must be in the baseline.
-public_out="$(python3 -I "$CHECKER" --rule retired-phrases \
-  --only README.md --only AGENTS.md --only docs/start-here --only docs/reference/COMPETITIVE_LANDSCAPE.md \
-  --only spec/PROTOCOL.md --only docs/assets 2>/dev/null)" || true
+public_code=0
+public_out="$(python3 -I "$CHECKER" --scope public --rule retired-phrases --rule em-dash 2>/dev/null)" || public_code=$?
+[[ "$public_code" == 0 || "$public_code" == 1 ]] || fail "public copy: checker exited $public_code"
 while IFS= read -r line; do
   [[ -n "$line" ]] || continue
   known=0

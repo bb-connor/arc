@@ -14,6 +14,11 @@ Rules (NORTH-STAR-FLOWS section 7, unified roadmap section 9):
 
 Output is one `RULE: path: message` line per violation. Exit 0 when clean,
 1 when any violation is found, 2 on a usage or read error (fail closed).
+
+`--scope program` checks only the program set; it is the gate for the native
+host documents. `--scope public` checks only the public copy, which carries a
+known baseline until the roadmap's positioning items land (see
+scripts/tests/check-native-host-docs.test.sh). The default scope is both.
 """
 from __future__ import annotations
 
@@ -33,8 +38,10 @@ RETIRED = (
 CASE_ID = re.compile(r"\b(Q(?:0[1-9]|[1-9][0-9])|C(?:0[1-9]|1[0-9])|H0[1-8][ab]?)\b")
 CASE_ROW = re.compile(r"^\|\s*(Q\d\d|C\d\d|H0[1-8][ab]?)\s*\|", re.M)
 LINK = re.compile(r"\]\(([^)\s]+)\)")
-HEADING = re.compile(r"^#{1,6}\s+(.+?)\s*#*\s*$", re.M)
-FENCE = re.compile(r"^(```|~~~).*?^\1[^\n]*$", re.M | re.S)
+HEADING = re.compile(r"^ {0,3}#{1,6}\s+(.+?)\s*#*\s*$", re.M)
+SETEXT = re.compile(r"^ {0,3}(\S[^\n]*?)\s*\n {0,3}(?:=+|-+)\s*$", re.M)
+FENCE = re.compile(r"^([ \t]*)(```|~~~)[^\n]*\n.*?^[ \t]*\2[^\n]*$", re.M | re.S)
+EM_DASH_ENTITY = re.compile(r"&(?:mdash|#8212|#x2014);", re.I)
 INLINE_CODE = re.compile(r"`[^`\n]*`")
 SVG_ATTR = re.compile(r"\b(?:alt|aria-label|title)\s*=\s*(\"[^\"]*\"|'[^']*')", re.I)
 SVG_TAG = re.compile(r"<[^>]*>")
@@ -116,7 +123,9 @@ def slug(text: str) -> str:
 def anchors(text: str) -> set[str]:
     seen: dict[str, int] = {}
     out = set()
-    for heading in HEADING.findall(FENCE.sub("", text)):
+    body = FENCE.sub("", text)
+    headings = HEADING.findall(body) + [h for h in SETEXT.findall(body) if not h.startswith("|")]
+    for heading in headings:
         base = slug(heading)
         count = seen.get(base, 0)
         seen[base] = count + 1
@@ -161,7 +170,7 @@ def check_retired(layout: Layout) -> list[str]:
         text = visible_text(path, read(path))
         for phrase in RETIRED:
             # "verify-only protocol" is not an "only protocol" claim.
-            if re.search(r"(?<![\w-])" + re.escape(phrase.lower()) + r"\b", text):
+            if re.search(r"(?<![\w-])" + re.escape(phrase.lower()) + r"s?\b", text):
                 out.append(f"retired-phrases: {layout.rel(path)}: contains '{phrase}'")
     return out
 
@@ -170,12 +179,14 @@ def check_em_dash(layout: Layout) -> list[str]:
     out = []
     for path in sorted(set(layout.program) | set(layout.public)):
         for number, line in enumerate(read(path).splitlines(), start=1):
-            if "\u2014" in line:
+            if "\u2014" in line or EM_DASH_ENTITY.search(line):
                 out.append(f"em-dash: {layout.rel(path)}: line {number} contains U+2014")
     return out
 
 
 def check_case_ids(layout: Layout) -> list[str]:
+    if layout.cases is None:
+        return []
     if not layout.cases.is_file():
         return [f"case-ids: {layout.rel(layout.cases)}: CASES.md does not exist"]
     rows = CASE_ROW.findall(read(layout.cases))
@@ -196,7 +207,11 @@ def check_case_ids(layout: Layout) -> list[str]:
 def check_budgets(layout: Layout) -> list[str]:
     out = []
     for name, where, files, limit in layout.budgets:
-        words = sum(len(read(p).split()) for p in files if p.is_file())
+        missing = [p for p in files if not p.is_file()]
+        if missing:
+            out.append(f"budgets: {layout.rel(where)}: {name} file missing")
+            continue
+        words = sum(len(read(p).split()) for p in files)
         if words > limit:
             out.append(f"budgets: {layout.rel(where)}: {name} has {words} words, exceeds {limit}")
     return out
@@ -214,6 +229,8 @@ RULES = {
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--rule", action="append", choices=sorted(RULES), help="rule to run (repeatable; default all)")
+    parser.add_argument("--scope", choices=("all", "program", "public"), default="all",
+                        help="program set, public copy, or both (default)")
     parser.add_argument("--only", action="append", default=[], metavar="PATH",
                         help="report only violations under this repository-relative path (repeatable)")
     parser.add_argument("--root", type=Path, default=DEFAULT_ROOT, help=argparse.SUPPRESS)
@@ -224,6 +241,12 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     try:
         layout = Layout(root)
+        if args.scope == "program":
+            layout.public = []
+        elif args.scope == "public":
+            layout.program = []
+            layout.budgets = []
+            layout.cases = None
         violations = [v for name in (args.rule or sorted(RULES)) for v in RULES[name](layout)]
     except (OSError, UnicodeDecodeError) as error:
         print(f"error: {error}", file=sys.stderr)
