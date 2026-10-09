@@ -209,3 +209,112 @@ fn quota_exhaustion_while_staging_is_a_resource_outcome() {
     assert_eq!(point(&service, &appended), None);
     service.shutdown();
 }
+
+/// Move only the unsigned end column of checkpoint `seq` one entry past
+/// its signed batch end.
+fn move_checkpoint_end(fixture: &Fixture, seq: i64) {
+    let changed = fixture
+        .tamper()
+        .execute(
+            "UPDATE kernel_checkpoints SET batch_end_seq = batch_end_seq + 1
+             WHERE checkpoint_seq = ?1",
+            [seq],
+        )
+        .unwrap();
+    assert_eq!(changed, 1);
+}
+
+/// Poll until the snapshot leaves Ready, asserting `id` is never served.
+fn never_served_until_refused(service: &ReceiptQuerySnapshots, id: &str, what: &str) {
+    let deadline = Instant::now() + Duration::from_secs(30);
+    loop {
+        assert_eq!(point(service, id), None, "{what}");
+        if matches!(
+            service.status().state,
+            ReceiptQuerySnapshotState::Invalid { .. }
+        ) {
+            return;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "the moved checkpoint end column was never refused"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
+
+#[test]
+fn a_checkpoint_with_a_moved_end_column_still_covers_its_batch_in_extension() {
+    let (fixture, service) = paused_before_a_checkpointed_batch();
+    let replacement = substitute_signed(&fixture, 10);
+    move_checkpoint_end(&fixture, 3);
+    service.pause_extension_for_test(false);
+    never_served_until_refused(
+        &service,
+        &replacement,
+        "a receipt of a checkpointed batch was published as uncheckpointed tail",
+    );
+    service.shutdown();
+}
+
+#[test]
+fn a_checkpoint_with_a_moved_end_column_still_covers_its_batch_in_the_build() {
+    let fixture = Fixture::new(4);
+    fixture.append_varied(0..12);
+    let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let ctx = context(&fixture.store, &cancel, limits());
+    let deadline = Instant::now() + Duration::from_secs(60);
+    while target(&ctx).checkpoint < 3 {
+        assert!(
+            Instant::now() < deadline,
+            "the third batch was never checkpointed"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let replacement = substitute_signed(&fixture, 10);
+    move_checkpoint_end(&fixture, 3);
+    let service = ReceiptQuerySnapshots::start(
+        fixture.store.clone(),
+        ReceiptQuerySnapshotConfig {
+            invalid_retry_backoff: Duration::from_secs(3),
+            ..config()
+        },
+    )
+    .unwrap();
+    never_served_until_refused(
+        &service,
+        &replacement,
+        "the build published a receipt of a checkpointed batch as uncheckpointed tail",
+    );
+    service.shutdown();
+}
+
+#[test]
+fn recertification_refuses_a_checkpoint_whose_end_column_moved() {
+    let fixture = Fixture::new(4);
+    fixture.append_varied(0..12);
+    let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let ctx = context(&fixture.store, &cancel, limits());
+    let deadline = Instant::now() + Duration::from_secs(60);
+    while target(&ctx).checkpoint < 3 {
+        assert!(
+            Instant::now() < deadline,
+            "the third batch was never checkpointed"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let service = ready(
+        &fixture,
+        ReceiptQuerySnapshotConfig {
+            recertify_interval: Duration::from_millis(200),
+            invalid_retry_backoff: Duration::from_secs(3),
+            ..config()
+        },
+    );
+    move_checkpoint_end(&fixture, 3);
+    let state = wait_for(&service, "a refusal", |state| {
+        matches!(state, ReceiptQuerySnapshotState::Invalid { .. })
+    });
+    assert!(format!("{state:?}").contains("checkpoint"), "{state:?}");
+    service.shutdown();
+}

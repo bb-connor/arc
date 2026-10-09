@@ -1121,15 +1121,20 @@ pub(super) fn observe(ctx: &WalkContext<'_>) -> Result<Observation, WalkError> {
             |row| row.get(0),
         )?;
         let head = max_entry.max(watermark);
+        // The newest checkpoint, whatever its unsigned coverage columns say:
+        // its signed body is authenticated before its range is classified,
+        // and must end at or below `head` (see `within_target`).
         let checkpoint: i64 = live_tx.query_row(
-            "SELECT COALESCE(MAX(checkpoint_seq), 0) FROM kernel_checkpoints WHERE batch_end_seq <= ?1",
-            [head],
+            "SELECT COALESCE(MAX(checkpoint_seq), 0) FROM kernel_checkpoints",
+            [],
             |row| row.get(0),
         )?;
         let lineage_rowid: i64 = live_tx
-            .query_row("SELECT COALESCE(MAX(rowid), 0) FROM capability_lineage", [], |row| {
-                row.get(0)
-            })
+            .query_row(
+                "SELECT COALESCE(MAX(rowid), 0) FROM capability_lineage",
+                [],
+                |row| row.get(0),
+            )
             .optional()?
             .unwrap_or(0);
         let max_source_seqs: (i64, i64) = live_tx.query_row(
@@ -1150,6 +1155,20 @@ pub(super) fn observe(ctx: &WalkContext<'_>) -> Result<Observation, WalkError> {
     drop(guard);
     let _ = live_tx.commit();
     result
+}
+
+/// A target's checkpoints cover only claim entries the target observed. The
+/// observation takes its newest checkpoint without trusting any unsigned
+/// coverage column, so this signed bound is what keeps a covered range from
+/// being treated as uncheckpointed tail.
+pub(super) fn within_target(checkpoint: &OwnedCheckpoint, head: i64) -> Result<(), WalkError> {
+    if checkpoint.batch_end > head {
+        return Err(WalkError::Integrity(format!(
+            "checkpoint {} covers claim entries through {}, beyond the observed claim log head {head}",
+            checkpoint.seq, checkpoint.batch_end
+        )));
+    }
+    Ok(())
 }
 
 /// Live source counts and checkpoint projection id statistics read in one

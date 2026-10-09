@@ -15,7 +15,7 @@ use super::service::Published;
 use super::walk::{
     authenticate, authenticate_checkpoints, check_sources, checked_prefix, commit_in_holds,
     copy_checkpoints, copy_claims, copy_lineage, observe, owned_checkpoint, pending_leaves,
-    Observation, WalkContext, WalkError,
+    within_target, Observation, WalkContext, WalkError,
 };
 
 /// Lineage rows read per refresh step.
@@ -65,6 +65,7 @@ pub(super) fn extend_cycle(
         let verified = authenticate_checkpoints(ctx, rows, &mut previous, &mut chain)?;
         for (checkpoint, _) in verified {
             let owned = owned_checkpoint(&checkpoint)?;
+            within_target(&owned, observation.head)?;
             stage_leaves(ctx, published, &mut staged, owned.batch_end)?;
             #[cfg(test)]
             published.test_gate(super::service::GatePoint::Settlement)?;

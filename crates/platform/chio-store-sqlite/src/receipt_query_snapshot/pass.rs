@@ -9,7 +9,7 @@ use super::db::{ChildCursor, OwnedCheckpoint, ProjectedToolRow, SnapshotBatch, S
 use super::walk::{
     authenticate, authenticate_checkpoints, check_sources, checked_prefix, commit_in_holds,
     copy_checkpoints, copy_claims, owned_checkpoint, pending_leaves, verify_source_bijection,
-    AuthenticatedEntry, OwnedSink, WalkContext, WalkError, WalkLimits,
+    within_target, AuthenticatedEntry, OwnedSink, WalkContext, WalkError, WalkLimits,
 };
 
 /// Rows counted per hold while verifying the source bijection.
@@ -144,7 +144,9 @@ impl Pass {
             if checkpoint.body.previous_checkpoint_sha256.is_some() {
                 witnesses = witnesses.saturating_add(1);
             }
-            checkpoints.push(owned_checkpoint(checkpoint)?);
+            let owned = owned_checkpoint(checkpoint)?;
+            within_target(&owned, self.target.head)?;
+            checkpoints.push(owned);
         }
         match self.mode {
             PassMode::Build => {
