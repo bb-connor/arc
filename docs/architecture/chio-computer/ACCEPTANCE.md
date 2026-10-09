@@ -33,7 +33,7 @@ dependency delta; a new feature name is not proof of isolation.
 | I3: existing work composition | Bind compiled work, protected verification and C5 closure/view | Real native execution, exact acceptance, six-dimensional observations and admission/closure races |
 | I4: independent computers | C4 owner bindings and qualified transfer/spending/host profiles | Separate operators, issuer keys and stores; receiver refusal; lost-reply and partition evidence |
 | I5: installed surface | SDK/CLI surface, dynamic collaboration and evidence export | Full hero from installed packages outside the source checkout, with supported installation profiles and negative cases |
-| I6: second-application reuse | Application C on the installed Computer-0 surface after G5 | Accepted dataset revision, governed diff, expected-base apply, source-conflict and lost-reply evidence, with no custom signing, retry, verifier service or ledger |
+| I6: second-application reuse | Application C on the installed Computer-0 surface, after COMP-5 | Accepted dataset revision, governed diff, expected-base apply, source-conflict and lost-reply evidence, with no custom signing, retry, verifier service or ledger |
 
 **Roadmap mapping.** I1 to I5 map to COMP-1 to COMP-5; I6 maps to COMP-7:
 
@@ -44,7 +44,7 @@ dependency delta; a new feature name is not proof of isolation.
 | I3 | COMP-3 | After WORK-W1, KERN-3a and KERN-3b, including KSPEC-04 phase 3 |
 | I4 | COMP-4 | Its exit is G4's complete run |
 | I5 | COMP-5 | Ships in the preview that G5 uses |
-| I6 | COMP-7 | Required after G5; uses the installed Computer-0 surface |
+| I6 | COMP-7 | After COMP-5; final evidence on the G5 release; never gates G5 |
 
 COMP-6 runs the internal development swarm (#1197) on Computer after I3.
 It is a separate dogfood rung, not an acceptance increment or prerequisite of
@@ -171,7 +171,8 @@ Under the unified roadmap, Application A is exercised at two gates:
 
 ### Application C: versioned data curation (required second application)
 
-At I6/COMP-7, after G5, run an application that prepares a versioned CSV/JSON
+At I6/COMP-7, once COMP-5's installed surface exists, run an application that
+prepares a versioned CSV/JSON
 dataset on the same git backend. A receiver-selected TaskLeaf reviews an admitted data contract;
 pinned ProgramLeafs normalize the authorized input and check schema and domain
 invariants under the original protected acceptance procedure. Produce a sealed
@@ -181,7 +182,8 @@ Application A. Custom work predicates and transformations are application code;
 there is no application-specific signing, retry, verifier service or ledger.
 
 Record installed package identities and reuse evidence outside the source
-checkout. This second-consumer demonstration may run internally; it does not
+checkout. Running early lets a second consumer find API problems before outside
+teams do; the final evidence is recorded on the release G5 uses. This second-consumer demonstration may run internally; it does not
 substitute for G5's independent outside-team runs of Application A. Its evidence
 is the required I6/COMP-7 exit; it does not gate I5/COMP-5 or G5. It requires no
 private-data return profile beyond Computer-0's already qualified contracts.

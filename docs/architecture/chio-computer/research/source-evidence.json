@@ -2054,14 +2054,14 @@
       ]
     },
     "computer_roadmap_revision_5": {
-      "head": "cf18681269b9fb1078459275cea8dfba7858b1d8",
-      "hosted_source_commit": "cf18681269b9fb1078459275cea8dfba7858b1d8",
+      "head": "652d6db4806fb24853419936f759e3d2dfbf9628",
+      "hosted_source_commit": "652d6db4806fb24853419936f759e3d2dfbf9628",
       "hosted_source_commit_matches_recorded_files": true,
-      "inspection": "Computer-0 closure exits, qualified WORK identifiers, installed hero and required post-G5 application reuse",
+      "inspection": "Computer-0 closure exits, qualified WORK identifiers, installed hero, COMP-7 reuse after COMP-5, and the roadmap docs gate",
       "sources": [
         {
           "path": "docs/operations/UNIFIED_ROADMAP.md",
-          "sha256": "89f447a5bea8020844381d5c783e4c8316787bd1ff1068b937480be126c33f70",
+          "sha256": "104037c88fe70cad7ecb807f507bc0a4f0a70b82292191b115070ee8d23f1654",
           "lines": 874,
           "matches_head": true
         }
