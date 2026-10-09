@@ -2572,6 +2572,116 @@ def compiler_immutable_externs(rows, additional_inputs, verified_native_inputs=N
     return immutable
 
 
+def audit_ordinary_host_tool_image(namespace, image, completed_images):
+    """Require actual tooling bytes in the reconciled original batch inventory."""
+    require((image["sha256"], image["size"]) in completed_images and image["size"] <= 512*1024**2,
+            "compiled_host_tool_batch")
+    with regular_input(namespace/"artifacts"/image["sha256"]) as stream:
+        require(os.fstat(stream.fileno()).st_size == image["size"], "compiled_host_tool_image")
+        digest = hashlib.sha256()
+        for chunk in iter(lambda: stream.read(1024*1024), b""):
+            digest.update(chunk)
+        require(digest.hexdigest() == image["sha256"], "compiled_host_tool_image")
+
+
+def audit_ordinary_host_metadata(rows, repository, namespace, source_binding, retained, tooling_image):
+    """Check versioned host observations without treating OS metadata as bytes."""
+    checked_tooling = set()
+    for row in rows:
+        observation = (row.get("semantics") or {}).get("host_execution")
+        if observation is None:
+            continue
+        require(type(observation) is dict and set(observation) == {"schema", "declaration", "loader_paths", "tooling_checks"}
+                and observation["schema"] == "chio.ordinary-host-invocation.v1"
+                and (row.get("semantics") or {}).get("native_scope") is None, "compiled_host_metadata")
+        reference = observation["declaration"]
+        require(reference in row["inputs"] and reference.get("role") == "host-execution-declaration", "compiled_host_metadata")
+        host = json.loads(retained(reference), object_pairs_hook=closed_pairs)
+        fields = {"schema", "repository", "namespace", "source_binding", "target_directory", "target", "machine",
+                  "compiler", "cargo", "linker", "sdk", "toolchain", "images", "aliases", "runtime_metadata", "vendor_roots", "runtime_inventory"}
+        require(type(host) is dict and set(host) == fields and host["schema"] == "chio.ordinary-host-execution.v1"
+                and host["repository"] == str(repository) and host["namespace"] == str(namespace)
+                and host["source_binding"] == source_binding
+                and host["target"] == {"arm64": "aarch64-apple-darwin", "x86_64": "x86_64-apple-darwin"}.get(host["machine"]),
+                "compiled_host_metadata")
+        runtime_reference = host["runtime_inventory"]
+        compiler_graph_image(runtime_reference)
+        runtime_image = next((item for item in row["inputs"] if item.get("role") == "host-source-inventory"
+                              and all(item.get(key) == runtime_reference.get(key) for key in ["path", "sha256", "size"])), None)
+        require(runtime_image is not None, "compiled_host_metadata")
+        runtime = json.loads(retained(runtime_image), object_pairs_hook=closed_pairs)
+        require(type(runtime) is dict and set(runtime) == {"source_inventory_version", "base_commit", "sources", "source_binding"}
+                and runtime["source_inventory_version"] == INVENTORY_VERSION
+                and runtime["source_binding"] == source_binding
+                and binding(runtime["sources"], runtime["base_commit"]) == source_binding, "compiled_host_metadata")
+        validate_source_rows(runtime["sources"])
+        target = compilation_absolute_path(host["target_directory"])
+        require(target.is_relative_to(repository/"target") and target != repository/"target", "compiled_host_metadata")
+        for key in ["compiler", "cargo", "linker", "sdk", "toolchain"]:
+            require(not compilation_absolute_path(host[key]).is_relative_to(repository), "compiled_host_metadata")
+        metadata = host["runtime_metadata"]
+        require(type(metadata) is dict and set(metadata) == {"coverage", "system", "release", "version", "macos_version", "shared_cache_file_metadata"}
+                and metadata["coverage"] == "ordinary-host-observation-no-retained-os-image-coverage"
+                and metadata["system"] == "Darwin" and type(metadata["shared_cache_file_metadata"]) is list
+                and len(metadata["shared_cache_file_metadata"]) <= 128, "compiled_host_metadata")
+        for item in metadata["shared_cache_file_metadata"]:
+            require(type(item) is dict and set(item) == {"path", "size", "mtime_ns"}
+                    and compilation_absolute_path(item["path"]).is_relative_to("/System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld")
+                    and type(item["size"]) is int and item["size"] >= 0
+                    and type(item["mtime_ns"]) is int and item["mtime_ns"] >= 0, "compiled_host_metadata")
+        allowed = {str(target/"debug/deps"), str(Path(host["toolchain"])/"lib"),
+                   str(Path(host["toolchain"])/"lib/rustlib"/host["target"]/"lib")}
+        require(type(observation["loader_paths"]) is dict and set(observation["loader_paths"]) <= {"LD_LIBRARY_PATH", "DYLD_FALLBACK_LIBRARY_PATH"}
+                and all(type(paths) is list and paths and all(path in allowed for path in paths)
+                        for paths in observation["loader_paths"].values()), "compiled_host_metadata")
+        require(type(host["images"]) is list and 0 < len(host["images"]) <= 10000
+                and type(host["aliases"]) is list and len(host["aliases"]) <= 10000, "compiled_host_metadata")
+        tooling = set()
+        tooling_paths = set()
+        for image in host["images"]:
+            require(type(image) is dict and set(image) == {"path", "sha256", "size", "purpose"}
+                    and image["purpose"] in {"cargo", "linker", "linker-support", "sdk", "loader"}, "compiled_host_metadata")
+            key = compiler_graph_image(image)
+            require(key not in tooling and key[0] not in tooling_paths
+                    and not Path(key[0]).is_relative_to(repository), "compiled_host_metadata")
+            tooling.add(key)
+            tooling_paths.add(key[0])
+            if image["purpose"] == "sdk":
+                require(Path(key[0]).is_relative_to(Path(host["sdk"])), "compiled_host_metadata")
+        for alias in host["aliases"]:
+            require(type(alias) is dict and set(alias) == {"path", "text"}
+                    and compilation_absolute_path(alias["path"]).is_relative_to(Path(host["sdk"]))
+                    and type(alias["text"]) is str and "\x00" not in alias["text"], "compiled_host_metadata")
+        if row["kind"] == "compilation" and row["status"] == "success":
+            checks = observation["tooling_checks"]
+            require(type(checks) is dict and set(checks) == {"before", "after"}
+                    and checks["before"] == checks["after"] and checks["before"] in row["inputs"]
+                    and checks["before"].get("role") == "host-tool-observation", "compiled_host_tool_checks")
+            state = json.loads(retained(checks["before"]), object_pairs_hook=closed_pairs)
+            require(type(state) is dict and set(state) == {"schema", "declaration_sha256", "images"}
+                    and state["schema"] == "chio.ordinary-host-tool-observation.v1"
+                    and state["declaration_sha256"] == reference["sha256"] and type(state["images"]) is list
+                    and len(state["images"]) == len(tooling), "compiled_host_tool_checks")
+            actual = set()
+            for image in state["images"]:
+                key = compiler_graph_image(image)
+                require(type(image) is dict and set(image) == {"path", "sha256", "size", "identity"}
+                        and type(image["identity"]) is list and len(image["identity"]) == 7
+                        and all(type(value) is int and value >= 0 for value in image["identity"])
+                        and image["identity"][3] == image["size"] and image["identity"][-1] == 1
+                        and stat.S_ISREG(image["identity"][2]), "compiled_host_tool_checks")
+                actual.add(key)
+                if key not in checked_tooling:
+                    tooling_image(image)
+                    checked_tooling.add(key)
+            require(actual == tooling and row["compiler"]["path"] == host["compiler"]
+                    and row["compiler"]["version"]["fields"]["host"] == host["target"], "compiled_host_metadata")
+            for image in row["inputs"]:
+                if image.get("role") == "extern":
+                    require(image.get("origin") == "recorded-producing-unit" and type(image.get("producer")) is dict
+                            and Path(image["path"]).is_relative_to(target), "compiled_host_extern_producer")
+
+
 def audit_compiler_profile_namespace(namespace, repository, inventory, source_binding, roots,
                                      additional_inputs=None, selected_ids=None, verified_native_inputs=None):
     """Join an original publication namespace to a checked source inventory.
@@ -2622,6 +2732,25 @@ def audit_compiler_profile_namespace(namespace, repository, inventory, source_bi
                 require(key in extra,"compiler_profile_source")
                 inputs[key] = extra[key]
     immutable = compiler_immutable_externs(rows,additional_inputs,verified_native_inputs)
+    def retained_host_image(image):
+        path = Path(namespace)/image["artifact"]
+        with regular_input(path) as stream:
+            raw = stream.read(16*1024**2+1)
+        require(len(raw) == image["size"] <= 16*1024**2 and hashlib.sha256(raw).hexdigest() == image["sha256"], "compiled_host_metadata")
+        return raw
+    completed_host_images = None
+    def original_host_tooling(image):
+        nonlocal completed_host_images
+        if completed_host_images is None:
+            completed_host_images = set()
+            for batch in publication.get("retention_batches", []):
+                reference = batch["complete"]
+                body = read_bytes(Path(namespace)/relative_path(reference["path"]))
+                require(hashlib.sha256(body).hexdigest() == reference["sha256"], "compiled_host_tool_batch")
+                complete = json.loads(body, object_pairs_hook=closed_pairs)
+                completed_host_images.update((item["sha256"], item["size"]) for item in complete["after"]["artifacts"])
+        audit_ordinary_host_tool_image(Path(namespace), image, completed_host_images)
+    audit_ordinary_host_metadata(rows, repository, Path(namespace), source_binding, retained_host_image, original_host_tooling)
     graph = audit_compiler_unit_graph(rows,list(inputs.values()),roots,immutable)
     require(audit_compiler_publications(namespace,source_binding) == publication,"compiler_namespace_changed")
     return {"schema":"chio.original-compiler-profile-verification.v1","source_binding":source_binding,
@@ -4416,6 +4545,14 @@ def audit_compiled_profile(root, profile, candidate, sources, base_commit, image
                 "compiled_profile_mode")
         require(report["host"].get("system") != "Linux", "compiled_profile_mode")
         verified_native_inputs = None
+        def retained_host_image(image):
+            exported = by_image[(image["sha256"], image["size"])]
+            raw = read_bytes(root/relative_path(exported["path"]))
+            require(len(raw) == image["size"] <= 16*1024**2 and hashlib.sha256(raw).hexdigest() == image["sha256"], "compiled_host_metadata")
+            return raw
+        def portable_host_tooling(image):
+            require((image["sha256"], image["size"]) in by_image, "compiled_host_tool_image")
+        audit_ordinary_host_metadata(rows, repository, namespace, runtime["source_binding"], retained_host_image, portable_host_tooling)
     else:
         verified_native_inputs = audit_linux_compiled_profile(root, profile["linux"], request["linux"], report["linux"],
                                      candidate, sources, base_commit, rows, by_image, producer, runtime)

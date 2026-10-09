@@ -272,6 +272,38 @@ class RecorderSubprocessTest(unittest.TestCase):
         self.assertIn(b"artifact_changed", result.stderr)
         self.assertEqual((self.base / "observer/dispatches").read_text(), before)
 
+    def test_ordinary_host_declared_features_and_darwin_outputs(self):
+        spec = importlib.util.spec_from_file_location("ordinary_host_recorder", TOOL)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        host = {"target": "aarch64-apple-darwin", "features": {"default", "proc-macro"},
+                "build_cfg": set(), "build_check_cfg": set(), "linker": "/public/clang"}
+        for kind, expected in [("bin", "unit"), ("proc-macro", "libunit.dylib")]:
+            args = [str(self.source), "--crate-name", "unit", "--crate-type", kind,
+                    "--emit", "dep-info,link", "--out-dir", str(self.source_root / "target"),
+                    "--cfg", 'feature="proc-macro"', "--check-cfg", 'cfg(feature, values("default", "proc-macro"))',
+                    "-Clinker=/public/clang"]
+            try:
+                parsed = module.parse(args, self.source_root, host=host)
+            except (TypeError, module.Refusal) as error:
+                self.fail("declared ordinary host compilation refused: " + str(error))
+            self.assertEqual(Path(module.output_paths(parsed)[1]["link"]).name, expected)
+
+    def test_ordinary_host_never_accepts_undeclared_cfg_values(self):
+        spec = importlib.util.spec_from_file_location("ordinary_host_recorder", TOOL)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        host = {"target": "aarch64-apple-darwin", "features": {"default"},
+                "build_cfg": set(), "build_check_cfg": set(), "linker": "/public/clang"}
+        args = [str(self.source), "--crate-type", "rlib", "--emit", "dep-info,link", "-o", str(self.out)]
+        for extra in [["--cfg", 'feature="undeclared"'], ["--cfg", 'opaque="private-value"'],
+                      ["--check-cfg", 'cfg(opaque,values("private-value"))']]:
+            try:
+                with self.assertRaisesRegex(module.Refusal, "opaque_cfg_value"):
+                    module.parse(args + extra, self.source_root, host=host)
+            except TypeError as error:
+                self.fail("ordinary host context unavailable: " + str(error))
+
     def test_bounded_quota_controls_use_real_subprocess(self):
         for name, limit in [("MAX_INPUT", 4), ("MAX_CONTENT", 4), ("MAX_JSON", 100), ("MAX_RECORDS", 0)]:
             campaign = self.source_root / ("target/quota-" + name)

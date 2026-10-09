@@ -748,7 +748,229 @@ def verify_unchanged(path, original, mutable_directory=None):
                 require(before == after, "input_parent_changed")
 
 
-def parse(arguments, cwd, native=None):
+def host_cfg_value(value, host, check=False):
+    """Only manifest features or exact retained Cargo build-script declarations."""
+    if host is None:
+        return False
+    if value in host["build_check_cfg" if check else "build_cfg"]:
+        return True
+    if not check:
+        match = re.fullmatch(r'feature="([A-Za-z0-9_.+-]+)"', value)
+        return match is not None and match[1] in host["features"]
+    match = re.fullmatch(r'cfg\(feature,\s*values\((.*)\)\)', value)
+    if match is None:
+        return False
+    try:
+        names = json.loads("[" + match[1] + "]")
+    except ValueError:
+        return False
+    return all(type(name) is str and name in host["features"] for name in names)
+
+
+def load_host_execution(environment, campaign, compiler):
+    """Explicit ordinary Darwin execution observation, never an isolation grant.
+
+    OS shared-cache metadata describes the host trust assumption. It is not a
+    retained image and cannot authorize an extern or replace toolchain bytes.
+    """
+    configured = environment.get("CHIO_COMPILATION_HOST_EXECUTION")
+    if configured is None:
+        return None
+    require(platform.system() == "Darwin" and not environment.get("CHIO_COMPILATION_SCOPE_DECLARATION"), "host_execution_platform")
+    path = absolute(configured)
+    reference, original = capture(path, "host-execution-declaration", campaign)
+    with HeldPath(path) as handle:
+        host = json.loads(handle.read(MAX_JSON))
+    fields = {"schema", "repository", "namespace", "source_binding", "target_directory", "target", "machine",
+              "compiler", "cargo", "linker", "sdk", "toolchain", "images", "aliases", "runtime_metadata", "vendor_roots", "runtime_inventory"}
+    require(type(host) is dict and set(host) == fields and host["schema"] == "chio.ordinary-host-execution.v1"
+            and host["repository"] == environment["CHIO_COMPILATION_SOURCE_ROOT"]
+            and host["namespace"] == environment["CHIO_COMPILATION_RECORDS"]
+            and host["source_binding"] == campaign.binding and host["machine"] == platform.machine()
+            and host["target"] == {"arm64": "aarch64-apple-darwin", "x86_64": "x86_64-apple-darwin"}.get(platform.machine()),
+            "host_execution_configuration")
+    root = absolute(host["repository"])
+    target = absolute(host["target_directory"])
+    require(target.is_relative_to(root/"target") and target != root/"target"
+            and environment.get("CARGO_TARGET_DIR") == str(target)
+            and host["compiler"] == str(compiler) == environment.get("RUSTC")
+            and host["cargo"] == environment.get("CARGO", host["cargo"])
+            and environment.get("SDKROOT") == host["sdk"], "host_execution_selection")
+    for key in ["compiler", "cargo", "linker", "sdk", "toolchain"]:
+        absolute(host[key])
+    require(type(host["images"]) is list and 0 < len(host["images"]) <= 10000
+            and type(host["aliases"]) is list and len(host["aliases"]) <= 10000
+            and type(host["vendor_roots"]) is list and 0 < len(host["vendor_roots"]) <= 16,
+            "host_execution_inventory")
+    for vendor in host["vendor_roots"]:
+        require(not absolute(vendor).is_relative_to(root), "host_vendor_scope")
+    allowed_loader = {str(target/"debug/deps"), str(absolute(host["toolchain"])/"lib"),
+                      str(absolute(host["toolchain"])/"lib/rustlib"/host["target"]/"lib")}
+    loaders = {}
+    for name, value in environment.items():
+        if name.startswith(("LD_", "DYLD_")):
+            require(name in {"LD_LIBRARY_PATH", "DYLD_FALLBACK_LIBRARY_PATH"}, "hidden_environment_input")
+            paths = value.split(os.pathsep)
+            require(all(item and str(absolute(item)) == item and item in allowed_loader for item in paths), "host_loader_paths")
+            loaders[name] = paths
+    require(not any(name in environment for name in {"RUSTC_CODEGEN_BACKEND", "RUST_TARGET_PATH", "RUSTC_OVERRIDE_VERSION_STRING",
+            "LIBRARY_PATH", "CPATH", "C_INCLUDE_PATH", "CPLUS_INCLUDE_PATH", "OBJC_INCLUDE_PATH", "COMPILER_PATH", "GCC_EXEC_PREFIX"}),
+            "hidden_environment_input")
+    host["reference"] = reference
+    host["identities"] = {str(path): original}
+    host["inputs"] = [reference]
+    runtime_reference = host["runtime_inventory"]
+    require(type(runtime_reference) is dict and set(runtime_reference) == {"path", "sha256", "size"}, "host_runtime_inventory")
+    item, observed = capture(absolute(runtime_reference["path"]), "host-source-inventory", campaign)
+    require(all(item[key] == runtime_reference[key] for key in ["path", "sha256", "size"]), "host_runtime_inventory")
+    with HeldPath(item["path"]) as handle:
+        runtime = json.loads(handle.read(MAX_JSON))
+    require(type(runtime) is dict and set(runtime) == {"source_inventory_version", "base_commit", "sources", "source_binding"}
+            and runtime["source_inventory_version"] == "chio.source-inventory.v4"
+            and runtime["source_binding"] == campaign.binding and type(runtime["sources"]) is list,
+            "host_runtime_inventory")
+    manifest = {key: runtime[key] for key in ["source_inventory_version", "base_commit", "sources"]}
+    require(hashlib.sha256(json.dumps(manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode()).hexdigest()
+            == campaign.binding, "host_runtime_inventory")
+    host["candidate_sources"] = {}
+    for entry in runtime["sources"]:
+        if "sha256" in entry:
+            path = absolute(entry["path"], root)
+            require(not Path(entry["path"]).is_absolute() and path.is_relative_to(root)
+                    and not path.is_relative_to(root/"target") and DIGEST.fullmatch(entry["sha256"]), "host_runtime_inventory")
+            host["candidate_sources"][str(path)] = entry["sha256"]
+        else:
+            require(entry.get("content_coverage") == "metadata-only", "host_runtime_inventory")
+    host["inputs"].append(item)
+    host["identities"][item["path"]] = observed
+    host["features"] = set()
+    host["build_cfg"], host["build_check_cfg"], host["native_libraries"] = set(), set(), []
+    host["loaders"] = loaders
+    manifest_text = environment.get("CARGO_MANIFEST_PATH")
+    if manifest_text is not None:
+        manifest = absolute(manifest_text)
+        require(str(manifest.parent) == environment.get("CARGO_MANIFEST_DIR")
+                and (manifest.is_relative_to(root) and not manifest.is_relative_to(root/"target")
+                     or any(manifest.is_relative_to(Path(vendor)) for vendor in host["vendor_roots"])), "host_manifest_scope")
+        item, observed = capture(manifest, "source", campaign)
+        with HeldPath(manifest) as handle:
+            body = tomllib.loads(handle.read(MAX_JSON).decode("utf-8"))
+        require(body.get("package", {}).get("name") == environment.get("CARGO_PKG_NAME"), "host_manifest_package")
+        host["features"] = set(body.get("features", {}))
+        for table in [body, *body.get("target", {}).values()]:
+            for key in ["dependencies", "build-dependencies", "dev-dependencies"]:
+                host["features"].update(name for name, value in table.get(key, {}).items()
+                                        if type(value) is dict and value.get("optional") is True)
+        host["inputs"].append(item)
+        host["identities"][str(manifest)] = observed
+        host["manifest"] = str(manifest)
+    if environment.get("OUT_DIR"):
+        generated = absolute(environment["OUT_DIR"])
+        require(generated.is_relative_to(target), "host_generated_scope")
+        build_output = generated.parent/"output"
+        if build_output.exists():
+            item, observed = capture(build_output, "source", campaign)
+            with HeldPath(build_output) as handle:
+                lines = handle.read(MAX_JSON).decode("utf-8").splitlines()
+            for line in lines:
+                for name, key in [("rustc-cfg", "build_cfg"), ("rustc-check-cfg", "build_check_cfg"), ("rustc-link-lib", "native_libraries")]:
+                    for prefix in ["cargo:", "cargo::"]:
+                        marker = prefix+name+"="
+                        if line.startswith(marker):
+                            value = line[len(marker):]
+                            require(len(value) <= 4096 and not SECRET_WORD.search(value), "host_build_declaration")
+                            if key == "native_libraries":
+                                host[key].append(value)
+                            else:
+                                host[key].add(value)
+            host["inputs"].append(item)
+            host["identities"][str(build_output)] = observed
+    return host
+
+
+def ordinary_candidate_files(host):
+    """Observe only bound regular candidates; aliases grant no input authority."""
+    root = Path(host["repository"])
+    declared = {}
+    for text in host["candidate_sources"]:
+        parts = absolute(text).relative_to(root).parts
+        current = declared
+        for part in parts[:-1]:
+            current = current.setdefault(part, {})
+            require(type(current) is dict, "host_runtime_inventory")
+        require(parts[-1] not in current, "host_runtime_inventory")
+        current[parts[-1]] = None
+    result = []
+    def observe(path, members):
+        with HeldPath(path, directory=True) as parent:
+            for name, children in sorted(members.items()):
+                info = os.stat(name, dir_fd=parent.fd, follow_symlinks=False)
+                if stat.S_ISLNK(info.st_mode):
+                    continue
+                child = path/name
+                if children is None:
+                    require(stat.S_ISREG(info.st_mode), "not_regular")
+                    result.append(child)
+                else:
+                    require(stat.S_ISDIR(info.st_mode), "unsafe_parent")
+                    observe(child, children)
+            parent.verify(content=False)
+    observe(root, declared)
+    return result
+
+
+def host_execution_inputs(host, campaign):
+    """Retain selected tooling bytes and recheck every declared alias object."""
+    inputs, originals = list(host["inputs"]), dict(host["identities"])
+    aliases = []
+    for alias in host["aliases"]:
+        require(type(alias) is dict and set(alias) == {"path", "text"}, "host_tool_alias")
+        path = absolute(alias["path"])
+        require(path.is_relative_to(Path(host["sdk"])) and not secret_path(alias["text"]), "host_tool_alias")
+        with HeldPath(path.parent, directory=True) as parent:
+            info = os.stat(path.name, dir_fd=parent.fd, follow_symlinks=False)
+            require(stat.S_ISLNK(info.st_mode) and os.readlink(path.name, dir_fd=parent.fd) == alias["text"], "host_tool_alias")
+            aliases.append((str(path), identity(info), alias["text"]))
+    with campaign.retention_batch():
+        names = set()
+        for image in host["images"]:
+            require(type(image) is dict and set(image) == {"path", "sha256", "size", "purpose"}
+                    and image["purpose"] in {"cargo", "linker", "linker-support", "sdk", "loader"}, "host_tool_image")
+            path = absolute(image["path"])
+            require(str(path) not in names and not path.is_relative_to(Path(host["repository"])), "host_tool_image")
+            names.add(str(path))
+            item, observed = capture(path, "host-tool", campaign)
+            require((item["sha256"], item["size"]) == (image["sha256"], image["size"]), "host_tool_image_changed")
+            item["coverage"] = "declared-ordinary-host-tooling-bytes"
+            item["purpose"] = image["purpose"]
+            originals[str(path)] = observed
+    require(host["cargo"] in names and host["linker"] in names and "/usr/lib/dyld" in names
+            and any(item["purpose"] == "sdk" for item in host["images"]), "host_tool_image")
+    return inputs, originals, aliases
+
+
+def observe_host_tools(host, campaign, originals):
+    """A shared retained vector carries actual per-invocation observations."""
+    images = []
+    for item in host["images"]:
+        with HeldPath(item["path"]) as held:
+            require(held.initial == originals[item["path"]][0], "host_tool_image_changed")
+            images.append({key: item[key] for key in ["path", "sha256", "size"]} | {"identity": list(held.initial)})
+    body = {"schema": "chio.ordinary-host-tool-observation.v1", "declaration_sha256": host["reference"]["sha256"], "images": images}
+    retained = campaign.retain(canonical(body)+b"\n")
+    return {"role": "host-tool-observation", "path": str(campaign.directory.path/retained["artifact"]), **retained}
+
+
+def verify_host_aliases(aliases):
+    for text, expected, target in aliases:
+        path = absolute(text)
+        with HeldPath(path.parent, directory=True) as parent:
+            require(identity(os.stat(path.name, dir_fd=parent.fd, follow_symlinks=False)) == expected
+                    and os.readlink(path.name, dir_fd=parent.fd) == target, "host_tool_alias_changed")
+
+
+def parse(arguments, cwd, native=None, host=None):
+    require(native is None or host is None, "ambiguous_execution_contract")
     require(arguments, "missing_compiler_arguments")
     require(not any(value.startswith("@") for value in arguments), "response_file")
     if native is None:
@@ -817,18 +1039,20 @@ def parse(arguments, cwd, native=None):
             require(result["target"] is None or result["target"] == value, "ambiguous_native_target")
             result["target"] = value
         elif key == "--cfg":
-            require(NAME.fullmatch(value), "opaque_cfg_value")
+            require(NAME.fullmatch(value) or host_cfg_value(value, host), "opaque_cfg_value")
         elif key == "--check-cfg":
-            require(re.fullmatch(r"cfg\([A-Za-z_][A-Za-z0-9_]*(?:,[A-Za-z_][A-Za-z0-9_]*)*(?:,values\((?:none\(\))?\))?\)", value), "opaque_cfg_value")
+            require(re.fullmatch(r"cfg\([A-Za-z_][A-Za-z0-9_]*(?:,[A-Za-z_][A-Za-z0-9_]*)*(?:,values\((?:none\(\))?\))?\)", value)
+                    or host_cfg_value(value, host, check=True), "opaque_cfg_value")
         elif key == "--extern":
             require("=" in value, "implicit_extern")
             name, path = value.split("=", 1)
             name = name.removeprefix("priv:").removeprefix("noprelude:")
             require(NAME.fullmatch(name), "extern_name")
             extension = Path(path).suffix
-            require(extension in {".rlib", ".rmeta"} or (native is not None and extension == ".so"), "dynamic_extern_hidden_inputs")
+            require(extension in {".rlib", ".rmeta"} or (native is not None and extension == ".so")
+                    or (host is not None and extension == ".dylib"), "dynamic_extern_hidden_inputs")
             external = {"name": name, "path": str(absolute(path, cwd))}
-            if extension == ".so":
+            if extension in {".so", ".dylib"}:
                 external["kind"] = "dynamic-image"
             result["externs"].append(external)
         elif key == "-L":
@@ -847,7 +1071,7 @@ def parse(arguments, cwd, native=None):
                             "embed-bitcode", "incremental", "codegen-units", "panic", "strip", "lto", "linker-plugin-lto",
                             "target-cpu", "target-feature", "relocation-model", "prefer-dynamic", "force-frame-pointers",
                             "symbol-mangling-version", "split-debuginfo", "rpath"}
-                    or (native is not None and name == "linker"), "unsupported_codegen_input")
+                    or ((native is not None or host is not None) and name == "linker"), "unsupported_codegen_input")
             flag["codegen"] = name
             if name == "incremental":
                 raise Refusal("incremental_hidden_inputs")
@@ -864,7 +1088,7 @@ def parse(arguments, cwd, native=None):
                 require(val in ({"0", "1", "2", "3", "s", "z"} if name == "opt-level" else {"0", "1", "2", "none", "limited", "full"}), "profile")
                 result["profile"]["optimization" if name == "opt-level" else "debug_info"] = val
         elif key == "-l":
-            require(native is not None, "native_link_hidden_inputs")
+            require(native is not None or host is not None and value in host.get("native_libraries", []), "native_link_hidden_inputs")
             require(re.fullmatch(r"(?:(?:static|dylib)(?::[+-](?:bundle|whole-archive|verbatim|as-needed)(?:,[+-](?:bundle|whole-archive|verbatim|as-needed))*)?=)?[A-Za-z0-9_.+-]+", value), "unsupported_native_library")
             result.setdefault("native_libraries", []).append(value)
         elif key == "--print":
@@ -885,7 +1109,12 @@ def parse(arguments, cwd, native=None):
     require(result["output"] is not None or result["out_dir"] is not None, "missing_output_directory")
     if not result["crate_types"]:
         result["crate_types"] = ["bin"]
-    require(native is not None or "link" not in result["emit"] or not any(t in {"bin", "dylib", "cdylib", "proc-macro"} for t in result["crate_types"]), "external_linker_contract_required")
+    require(native is not None or host is not None or "link" not in result["emit"] or not any(t in {"bin", "dylib", "cdylib", "proc-macro"} for t in result["crate_types"]), "external_linker_contract_required")
+    if host is not None:
+        require(result["target"] in {None, host["target"]}, "unsupported_host_target")
+        result["host_platform"] = "darwin"
+        if "link" in result["emit"] and any(t in {"bin", "dylib", "cdylib", "proc-macro"} for t in result["crate_types"]):
+            require(result.get("explicit_linker") and result.get("linker") == host["linker"], "host_linker_selection_not_bound")
     if native is not None:
         supported = {item["triple"] for item in native.get("supported_targets", [])} or {"x86_64-unknown-linux-gnu"}
         require((result["target"] or "x86_64-unknown-linux-gnu") in supported, "unsupported_native_target")
@@ -930,7 +1159,7 @@ def words(text):
     return result
 
 
-def parse_depfile(payload, cwd, environment, native=None):
+def parse_depfile(payload, cwd, environment, native=None, host=None):
     try:
         text = payload.decode("utf-8", errors="strict")
     except UnicodeError:
@@ -942,13 +1171,16 @@ def parse_depfile(payload, cwd, environment, native=None):
     resolutions = []
 
     def resolved(name, source=False):
-        if native is None:
+        if native is None and host is None:
             return str(absolute(name, cwd))
         if not source:
             require(".." not in name.split("/"), "depfile_target_parent_traversal")
             require(not name.endswith("/") and name.split("/")[-1] not in {"", "."}, "depfile_target_directory_syntax")
             return str(absolute(name, cwd))
-        path = checked_include_path(name, cwd, native)
+        context = native if native is not None else {"aliases": [],
+            "scopes": [{"root": host["repository"]}, *[{"root": path} for path in host["vendor_roots"]]],
+            "write_roots": [host["target_directory"]]}
+        path = checked_include_path(name, cwd, context)
         resolutions.append({"lexical_sha256": digest(name), "resolved": str(path)})
         return str(path)
     for line in text.splitlines():
@@ -974,7 +1206,7 @@ def parse_depfile(payload, cwd, environment, native=None):
                     require(re.fullmatch(r"(?:|alpha(?:\.[0-9]+)?|beta(?:\.[0-9]+)?|rc(?:\.[0-9]+)?|dev|nightly(?:\.[0-9]+)?)", observed),
                             "depfile_environment_not_public")
                 else:
-                    require(native is not None and name.startswith(("CARGO_PKG_", "CARGO_CFG_", "CARGO_FEATURE_")), "depfile_environment_not_public")
+                    require((native is not None or host is not None) and name.startswith(("CARGO_PKG_", "CARGO_CFG_", "CARGO_FEATURE_")), "depfile_environment_not_public")
             requirements[name] = {"name": name, "value_sha256": digest(observed)}
             continue
         require(not line.startswith("#"), "depfile_comment")
@@ -1008,7 +1240,7 @@ def parse_depfile(payload, cwd, environment, native=None):
             require(all(name in dependencies for name in left), "depfile_unbound_phony")
     result = {"targets": sorted(name for left, _ in producing for name in left),
               "dependencies": dependencies, "environment_requirements": list(requirements.values())}
-    if native is not None:
+    if native is not None or host is not None:
         result["path_resolution"] = sorted({canonical(value): value for value in resolutions}.values(), key=lambda value: value["lexical_sha256"])
     return result
 
@@ -1084,11 +1316,12 @@ def compiler_inputs(compiler, parsed, campaign, native=None):
         files.extend(tree_files(backends))
     inputs = []
     identities = {str(compiler): compiler_identity}
-    for path in files:
-        item, original = capture(path, "toolchain", campaign)
-        item["coverage"] = "conservative-toolchain-scope"
-        inputs.append(item)
-        identities[str(path)] = original
+    with campaign.retention_batch() if getattr(campaign, "host_execution", None) is not None else contextlib.nullcontext():
+        for path in files:
+            item, original = capture(path, "toolchain", campaign)
+            item["coverage"] = "conservative-toolchain-scope"
+            inputs.append(item)
+            identities[str(path)] = original
     return captured, inputs, identities
 
 
@@ -1100,8 +1333,10 @@ def output_paths(parsed):
     require(len(types) == 1, "multiple_crate_output_types")
     extensions = {"metadata": ".rmeta", "obj": ".o", "asm": ".s", "llvm-ir": ".ll", "llvm-bc": ".bc", "mir": ".mir"}
     native = parsed.get("native_platform") == "linux-gnu"
-    unit_name = (name + suffix if native and types[0] == "bin" else
-                 "lib" + name + suffix + (".so" if native and types[0] in {"dylib", "cdylib", "proc-macro"}
+    darwin = parsed.get("host_platform") == "darwin"
+    unit_name = (name + suffix if (native or darwin) and types[0] == "bin" else
+                 "lib" + name + suffix + (".dylib" if darwin and types[0] in {"dylib", "cdylib", "proc-macro"}
+                                          else ".so" if native and types[0] in {"dylib", "cdylib", "proc-macro"}
                                           else ".a" if types[0] == "staticlib" else ".rlib"))
     if parsed["output"]:
         primary = "link" if "link" in parsed["emit"] else next((kind for kind in parsed["emit"] if kind != "dep-info"), None)
@@ -1175,6 +1410,14 @@ class OutputLease:
 
     def verify(self, observed):
         require(self.produced() == observed, "produced_output_changed")
+
+    def verify_host_search(self, directory, original):
+        # Cargo also searches its output directory. Only this lease's exact,
+        # freshly verified emissions may extend its pre-dispatch membership.
+        additions = ({str(self.directory.path/name) for name in self.produced()}
+                     if Path(directory) == self.directory.path else set())
+        require({str(path) for path in tree_files(directory)} == set(original) | additions,
+                "search_changed_during_compilation")
 
     def close(self):
         if self.directory.fds:
@@ -2679,11 +2922,14 @@ def main(argv, supplied_environment=None, supplied_cwd=None, executor=None, prob
         campaign.native_reference = native_reference
         require(argv and os.path.isabs(argv[0]), "compiler_path")
         require(not any(SECRET_WORD.search(name) for name in environment), "credential_environment")
+        host = load_host_execution(environment, campaign, absolute(argv[0]))
+        campaign.host_execution = host
         for key in ["RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER"]:
             if key in environment:
                 absolute(environment[key])
         # Environment injection/loader inputs cannot be represented as ordinary opaque values.
-        require(not any((name.startswith(("LD_", "DYLD_")) and not (native is not None and name == "LD_LIBRARY_PATH")) or name in
+        require(not any((name.startswith(("LD_", "DYLD_")) and not (native is not None and name == "LD_LIBRARY_PATH")
+                         and not (host is not None and name in host["loaders"])) or name in
                         {"RUSTC_CODEGEN_BACKEND", "RUST_TARGET_PATH", "RUSTC_OVERRIDE_VERSION_STRING"}
                         for name in environment), "hidden_environment_input")
         cwd = Path(campaign.cwd)
@@ -2692,13 +2938,17 @@ def main(argv, supplied_environment=None, supplied_cwd=None, executor=None, prob
             require(compiler == declared_path(native["images"]["rustc"]["path"], native), "native_compiler_binding")
         if any(arg == "--print" or arg.startswith("--print=") for arg in argv[1:]):
             row["kind"] = "probe"
-        parsed = parse(argv[1:], cwd, native)
+        parsed = parse(argv[1:], cwd, native, host)
         require_native_linker_selection(parsed, native)
         row["kind"] = parsed["kind"]
         if parsed["kind"] == "probe":
             require(not any(flag.get("name") in {"--cfg", "--check-cfg"}
                             for flag in parsed.get("flags", [])), "opaque_probe_output")
             row["semantics"] = {"probe": parsed["probe"], "prints": parsed.get("prints", [])}
+            if host is not None:
+                row["semantics"]["host_execution"] = {"schema": "chio.ordinary-host-invocation.v1",
+                    "declaration": host["reference"], "loader_paths": host["loaders"], "tooling_checks": None}
+                row["inputs"].extend(host["inputs"])
             if native_reference is not None:
                 row["semantics"]["native_scope"] = native_reference
             if dispatch_selection is not None:
@@ -2712,6 +2962,9 @@ def main(argv, supplied_environment=None, supplied_cwd=None, executor=None, prob
             probe_result = dispatch_compiler(campaign, argv, True)
             actual_exit = probe_result.returncode
             verify_unchanged(compiler, original)
+            if host is not None:
+                for path, observed in host["identities"].items():
+                    verify_unchanged(path, observed)
             require(len(probe_result.stdout) <= MAX_JSON, "probe_output_limit")
             require(not SECRET_WORD.search(probe_result.stdout.decode("utf-8", errors="strict")), "unsafe_probe_output")
             if actual_exit == 0:
@@ -2725,6 +2978,10 @@ def main(argv, supplied_environment=None, supplied_cwd=None, executor=None, prob
             campaign.publish(row)
             return actual_exit if actual_exit >= 0 else 128 - actual_exit
         row["semantics"] = {key: parsed[key] for key in ["cwd", "source", "crate_name", "crate_types", "target", "profile", "flags"]}
+        if host is not None:
+            require("manifest" in host and Path(parsed["source"]).is_relative_to(Path(host["manifest"]).parent), "host_manifest_source")
+            row["semantics"]["host_execution"] = {"schema": "chio.ordinary-host-invocation.v1",
+                "declaration": host["reference"], "loader_paths": host["loaders"], "tooling_checks": None}
         if native_reference is not None:
             row["semantics"]["native_scope"] = native_reference
             row["semantics"]["native_libraries"] = parsed.get("native_libraries", [])
@@ -2745,8 +3002,15 @@ def main(argv, supplied_environment=None, supplied_cwd=None, executor=None, prob
             require(row["compiler"]["sha256"] == native["images"]["rustc"]["sha256"]
                     and row["compiler"]["version"]["fields"]["host"] == "x86_64-unknown-linux-gnu", "native_compiler_binding")
         row["inputs"].extend(toolchain)
+        host_aliases = []
+        if host is not None:
+            require(row["compiler"]["version"]["fields"]["host"] == host["target"], "host_compiler_binding")
+            host_inputs, host_identities, host_aliases = host_execution_inputs(host, campaign)
+            row["inputs"].extend(host_inputs)
+            identities.update(host_identities)
         source = Path(parsed["source"])
         public_files = ([Path(path) for path in readonly_members] if native is not None else
+                        ordinary_candidate_files(host) if host is not None else
                         tree_files(root, exclude={"target", ".git", "node_modules", ".venv", "__pycache__"}))
         if native is not None:
             require(str(source) in readonly_members or any(source.is_relative_to(Path(path)) for path in native["write_roots"]), "native_source_scope")
@@ -2759,7 +3023,7 @@ def main(argv, supplied_environment=None, supplied_cwd=None, executor=None, prob
             if str(source) not in readonly_members:
                 public_files.extend(tree_files(source.parent))
         elif not source.is_relative_to(root):
-            public_files.extend(tree_files(source.parent))
+            public_files.extend(tree_files(Path(host["manifest"]).parent if host is not None else source.parent))
         public_files.append(source)
         # Generated include inputs must be visible before dispatch as well.
         if environment.get("OUT_DIR"):
@@ -2768,6 +3032,8 @@ def main(argv, supplied_environment=None, supplied_cwd=None, executor=None, prob
             public_files.extend(tree_files(out_dir))
         source_identities = snapshot(set(public_files))
         source_item, source_identity = capture(source, "source", campaign)
+        if host is not None and str(source) in host["candidate_sources"]:
+            require(source_item["sha256"] == host["candidate_sources"][str(source)], "host_source_binding")
         if native is not None:
             if str(source) in readonly_members:
                 require(source_item["sha256"] == readonly_members[str(source)]["sha256"], "native_source_binding")
@@ -2776,20 +3042,27 @@ def main(argv, supplied_environment=None, supplied_cwd=None, executor=None, prob
         row["inputs"].append(source_item)
         identities[str(source)] = source_identity
         for external in parsed["externs"]:
-            if native is None:
+            if native is None and host is None:
                 with HeldPath(Path(external["path"]).parent, directory=True) as directory:
                     require(not any(Path(name).suffix in {".so", ".dylib", ".dll"}
                                     for name in os.listdir(directory.fd)), "dynamic_search_hidden_inputs")
                     directory.verify(content=False)
-            else:
+            elif native is not None:
                 require(external["path"] in readonly_members or any(Path(external["path"]).is_relative_to(Path(path)) for path in native["write_roots"]), "native_extern_scope")
             with HeldPath(external["path"]) as handle:
                 header = os.read(handle.fd, 8)
                 require(header.startswith(b"!<arch>\n") if external["path"].endswith(".rlib") else
+                        header[:4] in {b"\xcf\xfa\xed\xfe", b"\xfe\xed\xfa\xcf", b"\xca\xfe\xba\xbe"} if external["path"].endswith(".dylib") else
                         header.startswith(b"\x7fELF") if external["path"].endswith(".so") else header.startswith(b"rmeta"), "extern_image_format")
                 handle.verify()
             item, observed = capture(external["path"], "extern", campaign)
             item["extern_name"] = external["name"]
+            if host is not None:
+                require(Path(item["path"]).is_relative_to(Path(host["target_directory"])), "host_extern_scope")
+                item["producer"] = producing_unit(campaign, item)
+                item["origin"] = "recorded-producing-unit"
+                if external.get("kind") == "dynamic-image":
+                    item["extern_kind"] = "proc-macro-or-dynamic-image"
             if native is not None:
                 if external["path"] in readonly_members:
                     require(item["sha256"] == readonly_members[external["path"]]["sha256"], "native_extern_binding")
@@ -2816,16 +3089,25 @@ def main(argv, supplied_environment=None, supplied_cwd=None, executor=None, prob
                 files = tree_files(search_root) if writable_search else [Path(path) for path in readonly_members if Path(path).is_relative_to(search_root)]
             else:
                 files = tree_files(search_root)
-            require(native is not None or not any(path.suffix in {".so", ".dylib", ".dll"} for path in files), "dynamic_search_hidden_inputs")
+            require(native is not None or host is not None or not any(path.suffix in {".so", ".dylib", ".dll"} for path in files), "dynamic_search_hidden_inputs")
             search_snapshots[search["path"]] = sorted(str(p) for p in files)
             for path in files:
                 item, observed = capture(path, "search", campaign)
                 item["search_kind"] = search["kind"]
                 item["coverage"] = "conservative-search-scope"
+                if host is not None and path.suffix in {".so", ".dylib", ".dll"}:
+                    require(path.suffix == ".dylib" and path.is_relative_to(Path(host["target_directory"])), "host_dynamic_search_scope")
+                    item["producer"] = producing_unit(campaign, item)
+                    item["origin"] = "recorded-producing-unit"
                 row["inputs"].append(item)
                 identities[str(path)] = observed
         for path, original in identities.items():
             verify_unchanged(path, original, output_directory)
+        verify_host_aliases(host_aliases)
+        if host is not None:
+            before_tools = observe_host_tools(host, campaign, host_identities)
+            row["inputs"].append(before_tools)
+            row["semantics"]["host_execution"]["tooling_checks"] = {"before": before_tools, "after": None}
         dispatched = True
         actual_exit = dispatch_compiler(campaign, argv).returncode
         row["compiler_exit"] = actual_exit
@@ -2836,18 +3118,27 @@ def main(argv, supplied_environment=None, supplied_cwd=None, executor=None, prob
         produced = output_lease.produced()
         for path, original in identities.items():
             verify_unchanged(path, original, output_directory)
+        verify_host_aliases(host_aliases)
+        if host is not None:
+            after_tools = observe_host_tools(host, campaign, host_identities)
+            require(before_tools == after_tools, "host_tool_image_changed")
+            row["semantics"]["host_execution"]["tooling_checks"]["after"] = after_tools
         for directory, original in search_snapshots.items():
-            if native is None or any(Path(directory).is_relative_to(Path(path)) for path in native["write_roots"]):
+            if host is not None:
+                output_lease.verify_host_search(directory, original)
+            elif native is None or any(Path(directory).is_relative_to(Path(path)) for path in native["write_roots"]):
                 require(sorted(str(p) for p in tree_files(directory)) == original, "search_changed_during_compilation")
         with HeldPath(depfile) as handle:
             payload = handle.read()
-            dep = parse_depfile(payload, cwd, environment, native)
+            dep = parse_depfile(payload, cwd, environment, native, host)
             require(str(source) in dep["dependencies"], "source_not_in_depfile")
             for path in dep["dependencies"]:
                 require(path in source_identities or path in identities, "input_not_observed_before_dispatch")
                 verify_unchanged(path, source_identities.get(path, identities.get(path)), output_directory)
                 if not any(item["path"] == path and item["role"] == "source" for item in row["inputs"]):
                     item, observed = capture(path, "source", campaign)
+                    if host is not None and path in host["candidate_sources"]:
+                        require(item["sha256"] == host["candidate_sources"][path], "host_source_binding")
                     if native is not None:
                         if path in readonly_members:
                             require(item["sha256"] == readonly_members[path]["sha256"], "native_source_binding")
@@ -2883,6 +3174,8 @@ def main(argv, supplied_environment=None, supplied_cwd=None, executor=None, prob
             item, _ = capture(path, "unit", campaign)
             if native is not None and path.endswith(".so"):
                 item["unit_kind"] = "linux-dynamic-image"
+            if host is not None and path.endswith(".dylib"):
+                item["unit_kind"] = "darwin-dynamic-image"
             row["outputs"].append(item)
         output_lease.verify(produced)
         row["status"] = "success"
