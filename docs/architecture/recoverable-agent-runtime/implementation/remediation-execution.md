@@ -70,10 +70,19 @@ maintained checks passed 1,468 library cases, 25 doctests, 18 bounded Loom
 controls, format, names, boundaries and strict Kernel library-only Clippy.
 The excluded atomic-ledger callback case explains the one-test difference.
 All-targets strict Kernel Clippy remains failed with 248 unchanged Store
-development-dependency diagnostic signatures. The Process supplier finding,
-candidate ReceiptStore borrowed-backend regression and complete Capture producer
-retain their own obligations. The ReceiptStore regression has an actual compile
-failure; no corrected successor is accepted here.
+development-dependency diagnostic signatures. The Process supplier finding and
+complete Capture producer retain their own obligations.
+
+The [optional receipt registration successor](reviews/receipt-owner-registration.md)
+is installed as nine Kernel paths at `032d77338`. Its separate maintained run
+passed the borrowed-backend control, 1,472 library tests, 25 doctests, strict
+library Clippy and format. The 1,473-test composed-candidate run includes the
+excluded atomic-ledger callback case. No Store, Process, Capture overlay or
+production host activation was imported. The prior all-targets lint gap remains.
+The uninstalled receipt base still requires both P3 repairs and owning acceptance,
+a closed `configured_owner` consumer and an isolated strict check. Complete
+funding, retained debt, interruption/reopen, historical settlement and retirement
+remain explicit acceptance gates.
 
 ## Acceptance order
 
