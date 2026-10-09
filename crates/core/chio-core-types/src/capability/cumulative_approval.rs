@@ -730,19 +730,19 @@ fn root_commitment_hash(
     approval_budget_epoch: u64,
     signer_key_epoch: u64,
 ) -> Result<String> {
-    root_commitment_hash_parts(
-        &token.id,
-        &token.issuer,
-        &token.subject,
-        &token.scope,
-        token.issued_at,
-        token.expires_at,
+    root_commitment_hash_parts(RootCommitmentParts {
+        id: &token.id,
+        issuer: &token.issuer,
+        subject: &token.subject,
+        scope: &token.scope,
+        issued_at: token.issued_at,
+        expires_at: token.expires_at,
         root_grant_hash,
         threshold,
         approval_budget_id,
         approval_budget_epoch,
         signer_key_epoch,
-    )
+    })
 }
 
 fn root_commitment_hash_from_body(
@@ -753,38 +753,50 @@ fn root_commitment_hash_from_body(
     approval_budget_epoch: u64,
     signer_key_epoch: u64,
 ) -> Result<String> {
-    root_commitment_hash_parts(
-        &body.id,
-        &body.issuer,
-        &body.subject,
-        &body.scope,
-        body.issued_at,
-        body.expires_at,
+    root_commitment_hash_parts(RootCommitmentParts {
+        id: &body.id,
+        issuer: &body.issuer,
+        subject: &body.subject,
+        scope: &body.scope,
+        issued_at: body.issued_at,
+        expires_at: body.expires_at,
         root_grant_hash,
         threshold,
         approval_budget_id,
         approval_budget_epoch,
         signer_key_epoch,
-    )
+    })
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-)]
-fn root_commitment_hash_parts(
-    id: &str,
-    issuer: &PublicKey,
-    subject: &PublicKey,
-    scope: &ChioScope,
+/// Parameters of `root_commitment_hash_parts`.
+struct RootCommitmentParts<'a> {
+    id: &'a str,
+    issuer: &'a PublicKey,
+    subject: &'a PublicKey,
+    scope: &'a ChioScope,
     issued_at: u64,
     expires_at: u64,
-    root_grant_hash: &str,
-    threshold: &MonetaryAmount,
-    approval_budget_id: &str,
+    root_grant_hash: &'a str,
+    threshold: &'a MonetaryAmount,
+    approval_budget_id: &'a str,
     approval_budget_epoch: u64,
     signer_key_epoch: u64,
-) -> Result<String> {
+}
+
+fn root_commitment_hash_parts(params: RootCommitmentParts<'_>) -> Result<String> {
+    let RootCommitmentParts {
+        id,
+        issuer,
+        subject,
+        scope,
+        issued_at,
+        expires_at,
+        root_grant_hash,
+        threshold,
+        approval_budget_id,
+        approval_budget_epoch,
+        signer_key_epoch,
+    } = params;
     domain_hash(
         ROOT_COMMITMENT_DOMAIN,
         &CumulativeApprovalRootCommitment {
