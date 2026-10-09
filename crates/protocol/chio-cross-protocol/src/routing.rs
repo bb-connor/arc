@@ -139,112 +139,127 @@ pub fn plan_authoritative_route(
         if let Some(candidate) = available_candidate(DiscoveryProtocol::Native) {
             planned_outcome(
                 request_id,
-                RouteSelectionDecision::Attenuate,
-                source_protocol,
-                requested_target_protocol,
-                Some(candidate),
-                Some("governed intent disallowed projected protocols; selected native route"),
-                governed_intent,
-                &candidates,
+                PlannedOutcome {
+                    decision: RouteSelectionDecision::Attenuate,
+                    source_protocol,
+                    requested_target_protocol,
+                    selected_candidate: Some(candidate),
+                    reason: Some(
+                        "governed intent disallowed projected protocols; selected native route",
+                    ),
+                    governed_intent,
+                    candidates: &candidates,
+                },
             )?
         } else {
-            planned_outcome(
-                request_id,
-                RouteSelectionDecision::Deny,
-                source_protocol,
-                requested_target_protocol,
-                candidates.first(),
-                Some("governed intent disallowed projected protocols and no native route was available"),
-                governed_intent,
-                &candidates,
-            )?
+            planned_outcome(request_id, PlannedOutcome { decision: RouteSelectionDecision::Deny, source_protocol, requested_target_protocol, selected_candidate: candidates.first(), reason: Some("governed intent disallowed projected protocols and no native route was available"), governed_intent, candidates: &candidates })?
         }
     } else if let Some(preferred) = hints.preferred_target_protocol {
         if let Some(candidate) = available_candidate(preferred) {
             planned_outcome(
                 request_id,
-                if preferred == requested_target_protocol {
-                    RouteSelectionDecision::Select
-                } else {
-                    RouteSelectionDecision::Attenuate
+                PlannedOutcome {
+                    decision: if preferred == requested_target_protocol {
+                        RouteSelectionDecision::Select
+                    } else {
+                        RouteSelectionDecision::Attenuate
+                    },
+                    source_protocol,
+                    requested_target_protocol,
+                    selected_candidate: Some(candidate),
+                    reason: if preferred == requested_target_protocol {
+                        None
+                    } else {
+                        Some("control-plane policy preferred an alternate target protocol")
+                    },
+                    governed_intent,
+                    candidates: &candidates,
                 },
-                source_protocol,
-                requested_target_protocol,
-                Some(candidate),
-                if preferred == requested_target_protocol {
-                    None
-                } else {
-                    Some("control-plane policy preferred an alternate target protocol")
-                },
-                governed_intent,
-                &candidates,
             )?
         } else if let Some(candidate) = available_candidate(requested_target_protocol) {
             planned_outcome(
                 request_id,
-                RouteSelectionDecision::Select,
-                source_protocol,
-                requested_target_protocol,
-                Some(candidate),
-                Some("preferred target protocol unavailable; retained requested route"),
-                governed_intent,
-                &candidates,
+                PlannedOutcome {
+                    decision: RouteSelectionDecision::Select,
+                    source_protocol,
+                    requested_target_protocol,
+                    selected_candidate: Some(candidate),
+                    reason: Some("preferred target protocol unavailable; retained requested route"),
+                    governed_intent,
+                    candidates: &candidates,
+                },
             )?
         } else if let Some(candidate) = available_candidate(DiscoveryProtocol::Native) {
             planned_outcome(
                 request_id,
-                RouteSelectionDecision::Attenuate,
-                source_protocol,
-                requested_target_protocol,
-                Some(candidate),
-                Some("preferred target protocol unavailable; attenuated to native fallback"),
-                governed_intent,
-                &candidates,
+                PlannedOutcome {
+                    decision: RouteSelectionDecision::Attenuate,
+                    source_protocol,
+                    requested_target_protocol,
+                    selected_candidate: Some(candidate),
+                    reason: Some(
+                        "preferred target protocol unavailable; attenuated to native fallback",
+                    ),
+                    governed_intent,
+                    candidates: &candidates,
+                },
             )?
         } else {
             planned_outcome(
                 request_id,
-                RouteSelectionDecision::Deny,
-                source_protocol,
-                requested_target_protocol,
-                candidates.first(),
-                Some("no candidate route satisfied the preferred target protocol policy"),
-                governed_intent,
-                &candidates,
+                PlannedOutcome {
+                    decision: RouteSelectionDecision::Deny,
+                    source_protocol,
+                    requested_target_protocol,
+                    selected_candidate: candidates.first(),
+                    reason: Some(
+                        "no candidate route satisfied the preferred target protocol policy",
+                    ),
+                    governed_intent,
+                    candidates: &candidates,
+                },
             )?
         }
     } else if let Some(candidate) = available_candidate(requested_target_protocol) {
         planned_outcome(
             request_id,
-            RouteSelectionDecision::Select,
-            source_protocol,
-            requested_target_protocol,
-            Some(candidate),
-            None,
-            governed_intent,
-            &candidates,
+            PlannedOutcome {
+                decision: RouteSelectionDecision::Select,
+                source_protocol,
+                requested_target_protocol,
+                selected_candidate: Some(candidate),
+                reason: None,
+                governed_intent,
+                candidates: &candidates,
+            },
         )?
     } else if let Some(candidate) = available_candidate(DiscoveryProtocol::Native) {
         planned_outcome(
             request_id,
-            RouteSelectionDecision::Attenuate,
-            source_protocol,
-            requested_target_protocol,
-            Some(candidate),
-            Some("requested target protocol unavailable; attenuated to native fallback"),
-            governed_intent,
-            &candidates,
+            PlannedOutcome {
+                decision: RouteSelectionDecision::Attenuate,
+                source_protocol,
+                requested_target_protocol,
+                selected_candidate: Some(candidate),
+                reason: Some(
+                    "requested target protocol unavailable; attenuated to native fallback",
+                ),
+                governed_intent,
+                candidates: &candidates,
+            },
         )?
     } else {
         planned_outcome(
             request_id,
-            RouteSelectionDecision::Deny,
-            source_protocol,
-            requested_target_protocol,
-            candidates.first(),
-            Some("no candidate route was available at planning time"),
-            governed_intent,
-            &candidates,
+            PlannedOutcome {
+                decision: RouteSelectionDecision::Deny,
+                source_protocol,
+                requested_target_protocol,
+                selected_candidate: candidates.first(),
+                reason: Some("no candidate route was available at planning time"),
+                governed_intent,
+                candidates: &candidates,
+            },
         )?
     };
 
@@ -346,17 +361,30 @@ fn planned_protocols_for_target(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-fn planned_outcome(
-    request_id: &str,
+/// Parameters of `planned_outcome`.
+struct PlannedOutcome<'a> {
     decision: RouteSelectionDecision,
     source_protocol: DiscoveryProtocol,
     requested_target_protocol: DiscoveryProtocol,
-    selected_candidate: Option<&RouteCandidateEvidence>,
-    reason: Option<&str>,
-    governed_intent: Option<&GovernedTransactionIntent>,
-    candidates: &[RouteCandidateEvidence],
+    selected_candidate: Option<&'a RouteCandidateEvidence>,
+    reason: Option<&'a str>,
+    governed_intent: Option<&'a GovernedTransactionIntent>,
+    candidates: &'a [RouteCandidateEvidence],
+}
+
+fn planned_outcome(
+    request_id: &str,
+    params: PlannedOutcome<'_>,
 ) -> Result<RoutePlanningOutcome, BridgeError> {
+    let PlannedOutcome {
+        decision,
+        source_protocol,
+        requested_target_protocol,
+        selected_candidate,
+        reason,
+        governed_intent,
+        candidates,
+    } = params;
     let selected_route_id = if decision == RouteSelectionDecision::Deny {
         None
     } else {
