@@ -204,6 +204,9 @@ pub(super) struct Published {
     cancel: Arc<AtomicBool>,
     /// SQLite VM steps one walker hold of the snapshot connection may spend.
     hold_sql_steps: u64,
+    /// Storage failure the next walker commit hold reports.
+    #[cfg(test)]
+    commit_fault: Mutex<Option<SnapshotDbError>>,
 }
 
 /// Position an extension cycle starts from.
@@ -434,6 +437,16 @@ pub(super) struct PublishedSink<'a> {
 impl OwnedSink for PublishedSink<'_> {
     fn commit(&mut self, batch: &SnapshotBatch, through_entry_seq: i64) -> Result<(), WalkError> {
         self.published.hold(|owned| {
+            #[cfg(test)]
+            if let Some(fault) = self
+                .published
+                .commit_fault
+                .lock()
+                .ok()
+                .and_then(|mut fault| fault.take())
+            {
+                return Err(fault);
+            }
             owned.db.commit(batch)?;
             owned.meta.through_entry_seq = owned.meta.through_entry_seq.max(through_entry_seq);
             owned.meta.generation += 1;
@@ -633,14 +646,32 @@ impl ReceiptQuerySnapshots {
             },
         };
         if let Phase::Ready(published) = phase {
-            if let Ok(owned) = published.owned.lock() {
-                status.watermark = Some(published.watermark_of(&owned.meta));
-                status.quota_bytes = owned.db.quota_bytes();
-                status.used_bytes = owned.db.used_bytes().unwrap_or(0);
-                status.tool_receipts = owned.db.tool_row_count().unwrap_or(0);
-                let (dimensions, bytes) = owned.db.dim_stats().unwrap_or((0, 0));
-                status.dimensions = dimensions;
-                status.dimension_bytes = bytes;
+            // Every metric is maintained, so this is one bounded hold. A metric
+            // that cannot be read makes the state unavailable; it is never
+            // reported as a healthy zero.
+            let metrics = published.hold(|owned| {
+                Ok((
+                    published.watermark_of(&owned.meta),
+                    owned.db.quota_bytes(),
+                    owned.db.used_bytes()?,
+                    owned.db.tool_row_count()?,
+                    owned.db.dim_stats()?,
+                ))
+            });
+            match metrics {
+                Ok((watermark, quota, used, rows, (dimensions, bytes))) => {
+                    status.watermark = Some(watermark);
+                    status.quota_bytes = quota;
+                    status.used_bytes = used;
+                    status.tool_receipts = rows;
+                    status.dimensions = dimensions;
+                    status.dimension_bytes = bytes;
+                }
+                Err(error) => {
+                    status.state = ReceiptQuerySnapshotState::Unavailable {
+                        reason: format!("receipt query snapshot metrics are unavailable: {error}"),
+                    };
+                }
             }
         }
         status
@@ -941,7 +972,9 @@ fn run(inner: &Arc<Inner>) {
                 inner.set_phase(Phase::Unavailable(error.to_string()));
                 None
             }
-            Err(error @ (WalkError::WalkerBudget | WalkError::Busy(_))) => {
+            Err(
+                error @ (WalkError::WalkerBudget | WalkError::Busy(_) | WalkError::Unavailable(_)),
+            ) => {
                 inner.set_phase(Phase::Unavailable(error.to_string()));
                 Some(
                     inner
@@ -1058,6 +1091,8 @@ fn build_and_serve(inner: &Arc<Inner>) -> Result<(), WalkError> {
         changed: Arc::clone(&inner.changed),
         cancel: Arc::clone(&inner.cancel),
         hold_sql_steps: inner.config.hold_sql_steps,
+        #[cfg(test)]
+        commit_fault: Mutex::new(None),
     });
     inner.set_phase(Phase::Ready(Arc::clone(&published)));
     serve(inner, &extension_ctx, &ctx, &published)
@@ -1167,6 +1202,30 @@ impl ReceiptQuerySnapshots {
 
     pub(super) fn recheck_lease_for_test(&self, epoch: u64) -> Result<(), ReceiptStoreError> {
         self.inner.recheck_lease(epoch)
+    }
+
+    /// Make the walker's next commit hold fail with `fault`, as a failing
+    /// snapshot storage backend would.
+    pub(super) fn fail_next_commit_for_test(&self, fault: SnapshotDbError) {
+        if let Phase::Ready(published) = self.inner.phase() {
+            if let Ok(mut slot) = published.commit_fault.lock() {
+                *slot = Some(fault);
+            }
+        }
+    }
+
+    /// Poison the published snapshot's lock, as a panic inside a hold would.
+    pub(super) fn poison_snapshot_for_test(&self) {
+        if let Phase::Ready(published) = self.inner.phase() {
+            std::thread::scope(|scope| {
+                let _ = scope
+                    .spawn(|| {
+                        let _owned = published.owned.lock();
+                        panic!("poisoning the published snapshot");
+                    })
+                    .join();
+            });
+        }
     }
 
     pub(super) fn max_settled_per_hold_for_test(&self) -> u64 {

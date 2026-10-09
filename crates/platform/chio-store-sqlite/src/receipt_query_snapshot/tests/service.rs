@@ -5,6 +5,7 @@ use std::time::{Duration, Instant};
 use chio_kernel::receipt_query::{ReceiptQuery, ReceiptQuerySnapshotError, ReceiptReadContext};
 use chio_kernel::ReceiptStoreError;
 
+use super::super::db::SnapshotDbError;
 use super::super::service::{
     ReceiptQuerySnapshotConfig, ReceiptQuerySnapshotState, ReceiptQuerySnapshots,
 };
@@ -708,6 +709,121 @@ fn hold_shutdown_during_a_large_settlement_stops_the_walker() {
     );
     service.shutdown();
     assert_eq!(service.status().state, ReceiptQuerySnapshotState::Stopped);
+}
+
+#[test]
+fn a_status_metric_that_cannot_be_read_is_never_reported_as_healthy_zeros() {
+    let fixture = mixed_fixture();
+    let service = ready(&fixture, config());
+    service.pause_extension_for_test(true);
+    let healthy = service.status();
+    assert_eq!(healthy.state, ReceiptQuerySnapshotState::Ready);
+    assert!(healthy.tool_receipts > 0 && healthy.dimensions > 0);
+    service.poison_snapshot_for_test();
+    let status = service.status();
+    assert!(
+        matches!(
+            &status.state,
+            ReceiptQuerySnapshotState::Unavailable { reason }
+                if reason.contains("metrics are unavailable")
+        ),
+        "a failed metric read reported {status:?}"
+    );
+    service.shutdown();
+}
+
+/// Fail the walker's next commit hold with `fault` while a read lease is in
+/// flight. Returns the state the walker publishes, the in-flight lease's
+/// outcome, and whether a new lineage became ready afterwards.
+fn walker_storage_failure(
+    fault: SnapshotDbError,
+) -> (ReceiptQuerySnapshotState, ReceiptQuerySnapshotError, bool) {
+    let fixture = mixed_fixture();
+    let service = ready(
+        &fixture,
+        ReceiptQuerySnapshotConfig {
+            invalid_retry_backoff: Duration::from_millis(500),
+            ..config()
+        },
+    );
+    let first = service.query_receipts(&admin(1)).unwrap().snapshot.unwrap();
+    let epoch = service.lease_for_test().unwrap();
+    service.fail_next_commit_for_test(fault);
+    fixture.append_varied(18..20);
+    let state = wait_for(&service, "the failed commit", |state| {
+        *state != ReceiptQuerySnapshotState::Ready
+    });
+    let lease = snapshot_error(service.recheck_lease_for_test(epoch).unwrap_err());
+    let rebuilt = match state {
+        ReceiptQuerySnapshotState::Unavailable { .. } => {
+            wait_for(&service, "a rebuild", |state| {
+                *state == ReceiptQuerySnapshotState::Ready
+            });
+            let rebuilt = service.query_receipts(&admin(1)).unwrap().snapshot.unwrap();
+            let lineage = |id: &str| id.split(':').next().unwrap().to_string();
+            lineage(&first.snapshot_id) != lineage(&rebuilt.snapshot_id)
+        }
+        _ => false,
+    };
+    service.shutdown();
+    (state, lease, rebuilt)
+}
+
+#[test]
+fn a_typed_backing_io_failure_in_a_walker_hold_is_unavailable_never_invalid() {
+    let (state, lease, rebuilt) = walker_storage_failure(SnapshotDbError::Store(
+        ReceiptQuerySnapshotError::Unavailable("snapshot backing storage I/O failed".into()).into(),
+    ));
+    assert!(
+        matches!(
+            &state,
+            ReceiptQuerySnapshotState::Unavailable { reason }
+                if reason.contains("snapshot backing storage I/O failed")
+        ),
+        "a backing I/O failure published {state:?}"
+    );
+    assert!(
+        matches!(&lease, ReceiptQuerySnapshotError::Unavailable(_)),
+        "an in-flight read across a backing I/O failure refused as {lease:?}"
+    );
+    assert!(rebuilt, "the walker did not rebuild after an I/O failure");
+}
+
+#[test]
+fn a_snapshot_storage_io_error_in_a_walker_hold_is_unavailable_never_invalid() {
+    let io = rusqlite::Error::SqliteFailure(
+        rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_IOERR_READ),
+        Some("disk I/O error".into()),
+    );
+    let (state, lease, rebuilt) = walker_storage_failure(SnapshotDbError::Sqlite(io));
+    assert!(
+        matches!(&state, ReceiptQuerySnapshotState::Unavailable { .. }),
+        "a snapshot storage I/O error published {state:?}"
+    );
+    assert!(
+        matches!(&lease, ReceiptQuerySnapshotError::Unavailable(_)),
+        "an in-flight read across a storage I/O error refused as {lease:?}"
+    );
+    assert!(rebuilt, "the walker did not rebuild after an I/O error");
+}
+
+#[test]
+fn a_custody_mismatch_in_a_walker_hold_stays_invalid() {
+    let (state, lease, _) = walker_storage_failure(SnapshotDbError::Store(
+        ReceiptQuerySnapshotError::Invalid("snapshot backing file custody mismatch".into()).into(),
+    ));
+    assert!(
+        matches!(
+            &state,
+            ReceiptQuerySnapshotState::Invalid { reason }
+                if reason.contains("custody mismatch")
+        ),
+        "a custody mismatch published {state:?}"
+    );
+    assert!(
+        matches!(&lease, ReceiptQuerySnapshotError::Invalid(_)),
+        "an in-flight read across a custody mismatch refused as {lease:?}"
+    );
 }
 
 #[test]

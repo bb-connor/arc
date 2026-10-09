@@ -189,6 +189,8 @@ pub(super) struct SnapshotDb {
     page_size: u64,
     dims: HashMap<(i64, String), i64>,
     signers: HashMap<String, i64>,
+    /// Bytes of every interned dimension value, maintained as values commit.
+    dim_bytes: u64,
     /// Largest number of pending leaves one snapshot transaction removed.
     #[cfg(test)]
     pub(super) max_settled_per_hold: std::cell::Cell<u64>,
@@ -231,6 +233,7 @@ impl SnapshotDb {
             page_size,
             dims: HashMap::new(),
             signers: HashMap::new(),
+            dim_bytes: 0,
             #[cfg(test)]
             max_settled_per_hold: std::cell::Cell::new(0),
         };
@@ -242,6 +245,27 @@ impl SnapshotDb {
 
     pub(super) fn connection(&self) -> Result<&Connection, ReceiptStoreError> {
         self.storage.connection()
+    }
+
+    /// SQLite VM steps `work` spends on this connection.
+    #[cfg(test)]
+    pub(super) fn count_steps_for_test<T>(
+        &self,
+        work: impl FnOnce(&Self) -> T,
+    ) -> Result<(T, u64), ReceiptStoreError> {
+        let steps = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+        let counter = std::sync::Arc::clone(&steps);
+        self.connection()?.progress_handler(
+            1,
+            Some(move || {
+                counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                false
+            }),
+        )?;
+        let value = work(self);
+        self.connection()?
+            .progress_handler(0, None::<fn() -> bool>)?;
+        Ok((value, steps.load(std::sync::atomic::Ordering::Relaxed)))
     }
 
     #[cfg(test)]
@@ -337,6 +361,9 @@ impl SnapshotDb {
         );
         if result.is_ok() {
             let (dims, signers) = (dims.added, signers.added);
+            self.dim_bytes = dims.keys().fold(self.dim_bytes, |total, (_, value)| {
+                total.saturating_add(crate::integer::count(value.len()))
+            });
             self.dims.extend(dims);
             self.signers.extend(signers);
         }
@@ -406,6 +433,9 @@ impl SnapshotDb {
         );
         if matches!(result, Ok(Ok(_))) {
             let added = dims.added;
+            self.dim_bytes = added.keys().fold(self.dim_bytes, |total, (_, value)| {
+                total.saturating_add(crate::integer::count(value.len()))
+            });
             self.dims.extend(added);
         }
         result
@@ -605,16 +635,10 @@ impl SnapshotDb {
             .map_or(0, |(n, _, _)| n))
     }
 
+    /// Distinct dimension values and their bytes, maintained as values
+    /// commit, so reading them costs no SQL work.
     pub(super) fn dim_stats(&self) -> Result<(u64, u64), SnapshotDbError> {
-        let (count, bytes): (i64, i64) = self.connection()?.query_row(
-            "SELECT COUNT(*), COALESCE(SUM(length(CAST(value AS BLOB))), 0) FROM snapshot_dim",
-            [],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )?;
-        Ok((
-            u64::try_from(count).unwrap_or(0),
-            u64::try_from(bytes).unwrap_or(0),
-        ))
+        Ok((crate::integer::count(self.dims.len()), self.dim_bytes))
     }
 }
 

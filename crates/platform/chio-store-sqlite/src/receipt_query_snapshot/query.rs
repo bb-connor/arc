@@ -4,7 +4,7 @@
 use chio_kernel::receipt_query::{ReceiptQuery, MAX_QUERY_LIMIT};
 use chio_kernel::{ReceiptQuerySnapshotError, ReceiptStoreError};
 use rusqlite::types::Value;
-use rusqlite::{params_from_iter, OptionalExtension};
+use rusqlite::{params_from_iter, ErrorCode, OptionalExtension};
 
 use super::db::{
     blob32, tool_key, SnapshotDb, SnapshotDbError, COUNT_HOUR, COUNT_TOTAL, DIM_CAPABILITY,
@@ -59,12 +59,38 @@ fn column(dim: i64) -> &'static str {
     }
 }
 
-fn snapshot_error(error: SnapshotDbError) -> ReceiptStoreError {
+pub(super) fn snapshot_error(error: SnapshotDbError) -> ReceiptStoreError {
     match error {
         SnapshotDbError::Store(error) => error,
+        // Storage I/O and resource failures say nothing about the snapshot's
+        // contents; a read refuses as unavailable and may be retried.
+        SnapshotDbError::Sqlite(error) if storage_unavailable(&error) => {
+            ReceiptQuerySnapshotError::Unavailable(format!(
+                "receipt query snapshot storage failed: {error}"
+            ))
+            .into()
+        }
         SnapshotDbError::Sqlite(error) => ReceiptStoreError::Sqlite(error),
         other => ReceiptStoreError::Conflict(other.to_string()),
     }
+}
+
+/// Whether a snapshot storage error is an I/O or resource failure rather
+/// than a statement about the stored rows.
+pub(super) fn storage_unavailable(error: &rusqlite::Error) -> bool {
+    matches!(
+        error.sqlite_error_code(),
+        Some(
+            ErrorCode::SystemIoFailure
+                | ErrorCode::CannotOpen
+                | ErrorCode::OutOfMemory
+                | ErrorCode::ReadOnly
+                | ErrorCode::PermissionDenied
+                | ErrorCode::DiskFull
+                | ErrorCode::DatabaseBusy
+                | ErrorCode::DatabaseLocked
+        )
+    )
 }
 
 /// Select one page and its exact total from one snapshot version.

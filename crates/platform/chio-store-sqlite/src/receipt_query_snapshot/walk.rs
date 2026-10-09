@@ -10,6 +10,7 @@ use std::sync::Arc;
 use chio_core::receipt::body::ChioReceipt;
 use chio_core::receipt::lineage::ChildRequestReceipt;
 use chio_kernel::checkpoint::{CheckpointChainFrontier, KernelCheckpoint};
+use chio_kernel::receipt_query::ReceiptQuerySnapshotError;
 use chio_kernel::ReceiptStoreError;
 use rusqlite::{params, Connection, ErrorCode, OptionalExtension};
 
@@ -63,6 +64,8 @@ pub(super) enum WalkError {
     Cancelled,
     #[error("receipt query snapshot lineage was superseded")]
     Superseded,
+    #[error("receipt query snapshot is unavailable: {0}")]
+    Unavailable(String),
 }
 
 impl From<SnapshotDbError> for WalkError {
@@ -78,7 +81,12 @@ impl From<SnapshotDbError> for WalkError {
             SnapshotDbError::Duplicate(message) => Self::Integrity(message),
             SnapshotDbError::Store(error) => classify(error, None),
             SnapshotDbError::Sqlite(error) => {
-                Self::Integrity(format!("receipt query snapshot storage failed: {error}"))
+                let reason = format!("receipt query snapshot storage failed: {error}");
+                if super::query::storage_unavailable(&error) {
+                    Self::Unavailable(reason)
+                } else {
+                    Self::Integrity(reason)
+                }
             }
         }
     }
@@ -208,8 +216,21 @@ impl Drop for StepGuard<'_> {
 }
 
 /// Map a store error to its walker outcome. Interruption means cancellation
-/// or budget exhaustion; busy and pool errors are contention.
+/// or budget exhaustion; busy and pool errors are contention. A typed snapshot
+/// outcome keeps its class: only `Invalid` is an integrity failure.
 fn classify(error: ReceiptStoreError, guard: Option<&StepGuard<'_>>) -> WalkError {
+    if let ReceiptStoreError::QuerySnapshot(snapshot) = &error {
+        return match snapshot {
+            ReceiptQuerySnapshotError::Invalid(reason) => WalkError::Integrity(reason.clone()),
+            ReceiptQuerySnapshotError::Unavailable(reason) => {
+                WalkError::Unavailable(reason.clone())
+            }
+            ReceiptQuerySnapshotError::WorkBudgetExhausted(_) => WalkError::WalkerBudget,
+            ReceiptQuerySnapshotError::Building { .. }
+            | ReceiptQuerySnapshotError::Stale
+            | ReceiptQuerySnapshotError::Busy => WalkError::Busy(snapshot.to_string()),
+        };
+    }
     if let ReceiptStoreError::Sqlite(sqlite) = &error {
         match sqlite.sqlite_error_code() {
             Some(ErrorCode::OperationInterrupted) => {

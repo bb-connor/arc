@@ -387,3 +387,89 @@ fn a_changed_unsigned_subject_is_reported_as_drift() {
     assert_eq!(second, Err(1));
     assert_eq!(count_rows(&db), before);
 }
+
+#[test]
+fn hold_status_metrics_are_constant_work_for_high_cardinality_dimensions() {
+    let mut db = SnapshotDb::open_memory(512 * 1024 * 1024).unwrap();
+    for chunk in 0..10_i64 {
+        let rows: Vec<_> = (chunk * 2_000 + 1..=(chunk + 1) * 2_000)
+            .map(|seq| {
+                let mut row = synthetic(seq, 0);
+                // Every receipt carries its own capability and tool.
+                row.capability = format!("cap-unique-{seq}");
+                row.tool_name = format!("tool-unique-{seq}");
+                row
+            })
+            .collect();
+        db.commit(&SnapshotBatch {
+            tools: rows,
+            ..SnapshotBatch::default()
+        })
+        .unwrap();
+    }
+    let (stats, steps) = db
+        .count_steps_for_test(|db| db.dim_stats().unwrap())
+        .unwrap();
+    assert!(steps < 100, "status metrics spent {steps} VM steps");
+    let (count, bytes): (i64, i64) = db
+        .connection()
+        .unwrap()
+        .query_row(
+            "SELECT COUNT(*), SUM(length(CAST(value AS BLOB))) FROM snapshot_dim",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!(
+        stats,
+        (u64::try_from(count).unwrap(), u64::try_from(bytes).unwrap())
+    );
+}
+
+#[test]
+fn a_typed_unavailable_store_error_is_never_an_integrity_outcome() {
+    use super::super::walk::WalkError;
+    let classify_store_error = |error| WalkError::from(SnapshotDbError::Store(error));
+    let unavailable = ReceiptStoreError::QuerySnapshot(ReceiptQuerySnapshotError::Unavailable(
+        "snapshot storage is unavailable".into(),
+    ));
+    let outcome = classify_store_error(unavailable);
+    assert!(
+        !matches!(outcome, WalkError::Integrity(_)),
+        "a typed unavailable outcome became {outcome:?}"
+    );
+    assert!(outcome
+        .to_string()
+        .contains("snapshot storage is unavailable"));
+    let invalid = ReceiptStoreError::QuerySnapshot(ReceiptQuerySnapshotError::Invalid(
+        "custody mismatch".into(),
+    ));
+    assert!(matches!(
+        classify_store_error(invalid),
+        WalkError::Integrity(_)
+    ));
+}
+
+#[test]
+fn a_snapshot_storage_io_error_on_a_read_refuses_as_unavailable() {
+    use super::super::query::snapshot_error;
+    let io = rusqlite::Error::SqliteFailure(
+        rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_IOERR_READ),
+        Some("disk I/O error".into()),
+    );
+    let outcome = snapshot_error(SnapshotDbError::Sqlite(io));
+    assert!(
+        matches!(
+            &outcome,
+            ReceiptStoreError::QuerySnapshot(ReceiptQuerySnapshotError::Unavailable(_))
+        ),
+        "a read storage I/O error surfaced as {outcome:?}"
+    );
+    let custody = snapshot_error(SnapshotDbError::Store(
+        ReceiptQuerySnapshotError::Invalid("custody mismatch".into()).into(),
+    ));
+    assert!(matches!(
+        custody,
+        ReceiptStoreError::QuerySnapshot(ReceiptQuerySnapshotError::Invalid(_))
+    ));
+}
