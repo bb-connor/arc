@@ -938,3 +938,6 @@ async fn receipt_append_routes_accept_bodies_above_the_service_body_cap() {
 
 #[path = "router_tests/receipt_query_snapshot_tests.rs"]
 mod receipt_query_snapshot_tests;
+
+#[path = "router_tests/evidence_snapshot_export_tests.rs"]
+mod evidence_snapshot_export_tests;

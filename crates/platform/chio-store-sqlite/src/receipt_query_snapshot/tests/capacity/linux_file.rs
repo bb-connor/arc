@@ -773,6 +773,7 @@ fn hold_steps(entries: u64, config: &ReceiptQuerySnapshotConfig) -> Value {
             tree_size: last,
             merkle_root: [7; 32],
             kernel_key: signer,
+            canonical_sha256: [0; 32],
         }],
         ..SnapshotBatch::default()
     })

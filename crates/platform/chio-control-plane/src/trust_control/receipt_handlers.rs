@@ -353,10 +353,10 @@ pub(crate) async fn handle_evidence_export(
         Ok(principal) => principal,
         Err(response) => return response,
     };
-    let store = match state.receipt_store() {
-        Ok(store) => store,
+    match state.receipt_store() {
+        Ok(_) => (),
         Err(response) => return response,
-    };
+    }
     let query = match principal.authorize_evidence_export_query(request.query) {
         Ok(query) => query,
         Err(response) => return response,
@@ -373,27 +373,55 @@ pub(crate) async fn handle_evidence_export(
         Ok(query) => query,
         Err(response) => return response,
     };
+    let snapshots = match state.receipt_query_snapshots.clone() {
+        Some(snapshots) => snapshots,
+        None => {
+            return snapshot_error_response(
+                chio_kernel::ReceiptQuerySnapshotError::Unavailable("service not started".into())
+                    .into(),
+            )
+        }
+    };
     super::receipt_query_service::run_bounded_response(
         Arc::clone(&state.evidence_export_lane),
         move || {
-            let (bundle, transparency) = store
+            let (bundle, transparency, snapshot) = snapshots
                 .build_evidence_export_bundle_with_transparency(&query)
-                .map_err(|error| {
-                    plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+                .map_err(|error| match error {
+                    chio_kernel::evidence_export::EvidenceExportError::ReceiptStore(error) => {
+                        snapshot_error_response(error)
+                    }
+                    error => {
+                        plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+                    }
                 })?;
             evidence_export::validate_evidence_bundle_requirements(
                 &bundle,
                 prepared.require_proofs,
             )
             .map_err(|error| plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()))?;
-            Ok::<_, Response>(Json(evidence_export::RemoteEvidenceExportResponse {
-                bundle,
-                transparency: Some(transparency),
-                federation_policy: prepared.federation_policy,
-            }))
+            let response = AuthenticatedEvidenceExportResponse {
+                export: evidence_export::RemoteEvidenceExportResponse {
+                    bundle,
+                    transparency: Some(transparency),
+                    federation_policy: prepared.federation_policy,
+                },
+                snapshot,
+            };
+            chio_store_sqlite::evidence_export::validate_http_evidence_export_size(&response)
+                .map_err(snapshot_error_response)?;
+            Ok::<_, Response>(Json(response))
         },
     )
     .await
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AuthenticatedEvidenceExportResponse {
+    #[serde(flatten)]
+    export: evidence_export::RemoteEvidenceExportResponse,
+    snapshot: chio_kernel::ReceiptSnapshotWatermark,
 }
 
 pub(crate) async fn handle_evidence_import(

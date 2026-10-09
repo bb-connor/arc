@@ -188,15 +188,15 @@ enum Phase {
 pub(super) struct Meta {
     generation: u64,
     through_entry_seq: i64,
-    checkpoint_seq: i64,
+    pub(super) checkpoint_seq: i64,
     observed_at_ms: u64,
     observed_at: Instant,
     recertified_at_ms: u64,
 }
 
 pub(super) struct Owned {
-    db: SnapshotDb,
-    meta: Meta,
+    pub(super) db: SnapshotDb,
+    pub(super) meta: Meta,
     head: Option<KernelCheckpoint>,
     chain: CheckpointChainFrontier,
     watermark: i64,
@@ -207,7 +207,7 @@ pub(super) struct Owned {
 /// generations committed under `owned`.
 pub(super) struct Published {
     lineage: String,
-    owned: Mutex<Owned>,
+    pub(super) owned: Mutex<Owned>,
     health_sample: Mutex<Option<health::HealthSample>>,
     waiting: Arc<AtomicUsize>,
     changed: Arc<Condvar>,
@@ -301,7 +301,7 @@ impl Published {
         self.lock()
     }
 
-    fn watermark_of(&self, meta: &Meta) -> ReceiptSnapshotWatermark {
+    pub(super) fn watermark_of(&self, meta: &Meta) -> ReceiptSnapshotWatermark {
         ReceiptSnapshotWatermark {
             snapshot_id: format!("{}:{}", self.lineage, meta.generation),
             through_entry_seq: u64::try_from(meta.through_entry_seq).unwrap_or(0),
@@ -621,9 +621,9 @@ fn poisoned() -> ReceiptStoreError {
     ReceiptQuerySnapshotError::Invalid("receipt query snapshot lock poisoned".into()).into()
 }
 
-struct Inner {
-    store: Arc<SqliteReceiptStore>,
-    config: ReceiptQuerySnapshotConfig,
+pub(super) struct Inner {
+    pub(super) store: Arc<SqliteReceiptStore>,
+    pub(super) config: ReceiptQuerySnapshotConfig,
     requested_quota_bytes: AtomicU64,
     cancel: Arc<AtomicBool>,
     phase: Mutex<Phase>,
@@ -631,7 +631,7 @@ struct Inner {
     wake: Mutex<bool>,
     wake_signal: Condvar,
     readers: AtomicUsize,
-    waiting: Arc<AtomicUsize>,
+    pub(super) waiting: Arc<AtomicUsize>,
     epoch: AtomicU64,
     /// Epoch of the latest transition to Invalid.
     last_invalid_epoch: AtomicU64,
@@ -651,12 +651,12 @@ struct Inner {
 
 /// Owner of the authenticated receipt query snapshot of one store.
 pub struct ReceiptQuerySnapshots {
-    inner: Arc<Inner>,
+    pub(super) inner: Arc<Inner>,
     walker: Mutex<Option<JoinHandle<()>>>,
 }
 
 /// Admission of one read; released on drop.
-struct ReadPermit<'a> {
+pub(super) struct ReadPermit<'a> {
     readers: &'a AtomicUsize,
 }
 
@@ -909,7 +909,7 @@ impl Drop for ReceiptQuerySnapshots {
 }
 
 impl Inner {
-    fn admit(&self) -> Result<ReadPermit<'_>, ReceiptStoreError> {
+    pub(super) fn admit(&self) -> Result<ReadPermit<'_>, ReceiptStoreError> {
         let admitted = self.readers.fetch_add(1, Ordering::SeqCst);
         let permit = ReadPermit {
             readers: &self.readers,
@@ -971,7 +971,7 @@ impl Inner {
 
     /// The outcome of a read served from `published`. A typed `Invalid` drops
     /// that lineage; every other outcome passes through unchanged.
-    fn owned_read<T>(
+    pub(super) fn owned_read<T>(
         &self,
         published: &Arc<Published>,
         result: Result<T, ReceiptStoreError>,
@@ -984,7 +984,7 @@ impl Inner {
         result
     }
 
-    fn ready(&self) -> Result<(Arc<Published>, u64), ReceiptStoreError> {
+    pub(super) fn ready(&self) -> Result<(Arc<Published>, u64), ReceiptStoreError> {
         let epoch = self.epoch.load(Ordering::SeqCst);
         let error = match self.phase() {
             Phase::Ready(published) => {
@@ -1018,7 +1018,7 @@ impl Inner {
     /// unchanged. Otherwise it refuses with the outcome that ended that phase:
     /// Invalid only after an authentication or writer-poison failure, and the
     /// typed availability outcome of the current phase for anything else.
-    fn recheck_lease(&self, epoch: u64) -> Result<(), ReceiptStoreError> {
+    pub(super) fn recheck_lease(&self, epoch: u64) -> Result<(), ReceiptStoreError> {
         if self.store.writer_head_poisoned() {
             self.invalidate("receipt writer head is poisoned");
         }
@@ -1119,7 +1119,11 @@ impl Inner {
     /// Wait for the version to reach the head observed now. A page may then
     /// be served from a version observed within `max_staleness`; a negative
     /// point read may not.
-    fn await_head(&self, published: &Published, strict: bool) -> Result<(), ReceiptStoreError> {
+    pub(super) fn await_head(
+        &self,
+        published: &Published,
+        strict: bool,
+    ) -> Result<(), ReceiptStoreError> {
         let target = self.head()?;
         let deadline = Instant::now() + self.config.head_wait;
         loop {
@@ -1164,6 +1168,13 @@ impl Inner {
                 "receipt query fetch exhausted its SQL work budget".into(),
             )
             .into()),
+            Err(FetchError::RowCap { entry_seq, .. }) => self.owned_read(
+                published,
+                Err(ReceiptQuerySnapshotError::Invalid(format!(
+                    "claim entry {entry_seq} no longer holds the receipt the snapshot authenticated"
+                ))
+                .into()),
+            ),
             Err(FetchError::Store(error)) => Err(error),
         }
     }

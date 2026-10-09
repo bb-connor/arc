@@ -704,6 +704,12 @@ fn check_sources_in(
                     source_seq: row.source_seq,
                     entry_seq: row.entry_seq,
                     signer: entry.signer.clone(),
+                    leaf_hash: entry.leaf_hash,
+                    ts: crate::receipt_store::support::sqlite_i64(
+                        receipt.timestamp,
+                        "child timestamp",
+                    )
+                    .map_err(CopyError::Store)?,
                 });
             }
         }
@@ -1008,6 +1014,8 @@ pub(super) fn owned_checkpoint(
         tree_size: field(crate::integer::count(checkpoint.body.tree_size))?,
         merkle_root: *checkpoint.body.merkle_root.as_bytes(),
         kernel_key: checkpoint.body.kernel_key.to_hex(),
+        canonical_sha256: super::export::checkpoint_digest(checkpoint)
+            .map_err(|error| WalkError::Integrity(error.to_string()))?,
     })
 }
 

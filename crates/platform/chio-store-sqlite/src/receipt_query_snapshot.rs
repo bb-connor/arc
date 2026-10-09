@@ -7,6 +7,8 @@
 //! from the store and accepted only when they match the authenticated leaf.
 #[path = "receipt_query_snapshot/db.rs"]
 mod db;
+#[path = "receipt_query_snapshot/export.rs"]
+mod export;
 #[path = "receipt_query_snapshot/extend.rs"]
 mod extend;
 #[path = "receipt_query_snapshot/fetch.rs"]

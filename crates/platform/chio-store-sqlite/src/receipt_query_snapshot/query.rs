@@ -101,6 +101,39 @@ pub(super) fn select(
     query: &ReceiptQuery,
     sql_steps: u64,
 ) -> Result<Selection, ReceiptStoreError> {
+    select_with_limit(
+        db,
+        query,
+        sql_steps,
+        query.limit.clamp(1, MAX_QUERY_LIMIT),
+        None,
+    )
+}
+
+/// Capture a complete bounded export selection in one owned snapshot hold.
+/// The count allowance is enforced before its row query allocates a page.
+pub(super) fn select_for_export(
+    db: &SnapshotDb,
+    query: &ReceiptQuery,
+    sql_steps: u64,
+    allowance: u64,
+) -> Result<Selection, ReceiptStoreError> {
+    select_with_limit(
+        db,
+        query,
+        sql_steps,
+        crate::integer::checked::<_, usize>(allowance)?,
+        Some(allowance),
+    )
+}
+
+fn select_with_limit(
+    db: &SnapshotDb,
+    query: &ReceiptQuery,
+    sql_steps: u64,
+    limit: usize,
+    allowance: Option<u64>,
+) -> Result<Selection, ReceiptStoreError> {
     // Even a cached empty answer requires intact custody for this hold.
     db.connection()?;
     const VALID_OUTCOMES: &[&str] = &["allow", "deny", "cancelled", "incomplete"];
@@ -112,7 +145,6 @@ pub(super) fn select(
             )));
         }
     }
-    let limit = query.limit.clamp(1, MAX_QUERY_LIMIT);
     let scope = query
         .effective_read_scope()
         .map_err(ReceiptStoreError::from)?;
@@ -205,7 +237,10 @@ pub(super) fn select(
             max_cost: query.max_cost.map(|value| value.to_be_bytes().to_vec()),
         },
         cursor,
-        limit,
+        PlanLimit {
+            rows: limit,
+            allowance,
+        },
     );
     let exhausted = budget.exhausted();
     drop(budget);
@@ -235,6 +270,11 @@ impl RangeFilters {
     }
 }
 
+struct PlanLimit {
+    rows: usize,
+    allowance: Option<u64>,
+}
+
 fn run_plan(
     db: &SnapshotDb,
     tenant: Option<i64>,
@@ -242,7 +282,7 @@ fn run_plan(
     driver: Option<usize>,
     ranges: RangeFilters,
     cursor: Option<i64>,
-    limit: usize,
+    limit: PlanLimit,
 ) -> Result<(Vec<SelectedRow>, u64), ReceiptStoreError> {
     let count_scope = tenant.unwrap_or(SCOPE_ALL);
     let window = if ranges.has_time() {
@@ -331,6 +371,14 @@ fn run_plan(
             u64::try_from(count).unwrap_or(0)
         }
     };
+    if limit
+        .allowance
+        .is_some_and(|allowance| total_count > allowance)
+    {
+        return Err(crate::evidence_export::http_budget::refuse(
+            "HTTP evidence export receipt allowance; narrow the selected receipts or use local operator export",
+        ));
+    }
     let Some(cursor) = cursor else {
         return Ok((Vec::new(), total_count));
     };
@@ -339,7 +387,9 @@ fn run_plan(
          WHERE {filter} AND seq > ? ORDER BY seq LIMIT ?"
     );
     values.push(Value::Integer(cursor));
-    values.push(Value::Integer(crate::integer::checked::<_, i64>(limit)?));
+    values.push(Value::Integer(crate::integer::checked::<_, i64>(
+        limit.rows,
+    )?));
     let mut statement = db.connection()?.prepare(&sql)?;
     let rows = statement.query_map(params_from_iter(values.iter()), |row| {
         Ok(SelectedRow {

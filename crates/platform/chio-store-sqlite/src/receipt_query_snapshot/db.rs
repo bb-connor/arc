@@ -88,8 +88,10 @@ CREATE TABLE snapshot_checkpoint (
     batch_end INTEGER NOT NULL,
     tree_size INTEGER NOT NULL,
     merkle_root BLOB NOT NULL,
-    kernel_key TEXT NOT NULL
+    kernel_key TEXT NOT NULL,
+    canonical_sha256 BLOB NOT NULL
 );
+CREATE INDEX sq_checkpoint_start ON snapshot_checkpoint (batch_start);
 CREATE TABLE snapshot_pending_leaf (
     entry_seq INTEGER PRIMARY KEY,
     kind INTEGER NOT NULL,
@@ -99,8 +101,11 @@ CREATE TABLE snapshot_pending_leaf (
 CREATE TABLE snapshot_child_cursor (
     source_seq INTEGER PRIMARY KEY,
     entry_seq INTEGER NOT NULL UNIQUE,
-    signer INTEGER NOT NULL
+    signer INTEGER NOT NULL,
+    leaf_hash BLOB NOT NULL,
+    ts INTEGER NOT NULL
 );
+CREATE INDEX sq_child_ts ON snapshot_child_cursor (ts, source_seq);
 "#;
 
 /// One authenticated tool receipt, projected for filtering.
@@ -129,6 +134,8 @@ pub(super) struct ChildCursor {
     pub(super) source_seq: i64,
     pub(super) entry_seq: i64,
     pub(super) signer: String,
+    pub(super) leaf_hash: [u8; 32],
+    pub(super) ts: i64,
 }
 
 /// Leaf of an entry above the newest verified checkpoint.
@@ -149,6 +156,9 @@ pub(super) struct OwnedCheckpoint {
     pub(super) tree_size: i64,
     pub(super) merkle_root: [u8; 32],
     pub(super) kernel_key: String,
+    /// Domain-separated SHA-256 of the canonical signed checkpoint, including
+    /// its signature, publication fields and predecessor commitment.
+    pub(super) canonical_sha256: [u8; 32],
 }
 
 /// One batch of authenticated changes committed as one snapshot transaction.
@@ -357,9 +367,9 @@ impl SnapshotDb {
                     let signer = intern_signer(&transaction, &mut signers, &cursor.signer)?;
                     transaction
                     .prepare_cached(
-                        "INSERT INTO snapshot_child_cursor (source_seq, entry_seq, signer) VALUES (?1, ?2, ?3)",
+                        "INSERT INTO snapshot_child_cursor (source_seq, entry_seq, signer, leaf_hash, ts) VALUES (?1, ?2, ?3, ?4, ?5)",
                     )?
-                    .execute(params![cursor.source_seq, cursor.entry_seq, signer])?;
+                    .execute(params![cursor.source_seq, cursor.entry_seq, signer, &cursor.leaf_hash[..], cursor.ts])?;
                 }
                 for leaf in &batch.pending {
                     let signer = intern_signer(&transaction, &mut signers, &leaf.signer)?;
@@ -372,7 +382,7 @@ impl SnapshotDb {
                 for checkpoint in &batch.checkpoints {
                     transaction
                     .prepare_cached(
-                        "INSERT INTO snapshot_checkpoint (seq, batch_start, batch_end, tree_size, merkle_root, kernel_key) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                        "INSERT INTO snapshot_checkpoint (seq, batch_start, batch_end, tree_size, merkle_root, kernel_key, canonical_sha256) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                     )?
                     .execute(params![
                         checkpoint.seq,
@@ -380,7 +390,8 @@ impl SnapshotDb {
                         checkpoint.batch_end,
                         checkpoint.tree_size,
                         &checkpoint.merkle_root[..],
-                        checkpoint.kernel_key
+                        checkpoint.kernel_key,
+                        &checkpoint.canonical_sha256[..]
                     ])?;
                 }
 
@@ -523,7 +534,7 @@ impl SnapshotDb {
         Ok(self
             .connection()?
             .prepare_cached(
-                "SELECT seq, batch_start, batch_end, tree_size, merkle_root, kernel_key FROM snapshot_checkpoint WHERE seq = ?1",
+                "SELECT seq, batch_start, batch_end, tree_size, merkle_root, kernel_key, canonical_sha256 FROM snapshot_checkpoint WHERE seq = ?1",
             )?
             .query_row([seq], |row| {
                 Ok(OwnedCheckpoint {
@@ -533,6 +544,7 @@ impl SnapshotDb {
                     tree_size: row.get(3)?,
                     merkle_root: blob32(row.get::<_, Vec<u8>>(4)?)?,
                     kernel_key: row.get(5)?,
+                    canonical_sha256: blob32(row.get::<_, Vec<u8>>(6)?)?,
                 })
             })
             .optional()?)
@@ -624,7 +636,7 @@ impl SnapshotDb {
         let mut children = Vec::new();
         {
             let mut statement = self.connection()?.prepare_cached(
-                "SELECT c.source_seq, c.entry_seq, s.kernel_key FROM snapshot_child_cursor c
+                "SELECT c.source_seq, c.entry_seq, s.kernel_key, c.leaf_hash, c.ts FROM snapshot_child_cursor c
                  JOIN snapshot_signer s ON s.id = c.signer
                  WHERE c.entry_seq >= ?1 AND c.entry_seq <= ?2 ORDER BY c.entry_seq",
             )?;
@@ -633,6 +645,8 @@ impl SnapshotDb {
                     source_seq: row.get(0)?,
                     entry_seq: row.get(1)?,
                     signer: row.get(2)?,
+                    leaf_hash: blob32(row.get::<_, Vec<u8>>(3)?)?,
+                    ts: row.get(4)?,
                 })
             })?;
             for row in rows {

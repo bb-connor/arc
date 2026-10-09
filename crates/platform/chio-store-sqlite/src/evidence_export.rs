@@ -19,6 +19,10 @@ use rusqlite::{params, Connection, OptionalExtension};
 use crate::receipt_store::retained_read::RetainedSnapshot;
 use crate::receipt_store::SqliteReceiptStore;
 
+#[path = "evidence_export/http_budget.rs"]
+pub(crate) mod http_budget;
+pub use http_budget::{validate_http_evidence_export_size, HTTP_EVIDENCE_EXPORT_MAX_BYTES};
+
 impl SqliteReceiptStore {
     /// Build a local-only evidence export bundle from the current SQLite store.
     ///
@@ -125,7 +129,7 @@ impl SqliteReceiptStore {
         Self::enrich_transparency_on_connection(&*self.connection()?, summary)
     }
 
-    fn enrich_transparency_on_connection(
+    pub(crate) fn enrich_transparency_on_connection(
         connection: &Connection,
         mut summary: CheckpointTransparencySummary,
     ) -> Result<CheckpointTransparencySummary, EvidenceExportError> {
@@ -518,7 +522,7 @@ fn publication_core_matches(
     clippy::unwrap_used,
     reason = "Test and proof fixtures deliberately fail on violated setup invariants."
 )]
-mod tests {
+pub(crate) mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use chio_core::capability::{
@@ -540,6 +544,9 @@ mod tests {
 
     #[path = "retained_tests.rs"]
     mod retained_tests;
+
+    #[path = "snapshot_tests.rs"]
+    mod snapshot_tests;
 
     fn unique_db_path(prefix: &str) -> std::path::PathBuf {
         let nonce = SystemTime::now()
@@ -606,11 +613,11 @@ mod tests {
         receipt_with_ts_and_tenant(id, capability_id, timestamp, None)
     }
 
-    fn evidence_receipt_keypair() -> Keypair {
+    pub(crate) fn evidence_receipt_keypair() -> Keypair {
         Keypair::from_seed(&[0x42; 32])
     }
 
-    fn receipt_with_ts_and_tenant(
+    pub(crate) fn receipt_with_ts_and_tenant(
         id: &str,
         capability_id: &str,
         timestamp: u64,
@@ -653,7 +660,7 @@ mod tests {
         child_receipt_with_ts_and_key(id, timestamp, &Keypair::generate())
     }
 
-    fn child_receipt_with_ts_and_key(
+    pub(crate) fn child_receipt_with_ts_and_key(
         id: &str,
         timestamp: u64,
         keypair: &Keypair,

@@ -27,6 +27,9 @@ pub(super) enum FetchError {
     Mismatch(String),
     /// The fetch exhausted its SQL budget: a resource outcome.
     Budget,
+    /// Measure before allocation; callers distinguish their request byte
+    /// allowance from the largest row accepted by the authenticated walker.
+    RowCap { entry_seq: i64, bytes: u64 },
     /// Any other store error, returned to the caller unchanged.
     Store(ReceiptStoreError),
 }
@@ -197,11 +200,17 @@ fn copy_rows(
             return Ok(Copied::Missing(row.entry_seq));
         };
         let length = u64::try_from(length).unwrap_or(u64::MAX);
-        if !tool || length > limits.max_receipt_bytes {
+        if !tool {
             return Err(FetchError::Mismatch(format!(
                 "claim entry {} no longer holds the receipt the snapshot authenticated",
                 row.entry_seq
             )));
+        }
+        if length > limits.max_receipt_bytes {
+            return Err(FetchError::RowCap {
+                entry_seq: row.entry_seq,
+                bytes: length,
+            });
         }
         if !copied.is_empty() && bytes.saturating_add(length) > limits.page_bytes {
             short = true;
