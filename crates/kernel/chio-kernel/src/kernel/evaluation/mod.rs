@@ -28,7 +28,7 @@ mod nested_flow_grant_selection;
 pub(super) mod pre_dispatch_custody;
 mod return_recording;
 #[cfg(feature = "admission-test-support")]
-use native_capture_checkpoint::{NativeCaptureCheckpointContext, NativeCaptureCheckpointOutcome};
+use native_capture_checkpoint::NativeCaptureCheckpointContext;
 mod sync_evaluation_wrapper;
 
 pub use caller_execution::{CallerExecutionReport, CallerStartCredentials, CallerStartResponse};

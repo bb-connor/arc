@@ -3,8 +3,10 @@ use std::ops::ControlFlow;
 use super::evaluation_helpers::OrdinaryRecoveryFinalization;
 use super::evaluation_helpers::PreDispatchCleanupDeny;
 use super::nested_flow_grant_selection::{NestedFlowGrantSelection, SelectedNestedFlowGrant};
+use super::pre_dispatch_custody::{
+    AdmissionDenial, AdmittedDispatch, OperationSettlement, PreparedAdmission,
+};
 use super::*;
-use crate::budget_store::BudgetInvocationCaptureDecision;
 use crate::finding_denial::denied_metadata;
 use crate::kernel::admission_coordinator::DispatchTransport;
 use crate::kernel::dispatch::dispatch_admission_error_reason;
@@ -383,18 +385,22 @@ impl ChioKernel {
                 return Ok(response);
             }
         }
+        let custody = PreparedAdmission::open(
+            self,
+            request,
+            now,
+            extra_metadata.clone(),
+            durable_admission,
+        );
 
         // Persistence is confirmed healthy, so the writer-backed lineage write can
         // run without racing a dead writer.
         if let Err(error) = self.record_observed_capability_snapshot(cap) {
             let msg = error.to_string();
             warn!(request_id = %request.request_id, reason = %redacted!(&msg), "failed to persist capability lineage");
-            self.compensate_durable_admission_after_pre_dispatch_cleanup(
-                durable_operation(durable_admission.as_ref()),
-                None,
-                None,
-            )?;
-            return self.build_deny_response(request, &msg, now, None);
+            return custody.settle_then(OperationSettlement::Compensate, || {
+                self.build_deny_response(request, &msg, now, None)
+            });
         }
 
         let session_roots = match self
@@ -404,42 +410,40 @@ impl ChioKernel {
             Err(error) => {
                 let msg = error.to_string();
                 warn!(request_id = %request.request_id, reason = %redacted!(&msg), "session filesystem roots lookup failed pre-dispatch (nested flow)");
-                self.compensate_durable_admission_after_pre_dispatch_cleanup(
-                    durable_operation(durable_admission.as_ref()),
-                    None,
-                    None,
-                )?;
-                return self.build_deny_response(request, &msg, now, None);
+                return custody.settle_then(OperationSettlement::Compensate, || {
+                    self.build_deny_response(request, &msg, now, None)
+                });
             }
         };
 
-        let SelectedNestedFlowGrant {
-            matched_grant_index,
-            mut budget_mutation,
-            validated_governed_admission,
-            governed_call_chain_receipt_evidence,
-            pre_invocation_guard_evidence,
-            runtime_admission_metadata,
-            runtime_reservation,
-        } = match self
-            .select_nested_flow_grant(NestedFlowGrantSelection {
-                parent_context,
-                request,
-                extra_metadata: &extra_metadata,
-                security_context,
-                now,
-                now_unix_ms,
-                cap,
-                matching_grants: &matching_grants,
-                required_delivery_grant_index,
-                durable_admission: &mut durable_admission,
-                session_roots: &session_roots,
-            })
+        let (
+            mut custody,
+            SelectedNestedFlowGrant {
+                validated_governed_admission,
+                governed_call_chain_receipt_evidence,
+            },
+        ) = match self
+            .select_nested_flow_grant(
+                custody,
+                NestedFlowGrantSelection {
+                    parent_context,
+                    request,
+                    extra_metadata: &extra_metadata,
+                    security_context,
+                    now,
+                    now_unix_ms,
+                    cap,
+                    matching_grants: &matching_grants,
+                    required_delivery_grant_index,
+                    session_roots: &session_roots,
+                },
+            )
             .await?
         {
             ControlFlow::Continue(selected) => selected,
             ControlFlow::Break(response) => return Ok(response),
         };
+        let matched_grant_index = custody.matched_grant_index();
 
         let _governed_runtime_attestation_receipt_scope =
             scope_governed_runtime_attestation_receipt_record(
@@ -447,9 +451,6 @@ impl ChioKernel {
                     .as_ref()
                     .and_then(|admission| admission.verified_runtime_attestation.clone()),
             );
-        let verified_governed_payee_binding = validated_governed_admission
-            .as_ref()
-            .and_then(|admission| admission.verified_payee_binding.clone());
         let _governed_call_chain_receipt_evidence_scope =
             scope_governed_call_chain_receipt_evidence(governed_call_chain_receipt_evidence);
 
@@ -460,34 +461,16 @@ impl ChioKernel {
         // reference-counted release frees the shared edge only when the last
         // holder releases, so an overlapping evaluation that still holds it
         // keeps its share and an oversubscribing sibling stays denied.
-        let budget_lease_acquired = match self.admit_capability_budget(cap) {
-            Ok(lease_acquired) => lease_acquired,
+        match self.admit_capability_budget(cap) {
+            Ok(lease_acquired) => custody.hold_lease(lease_acquired),
             Err(reason) => {
                 let msg = format!("sibling-sum budget admission failed: {reason}");
                 warn!(request_id = %request.request_id, reason = %redacted!(&msg), "capability rejected");
-                return self.with_pre_invocation_guard_evidence(
-                    &pre_invocation_guard_evidence,
-                    || {
-                        self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
-                            request,
-                            reason: &msg,
-                            timestamp: now,
-                            matched_grant_index,
-                            cap,
-                            budget_mutation: &budget_mutation,
-                            payment_authorization: None,
-                            durable_operation: durable_operation(durable_admission.as_ref()),
-                            runtime_admission_metadata,
-                            runtime_reservation: &runtime_reservation,
-                            verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                            // Admission failed: this evaluation acquired no
-                            // lease, so there is nothing for cleanup to release.
-                            budget_lease_acquired: false,
-                        })
-                    },
-                );
+                // Admission failed: this evaluation acquired no lease, so
+                // there is nothing for cleanup to release.
+                return custody.deny(AdmissionDenial::new(&msg));
             }
-        };
+        }
 
         if self.execution_nonce_preflight_required(request) {
             // Nonce-preflight authorizes without producing output, so an
@@ -508,65 +491,18 @@ impl ChioKernel {
                 let reason =
                     "output-digest delivery cannot be enforced on a no-output authorization path";
                 warn!(request_id = %request.request_id, reason, "delivery contract denied");
-                return self.with_pre_invocation_guard_evidence(
-                    &pre_invocation_guard_evidence,
-                    || {
-                        self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
-                            request,
-                            reason,
-                            timestamp: now,
-                            matched_grant_index,
-                            cap,
-                            budget_mutation: &budget_mutation,
-                            payment_authorization: None,
-                            durable_operation: durable_operation(durable_admission.as_ref()),
-                            runtime_admission_metadata,
-                            runtime_reservation: &runtime_reservation,
-                            verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                            budget_lease_acquired,
-                        })
-                    },
-                );
+                return custody.deny(AdmissionDenial::new(reason));
             }
-            return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
-                self.build_execution_nonce_preflight_allow_response_after_cleanup(
-                    request,
-                    now,
-                    matched_grant_index,
-                    cap,
-                    &budget_mutation,
-                    durable_admission.as_mut(),
-                    runtime_admission_metadata,
-                    &runtime_reservation,
-                    budget_lease_acquired,
-                )
-            });
+            return custody.allow_preflight_retry();
         }
 
-        if let Err(error) = self.validate_required_execution_nonce_for_admission(
-            request,
-            cap,
-            durable_admission.as_ref(),
-        ) {
+        if let Err(error) =
+            self.validate_required_execution_nonce_for_admission(request, cap, custody.durable())
+        {
             let msg = error.to_string();
             warn!(request_id = %request.request_id, rejection_code = %error.report().code, reason = %redacted!(&msg), "execution nonce denied");
-            return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
-                self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
-                    request,
-                    reason: &msg,
-                    timestamp: now,
-                    matched_grant_index,
-                    cap,
-                    budget_mutation: &budget_mutation,
-                    payment_authorization: None,
-                    durable_operation: durable_operation(durable_admission.as_ref()),
-                    runtime_admission_metadata: error
-                        .rejection_metadata(runtime_admission_metadata),
-                    runtime_reservation: &runtime_reservation,
-                    verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                    budget_lease_acquired,
-                })
-            });
+            let metadata = error.rejection_metadata(custody.metadata().clone());
+            return custody.deny(AdmissionDenial::new(&msg).with_metadata(metadata));
         }
 
         // Nested dispatch enforces the same delivery-contract boundary as a
@@ -589,31 +525,13 @@ impl ChioKernel {
                     .as_ref()
                     .and_then(|adapter| adapter.rail_mode())
                     .is_none_or(|mode| mode == crate::payment::PaymentRailMode::ReversibleHold);
-                if durable_admission.is_none()
+                if custody.durable().is_none()
                     || !rail_is_reversible
                     || Self::is_governed_mustprepay_request(request)
                 {
                     let reason = "output-digest delivery requires durable reversible-hold coverage";
                     warn!(request_id = %request.request_id, reason, "delivery contract denied");
-                    return self.with_pre_invocation_guard_evidence(
-                        &pre_invocation_guard_evidence,
-                        || {
-                            self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
-                                request,
-                                reason,
-                                timestamp: now,
-                                matched_grant_index,
-                                cap,
-                                budget_mutation: &budget_mutation,
-                                payment_authorization: None,
-                                durable_operation: durable_operation(durable_admission.as_ref()),
-                                runtime_admission_metadata,
-                                runtime_reservation: &runtime_reservation,
-                                verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                                budget_lease_acquired,
-                            })
-                        },
-                    );
+                    return custody.deny(AdmissionDenial::new(reason));
                 }
             }
             // Nested dispatch enforces the same purchase boundary as a
@@ -622,53 +540,13 @@ impl ChioKernel {
             // reservation before any mutation.
             if let Err(denial) = self.verify_purchase_admission(selected.grant, request, now) {
                 warn!(request_id = %request.request_id, denial = %denial.code(), reason = %redacted!(denial.detail()), "finding purchase denied");
-                return self.with_pre_invocation_guard_evidence(
-                    &pre_invocation_guard_evidence,
-                    || {
-                        self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
-                            request,
-                            reason: denial.detail(),
-                            timestamp: now,
-                            matched_grant_index,
-                            cap,
-                            budget_mutation: &budget_mutation,
-                            payment_authorization: None,
-                            durable_operation: durable_operation(durable_admission.as_ref()),
-                            runtime_admission_metadata: denied_metadata(
-                                &runtime_admission_metadata,
-                                &denial,
-                            ),
-                            runtime_reservation: &runtime_reservation,
-                            verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                            budget_lease_acquired,
-                        })
-                    },
-                );
+                let metadata = denied_metadata(custody.metadata(), &denial);
+                return custody.deny(AdmissionDenial::new(denial.detail()).with_metadata(metadata));
             }
             if let Err(denial) = self.verify_recovery_admission(selected.grant, request, now) {
                 warn!(request_id = %request.request_id, denial = %denial.code(), reason = %redacted!(denial.detail()), "finding recovery denied");
-                return self.with_pre_invocation_guard_evidence(
-                    &pre_invocation_guard_evidence,
-                    || {
-                        self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
-                            request,
-                            reason: denial.detail(),
-                            timestamp: now,
-                            matched_grant_index,
-                            cap,
-                            budget_mutation: &budget_mutation,
-                            payment_authorization: None,
-                            durable_operation: durable_operation(durable_admission.as_ref()),
-                            runtime_admission_metadata: denied_metadata(
-                                &runtime_admission_metadata,
-                                &denial,
-                            ),
-                            runtime_reservation: &runtime_reservation,
-                            verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                            budget_lease_acquired,
-                        })
-                    },
-                );
+                let metadata = denied_metadata(custody.metadata(), &denial);
+                return custody.deny(AdmissionDenial::new(denial.detail()).with_metadata(metadata));
             }
         }
 
@@ -677,35 +555,23 @@ impl ChioKernel {
         // whether money is at risk, and no financial hold may cross into the tool
         // server without a durable payment participant to reconcile ambiguity.
         if !self.unsafe_ephemeral_financial_dispatch
-            && durable_admission
-                .as_ref()
+            && custody
+                .durable()
                 .is_none_or(|admission| !admission.requires_payment())
-            && (budget_mutation.charge_result().is_some()
+            && (custody.budget().charge_result().is_some()
                 || Self::is_governed_mustprepay_request(request))
         {
             let reason = "financial tool dispatch requires durable admission coverage";
             warn!(request_id = %request.request_id, reason, "financial nested dispatch denied");
-            return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
-                self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
-                    request,
-                    reason,
-                    timestamp: now,
-                    matched_grant_index,
-                    cap,
-                    budget_mutation: &budget_mutation,
-                    payment_authorization: None,
-                    durable_operation: durable_operation(durable_admission.as_ref()),
-                    runtime_admission_metadata,
-                    runtime_reservation: &runtime_reservation,
-                    verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                    budget_lease_acquired,
-                })
-            });
+            return custody.deny(AdmissionDenial::new(reason));
         }
 
-        // Resolve the server before arming the drop guard. A missing registry
-        // entry has not crossed the connector dispatch boundary, so this branch
-        // can unwind pre-dispatch admission state.
+        // Resolve the server before dispatch. A missing registry entry has not
+        // crossed the connector dispatch boundary, so this branch unwinds the
+        // pre-dispatch admission state: the runtime reservations, the
+        // sibling-sum lease and the pre-execution budget mutation, so a server
+        // that vanished between admission and lookup does not leak the
+        // consumed child share or invocation slot onto later valid siblings.
         let Some(server) = self.tool_servers.get(&request.server_id) else {
             let error = KernelError::ToolNotRegistered(format!(
                 "server \"{}\" / tool \"{}\"",
@@ -713,28 +579,7 @@ impl ChioKernel {
             ));
             let msg = error.to_string();
             warn!(request_id = %request.request_id, reason = %redacted!(&msg), "tool server error");
-            // ToolNotRegistered precedes any tool side effect, and no drop guard
-            // is armed yet, so this arm owns the full unwind. Reverse ALL
-            // pre-dispatch state (runtime-admission reservations, sibling-sum
-            // capability admission, and the pre-execution budget mutation) so a
-            // server that vanished between admission and lookup does not leak the
-            // consumed child share / invocation slot onto later valid siblings.
-            return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
-                self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
-                    request,
-                    reason: &msg,
-                    timestamp: now,
-                    matched_grant_index,
-                    cap,
-                    budget_mutation: &budget_mutation,
-                    payment_authorization: None,
-                    durable_operation: durable_operation(durable_admission.as_ref()),
-                    runtime_admission_metadata,
-                    runtime_reservation: &runtime_reservation,
-                    verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                    budget_lease_acquired,
-                })
-            });
+            return custody.deny(AdmissionDenial::new(&msg));
         };
         let matched_grant = matching_grants
             .iter()
@@ -745,10 +590,10 @@ impl ChioKernel {
                     "selected grant disappeared before dispatch revalidation".to_string(),
                 )
             })?;
-        let durable_execution_nonce = durable_admission
-            .as_ref()
+        let durable_execution_nonce = custody
+            .durable()
             .is_some_and(DurableToolAdmission::requires_execution_nonce);
-        let mut credential_reservation = match self
+        let credential_reservation = self
             .read_authority_time()
             .map_err(KernelError::from)
             .and_then(|time| {
@@ -756,68 +601,33 @@ impl ChioKernel {
                     request,
                     dpop_required,
                     time.as_secs(),
-                    durable_admission.as_ref(),
+                    custody.durable(),
                     matched_grant_index,
                 )
-            }) {
-            Ok(reservation) => reservation,
+            });
+        let force_dispatch_revalidation = match credential_reservation {
+            Ok(reservation) => {
+                let force = reservation.requires_post_reservation_revalidation();
+                custody.hold_credentials(reservation);
+                force
+            }
             Err(error) => {
                 let reason = error.to_string();
                 warn!(request_id = %request.request_id, rejection_code = %error.report().code, reason = %redacted!(&reason), "dispatch credential reservation denied (nested flow)");
-                return self.with_pre_invocation_guard_evidence(
-                    &pre_invocation_guard_evidence,
-                    || {
-                        self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
-                            request,
-                            reason: &reason,
-                            timestamp: self
-                                .read_authority_time()
-                                .map(|time| time.as_secs())
-                                .unwrap_or(now),
-                            matched_grant_index,
-                            cap,
-                            budget_mutation: &budget_mutation,
-                            payment_authorization: None,
-                            durable_operation: durable_operation(durable_admission.as_ref()),
-                            runtime_admission_metadata: error
-                                .rejection_metadata(runtime_admission_metadata.clone()),
-                            runtime_reservation: &runtime_reservation,
-                            verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                            budget_lease_acquired,
-                        })
-                    },
+                let metadata = error.rejection_metadata(custody.metadata().clone());
+                return custody.deny(
+                    AdmissionDenial::new(&reason)
+                        .sampled()
+                        .with_metadata(metadata),
                 );
             }
         };
-        let force_dispatch_revalidation =
-            credential_reservation.requires_post_reservation_revalidation();
-        let dispatch_context = Self::tool_dispatch_context(request, durable_admission.as_ref());
-        let readiness_result = {
-            let mut readiness_drop_guard = PostAdmissionDropGuard::new(
-                self,
-                request,
-                cap,
-                Some(matched_grant_index),
-                &budget_mutation,
-                None,
-                PostAdmissionReceiptContext {
-                    extra_metadata: runtime_admission_metadata.clone(),
-                    runtime_reservation: runtime_reservation.clone(),
-                    pre_invocation_guard_evidence: pre_invocation_guard_evidence.clone(),
-                    verified_payee_binding: verified_governed_payee_binding.clone(),
-                },
-                budget_lease_acquired,
-            )
-            .with_durable_operation(durable_operation(durable_admission.as_ref()));
-            let result = self
-                .wait_for_tool_dispatch_readiness(request, Some(server), dispatch_context.as_ref())
-                .await;
-            readiness_drop_guard.disarm();
-            result
-        };
-        let mut runtime_admission_metadata = runtime_admission_metadata;
+        let dispatch_context = Self::tool_dispatch_context(request, custody.durable());
+        let readiness_result = self
+            .wait_for_tool_dispatch_readiness(request, Some(server), dispatch_context.as_ref())
+            .await;
         let (readiness_result, prepared_delivery) =
-            PreparedToolDelivery::retain(readiness_result, &mut runtime_admission_metadata);
+            PreparedToolDelivery::retain(readiness_result, custody.metadata_mut());
         let server = prepared_delivery
             .as_ref()
             .and_then(|prepared| prepared.connection.as_ref())
@@ -831,7 +641,7 @@ impl ChioKernel {
             Ok(readiness_waited) => revalidation_time.map_err(KernelError::from).and_then(|_| {
                 self.revalidate_immediately_before_dispatch(
                     request,
-                    durable_admission.as_ref(),
+                    custody.durable(),
                     dpop_required,
                     matched_grant,
                     matched_grant_index,
@@ -840,7 +650,7 @@ impl ChioKernel {
                     Some(session_roots.as_slice()),
                     security_context,
                     &receipt_admission,
-                    runtime_admission_metadata.as_ref(),
+                    custody.metadata().as_ref(),
                     false,
                     durable_execution_nonce,
                     readiness_waited || force_dispatch_revalidation,
@@ -857,141 +667,55 @@ impl ChioKernel {
             .unwrap_or_default();
         if let Err(error) = final_dispatch_admission {
             let mut reason = dispatch_admission_error_reason(&error);
-            if let Err(rollback_error) = credential_reservation.rollback_before_dispatch() {
+            if let Err(rollback_error) = custody.rollback_credentials() {
                 reason = format!("{reason}; {rollback_error}");
             }
             warn!(request_id = %request.request_id, reason = %redacted!(&reason), "immediate dispatch revalidation denied (nested flow)");
-            return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
-                self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
-                    request,
-                    reason: &reason,
-                    timestamp: revalidation_now_unix_ms / 1000,
-                    matched_grant_index,
-                    cap,
-                    budget_mutation: &budget_mutation,
-                    payment_authorization: None,
-                    durable_operation: durable_operation(durable_admission.as_ref()),
-                    runtime_admission_metadata: error.denied_metadata(&runtime_admission_metadata),
-                    runtime_reservation: &runtime_reservation,
-                    verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                    budget_lease_acquired,
-                })
-            });
+            let metadata = error.denied_metadata(custody.metadata());
+            return custody.deny(
+                AdmissionDenial::new(&reason)
+                    .at(revalidation_now_unix_ms / 1000)
+                    .with_metadata(metadata),
+            );
         }
-        if let Some(admission) = durable_admission.as_mut() {
-            if let Err(error) = self.mark_durable_capture_pending(admission, now_unix_ms) {
-                let reason = error.to_string();
-                warn!(request_id = %request.request_id, reason = %redacted!(&reason), "durable capture boundary could not be confirmed (nested flow)");
-                return self.build_deny_response_with_metadata(
-                    request,
-                    &reason,
-                    now,
-                    Some(matched_grant_index),
-                    self.retained_admission_receipt_metadata(
-                        &budget_mutation,
-                        runtime_admission_metadata.clone(),
-                    ),
-                );
-            }
+        let capture_pending = custody
+            .durable_mut()
+            .map(|admission| self.mark_durable_capture_pending(admission, now_unix_ms));
+        if let Some(Err(error)) = capture_pending {
+            let reason = error.to_string();
+            warn!(request_id = %request.request_id, reason = %redacted!(&reason), "durable capture boundary could not be confirmed (nested flow)");
+            return custody.deny_capture_pending(&reason);
         }
-        if budget_mutation.durable_hold_result().is_some() && durable_admission.is_none() {
-            let capture = self.capture_invocation(cap, &mut budget_mutation);
-            match capture {
-                Ok(BudgetInvocationCaptureDecision::Captured(_)) => {}
-                Ok(BudgetInvocationCaptureDecision::AlreadyCaptured(_)) => {
-                    let reason = "monetary invocation was already dispatched";
-                    return self.with_pre_invocation_guard_evidence(
-                        &pre_invocation_guard_evidence,
-                        || {
-                            self.build_capture_replay_deny_response(
-                                request,
-                                reason,
-                                now,
-                                matched_grant_index,
-                                cap,
-                                &budget_mutation,
-                                runtime_admission_metadata,
-                                &runtime_reservation,
-                                budget_lease_acquired,
-                                verified_governed_payee_binding.as_ref(),
-                            )
-                        },
-                    );
-                }
-                Err(error) => {
-                    let internal_reason = error.to_string();
-                    warn!(
-                        request_id = %request.request_id,
-                        reason = %redacted!(&internal_reason),
-                        "budget invocation capture could not be confirmed"
-                    );
-                    let reason = "budget invocation capture could not be confirmed";
-                    return self.with_pre_invocation_guard_evidence(
-                        &pre_invocation_guard_evidence,
-                        || {
-                            self.build_deny_response_with_metadata(
-                                request,
-                                reason,
-                                now,
-                                Some(matched_grant_index),
-                                self.ambiguous_invocation_capture_receipt_metadata(
-                                    &budget_mutation,
-                                    runtime_admission_metadata,
-                                ),
-                            )
-                        },
-                    );
-                }
-            }
-        }
+        let mut custody = match custody.capture_non_durable_invocation() {
+            ControlFlow::Continue(custody) => custody,
+            ControlFlow::Break(response) => return response,
+        };
 
-        let payment_authorization = match self.authorize_payment_if_needed(
+        let payment_authorization = self.authorize_payment_if_needed(
             request,
-            budget_mutation.charge_result(),
-            durable_admission.as_ref(),
+            custody.budget().charge_result(),
+            custody.durable(),
             now_unix_ms,
-            verified_governed_payee_binding.as_ref(),
-        ) {
-            Ok(authorization) => {
-                if authorization.is_some() {
-                    if let Err(error) = credential_reservation.retain_after_external_authorization()
-                    {
-                        let reason = format!(
-                            "dispatch credential retention failed after payment authorization: {error}"
-                        );
-                        warn!(request_id = %request.request_id, reason = %redacted!(&reason), "payment credential retention denied (nested flow)");
-                        return self.with_pre_invocation_guard_evidence(
-                            &pre_invocation_guard_evidence,
-                            || {
-                                self.build_pre_dispatch_cleanup_deny_response_with_credentials(
-                                    PreDispatchCleanupDeny {
-                                        request,
-                                        reason: &reason,
-                                        timestamp: self
-                                            .read_authority_time()
-                                            .map(|time| time.as_secs())
-                                            .unwrap_or(now),
-                                        matched_grant_index,
-                                        cap,
-                                        budget_mutation: &budget_mutation,
-                                        payment_authorization: authorization.as_ref(),
-                                        durable_operation: durable_operation(
-                                            durable_admission.as_ref(),
-                                        ),
-                                        runtime_admission_metadata: runtime_admission_metadata
-                                            .clone(),
-                                        runtime_reservation: &runtime_reservation,
-                                        verified_payee_binding: verified_governed_payee_binding
-                                            .as_ref(),
-                                        budget_lease_acquired,
-                                    },
-                                    PaymentCredentialDisposition::RetentionOutcomeUnknown,
-                                )
-                            },
-                        );
-                    }
+            custody.payee(),
+        );
+        match payment_authorization {
+            Ok(None) => {}
+            Ok(Some(authorization)) => {
+                custody.hold_payment(authorization);
+                if let Err(error) = custody
+                    .credentials()
+                    .and_then(|credentials| credentials.retain_after_external_authorization())
+                {
+                    let reason = format!(
+                        "dispatch credential retention failed after payment authorization: {error}"
+                    );
+                    warn!(request_id = %request.request_id, reason = %redacted!(&reason), "payment credential retention denied (nested flow)");
+                    return custody.deny(
+                        AdmissionDenial::new(&reason).sampled().with_credentials(
+                            PaymentCredentialDisposition::RetentionOutcomeUnknown,
+                        ),
+                    );
                 }
-                authorization
             }
             Err(error) => {
                 let internal_reason = error.to_string();
@@ -1007,115 +731,13 @@ impl ChioKernel {
                     &error,
                     PaymentError::Declined(_) | PaymentError::InsufficientFunds
                 ) {
-                    let mut denial_reason = reason.clone();
-                    let credential_disposition = if let Err(rollback_error) =
-                        credential_reservation.rollback_before_dispatch()
-                    {
-                        denial_reason = format!("{denial_reason}; {rollback_error}");
-                        PaymentCredentialDisposition::RetentionOutcomeUnknown
-                    } else {
-                        PaymentCredentialDisposition::NonePresent
-                    };
-                    let cleanup_metadata = self.merge_dispatch_credential_disposition_metadata(
-                        runtime_admission_metadata,
-                        credential_disposition,
-                    );
-                    if budget_mutation
-                        .charge_result()
-                        .and_then(|charge| charge.invocation_capture.as_ref())
-                        .is_some()
-                    {
-                        return self.with_pre_invocation_guard_evidence(
-                            &pre_invocation_guard_evidence,
-                            || {
-                                self.build_definite_payment_denial_after_capture(
-                                    request,
-                                    &denial_reason,
-                                    now,
-                                    cap,
-                                    &budget_mutation,
-                                    durable_operation(durable_admission.as_ref()),
-                                    cleanup_metadata,
-                                    &runtime_reservation,
-                                    budget_lease_acquired,
-                                    verified_governed_payee_binding.as_ref(),
-                                )
-                            },
-                        );
-                    }
-                    return self.with_pre_invocation_guard_evidence(
-                        &pre_invocation_guard_evidence,
-                        || {
-                            self.build_pre_dispatch_cleanup_deny_response_with_credentials(
-                                PreDispatchCleanupDeny {
-                                    request,
-                                    reason: &denial_reason,
-                                    timestamp: now,
-                                    matched_grant_index,
-                                    cap,
-                                    budget_mutation: &budget_mutation,
-                                    payment_authorization: None,
-                                    durable_operation: durable_operation(
-                                        durable_admission.as_ref(),
-                                    ),
-                                    runtime_admission_metadata: cleanup_metadata,
-                                    runtime_reservation: &runtime_reservation,
-                                    verified_payee_binding: verified_governed_payee_binding
-                                        .as_ref(),
-                                    budget_lease_acquired,
-                                },
-                                PaymentCredentialDisposition::NonePresent,
-                            )
-                        },
-                    );
+                    return custody.deny_declined_payment(reason);
                 }
-                let metadata = merge_metadata_objects(
-                    self.retained_admission_receipt_metadata(
-                        &budget_mutation,
-                        runtime_admission_metadata,
-                    ),
-                    Some(serde_json::json!({
-                        "financial": {
-                            "payment_authorization_ambiguous": true,
-                            "payment_authorization_error_code": error_code,
-                            "payment_attempt_reference": Self::payment_operation_reference(
-                                request,
-                                durable_operation(durable_admission.as_ref()),
-                            )
-                        }
-                    })),
-                );
-                let (denial_reason, credential_disposition) =
-                    match credential_reservation.commit() {
-                        Ok(disposition) => (reason, disposition),
-                        Err(retention_error) => (
-                            format!(
-                                "payment authorization outcome is ambiguous and credential retention failed: {retention_error}"
-                            ),
-                            PaymentCredentialDisposition::RetentionOutcomeUnknown,
-                        ),
-                    };
-                let metadata = self.merge_dispatch_credential_disposition_metadata(
-                    metadata,
-                    credential_disposition,
-                );
-                return self.with_pre_invocation_guard_evidence(
-                    &pre_invocation_guard_evidence,
-                    || {
-                        self.build_deny_response_with_metadata_and_payee_binding(
-                            request,
-                            &denial_reason,
-                            now,
-                            Some(matched_grant_index),
-                            metadata,
-                            verified_governed_payee_binding.as_ref(),
-                        )
-                    },
-                );
+                return custody.deny_ambiguous_payment(reason, error_code);
             }
-        };
+        }
 
-        if payment_authorization.is_some() {
+        if custody.payment().is_some() {
             let post_payment_time = self.read_authority_time();
             let post_payment_now_unix_ms = post_payment_time
                 .as_ref()
@@ -1125,7 +747,7 @@ impl ChioKernel {
                 post_payment_time.map_err(KernelError::from).and_then(|_| {
                     self.revalidate_immediately_before_dispatch(
                         request,
-                        durable_admission.as_ref(),
+                        custody.durable(),
                         dpop_required,
                         matched_grant,
                         matched_grant_index,
@@ -1134,7 +756,7 @@ impl ChioKernel {
                         Some(session_roots.as_slice()),
                         security_context,
                         &receipt_admission,
-                        runtime_admission_metadata.as_ref(),
+                        custody.metadata().as_ref(),
                         false,
                         durable_execution_nonce,
                         // External payment authorization may change mutable authority
@@ -1150,28 +772,12 @@ impl ChioKernel {
             if let Err(error) = post_payment_admission {
                 let reason = dispatch_admission_error_reason(&error);
                 warn!(request_id = %request.request_id, reason = %redacted!(&reason), "post-payment dispatch revalidation denied (nested flow)");
-                return self.with_pre_invocation_guard_evidence(
-                    &pre_invocation_guard_evidence,
-                    || {
-                        self.build_pre_dispatch_cleanup_deny_response_with_credentials(
-                            PreDispatchCleanupDeny {
-                                request,
-                                reason: &reason,
-                                timestamp: post_payment_now_unix_ms / 1000,
-                                matched_grant_index,
-                                cap,
-                                budget_mutation: &budget_mutation,
-                                payment_authorization: payment_authorization.as_ref(),
-                                durable_operation: durable_operation(durable_admission.as_ref()),
-                                runtime_admission_metadata: error
-                                    .denied_metadata(&runtime_admission_metadata),
-                                runtime_reservation: &runtime_reservation,
-                                verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                                budget_lease_acquired,
-                            },
-                            PaymentCredentialDisposition::RetainedAfterAuthorization,
-                        )
-                    },
+                let metadata = error.denied_metadata(custody.metadata());
+                return custody.deny(
+                    AdmissionDenial::new(&reason)
+                        .at(post_payment_now_unix_ms / 1000)
+                        .with_metadata(metadata)
+                        .with_credentials(PaymentCredentialDisposition::RetainedAfterAuthorization),
                 );
             }
         }
@@ -1182,29 +788,10 @@ impl ChioKernel {
         ) {
             let reason = refusal.error.to_string();
             warn!(request_id = %request.request_id, reason = %redacted!(&reason), "parent session cancellation won the nested pre-dispatch boundary");
-            return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
-                let cleanup = PreDispatchCleanupDeny {
-                    request,
-                    reason: refusal.cancellation.as_deref().unwrap_or(&reason),
-                    timestamp: self
-                        .read_authority_time()
-                        .map(|time| time.as_secs())
-                        .unwrap_or(now),
-                    matched_grant_index,
-                    cap,
-                    budget_mutation: &budget_mutation,
-                    payment_authorization: payment_authorization.as_ref(),
-                    durable_operation: durable_operation(durable_admission.as_ref()),
-                    runtime_admission_metadata: runtime_admission_metadata.clone(),
-                    runtime_reservation: &runtime_reservation,
-                    verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                    budget_lease_acquired,
-                };
-                self.build_session_dispatch_refusal_response(
-                    cleanup,
-                    refusal.cancellation.is_some(),
-                )
-            });
+            return custody.deny_session_refusal(
+                refusal.cancellation.as_deref().unwrap_or(&reason),
+                refusal.cancellation.is_some(),
+            );
         }
 
         // Claim the pool participant while the durable admission is still in a
@@ -1218,9 +805,9 @@ impl ChioKernel {
                     matched_grant,
                     request,
                     time.get(),
-                    durable_admission
-                        .as_ref()
-                        .map(|admission| admission.operation().binding().operation_id().as_str()),
+                    custody
+                        .operation()
+                        .map(|operation| operation.binding().operation_id().as_str()),
                 )
             });
         if let Ok(purchase) = &pool_claim {
@@ -1229,119 +816,65 @@ impl ChioKernel {
         if let Err(error) = pool_claim {
             let reason = error.to_string();
             warn!(request_id = %request.request_id, reason = %redacted!(&reason), "finding pool nested dispatch claim denied");
-            return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
-                self.build_pre_dispatch_cleanup_deny_response_with_credentials(
-                    PreDispatchCleanupDeny {
-                        request,
-                        reason: &reason,
-                        timestamp: self
-                            .read_authority_time()
-                            .map(|time| time.as_secs())
-                            .unwrap_or(now),
-                        matched_grant_index,
-                        cap,
-                        budget_mutation: &budget_mutation,
-                        payment_authorization: payment_authorization.as_ref(),
-                        durable_operation: durable_operation(durable_admission.as_ref()),
-                        runtime_admission_metadata: error
-                            .denied_metadata(&runtime_admission_metadata),
-                        runtime_reservation: &runtime_reservation,
-                        verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                        budget_lease_acquired,
-                    },
-                    if payment_authorization.is_some() {
-                        PaymentCredentialDisposition::RetainedAfterAuthorization
-                    } else {
-                        PaymentCredentialDisposition::NonePresent
-                    },
-                )
-            });
+            let metadata = error.denied_metadata(custody.metadata());
+            let credentials = if custody.payment().is_some() {
+                PaymentCredentialDisposition::RetainedAfterAuthorization
+            } else {
+                PaymentCredentialDisposition::NonePresent
+            };
+            return custody.deny(
+                AdmissionDenial::new(&reason)
+                    .sampled()
+                    .with_metadata(metadata)
+                    .with_credentials(credentials),
+            );
         }
 
         #[cfg(feature = "admission-test-support")]
-        let mut credential_reservation = match self.evaluate_native_capture_checkpoint(
-            credential_reservation,
-            durable_admission.as_mut(),
-            &mut budget_mutation,
-            NativeCaptureCheckpointContext {
-                request,
-                security_context,
-                timestamp: now,
-                matched_grant_index,
-                payment_authorization: payment_authorization.as_ref(),
-                metadata: runtime_admission_metadata.as_ref(),
-                runtime_reservation: &runtime_reservation,
-                verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                budget_lease_acquired,
-                evidence: &pre_invocation_guard_evidence,
-            },
-        ) {
-            NativeCaptureCheckpointOutcome::Continue(credentials) => credentials,
-            NativeCaptureCheckpointOutcome::Break(response) => return response,
+        let mut custody = match custody.native_capture_checkpoint(security_context) {
+            ControlFlow::Continue(custody) => custody,
+            ControlFlow::Break(response) => return response,
         };
         let mut security_pre_dispatch = match self.run_security_pre_dispatch_hook(
             request,
             security_context,
-            durable_admission.as_ref(),
+            custody.durable(),
         ) {
             Ok(outcome) => outcome,
             Err(denial) => {
-                let mut denial_evidence = pre_invocation_guard_evidence.clone();
-                denial_evidence.push(denial.evidence);
                 let reason = denial.reason;
                 warn!(request_id = %request.request_id, reason, "security pre-dispatch denied (nested flow)");
-                return self.build_pre_commit_credential_rejection_response(
-                    PreDispatchCleanupDeny {
-                        request,
-                        reason,
-                        timestamp: now,
-                        matched_grant_index,
-                        cap,
-                        budget_mutation: &budget_mutation,
-                        payment_authorization: payment_authorization.as_ref(),
-                        durable_operation: durable_operation(durable_admission.as_ref()),
-                        runtime_admission_metadata: runtime_admission_metadata.clone(),
-                        runtime_reservation: &runtime_reservation,
-                        verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                        budget_lease_acquired,
-                    },
-                    credential_reservation,
-                    &denial_evidence,
-                );
+                return custody.deny_security(reason, denial.evidence);
             }
         };
         // Security has accepted, but dispatch has not started. Retain on
         // uncertain commit/cancellation, never before a definite security denial.
-        if let Err(error) = credential_reservation.retain_if_dropped() {
+        if let Err(error) = custody
+            .credentials()
+            .and_then(|credentials| credentials.retain_if_dropped())
+        {
             let reason = format!("dispatch credential retention failed before dispatch: {error}");
-            let response =
-                self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
-                    self.build_pre_dispatch_cleanup_deny_response_with_credentials(
-                        PreDispatchCleanupDeny {
-                            request,
-                            reason: &reason,
-                            timestamp: self
-                                .read_authority_time()
-                                .map(|time| time.as_secs())
-                                .unwrap_or(now),
-                            matched_grant_index,
-                            cap,
-                            budget_mutation: &budget_mutation,
-                            payment_authorization: payment_authorization.as_ref(),
-                            durable_operation: durable_operation(durable_admission.as_ref()),
-                            runtime_admission_metadata: runtime_admission_metadata.clone(),
-                            runtime_reservation: &runtime_reservation,
-                            verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                            budget_lease_acquired,
-                        },
-                        PaymentCredentialDisposition::RetentionOutcomeUnknown,
-                    )
-                });
+            let response = custody.deny(
+                AdmissionDenial::new(&reason)
+                    .sampled()
+                    .with_credentials(PaymentCredentialDisposition::RetentionOutcomeUnknown),
+            );
             if let Some(outcome) = security_pre_dispatch.dispatch_outcome.take() {
                 outcome.record_dispatch_failed()?;
             }
             return response;
         }
+        let AdmittedDispatch {
+            durable: mut durable_admission,
+            budget: mut budget_mutation,
+            runtime: runtime_reservation,
+            lease_acquired: budget_lease_acquired,
+            payment: payment_authorization,
+            metadata: runtime_admission_metadata,
+            evidence: pre_invocation_guard_evidence,
+            payee: verified_governed_payee_binding,
+            credentials: mut credential_reservation,
+        } = custody.into_dispatch()?;
         let mut security_dispatch_outcome = security_pre_dispatch.dispatch_outcome.take();
         let mut security_request_lifecycle = security_pre_dispatch.request_lifecycle.take();
 

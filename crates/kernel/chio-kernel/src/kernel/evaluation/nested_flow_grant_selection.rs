@@ -2,7 +2,9 @@
 
 use std::ops::ControlFlow;
 
-use super::evaluation_helpers::PreDispatchCleanupDeny;
+use super::pre_dispatch_custody::{
+    AdmissionDenial, BudgetedAdmission, OperationSettlement, PreparedAdmission, SelectedGrant,
+};
 use super::*;
 
 /// Inputs to nested-flow grant selection: the matching grants in specificity
@@ -17,28 +19,26 @@ pub(super) struct NestedFlowGrantSelection<'a> {
     pub(super) cap: &'a CapabilityToken,
     pub(super) matching_grants: &'a [MatchingGrant<'a>],
     pub(super) required_delivery_grant_index: Option<usize>,
-    pub(super) durable_admission: &'a mut Option<DurableToolAdmission>,
     pub(super) session_roots: &'a [String],
 }
 
-/// The grant that passed governed validation, guards, runtime admission, and
-/// the budget charge, with the admission state the dispatch path carries on.
+/// The governed evidence of the grant that passed governed validation,
+/// guards, runtime admission, and the budget charge. Its admitted resources
+/// are in the returned custody.
 pub(super) struct SelectedNestedFlowGrant {
-    pub(super) matched_grant_index: usize,
-    pub(super) budget_mutation: PreExecutionBudgetMutation,
     pub(super) validated_governed_admission: Option<ValidatedGovernedAdmission>,
     pub(super) governed_call_chain_receipt_evidence: Option<GovernedCallChainReceiptEvidence>,
-    pub(super) pre_invocation_guard_evidence: Vec<GuardEvidence>,
-    pub(super) runtime_admission_metadata: Option<serde_json::Value>,
-    /// The runtime hook's own reservation record for this grant.
-    pub(super) runtime_reservation: RuntimeReservation,
 }
 
+pub(super) type NestedFlowGrantSelectionOutcome<'c> =
+    ControlFlow<ToolCallResponse, (BudgetedAdmission<'c>, SelectedNestedFlowGrant)>;
+
 impl ChioKernel {
-    pub(super) async fn select_nested_flow_grant(
+    pub(super) async fn select_nested_flow_grant<'c>(
         &self,
+        mut custody: PreparedAdmission<'c>,
         selection: NestedFlowGrantSelection<'_>,
-    ) -> Result<ControlFlow<ToolCallResponse, SelectedNestedFlowGrant>, KernelError> {
+    ) -> Result<NestedFlowGrantSelectionOutcome<'c>, KernelError> {
         let NestedFlowGrantSelection {
             parent_context,
             request,
@@ -49,7 +49,6 @@ impl ChioKernel {
             cap,
             matching_grants,
             required_delivery_grant_index,
-            durable_admission,
             session_roots,
         } = selection;
         let mut budget_error = None;
@@ -62,8 +61,8 @@ impl ChioKernel {
             if required_delivery_grant_index.is_some_and(|required| matching.index != required) {
                 continue;
             }
-            if durable_admission
-                .as_ref()
+            if custody
+                .durable()
                 .is_some_and(|admission| !admission.permits_matching_grant(matching))
             {
                 continue;
@@ -99,25 +98,12 @@ impl ChioKernel {
                     continue;
                 }
             };
-            let no_budget_mutation = PreExecutionBudgetMutation::None;
-            let mut guard_drop_guard = PostAdmissionDropGuard::new(
-                self,
-                request,
-                cap,
-                Some(matching.index),
-                &no_budget_mutation,
-                None,
-                PostAdmissionReceiptContext {
-                    extra_metadata: extra_metadata.clone(),
-                    runtime_reservation: RuntimeReservation::NONE,
-                    pre_invocation_guard_evidence: Vec::new(),
-                    verified_payee_binding: validated_governed_admission
-                        .as_ref()
-                        .and_then(|admission| admission.verified_payee_binding.clone()),
-                },
-                false,
-            )
-            .with_durable_operation(durable_operation(durable_admission.as_ref()));
+            custody.attempt(
+                matching.index,
+                validated_governed_admission
+                    .as_ref()
+                    .and_then(|admission| admission.verified_payee_binding.clone()),
+            );
             let guard_result = self
                 .run_guards_within_budget(
                     request,
@@ -127,8 +113,6 @@ impl ChioKernel {
                     security_context,
                 )
                 .await;
-            guard_drop_guard.disarm();
-            drop(guard_drop_guard);
             let pre_invocation_guard_evidence = match guard_result {
                 Ok(evidence) => evidence,
                 Err(error) => {
@@ -148,7 +132,7 @@ impl ChioKernel {
                 matching_grants
                     .iter()
                     .any(|grant| grant.grant.dpop_required == Some(true)),
-                durable_admission.as_mut(),
+                custody.durable_mut(),
             );
             let runtime_reservation = RuntimeReservation::from_decision(&runtime_admission);
             let runtime_admission_metadata =
@@ -160,27 +144,28 @@ impl ChioKernel {
                 warn!(request_id = %request.request_id, reason = %redacted!(&msg), "runtime admission denied (nested flow)");
                 let (runtime_admission_metadata, runtime_release_confirmed) = self
                     .release_runtime_admission_reservations_for_pre_dispatch_denial(
-                        durable_operation(durable_admission.as_ref()),
+                        custody.operation(),
                         &runtime_reservation,
                         runtime_admission_metadata,
                     );
-                if runtime_release_confirmed {
-                    self.compensate_durable_admission_after_pre_dispatch_cleanup(
-                        durable_operation(durable_admission.as_ref()),
-                        None,
-                        None,
-                    )?;
-                }
-                return self
-                    .with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
-                        self.build_runtime_admission_deny_response_with_metadata(
-                            request,
-                            &msg,
-                            now,
-                            Some(matching.index),
-                            runtime_admission_metadata,
-                        )
-                    })
+                return custody
+                    .settle_then(
+                        OperationSettlement::compensate_if(runtime_release_confirmed),
+                        || {
+                            self.with_pre_invocation_guard_evidence(
+                                &pre_invocation_guard_evidence,
+                                || {
+                                    self.build_runtime_admission_deny_response_with_metadata(
+                                        request,
+                                        &msg,
+                                        now,
+                                        Some(matching.index),
+                                        runtime_admission_metadata,
+                                    )
+                                },
+                            )
+                        },
+                    )
                     .map(ControlFlow::Break);
             }
 
@@ -189,7 +174,7 @@ impl ChioKernel {
                 cap,
                 std::slice::from_ref(matching),
                 self.execution_nonce_preflight_required(request),
-                durable_admission.as_mut(),
+                custody.durable_mut(),
                 now_unix_ms,
             ) {
                 Ok(BudgetAdmissionOutcome::Authorized {
@@ -199,25 +184,20 @@ impl ChioKernel {
                     if let Err(error) = self.reserve_validated_governed_approval(
                         request,
                         validated_governed_admission.as_ref(),
-                        durable_admission.as_mut(),
+                        custody.durable_mut(),
                         now_unix_ms,
                     ) {
                         let msg = error.to_string();
-                        return self
-                            .build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
-                                request,
-                                reason: &msg,
-                                timestamp: now,
-                                matched_grant_index: grant_index,
-                                cap,
-                                budget_mutation: mutation.as_ref(),
-                                payment_authorization: None,
-                                durable_operation: durable_operation(durable_admission.as_ref()),
-                                runtime_admission_metadata,
-                                runtime_reservation: &runtime_reservation,
-                                verified_payee_binding: None,
-                                budget_lease_acquired: false,
+                        return custody
+                            .select(SelectedGrant {
+                                grant_index,
+                                budget: *mutation,
+                                runtime: runtime_reservation,
+                                metadata: runtime_admission_metadata,
+                                evidence: None,
+                                payee: None,
                             })
+                            .deny(AdmissionDenial::new(&msg))
                             .map(ControlFlow::Break);
                     }
                     selected = Some((
@@ -237,7 +217,7 @@ impl ChioKernel {
                 }) => {
                     let (runtime_admission_metadata, runtime_release_confirmed) = self
                         .release_runtime_admission_reservations_for_pre_dispatch_denial(
-                            durable_operation(durable_admission.as_ref()),
+                            custody.operation(),
                             &runtime_reservation,
                             runtime_admission_metadata,
                         );
@@ -249,14 +229,20 @@ impl ChioKernel {
                         runtime_release_retained = true;
                         break;
                     }
-                    return self
-                        .with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
-                            self.build_pending_approval_response_with_metadata(
-                                request,
-                                &proposal,
-                                now,
-                                grant_index,
-                                runtime_admission_metadata,
+                    // The parked operation keeps its durable state for approval.
+                    return custody
+                        .settle_then(OperationSettlement::Retain, || {
+                            self.with_pre_invocation_guard_evidence(
+                                &pre_invocation_guard_evidence,
+                                || {
+                                    self.build_pending_approval_response_with_metadata(
+                                        request,
+                                        &proposal,
+                                        now,
+                                        grant_index,
+                                        runtime_admission_metadata,
+                                    )
+                                },
                             )
                         })
                         .map(ControlFlow::Break);
@@ -264,7 +250,7 @@ impl ChioKernel {
                 Err(error @ KernelError::BudgetExhausted(_)) => {
                     let (runtime_admission_metadata, runtime_release_confirmed) = self
                         .release_runtime_admission_reservations_for_pre_dispatch_denial(
-                            durable_operation(durable_admission.as_ref()),
+                            custody.operation(),
                             &runtime_reservation,
                             runtime_admission_metadata,
                         );
@@ -287,31 +273,32 @@ impl ChioKernel {
                     let msg = error.to_string();
                     let (runtime_admission_metadata, runtime_release_confirmed) = self
                         .release_runtime_admission_reservations_for_pre_dispatch_denial(
-                            durable_operation(durable_admission.as_ref()),
+                            custody.operation(),
                             &runtime_reservation,
                             runtime_admission_metadata,
                         );
-                    if runtime_release_confirmed {
-                        self.compensate_durable_admission_after_pre_dispatch_cleanup(
-                            durable_operation(durable_admission.as_ref()),
-                            None,
-                            None,
-                        )?;
-                    }
-                    return self
-                        .with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
-                            self.build_monetary_deny_response_with_metadata(
-                                request,
-                                &msg,
-                                now,
-                                matching_grants,
-                                cap,
-                                self.merge_budget_receipt_metadata(
-                                    runtime_admission_metadata,
-                                    self.budget_backend_receipt_metadata()?,
-                                ),
-                            )
-                        })
+                    return custody
+                        .settle_then(
+                            OperationSettlement::compensate_if(runtime_release_confirmed),
+                            || {
+                                self.with_pre_invocation_guard_evidence(
+                                    &pre_invocation_guard_evidence,
+                                    || {
+                                        self.build_monetary_deny_response_with_metadata(
+                                            request,
+                                            &msg,
+                                            now,
+                                            matching_grants,
+                                            cap,
+                                            self.merge_budget_receipt_metadata(
+                                                runtime_admission_metadata,
+                                                self.budget_backend_receipt_metadata()?,
+                                            ),
+                                        )
+                                    },
+                                )
+                            },
+                        )
                         .map(ControlFlow::Break);
                 }
             }
@@ -334,22 +321,19 @@ impl ChioKernel {
             if budget_error.is_none() {
                 if let Some(denial) = guard_denial {
                     let msg = denial.error.to_string();
-                    self.compensate_durable_admission_after_pre_dispatch_cleanup(
-                        durable_operation(durable_admission.as_ref()),
-                        None,
-                        None,
-                    )?;
-                    let receipt_metadata = Some(self.budget_backend_receipt_metadata()?);
-                    return self
-                        .with_pre_invocation_guard_evidence(&denial.evidence, || {
-                            self.build_monetary_deny_response_with_metadata(
-                                request,
-                                &msg,
-                                now,
-                                matching_grants,
-                                cap,
-                                receipt_metadata,
-                            )
+                    return custody
+                        .settle_then(OperationSettlement::Compensate, || {
+                            let receipt_metadata = Some(self.budget_backend_receipt_metadata()?);
+                            self.with_pre_invocation_guard_evidence(&denial.evidence, || {
+                                self.build_monetary_deny_response_with_metadata(
+                                    request,
+                                    &msg,
+                                    now,
+                                    matching_grants,
+                                    cap,
+                                    receipt_metadata,
+                                )
+                            })
                         })
                         .map(ControlFlow::Break);
                 }
@@ -362,44 +346,50 @@ impl ChioKernel {
             let msg = error.to_string();
             // An unconfirmed runtime release keeps the operation on its
             // recovery path, as at every other pre-dispatch denial.
-            if !runtime_release_retained
-                && durable_admission.as_ref().is_some_and(|admission| {
-                    admission.state()
+            let settlement = OperationSettlement::compensate_if(
+                !runtime_release_retained
+                    && custody.durable().is_some_and(|admission| {
+                        admission.state()
                     == crate::admission_operation::AdmissionOperationState::BrokerAttemptRegistered
+                    }),
+            );
+            return custody
+                .settle_then(settlement, || {
+                    self.build_monetary_deny_response_with_metadata(
+                        request,
+                        &msg,
+                        now,
+                        matching_grants,
+                        cap,
+                        self.merge_budget_receipt_metadata(
+                            error.rejection_metadata(merge_metadata_objects(
+                                extra_metadata.clone(),
+                                budget_error_metadata,
+                            )),
+                            self.budget_backend_receipt_metadata()?,
+                        ),
+                    )
                 })
-            {
-                self.compensate_durable_admission_after_pre_dispatch_cleanup(
-                    durable_operation(durable_admission.as_ref()),
-                    None,
-                    None,
-                )?;
-            }
-            return self
-                .build_monetary_deny_response_with_metadata(
-                    request,
-                    &msg,
-                    now,
-                    matching_grants,
-                    cap,
-                    self.merge_budget_receipt_metadata(
-                        error.rejection_metadata(merge_metadata_objects(
-                            extra_metadata.clone(),
-                            budget_error_metadata,
-                        )),
-                        self.budget_backend_receipt_metadata()?,
-                    ),
-                )
                 .map(ControlFlow::Break);
         };
 
-        Ok(ControlFlow::Continue(SelectedNestedFlowGrant {
-            matched_grant_index,
-            budget_mutation,
-            validated_governed_admission,
-            governed_call_chain_receipt_evidence,
-            pre_invocation_guard_evidence,
-            runtime_admission_metadata,
-            runtime_reservation,
-        }))
+        let payee = validated_governed_admission
+            .as_ref()
+            .and_then(|admission| admission.verified_payee_binding.clone());
+        let custody = custody.select(SelectedGrant {
+            grant_index: matched_grant_index,
+            budget: budget_mutation,
+            runtime: runtime_reservation,
+            metadata: runtime_admission_metadata,
+            evidence: Some(pre_invocation_guard_evidence),
+            payee,
+        });
+        Ok(ControlFlow::Continue((
+            custody,
+            SelectedNestedFlowGrant {
+                validated_governed_admission,
+                governed_call_chain_receipt_evidence,
+            },
+        )))
     }
 }

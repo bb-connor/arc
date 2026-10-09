@@ -452,6 +452,10 @@ impl ChioKernel {
         clippy::too_many_arguments,
         reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
     )]
+    #[expect(
+        dead_code,
+        reason = "pre-dispatch custody owns this exit in both evaluation cores"
+    )]
     pub(super) fn build_definite_payment_denial_after_capture(
         &self,
         request: &ToolCallRequest,
@@ -524,6 +528,10 @@ impl ChioKernel {
         )
     }
 
+    #[expect(
+        dead_code,
+        reason = "pre-dispatch custody owns this exit in both evaluation cores"
+    )]
     pub(super) fn build_pre_dispatch_cleanup_deny_response(
         &self,
         denial: PreDispatchCleanupDeny<'_>,
@@ -547,6 +555,10 @@ impl ChioKernel {
     }
 
     /// Preserve the host cancellation decision through the shared cleanup owner.
+    #[expect(
+        dead_code,
+        reason = "pre-dispatch custody owns this exit in both evaluation cores"
+    )]
     pub(super) fn build_session_dispatch_refusal_response(
         &self,
         cleanup: PreDispatchCleanupDeny<'_>,
