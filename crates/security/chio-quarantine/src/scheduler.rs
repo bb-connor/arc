@@ -248,11 +248,7 @@ impl<
             action_id: work.action_id.clone(),
         };
         let Some(current) = self.store.load_plan(&key)? else {
-            return self.schedule_retry(
-                work,
-                now_unix_ms,
-                error_code("response.scheduler_plan_missing")?,
-            );
+            return self.schedule_retry(work, error_code("response.scheduler_plan_missing")?);
         };
         let current_snapshot =
             decode_response_record(&current).map_err(SchedulerError::InvalidExecutionRecord)?;
@@ -275,7 +271,7 @@ impl<
                     });
                 }
                 Err(error) => {
-                    return self.schedule_retry(work, now_unix_ms, error.code().clone());
+                    return self.schedule_retry(work, error.code().clone());
                 }
             }
         }
@@ -296,7 +292,7 @@ impl<
                     return Err(SchedulerError::ExecutionRecordNotDurable);
                 }
                 if let (ResponseState::Active, Some(lapsed_code)) = (snapshot.state, lapsed_fence) {
-                    return self.schedule_retry(work, now_unix_ms, lapsed_code);
+                    return self.schedule_retry(work, lapsed_code);
                 }
                 match snapshot.state {
                     ResponseState::Active
@@ -310,21 +306,17 @@ impl<
                             state: snapshot.state,
                         })
                     }
-                    ResponseState::RollbackPartial => self.schedule_retry(
-                        work,
-                        now_unix_ms,
-                        error_code("response.rollback_partial")?,
-                    ),
+                    ResponseState::RollbackPartial => {
+                        self.schedule_retry(work, error_code("response.rollback_partial")?)
+                    }
                     ResponseState::Planned
                     | ResponseState::AwaitingApproval
                     | ResponseState::Applying
                     | ResponseState::ApplyPartial
                     | ResponseState::Expiring
-                    | ResponseState::RollingBack => self.schedule_retry(
-                        work,
-                        now_unix_ms,
-                        error_code("response.execution_incomplete")?,
-                    ),
+                    | ResponseState::RollingBack => {
+                        self.schedule_retry(work, error_code("response.execution_incomplete")?)
+                    }
                 }
             }
             Err(error) => {
@@ -334,7 +326,7 @@ impl<
                     action_id = work.action_id.as_str(),
                     "response execution refused"
                 );
-                self.schedule_retry(work, now_unix_ms, code)
+                self.schedule_retry(work, code)
             }
         }
     }
@@ -425,10 +417,12 @@ impl<
         self.release(work, false)
     }
 
+    /// Records the next retry from the store's trusted time at recording
+    /// rather than the instant processing began, so an attempt that outlasts
+    /// its backoff still records a retry that is not yet due.
     fn schedule_retry(
         &self,
         work: &ScheduledWork,
-        now_unix_ms: u64,
         error_code: ErrorCode,
     ) -> Result<SchedulerWorkOutcome, SchedulerError> {
         let key = SchedulerWorkKey {
@@ -436,6 +430,7 @@ impl<
             action_id: work.action_id.clone(),
         };
         let previous = self.store.load_retry(&key)?;
+        let now_unix_ms = self.store.trusted_now_unix_ms()?;
         let expected_attempts = previous.as_ref().map(|retry| retry.attempts).unwrap_or(0);
         let first_failure_at_unix_ms = previous
             .as_ref()

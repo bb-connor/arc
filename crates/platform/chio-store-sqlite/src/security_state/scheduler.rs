@@ -469,6 +469,13 @@ impl ResponseSchedulerStore for SqliteSecurityStateStore {
         load_scheduler_retry(&connection, key)
     }
 
+    fn trusted_now_unix_ms(&self) -> PortResult<u64> {
+        self.clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)
+            .map_err(PortError::from)
+    }
+
     fn validate_lease(&self, work: &ScheduledWork) -> PortResult<()> {
         let mut connection = self.connection()?;
         let transaction = connection
