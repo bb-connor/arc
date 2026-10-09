@@ -505,7 +505,6 @@ pub fn verify_passport_root_and_claim_set_artifacts_unchecked_signature_with_ext
     )
 }
 
-#[allow(clippy::too_many_arguments)]
 fn verify_passport_root_and_claim_set_artifacts_bound(
     passport: &TransactionPassport,
     passport_path: String,

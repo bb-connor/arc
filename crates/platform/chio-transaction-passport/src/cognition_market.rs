@@ -189,7 +189,6 @@ pub fn verify_cognition_market_passport_artifacts(
 
 /// Verify cognition-market artifacts while carrying claims already verified
 /// by other authoritative family verifiers into the combined root gate.
-#[allow(clippy::too_many_arguments)]
 pub fn verify_cognition_market_passport_artifacts_with_external_claims(
     passport: &TransactionPassport,
     passport_path: String,
