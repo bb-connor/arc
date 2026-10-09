@@ -936,9 +936,12 @@ jobs:
         run: python3 scripts/check-release-source-gates.py
 
       - name: Checkout main
+        # Keep rendering, identity checks and signing in the qualified tag
+        # checkout. Main is only the destination for the checksum review PR.
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           ref: main
+          path: checksum-review
           token: ${{ secrets.GITHUB_TOKEN }}
           persist-credentials: true
 
@@ -1111,10 +1114,27 @@ jobs:
           echo "Candidate promotion remains blocked until that PR is merged with these exact bytes."
           echo "See docs/install/PUBLISHING.md and check-release-draft-assets.py --checksum-review-pr."
 
+      - name: Copy signed checksum materials into review checkout
+        if: steps.checksum_release.outputs.prerelease != 'true'
+        shell: bash
+        env:
+          CHIO_RELEASE_TAG: ${{ steps.checksum_release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p checksum-review/supply-chain/checksums
+          for suffix in txt txt.sig txt.pem; do
+            source="supply-chain/checksums/${CHIO_RELEASE_TAG}.${suffix}"
+            destination="checksum-review/${source}"
+            test -s "${source}"
+            cp "${source}" "${destination}"
+            cmp "${source}" "${destination}"
+          done
+
       - name: Open checksum index PR
         if: steps.checksum_release.outputs.prerelease != 'true'
         uses: peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c
         with:
+          path: checksum-review
           base: main
           branch: chore/checksum-index-${{ steps.checksum_release.outputs.tag }}
           title: "chore(release): publish ${{ steps.checksum_release.outputs.tag }} checksum index"

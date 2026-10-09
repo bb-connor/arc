@@ -8,8 +8,10 @@ import io
 import json
 import os
 import re
+import shutil
 import subprocess
 import tempfile
+import textwrap
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -102,6 +104,190 @@ class SigningSourceWorkflow(unittest.TestCase):
                 require_signing_source_boundary(
                     (ROOT / ".github/workflows" / filename).read_text(), job_name, sdk
                 )
+
+    def test_checksum_signing_keeps_tagged_helpers_and_copies_exact_bytes_to_main(self):
+        """Run the workflow checkout and shell boundaries with newer main code.
+
+        GitHub qualification results are supplied and hosted cosign uses a file
+        recorder. Git checkouts, the tagged identity helper, rendering and
+        copying are real.
+        """
+        workflow = (ROOT / ".github/workflows/release-binaries.yml").read_text()
+        job = re.search(
+            r"^  checksum-index:\n(.*?)(?=^  [\w-]+:|\Z)",
+            workflow.split("\njobs:\n", 1)[1],
+            re.MULTILINE | re.DOTALL,
+        ).group(1)
+        steps = re.split(
+            r"(?=^      - )", job.split("    steps:\n", 1)[1], flags=re.MULTILINE
+        )[1:]
+
+        def field(step, name, default=None):
+            match = re.search(
+                rf"^          {re.escape(name)}: (.*)$", step, re.MULTILINE
+            )
+            return match.group(1) if match else default
+
+        def command(step):
+            script = step.split("        run: ", 1)[1].rstrip()
+            return textwrap.dedent(script[2:]) if script.startswith("|\n") else script
+
+        with tempfile.TemporaryDirectory(prefix="chio-checksum-checkout-") as directory:
+            root = Path(directory)
+            origin = root / "origin"
+            origin.mkdir()
+
+            def git(cwd, *args):
+                return subprocess.check_output(
+                    ["git", *args], cwd=cwd, text=True, stderr=subprocess.PIPE
+                ).strip()
+
+            git(origin, "init", "--quiet", "--initial-branch=main")
+            (origin / "scripts").mkdir()
+            for name in ("verify-release-identity.py", "check-release-source-gates.py"):
+                shutil.copyfile(ROOT / "scripts" / name, origin / "scripts" / name)
+            manifest = origin / "crates/products/chio-cli/Cargo.toml"
+            manifest.parent.mkdir(parents=True)
+            manifest.write_text('[package]\nversion = "1.2.3"\n')
+
+            def commit(message):
+                git(origin, "add", ".")
+                git(
+                    origin,
+                    "-c",
+                    "user.name=Fixture",
+                    "-c",
+                    "user.email=fixture@example.invalid",
+                    "-c",
+                    "commit.gpgsign=false",
+                    "commit",
+                    "--quiet",
+                    "-m",
+                    message,
+                )
+                return git(origin, "rev-parse", "HEAD")
+
+            source = commit("qualified release source")
+            git(origin, "tag", "v1.2.3")
+            (origin / "scripts/verify-release-identity.py").write_text(
+                "from pathlib import Path\n"
+                'Path("supply-chain/checksums/v1.2.3.txt").write_text("new unqualified main changed signing bytes\\n")\n'
+            )
+            newer_main = commit("new main changes signing helper")
+            tools = root / "tools"
+            tools.mkdir()
+            recorder = tools / "cosign"
+            recorder.write_text(
+                "#!/usr/bin/env python3\nimport hashlib, sys\nfrom pathlib import Path\n"
+                "args = sys.argv[1:]\n"
+                "blob = Path(args[-1]).read_bytes()\n"
+                "Path(args[args.index('--output-signature') + 1]).write_text(hashlib.sha256(blob).hexdigest())\n"
+                "Path(args[args.index('--output-certificate') + 1]).write_text('checkout fixture certificate\\n')\n"
+            )
+            recorder.chmod(0o755)
+            workspace = root / "workspace"
+            env = os.environ | {
+                "PATH": str(tools) + os.pathsep + os.environ["PATH"],
+                "GITHUB_WORKSPACE": str(workspace),
+                "GITHUB_REPOSITORY": "bb-connor/arc",
+                "GITHUB_SHA": source,
+                "GITHUB_REF_TYPE": "tag",
+                "GITHUB_REF_NAME": "v1.2.3",
+                "GITHUB_REF": "refs/tags/v1.2.3",
+                "GITHUB_WORKFLOW_REF": "bb-connor/arc/.github/workflows/release-binaries.yml@refs/tags/v1.2.3",
+                "CHIO_VERSION": "1.2.3",
+                "CHIO_RELEASE_TAG": "v1.2.3",
+                "CHIO_SOURCE_REF": "refs/tags/v1.2.3",
+                "CHIO_SOURCE_SHA": source,
+            }
+
+            def run(step):
+                subprocess.run(
+                    ["bash", "-euo", "pipefail", "-c", command(step)],
+                    cwd=workspace,
+                    env=env,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+
+            index = workspace / "supply-chain/checksums/v1.2.3.txt"
+            rendered = None
+            signed_materials = {}
+            reviewed = False
+            for step in steps:
+                name = step.split("\n", 1)[0].removeprefix("      - name: ")
+                if "uses: actions/checkout@" in step:
+                    target = workspace / field(step, "path", "")
+                    if not target.exists():
+                        git(
+                            root,
+                            "clone",
+                            "--quiet",
+                            "--no-local",
+                            str(origin),
+                            str(target),
+                        )
+                    ref = field(step, "ref")
+                    git(
+                        target,
+                        "checkout",
+                        "--quiet",
+                        source if ref == "${{ github.sha }}" else ref,
+                    )
+                elif (
+                    name
+                    == "Require exact-source qualification before rendering or signing"
+                ):
+                    with (
+                        patch.object(
+                            GATE,
+                            "__file__",
+                            str(workspace / "scripts/check-release-source-gates.py"),
+                        ),
+                        patch.dict(os.environ, env, clear=True),
+                        patch.object(GATE, "require_gates", return_value=[]),
+                        contextlib.redirect_stdout(io.StringIO()),
+                    ):
+                        GATE.main()
+                elif name == "Download release build artifacts":
+                    artifacts = workspace / "artifacts"
+                    artifacts.mkdir()
+                    (artifacts / "release.sha256").write_text(
+                        "a" * 64 + "  fixture.tar.gz\n"
+                    )
+                elif name == "Render checksum index":
+                    run(step)
+                    rendered = index.read_bytes()
+                elif name == "Require canonical release signing identity":
+                    run(step)
+                elif name == "Cosign sign-blob checksum index":
+                    run(step)
+                    self.assertEqual(
+                        index.read_bytes(),
+                        rendered,
+                        "new main helper changed canonical signing bytes",
+                    )
+                    self.assertEqual(git(workspace, "rev-parse", "HEAD"), source)
+                    for suffix in (".txt", ".txt.sig", ".txt.pem"):
+                        relative = Path("supply-chain/checksums/v1.2.3" + suffix)
+                        signed_materials[relative] = (workspace / relative).read_bytes()
+                elif name == "Copy signed checksum materials into review checkout":
+                    run(step)
+                elif name == "Open checksum index PR":
+                    review = workspace / field(step, "path", "")
+                    self.assertEqual(field(step, "base"), "main")
+                    self.assertEqual(git(review, "rev-parse", "HEAD"), newer_main)
+                    self.assertEqual(len(signed_materials), 3)
+                    for relative, signed_bytes in signed_materials.items():
+                        self.assertEqual((review / relative).read_bytes(), signed_bytes)
+                        self.assertEqual(
+                            (workspace / relative).read_bytes(), signed_bytes
+                        )
+                    reviewed = True
+            self.assertTrue(
+                reviewed, "the signed checksum review PR boundary did not run"
+            )
 
 
 class SourceGate(unittest.TestCase):
