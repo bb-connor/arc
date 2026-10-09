@@ -1040,7 +1040,12 @@ pub(crate) async fn handle_public_submit_oid4vp_response(
     State(state): State<TrustServiceState>,
     Form(payload): Form<Oid4vpDirectPostForm>,
 ) -> Response {
-    let clock_now = match unix_timestamp_now() {
+    // Acceptance time comes from the request-handling state clock, sampled both
+    // before and after the untrusted remote waits. A slow issuer or lifecycle
+    // response therefore cannot carry acceptance past the request's expiry under
+    // a stale timestamp. A clock failure fails closed.
+    let clock = state.finding_challenge_clock.as_ref();
+    let clock_now = match clock_unix_secs(clock) {
         Ok(now) => now,
         Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
     };
@@ -1076,26 +1081,70 @@ pub(crate) async fn handle_public_submit_oid4vp_response(
         Ok(credential) => credential,
         Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
     };
-    let issuer_public_keys =
-        match resolve_portable_issuer_public_keys(&state.config, &credential.issuer) {
-            Ok(keys) => keys,
-            Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-        };
-    let mut verification = match verify_oid4vp_direct_post_response_with_any_issuer_key(
+    let requested_issuer_allowlist = request
+        .dcql_query
+        .credentials
+        .first()
+        .map(|credential| credential.issuer_allowlist.iter().cloned().collect())
+        .unwrap_or_default();
+    // Trust is decided before any network I/O: our own advertised issuer uses
+    // local keys, every other issuer must be in the verifier request's signed
+    // issuer allowlist, and an empty allowlist trusts only the local issuer.
+    let issuer_public_keys = match plan_portable_issuer_keys(
+        &state.config,
+        &credential.issuer,
+        &requested_issuer_allowlist,
+    ) {
+        Ok(PortableIssuerResolution::Local(keys)) => keys,
+        Ok(PortableIssuerResolution::Untrusted) => {
+            return plain_http_error(
+                StatusCode::FORBIDDEN,
+                "portable credential issuer is not trusted by the verifier request",
+            );
+        }
+        Ok(PortableIssuerResolution::Remote(fetch)) => {
+            match run_portable_issuer_fetch(move || fetch.resolve()).await {
+                Ok(Ok(keys)) => keys,
+                Ok(Err(error)) => {
+                    return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string())
+                }
+                Err(refusal) => return refusal.into_response(plain_http_error),
+            }
+        }
+        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+    };
+    // Refresh trusted time after the issuer-key wait and verify the signed
+    // response against it. This yields the passport identity used to plan the
+    // lifecycle resolution; it runs before the signed lifecycle URL is fetched.
+    let verify_now = match clock_unix_secs(clock) {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
+    let verified = match verify_oid4vp_direct_post_response_with_any_issuer_key(
         &payload.response,
         &request,
         &issuer_public_keys,
-        now,
+        verify_now,
     ) {
         Ok(verification) => verification,
         Err(error) => return plain_http_error(StatusCode::FORBIDDEN, &error.to_string()),
     };
-    let lifecycle = match resolve_oid4vp_passport_lifecycle(
+    let lifecycle = match plan_oid4vp_passport_lifecycle(
         &state.config,
-        &verification.passport_id,
-        verification.passport_status.as_ref(),
+        &verified.passport_id,
+        verified.passport_status.as_ref(),
+        verify_now,
     ) {
-        Ok(lifecycle) => lifecycle,
+        Ok(PassportLifecyclePlan::Resolved(lifecycle)) => lifecycle,
+        Ok(PassportLifecyclePlan::Remote(fetch)) => {
+            match run_portable_issuer_fetch(move || fetch.resolve()).await {
+                Ok(Ok(lifecycle)) => Some(lifecycle),
+                Ok(Err(error)) => {
+                    return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string())
+                }
+                Err(refusal) => return refusal.into_response(plain_http_error),
+            }
+        }
         Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
     };
     if let Some(lifecycle) = lifecycle.as_ref() {
@@ -1103,7 +1152,25 @@ pub(crate) async fn handle_public_submit_oid4vp_response(
             return plain_http_error(StatusCode::FORBIDDEN, &passport_lifecycle_reason(lifecycle));
         }
     }
-    if let Err(error) = store.consume(&request, &request_jwt, now) {
+    // Refresh trusted time after the lifecycle wait and revalidate the signed
+    // response at that final acceptance time, so a credential or holder proof
+    // that expired during either remote wait is refused even while the verifier
+    // request is still live. The atomic consume then enforces request expiry
+    // against the same time and records it as the consumption instant.
+    let accept_now = match clock_unix_secs(clock) {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
+    let mut verification = match verify_oid4vp_direct_post_response_with_any_issuer_key(
+        &payload.response,
+        &request,
+        &issuer_public_keys,
+        accept_now,
+    ) {
+        Ok(verification) => verification,
+        Err(error) => return plain_http_error(StatusCode::FORBIDDEN, &error.to_string()),
+    };
+    if let Err(error) = store.consume(&request, &request_jwt, accept_now) {
         return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
     }
     verification.exchange_transaction = Some(WalletExchangeTransactionState::consumed(
@@ -1111,7 +1178,7 @@ pub(crate) async fn handle_public_submit_oid4vp_response(
         &request.jti,
         request.iat,
         request.exp,
-        now,
+        accept_now,
     ));
     verification.identity_assertion = request.identity_assertion.clone();
     Json(verification).into_response()
@@ -1563,3 +1630,7 @@ pub(crate) async fn handle_federated_issue(
         Err(response) => response,
     }
 }
+
+#[cfg(test)]
+#[path = "passport_handlers/oid4vp_issuer_fetch_tests.rs"]
+mod oid4vp_issuer_fetch_tests;

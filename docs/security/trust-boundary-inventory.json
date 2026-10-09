@@ -18101,9 +18101,10 @@
     "crates/platform/chio-control-plane/src/trust_control/cluster/partition.rs": [
       "handle_internal_cluster_partition::request-json::ClusterPartitionRequest"
     ],
-    "crates/platform/chio-control-plane/src/trust_control/config_and_public.rs": [
-      "resolve_oid4vp_passport_lifecycle::shared-reader::crates/platform/chio-control-plane/src/json_input.rs::read",
-      "resolve_portable_issuer_public_keys::shared-reader::crates/platform/chio-control-plane/src/json_input.rs::read"
+    "crates/platform/chio-control-plane/src/trust_control/config_and_public/portable_issuer_fetch.rs": [
+      "fetch_portable_issuer_jwks::shared-reader::crates/platform/chio-control-plane/src/json_input.rs::read",
+      "resolve#1::shared-reader::crates/platform/chio-control-plane/src/trust_control/config_and_public/portable_issuer_fetch.rs::fetch_portable_issuer_jwks",
+      "resolve#2::shared-reader::crates/platform/chio-control-plane/src/json_input.rs::read"
     ],
     "crates/platform/chio-control-plane/src/trust_control/finding_admission_view.rs": [
       "current_admission_view::original-json-reader::UntrustedJsonText",
@@ -18266,8 +18267,6 @@
       "handle_federated_issue::request-json::FederatedIssueRequest",
       "handle_federated_issue::shared-reader::crates/platform/chio-control-plane/src/trust_control/service_types/requests.rs::ensure_requested_capability_within_parent_snapshot",
       "handle_public_submit_oid4vp_response::request-form::Oid4vpDirectPostForm",
-      "handle_public_submit_oid4vp_response::shared-reader::crates/platform/chio-control-plane/src/trust_control/config_and_public.rs::resolve_oid4vp_passport_lifecycle",
-      "handle_public_submit_oid4vp_response::shared-reader::crates/platform/chio-control-plane/src/trust_control/config_and_public.rs::resolve_portable_issuer_public_keys",
       "handle_public_verify_passport_challenge::request-json::VerifyPassportChallengeRequest",
       "handle_publish_passport_status::request-json::PublishPassportStatusRequest",
       "handle_redeem_passport_issuance_credential::request-json::Oid4vciCredentialRequest",

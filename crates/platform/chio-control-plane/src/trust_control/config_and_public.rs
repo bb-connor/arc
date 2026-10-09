@@ -1200,96 +1200,9 @@ pub(crate) fn resolve_oid4vp_verifier_signing_key(
     load_or_create_authority_keypair(path)
 }
 
-pub(crate) fn resolve_portable_issuer_public_keys(
-    config: &TrustServiceConfig,
-    issuer: &str,
-) -> Result<Vec<PublicKey>, CliError> {
-    if config.advertise_url.as_deref() == Some(issuer) {
-        return resolve_oid4vp_verifier_trusted_public_keys(config);
-    }
-    let jwks_url = format!("{issuer}{OID4VCI_JWKS_PATH}");
-    let response = ureq::get(&jwks_url).call().map_err(|error| match error {
-        ureq::Error::Status(status, response) => {
-            let body = response.into_string().unwrap_or_default();
-            CliError::cli_other_error(format!(
-                "failed to fetch portable issuer JWKS from `{jwks_url}` with status {status}: {body}"
-            ))
-        }
-        ureq::Error::Transport(transport) => CliError::cli_other_error(format!(
-            "failed to fetch portable issuer JWKS from `{jwks_url}`: {transport}"
-        )),
-    })?;
-    let jwks: chio_credentials::PortableJwkSet =
-        crate::json_input::read(response.into_reader(), 4 * 1024 * 1024)?;
-    jwks.keys.first().ok_or_else(|| {
-        CliError::cli_other_error(format!(
-            "portable issuer JWKS at `{jwks_url}` did not publish any keys"
-        ))
-    })?;
-    let mut public_keys = Vec::with_capacity(jwks.keys.len());
-    for entry in &jwks.keys {
-        public_keys.push(
-            entry
-                .jwk
-                .to_public_key()
-                .map_err(|error| CliError::cli_other_error(error.to_string()))?,
-        );
-    }
-    if public_keys.is_empty() {
-        return Err(CliError::cli_other_error(format!(
-            "portable issuer JWKS at `{jwks_url}` did not publish any keys"
-        )));
-    }
-    Ok(public_keys)
-}
-
-pub(crate) fn resolve_oid4vp_passport_lifecycle(
-    config: &TrustServiceConfig,
-    passport_id: &str,
-    status_ref: Option<&chio_credentials::Oid4vciChioPassportStatusReference>,
-) -> Result<Option<PassportLifecycleResolution>, CliError> {
-    let clock_now = unix_timestamp_now()?;
-    if let Some(path) = config.passport_statuses_file.as_deref() {
-        let registry = PassportStatusRegistry::load(path)?;
-        return Ok(Some(registry.resolve_at(passport_id, clock_now)));
-    }
-    let Some(status_ref) = status_ref else {
-        return Ok(None);
-    };
-    let resolve_url = status_ref
-        .distribution
-        .resolve_urls
-        .first()
-        .cloned()
-        .ok_or_else(|| {
-            CliError::cli_other_error(
-                "OID4VP passport status validation requires at least one resolve URL".to_string(),
-            )
-        })?;
-    let url = format!(
-        "{}/{}",
-        resolve_url.trim_end_matches('/'),
-        utf8_percent_encode(passport_id, NON_ALPHANUMERIC)
-    );
-    let response = ureq::get(&url).call().map_err(|error| match error {
-        ureq::Error::Status(status, response) => {
-            let body = response.into_string().unwrap_or_default();
-            CliError::cli_other_error(format!(
-                "failed to resolve portable passport lifecycle from `{url}` with status {status}: {body}"
-            ))
-        }
-        ureq::Error::Transport(transport) => CliError::cli_other_error(format!(
-            "failed to resolve portable passport lifecycle from `{url}`: {transport}"
-        )),
-    })?;
-    let lifecycle: PassportLifecycleResolution =
-        crate::json_input::read(response.into_reader(), 4 * 1024 * 1024)?;
-    lifecycle
-        .validate()
-        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
-    Ok(Some(lifecycle))
-}
-
+#[path = "config_and_public/portable_issuer_fetch.rs"]
+mod portable_issuer_fetch;
+pub(crate) use portable_issuer_fetch::*;
 pub(crate) fn build_enterprise_admission_audit(
     identity: &EnterpriseIdentityContext,
     subject_public_key: &str,
