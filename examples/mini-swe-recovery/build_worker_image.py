@@ -8,6 +8,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+BASE_IMAGE = (Path(__file__).resolve().parent / "base-image.txt").read_text().strip()
 DOCKER = ["/usr/bin/docker", "--host", "unix:///var/run/docker.sock"]
 
 
@@ -17,7 +18,7 @@ def run(*arguments, **kwargs):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--base", default="python:3.11-slim")
+    parser.add_argument("--base", default=BASE_IMAGE)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.output.exists():
@@ -55,7 +56,7 @@ def main():
         )
         for package in ("chio-process", "chio-mini-swe"):
             run("uv", "build", ROOT / "sdks/python" / package, "--wheel", "--out-dir", context)
-        (context / "Dockerfile").write_text("""ARG PYTHON_IMAGE=python:3.11-slim
+        (context / "Dockerfile").write_text("ARG PYTHON_IMAGE=" + BASE_IMAGE + """
 FROM ${PYTHON_IMAGE}
 COPY requirements.txt /opt/chio/requirements.txt
 RUN python -m pip install --no-cache-dir --only-binary=:all: --require-hashes \\

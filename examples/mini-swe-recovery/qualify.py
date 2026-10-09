@@ -14,6 +14,7 @@ import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+BASE_IMAGE = (HERE / "base-image.txt").read_text().strip()
 
 
 def command(*arguments, **kwargs):
@@ -264,7 +265,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--chio", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--image", default="python:3.11-slim")
+    parser.add_argument("--image", default=BASE_IMAGE)
     worker = parser.add_mutually_exclusive_group()
     worker.add_argument(
         "--worker-image", help="Immutable local image id for isolated Python workers"

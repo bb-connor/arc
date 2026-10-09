@@ -80,7 +80,7 @@ isolate the Python worker as well as the tool commands, build the local worker
 image and select it explicitly:
 
 ```sh
-docker --host unix:///var/run/docker.sock pull python:3.11-slim
+docker --host unix:///var/run/docker.sock pull "$(cat examples/mini-swe-recovery/base-image.txt)"
 python3 examples/mini-swe-recovery/build_worker_image.py --output /tmp/chio-worker-image.json
 MSWEA_SILENT_STARTUP=1 uv run --project sdks/python/chio-mini-swe --locked python examples/mini-swe-recovery/qualify.py --chio /absolute/path/to/chio --worker-image-file /tmp/chio-worker-image.json --output /tmp/mini-swe-isolated-evidence
 ```
