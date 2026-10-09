@@ -236,6 +236,57 @@ pub(super) fn remove_for_relocation(
     Ok(())
 }
 
+/// Whether this lock root bound `canonical_database_path` to `store_uuid`
+/// itself: its marker holds exactly the record `ensure` writes in place,
+/// naming the marker's own inode. Only provisioning, serving and a committed
+/// import write one. A marker copied from another lock root names the inode
+/// it was copied from and binds nothing here; relocation then removes it, or
+/// refuses it when it is not a marker of this authority.
+pub(super) fn bound_in_place(
+    lock_root: &Path,
+    canonical_database_path: &Path,
+    store_uuid: &str,
+) -> Result<bool, SqliteServingOwnerError> {
+    let marker_path = marker_path(lock_root, canonical_database_path)?;
+    let path_metadata = match fs::symlink_metadata(&marker_path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(false),
+        Err(error) => return Err(error.into()),
+    };
+    validate_marker_metadata(lock_root, &path_metadata)?;
+    let mut options = OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NOFOLLOW);
+    }
+    let file = options.open(&marker_path)?;
+    let file_metadata = file.metadata()?;
+    validate_inode_identity(&path_metadata, &file_metadata, None)?;
+    let in_place = PathIdentityRecord {
+        format: FORMAT.to_string(),
+        canonical_database_path: path_text(canonical_database_path)?,
+        store_uuid: store_uuid.to_string(),
+        marker_device: read_u64(
+            metadata_device(&file_metadata)?,
+            "path identity marker device",
+        )?,
+        marker_inode: read_u64(
+            metadata_inode(&file_metadata)?,
+            "path identity marker inode",
+        )?,
+    };
+    let expected = canonical_json_bytes(&in_place).map_err(|error| {
+        invalid(format!(
+            "local path identity continuity marker encoding failed: {error}"
+        ))
+    })?;
+    let mut bytes = Vec::with_capacity(expected.len());
+    file.take(MAX_MARKER_BYTES + 1).read_to_end(&mut bytes)?;
+    Ok(bytes == expected)
+}
+
 fn validate_record(
     record: &PathIdentityRecord,
     canonical_database_path: &Path,

@@ -415,47 +415,126 @@ fn reimporting_a_retained_export_cannot_roll_back_a_destination_that_served() {
 }
 
 #[test]
-fn an_import_interrupted_before_serving_retries_from_the_retained_export() {
+fn an_import_stopped_before_its_database_commit_retries_from_the_retained_export() {
     let (temp, database, lock_root) = fixture();
     SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
     drop(crate::test_authority::open_serving(&database, &lock_root).expect("serve at source"));
     let seal = SqliteAuthorityStore::export_for_relocation(&database, &lock_root).expect("export");
-    let (moved, locks) = copy_store(temp.path(), &temp.path().join("moved"));
-    let lock = locks.join(format!("{}.lock", seal.store_uuid));
+    let exported = fs::read(&database).expect("exported bytes");
+    for variant in ["seeded", "shaped", "unseeded", "torn-first-seed"] {
+        let (moved, locks) = copy_store(temp.path(), &temp.path().join(variant));
+        let lock = locks.join(format!("{}.lock", seal.store_uuid));
+        crate::serving_owner::relocation::import_commit_cutpoint::arm();
+        let stopped =
+            SqliteAuthorityStore::import_relocated_checked(&moved, &locks, &seal, || Ok(()));
+        assert!(
+            matches!(&stopped, Err(SqliteServingOwnerError::OutcomeUnknown(detail)) if detail.contains("before its database commit")),
+            "{variant}: {stopped:?}"
+        );
+        // A crash before the commit leaves the exported database, a fresh
+        // seeded lock and no identity marker for the destination path.
+        assert!(fs::read(&moved).expect("stopped database") == exported);
+        assert!(!path_identity_marker(&moved, &locks).exists());
+        assert_eq!(serving_lock_paths(&locks), vec![lock.clone()]);
+        match variant {
+            "shaped" => overwrite_lock_bytes(&lock, 0, &[0; 2048]),
+            "unseeded" => {
+                fs::remove_file(&lock).expect("remove seeded lock");
+                drop(create_lock_file(&lock).expect("unseeded lock"));
+            }
+            "torn-first-seed" => overwrite_lock_bytes(&lock, 64, &[0xa5; 32]),
+            _ => {}
+        }
+        let retried = SqliteAuthorityStore::import_relocated_checked_with_phase(
+            &moved,
+            &locks,
+            &seal,
+            |phase| {
+                assert_eq!(phase, RelocationImportPhase::Exported);
+                Ok(())
+            },
+        )
+        .unwrap_or_else(|error| panic!("{variant} retry: {error}"));
+        assert_eq!(retried.seal, seal);
+        assert!(path_identity_marker(&moved, &locks).is_file());
+        SqliteAuthorityStore::provision(&moved, &locks).expect("re-provision at new path");
+        let relocated =
+            crate::test_authority::open_serving(&moved, &locks).expect("serve after retry");
+        assert_eq!(relocated.mutation_fence().owner_epoch, seal.owner_epoch + 1);
+        assert_eq!(relocated.mutation_fence().store_uuid, seal.store_uuid);
+        assert_eq!(serving_lock_paths(&locks), vec![lock]);
+    }
+}
 
-    // The import seeded its anchor but its database commit did not land.
-    let first = SqliteAuthorityStore::import_relocated_checked(&moved, &locks, &seal, || Ok(()))
-        .expect("first import");
-    restore_database_in_place(&moved, &database);
-    let retried =
-        SqliteAuthorityStore::import_relocated_checked_with_phase(&moved, &locks, &seal, |phase| {
-            assert_eq!(phase, RelocationImportPhase::Exported);
-            Ok(())
-        })
-        .expect("retry after a seeded anchor");
-    assert_eq!(retried.seal, seal);
-    assert_ne!(retried.import_id, first.import_id);
-
-    // The import created its lock but stopped before seeding it.
-    restore_database_in_place(&moved, &database);
-    fs::remove_file(&lock).expect("remove seeded lock");
-    drop(create_lock_file(&lock).expect("unseeded lock"));
-    SqliteAuthorityStore::import_relocated_checked(&moved, &locks, &seal, || Ok(()))
-        .expect("retry after an unseeded lock");
-
-    // The import's first anchor write was torn: the first slot does not
-    // decode and the second was never written.
-    restore_database_in_place(&moved, &database);
-    overwrite_lock_bytes(&lock, 64, &[0xa5; 32]);
-    let imported = SqliteAuthorityStore::import_relocated_checked(&moved, &locks, &seal, || Ok(()))
-        .expect("retry after a torn first seed");
+#[test]
+fn a_copied_marker_for_the_destination_path_does_not_bind_a_new_lock_root() {
+    let (temp, database, lock_root) = fixture();
+    SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
+    drop(crate::test_authority::open_serving(&database, &lock_root).expect("serve at source"));
+    let seal = SqliteAuthorityStore::export_for_relocation(&database, &lock_root).expect("export");
+    // Same database path, another lock root: the copied marker for this path
+    // records the inode it was copied from.
+    let locks = temp.path().join("copied-locks");
+    create_lock_root(&locks);
+    for entry in fs::read_dir(&lock_root).expect("read lock root") {
+        let entry = entry.expect("lock root entry");
+        fs::copy(entry.path(), locks.join(entry.file_name())).expect("copy lock artifact");
+    }
+    assert!(path_identity_marker(&database, &locks).is_file());
+    let imported =
+        SqliteAuthorityStore::import_relocated_checked(&database, &locks, &seal, || Ok(()))
+            .expect("import beside a copied marker");
     assert_eq!(imported.seal, seal);
-
-    SqliteAuthorityStore::provision(&moved, &locks).expect("re-provision at new path");
-    let relocated = crate::test_authority::open_serving(&moved, &locks).expect("serve after retry");
+    SqliteAuthorityStore::provision(&database, &locks).expect("re-provision");
+    let relocated =
+        crate::test_authority::open_serving(&database, &locks).expect("serve under new root");
     assert_eq!(relocated.mutation_fence().owner_epoch, seal.owner_epoch + 1);
-    assert_eq!(relocated.mutation_fence().store_uuid, seal.store_uuid);
-    assert_eq!(serving_lock_paths(&locks), vec![lock]);
+}
+
+#[test]
+fn an_in_place_import_binds_the_source_location_like_any_destination() {
+    let (temp, database, lock_root) = fixture();
+    SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
+    drop(crate::test_authority::open_serving(&database, &lock_root).expect("serve at source"));
+    let seal = SqliteAuthorityStore::export_for_relocation(&database, &lock_root).expect("export");
+    let retained = temp.path().join("retained.db");
+    fs::copy(&database, &retained).expect("retain export");
+    // The source location still holds its retirement record, so it imports
+    // in place over its own provisioning marker.
+    assert!(path_identity_marker(&database, &lock_root).is_file());
+    SqliteAuthorityStore::import_relocated_checked(&database, &lock_root, &seal, || Ok(()))
+        .expect("in-place import");
+    {
+        SqliteAuthorityStore::provision(&database, &lock_root).expect("re-provision");
+        let authority =
+            crate::test_authority::open_serving(&database, &lock_root).expect("serve in place");
+        assert!(matches!(
+            authority
+                .budget_store()
+                .authorize_budget_hold(structured_request(Some(active_authority(&authority))))
+                .expect("budget hold after import"),
+            BudgetAuthorizeHoldDecision::Authorized(_)
+        ));
+    }
+    let lock = lock_root.join(format!("{}.lock", seal.store_uuid));
+    OpenOptions::new()
+        .write(true)
+        .open(&lock)
+        .expect("open lock")
+        .set_len(0)
+        .expect("empty lock");
+    let marker = path_identity_marker(&database, &lock_root);
+    let marker_bytes = fs::read(&marker).expect("marker");
+    let lock_inode = lock_identity(&lock);
+    restore_database_in_place(&database, &retained);
+    assert!(matches!(
+        SqliteAuthorityStore::import_relocated_checked(&database, &lock_root, &seal, || Ok(())),
+        Err(SqliteServingOwnerError::RelocationDestinationAnchored(_))
+    ));
+    assert!(fs::read(&lock).expect("retained lock").is_empty());
+    assert_eq!(lock_identity(&lock), lock_inode);
+    assert_eq!(fs::read(&marker).expect("retained marker"), marker_bytes);
+    assert!(fs::read(&database).expect("refused export") == fs::read(&retained).expect("retained"));
 }
 
 fn overwrite_lock_bytes(path: &Path, offset: u64, bytes: &[u8]) {
@@ -468,8 +547,93 @@ fn overwrite_lock_bytes(path: &Path, offset: u64, bytes: &[u8]) {
     file.sync_all().expect("sync damaged lock");
 }
 
+/// The lock's bytes and inode, or nothing when it is absent.
+fn lock_state(path: &Path) -> Option<(Vec<u8>, (u64, u64))> {
+    path.exists()
+        .then(|| (fs::read(path).expect("lock bytes"), lock_identity(path)))
+}
+
 fn lock_identity(path: &Path) -> (u64, u64) {
     use std::os::unix::fs::MetadataExt;
     let metadata = fs::metadata(path).expect("lock metadata");
     (metadata.dev(), metadata.ino())
+}
+
+#[test]
+fn an_emptied_or_damaged_anchor_cannot_hide_a_committed_import() {
+    let (temp, database, lock_root) = fixture();
+    SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
+    drop(crate::test_authority::open_serving(&database, &lock_root).expect("serve at source"));
+    let seal = SqliteAuthorityStore::export_for_relocation(&database, &lock_root).expect("export");
+    let exported = fs::read(&database).expect("exported bytes");
+    let mut outcomes = Vec::new();
+    for variant in [
+        "second-slot-zeroed",
+        "anchor-zeroed",
+        "anchor-emptied",
+        "anchor-deleted",
+        "first-seed-torn",
+        "committed-unserved",
+    ] {
+        let (moved, locks) = copy_store(temp.path(), &temp.path().join(variant));
+        SqliteAuthorityStore::import_relocated_checked(&moved, &locks, &seal, || Ok(()))
+            .expect("first import");
+        if variant != "committed-unserved" {
+            SqliteAuthorityStore::provision(&moved, &locks).expect("re-provision at new path");
+            let authority =
+                crate::test_authority::open_serving(&moved, &locks).expect("serve at new path");
+            assert!(authority.mutation_fence().owner_epoch > seal.owner_epoch);
+            if matches!(
+                variant,
+                "anchor-zeroed" | "anchor-emptied" | "anchor-deleted"
+            ) {
+                assert!(matches!(
+                    authority
+                        .budget_store()
+                        .authorize_budget_hold(structured_request(Some(active_authority(
+                            &authority
+                        ))))
+                        .expect("budget hold after import"),
+                    BudgetAuthorizeHoldDecision::Authorized(_)
+                ));
+            }
+        }
+        let lock = locks.join(format!("{}.lock", seal.store_uuid));
+        match variant {
+            "second-slot-zeroed" => overwrite_lock_bytes(&lock, 1024, &[0; 1024]),
+            "anchor-zeroed" => overwrite_lock_bytes(&lock, 0, &[0; 2048]),
+            "anchor-emptied" => OpenOptions::new()
+                .write(true)
+                .open(&lock)
+                .expect("open lock")
+                .set_len(0)
+                .expect("empty lock"),
+            "anchor-deleted" => fs::remove_file(&lock).expect("delete lock"),
+            "first-seed-torn" => {
+                overwrite_lock_bytes(&lock, 1024, &[0; 1024]);
+                overwrite_lock_bytes(&lock, 64, &[0xa5; 32]);
+            }
+            _ => {}
+        }
+        let marker = path_identity_marker(&moved, &locks);
+        let anchor = lock_state(&lock);
+        let marker_bytes = fs::read(&marker).expect("native destination marker");
+        restore_database_in_place(&moved, &database);
+
+        let result =
+            SqliteAuthorityStore::import_relocated_checked(&moved, &locks, &seal, || Ok(()));
+        let untouched = lock_state(&lock) == anchor
+            && fs::read(&marker).expect("retained marker") == marker_bytes
+            && fs::read(&moved).expect("refused export") == exported;
+        outcomes.push((variant, result, untouched));
+    }
+    for (variant, result, untouched) in &outcomes {
+        assert!(
+            matches!(
+                result,
+                Err(SqliteServingOwnerError::RelocationDestinationAnchored(_))
+            ) && *untouched,
+            "{variant} re-imported over a committed destination: {result:?}, untouched {untouched}; all: {outcomes:?}"
+        );
+    }
 }

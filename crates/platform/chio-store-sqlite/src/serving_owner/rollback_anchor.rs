@@ -59,6 +59,17 @@ struct LoadedAnchor {
     corrupt_slot: bool,
 }
 
+/// An anchor image an import of an export may replace.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ReplaceableAnchor {
+    /// Never seeded, or its first seed did not complete.
+    Unseeded,
+    /// The exported store's own retirement record.
+    Retirement,
+    /// The record an import of the same export seeded.
+    ImportSeed,
+}
+
 pub(crate) struct RollbackAnchor {
     file: File,
     lock_root: PathBuf,
@@ -168,23 +179,25 @@ impl RollbackAnchor {
     }
 
     /// Refuse to replace this anchor unless it records nothing beyond the
-    /// exported state `connection` holds.
+    /// exported state `connection` holds, and report which such image it is.
     ///
     /// An import may replace an anchor that was never seeded or whose first
     /// seed did not complete, the export's own retirement record, or the
     /// record an import of the same export seeded before the destination
     /// served. Any other record anchors history the exported copy does not
     /// carry, and replacing it would let that copy roll the destination back.
-    /// Any other damaged slot cannot prove the absence of such history. The
-    /// anchor file is only read.
+    /// Any other damaged slot cannot prove the absence of such history. An
+    /// emptied or truncated history is indistinguishable here from one never
+    /// written, so the caller also requires the destination path to be
+    /// unbound. The anchor file is only read.
     pub(crate) fn verify_replaceable_by_export(
         &self,
         connection: &Connection,
-    ) -> Result<(), SqliteServingOwnerError> {
+    ) -> Result<ReplaceableAnchor, SqliteServingOwnerError> {
         let _rotation = self.hold_rotation()?;
         self.validate_identity()?;
         if self.file.metadata()?.len() == 0 {
-            return Ok(());
+            return Ok(ReplaceableAnchor::Unseeded);
         }
         // A non-empty file is only size-checked here, never reshaped.
         self.ensure_shape()?;
@@ -193,10 +206,10 @@ impl RollbackAnchor {
             read_exact_at(&self.file, slot, slot_index * SLOT_SIZE)?;
         }
         if unfinished_first_seed(&slots) {
-            return Ok(());
+            return Ok(ReplaceableAnchor::Unseeded);
         }
         let Some(loaded) = decode_slots(&slots)? else {
-            return Ok(());
+            return Ok(ReplaceableAnchor::Unseeded);
         };
         let database = DatabaseState::load_current(connection)?;
         if database.retired_export_id.is_none() {
@@ -207,12 +220,20 @@ impl RollbackAnchor {
             retired_export_id: None,
             ..retired.clone()
         };
-        if loaded.corrupt_slot || (loaded.record != retired && loaded.record != seeded) {
+        if loaded.corrupt_slot {
             return Err(SqliteServingOwnerError::RelocationDestinationAnchored(
                 self.lock_path.display().to_string(),
             ));
         }
-        Ok(())
+        if loaded.record == retired {
+            Ok(ReplaceableAnchor::Retirement)
+        } else if loaded.record == seeded {
+            Ok(ReplaceableAnchor::ImportSeed)
+        } else {
+            Err(SqliteServingOwnerError::RelocationDestinationAnchored(
+                self.lock_path.display().to_string(),
+            ))
+        }
     }
 
     pub(crate) fn verify_current(

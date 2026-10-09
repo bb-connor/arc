@@ -5,14 +5,18 @@
 //! database refuses to serve. Relocation is the sanctioned way to move that
 //! binding: `export` retires the store where it is and seals its commit chain
 //! heads, and `import` re-anchors a byte-identical copy at its new location
-//! after proving the copy matches the seal. An exported store never serves
-//! again at its old location. At its new location, import replaces the lock
-//! artifacts only when the destination rollback anchor is absent or records
-//! exactly the exported state, so a retained copy of the export can retry an
-//! import that has not served, but once the destination serves its anchor
-//! records history beyond the seal and every further import of that export
-//! there is refused. Imports under distinct lock roots are not coordinated:
-//! each is its own serving lineage, sharing history only up to the seal.
+//! after proving the copy matches the seal. An exported store does not serve
+//! again until an import re-anchors it. Import replaces a destination's lock
+//! artifacts only when its rollback anchor records nothing beyond the
+//! exported state and its lock root has not bound the destination path to
+//! the store; only the export's own location, still holding its retirement
+//! record, is imported over its provisioning binding. A retained copy of the
+//! export can therefore retry an import that stopped before its database
+//! commit, but once an import commits at a destination every further import
+//! of that export there is refused, even after its anchor is emptied or
+//! truncated. Restoring or deleting the lock root removes that evidence with
+//! the anchor. Imports under distinct lock roots are not coordinated: each is
+//! its own serving lineage, sharing history only up to the seal.
 
 use chio_security_types::clock::{Clock, ClockError, SystemClock, UnixMillis};
 use std::fs::{self, File};
@@ -24,7 +28,7 @@ use serde::{Deserialize, Serialize};
 
 use super::global_commit_chain::verify_global_commit_chain;
 use super::lease_history::initialize_serving_lease_schema;
-use super::rollback_anchor::RollbackAnchor;
+use super::rollback_anchor::{ReplaceableAnchor, RollbackAnchor};
 use super::{
     acquire_serving_lock, canonical_lock_root, create_lock_file, database_parent,
     load_provisioning_record, load_provisioning_record_tx, metadata_device, metadata_inode,
@@ -32,8 +36,8 @@ use super::{
     sqlite_u64, validate_database_identity, validate_database_metadata,
     validate_database_path_component, validate_lock_metadata, validate_open_lock_file,
     validate_provisioning_record, validate_secure_directory, validate_uuid_v7,
-    verify_authority_store_invariants, verify_serving_owner_schema, SchemaCatalogEntry,
-    SqliteAuthorityStore, SqliteServingOwnerError,
+    verify_authority_store_invariants, verify_serving_owner_schema, ProvisioningRecord,
+    SchemaCatalogEntry, SqliteAuthorityStore, SqliteServingOwnerError,
 };
 use crate::admission_operation_store::verify_admission_commit_chain;
 
@@ -385,9 +389,10 @@ impl SqliteAuthorityStore {
     /// taken behind the export, or a store that was never exported, is
     /// refused. Lock files and identity markers copied from the previous
     /// location are replaced, and an interrupted import can be repeated. A
-    /// destination whose rollback anchor records history beyond the seal is
-    /// refused with `RelocationDestinationAnchored`, leaving its anchor, lock
-    /// and identity markers untouched.
+    /// destination whose rollback anchor records history beyond the seal, or
+    /// whose lock root already bound it to the store through a committed
+    /// import, is refused with `RelocationDestinationAnchored`, leaving its
+    /// anchor, lock and identity markers untouched.
     pub fn import_relocated(
         database_path: impl AsRef<Path>,
         lock_root: impl AsRef<Path>,
@@ -594,6 +599,12 @@ impl SqliteAuthorityStore {
             seal.exported_at_ms
                 .max(admission.trusted_time_high_water_unix_ms),
         )?;
+        refuse_bound_destination(
+            &lock_root,
+            &database_path,
+            &record,
+            previous_anchor.as_ref().map(|(_, image)| *image),
+        )?;
         // Verification refusals are read-only. From here, authorized I/O can
         // partially complete and retains the normal import retry semantics.
         connection.set_db_config(DbConfig::SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE, false)?;
@@ -606,7 +617,7 @@ impl SqliteAuthorityStore {
             &database_path,
             Path::new(&record.database_path),
             &record.store_uuid,
-            previous_anchor.as_ref(),
+            previous_anchor.as_ref().map(|(anchor, _)| anchor),
         )?;
         let lock_file = create_lock_file(&lock_path)?;
         let lock_metadata = lock_file.metadata()?;
@@ -679,6 +690,12 @@ impl SqliteAuthorityStore {
         // Seed the new location with the imported state. Seeding the exported
         // source state would carry its permanent retirement fence here.
         rollback_anchor.seed_new(&transaction)?;
+        #[cfg(test)]
+        if import_commit_cutpoint::take() {
+            return Err(SqliteServingOwnerError::OutcomeUnknown(
+                "relocation import stopped before its database commit".to_string(),
+            ));
+        }
         transaction.commit().map_err(|error| {
             SqliteServingOwnerError::OutcomeUnknown(format!(
                 "sqlite relocation import commit outcome is unknown: {error}"
@@ -702,7 +719,7 @@ fn lock_replaceable_anchor(
     database_path: &Path,
     store_uuid: &str,
     connection: &Connection,
-) -> Result<Option<RollbackAnchor>, SqliteServingOwnerError> {
+) -> Result<Option<(RollbackAnchor, ReplaceableAnchor)>, SqliteServingOwnerError> {
     match fs::symlink_metadata(lock_path) {
         Ok(_) => {
             let file = open_lock_file(lock_path)?;
@@ -716,12 +733,42 @@ fn lock_replaceable_anchor(
                 read_u64(metadata_device(&metadata)?, "lock_device")?,
                 read_u64(metadata_inode(&metadata)?, "lock_inode")?,
             )?;
-            anchor.verify_replaceable_by_export(connection)?;
-            Ok(Some(anchor))
+            let image = anchor.verify_replaceable_by_export(connection)?;
+            Ok(Some((anchor, image)))
         }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(error) => Err(error.into()),
     }
+}
+
+/// Refuse a destination path this lock root already bound to the authority.
+///
+/// A marker created in place for the destination is written only after
+/// provisioning, serving or an import commits there, and an interrupted
+/// import removes it before it seeds a new anchor. The exported store's own
+/// location, still holding its retirement record, carries its provisioning
+/// marker into an in-place import. Anywhere else the marker proves the
+/// destination committed a lineage that an emptied or truncated anchor may
+/// no longer show, so the exported copy cannot replace it.
+fn refuse_bound_destination(
+    lock_root: &Path,
+    database_path: &Path,
+    record: &ProvisioningRecord,
+    anchor: Option<ReplaceableAnchor>,
+) -> Result<(), SqliteServingOwnerError> {
+    let retired_source = Path::new(&record.database_path) == database_path
+        && Path::new(&record.lock_root) == lock_root
+        && anchor == Some(ReplaceableAnchor::Retirement);
+    if !retired_source
+        && path_identity::bound_in_place(lock_root, database_path, &record.store_uuid)?
+    {
+        return Err(SqliteServingOwnerError::RelocationDestinationAnchored(
+            path_identity::marker_path(lock_root, database_path)?
+                .display()
+                .to_string(),
+        ));
+    }
+    Ok(())
 }
 
 /// Lock artifacts belong to the previous location or to an import of this
@@ -752,6 +799,25 @@ fn remove_previous_lock_artifacts(
     }
     File::open(lock_root)?.sync_all()?;
     Ok(())
+}
+
+/// Stops the next import on this thread after it seeds its anchor and before
+/// its database commit, leaving the image a crash at that point leaves.
+#[cfg(test)]
+pub(super) mod import_commit_cutpoint {
+    use std::cell::Cell;
+
+    thread_local! {
+        static ARMED: Cell<bool> = const { Cell::new(false) };
+    }
+
+    pub(in crate::serving_owner) fn arm() {
+        ARMED.with(|armed| armed.set(true));
+    }
+
+    pub(super) fn take() -> bool {
+        ARMED.with(|armed| armed.replace(false))
+    }
 }
 
 /// Bound offline relocation time to retained serving and admission history.
