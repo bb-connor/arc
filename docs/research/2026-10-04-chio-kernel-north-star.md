@@ -1,7 +1,15 @@
 # Chio kernel north star: research and brainstorm
 
+> **Historical research (2026-10-04).** This document predates the north star the owner approved on 2026-10-08, which is recorded in the unified roadmap (`docs/operations/UNIFIED_ROADMAP.md`, PR #1196):
+>
+> **Chio is a Rust kernel for agentic operating systems that coordinate work, share resources, and cooperate across organizational boundaries.**
+>
+> *Authority that only narrows. Work that survives. Evidence that travels.*
+>
+> The statement in section 2 is not a north star. It is kept as a technical target for the kernel, one level below the approved north star: what the kernel must become for that sentence to hold. The tagline this document once quoted in section 1 is retired. The diagnosis, measurements and bets are unchanged research. The keystone specs they produced are KSPEC-09 to KSPEC-11 in the program index (`docs/superpowers/specs/2026-10-04-ftl-lessons-program-design.md`).
+
 - Date: 2026-10-04
-- Status: research notes. Nothing here is approved. Each bet ends with a proposed first step and asks whether it should become a spec.
+- Status: historical research notes (see the banner). Nothing here is approved. Each bet ends with a proposed first step and asks whether it should become a spec.
 - Inputs:
   - the nine specs of the FTL lessons program (`docs/superpowers/specs/2026-10-04-*`, PR #1174);
   - its brainstorm (`docs/research/2026-10-04-ftl-lessons-brainstorm.md`);
@@ -46,9 +54,11 @@ The internal assessment measured what that costs.
   - As of the 2026-10-01 execution review, no commit after `f25cd61f49` had run in hosted CI (`M:docs/reviews/2026-10-01-execution-review.md`). That records acceptance debt at that review, not a claim about every later run.
   - The quickstart begins with a release build of a 636-package CLI (`M:README.md:257-265`).
 
-The tagline is "the kernel your agents answer to". Today that kernel is too large, too slow and too unproven to answer for itself. **Its shape is right; its size, uniformity and proof are not.**
+An earlier draft quoted a tagline here. That tagline is retired and no longer describes Chio (see the banner). Today the kernel is too large, too slow and too unproven for the guarantees Chio asks it to carry. **Its shape is right; its size, uniformity and proof are not.**
 
-## 2. North star
+## 2. Kernel technical target (under the approved north star)
+
+This section was written as this document's north star. It is now a technical target for the kernel that sits under the approved north star in the banner, and does not replace it. The approved north star says what Chio is for; this target says what its kernel has to become to carry that.
 
 > A small, proven, fast kernel that enforces information-flow-safe authority for any agent framework, and produces evidence that anyone can verify without trusting the operator.
 
@@ -394,3 +404,9 @@ Bets 6 (C2SP witnessing) and 11 (60-second first receipt) are small enough to go
 | Finding | Title | Disposition | Where |
 |---|---|---|---|
 | R-0-02 (residual) | The revised overview still makes every durable read a two-commit read | Fixed. Only eligible durable reads (covered by the mode, with bounded redispatch permitted) take two commits. Tracked or otherwise ineligible reads take three, per spec 10 section 6.2 | "The hot path" |
+
+### Landing preparation (2026-10-09)
+
+| Item | Disposition | Where |
+|---|---|---|
+| Roadmap section 7: the document still carries a superseded north star and a retired tagline | Fixed. A historical banner states the approved north star and its supporting line. The tagline in section 1 is removed and noted as retired. Section 2 is retitled as a kernel technical target under the approved north star; its content is unchanged | banner; section 1; section 2 |

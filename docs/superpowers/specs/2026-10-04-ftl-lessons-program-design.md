@@ -15,7 +15,7 @@
   - `P:` = `feat/process-command-experience-20260924` at `e24596543`: a portable CLI runner with no kernel change.
 - Follow-on:
   - `docs/research/2026-10-04-ftl-lessons-brainstorm.md`: candidates on the shipped baseline.
-  - `docs/research/2026-10-04-chio-kernel-north-star.md`: the kernel north star, eleven bets that fold these specs into a small, proven, fast and agent-safe kernel.
+  - `docs/research/2026-10-04-chio-kernel-north-star.md`: historical kernel research, eleven bets that fold these specs into a small, proven, fast and agent-safe kernel. Its section 2 is a kernel technical target under the approved north star, not a north star of its own.
 
 ## Revision history
 
