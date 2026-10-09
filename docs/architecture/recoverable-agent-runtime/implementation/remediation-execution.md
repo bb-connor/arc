@@ -101,6 +101,16 @@ historical reports remain intact. Original comment continuity also restores
 register has 395 records, with 80 currently scoped closed, 229 open and 41 needing
 revalidation; 44 candidate-only records and one prerequisite remain separate.
 
+The [SF-R02 model-response parser packet](reviews/model-response-parsing.md)
+records the four original mock-only controls on unchanged maintained source.
+The three negative cases reuse the current 133 normal/optimized fixture runs;
+only the unchanged original positive ran once per mode to preserve its exact
+request-count and attempt-metadata assertions. Companion independent spec and
+quality reports cover only this bounded local acceptance. `SF-R02` remains open,
+with native preflight, matched
+live cohort and applicable primary-lane obligations intact. No count changes or
+provider, native, Linux or hosted qualification are credited.
+
 The candidate also passed all 19 budget-source, atomic ledger and provisioning
 controls after repairing its fixtures and actual owning connection profile.
 The [Kernel foundation successor](reviews/kernel-foundation.md) has independent
