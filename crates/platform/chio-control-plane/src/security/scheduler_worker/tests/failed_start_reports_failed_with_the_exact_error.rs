@@ -37,7 +37,10 @@ async fn failed_start_reports_failed_with_the_exact_error() {
     assert!(!handle.is_running());
     assert_eq!(worker.health().lifecycle, ResponseWorkerLifecycle::Failed);
     assert!(!worker.publication_ready.load(Ordering::Acquire));
-    assert!(handle.shutdown().await.is_err());
+    assert!(matches!(
+        handle.shutdown().await,
+        Err(ResponseWorkerTickError::WorkerCrash(_))
+    ));
     assert_eq!(
         *phase.borrow(),
         WorkerPhase::Failed(
