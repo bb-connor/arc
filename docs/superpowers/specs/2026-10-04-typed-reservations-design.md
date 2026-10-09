@@ -533,7 +533,8 @@ Rules:
       - dropped, and so returned, when `commit_terminal_receipt` or a fault receipt commits;
       - moved into the `BufferedPostEffectRecord` when `fail` or the obligation's `Drop` must buffer. The record owns the slot until it flushes, and flushing drops it.
     - `Drop` and `fail` can buffer only by moving their own slot, so a buffered record always has capacity and a slot can never be released while its record is pending.
-    - Every evaluation past the boundary therefore holds a slot, and at most one record per slot can exist, so a buffered record always fits. The bound is per kernel, and so is the buffer. A host that builds one kernel per hosted session (M: `chio-mcp-remote` `session_core/factory.rs:381`) gets one pool and one buffer per session kernel, with no global session limit required.
+    - Every evaluation past the boundary therefore holds a slot, and at most one record per slot can exist, so a buffered record always fits. The pool and the buffer are per kernel.
+    - **Host-wide budget.** A host that builds more than one kernel, such as one kernel per hosted session (M: `chio-mcp-remote` `session_core/factory.rs:381`), also shares one `host_post_effect_evidence_slots` budget across all of them (default 4096, configurable, at least 1). `acquire_evidence_slot` takes one permit from the kernel's pool and one from the host budget as a single `EvidenceSlot`. If either is empty, the call is denied before dispatch with `post_effect_evidence_capacity`, as above. The token owns both permits and its `Drop` returns both, so a buffered record keeps its host permit until it flushes. Records buffered across all session kernels of a host therefore never exceed `host_post_effect_evidence_slots`, however many sessions clients open. Exhaustion denies new non-durable dispatch host-wide and fails closed; durable calls take no slot and are unaffected.
     - While a `KernelEvidence` latch is set, new non-durable dispatch is already denied (rule 17), so the pool drains as records flush.
 
 ### 4.9 Work-profile durability rule
@@ -561,6 +562,7 @@ entered_effect_boundary(e) and non_durable(e) ->
 
 entered_effect_boundary(e) and non_durable(e) -> holds_evidence_slot(e)    (rule 18)
 buffered_records(kernel) <= post_effect_evidence_slots(kernel)
+sum(buffered_records(k) for k in kernels(host)) <= host_post_effect_evidence_slots(host)   (rule 18)
 receipt_timestamp(e) = authority_time_at_receipt_creation(e)              (rule 14)
 
 entered_effect_boundary(e) and durable(e) ->
@@ -837,6 +839,7 @@ Following the RFC-0002 precedent, each phase ships as the only behavior.
   - a tool output large enough to fail the terminal receipt cannot fail the fault receipt;
   - a slow tool's receipt `timestamp` is at or after the tool's completion, and `evaluation_started_at` is at or before dispatch;
   - slot exhaustion denies before dispatch with `post_effect_evidence_capacity`, and compensation runs;
+  - host-wide evidence budget (rule 18): with `host_post_effect_evidence_slots = 2` and a failing receipt store, two hosted sessions each buffer one record, and a third session's non-durable call is denied before dispatch with `post_effect_evidence_capacity` although its own kernel pool is free. Opening more sessions never raises the number of buffered records. A flush returns one host permit and the next call proceeds;
   - a `Discharged` whose binding differs from the region's obligation is never delivered and sets the `KernelEvidence` latch;
   - a panicking host observer during `Drop` does not abort;
   - a payment release failure is recorded in settlement metadata;
@@ -997,3 +1000,9 @@ Where the analogy breaks:
 | Review | Issue | Disposition | Contract |
 |---|---|---|---|
 | 4198110084 (spec 3 side) | Align the terminal-count predicate with stateless reads | Fixed. The predicate counts a Withheld receipt only when its disposition is Terminal; all check-only refusals are Reusable even when automatic retry is discouraged | Section 4.11; spec 9 M20 |
+
+### PR #1174 review round 36 (review bots)
+
+| Review | Issue | Disposition | Contract |
+|---|---|---|---|
+| 4228925634 | Per-kernel evidence pools did not bound a host with many session kernels | Fixed. Rule 18 adds `host_post_effect_evidence_slots` (default 4096), shared by every kernel a host builds. An `EvidenceSlot` holds one kernel permit and one host permit and returns both on drop, so a buffered record keeps its host permit until it flushes; exhaustion denies non-durable dispatch with `post_effect_evidence_capacity`. A host-wide predicate and unit case are added | Rule 18; section 4.11; section 9 |

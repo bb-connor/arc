@@ -678,6 +678,7 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
       Any failure refuses the break-glass resume.
 
     - Verification is offline and signature-only: at least `k` distinct roster principals, no store reads, and no live clock except the attestation.
+    - **Bounds (`stop_quorum_max = 8`).** S28's quorum threshold `k` is at most 8, and a configuration with a larger `k` is rejected at load time. An artifact carries at most 16 approvals; a larger one is refused before any signature is verified or any transition is built. The record's `Quorum.principals` holds exactly `k` principals: the `k` lexicographically smallest distinct verified roster principals, in ascending order. Further valid approvals are covered only by `artifact_digest`. A verifier refuses a `Quorum` authorizer whose `principals` is not exactly `k` strictly ascending roster principals. S28 derives each `PrincipalId` from a subject key as a fixed-length digest, so a `Resume` or `Relax` record carries at most 24 of them in its quorum fields (its `authorizer` and up to two contributors') and stays within S6's 4 KiB bound.
     - **Bound to the active roster.** The artifact's `roster_digest` must equal the digest of the operator roster active for the scope at the current deployment generation. The verifier takes that from the signed deployment configuration it already holds, not from the artifact. An artifact naming an older roster, even a validly signed one, is refused. After a roster rotation, principals removed from it can never form a quorum.
     - It is not the tool-call `ThresholdApprovalCollector`, which binds approvals to an original agent request and refuses while stopped (M: `collection_context.rs:13-66`).
 - **S30. Operator reach.**
@@ -1063,6 +1064,7 @@ Every phase ships behind `durable-stop` until its conformance scenarios pass. Ha
   - Clock-unavailable stop authentication commits (S18).
   - Cooldown start on the first observation (S19).
   - Quorum artifact verification with fewer than `k`, duplicate principals, or a wrong roster digest (S29).
+  - Quorum bounds (S29): a configuration with `k = 9` is rejected at load; an artifact with 17 approvals is refused before verification and builds no transition; an artifact with `k + 3` valid approvals yields a `Quorum` authorizer holding exactly the `k` smallest verified principals in ascending order, and the encoded `Resume` record stays within 4 KiB; a verifier refuses a record whose `principals` is not exactly `k` strictly ascending roster principals.
   - S5 migration of a legacy `semantic-stop` record without an installed registry.
   - Resume headroom at `bound - 1`, and a stop or restrict filling the last slot ends `Stopped` (S6).
   - **Rollover while stopped (Codex round 7).** Drive a stopped scope to `bound - rollover_margin`. The `Rollover` record is generation 2, epoch 1, still `Stopped` with the same `allow_containment`. Crossings stay refused throughout, a pending resume decided against the old head refuses with `StopHeadMoved`, and a pending intent applies at `(2, 2)`. Repeat while running: the head stays `Running`, and a stop after the rollover appends at `(2, 2)`.
@@ -1345,3 +1347,9 @@ Where the analogy breaks:
 | CV-4 | The failure table permitted an unsigned running head | Fixed. The rollover row is split: a running rollover rolls back and retries (S38), and only a stopped rollover, reconcile or migration commits with pending evidence. A new test covers the running case | Section 14; section 17 |
 | 4226929195 | Check-only `AfterResume` promised durable replay | Fixed. `AfterResume` is split by class: durable operations replay the released output from custody; a check-only read has no row or custody, so a retry is a fresh read whose value may differ, and no replay is promised (spec 9 M11, spec 10 X16) | S14; section 17 |
 | 4226832958 | The default HTTPS publication path had no contract | Fixed. S22 defines the transport-neutral `StopEpochPublication` message and its receiver rules, which never rely on transport authentication. UR-CT-CROSS (roadmap Gate 0, PR #1196, frozen by owner decision UR-D4) owns the HTTPS endpoint, authentication and envelope; this spec registers the message kind there instead of defining a second HTTPS protocol, and phase 7 waits for that contract | S22; sections 15, 16 and 17 |
+
+### PR #1174 review round 36 (review bots)
+
+| Review | Issue | Disposition | Contract |
+|---|---|---|---|
+| 4228925644 | Unbounded quorum approvals could push a stop record past 4 KiB | Fixed. S29 bounds `k` at `stop_quorum_max = 8` (larger configurations reject at load) and an artifact at 16 approvals (refused before verification). The record canonicalizes `Quorum.principals` to exactly the `k` smallest verified principals in ascending order, which verifiers check, so a quorum `Resume` or `Relax` record stays within S6's 4 KiB | S29; S6; section 17 |
