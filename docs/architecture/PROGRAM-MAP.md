@@ -9,7 +9,7 @@ The October 7 register read GitHub PR metadata with `gh pr view` and inspected i
 | Alias | Program | Inspected revision or artifact | Inspection state |
 | --- | --- | --- | --- |
 | T | Existing trust-control read APIs and CLI dashboard | `6573b8980a1e5331028b7e688169f033a39d0384` | Inspected `origin/main` object; source evidence, not desktop qualification |
-| F | #1160 security/process foundation and doc 19 | `main` at the #1160 merge commit (unified roadmap G0.1). Paths were read at `1267f9bf31d81947eee5cad838b1e3b4332ab4ab`; `crates/kernel/chio-process/src/mailboxes` was re-verified at #1160 head `fd8bfdc947bbaf070b39457a9190f032a018e55a`. | main (experimental; broker Linux-only) |
+| F | #1160 security/process foundation and doc 19 | `main` at the #1160 merge commit (unified roadmap G0.1). Paths were read at `1267f9bf31d81947eee5cad838b1e3b4332ab4ab`; `crates/kernel/chio-process/src/mailboxes` was re-verified at #1160 head `fd8bfdc947bbaf070b39457a9190f032a018e55a`. | main (experimental; broker Linux-only) once #1160 lands at Gate 0; until then these paths exist only on #1160 |
 | B | #1164 workbench | `5bdf08fc3573eba00dd2be7b4fab1c22e48db1f7` | Open, draft |
 | N | #1170 NVIDIA strategy | `666274baef7a503a6bf4791816483cbc6eb1b4ed` | Open, not draft |
 | W | #1173 verifiable work | `a0447e36ae55014a59aad2ae0c489ab4551f6389` | Open, not draft |
