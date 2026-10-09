@@ -264,6 +264,9 @@ fn an_unreturned_mutation_never_changes_an_answer_and_recertification_detects_it
         &fixture,
         ReceiptQuerySnapshotConfig {
             recertify_interval: Duration::from_millis(300),
+            // The recertification outcome stays published long enough to be
+            // observed before a rebuild replaces it.
+            invalid_retry_backoff: Duration::from_secs(3),
             ..config()
         },
     );
