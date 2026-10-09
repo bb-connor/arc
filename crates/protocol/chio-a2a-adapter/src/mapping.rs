@@ -1,3 +1,13 @@
+use crate::discovery::{parse_security_requirements, parse_security_schemes, validate_remote_url};
+use crate::partner_policy::A2aPartnerPolicy;
+use crate::protocol::{A2aAgentCard, A2aAgentInterface, A2aAgentSkill, A2aProtocolBinding};
+use crate::A2A_PROTOCOL_MAJOR;
+use chio_kernel::KernelError;
+use chio_manifest::{validate_manifest, LatencyHint, ToolDefinition, ToolManifest};
+use serde::Deserialize;
+use serde_json::{json, Value};
+use url::Url;
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct A2aToolInput {
@@ -39,80 +49,80 @@ struct A2aToolInput {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct A2aGetTaskToolInput {
-    id: String,
+pub(super) struct A2aGetTaskToolInput {
+    pub(super) id: String,
     #[serde(default, alias = "historyLength")]
-    history_length: Option<u32>,
+    pub(super) history_length: Option<u32>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct A2aSubscribeTaskToolInput {
-    id: String,
+pub(super) struct A2aSubscribeTaskToolInput {
+    pub(super) id: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct A2aCancelTaskToolInput {
-    id: String,
+pub(super) struct A2aCancelTaskToolInput {
+    pub(super) id: String,
     #[serde(default)]
-    metadata: Option<Value>,
+    pub(super) metadata: Option<Value>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct A2aAuthenticationInfoToolInput {
-    scheme: String,
+pub(super) struct A2aAuthenticationInfoToolInput {
+    pub(super) scheme: String,
     #[serde(default)]
-    credentials: Option<String>,
+    pub(super) credentials: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct A2aCreatePushNotificationConfigToolInput {
-    task_id: String,
+pub(super) struct A2aCreatePushNotificationConfigToolInput {
+    pub(super) task_id: String,
     #[serde(default)]
-    id: Option<String>,
-    url: String,
+    pub(super) id: Option<String>,
+    pub(super) url: String,
     #[serde(default)]
-    token: Option<String>,
+    pub(super) token: Option<String>,
     #[serde(default)]
-    authentication: Option<A2aAuthenticationInfoToolInput>,
+    pub(super) authentication: Option<A2aAuthenticationInfoToolInput>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct A2aPushNotificationConfigRefToolInput {
-    task_id: String,
-    id: String,
+pub(super) struct A2aPushNotificationConfigRefToolInput {
+    pub(super) task_id: String,
+    pub(super) id: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct A2aListPushNotificationConfigsToolInput {
-    task_id: String,
+pub(super) struct A2aListPushNotificationConfigsToolInput {
+    pub(super) task_id: String,
     #[serde(default, alias = "pageSize")]
-    page_size: Option<u32>,
+    pub(super) page_size: Option<u32>,
     #[serde(default, alias = "pageToken")]
-    page_token: Option<String>,
+    pub(super) page_token: Option<String>,
 }
 
 #[derive(Debug, Clone)]
-struct A2aSendToolInput {
-    message: Option<String>,
-    data: Option<Value>,
-    context_id: Option<String>,
-    task_id: Option<String>,
-    reference_task_ids: Option<Vec<String>>,
-    metadata: Option<Value>,
-    message_metadata: Option<Value>,
-    history_length: Option<u32>,
-    return_immediately: Option<bool>,
-    stream: bool,
+pub(super) struct A2aSendToolInput {
+    pub(super) message: Option<String>,
+    pub(super) data: Option<Value>,
+    pub(super) context_id: Option<String>,
+    pub(super) task_id: Option<String>,
+    pub(super) reference_task_ids: Option<Vec<String>>,
+    pub(super) metadata: Option<Value>,
+    pub(super) message_metadata: Option<Value>,
+    pub(super) history_length: Option<u32>,
+    pub(super) return_immediately: Option<bool>,
+    pub(super) stream: bool,
 }
 
 #[derive(Debug, Clone)]
-enum A2aToolInvocation {
+pub(super) enum A2aToolInvocation {
     SendMessage(A2aSendToolInput),
     GetTask(A2aGetTaskToolInput),
     SubscribeTask(A2aSubscribeTaskToolInput),
@@ -124,19 +134,19 @@ enum A2aToolInvocation {
 }
 
 #[derive(Debug, Clone)]
-struct A2aParsedSecurityScheme {
-    name: String,
-    kind: A2aSecuritySchemeKind,
+pub(super) struct A2aParsedSecurityScheme {
+    pub(super) name: String,
+    pub(super) kind: A2aSecuritySchemeKind,
 }
 
 #[derive(Debug, Clone)]
-struct A2aSecurityRequirementEntry {
-    scheme_name: String,
-    scopes: Vec<String>,
+pub(super) struct A2aSecurityRequirementEntry {
+    pub(super) scheme_name: String,
+    pub(super) scopes: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
-enum A2aSecuritySchemeKind {
+pub(super) enum A2aSecuritySchemeKind {
     BearerToken,
     BasicAuth,
     OAuthBearerToken { token_endpoint: Option<String> },
@@ -149,9 +159,9 @@ enum A2aSecuritySchemeKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct A2aSkillInputSurface {
-    accepts_text: bool,
-    accepts_json: bool,
+pub(super) struct A2aSkillInputSurface {
+    pub(super) accepts_text: bool,
+    pub(super) accepts_json: bool,
 }
 
 impl A2aSkillInputSurface {
@@ -237,7 +247,7 @@ pub enum AdapterError {
     Lifecycle(String),
 }
 
-fn build_manifest(
+pub(super) fn build_manifest(
     server_id: &str,
     server_version: &str,
     public_key: &str,
@@ -481,7 +491,7 @@ fn build_tool_definition(
     })
 }
 
-fn append_send_message_schema_requirement(
+pub(super) fn append_send_message_schema_requirement(
     one_of: &mut Vec<Value>,
     input_surface: A2aSkillInputSurface,
 ) -> Result<(), AdapterError> {
@@ -501,7 +511,7 @@ fn append_send_message_schema_requirement(
     Ok(())
 }
 
-fn skill_input_surface(
+pub(super) fn skill_input_surface(
     agent_card: &A2aAgentCard,
     skill: &A2aAgentSkill,
 ) -> Result<A2aSkillInputSurface, AdapterError> {
@@ -556,7 +566,7 @@ fn partner_policy_allows_interface(
         .any(|allowed| allowed == &origin))
 }
 
-fn validate_partner_policy(
+pub(super) fn validate_partner_policy(
     policy: &A2aPartnerPolicy,
     agent_card: &A2aAgentCard,
     selected_interface: &A2aAgentInterface,
@@ -622,7 +632,7 @@ fn validate_partner_policy(
     Ok(())
 }
 
-fn select_supported_interface(
+pub(super) fn select_supported_interface(
     interfaces: &[A2aAgentInterface],
     partner_policy: Option<&A2aPartnerPolicy>,
 ) -> Result<(A2aAgentInterface, A2aProtocolBinding), AdapterError> {
@@ -666,7 +676,7 @@ fn select_supported_interface(
     Err(AdapterError::NoSupportedInterfaces)
 }
 
-fn parse_tool_input(arguments: Value) -> Result<A2aToolInvocation, AdapterError> {
+pub(super) fn parse_tool_input(arguments: Value) -> Result<A2aToolInvocation, AdapterError> {
     let input: A2aToolInput = serde_json::from_value(arguments).map_err(|error| {
         AdapterError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(error))
     })?;
@@ -805,7 +815,7 @@ impl std::fmt::Debug for AdapterError {
 }
 
 impl AdapterError {
-    fn into_kernel_error(self) -> KernelError {
+    pub(super) fn into_kernel_error(self) -> KernelError {
         match self {
             Self::UntrustedInput(error) => KernelError::UntrustedInput(error),
             Self::Clock(error) => KernelError::Clock(error),

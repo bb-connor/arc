@@ -1,23 +1,79 @@
+use crate::auth::{
+    bearer_request_header, build_optional_default_tls_config, build_optional_mutual_tls_config,
+    delete_empty, fetch_json, get_sse, merged_oauth_scopes, oauth_cache_key, post_json,
+    post_sse_json, request_client_credentials_token,
+};
+use crate::clock::ClockSource;
+use crate::config::{
+    validate_url_auth_value, A2aAdapterConfig, A2aCachedBearerToken, A2aOAuthClientCredentials,
+    A2aRequestCookie, A2aRequestHeader, A2aRequestQueryParam, A2aResolvedRequestAuth, A2aTlsMode,
+    A2aTransportConfig,
+};
+use crate::discovery::{
+    build_cancel_task_url, build_get_task_url, build_list_push_notification_configs_url,
+    build_push_notification_config_url, build_push_notification_configs_url,
+    build_send_message_url, build_subscribe_task_url, configured_basic_auth_header,
+    configured_bearer_header, configured_named_cookie, configured_named_header,
+    configured_named_query_param, dedupe_request_cookies, dedupe_request_headers,
+    dedupe_request_query_params, derive_chio_server_id, dispatch_message_id,
+    merge_skill_routing_metadata, next_message_id, normalize_agent_card_url, parse_remote_url,
+    parse_security_requirements, parse_security_schemes, validate_authentication_info,
+    validate_identifier, validate_notification_target_url, validate_object_metadata,
+    validate_optional_push_auth_material, validate_send_message_response, validate_stream_response,
+    validate_task_response,
+};
+use crate::mapping::{
+    build_manifest, parse_tool_input, select_supported_interface, skill_input_surface,
+    validate_partner_policy, A2aCancelTaskToolInput, A2aCreatePushNotificationConfigToolInput,
+    A2aGetTaskToolInput, A2aListPushNotificationConfigsToolInput,
+    A2aPushNotificationConfigRefToolInput, A2aSecuritySchemeKind, A2aSendToolInput,
+    A2aSubscribeTaskToolInput, A2aToolInvocation, AdapterError,
+};
+use crate::partner_policy::A2aPartnerPolicy;
+use crate::protocol::{
+    A2aAgentCard, A2aAgentInterface, A2aAgentSkill, A2aCancelTaskRequest,
+    A2aDeleteTaskPushNotificationConfigRequest, A2aGetTaskPushNotificationConfigRequest,
+    A2aGetTaskRequest, A2aJsonRpcRequest, A2aJsonRpcResponse,
+    A2aListTaskPushNotificationConfigsRequest, A2aListTaskPushNotificationConfigsResponse,
+    A2aMessage, A2aOpenIdConfiguration, A2aPart, A2aProtocolBinding, A2aSendMessageConfiguration,
+    A2aSendMessageRequest, A2aSendMessageResponse, A2aSubscribeToTaskRequest,
+    A2aTaskPushNotificationConfig,
+};
+use crate::task_registry::{
+    A2aTaskFollowUpContext, A2aTaskRecordContext, A2aTaskRegistry, A2aTaskRegistryRecordError,
+};
+use chio_kernel::{
+    KernelError, NestedFlowBridge, ToolDispatchContext, ToolServerConnection,
+    ToolServerStreamResult,
+};
+use chio_manifest::ToolManifest;
+use chio_security_types::clock::*;
+use serde_json::{json, Value};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Mutex;
+use std::time::Duration;
+use url::Url;
+
 #[derive(Debug)]
 pub struct A2aAdapter {
-    manifest: ToolManifest,
-    agent_card: A2aAgentCard,
-    agent_card_url: Url,
-    selected_interface: A2aAgentInterface,
-    selected_binding: A2aProtocolBinding,
-    configured_headers: Vec<A2aRequestHeader>,
-    configured_query_params: Vec<A2aRequestQueryParam>,
-    configured_cookies: Vec<A2aRequestCookie>,
-    oauth_client_credentials: Option<A2aOAuthClientCredentials>,
-    oauth_scopes: Vec<String>,
-    oauth_token_endpoint_override: Option<String>,
-    transport_config: A2aTransportConfig,
-    token_cache: Mutex<Vec<A2aCachedBearerToken>>,
-    clock: ClockSource,
-    timeout: Duration,
-    request_counter: AtomicU64,
-    partner_policy: Option<A2aPartnerPolicy>,
-    task_registry: Option<A2aTaskRegistry>,
+    pub(super) manifest: ToolManifest,
+    pub(super) agent_card: A2aAgentCard,
+    pub(super) agent_card_url: Url,
+    pub(super) selected_interface: A2aAgentInterface,
+    pub(super) selected_binding: A2aProtocolBinding,
+    pub(super) configured_headers: Vec<A2aRequestHeader>,
+    pub(super) configured_query_params: Vec<A2aRequestQueryParam>,
+    pub(super) configured_cookies: Vec<A2aRequestCookie>,
+    pub(super) oauth_client_credentials: Option<A2aOAuthClientCredentials>,
+    pub(super) oauth_scopes: Vec<String>,
+    pub(super) oauth_token_endpoint_override: Option<String>,
+    pub(super) transport_config: A2aTransportConfig,
+    pub(super) token_cache: Mutex<Vec<A2aCachedBearerToken>>,
+    pub(super) clock: ClockSource,
+    pub(super) timeout: Duration,
+    pub(super) request_counter: AtomicU64,
+    pub(super) partner_policy: Option<A2aPartnerPolicy>,
+    pub(super) task_registry: Option<A2aTaskRegistry>,
 }
 
 impl A2aAdapter {
@@ -137,7 +193,7 @@ impl A2aAdapter {
         )
     }
 
-    fn validate_task_binding(
+    pub(super) fn validate_task_binding(
         &self,
         tool_name: &str,
         task_id: &str,
@@ -160,7 +216,7 @@ impl A2aAdapter {
         registry.validate_follow_up(task_id, &context)
     }
 
-    fn record_task_activity(
+    pub(super) fn record_task_activity(
         &self,
         tool_name: &str,
         response: &Value,
@@ -217,7 +273,7 @@ impl A2aAdapter {
         Ok(())
     }
 
-    fn resolve_request_auth(
+    pub(super) fn resolve_request_auth(
         &self,
         skill: &A2aAgentSkill,
     ) -> Result<A2aResolvedRequestAuth, AdapterError> {
@@ -495,7 +551,7 @@ impl A2aAdapter {
         )
     }
 
-    fn invoke_skill(
+    pub(super) fn invoke_skill(
         &self,
         tool_name: &str,
         skill: &A2aAgentSkill,
@@ -642,7 +698,7 @@ impl A2aAdapter {
         }
     }
 
-    fn build_send_message_request(
+    pub(super) fn build_send_message_request(
         &self,
         skill: &A2aAgentSkill,
         input: A2aSendToolInput,
@@ -770,7 +826,7 @@ impl A2aAdapter {
         validate_task_response(task)
     }
 
-    fn get_task_http_json(
+    pub(super) fn get_task_http_json(
         &self,
         input: A2aGetTaskToolInput,
         request_auth: &A2aResolvedRequestAuth,
@@ -1259,7 +1315,7 @@ impl A2aAdapter {
     }
 }
 
-fn decode_jsonrpc_result<T>(
+pub(super) fn decode_jsonrpc_result<T>(
     response: A2aJsonRpcResponse<T>,
     method: &str,
 ) -> Result<T, AdapterError> {

@@ -1,4 +1,13 @@
-use super::*;
+use crate::mapping::AdapterError;
+use crate::tests::support::{test_adapter_config, FakeA2aServer};
+use crate::A2aAdapter;
+use chio_core::crypto::Keypair;
+use chio_security_types::clock::{Clock, ClockError, ClockReading};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+use std::thread;
+use std::time::Duration;
+
 use std::sync::{atomic::AtomicBool, mpsc, Mutex, Weak};
 
 fn reading(elapsed: u64) -> ClockReading {
@@ -9,7 +18,7 @@ fn reading(elapsed: u64) -> ClockReading {
     )
 }
 
-fn adapter(clock: Arc<dyn Clock>) -> Arc<A2aAdapter> {
+pub(super) fn adapter(clock: Arc<dyn Clock>) -> Arc<A2aAdapter> {
     let server = FakeA2aServer::spawn_jsonrpc_push_notification_capability_only().unwrap();
     let adapter = A2aAdapter::discover(
         test_adapter_config(server.base_url(), Keypair::generate().public_key().to_hex())

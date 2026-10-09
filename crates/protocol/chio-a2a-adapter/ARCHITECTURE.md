@@ -16,15 +16,13 @@ saw it, and denies any later follow-up that disagrees.
 
 ## Module map
 
-All files below except `loaded_weights.rs` are `include!`d from `lib.rs` into
-the crate-root scope rather than declared as `mod`, so their public items
-resolve as `chio_a2a_adapter::*` directly (for example
-`chio_a2a_adapter::A2aAdapterConfig`, not a per-file path). `fuzz.rs` is the
-one included file that declares its own nested `pub mod fuzz`.
+Each file below is a Rust module declared from `lib.rs`; the public items are
+re-exported from the crate root, so they resolve as `chio_a2a_adapter::*`
+(for example `chio_a2a_adapter::A2aAdapterConfig`, not a per-file path).
 
 | Path | Responsibility |
 |------|----------------|
-| `src/lib.rs` | Crate root: shared constants, `pub mod loaded_weights`, and `include!`s of the files below into the crate-root scope. |
+| `src/lib.rs` | Crate root: shared constants, module declarations, and the public re-exports. |
 | `src/config.rs` | `A2aAdapterConfig` builder: agent-card URL and manifest public key, request auth (bearer/basic/header/query/cookie), OAuth client credentials and scopes, TLS root CAs and mutual-TLS identity, timeout, server id/version, partner policy, task-registry path, egress contract. Validates auth material before discovery. |
 | `src/partner_policy.rs` | `A2aPartnerPolicy` builder: required tenant, required skills, required security-scheme names, allowed interface origins. |
 | `src/protocol.rs` | Local serde model for A2A Agent Cards, skills, interfaces, JSON-RPC envelopes, and `SendMessage`/`GetTask`/`CancelTask`/push-notification-config requests and responses. |

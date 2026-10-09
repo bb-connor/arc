@@ -1,4 +1,23 @@
-use super::*;
+use crate::clock::ClockSource;
+use crate::config::A2aAdapterConfig;
+use crate::mapping::validate_partner_policy;
+use crate::partner_policy::A2aPartnerPolicy;
+use crate::protocol::{A2aAgentCapabilities, A2aAgentInterface, A2aProtocolBinding};
+use crate::task_registry::{A2aTaskFollowUpContext, A2aTaskRecordContext, A2aTaskRegistry};
+use crate::tests::support::{
+    agent_card_security_metadata, bind_fake_a2a_listener, insert_test_egress_authority,
+    local_test_adapter, read_http_request, test_adapter_config, test_egress_contract, unique_path,
+    write_http_json_response, FakeA2aServer, TestScenario,
+};
+use crate::A2aAdapter;
+use chio_core::crypto::Keypair;
+use chio_kernel::ToolServerConnection;
+use serde_json::json;
+use std::io::Write;
+use std::sync::atomic::AtomicU64;
+use std::sync::Mutex;
+use std::time::Duration;
+use std::{fs, thread};
 
 #[tokio::test]
 async fn adapter_discovers_jsonrpc_and_invokes_skill() {

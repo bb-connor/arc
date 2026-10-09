@@ -1,10 +1,10 @@
 #[derive(Debug, Clone, Default)]
 pub struct A2aPartnerPolicy {
-    partner_id: String,
-    required_tenant: Option<String>,
-    required_skills: Vec<String>,
-    required_security_scheme_names: Vec<String>,
-    allowed_interface_origins: Vec<String>,
+    pub(super) partner_id: String,
+    pub(super) required_tenant: Option<String>,
+    pub(super) required_skills: Vec<String>,
+    pub(super) required_security_scheme_names: Vec<String>,
+    pub(super) allowed_interface_origins: Vec<String>,
 }
 
 impl A2aPartnerPolicy {
@@ -29,7 +29,10 @@ impl A2aPartnerPolicy {
     pub fn require_skill(mut self, skill_id: impl Into<String>) -> Self {
         let skill_id = skill_id.into();
         if !skill_id.trim().is_empty()
-            && !self.required_skills.iter().any(|existing| existing == &skill_id)
+            && !self
+                .required_skills
+                .iter()
+                .any(|existing| existing == &skill_id)
         {
             self.required_skills.push(skill_id);
         }
@@ -64,4 +67,3 @@ impl A2aPartnerPolicy {
         self
     }
 }
-

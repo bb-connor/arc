@@ -1,4 +1,30 @@
-use super::*;
+use crate::auth::{parse_pem_certificates, parse_pem_private_key};
+use crate::clock::ClockSource;
+use crate::config::{A2aAdapterConfig, A2aTransportConfig};
+use crate::discovery::normalize_agent_card_url;
+use crate::mapping::build_manifest;
+use crate::protocol::{
+    A2aAgentCapabilities, A2aAgentCard, A2aAgentInterface, A2aAgentSkill, A2aProtocolBinding,
+};
+use crate::A2aAdapter;
+use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
+use chio_core::capability::token::{CapabilityToken, CapabilityTokenBody};
+use chio_core::crypto::Keypair;
+use chio_egress_contract::HttpEgressContract;
+use chio_kernel::ToolCallStream;
+use rcgen::KeyPair as RcgenKeyPair;
+use rcgen::{
+    BasicConstraints, CertificateParams, DistinguishedName, DnType, ExtendedKeyUsagePurpose, IsCa,
+};
+use serde_json::{json, Value};
+use std::io::{Read, Write};
+use std::net::TcpListener;
+use std::path::PathBuf;
+use std::sync::atomic::AtomicU64;
+use std::sync::{mpsc, Arc, Mutex, Once};
+use std::thread;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use url::Url;
 
 pub(super) fn ensure_rustls_crypto_provider() {
     static INIT: Once = Once::new();

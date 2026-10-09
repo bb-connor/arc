@@ -1,4 +1,14 @@
-const MAX_SSE_LINE_BYTES: usize = 16 * 1024;
+use crate::config::{A2aRequestHeader, A2aResolvedRequestAuth};
+use crate::discovery::validate_stream_response;
+use crate::mapping::AdapterError;
+use crate::MAX_A2A_JSON_BYTES;
+use chio_egress_contract::HttpEgressContract;
+use chio_kernel::{ToolCallChunk, ToolCallStream, ToolServerStreamResult};
+use serde_json::Value;
+use std::io::{BufRead, BufReader, Read};
+use url::Url;
+
+pub(super) const MAX_SSE_LINE_BYTES: usize = 16 * 1024;
 const MAX_SSE_EVENT_BYTES: usize = 256 * 1024;
 const MAX_SSE_TOTAL_BYTES: usize = 1024 * 1024;
 const MAX_SSE_CHUNKS: usize = 1024;
@@ -10,7 +20,7 @@ const MAX_SSE_CHUNKS: usize = 1024;
 // is defined in `config.rs` and includes `HttpEgressContract`.
 
 #[cfg(any(test, feature = "fuzz"))]
-fn parse_sse_stream<R: Read, F>(
+pub(super) fn parse_sse_stream<R: Read, F>(
     reader: R,
     decode_event: F,
 ) -> Result<ToolServerStreamResult, AdapterError>
@@ -20,7 +30,7 @@ where
     parse_sse_stream_with_limit(reader, MAX_SSE_TOTAL_BYTES as u64, decode_event)
 }
 
-fn parse_sse_stream_with_limit<R: Read, F>(
+pub(super) fn parse_sse_stream_with_limit<R: Read, F>(
     reader: R,
     max_total_bytes: u64,
     decode_event: F,
@@ -102,7 +112,7 @@ where
     }
 }
 
-fn read_sse_line(
+pub(super) fn read_sse_line(
     reader: &mut impl BufRead,
     output: &mut String,
     total_bytes: &mut u64,
@@ -184,7 +194,7 @@ fn read_sse_line(
     Ok(Some(()))
 }
 
-fn process_sse_event<F>(
+pub(super) fn process_sse_event<F>(
     chunks: &mut Vec<ToolCallChunk>,
     saw_terminal_or_interrupted: &mut bool,
     data_lines: &mut Vec<String>,
@@ -201,11 +211,9 @@ where
     let payload = data_lines.join("\n");
     data_lines.clear();
     *event_bytes = 0;
-    let event = chio_core::canonical::DocumentJson::from_wire(
-        payload.as_bytes(),
-        MAX_SSE_EVENT_BYTES,
-    )?
-    .decode::<Value>()?;
+    let event =
+        chio_core::canonical::DocumentJson::from_wire(payload.as_bytes(), MAX_SSE_EVENT_BYTES)?
+            .decode::<Value>()?;
     let stream_response = decode_event(event)?;
     let (stream_response, terminal_or_interrupted) = validate_stream_response(stream_response)?;
     if chunks.len() >= MAX_SSE_CHUNKS {
@@ -220,7 +228,7 @@ where
     Ok(())
 }
 
-fn apply_request_headers(
+pub(super) fn apply_request_headers(
     mut request: ureq::Request,
     request_headers: &[A2aRequestHeader],
     strip_sensitive_headers: bool,
@@ -236,7 +244,7 @@ fn apply_request_headers(
     request
 }
 
-fn apply_request_auth(
+pub(super) fn apply_request_auth(
     mut request: ureq::Request,
     request_auth: &A2aResolvedRequestAuth,
     strip_sensitive_headers: bool,
@@ -249,13 +257,13 @@ fn apply_request_auth(
     request
 }
 
-fn is_sensitive_redirect_header(name: &str) -> bool {
+pub(super) fn is_sensitive_redirect_header(name: &str) -> bool {
     name.eq_ignore_ascii_case("authorization")
         || name.eq_ignore_ascii_case("cookie")
         || name.eq_ignore_ascii_case("proxy-authorization")
 }
 
-fn same_origin(left: &Url, right: &Url) -> bool {
+pub(super) fn same_origin(left: &Url, right: &Url) -> bool {
     left.scheme() == right.scheme()
         && left.host_str().map(str::to_ascii_lowercase)
             == right.host_str().map(str::to_ascii_lowercase)
@@ -278,7 +286,7 @@ fn build_cookie_header(request_auth: &A2aResolvedRequestAuth) -> String {
     cookie_fragments.join("; ")
 }
 
-fn apply_request_auth_url(mut url: Url, request_auth: &A2aResolvedRequestAuth) -> Url {
+pub(super) fn apply_request_auth_url(mut url: Url, request_auth: &A2aResolvedRequestAuth) -> Url {
     if request_auth.query_params.is_empty() {
         return url;
     }
@@ -305,7 +313,7 @@ fn apply_request_auth_url(mut url: Url, request_auth: &A2aResolvedRequestAuth) -
     url
 }
 
-fn enforce_ureq_content_length(
+pub(super) fn enforce_ureq_content_length(
     contract: &HttpEgressContract,
     response: &ureq::Response,
     context: &str,
@@ -356,7 +364,10 @@ fn read_ureq_response_body_with_contract(
     Ok(body)
 }
 
-fn map_ureq_error_with_contract(error: ureq::Error, contract: &HttpEgressContract) -> AdapterError {
+pub(super) fn map_ureq_error_with_contract(
+    error: ureq::Error,
+    contract: &HttpEgressContract,
+) -> AdapterError {
     match error {
         ureq::Error::Status(status, response) => {
             let body = match read_ureq_response_body_with_contract(

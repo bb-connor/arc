@@ -1,5 +1,21 @@
+use crate::clock::ClockSource;
+use crate::discovery::{
+    binding_label, validate_artifact_update, validate_status_update, validate_task_value,
+};
+use crate::mapping::AdapterError;
+use crate::protocol::{A2aAgentInterface, A2aProtocolBinding};
+use crate::{MAX_A2A_JSON_BYTES, TASK_REGISTRY_VERSION};
+use chio_security_types::clock::Clock;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::collections::BTreeMap;
+use std::fs;
+use std::io::Read;
+use std::path::PathBuf;
+use std::sync::Mutex;
+
 #[derive(Debug)]
-struct A2aTaskRegistry {
+pub(super) struct A2aTaskRegistry {
     path: PathBuf,
     lock: Mutex<()>,
     clock: ClockSource,
@@ -7,28 +23,28 @@ struct A2aTaskRegistry {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct A2aPersistedTaskRegistry {
+pub(super) struct A2aPersistedTaskRegistry {
     version: String,
     #[serde(default)]
-    tasks: BTreeMap<String, A2aTaskRecord>,
+    pub(super) tasks: BTreeMap<String, A2aTaskRecord>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct A2aTaskRecord {
-    task_id: String,
-    tool_name: String,
-    server_id: String,
-    interface_url: String,
-    protocol_binding: String,
+pub(super) struct A2aTaskRecord {
+    pub(super) task_id: String,
+    pub(super) tool_name: String,
+    pub(super) server_id: String,
+    pub(super) interface_url: String,
+    pub(super) protocol_binding: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    tenant: Option<String>,
-    partner: String,
-    first_seen_at: u64,
-    last_seen_at: u64,
+    pub(super) tenant: Option<String>,
+    pub(super) partner: String,
+    pub(super) first_seen_at: u64,
+    pub(super) last_seen_at: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    last_state: Option<String>,
-    last_source: String,
+    pub(super) last_state: Option<String>,
+    pub(super) last_source: String,
 }
 
 impl Default for A2aPersistedTaskRegistry {
@@ -40,22 +56,22 @@ impl Default for A2aPersistedTaskRegistry {
     }
 }
 
-struct A2aTaskRecordContext<'a> {
-    source: &'a str,
-    tool_name: &'a str,
-    server_id: &'a str,
-    selected_interface: &'a A2aAgentInterface,
-    selected_binding: &'a A2aProtocolBinding,
-    partner: &'a str,
+pub(super) struct A2aTaskRecordContext<'a> {
+    pub(super) source: &'a str,
+    pub(super) tool_name: &'a str,
+    pub(super) server_id: &'a str,
+    pub(super) selected_interface: &'a A2aAgentInterface,
+    pub(super) selected_binding: &'a A2aProtocolBinding,
+    pub(super) partner: &'a str,
 }
 
-struct A2aTaskFollowUpContext<'a> {
-    operation: &'a str,
-    tool_name: &'a str,
-    server_id: &'a str,
-    selected_interface: &'a A2aAgentInterface,
-    selected_binding: &'a A2aProtocolBinding,
-    partner: &'a str,
+pub(super) struct A2aTaskFollowUpContext<'a> {
+    pub(super) operation: &'a str,
+    pub(super) tool_name: &'a str,
+    pub(super) server_id: &'a str,
+    pub(super) selected_interface: &'a A2aAgentInterface,
+    pub(super) selected_binding: &'a A2aProtocolBinding,
+    pub(super) partner: &'a str,
 }
 
 #[derive(Debug, Clone)]
@@ -65,7 +81,7 @@ struct A2aTaskObservation {
 }
 
 #[derive(Debug)]
-enum A2aTaskRegistryRecordError {
+pub(super) enum A2aTaskRegistryRecordError {
     Fatal(AdapterError),
     RebindConflict(AdapterError),
 }
@@ -81,11 +97,14 @@ impl A2aTaskRegistryRecordError {
 
 impl A2aTaskRegistry {
     #[cfg(test)]
-    fn open(path: &std::path::Path) -> Result<Self, AdapterError> {
+    pub(super) fn open(path: &std::path::Path) -> Result<Self, AdapterError> {
         Self::open_with_clock(path, ClockSource::default())
     }
 
-    fn open_with_clock(path: &std::path::Path, clock: ClockSource) -> Result<Self, AdapterError> {
+    pub(super) fn open_with_clock(
+        path: &std::path::Path,
+        clock: ClockSource,
+    ) -> Result<Self, AdapterError> {
         let registry = Self {
             path: path.to_path_buf(),
             lock: Mutex::new(()),
@@ -95,7 +114,7 @@ impl A2aTaskRegistry {
         Ok(registry)
     }
 
-    fn load(&self) -> Result<A2aPersistedTaskRegistry, AdapterError> {
+    pub(super) fn load(&self) -> Result<A2aPersistedTaskRegistry, AdapterError> {
         match fs::File::open(&self.path) {
             Ok(file) => {
                 let mut bytes = Vec::new();
@@ -131,11 +150,11 @@ impl A2aTaskRegistry {
         }
     }
 
-    fn save(&self, registry: &A2aPersistedTaskRegistry) -> Result<(), AdapterError> {
-        task_registry_persistence::save(&self.path, registry)
+    pub(super) fn save(&self, registry: &A2aPersistedTaskRegistry) -> Result<(), AdapterError> {
+        persistence::save(&self.path, registry)
     }
 
-    fn validate_follow_up(
+    pub(super) fn validate_follow_up(
         &self,
         task_id: &str,
         context: &A2aTaskFollowUpContext<'_>,
@@ -201,7 +220,7 @@ impl A2aTaskRegistry {
     }
 
     #[cfg(test)]
-    fn record_from_value(
+    pub(super) fn record_from_value(
         &self,
         value: &Value,
         context: &A2aTaskRecordContext<'_>,
@@ -210,7 +229,7 @@ impl A2aTaskRegistry {
             .map_err(A2aTaskRegistryRecordError::into_adapter_error)
     }
 
-    fn record_from_value_classified(
+    pub(super) fn record_from_value_classified(
         &self,
         value: &Value,
         context: &A2aTaskRecordContext<'_>,
@@ -380,5 +399,4 @@ fn validate_task_record_binding(
     }
     Ok(())
 }
-#[path = "task_registry/persistence.rs"]
-mod task_registry_persistence;
+pub(super) mod persistence;

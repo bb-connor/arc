@@ -7,35 +7,22 @@
 
 #![forbid(unsafe_code)]
 
-use chio_security_types::clock::{AuthorityDeadline, Clock, ClockError, ClockReading, SystemClock};
-use std::collections::BTreeMap;
-use std::fs;
-use std::io::{BufRead, BufReader, Read};
-use std::net::{SocketAddr, ToSocketAddrs};
-use std::path::PathBuf;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+pub use config::A2aAdapterConfig;
+pub use invoke::A2aAdapter;
+pub use mapping::AdapterError;
+pub use partner_policy::A2aPartnerPolicy;
+pub use protocol::{
+    A2aAgentCapabilities, A2aAgentCard, A2aAgentInterface, A2aAgentSkill, A2aAuthenticationInfo,
+    A2aCancelTaskRequest, A2aDeleteTaskPushNotificationConfigRequest,
+    A2aGetTaskPushNotificationConfigRequest, A2aGetTaskRequest,
+    A2aListTaskPushNotificationConfigsRequest, A2aListTaskPushNotificationConfigsResponse,
+    A2aMessage, A2aPart, A2aSendMessageConfiguration, A2aSendMessageRequest,
+    A2aSendMessageResponse, A2aSubscribeToTaskRequest, A2aTaskPushNotificationConfig,
+};
 use std::time::Duration;
-#[cfg(test)]
-use std::time::{SystemTime, UNIX_EPOCH};
+
 mod clock;
 mod oauth_cache;
-use clock::ClockSource;
-
-use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
-use base64::Engine as _;
-use chio_core::sha256_hex;
-use chio_egress_contract::HttpEgressContract;
-use chio_kernel::{
-    KernelError, NestedFlowBridge, ToolCallChunk, ToolCallStream, ToolDispatchContext,
-    ToolServerConnection, ToolServerStreamResult,
-};
-use chio_manifest::{validate_manifest, LatencyHint, ToolDefinition, ToolManifest};
-use serde::{Deserialize, Serialize};
-use serde_json::{json, Map, Value};
-use ureq::rustls::pki_types::pem::PemObject as _;
-use url::form_urlencoded::{byte_serialize, Serializer as UrlFormSerializer};
-use url::Url;
 
 const MAX_A2A_JSON_BYTES: usize = 16 * 1024 * 1024;
 
@@ -50,16 +37,16 @@ const TASK_REGISTRY_VERSION: &str = "chio.a2a-task-registry.v1";
 
 pub mod loaded_weights;
 
-include!("config.rs");
-include!("partner_policy.rs");
-include!("invoke.rs");
-include!("protocol.rs");
-include!("task_registry.rs");
-include!("mapping.rs");
-include!("discovery.rs");
-include!("auth.rs");
-include!("transport.rs");
+mod auth;
+mod config;
+mod discovery;
+#[cfg(feature = "fuzz")]
+pub mod fuzz;
+mod invoke;
+mod mapping;
+mod partner_policy;
+mod protocol;
+mod task_registry;
 #[cfg(test)]
 mod tests;
-#[cfg(feature = "fuzz")]
-include!("fuzz.rs");
+mod transport;

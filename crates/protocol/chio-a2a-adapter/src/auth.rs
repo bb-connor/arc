@@ -1,4 +1,31 @@
-fn bearer_request_header(access_token: String) -> A2aRequestHeader {
+use crate::config::{
+    bearer_token_contains_forbidden_character, A2aMutualTlsIdentity, A2aOAuthClientCredentials,
+    A2aRequestHeader, A2aResolvedRequestAuth, A2aTlsMode, A2aTransportConfig,
+};
+use crate::mapping::AdapterError;
+use crate::protocol::A2aOAuthTokenResponse;
+use crate::transport::{
+    apply_request_auth, apply_request_auth_url, apply_request_headers, enforce_ureq_content_length,
+    map_ureq_error_with_contract, parse_sse_stream_with_limit, same_origin,
+};
+use crate::{
+    A2A_PROTOCOL_VERSION_HEADER_VALUE, A2A_VERSION_HEADER, MAX_A2A_JSON_BYTES, SSE_CONTENT_TYPE,
+};
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::Engine as _;
+use chio_egress_contract::HttpEgressContract;
+use chio_kernel::ToolServerStreamResult;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::io::Read;
+use std::net::{SocketAddr, ToSocketAddrs};
+use std::sync::Arc;
+use std::time::Duration;
+use ureq::rustls::pki_types::pem::PemObject;
+use url::form_urlencoded::Serializer as UrlFormSerializer;
+use url::Url;
+
+pub(super) fn bearer_request_header(access_token: String) -> A2aRequestHeader {
     A2aRequestHeader {
         name: "Authorization".to_string(),
         value: format!("Bearer {access_token}"),
@@ -6,14 +33,17 @@ fn bearer_request_header(access_token: String) -> A2aRequestHeader {
     }
 }
 
-fn basic_request_header_value(username: String, password: String) -> String {
+pub(super) fn basic_request_header_value(username: String, password: String) -> String {
     format!(
         "Basic {}",
         BASE64_STANDARD.encode(format!("{username}:{password}"))
     )
 }
 
-fn merged_oauth_scopes(required_scopes: &[String], configured_scopes: &[String]) -> Vec<String> {
+pub(super) fn merged_oauth_scopes(
+    required_scopes: &[String],
+    configured_scopes: &[String],
+) -> Vec<String> {
     let mut scopes = Vec::new();
     for scope in required_scopes.iter().chain(configured_scopes.iter()) {
         if !scope.trim().is_empty() && !scopes.iter().any(|existing| existing == scope) {
@@ -23,7 +53,11 @@ fn merged_oauth_scopes(required_scopes: &[String], configured_scopes: &[String])
     scopes
 }
 
-fn oauth_cache_key(scheme_name: &str, token_endpoint: &Url, scopes: &[String]) -> String {
+pub(super) fn oauth_cache_key(
+    scheme_name: &str,
+    token_endpoint: &Url,
+    scopes: &[String],
+) -> String {
     let mut normalized_scopes = scopes.to_vec();
     normalized_scopes.sort();
     normalized_scopes.dedup();
@@ -34,7 +68,7 @@ fn oauth_cache_key(scheme_name: &str, token_endpoint: &Url, scopes: &[String]) -
     )
 }
 
-fn request_client_credentials_token(
+pub(super) fn request_client_credentials_token(
     token_endpoint: &Url,
     credentials: &A2aOAuthClientCredentials,
     scopes: &[String],
@@ -150,8 +184,8 @@ fn enforce_egress_contract(
 }
 
 #[derive(Clone)]
-struct A2aContractResolver {
-    contract: HttpEgressContract,
+pub(super) struct A2aContractResolver {
+    pub(super) contract: HttpEgressContract,
 }
 
 impl ureq::Resolver for A2aContractResolver {
@@ -314,7 +348,7 @@ where
     )
 }
 
-fn fetch_json<T: for<'de> Deserialize<'de>>(
+pub(super) fn fetch_json<T: for<'de> Deserialize<'de>>(
     url: &Url,
     request_auth: &A2aResolvedRequestAuth,
     timeout: Duration,
@@ -340,7 +374,7 @@ fn fetch_json<T: for<'de> Deserialize<'de>>(
     read_json_response_with_contract(response, request_url.as_str(), transport_config)
 }
 
-fn delete_empty(
+pub(super) fn delete_empty(
     url: &Url,
     request_auth: &A2aResolvedRequestAuth,
     timeout: Duration,
@@ -366,7 +400,7 @@ fn delete_empty(
     Ok(())
 }
 
-fn get_sse<F>(
+pub(super) fn get_sse<F>(
     url: &Url,
     request_auth: &A2aResolvedRequestAuth,
     timeout: Duration,
@@ -408,7 +442,7 @@ where
     )
 }
 
-fn post_json<T: for<'de> Deserialize<'de>, B: Serialize>(
+pub(super) fn post_json<T: for<'de> Deserialize<'de>, B: Serialize>(
     url: &str,
     body: &B,
     request_auth: &A2aResolvedRequestAuth,
@@ -471,7 +505,7 @@ fn post_form_json<T: for<'de> Deserialize<'de>>(
     read_json_response_with_contract(response, url.as_str(), transport_config)
 }
 
-fn post_sse_json<T: Serialize, F>(
+pub(super) fn post_sse_json<T: Serialize, F>(
     url: &str,
     body: &T,
     request_auth: &A2aResolvedRequestAuth,
@@ -521,7 +555,7 @@ where
     )
 }
 
-fn build_optional_default_tls_config(
+pub(super) fn build_optional_default_tls_config(
     root_ca_pems: &[String],
 ) -> Result<Option<Arc<ureq::rustls::ClientConfig>>, AdapterError> {
     if root_ca_pems.is_empty() {
@@ -530,7 +564,7 @@ fn build_optional_default_tls_config(
     Ok(Some(Arc::new(build_client_tls_config(root_ca_pems, None)?)))
 }
 
-fn build_optional_mutual_tls_config(
+pub(super) fn build_optional_mutual_tls_config(
     root_ca_pems: &[String],
     mutual_tls_identity: Option<&A2aMutualTlsIdentity>,
 ) -> Result<Option<Arc<ureq::rustls::ClientConfig>>, AdapterError> {
@@ -588,7 +622,7 @@ fn build_root_cert_store(
     Ok(root_store)
 }
 
-fn parse_pem_certificates(
+pub(super) fn parse_pem_certificates(
     pem: &str,
     field_name: &str,
 ) -> Result<Vec<ureq::rustls::pki_types::CertificateDer<'static>>, AdapterError> {
@@ -605,7 +639,7 @@ fn parse_pem_certificates(
     Ok(certificates)
 }
 
-fn parse_pem_private_key(
+pub(super) fn parse_pem_private_key(
     pem: &str,
     field_name: &str,
 ) -> Result<ureq::rustls::pki_types::PrivateKeyDer<'static>, AdapterError> {

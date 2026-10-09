@@ -1,4 +1,13 @@
-use super::*;
+use crate::mapping::AdapterError;
+use crate::task_registry::{A2aPersistedTaskRegistry, A2aTaskRecord, A2aTaskRegistry};
+use crate::tests::support::{test_adapter_config, unique_path, FakeA2aServer};
+use crate::transport::process_sse_event;
+use crate::{A2aAdapter, MAX_A2A_JSON_BYTES, TASK_REGISTRY_VERSION};
+use chio_core::crypto::Keypair;
+use chio_security_types::clock::{Clock, ClockError};
+use serde_json::json;
+use std::fs;
+use std::sync::Arc;
 
 struct ProtocolClock(
     std::sync::Mutex<

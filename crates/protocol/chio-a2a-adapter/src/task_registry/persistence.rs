@@ -1,11 +1,10 @@
 //! Publish only complete registry snapshots within the reader's byte ceiling.
-
 use std::io::{self, BufWriter, Write};
 use std::path::Path;
 
 use super::{A2aPersistedTaskRegistry, AdapterError, MAX_A2A_JSON_BYTES};
 
-pub(super) fn save(path: &Path, registry: &A2aPersistedTaskRegistry) -> Result<(), AdapterError> {
+pub(crate) fn save(path: &Path, registry: &A2aPersistedTaskRegistry) -> Result<(), AdapterError> {
     let parent = path
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())

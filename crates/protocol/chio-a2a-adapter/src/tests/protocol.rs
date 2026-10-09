@@ -1,4 +1,22 @@
-use super::*;
+use crate::auth::A2aContractResolver;
+use crate::discovery::{
+    build_cancel_task_url, build_get_task_url, build_list_push_notification_configs_url,
+    build_push_notification_config_url, build_push_notification_configs_url,
+    build_send_message_url, validate_send_message_response, validate_stream_response,
+};
+use crate::invoke::decode_jsonrpc_result;
+use crate::mapping::{
+    append_send_message_schema_requirement, parse_tool_input, A2aSkillInputSurface, AdapterError,
+};
+use crate::protocol::{A2aJsonRpcError, A2aJsonRpcResponse, A2aSendMessageResponse};
+use crate::tests::support::task_payload;
+use crate::transport::{
+    parse_sse_stream, parse_sse_stream_with_limit, read_sse_line, MAX_SSE_LINE_BYTES,
+};
+use chio_egress_contract::HttpEgressContract;
+use chio_kernel::ToolServerStreamResult;
+use serde_json::{json, Value};
+use std::io::{BufRead, BufReader, Read};
 
 #[tokio::test]
 async fn a2a_contract_resolver_rejects_loopback_answers() {

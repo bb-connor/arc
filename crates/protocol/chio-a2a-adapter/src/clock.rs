@@ -1,5 +1,6 @@
 //! One injected clock owner for OAuth custody and lifecycle observations.
-use super::*;
+use chio_security_types::clock::{Clock, ClockError, ClockReading, SystemClock};
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub(super) struct ClockSource(pub(super) Arc<dyn Clock>);

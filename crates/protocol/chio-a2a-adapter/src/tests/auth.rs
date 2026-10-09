@@ -1,4 +1,27 @@
-use super::*;
+use crate::auth::{basic_request_header_value, request_client_credentials_token};
+use crate::clock::ClockSource;
+use crate::config::{A2aOAuthClientCredentials, A2aRequestQueryParam, A2aTransportConfig};
+use crate::discovery::normalize_agent_card_url;
+use crate::mapping::build_manifest;
+use crate::protocol::{
+    A2aAgentCapabilities, A2aAgentCard, A2aAgentInterface, A2aAgentSkill, A2aProtocolBinding,
+};
+use crate::tests::support::{
+    agent_card_security_metadata, bind_fake_a2a_listener, ensure_rustls_crypto_provider,
+    insert_test_egress_authority, local_test_adapter, read_http_request, test_adapter_config,
+    test_egress_contract, FakeA2aServer, FakeMtlsA2aServer, TestScenario,
+};
+use crate::A2aAdapter;
+use chio_core::crypto::Keypair;
+use chio_kernel::ToolServerConnection;
+use chio_security_types::clock::*;
+use serde_json::json;
+use std::io::Write;
+use std::sync::atomic::AtomicU64;
+use std::sync::Mutex;
+use std::thread;
+use std::time::Duration;
+use url::Url;
 
 #[tokio::test]
 async fn adapter_oauth2_client_credentials_fetches_token_and_caches_it() {

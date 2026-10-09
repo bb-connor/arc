@@ -1,3 +1,6 @@
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct A2aAgentCard {
@@ -161,17 +164,17 @@ pub struct A2aListTaskPushNotificationConfigsResponse {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "snake_case")]
-struct A2aOAuthTokenResponse {
-    access_token: String,
+pub(super) struct A2aOAuthTokenResponse {
+    pub(super) access_token: String,
     #[serde(default)]
-    token_type: Option<String>,
+    pub(super) token_type: Option<String>,
     #[serde(default)]
-    expires_in: Option<u64>,
+    pub(super) expires_in: Option<u64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-struct A2aOpenIdConfiguration {
-    token_endpoint: String,
+pub(super) struct A2aOpenIdConfiguration {
+    pub(super) token_endpoint: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -233,30 +236,29 @@ pub struct A2aSendMessageResponse {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct A2aJsonRpcRequest<T> {
-    jsonrpc: &'static str,
-    id: u64,
-    method: &'static str,
-    params: T,
+pub(super) struct A2aJsonRpcRequest<T> {
+    pub(super) jsonrpc: &'static str,
+    pub(super) id: u64,
+    pub(super) method: &'static str,
+    pub(super) params: T,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct A2aJsonRpcResponse<T> {
-    jsonrpc: String,
-    result: Option<T>,
-    error: Option<A2aJsonRpcError>,
+pub(super) struct A2aJsonRpcResponse<T> {
+    pub(super) jsonrpc: String,
+    pub(super) result: Option<T>,
+    pub(super) error: Option<A2aJsonRpcError>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-struct A2aJsonRpcError {
-    code: i64,
-    message: String,
+pub(super) struct A2aJsonRpcError {
+    pub(super) code: i64,
+    pub(super) message: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum A2aProtocolBinding {
+pub(super) enum A2aProtocolBinding {
     JsonRpc,
     HttpJson,
 }
-

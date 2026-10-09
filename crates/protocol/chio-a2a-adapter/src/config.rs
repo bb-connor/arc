@@ -1,86 +1,99 @@
+use crate::auth::basic_request_header_value;
+use crate::clock::ClockSource;
+use crate::discovery::{upsert_request_cookie, upsert_request_header, upsert_request_query_param};
+use crate::mapping::AdapterError;
+use crate::partner_policy::A2aPartnerPolicy;
+use crate::transport::is_sensitive_redirect_header;
+use crate::DEFAULT_REQUEST_TIMEOUT;
+use chio_egress_contract::HttpEgressContract;
+use chio_security_types::clock::{AuthorityDeadline, Clock};
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::time::Duration;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct A2aRequestHeader {
-    name: String,
-    value: String,
-    sensitive: bool,
+pub(super) struct A2aRequestHeader {
+    pub(super) name: String,
+    pub(super) value: String,
+    pub(super) sensitive: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct A2aRequestQueryParam {
-    name: String,
-    value: String,
-    sensitive: bool,
+pub(super) struct A2aRequestQueryParam {
+    pub(super) name: String,
+    pub(super) value: String,
+    pub(super) sensitive: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct A2aRequestCookie {
-    name: String,
-    value: String,
+pub(super) struct A2aRequestCookie {
+    pub(super) name: String,
+    pub(super) value: String,
 }
 
 #[derive(Debug, Clone)]
-struct A2aOAuthClientCredentials {
-    client_id: String,
-    client_secret: String,
+pub(super) struct A2aOAuthClientCredentials {
+    pub(super) client_id: String,
+    pub(super) client_secret: String,
 }
 
 #[derive(Debug, Clone)]
-struct A2aCachedBearerToken {
-    cache_key: String,
-    access_token: String,
-    deadline: AuthorityDeadline,
+pub(super) struct A2aCachedBearerToken {
+    pub(super) cache_key: String,
+    pub(super) access_token: String,
+    pub(super) deadline: AuthorityDeadline,
 }
 
 #[derive(Debug, Clone)]
-struct A2aMutualTlsIdentity {
-    cert_chain_pem: String,
-    private_key_pem: String,
+pub(super) struct A2aMutualTlsIdentity {
+    pub(super) cert_chain_pem: String,
+    pub(super) private_key_pem: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum A2aTlsMode {
+pub(super) enum A2aTlsMode {
     Default,
     MutualTls,
 }
 
 #[derive(Debug, Clone)]
-struct A2aResolvedRequestAuth {
-    headers: Vec<A2aRequestHeader>,
-    query_params: Vec<A2aRequestQueryParam>,
-    cookies: Vec<A2aRequestCookie>,
-    tls_mode: A2aTlsMode,
+pub(super) struct A2aResolvedRequestAuth {
+    pub(super) headers: Vec<A2aRequestHeader>,
+    pub(super) query_params: Vec<A2aRequestQueryParam>,
+    pub(super) cookies: Vec<A2aRequestCookie>,
+    pub(super) tls_mode: A2aTlsMode,
 }
 
 #[derive(Debug, Clone)]
-struct A2aTransportConfig {
-    default_tls_config: Option<Arc<ureq::rustls::ClientConfig>>,
-    mutual_tls_config: Option<Arc<ureq::rustls::ClientConfig>>,
+pub(super) struct A2aTransportConfig {
+    pub(super) default_tls_config: Option<Arc<ureq::rustls::ClientConfig>>,
+    pub(super) mutual_tls_config: Option<Arc<ureq::rustls::ClientConfig>>,
     /// Typed HTTP egress contract that gates every outbound A2A dispatch.
     /// `None` fails closed before dispatch; production callers must thread a
     /// tenant-scoped contract via [`A2aAdapterConfig::with_egress_contract`].
-    egress_contract: Option<HttpEgressContract>,
+    pub(super) egress_contract: Option<HttpEgressContract>,
 }
 
 #[derive(Debug, Clone)]
 pub struct A2aAdapterConfig {
-    agent_card_url: String,
-    clock: ClockSource,
-    public_key: String,
-    request_headers: Vec<A2aRequestHeader>,
-    request_query_params: Vec<A2aRequestQueryParam>,
-    request_cookies: Vec<A2aRequestCookie>,
-    oauth_client_credentials: Option<A2aOAuthClientCredentials>,
-    oauth_scopes: Vec<String>,
-    oauth_token_endpoint_override: Option<String>,
-    tls_root_ca_pems: Vec<String>,
-    mutual_tls_identity: Option<A2aMutualTlsIdentity>,
-    timeout: Duration,
-    server_id: Option<String>,
-    server_version: String,
-    partner_policy: Option<A2aPartnerPolicy>,
-    task_registry_path: Option<PathBuf>,
+    pub(super) agent_card_url: String,
+    pub(super) clock: ClockSource,
+    pub(super) public_key: String,
+    pub(super) request_headers: Vec<A2aRequestHeader>,
+    pub(super) request_query_params: Vec<A2aRequestQueryParam>,
+    pub(super) request_cookies: Vec<A2aRequestCookie>,
+    pub(super) oauth_client_credentials: Option<A2aOAuthClientCredentials>,
+    pub(super) oauth_scopes: Vec<String>,
+    pub(super) oauth_token_endpoint_override: Option<String>,
+    pub(super) tls_root_ca_pems: Vec<String>,
+    pub(super) mutual_tls_identity: Option<A2aMutualTlsIdentity>,
+    pub(super) timeout: Duration,
+    pub(super) server_id: Option<String>,
+    pub(super) server_version: String,
+    pub(super) partner_policy: Option<A2aPartnerPolicy>,
+    pub(super) task_registry_path: Option<PathBuf>,
     /// Typed HTTP egress contract that gates every outbound A2A dispatch.
-    egress_contract: Option<HttpEgressContract>,
+    pub(super) egress_contract: Option<HttpEgressContract>,
 }
 
 impl A2aAdapterConfig {
@@ -312,7 +325,7 @@ impl A2aAdapterConfig {
         self
     }
 
-    fn validate_request_auth_material(&self) -> Result<(), AdapterError> {
+    pub(super) fn validate_request_auth_material(&self) -> Result<(), AdapterError> {
         for header in &self.request_headers {
             validate_http_header_name("request header", &header.name)?;
             validate_header_value("request header value", &header.value)?;
@@ -367,7 +380,7 @@ fn validate_http_token(field: &str, value: &str) -> Result<(), AdapterError> {
     Ok(())
 }
 
-fn is_http_token_byte(byte: u8) -> bool {
+pub(super) fn is_http_token_byte(byte: u8) -> bool {
     matches!(
         byte,
         b'A'..=b'Z'
@@ -415,7 +428,7 @@ fn validate_url_component_name(field: &str, value: &str) -> Result<(), AdapterEr
     Ok(())
 }
 
-fn validate_url_auth_value(field: &str, value: &str) -> Result<(), AdapterError> {
+pub(super) fn validate_url_auth_value(field: &str, value: &str) -> Result<(), AdapterError> {
     if value.is_empty()
         || value.trim() != value
         || value.chars().any(|character| character.is_ascii_control())
@@ -449,7 +462,7 @@ fn validate_bearer_token_value(field: &str, value: &str) -> Result<(), AdapterEr
     Ok(())
 }
 
-fn bearer_token_contains_forbidden_character(value: &str) -> bool {
+pub(super) fn bearer_token_contains_forbidden_character(value: &str) -> bool {
     value
         .chars()
         .any(|character| character.is_whitespace() || character.is_control())

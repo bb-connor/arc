@@ -1,4 +1,17 @@
-use super::*;
+use crate::mapping::AdapterError;
+use crate::protocol::{A2aAgentCapabilities, A2aAgentInterface, A2aProtocolBinding};
+use crate::task_registry::A2aTaskRegistry;
+use crate::tests::support::{
+    ensure_rustls_crypto_provider, local_test_adapter, read_http_request, test_adapter_config,
+    unique_path,
+};
+use crate::A2aAdapter;
+use chio_core::crypto::Keypair;
+use serde_json::{json, Value};
+use std::io::Write;
+use std::net::TcpListener;
+use std::time::Duration;
+use std::{fs, thread};
 
 async fn invoke_raw_peer(
     binding: A2aProtocolBinding,

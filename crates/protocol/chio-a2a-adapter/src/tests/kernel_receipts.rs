@@ -1,4 +1,21 @@
-use super::*;
+use crate::auth::basic_request_header_value;
+use crate::tests::support::{
+    ensure_rustls_crypto_provider, seed_a2a_task, test_adapter_config, test_capability,
+    unique_path, FakeA2aServer, FakeMtlsA2aServer, ToolCallOutputExt,
+};
+use crate::A2aAdapter;
+use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
+use chio_core::capability::token::{CapabilityToken, CapabilityTokenBody};
+use chio_core::crypto::Keypair;
+use chio_core::receipt::decision::Decision;
+use chio_kernel::{
+    ChioKernel, KernelConfig, ToolCallRequest, ToolServerConnection, Verdict,
+    DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
+    DEFAULT_MAX_STREAM_TOTAL_BYTES,
+};
+use serde_json::{json, Value};
+use std::sync::Arc;
+use std::time::Duration;
 
 use chio_kernel::{RuntimeAdmissionContext, RuntimeAdmissionDecision, RuntimeAdmissionHook};
 

@@ -1,4 +1,20 @@
-use super::*;
+use crate::clock::ClockSource;
+use crate::config::{A2aAdapterConfig, A2aResolvedRequestAuth, A2aTlsMode, A2aTransportConfig};
+use crate::discovery::normalize_agent_card_url;
+use crate::mapping::{
+    build_manifest, parse_tool_input, A2aGetTaskToolInput, A2aSendToolInput, AdapterError,
+};
+use crate::protocol::{
+    A2aAgentCapabilities, A2aAgentCard, A2aAgentInterface, A2aAgentSkill, A2aProtocolBinding,
+};
+use crate::tests::support::{local_test_adapter, test_adapter_config, unique_path, FakeA2aServer};
+use crate::A2aAdapter;
+use chio_core::crypto::Keypair;
+use chio_kernel::{KernelError, ToolDispatchContext, ToolServerConnection};
+use serde_json::{json, Value};
+use std::sync::atomic::AtomicU64;
+use std::sync::Mutex;
+use std::time::Duration;
 
 #[tokio::test]
 async fn adapter_invokes_http_json_binding() {

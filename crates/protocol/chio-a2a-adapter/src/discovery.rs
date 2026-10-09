@@ -1,4 +1,21 @@
-fn parse_security_requirements(
+use crate::config::{is_http_token_byte, A2aRequestCookie, A2aRequestHeader, A2aRequestQueryParam};
+use crate::mapping::{
+    A2aAuthenticationInfoToolInput, A2aParsedSecurityScheme, A2aSecurityRequirementEntry,
+    A2aSecuritySchemeKind, AdapterError,
+};
+use crate::protocol::{
+    A2aAgentSkill, A2aAuthenticationInfo, A2aProtocolBinding, A2aSendMessageResponse,
+};
+use crate::DEFAULT_AGENT_CARD_PATH;
+use chio_core::sha256_hex;
+use chio_kernel::ToolDispatchContext;
+use chio_security_types::clock::{Clock, ClockError};
+use serde_json::{Map, Value};
+use std::sync::atomic::{AtomicU64, Ordering};
+use url::form_urlencoded::byte_serialize;
+use url::Url;
+
+pub(super) fn parse_security_requirements(
     raw: &Value,
 ) -> Result<Vec<Vec<A2aSecurityRequirementEntry>>, AdapterError> {
     let requirements = raw.as_array().ok_or_else(|| {
@@ -29,7 +46,9 @@ fn parse_security_requirements(
         .collect()
 }
 
-fn parse_security_schemes(raw: &Value) -> Result<Vec<A2aParsedSecurityScheme>, AdapterError> {
+pub(super) fn parse_security_schemes(
+    raw: &Value,
+) -> Result<Vec<A2aParsedSecurityScheme>, AdapterError> {
     let schemes = raw.as_object().ok_or_else(|| {
         AdapterError::Protocol("A2A securitySchemes must be an object".to_string())
     })?;
@@ -185,7 +204,7 @@ fn extract_oauth_token_endpoint(raw: &Value) -> Option<String> {
     })
 }
 
-fn configured_bearer_header(headers: &[A2aRequestHeader]) -> Option<A2aRequestHeader> {
+pub(super) fn configured_bearer_header(headers: &[A2aRequestHeader]) -> Option<A2aRequestHeader> {
     headers
         .iter()
         .find(|header| {
@@ -195,7 +214,9 @@ fn configured_bearer_header(headers: &[A2aRequestHeader]) -> Option<A2aRequestHe
         .cloned()
 }
 
-fn configured_basic_auth_header(headers: &[A2aRequestHeader]) -> Option<A2aRequestHeader> {
+pub(super) fn configured_basic_auth_header(
+    headers: &[A2aRequestHeader],
+) -> Option<A2aRequestHeader> {
     headers
         .iter()
         .find(|header| {
@@ -205,7 +226,7 @@ fn configured_basic_auth_header(headers: &[A2aRequestHeader]) -> Option<A2aReque
         .cloned()
 }
 
-fn configured_named_header(
+pub(super) fn configured_named_header(
     headers: &[A2aRequestHeader],
     header_name: &str,
 ) -> Option<A2aRequestHeader> {
@@ -215,7 +236,7 @@ fn configured_named_header(
         .cloned()
 }
 
-fn configured_named_query_param(
+pub(super) fn configured_named_query_param(
     query_params: &[A2aRequestQueryParam],
     param_name: &str,
 ) -> Option<A2aRequestQueryParam> {
@@ -225,7 +246,7 @@ fn configured_named_query_param(
         .cloned()
 }
 
-fn configured_named_cookie(
+pub(super) fn configured_named_cookie(
     cookies: &[A2aRequestCookie],
     cookie_name: &str,
 ) -> Option<A2aRequestCookie> {
@@ -235,7 +256,7 @@ fn configured_named_cookie(
         .cloned()
 }
 
-fn dedupe_request_headers(headers: &mut Vec<A2aRequestHeader>) {
+pub(super) fn dedupe_request_headers(headers: &mut Vec<A2aRequestHeader>) {
     let mut deduped: Vec<A2aRequestHeader> = Vec::new();
     for header in headers.drain(..) {
         let mut merged = false;
@@ -253,7 +274,7 @@ fn dedupe_request_headers(headers: &mut Vec<A2aRequestHeader>) {
     *headers = deduped;
 }
 
-fn dedupe_request_query_params(query_params: &mut Vec<A2aRequestQueryParam>) {
+pub(super) fn dedupe_request_query_params(query_params: &mut Vec<A2aRequestQueryParam>) {
     let mut deduped = Vec::new();
     for query_param in query_params.drain(..) {
         if !deduped
@@ -266,7 +287,7 @@ fn dedupe_request_query_params(query_params: &mut Vec<A2aRequestQueryParam>) {
     *query_params = deduped;
 }
 
-fn dedupe_request_cookies(cookies: &mut Vec<A2aRequestCookie>) {
+pub(super) fn dedupe_request_cookies(cookies: &mut Vec<A2aRequestCookie>) {
     let mut deduped = Vec::new();
     for cookie in cookies.drain(..) {
         if !deduped
@@ -279,7 +300,7 @@ fn dedupe_request_cookies(cookies: &mut Vec<A2aRequestCookie>) {
     *cookies = deduped;
 }
 
-fn upsert_request_header(
+pub(super) fn upsert_request_header(
     headers: &mut Vec<A2aRequestHeader>,
     name: String,
     value: String,
@@ -300,7 +321,7 @@ fn upsert_request_header(
     }
 }
 
-fn upsert_request_query_param(
+pub(super) fn upsert_request_query_param(
     query_params: &mut Vec<A2aRequestQueryParam>,
     name: String,
     value: String,
@@ -321,7 +342,11 @@ fn upsert_request_query_param(
     }
 }
 
-fn upsert_request_cookie(cookies: &mut Vec<A2aRequestCookie>, name: String, value: String) {
+pub(super) fn upsert_request_cookie(
+    cookies: &mut Vec<A2aRequestCookie>,
+    name: String,
+    value: String,
+) {
     if let Some(existing) = cookies.iter_mut().find(|cookie| cookie.name == name) {
         existing.value = value;
     } else {
@@ -329,7 +354,7 @@ fn upsert_request_cookie(cookies: &mut Vec<A2aRequestCookie>, name: String, valu
     }
 }
 
-fn merge_skill_routing_metadata(
+pub(super) fn merge_skill_routing_metadata(
     metadata: Option<Value>,
     skill: &A2aAgentSkill,
 ) -> Result<Value, AdapterError> {
@@ -361,7 +386,7 @@ fn merge_skill_routing_metadata(
     Ok(Value::Object(object))
 }
 
-fn validate_object_metadata(
+pub(super) fn validate_object_metadata(
     field_name: &str,
     metadata: Option<Value>,
 ) -> Result<Option<Value>, AdapterError> {
@@ -374,7 +399,7 @@ fn validate_object_metadata(
     }
 }
 
-fn validate_send_message_response(
+pub(super) fn validate_send_message_response(
     mut response: A2aSendMessageResponse,
 ) -> Result<A2aSendMessageResponse, AdapterError> {
     let has_task = response.task.is_some();
@@ -390,7 +415,7 @@ fn validate_send_message_response(
     Ok(response)
 }
 
-fn validate_task_response(task: Value) -> Result<Value, AdapterError> {
+pub(super) fn validate_task_response(task: Value) -> Result<Value, AdapterError> {
     let Some(id) = task.get("id").and_then(Value::as_str) else {
         return Err(AdapterError::Protocol(
             "A2A task response must contain string `id`".to_string(),
@@ -411,7 +436,7 @@ fn validate_task_response(task: Value) -> Result<Value, AdapterError> {
     Ok(task)
 }
 
-fn validate_stream_response(response: Value) -> Result<(Value, bool), AdapterError> {
+pub(super) fn validate_stream_response(response: Value) -> Result<(Value, bool), AdapterError> {
     let has_task = response.get("task").is_some();
     let has_message = response.get("message").is_some();
     let has_status_update = response.get("statusUpdate").is_some();
@@ -458,7 +483,7 @@ fn validate_stream_response(response: Value) -> Result<(Value, bool), AdapterErr
     Ok((response, terminal_or_interrupted))
 }
 
-fn validate_task_value(task: &Value) -> Result<(), AdapterError> {
+pub(super) fn validate_task_value(task: &Value) -> Result<(), AdapterError> {
     validate_non_empty_string(
         task.get("id").and_then(Value::as_str),
         "A2A task response must contain string `id`",
@@ -473,7 +498,7 @@ fn validate_task_value(task: &Value) -> Result<(), AdapterError> {
     )
 }
 
-fn validate_status_update(update: &Value) -> Result<(), AdapterError> {
+pub(super) fn validate_status_update(update: &Value) -> Result<(), AdapterError> {
     validate_non_empty_string(
         update.get("taskId").and_then(Value::as_str),
         "A2A status update must contain string `taskId`",
@@ -489,7 +514,7 @@ fn validate_status_update(update: &Value) -> Result<(), AdapterError> {
     )
 }
 
-fn validate_artifact_update(update: &Value) -> Result<(), AdapterError> {
+pub(super) fn validate_artifact_update(update: &Value) -> Result<(), AdapterError> {
     validate_non_empty_string(
         update.get("taskId").and_then(Value::as_str),
         "A2A artifact update must contain string `taskId`",
@@ -531,7 +556,7 @@ fn task_state_is_terminal_or_interrupted(state: Option<&str>) -> bool {
     )
 }
 
-fn binding_label(binding: &A2aProtocolBinding) -> &'static str {
+pub(super) fn binding_label(binding: &A2aProtocolBinding) -> &'static str {
     match binding {
         A2aProtocolBinding::JsonRpc => "JSONRPC",
         A2aProtocolBinding::HttpJson => "HTTP+JSON",
@@ -540,11 +565,11 @@ fn binding_label(binding: &A2aProtocolBinding) -> &'static str {
 
 /// The message id of a durable dispatch is its admission operation id, so a
 /// redelivery of the same operation presents the same id to the agent.
-fn dispatch_message_id(context: &ToolDispatchContext) -> String {
+pub(super) fn dispatch_message_id(context: &ToolDispatchContext) -> String {
     format!("chio-a2a-{}", context.idempotency_key())
 }
 
-fn next_message_id(
+pub(super) fn next_message_id(
     counter: &AtomicU64,
     server_id: &str,
     skill_id: &str,
@@ -562,7 +587,7 @@ fn next_message_id(
     ))
 }
 
-fn derive_chio_server_id(agent_card_url: &Url) -> String {
+pub(super) fn derive_chio_server_id(agent_card_url: &Url) -> String {
     let host = agent_card_url
         .host_str()
         .unwrap_or("a2a")
@@ -581,7 +606,7 @@ fn derive_chio_server_id(agent_card_url: &Url) -> String {
     format!("a2a-{host}-{}", &hash[..12])
 }
 
-fn normalize_agent_card_url(value: &str) -> Result<Url, AdapterError> {
+pub(super) fn normalize_agent_card_url(value: &str) -> Result<Url, AdapterError> {
     let mut url = Url::parse(value).map_err(|error| AdapterError::InvalidUrl(error.to_string()))?;
     validate_remote_url(&url)?;
     if url.path().ends_with(".json") {
@@ -601,7 +626,7 @@ fn normalize_agent_card_url(value: &str) -> Result<Url, AdapterError> {
     Ok(url)
 }
 
-fn build_get_task_url(
+pub(super) fn build_get_task_url(
     base: &str,
     task_id: &str,
     tenant: Option<&str>,
@@ -616,7 +641,7 @@ fn build_get_task_url(
     Ok(url)
 }
 
-fn build_subscribe_task_url(
+pub(super) fn build_subscribe_task_url(
     base: &str,
     task_id: &str,
     tenant: Option<&str>,
@@ -625,7 +650,7 @@ fn build_subscribe_task_url(
     join_tenant_url_path(base, tenant, &format!("/tasks/{encoded_id}:subscribe"))
 }
 
-fn build_send_message_url(
+pub(super) fn build_send_message_url(
     base: &str,
     tenant: Option<&str>,
     streaming: bool,
@@ -641,7 +666,7 @@ fn build_send_message_url(
     )
 }
 
-fn build_cancel_task_url(
+pub(super) fn build_cancel_task_url(
     base: &str,
     task_id: &str,
     tenant: Option<&str>,
@@ -650,7 +675,7 @@ fn build_cancel_task_url(
     join_tenant_url_path(base, tenant, &format!("/tasks/{encoded_id}:cancel"))
 }
 
-fn build_push_notification_configs_url(
+pub(super) fn build_push_notification_configs_url(
     base: &str,
     task_id: &str,
     tenant: Option<&str>,
@@ -663,7 +688,7 @@ fn build_push_notification_configs_url(
     )
 }
 
-fn build_push_notification_config_url(
+pub(super) fn build_push_notification_config_url(
     base: &str,
     task_id: &str,
     config_id: &str,
@@ -678,7 +703,7 @@ fn build_push_notification_config_url(
     )
 }
 
-fn build_list_push_notification_configs_url(
+pub(super) fn build_list_push_notification_configs_url(
     base: &str,
     task_id: &str,
     tenant: Option<&str>,
@@ -716,7 +741,7 @@ fn join_tenant_url_path(
     Ok(url)
 }
 
-fn validate_remote_url(url: &Url) -> Result<(), AdapterError> {
+pub(super) fn validate_remote_url(url: &Url) -> Result<(), AdapterError> {
     let scheme = url.scheme();
     let host = url.host_str().unwrap_or_default();
     let localhost = matches!(host, "localhost" | "127.0.0.1" | "::1");
@@ -730,7 +755,7 @@ fn validate_remote_url(url: &Url) -> Result<(), AdapterError> {
     }
 }
 
-fn parse_remote_url(value: &str, field_name: &str) -> Result<Url, AdapterError> {
+pub(super) fn parse_remote_url(value: &str, field_name: &str) -> Result<Url, AdapterError> {
     let url = Url::parse(value).map_err(|error| {
         AdapterError::AuthNegotiation(format!("{field_name} is not a valid URL: {error}"))
     })?;
@@ -742,7 +767,7 @@ fn parse_remote_url(value: &str, field_name: &str) -> Result<Url, AdapterError> 
     Ok(url)
 }
 
-fn validate_notification_target_url(value: &str) -> Result<String, AdapterError> {
+pub(super) fn validate_notification_target_url(value: &str) -> Result<String, AdapterError> {
     let url = Url::parse(value).map_err(|error| {
         AdapterError::InvalidToolInput(format!("invalid push notification URL: {error}"))
     })?;
@@ -764,7 +789,7 @@ fn validate_notification_target_url(value: &str) -> Result<String, AdapterError>
     Ok(url.to_string())
 }
 
-fn validate_identifier(field_name: &str, value: String) -> Result<String, AdapterError> {
+pub(super) fn validate_identifier(field_name: &str, value: String) -> Result<String, AdapterError> {
     if value.trim().is_empty() {
         Err(AdapterError::InvalidToolInput(format!(
             "`{field_name}` must not be empty"
@@ -774,7 +799,7 @@ fn validate_identifier(field_name: &str, value: String) -> Result<String, Adapte
     }
 }
 
-fn validate_authentication_info(
+pub(super) fn validate_authentication_info(
     input: Option<A2aAuthenticationInfoToolInput>,
 ) -> Result<Option<A2aAuthenticationInfo>, AdapterError> {
     match input {
@@ -798,7 +823,7 @@ fn validate_push_auth_scheme(field_name: &str, value: String) -> Result<String, 
     Ok(value)
 }
 
-fn validate_optional_push_auth_material(
+pub(super) fn validate_optional_push_auth_material(
     field_name: &str,
     value: Option<String>,
 ) -> Result<Option<String>, AdapterError> {
