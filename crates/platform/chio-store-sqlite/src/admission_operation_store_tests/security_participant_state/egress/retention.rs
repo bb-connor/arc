@@ -68,6 +68,15 @@ fn maintenance_tick(fixture: &Fixture) -> AnchoredTestResult {
     Ok(())
 }
 
+/// The typed, retryable store-wide capacity refusal.
+fn capacity_refused(error: &(dyn Error + 'static)) -> bool {
+    matches!(
+        error.downcast_ref::<AdmissionOperationStoreError>(),
+        Some(AdmissionOperationStoreError::Unavailable(detail))
+            if detail.starts_with("native security current-row capacity is exhausted: ")
+    )
+}
+
 struct Finished {
     pending: Pending,
     fence: EgressFence,
@@ -102,12 +111,14 @@ fn automatic_maintenance_keeps_sustained_native_calls_within_current_row_budget(
     let budget = native_rows(&fixture)? + MARGIN;
     native::with_test_current_rows(budget, || -> AnchoredTestResult {
         for index in 1..=INVOCATIONS {
-            generation = invoke(&fixture, &format!("retention-{index}"), Some(generation))
+            let finished = invoke(&fixture, &format!("retention-{index}"), Some(generation))
                 .map_err(|error| {
                     format!("native invocation {index} under a {budget}-row budget: {error}")
-                })?
-                .fence
-                .context_generation;
+                })?;
+            generation = finished.fence.context_generation;
+            // A sustained call finishes, releasing its reserved completion rows;
+            // only the first stays open for the retry checks below.
+            compensation::compensate(&fixture, &finished.pending)?;
             assert!(native_rows(&fixture)? <= budget);
         }
         // No operator call: the per-evaluation tick sealed every segment.
@@ -148,7 +159,8 @@ fn automatic_maintenance_keeps_sustained_native_calls_within_current_row_budget(
 
 #[test]
 fn live_pending_fences_beyond_current_row_budget_remain_refused() -> AnchoredTestResult {
-    const LIVE_MARGIN: u64 = 4;
+    // Room for a few live operations, each holding eight reserved completion rows.
+    const LIVE_MARGIN: u64 = 40;
     let fixture = fixture();
     let initialized = hydrate(&fixture, &imported(&fixture, "source")?)?;
     let mut generation = invoke(&fixture, "live-0", None)?.fence.context_generation;
@@ -182,12 +194,7 @@ fn live_pending_fences_beyond_current_row_budget_remain_refused() -> AnchoredTes
                 return Err("live pending fences exceeded the current-row budget".into());
             }
         };
-        assert!(
-            refusal
-                .to_string()
-                .contains("orphan or excessive native state"),
-            "{refusal}"
-        );
+        assert!(capacity_refused(refusal.as_ref()), "{refusal}");
         assert!(!live.is_empty());
         fixture.store.checkpoint_security_participant_history(
             &initialized,
@@ -208,9 +215,9 @@ fn live_pending_fences_beyond_current_row_budget_remain_refused() -> AnchoredTes
         let retry = pending(&fixture, "live-retry", Some(generation))
             .and_then(|pending| pending.acquire(&fixture));
         assert!(
-            retry.as_ref().is_err_and(|error| error
-                .to_string()
-                .contains("orphan or excessive native state")),
+            retry
+                .as_ref()
+                .is_err_and(|error| capacity_refused(error.as_ref())),
             "live state beyond the budget was admitted"
         );
         assert!(native_rows(&fixture)? <= budget);
@@ -417,6 +424,9 @@ fn journals(fixture: &Fixture) -> AnchoredTestResult<(i64, i64, i64, i64, i64)> 
     )?)
 }
 
+/// Pending fences left to expire under the sealed full head.
+const LIVE_FENCES: u64 = 10;
+
 #[test]
 fn expiry_under_a_sealed_full_head_is_recovered_by_either_maintenance_path() -> AnchoredTestResult {
     for automatic in [true, false] {
@@ -440,9 +450,12 @@ fn expiry_under_a_sealed_full_head_is_recovered_by_either_maintenance_path() -> 
                 ))
             }
         };
-        let mut generation = invoke(&fixture, "sealed-0", None)?.fence.context_generation;
+        let first = invoke(&fixture, "sealed-0", None)?;
+        let mut generation = first.fence.context_generation;
         let mut live = Vec::new();
-        for index in 1..=3 {
+        // Their release must cover the next invocation's join and fence rows
+        // and its eight reserved completion rows.
+        for index in 1..=LIVE_FENCES {
             let pending = pending(&fixture, &format!("sealed-{index}"), Some(generation))?;
             generation = pending.plan.expected_context_generation;
             let fence = pending.acquire(&fixture)?;
@@ -459,9 +472,9 @@ fn expiry_under_a_sealed_full_head_is_recovered_by_either_maintenance_path() -> 
             let journal = journals(&fixture)?;
             let refused = pending(&fixture, "sealed-refused", Some(generation));
             assert!(
-                refused.as_ref().is_err_and(|error| error
-                    .to_string()
-                    .contains("orphan or excessive native state")),
+                refused
+                    .as_ref()
+                    .is_err_and(|error| capacity_refused(error.as_ref())),
                 "a command was admitted beyond the current-row budget"
             );
             assert_eq!(journals(&fixture)?, journal);
@@ -494,7 +507,7 @@ fn expiry_under_a_sealed_full_head_is_recovered_by_either_maintenance_path() -> 
                 journals(&fixture)?,
                 (journal.0, journal.1, journal.2, journal.3, journal.4 + 1)
             );
-            assert_eq!(native_rows(&fixture)?, full - 3);
+            assert_eq!(native_rows(&fixture)?, full - LIVE_FENCES);
             let journal = journals(&fixture)?;
             for (pending, fence) in &live {
                 assert!(!identities(&fixture)?.contains(&(
@@ -522,7 +535,12 @@ fn expiry_under_a_sealed_full_head_is_recovered_by_either_maintenance_path() -> 
                     .is_err_and(|error| error.to_string().contains("store.invalid_data")));
             }
             assert_eq!(journals(&fixture)?, journal);
-            // Recovered capacity admits the next ordinary invocation.
+            // The expired operations can never commit; they finish and release
+            // their reserved rows. Recovered capacity admits the next invocation.
+            compensation::compensate(&fixture, &first.pending)?;
+            for (pending, _) in &live {
+                compensation::compensate(&fixture, pending)?;
+            }
             invoke(&fixture, "sealed-recovered", Some(generation))?;
             Ok(())
         })?;

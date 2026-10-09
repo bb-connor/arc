@@ -416,9 +416,8 @@ fn missing_principal_label_under_an_existing_epoch_is_refused_by_the_native_read
             .err()
             .ok_or("a missing principal label was observed as absent")?;
         assert!(
-            refused
-                .to_string()
-                .contains("native current rows are missing anchored history"),
+            matches!(&refused, AdmissionOperationStoreError::Invariant(detail)
+                if detail.contains("native current rows are missing anchored history")),
             "{refused}"
         );
     }
@@ -463,9 +462,8 @@ fn resurrected_evicted_session_row_is_refused_at_open() -> AnchoredTestResult {
         .err()
         .ok_or("resurrected session row was accepted")?;
     assert!(
-        refused
-            .to_string()
-            .contains("native current row differs from anchored history"),
+        matches!(&refused, AdmissionOperationStoreError::Invariant(detail)
+            if detail.contains("native current row differs from anchored history")),
         "{refused}"
     );
     let Fixture {
@@ -482,9 +480,8 @@ fn resurrected_evicted_session_row_is_refused_at_open() -> AnchoredTestResult {
         .err()
         .ok_or("resurrected session row was accepted at open")?;
     assert!(
-        refused
-            .to_string()
-            .contains("native current row differs from anchored history"),
+        matches!(&refused, crate::serving_owner::SqliteServingOwnerError::Invalid(detail)
+            if detail.contains("native current row differs from anchored history")),
         "{refused}"
     );
     Ok(())

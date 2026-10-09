@@ -2,6 +2,7 @@
 //! through the kernel's own pre-evaluation refresh, keeping every label, while
 //! rows that cannot exist without their exact isolation epoch still refuse.
 use super::*;
+use chio_kernel::admission_operation::AdmissionOperationStoreError;
 use chio_security_types::ports::{
     FlowJoinRequest, FlowStateKey, FlowStateSnapshot, FlowStateStore, PortErrorKind, PortResult,
 };
@@ -377,9 +378,8 @@ fn missing_principal_label_edited_out_of_band_is_refused_by_the_serving_owner() 
     // An out-of-band edit is refused before any flow read; the in-process
     // snapshot rule is covered by the library test of the same name.
     assert!(
-        refused
-            .to_string()
-            .contains("authority database changed outside its serving-owner connection"),
+        matches!(&refused, AdmissionOperationStoreError::OutcomeUnknown(detail)
+            if detail.contains("authority database changed outside its serving-owner connection")),
         "{refused}"
     );
     Ok(())
