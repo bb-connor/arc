@@ -1,6 +1,8 @@
 //! Receipt query snapshot tests.
 #[path = "tests/build.rs"]
 mod build;
+#[path = "tests/capacity.rs"]
+mod capacity;
 #[path = "tests/memory.rs"]
 mod memory;
 #[path = "tests/query.rs"]
