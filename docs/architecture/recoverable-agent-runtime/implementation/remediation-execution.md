@@ -57,6 +57,12 @@ The next bounded installation has completed for
 The maintained source passed 1,435 Python SDK/framework tests, 288 TypeScript
 recovery tests and five provisioning/upgrade controls. These independent units
 do not install the larger Native bank or close its lifecycle obligations.
+The [SDK compatibility and portability continuity review](reviews/sdk-compatibility-portability.md)
+restores only the original scoped closures of `H-SDK-02` and `H-SDK-11` after
+SPEC_PASS and independent QUALITY_PASS. Alias, naming, portable lock, offline
+fixture library and resolved-boundary checks retain their recorded scopes.
+Historical pins and evidence remain intact. `H-SDK-01`, source-fixture cleanup
+and metadata work remain pending; no runtime or hosted qualification is added.
 The candidate also passed all 19 budget-source, atomic ledger and provisioning
 controls after repairing its fixtures and actual owning connection profile.
 The [Kernel foundation successor](reviews/kernel-foundation.md) has independent
@@ -86,11 +92,17 @@ is uninstalled; a genuine `configured_owner` consumer, closed Store installation
 selection and isolated strict checks remain pending. The broader receipt module
 gate failed: 390 passed, 17 rollback-anchor setup failures due to absent `/dev/shm`,
 two existing scale cases ignored. Associated qualified behavior remains untested.
-The separate initial Capture source/selection stage passed twelve owning controls
-and spec review; quality review is pending and earlier failed checkpoints remain
-preserved. These results provide no final Capture acceptance. Complete
-funding, retained debt, interruption/reopen, historical settlement and retirement
-remain explicit acceptance gates.
+The separate initial Capture source/selection stage's twelve owning passes and
+SPEC_PASS apply only to its historical 14-path scope. A later production Store
+compile failed with E0432 because the geometry export was gated by `cfg(test)`.
+The 15-path export repair subsequently compiled production Store during an
+owning run that remained RED. The [historical records](reviews/receipt-owner-registration.md)
+also preserve the independent quality verdict, CHANGES_REQUIRED. One unresolved
+Capture finding and its related review and implementation are parked after an
+automatic guard block and the instruction to stop, with no retry. The current
+Capture candidate remains uninstalled and unaccepted. Complete funding, retained
+debt, interruption/reopen, historical settlement and retirement remain explicit
+acceptance gates.
 
 ## Acceptance order
 

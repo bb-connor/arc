@@ -84,11 +84,22 @@ closed receipt-only installation selection and isolated strict Store checks
 remain prerequisites. The prior base installation gate is not promoted to full
 installation acceptance by closing these two candidate repair obligations.
 
-The separate initial Capture source/selection stage has twelve owning passes
+The separate initial Capture source/selection stage's twelve owning passes
 (10 selection cases, one typed-preimage case and one observation-budget case)
-and SPEC_PASS. Its quality review is pending. Earlier failed checkpoints remain
-preserved; this stage provides no productive Capture, financing or retirement
-acceptance.
+and [SPEC_PASS](../../../../../target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/initial-capture-source/spec-review.md)
+apply only to its historical 14-path scope. A subsequent non-test Store
+[compile failed with E0432](../../../../../target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-materializer-red/materializer-red-first.json)
+because the geometry export was gated by `cfg(test)`. The current 15-path export
+repair subsequently compiled production Store during the
+[second materializer run](../../../../../target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-materializer-red/materializer-red-second.json),
+whose owning test remained RED. Earlier source hashes and results remain
+historical evidence; none of these records establishes current acceptance.
+
+The independent [historical quality review](../../../../../target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/initial-capture-source/quality-review.md)
+returned CHANGES_REQUIRED. One unresolved Capture finding and its related review
+and implementation are parked after an automatic guard block and the instruction
+to stop, with no retry. The current Capture candidate remains uninstalled and
+unaccepted; productive Capture, financing and retirement acceptance remain open.
 
 The read-only `kernel-installed-pin-continuity.json` audit verifies 29 distinct
 Kernel postimages across both installations and finds no intersections with the

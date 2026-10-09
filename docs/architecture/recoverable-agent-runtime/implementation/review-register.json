@@ -58,14 +58,14 @@
     "qualified": 0,
     "current_status": {
       "candidate_only": 39,
-      "needs_revalidation": 47,
+      "needs_revalidation": 45,
       "open": 231,
       "prerequisite_only": 1,
-      "recorded_scoped_closed": 70
+      "recorded_scoped_closed": 72
     },
     "needs_revalidation_by_category": {
       "additional": 10,
-      "canonical": 37
+      "canonical": 35
     },
     "severity_by_category": {
       "canonical": {
@@ -2344,8 +2344,47 @@
           "scripts/tests/check-source-names.test.py"
         ]
       },
-      "current_status": "needs_revalidation",
-      "current_reason": "Recorded closure is preserved; a cited source or document pin differs. Review continuity and relevant controls on the integrated candidate. A hash difference is not a demonstrated regression."
+      "current_status": "recorded_scoped_closed",
+      "current_reason": "SPEC_PASS and independent QUALITY_PASS revalidate the original machine-interface alias obligation on current source. Historical changed pins remain recorded; six alias controls and 70 naming controls passed in the spec packet, and quality independently repeated six alias controls. The accepted naming successor is retained by hash continuity. No native execution or expanded qualification is credited.",
+      "current_review": {
+        "path": "docs/architecture/recoverable-agent-runtime/implementation/reviews/sdk-compatibility-portability.md",
+        "sha256": "286af926d082d7d5c664e710a4610ba7cde67f8b48448aaf7ac7a23de3e6d50d",
+        "recorded_at_utc": "2026-10-09T18:00:50.905482+00:00",
+        "scope": "Original source-scoped persisted machine-interface aliases and reviewed internal Make naming transition only.",
+        "previous_current_status": "needs_revalidation",
+        "previous_current_reason": "Recorded closure is preserved; a cited source or document pin differs. Review continuity and relevant controls on the integrated candidate. A hash difference is not a demonstrated regression.",
+        "spec_review": {
+          "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/interface-alias-continuity/review.json",
+          "sha256": "ec803825ee7a549b091a3e739025a69db9de3ba85c5d2fb7554e56f4a9cb1045"
+        },
+        "quality_review": {
+          "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/sdk-portability-and-alias-quality/quality-review.json",
+          "sha256": "53c5e5116cb29599092a2a57859943a0b4fd07f9052c99ec1c502d82de5895ac"
+        },
+        "quality_report": {
+          "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/sdk-portability-and-alias-quality/quality-review.md",
+          "sha256": "10c451bef928677f539e35ad4bdfec1264ab3737a4a8774dc06feaa3fb66aa36"
+        },
+        "source_manifest": {
+          "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/interface-alias-continuity/source-manifest.json",
+          "sha256": "3c768a25b7e6272ab2f232120e8bbaad8f9d98c4e7982aaf837f86d36dc4959a"
+        },
+        "quality_source_manifest": {
+          "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/sdk-portability-and-alias-quality/reviewed-source-manifest.json",
+          "sha256": "878763b163c0cf8ea4d0597b9921d4b595baf8987071d6aff08045c81de48fdb"
+        },
+        "quality_evidence_manifest": {
+          "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/sdk-portability-and-alias-quality/reviewed-evidence-manifest.json",
+          "sha256": "0c3277fa320b805f52e306bfff1c661f230a62d721b4a6908ba9f004f97c6f5b"
+        },
+        "verdicts": [
+          "SPEC_PASS",
+          "QUALITY_PASS"
+        ],
+        "confidence": "high for the original scoped obligation",
+        "historical_pins_preserved": true,
+        "qualified": false
+      }
     },
     {
       "key": "H-SDK-03",
@@ -2595,8 +2634,47 @@
           "crates/security/chio-semantic-contracts/src/verification.rs"
         ]
       },
-      "current_status": "needs_revalidation",
-      "current_reason": "Recorded closure is preserved; a cited source or document pin differs. Review continuity and relevant controls on the integrated candidate. A hash difference is not a demonstrated regression."
+      "current_status": "recorded_scoped_closed",
+      "current_reason": "SPEC_PASS and independent QUALITY_PASS revalidate the original portable dependency identity obligation. The current checker, five controls, offline locked alloc/std fixture library checks and resolved graph cover current continuity; later Rust 1.93 alloc/std and Rust 1.95 wasm alloc checks are separately pinned supporting observations. Historical changed pins, policy pass and prerequisite failure remain intact. No current cargo-vet execution or expanded qualification is credited.",
+      "current_review": {
+        "path": "docs/architecture/recoverable-agent-runtime/implementation/reviews/sdk-compatibility-portability.md",
+        "sha256": "286af926d082d7d5c664e710a4610ba7cde67f8b48448aaf7ac7a23de3e6d50d",
+        "recorded_at_utc": "2026-10-09T18:00:50.905482+00:00",
+        "scope": "Original source-scoped portable dependency identity and fixture continuity only; historical policy execution retains its original epoch.",
+        "previous_current_status": "needs_revalidation",
+        "previous_current_reason": "Recorded closure is preserved; a cited source or document pin differs. Review continuity and relevant controls on the integrated candidate. A hash difference is not a demonstrated regression.",
+        "spec_review": {
+          "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/portable-lock-continuity/spec-review.json",
+          "sha256": "929f8e94334113ab3f0d3eff0eda42c32b94b621714be74fea6cbb7110cac253"
+        },
+        "quality_review": {
+          "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/sdk-portability-and-alias-quality/quality-review.json",
+          "sha256": "53c5e5116cb29599092a2a57859943a0b4fd07f9052c99ec1c502d82de5895ac"
+        },
+        "quality_report": {
+          "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/sdk-portability-and-alias-quality/quality-review.md",
+          "sha256": "10c451bef928677f539e35ad4bdfec1264ab3737a4a8774dc06feaa3fb66aa36"
+        },
+        "source_manifest": {
+          "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/portable-lock-continuity/current-build-source.json",
+          "sha256": "776efe64e32324554cbdbd5dbd5d0dc88f71226f8f6ae4d290a7b5470f226596"
+        },
+        "quality_source_manifest": {
+          "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/sdk-portability-and-alias-quality/reviewed-source-manifest.json",
+          "sha256": "878763b163c0cf8ea4d0597b9921d4b595baf8987071d6aff08045c81de48fdb"
+        },
+        "quality_evidence_manifest": {
+          "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/sdk-portability-and-alias-quality/reviewed-evidence-manifest.json",
+          "sha256": "0c3277fa320b805f52e306bfff1c661f230a62d721b4a6908ba9f004f97c6f5b"
+        },
+        "verdicts": [
+          "SPEC_PASS",
+          "QUALITY_PASS"
+        ],
+        "confidence": "high for the original scoped obligation",
+        "historical_pins_preserved": true,
+        "qualified": false
+      }
     },
     {
       "key": "H-SDK-12",
@@ -9349,6 +9427,38 @@
       ],
       "at_utc": "2026-10-09T17:23:57.657544+00:00",
       "scope": "Preserved broader receipt module failure: 390 passed, 17 failed at missing /dev/shm rollback-anchor setup, two existing scale cases ignored. Four receipt repair paths unchanged; 27-case candidate P3 closure retains its scope. Separate initial Capture source/selection controls total 12 passes with SPEC_PASS and quality review pending. No canonical closure or qualification change.",
+      "qualified": false
+    },
+    {
+      "finding": "H-SDK-02",
+      "at_utc": "2026-10-09T18:00:50.905482+00:00",
+      "review": "docs/architecture/recoverable-agent-runtime/implementation/reviews/sdk-compatibility-portability.md",
+      "review_sha256": "286af926d082d7d5c664e710a4610ba7cde67f8b48448aaf7ac7a23de3e6d50d",
+      "scope": "Original source-scoped persisted machine-interface aliases and reviewed internal Make naming transition only.",
+      "previous_current_status": "needs_revalidation",
+      "current_status": "recorded_scoped_closed",
+      "historical_closure_and_pin_audit_unchanged": true,
+      "qualified": false
+    },
+    {
+      "finding": "H-SDK-11",
+      "at_utc": "2026-10-09T18:00:50.905482+00:00",
+      "review": "docs/architecture/recoverable-agent-runtime/implementation/reviews/sdk-compatibility-portability.md",
+      "review_sha256": "286af926d082d7d5c664e710a4610ba7cde67f8b48448aaf7ac7a23de3e6d50d",
+      "scope": "Original source-scoped portable dependency identity and fixture continuity only; historical policy execution retains its original epoch.",
+      "previous_current_status": "needs_revalidation",
+      "current_status": "recorded_scoped_closed",
+      "historical_closure_and_pin_audit_unchanged": true,
+      "qualified": false
+    },
+    {
+      "findings": [],
+      "at_utc": "2026-10-09T18:00:50.905482+00:00",
+      "review": "docs/architecture/recoverable-agent-runtime/implementation/reviews/receipt-owner-registration.md",
+      "review_sha256": "e082cbf17e5cfb5526815183d3726e9c98ec7b22f3d8f4064cdaab4b44700605",
+      "previous_review_sha256": "81e643477832374d6c1d7439861c0d0a3d2b2acbbd20bfa512398dc9e8d1fe67",
+      "historical_pending_statement_update_index": 15,
+      "scope": "Documentation correction only: the prior twelve-pass and SPEC_PASS Capture record retains its historical 14-path scope. Later quality returned CHANGES_REQUIRED; production Store compilation failed E0432 before the 15-path export repair compiled within an owning run that remained RED. One unresolved Capture finding and related work are parked after an automatic guard block and the instruction to stop, with no retry. The current candidate remains uninstalled and unaccepted. No blocked case was re-inspected; no finding row, closure count or qualification is changed by this correction.",
       "qualified": false
     }
   ],
