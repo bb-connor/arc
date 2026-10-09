@@ -57,7 +57,7 @@ features = ["js"]
 [features]
 default = ["std"]
 # Verify the real portable SHA-256 implementation without CPU probes or
-# architecture intrinsics. No hash stub is introduced and defaults stay intact.
+# architecture intrinsics. Default hashing behavior remains unchanged.
 kani = ["sha2/force-soft"]
 # Enables the `std` library and the `thiserror` derive. Turning this feature
 # off produces a `no_std + alloc` build suitable for wasm32-unknown-unknown

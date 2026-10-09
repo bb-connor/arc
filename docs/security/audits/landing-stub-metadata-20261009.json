@@ -1,0 +1,70 @@
+{
+  "schema": "chio.landing-metadata-qualification.v1",
+  "requirement": "LANDING-STUB-METADATA",
+  "observed_utc": "2026-10-09T20:03:06.710520+00:00",
+  "semantic_equality": {
+    "base": "8fd90b07634b2484577a90da26079866d62d836a",
+    "path": "crates/core/chio-core-types/Cargo.toml",
+    "before_sha256": "9d5e6e87b3ed28734face45a3e08262fe0064812fb737b0abaa448ffe6114aae",
+    "after_sha256": "a1ac3fe6efcdbea56eb892d10475325427c3d6ef4c34090ca1d21459457dabac",
+    "parsed_toml_equal": true,
+    "change": "Comment wording only; remove ambiguous phrase hash stub; no configuration or feature change.",
+    "original_full_scanner": {
+      "exit": 1,
+      "log": "/tmp/pr1160-landing-store-fixtures-20261009/stub-surface.log",
+      "log_sha256": "f766f1b687d945cb23a88c409ca0ec877a345c4a50a2289130b09f9f19a04e7f"
+    }
+  },
+  "scanner_green": {
+    "command": [
+      "python3",
+      "scripts/check-stub-surfaces.py"
+    ],
+    "exit": 0,
+    "seconds": 38.16622519493103,
+    "log_sha256": "ddd32ef8ba8300ecc24a3f03502d772da1bd296440fb24d7a5a11af36b24c707"
+  },
+  "coverage_after_comment": {
+    "generate": {
+      "command": [
+        "swarm",
+        "build",
+        "--class",
+        "integrator",
+        "--",
+        "cargo",
+        "xtask",
+        "gen",
+        "proof-coverage"
+      ],
+      "exit": 0,
+      "seconds": 74.43901777267456,
+      "log_sha256": "b4e0a8eecb20a6332c0dec0105a17e1e100c39b0c21e136b3c02cb697f9bc724"
+    },
+    "check": {
+      "command": [
+        "swarm",
+        "build",
+        "--class",
+        "integrator",
+        "--",
+        "cargo",
+        "xtask",
+        "gen",
+        "proof-coverage",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 4.7262396812438965,
+      "log_sha256": "2cde6f8ba5f568931d71a9a035e64dd2644eb5e65b2dc9bbf5a16822a6872646"
+    }
+  },
+  "meaning": "Cargo manifest comment wording repair only; parsed configuration is identical. Historical proof audit remains pinned to its original source. Subsequent documentation/report changes require final generated coverage renewal.",
+  "scope": {
+    "rust_logic_changed": false,
+    "proof_executed": false,
+    "baseline_changed": false,
+    "hosted_qualified": false,
+    "merged": false
+  }
+}
