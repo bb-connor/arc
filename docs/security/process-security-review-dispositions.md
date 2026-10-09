@@ -40,7 +40,7 @@ Core rerun entry points (add the common Rust settings above):
 
 ```sh
 cargo test -p chio-cli --test process_host
-cargo test -p chio-cli --bin chio process_host::runner
+cargo test -p chio-cli --lib process_host::runner
 cargo test -p chio-process --features worker-server,mailboxes
 cargo test -p chio-kernel-core --test signed_lineage
 cargo test -p chio-cli --test process_response_verify

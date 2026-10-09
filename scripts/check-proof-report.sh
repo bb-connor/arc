@@ -119,7 +119,7 @@ TRACE_TRACKED_ARTIFACTS = {
     "crates/products/chio-cli/src/cli/trust.rs",
     "crates/products/chio-cli/src/cli/types.rs",
     "crates/products/chio-cli/src/cli/types/trust.rs",
-    "crates/products/chio-cli/src/main.rs",
+    "crates/products/chio-cli/src/lib.rs",
     "scripts/check-receipt-trace.sh",
     "scripts/check-receipt-trace-bindings.py",
     "scripts/check-receipt-trace-negative-registry.py",

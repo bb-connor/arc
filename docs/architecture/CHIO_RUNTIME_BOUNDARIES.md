@@ -15,7 +15,7 @@ quietly collapse back into monolithic shells.
 
 ## Layering Rules
 
-- `chio-cli` stays a shell. `crates/products/chio-cli/src/main.rs` re-exports runtime
+- `chio-cli` stays a shell. `crates/products/chio-cli/src/lib.rs` re-exports runtime
   surfaces from `chio-hosted-mcp` and `chio-control-plane` instead of inlining
   additional giant modules.
 - `chio-mcp-remote` owns the remote MCP HTTP edge. `chio-hosted-mcp`

@@ -270,7 +270,7 @@ run_proof() {
 run_buyer() {
   bash "$repo_root/scripts/check-chio-treaty-buyer-hero-loop.sh" --packet-only
   run_cargo_test_filter chio-runtime-core buyer_review --test runtime_buyer_review
-  run_cargo_test_filter chio-cli chio_attest_buyer --bin chio
+  run_cargo_test_filter chio-cli chio_attest_buyer --lib
 }
 
 run_negative() {
