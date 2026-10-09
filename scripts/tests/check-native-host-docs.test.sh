@@ -87,7 +87,12 @@ EOF
   printf '# Protocol\n' >"$fixture/spec/PROTOCOL.md"
   printf '<svg xmlns="http://www.w3.org/2000/svg" aria-label="Evidence that travels"><text>Evidence that travels</text></svg>\n' \
     >"$fixture/docs/assets/subhead.svg"
-  # Every budgeted single document exists; a missing one is a violation.
+  # Every budgeted document exists; a missing one is a violation.
+  local shared
+  for shared in NORTH-STAR-FLOWS STATUS-GLOSSARY CAPABILITIES HOST-CONTRACT CONSUMERS QUALIFICATION \
+    FIRST-CLASS-INTEGRATIONS RELEASE OPERATOR; do
+    printf '# %s\n' "$shared" >"$spec/$shared.md"
+  done
   mkdir -p "$fixture/docs/superpowers/specs/2026-10-07-macos-integration" \
     "$fixture/docs/superpowers/plans/2026-10-07-omarchy-integration" \
     "$fixture/docs/superpowers/plans/2026-10-07-macos-integration"
@@ -216,6 +221,11 @@ expect "annex budget" 1 "budgets: docs/superpowers/specs/2026-10-07-macos-integr
 # --only limits the report to one path and keeps violations under it.
 expect "--only filters other paths" 0 "-" -- --rule budgets --only docs/superpowers/specs/2026-10-07-desktop-integration
 expect "--only keeps matching paths" 1 "budgets: docs/superpowers/specs/2026-10-07-macos-integration/ANNEX.md: macos annex has 6001 words, exceeds 6000" -- --rule budgets --only docs/superpowers/specs/2026-10-07-macos-integration
+
+# A missing required shared document fails closed.
+new_fixture missing-shared-doc
+rm "$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/OPERATOR.md"
+expect "missing shared document" 1 "budgets: docs/superpowers/specs/2026-10-07-desktop-integration/OPERATOR.md: shared spec set file missing" -- --rule budgets
 
 # A missing budgeted document fails closed.
 new_fixture missing-budget-doc

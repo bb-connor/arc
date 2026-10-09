@@ -48,6 +48,21 @@ SVG_TAG = re.compile(r"<[^>]*>")
 SVG_TEXT_BLOCK = re.compile(r"<(?:style|script)\b.*?</(?:style|script)>", re.I | re.S)
 
 
+SHARED_REQUIRED = (
+    "NORTH-STAR-FLOWS.md",
+    "README.md",
+    "CASES.md",
+    "STATUS-GLOSSARY.md",
+    "CAPABILITIES.md",
+    "HOST-CONTRACT.md",
+    "CONSUMERS.md",
+    "QUALIFICATION.md",
+    "FIRST-CLASS-INTEGRATIONS.md",
+    "RELEASE.md",
+    "OPERATOR.md",
+)
+
+
 class Layout:
     """Every path the rules read, computed from one repository root."""
 
@@ -87,8 +102,12 @@ class Layout:
             self.macos / "reviews/2026-10-07-architecture-review.md",
             self.plans / "2026-10-08-north-star-restructure.md",
         }
+        # Every required shared document must exist; any other top-level
+        # Markdown in the spec directory also counts toward the budget.
         # REVIEW.md and TRIM-LEDGER.md are audit records, not specification.
-        shared = [p for p in self.spec.glob("*.md") if p.name not in {"REVIEW.md", "TRIM-LEDGER.md"}]
+        required = [self.spec / name for name in SHARED_REQUIRED]
+        extra = [p for p in self.spec.glob("*.md") if p.name not in {"REVIEW.md", "TRIM-LEDGER.md", *SHARED_REQUIRED}]
+        shared = required + sorted(extra)
         self.budgets = [
             ("shared spec set", self.spec, sorted(shared), 15000),
             ("omarchy annex", self.omarchy / "ANNEX.md", [self.omarchy / "ANNEX.md"], 6000),
@@ -209,7 +228,8 @@ def check_budgets(layout: Layout) -> list[str]:
     for name, where, files, limit in layout.budgets:
         missing = [p for p in files if not p.is_file()]
         if missing:
-            out.append(f"budgets: {layout.rel(where)}: {name} file missing")
+            for path in missing:
+                out.append(f"budgets: {layout.rel(path)}: {name} file missing")
             continue
         words = sum(len(read(p).split()) for p in files)
         if words > limit:
