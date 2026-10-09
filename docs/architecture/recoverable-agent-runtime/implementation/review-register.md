@@ -34,12 +34,12 @@ The current status counts are:
 | Status | Records | Meaning |
 | --- | ---: | --- |
 | `open` | 231 | No complete independent disposition is recorded. |
-| `needs_revalidation` | 45 | Historical closure remains, but cited source or document pins differ without an accepted current continuity review. |
-| `recorded_scoped_closed` | 72 | The recorded scoped disposition is retained, with the limits stated per record. |
+| `needs_revalidation` | 42 | Historical closure remains, but cited source or document pins differ without an accepted current continuity review. |
+| `recorded_scoped_closed` | 75 | The recorded scoped disposition is retained, with the limits stated per record. |
 | `candidate_only` | 39 | The defective candidate was uninstalled when found; corrected successors may have separate evidence. |
 | `prerequisite_only` | 1 | Provenance work, not a proved implementation defect. |
 
-The 45 remaining revalidation flags are part of the 117 historical scoped closures. They
+The 42 remaining revalidation flags are part of the 117 historical scoped closures. They
 are not added to the 231 historically unclosed findings. No finding is declared
 regressed merely because its bytes changed, and no matching pin constitutes a
 new behavioral test. The initial audit flagged 48 closures. An independent
@@ -52,9 +52,17 @@ The [SDK compatibility and portability continuity review](reviews/sdk-compatibil
 then restores only the original scoped classifications of `H-SDK-02` and
 `H-SDK-11` after SPEC_PASS and independent QUALITY_PASS. Their historical changed
 pins remain recorded; additive `current_review` objects retain both previous
-statuses and reasons. The remaining flags comprise 35 canonical and ten additional
-findings. Historical closure totals and every other record are unchanged.
+statuses and reasons. That update left 35 canonical and ten additional
+revalidation flags. Historical closure totals and every other record are unchanged.
 `H-SDK-01`, source-fixture cleanup and metadata work remain pending.
+
+The [coverage locator continuity review](reviews/coverage-locator-continuity.md)
+subsequently restores `C1-08`, `E-knowledge-15` and `G-product-07` for their original
+source-locator obligations only. SPEC_PASS and independent QUALITY_PASS account
+for all 243 pointers (160/55/28), 14 protected historical inputs and the unchanged
+mappings of 108 references in the changed containing test file. Historical pins
+and previous statuses/reasons remain intact. The remaining flags are 32 canonical
+and ten additional. This grants no behavioral, test-run or runtime acceptance.
 
 The installed SDK changes affect six direct pin pairs across `H-SDK-03`,
 `H-SDK-08`, `H-SDK-09` and `SDK-INDEPENDENT-03`. The independent
@@ -326,11 +334,20 @@ The SDK continuity update preserves 386 of 388 records byte-for-byte. Only the
 two SDK current statuses and reasons change, with additive reviews retaining
 their previous values. All canonical historical fields, pin audits, original
 inventories and prior updates remain unchanged. The two restored scoped closures
-change only current classification counts: 45 need revalidation and 72 retain
-their scoped closure. The 269 reviewed source hashes, 58 evidence hashes and ten
+changed only the then-current classification counts: 45 needed revalidation and
+72 retained their scoped closure. The 269 reviewed source hashes, 58 evidence hashes and ten
 frozen portable-packet files were verified without rerunning source tests.
 After accounting, 268 source hashes still match; the frozen register pin matches
 its pre-update Git blob. The reviewed manifest remains unchanged.
+The later locator continuity update preserves 385 of 388 row byte sequences
+exactly and every historical field in the three updated rows. Only their current
+statuses/reasons and additive reviews change. All 19 prior updates, historical
+pins and original inventories remain intact. The current counts become 42 needing
+revalidation and 75 retaining scoped closure; the total remains 388. The 89
+reviewed input pins and all eleven original/quality packet artifact pins were
+verified, retaining the register input against its pre-update Git blob. No tests
+or source modules were run or imported, and pending fixture/SDK findings were not
+added by this update.
 The installation-specific SDK continuity audit supplements the historical pin
 audit; it does not rerun unrelated flags. Confidence is high for this accounting;
 current integrated behavior remains unqualified.

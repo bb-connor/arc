@@ -58,14 +58,14 @@
     "qualified": 0,
     "current_status": {
       "candidate_only": 39,
-      "needs_revalidation": 45,
+      "needs_revalidation": 42,
       "open": 231,
       "prerequisite_only": 1,
-      "recorded_scoped_closed": 72
+      "recorded_scoped_closed": 75
     },
     "needs_revalidation_by_category": {
       "additional": 10,
-      "canonical": 35
+      "canonical": 32
     },
     "severity_by_category": {
       "canonical": {
@@ -1069,8 +1069,53 @@
           "docs/architecture/recoverable-agent-runtime/implementation/STATUS.md"
         ]
       },
-      "current_status": "needs_revalidation",
-      "current_reason": "Recorded closure is preserved; a cited source or document pin differs. Review continuity and relevant controls on the integrated candidate. A hash difference is not a demonstrated regression."
+      "current_status": "recorded_scoped_closed",
+      "current_reason": "SPEC_PASS and independent QUALITY_PASS restore only the original source-locator closure: all 160 original pointer occurrences resolve with unchanged mappings and protected historical evidence. The historical STATUS pin difference remains recorded. The complete review accounts for 108 references in the changed containing test file without reviewing its bodies or transferring historical test acceptance. No test execution, behavior or runtime qualification is credited.",
+      "current_review": {
+        "path": "docs/architecture/recoverable-agent-runtime/implementation/reviews/coverage-locator-continuity.md",
+        "sha256": "5768857db93038c293c9d3aacf7181ff45c0b133fa157739d61fe7b3f469eabb",
+        "recorded_at_utc": "2026-10-09T18:39:13.735186+00:00",
+        "scope": "Resolve all affected P1 test anchors through the current-name overlay and hash-check the historical coverage record unchanged.",
+        "previous_current_status": "needs_revalidation",
+        "previous_current_reason": "Recorded closure is preserved; a cited source or document pin differs. Review continuity and relevant controls on the integrated candidate. A hash difference is not a demonstrated regression.",
+        "spec_review": {
+          "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/coverage-locator-continuity/spec-review.json",
+          "sha256": "5eaa7362e4ef5020e31fd1a1e9e48b18653cb99f1b42476ff2528ae4ec8f673c"
+        },
+        "quality_review": {
+          "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/coverage-locator-continuity/quality-review.json",
+          "sha256": "8bf89f016d68b9070c96ecac58272c638d3b7940ebbefb614f15f05705af6894"
+        },
+        "quality_report": {
+          "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/coverage-locator-continuity/quality-review.md",
+          "sha256": "78475e902705c108becd7ce8fd1cc26002c1156ff36b7ca6d7280597dce33f7c"
+        },
+        "source_manifest": {
+          "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/coverage-locator-continuity/source-manifest.json",
+          "sha256": "d551d7c4c52353cacf86304aea492734c947528f531e469bd728508e1232b0cc"
+        },
+        "reviewed_input_manifest": {
+          "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/coverage-locator-continuity/quality-reviewed-manifest.json",
+          "sha256": "fa7d1d6481df0d017d63822daba0a2be4240f88922b74c6b4122f6016ff37d04"
+        },
+        "pointer_verification": {
+          "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/coverage-locator-continuity/quality-locator-verification.json",
+          "sha256": "0e48123d86727050e662d18a04e83b57e1dc19f7a9c84092bb65338ebfc956d4"
+        },
+        "verdicts": [
+          "SPEC_PASS",
+          "QUALITY_PASS"
+        ],
+        "pointer_occurrences": 160,
+        "resolved_pointer_occurrences": 160,
+        "changed_containing_source_occurrences": 107,
+        "protected_historical_input_pins": 14,
+        "historical_pins_preserved": true,
+        "historical_execution_credit_transferred": false,
+        "tests_executed": 0,
+        "confidence": "high for the complete original source-locator obligation only",
+        "qualified": false
+      }
     },
     {
       "key": "C1-09",
@@ -1831,8 +1876,53 @@
           "docs/architecture/recoverable-agent-runtime/implementation/STATUS.md"
         ]
       },
-      "current_status": "needs_revalidation",
-      "current_reason": "Recorded closure is preserved; a cited source or document pin differs. Review continuity and relevant controls on the integrated candidate. A hash difference is not a demonstrated regression."
+      "current_status": "recorded_scoped_closed",
+      "current_reason": "SPEC_PASS and independent QUALITY_PASS restore only the original source-locator closure: all 55 original pointer occurrences resolve with unchanged mappings and protected historical evidence. The historical STATUS pin difference remains recorded. The complete review accounts for 108 references in the changed containing test file without reviewing its bodies or transferring historical test acceptance. No test execution, behavior or runtime qualification is credited.",
+      "current_review": {
+        "path": "docs/architecture/recoverable-agent-runtime/implementation/reviews/coverage-locator-continuity.md",
+        "sha256": "5768857db93038c293c9d3aacf7181ff45c0b133fa157739d61fe7b3f469eabb",
+        "recorded_at_utc": "2026-10-09T18:39:13.735186+00:00",
+        "scope": "Resolve P4 anchors through a new current-name map and preserve the original coverage/acceptance hashes.",
+        "previous_current_status": "needs_revalidation",
+        "previous_current_reason": "Recorded closure is preserved; a cited source or document pin differs. Review continuity and relevant controls on the integrated candidate. A hash difference is not a demonstrated regression.",
+        "spec_review": {
+          "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/coverage-locator-continuity/spec-review.json",
+          "sha256": "5eaa7362e4ef5020e31fd1a1e9e48b18653cb99f1b42476ff2528ae4ec8f673c"
+        },
+        "quality_review": {
+          "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/coverage-locator-continuity/quality-review.json",
+          "sha256": "8bf89f016d68b9070c96ecac58272c638d3b7940ebbefb614f15f05705af6894"
+        },
+        "quality_report": {
+          "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/coverage-locator-continuity/quality-review.md",
+          "sha256": "78475e902705c108becd7ce8fd1cc26002c1156ff36b7ca6d7280597dce33f7c"
+        },
+        "source_manifest": {
+          "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/coverage-locator-continuity/source-manifest.json",
+          "sha256": "d551d7c4c52353cacf86304aea492734c947528f531e469bd728508e1232b0cc"
+        },
+        "reviewed_input_manifest": {
+          "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/coverage-locator-continuity/quality-reviewed-manifest.json",
+          "sha256": "fa7d1d6481df0d017d63822daba0a2be4240f88922b74c6b4122f6016ff37d04"
+        },
+        "pointer_verification": {
+          "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/coverage-locator-continuity/quality-locator-verification.json",
+          "sha256": "0e48123d86727050e662d18a04e83b57e1dc19f7a9c84092bb65338ebfc956d4"
+        },
+        "verdicts": [
+          "SPEC_PASS",
+          "QUALITY_PASS"
+        ],
+        "pointer_occurrences": 55,
+        "resolved_pointer_occurrences": 55,
+        "changed_containing_source_occurrences": 0,
+        "protected_historical_input_pins": 14,
+        "historical_pins_preserved": true,
+        "historical_execution_credit_transferred": false,
+        "tests_executed": 0,
+        "confidence": "high for the complete original source-locator obligation only",
+        "qualified": false
+      }
     },
     {
       "key": "E-knowledge-16",
@@ -2152,8 +2242,53 @@
           "docs/architecture/recoverable-agent-runtime/implementation/STATUS.md"
         ]
       },
-      "current_status": "needs_revalidation",
-      "current_reason": "Recorded closure is preserved; a cited source or document pin differs. Review continuity and relevant controls on the integrated candidate. A hash difference is not a demonstrated regression."
+      "current_status": "recorded_scoped_closed",
+      "current_reason": "SPEC_PASS and independent QUALITY_PASS restore only the original source-locator closure: all 28 original pointer occurrences resolve with unchanged mappings and protected historical evidence. The historical STATUS pin difference remains recorded. The complete review accounts for 108 references in the changed containing test file without reviewing its bodies or transferring historical test acceptance. No test execution, behavior or runtime qualification is credited.",
+      "current_review": {
+        "path": "docs/architecture/recoverable-agent-runtime/implementation/reviews/coverage-locator-continuity.md",
+        "sha256": "5768857db93038c293c9d3aacf7181ff45c0b133fa157739d61fe7b3f469eabb",
+        "recorded_at_utc": "2026-10-09T18:39:13.735186+00:00",
+        "scope": "Resolve all nine current anchors through a new overlay and prove the historical P6 record unchanged.",
+        "previous_current_status": "needs_revalidation",
+        "previous_current_reason": "Recorded closure is preserved; a cited source or document pin differs. Review continuity and relevant controls on the integrated candidate. A hash difference is not a demonstrated regression.",
+        "spec_review": {
+          "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/coverage-locator-continuity/spec-review.json",
+          "sha256": "5eaa7362e4ef5020e31fd1a1e9e48b18653cb99f1b42476ff2528ae4ec8f673c"
+        },
+        "quality_review": {
+          "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/coverage-locator-continuity/quality-review.json",
+          "sha256": "8bf89f016d68b9070c96ecac58272c638d3b7940ebbefb614f15f05705af6894"
+        },
+        "quality_report": {
+          "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/coverage-locator-continuity/quality-review.md",
+          "sha256": "78475e902705c108becd7ce8fd1cc26002c1156ff36b7ca6d7280597dce33f7c"
+        },
+        "source_manifest": {
+          "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/coverage-locator-continuity/source-manifest.json",
+          "sha256": "d551d7c4c52353cacf86304aea492734c947528f531e469bd728508e1232b0cc"
+        },
+        "reviewed_input_manifest": {
+          "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/coverage-locator-continuity/quality-reviewed-manifest.json",
+          "sha256": "fa7d1d6481df0d017d63822daba0a2be4240f88922b74c6b4122f6016ff37d04"
+        },
+        "pointer_verification": {
+          "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/coverage-locator-continuity/quality-locator-verification.json",
+          "sha256": "0e48123d86727050e662d18a04e83b57e1dc19f7a9c84092bb65338ebfc956d4"
+        },
+        "verdicts": [
+          "SPEC_PASS",
+          "QUALITY_PASS"
+        ],
+        "pointer_occurrences": 28,
+        "resolved_pointer_occurrences": 28,
+        "changed_containing_source_occurrences": 1,
+        "protected_historical_input_pins": 14,
+        "historical_pins_preserved": true,
+        "historical_execution_credit_transferred": false,
+        "tests_executed": 0,
+        "confidence": "high for the complete original source-locator obligation only",
+        "qualified": false
+      }
     },
     {
       "key": "G-product-08",
@@ -9459,6 +9594,27 @@
       "previous_review_sha256": "81e643477832374d6c1d7439861c0d0a3d2b2acbbd20bfa512398dc9e8d1fe67",
       "historical_pending_statement_update_index": 15,
       "scope": "Documentation correction only: the prior twelve-pass and SPEC_PASS Capture record retains its historical 14-path scope. Later quality returned CHANGES_REQUIRED; production Store compilation failed E0432 before the 15-path export repair compiled within an owning run that remained RED. One unresolved Capture finding and related work are parked after an automatic guard block and the instruction to stop, with no retry. The current candidate remains uninstalled and unaccepted. No blocked case was re-inspected; no finding row, closure count or qualification is changed by this correction.",
+      "qualified": false
+    },
+    {
+      "findings": [
+        "C1-08",
+        "E-knowledge-15",
+        "G-product-07"
+      ],
+      "at_utc": "2026-10-09T18:39:13.735186+00:00",
+      "review": "docs/architecture/recoverable-agent-runtime/implementation/reviews/coverage-locator-continuity.md",
+      "review_sha256": "5768857db93038c293c9d3aacf7181ff45c0b133fa157739d61fe7b3f469eabb",
+      "scope": "Restore only the three original source-locator closures after SPEC_PASS and independent QUALITY_PASS. All 243 original pointer occurrences retain their mappings and all 14 protected historical input pins remain intact. The changed containing test source affects 108 references, whose declarations still resolve; no test-body or behavioral acceptance is transferred. Previous statuses/reasons and the historical pin audit are preserved.",
+      "pointer_occurrences_by_id": {
+        "C1-08": 160,
+        "E-knowledge-15": 55,
+        "G-product-07": 28
+      },
+      "previous_current_status": "needs_revalidation",
+      "current_status": "recorded_scoped_closed",
+      "historical_closure_and_pin_audit_unchanged": true,
+      "tests_executed": 0,
       "qualified": false
     }
   ],
