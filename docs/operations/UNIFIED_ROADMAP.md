@@ -190,7 +190,7 @@ Gate 0 exists so that parallel lanes do not collide. Everything a lane builds ag
 
 - **Preview versions:** `0.2.0-alpha.N`. This is SEC-M10's developer preview, widened to include what HOST-M3 needs.
 - **Repos:** `bb-connor/arc` is the development repo; `backbay-labs/chio` is the distribution mirror, synced on every tag (D7, decided 2026-10-09).
-- **Preview exception:** previews may ship before #1160's full-release obligations close (decision D8).
+- **Preview exception (conditional):** #1160's landing ledger records `release_permitted: false`. Previews may ship before #1160's full-release obligations close only if the owner approves D8 (still open) and the resulting amendment is recorded in that ledger. Until both happen, previews wait for those obligations.
 - **Host compatibility:** tested version ranges for harness hosts, instead of exact pinned hashes.
 
 ### G0.4 Work that starts without waiting for Gate 0
@@ -224,7 +224,7 @@ Each lane is a ladder of rungs, and each rung ends in exit evidence. Lanes run i
 - A's passport revocation never reaches B. Federated issue reads B's own local status.
 - At proxied routes a federated capability is a bearer token, because holder possession is not checked.
 - The door ignores revocations made after it started.
-- `evidence verify` gains `--trusted-kernel-pubkey` and `--trusted-anchor-file` with #1160, but it cannot anchor to a partner's published keys.
+- `evidence verify` gains `--trusted-kernel-pubkey` and `--trusted-anchor-file` with #1160. That verifier already checks every receipt and checkpoint signer against keys the verifier supplies independently, so a partner's keys can be pinned by hand. What is missing is partner-card ingestion and discovery: nothing reads a partner's published card or key history into the verifier.
 - Door receipts are signed `HttpReceipt`s projected into `ChioReceipt`s in the door's own receipt store, with the original carried in metadata (`chio_http_receipt_v1`). The evidence verifier never checks that embedded `HttpReceipt`.
 - The issuance inbox design has no way to return the issued capability to the holder.
 - As written in #1177's NORTH-STAR-FLOWS, the HOST-M1 flow fails on #1160 in two places:
@@ -238,7 +238,7 @@ Each lane is a ladder of rungs, and each rung ends in exit evidence. Lanes run i
   - B's authority owns the delegation ceiling.
   - The challenge is consumed once across challenge submit and federated issue.
   - Door receipts are exportable, and the verifier checks the embedded `HttpReceipt`.
-  - `evidence verify` anchored to a partner card, extending #1160's `--trusted-anchor-file`.
+  - `evidence verify` ingests a partner card into #1160's existing pinned-key verifier (`--trusted-kernel-pubkey`, `--trusted-anchor-file`), in place of hand-pinned keys.
   - OS key custody built on #1160's `signing_custody`: `credential:` or systemd-creds on headless hosts, Keychain or Secret Service on desktops. Plaintext seed files are labelled development-only.
   - Service packaging: systemd units, a LaunchAgent, and a container image.
   - The desktop review moments (Waybar or QML, menu bar, notifier) are optional follow-ons, not gates.
@@ -387,7 +387,7 @@ Only the kernel hold ledger durably records consumption. Money is not pooled acr
   - The kernel hold ledger is the only consumption authority.
   - Every other counter becomes a commitment entry or a view, following #1174's sealed-ledger proposal.
   - First slice: a family monetary cap, using #957's co-debit pattern, plus a durable sibling registry.
-  - Decide what basis-point shares actually bound; today they are declarations only.
+  - Basis-point shares already have sibling-sum enforcement at admission: `admit_capability_budget` submits `budget_share_bps` to `try_admit_child`, and an oversubscribing child is denied before dispatch. What is missing is the consumption binding and durability. A share never bounds what the child actually spends, and the registry is the in-memory `InMemoryBudgetRegistry`, so after a restart delegated admission fails closed until prior reserved holds close instead of rebuilding the shares. Decide what a share bounds in the hold ledger, and carry admitted shares across restart in the durable sibling registry.
 - **SHARE-2: model spend through the kernel.**
   - Model calls route through the broker's provider adapter, using the worst-case-then-reconcile lifecycle.
   - Add a token quota for subscription harnesses.
@@ -414,7 +414,7 @@ Only the kernel hold ledger durably records consumption. Money is not pooled acr
 
 - **REL-1: the preview train.**
   - SEC-M9 packaging and SEC-M10 publishing.
-  - #1160's post-merge obligations, or the CT-REL preview exception.
+  - #1160's post-merge obligations, or the CT-REL preview exception once D8 is approved and its landing-ledger amendment is recorded.
   - Close out the AWS-LC fork audit (review sufficiency: D16). The source audit and its independent review are already on main (`docs/security/audits/aws-lc-rs-1.18.1-fork.md`, `aws-lc-rs-1.18.1-independent-review.md`). The audit states that it is not an approval to publish a release.
   - Turn the Release Qualification workflow green. `docs/release/RISK_REGISTER.md` requires hosted CI and Release Qualification success before tagging, and Release Qualification has failed on every recent push to main.
   - Retarget `release-tagged.yml`, which checks out `project/roadmap-04-25-2026`, a branch section 7 archives.
@@ -453,7 +453,7 @@ Only the kernel hold ledger durably records consumption. Money is not pooled acr
 - **OUT-3: standards.**
   - The IETF -00 (decision D11).
   - WIMSE and ODIS positions.
-  - NVIDIA is a channel, not a dependency. Build OpenShell middleware only if a candidate team runs OpenShell. Re-check the Agent Policy Fabric monthly.
+  - Platform interoperability is technical only, and no platform is a dependency. Build OpenShell middleware only if a candidate team runs OpenShell. Track the Agent Policy Fabric for interop changes. Channels and audiences are in the private GTM plan.
 - **OUT-4: records.** Independent-operation records and ADR-0011 claim reviews for every gate.
 
 ## 5. Gates
@@ -462,11 +462,15 @@ Only the kernel hold ledger durably records consumption. Money is not pooled acr
 Gate 0 ─┬─ REL-1,REL-2 + KERN-1,KERN-2,KERN-6 + OUT-2 ──────> G1 preview installable
         │                                                     │
         ├─ COOP-1,COOP-2 + REL-4 + OUT-1 ─────────────────────┴─> G2 outside HOST-M1 ──┐
-        │                                                                               ├─> G4 internal HOST-M3 ─> G5 outside HOST-M3 x2
-        ├─ SHARE-1..3 + KERN-3,KERN-5 + REL-3 + WORK slice β ──> G3 HOST-M2 on Linux ──┘          ▲
-        │                                                                                           │
-        └─ WORK-W1,W2,W3 + REC + COOP-3,COOP-4 + KERN-4 ────────────────────────────────────────────┘
+        │                                                                              │
+        ├─ SHARE-1..3 + KERN-3,KERN-5 + REL-3 + WORK slice β ──> G3 HOST-M2 on Linux ──┤
+        │                                                                              │
+        ├─ WORK-W1,W2,W3 + REC + COOP-3 + KERN-4 ──────────────────────────────────────┴─> G4 internal HOST-M3 ──┐
+        │                                                                                                        ├─> G5 outside HOST-M3 x2
+        └─ COOP-4 ───────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
+
+WORK, REC, COOP-3 and KERN-4 join at G4, because G4's complete run needs co-signed work, lost-reply recovery and the HOST-M3 door. COOP-4 is the only lane input that joins at G5 directly: G4 verifies evidence against pinned partner keys (COOP-1), and COOP-4's checkpoint compatibility and edge audit serve outside counterparties.
 
 **G1: an outsider can install the preview.**
 
@@ -657,8 +661,9 @@ ADR-0023, ADR-0028, ADR-0035 and ADR-0036 are candidate numbers inside #1170's s
 | --- | --- | --- |
 | Builders, harness and plugin authors, OS users | The north star and the supporting line, cross-org clause first | Install, connect their agent, see a deny receipt |
 | Counterparty pairs | "Verify the agent's authority at your door, not theirs." | A two-operator run with their own keys |
-| NVIDIA, OpenShell and enterprise platforms | #1170's interim category sentence and the Alliance's "policy, identity and governance" layer name; never "kernel" as the category | Coverage table, preview label |
 | Standards bodies | No tagline; artifact names only | Interop vectors |
+
+Platform and vendor audiences, channels and messaging are in the private GTM plan. This document keeps only the technical interoperability requirements (OUT-3).
 
 **Stale surfaces on main to fix (U3):**
 
