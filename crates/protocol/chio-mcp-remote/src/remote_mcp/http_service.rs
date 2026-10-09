@@ -614,6 +614,12 @@ pub(super) async fn handle_post(State(state): State<RemoteAppState>, request: Re
                         break;
                     }
                 }
+                Err(RequestEventsError::Overflowed) => {
+                    let failure = json!({"jsonrpc":"2.0","id":request_id,
+                        "error":{"code":-32603,"message":"request event queue overflowed; effect is uncertain"}});
+                    yield Ok(Event::default().data(failure.to_string()));
+                    break;
+                }
                 Err(RequestEventsError::Closed) => {
                     session_worker::close(&state, &session_for_stream).await;
                     let failure = json!({"jsonrpc":"2.0","id":request_id,
@@ -709,6 +715,13 @@ pub(super) async fn handle_initialize_post(
                         "initialize_sse",
                     );
                 }
+            }
+            Err(RequestEventsError::Overflowed) => {
+                session_worker::close(&state, &session).await;
+                return plain_http_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "remote MCP initialize event queue overflowed",
+                );
             }
             Err(RequestEventsError::Closed) => {
                 session_worker::close(&state, &session).await;

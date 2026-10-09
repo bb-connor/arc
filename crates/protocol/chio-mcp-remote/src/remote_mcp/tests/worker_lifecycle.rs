@@ -1,6 +1,6 @@
 //! Actual HTTP waits must terminate when their owning worker or response is lost.
 use super::*;
-use crate::session_core_events::RequestRouteError;
+use crate::session_core_events::{RequestRouteError, REQUEST_ROUTE_CAPACITY};
 use axum::body::{Body, HttpBody};
 use std::future::Future;
 use std::pin::Pin;
@@ -617,6 +617,184 @@ async fn duplicate_request_route_is_refused_and_dropped_route_is_released() {
     drop(again);
     drop(message);
     drop(input_rx);
+}
+
+fn correlated_event(
+    generation: McpRequestGeneration,
+    message: Value,
+    seq: u64,
+) -> RemoteSessionEvent {
+    RemoteSessionEvent {
+        seq,
+        event_id: format!("route-{seq}"),
+        kind: RemoteSessionEventKind::RequestCorrelated,
+        request_generation: Some(generation),
+        message,
+    }
+}
+
+fn server_request(id: u64) -> Value {
+    json!({"jsonrpc":"2.0","id":format!("srv-{id}"),"method":"roots/list"})
+}
+
+#[tokio::test]
+async fn flooded_route_reports_overflow_and_leaves_other_requests_untouched() {
+    let fixture = fixture(0, None);
+    let (session, input_rx) = controlled_session(&fixture, "flood-session", 8).await;
+    let flooded = session
+        .input_tx
+        .account(json!({"jsonrpc":"2.0","id":1,"method":"ping"}))
+        .unwrap();
+    let healthy = session
+        .input_tx
+        .account(json!({"jsonrpc":"2.0","id":2,"method":"ping"}))
+        .unwrap();
+    let mut flooded_events = session
+        .event_tx
+        .register_request(flooded.request_generation())
+        .unwrap();
+    let mut healthy_events = session
+        .event_tx
+        .register_request(healthy.request_generation())
+        .unwrap();
+
+    // The sends all return without a reader, so the sender never blocks.
+    let overshoot = REQUEST_ROUTE_CAPACITY + 10;
+    for sequence in 0..overshoot as u64 {
+        session
+            .event_tx
+            .send(correlated_event(
+                flooded.request_generation(),
+                server_request(sequence),
+                sequence,
+            ))
+            .ok();
+    }
+    session
+        .event_tx
+        .send(correlated_event(
+            flooded.request_generation(),
+            json!({"jsonrpc":"2.0","id":1,"result":{"late":true}}),
+            9_000,
+        ))
+        .ok();
+    session
+        .event_tx
+        .send(correlated_event(
+            healthy.request_generation(),
+            json!({"jsonrpc":"2.0","id":2,"result":{"ok":true}}),
+            9_001,
+        ))
+        .ok();
+
+    for sequence in 0..REQUEST_ROUTE_CAPACITY as u64 {
+        let event = flooded_events.recv().await.unwrap();
+        assert_eq!(event.seq, sequence);
+    }
+    assert_eq!(
+        flooded_events.recv().await.err(),
+        Some(RequestEventsError::Overflowed)
+    );
+    assert_eq!(
+        flooded_events.recv().await.err(),
+        Some(RequestEventsError::Closed)
+    );
+
+    let event = healthy_events.recv().await.unwrap();
+    assert_eq!(
+        event.message,
+        json!({"jsonrpc":"2.0","id":2,"result":{"ok":true}})
+    );
+    drop((flooded, healthy, input_rx));
+}
+
+#[tokio::test]
+async fn terminal_response_is_delivered_when_the_event_queue_is_full() {
+    let fixture = fixture(0, None);
+    let (session, input_rx) = controlled_session(&fixture, "full-queue-session", 8).await;
+    let message = session
+        .input_tx
+        .account(json!({"jsonrpc":"2.0","id":5,"method":"ping"}))
+        .unwrap();
+    let mut events = session
+        .event_tx
+        .register_request(message.request_generation())
+        .unwrap();
+    for sequence in 0..REQUEST_ROUTE_CAPACITY as u64 {
+        session
+            .event_tx
+            .send(correlated_event(
+                message.request_generation(),
+                server_request(sequence),
+                sequence,
+            ))
+            .ok();
+    }
+    session
+        .event_tx
+        .send(correlated_event(
+            message.request_generation(),
+            json!({"jsonrpc":"2.0","id":5,"result":{"answer":"exact"}}),
+            9_000,
+        ))
+        .ok();
+    for sequence in 0..REQUEST_ROUTE_CAPACITY as u64 {
+        assert_eq!(events.recv().await.unwrap().seq, sequence);
+    }
+    assert_eq!(
+        events.recv().await.unwrap().message,
+        json!({"jsonrpc":"2.0","id":5,"result":{"answer":"exact"}})
+    );
+    assert_eq!(events.recv().await.err(), Some(RequestEventsError::Closed));
+    drop((message, input_rx));
+}
+
+#[tokio::test]
+async fn overflowing_post_request_gets_the_overflow_error_and_the_session_survives() {
+    let fixture = fixture(0, None);
+    let (session, input_rx) = controlled_session(&fixture, "overflow-post-session", 8).await;
+    let mut output = BroadcastJsonRpcWriter::new(
+        session.event_tx.clone(),
+        session.retained_notification_events.clone(),
+        session.next_event_id.clone(),
+        session.session_id.clone(),
+        session.input_tx.response_context(),
+    );
+    let response = post(
+        &fixture,
+        Some(&session.session_id),
+        &json!({"jsonrpc":"2.0","id":31,"method":"ping","params":{}}),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let request = input_rx.try_recv().unwrap().unwrap();
+    let _scope = input_rx.enter_response_scope(&request).unwrap();
+    for sequence in 0..(REQUEST_ROUTE_CAPACITY as u64 + 8) {
+        publish(&mut output, &server_request(sequence));
+    }
+    publish(
+        &mut output,
+        &json!({"jsonrpc":"2.0","id":31,"result":{"answer":"exact"}}),
+    );
+    let bytes = tokio::time::timeout(
+        WAIT,
+        axum::body::to_bytes(response.into_body(), 1024 * 1024),
+    )
+    .await
+    .expect("overflowed request did not terminate")
+    .unwrap();
+    let delivered = sse_messages(&bytes);
+    let last = delivered.last().unwrap();
+    assert_eq!(last["id"], 31);
+    assert_eq!(
+        last["error"]["message"],
+        "request event queue overflowed; effect is uncertain"
+    );
+    assert_eq!(
+        session.lifecycle_snapshot().state,
+        RemoteSessionState::Ready
+    );
+    fixture.state.sessions.shutdown_all_active().await.unwrap();
 }
 
 #[tokio::test]
