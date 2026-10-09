@@ -255,27 +255,44 @@ pub(super) fn load_event_admission(
     Ok(admission)
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-)]
-fn write_transition_projection(
-    transaction: &Transaction<'_>,
-    event_id: &str,
-    hold: &StructuredHold,
+/// Parameters of `write_transition_projection`.
+struct TransitionProjection<'a> {
+    event_id: &'a str,
+    hold: &'a StructuredHold,
     authorization_outcome: Option<BudgetAuthorizationOutcome>,
     invocation_before: BudgetInvocationState,
     invocation_after: BudgetInvocationState,
     monetary_before: BudgetMonetaryState,
     monetary_after: BudgetMonetaryState,
-    quota_before: &[QuotaState],
-    quota_after: &[QuotaState],
-    cumulative_before: Option<CumulativeSnapshot<'_>>,
-    cumulative_after: Option<CumulativeSnapshot<'_>>,
-    approval_set_digest: Option<&str>,
+    quota_before: &'a [QuotaState],
+    quota_after: &'a [QuotaState],
+    cumulative_before: Option<CumulativeSnapshot<'a>>,
+    cumulative_after: Option<CumulativeSnapshot<'a>>,
+    approval_set_digest: Option<&'a str>,
     trusted_time: Option<u64>,
     expected_cumulative_state: Option<BudgetCumulativeApprovalState>,
+}
+
+fn write_transition_projection(
+    transaction: &Transaction<'_>,
+    params: TransitionProjection<'_>,
 ) -> Result<(), BudgetStoreError> {
+    let TransitionProjection {
+        event_id,
+        hold,
+        authorization_outcome,
+        invocation_before,
+        invocation_after,
+        monetary_before,
+        monetary_after,
+        quota_before,
+        quota_after,
+        cumulative_before,
+        cumulative_after,
+        approval_set_digest,
+        trusted_time,
+        expected_cumulative_state,
+    } = params;
     let admission = &hold.admission;
     if quota_before.len() != quota_after.len() {
         return Err(BudgetStoreError::Invariant(
@@ -627,24 +644,37 @@ fn validate_transition_identity(
     Ok(())
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-)]
-fn replay_transition(
-    store: &SqliteBudgetStore,
-    transaction: &Transaction<'_>,
-    event_id: &str,
+/// Parameters of `replay_transition`.
+struct TransitionReplay<'a> {
+    event_id: &'a str,
     kind: BudgetMutationKind,
-    hold_id: &str,
-    capability_id: &str,
+    hold_id: &'a str,
+    capability_id: &'a str,
     grant_index: usize,
     exposure_units: Option<u64>,
     realized_spend_units: Option<u64>,
-    authority: Option<&BudgetEventAuthority>,
+    authority: Option<&'a BudgetEventAuthority>,
     trusted_time: Option<u64>,
     expected_cumulative_state: Option<BudgetCumulativeApprovalState>,
+}
+
+fn replay_transition(
+    store: &SqliteBudgetStore,
+    transaction: &Transaction<'_>,
+    params: TransitionReplay<'_>,
 ) -> Result<Option<BudgetHoldMutationDecision>, BudgetStoreError> {
+    let TransitionReplay {
+        event_id,
+        kind,
+        hold_id,
+        capability_id,
+        grant_index,
+        exposure_units,
+        realized_spend_units,
+        authority,
+        trusted_time,
+        expected_cumulative_state,
+    } = params;
     let Some(event) = SqliteBudgetStore::load_mutation_event(transaction, event_id)? else {
         return Ok(None);
     };

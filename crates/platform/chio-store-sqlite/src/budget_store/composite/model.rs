@@ -858,25 +858,24 @@ pub(super) fn load_event_revocation_commit(
     Ok(commit)
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-)]
 pub(super) fn write_authorization_event_projection(
     transaction: &Transaction<'_>,
-    event_id: &str,
-    admission: &BudgetAdmissionBinding,
-    outcome: BudgetAuthorizationOutcome,
-    quotas: &[BudgetInvocationQuota],
-    quota_before: &[QuotaState],
-    quota_after: &[QuotaState],
-    cumulative: Option<&BudgetCumulativeApprovalRequest>,
-    cumulative_state: Option<BudgetCumulativeApprovalState>,
-    cumulative_before: Option<&CumulativeAccount>,
-    cumulative_after: Option<&CumulativeAccount>,
-    invocation_quotas_explicit: bool,
-    requested_exposure_units: u64,
+    params: AuthorizationEventProjection<'_>,
 ) -> Result<(), BudgetStoreError> {
+    let AuthorizationEventProjection {
+        event_id,
+        admission,
+        outcome,
+        quotas,
+        quota_before,
+        quota_after,
+        cumulative,
+        cumulative_state,
+        cumulative_before,
+        cumulative_after,
+        invocation_quotas_explicit,
+        requested_exposure_units,
+    } = params;
     transaction.execute(
         r#"
         UPDATE budget_mutation_events
@@ -1549,21 +1548,20 @@ pub(super) fn cumulative_usage(
     }
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-)]
 pub(super) fn authorization_decision(
     store: &SqliteBudgetStore,
-    request: BudgetAuthorizeHoldRequest,
-    outcome: BudgetAuthorizationOutcome,
-    event_seq: u64,
-    recorded_at: i64,
-    usage: BudgetUsageRecord,
-    quotas: Vec<QuotaState>,
-    cumulative_state: Option<BudgetCumulativeApprovalState>,
-    cumulative_account: Option<CumulativeAccount>,
+    params: AuthorizationDecisionInput,
 ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
+    let AuthorizationDecisionInput {
+        request,
+        outcome,
+        event_seq,
+        recorded_at,
+        usage,
+        quotas,
+        cumulative_state,
+        cumulative_account,
+    } = params;
     let quota_usages = quotas.iter().map(QuotaState::usage).collect();
     let cumulative = request
         .cumulative_approval
@@ -1660,22 +1658,24 @@ pub(super) fn decision_from_persisted_event(
     let cumulative_account = load_event_cumulative_after(transaction, &event.event_id)?;
     authorization_decision(
         store,
-        request,
-        outcome,
-        event.event_seq,
-        event.recorded_at,
-        BudgetUsageRecord {
-            capability_id: event.capability_id.clone(),
-            grant_index: event.grant_index,
-            invocation_count: event.invocation_count_after,
-            updated_at: event.recorded_at,
-            seq: event.usage_seq.unwrap_or(0),
-            total_cost_exposed: event.total_cost_exposed_after,
-            total_cost_realized_spend: event.total_cost_realized_spend_after,
+        AuthorizationDecisionInput {
+            request,
+            outcome,
+            event_seq: event.event_seq,
+            recorded_at: event.recorded_at,
+            usage: BudgetUsageRecord {
+                capability_id: event.capability_id.clone(),
+                grant_index: event.grant_index,
+                invocation_count: event.invocation_count_after,
+                updated_at: event.recorded_at,
+                seq: event.usage_seq.unwrap_or(0),
+                total_cost_exposed: event.total_cost_exposed_after,
+                total_cost_realized_spend: event.total_cost_realized_spend_after,
+            },
+            quotas: quota_states,
+            cumulative_state,
+            cumulative_account,
         },
-        quota_states,
-        cumulative_state,
-        cumulative_account,
     )
 }
 

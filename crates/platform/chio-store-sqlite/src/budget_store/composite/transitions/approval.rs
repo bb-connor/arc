@@ -59,16 +59,18 @@ impl SqliteBudgetStore {
         if let Some(decision) = replay_transition(
             self,
             &transaction,
-            &request.event_id,
-            BudgetMutationKind::AuthorizeCumulativeApproval,
-            &request.hold_id,
-            &identity.0,
-            grant_index,
-            Some(0),
-            Some(0),
-            request.authority.as_ref(),
-            None,
-            None,
+            TransitionReplay {
+                event_id: &request.event_id,
+                kind: BudgetMutationKind::AuthorizeCumulativeApproval,
+                hold_id: &request.hold_id,
+                capability_id: &identity.0,
+                grant_index,
+                exposure_units: Some(0),
+                realized_spend_units: Some(0),
+                authority: request.authority.as_ref(),
+                trusted_time: None,
+                expected_cumulative_state: None,
+            },
         )? {
             let stored = transaction.query_row(
                 r#"
@@ -190,28 +192,30 @@ impl SqliteBudgetStore {
         )?;
         write_transition_projection(
             &transaction,
-            &event.event_id,
-            &hold,
-            Some(BudgetAuthorizationOutcome::Authorized),
-            hold.invocation_state,
-            hold.invocation_state,
-            hold.monetary_state,
-            hold.monetary_state,
-            &quota_states,
-            &quota_states,
-            Some(CumulativeSnapshot {
-                request: &cumulative,
-                state: state_before,
-                account: &account_before,
-            }),
-            Some(CumulativeSnapshot {
-                request: &cumulative,
-                state: BudgetCumulativeApprovalState::Authorized,
-                account: &account_after,
-            }),
-            Some(&request.approval_set_digest),
-            None,
-            None,
+            TransitionProjection {
+                event_id: &event.event_id,
+                hold: &hold,
+                authorization_outcome: Some(BudgetAuthorizationOutcome::Authorized),
+                invocation_before: hold.invocation_state,
+                invocation_after: hold.invocation_state,
+                monetary_before: hold.monetary_state,
+                monetary_after: hold.monetary_state,
+                quota_before: &quota_states,
+                quota_after: &quota_states,
+                cumulative_before: Some(CumulativeSnapshot {
+                    request: &cumulative,
+                    state: state_before,
+                    account: &account_before,
+                }),
+                cumulative_after: Some(CumulativeSnapshot {
+                    request: &cumulative,
+                    state: BudgetCumulativeApprovalState::Authorized,
+                    account: &account_after,
+                }),
+                approval_set_digest: Some(&request.approval_set_digest),
+                trusted_time: None,
+                expected_cumulative_state: None,
+            },
         )?;
         let decision = transition_decision_from_event(self, &transaction, event)?;
         self.append_joint_commit(

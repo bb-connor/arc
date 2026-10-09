@@ -9,6 +9,7 @@ mod event_projection;
 mod model;
 mod native_capture;
 mod nonce;
+mod params;
 mod preflight;
 pub(crate) use nonce::{
     verify_compensated_budget_hold_tx, verify_nonce_budget_phase_tx, NonceBudgetPhase,
@@ -24,6 +25,7 @@ mod validation;
 
 use cumulative_model::*;
 use model::*;
+use params::*;
 use transitions::*;
 use validation::*;
 
@@ -529,30 +531,34 @@ impl SqliteBudgetStore {
         )?;
         write_authorization_event_projection(
             &transaction,
-            &event.event_id,
-            admission,
-            outcome,
-            &quotas,
-            &quota_before,
-            &quota_after,
-            request.cumulative_approval.as_ref(),
-            cumulative_state,
-            cumulative_before.as_ref(),
-            cumulative_after.as_ref(),
-            !request.invocation_quotas.is_empty(),
-            request.requested_exposure_units,
+            AuthorizationEventProjection {
+                event_id: &event.event_id,
+                admission,
+                outcome,
+                quotas: &quotas,
+                quota_before: &quota_before,
+                quota_after: &quota_after,
+                cumulative: request.cumulative_approval.as_ref(),
+                cumulative_state,
+                cumulative_before: cumulative_before.as_ref(),
+                cumulative_after: cumulative_after.as_ref(),
+                invocation_quotas_explicit: !request.invocation_quotas.is_empty(),
+                requested_exposure_units: request.requested_exposure_units,
+            },
         )?;
         self.append_joint_commit(&transaction, authorization_kind, event_id, event_seq)?;
         let decision = authorization_decision(
             self,
-            request.clone(),
-            outcome,
-            event_seq,
-            event.recorded_at,
-            usage_after,
-            quota_after,
-            cumulative_state,
-            cumulative_after,
+            AuthorizationDecisionInput {
+                request: request.clone(),
+                outcome,
+                event_seq,
+                recorded_at: event.recorded_at,
+                usage: usage_after,
+                quotas: quota_after,
+                cumulative_state,
+                cumulative_account: cumulative_after,
+            },
         )?;
         let operation =
             self.bind_authorization_to_admission(&transaction, &request, &decision, binding, true)?;

@@ -1,6 +1,19 @@
 #![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use super::*;
 
+/// Parameters of `settle_composite_hold_in_transaction`.
+struct CompositeSettlement<'a> {
+    capability_id: &'a str,
+    grant_index: usize,
+    exposed_units: u64,
+    realized_units: u64,
+    hold_id: &'a str,
+    event_id: &'a str,
+    authority: Option<&'a BudgetEventAuthority>,
+    kind: BudgetMutationKind,
+    monetary_after: BudgetMonetaryState,
+}
+
 impl SqliteBudgetStore {
     pub(crate) fn release_composite_hold(
         &self,
@@ -24,16 +37,18 @@ impl SqliteBudgetStore {
         if let Some(decision) = replay_transition(
             self,
             &transaction,
-            event_id,
-            BudgetMutationKind::ReleaseExposure,
-            hold_id,
-            &request.capability_id,
-            request.grant_index,
-            Some(request.released_exposure_units),
-            Some(0),
-            request.authority.as_ref(),
-            None,
-            None,
+            TransitionReplay {
+                event_id,
+                kind: BudgetMutationKind::ReleaseExposure,
+                hold_id,
+                capability_id: &request.capability_id,
+                grant_index: request.grant_index,
+                exposure_units: Some(request.released_exposure_units),
+                realized_spend_units: Some(0),
+                authority: request.authority.as_ref(),
+                trusted_time: None,
+                expected_cumulative_state: None,
+            },
         )? {
             transaction.rollback()?;
             return Ok(decision);
@@ -146,28 +161,30 @@ impl SqliteBudgetStore {
                 });
         write_transition_projection(
             &transaction,
-            &event.event_id,
-            &hold,
-            None,
-            hold.invocation_state,
-            hold.invocation_state,
-            hold.monetary_state,
-            monetary_after,
-            &quota_states,
-            &quota_states,
-            cumulative_snapshot,
-            cumulative
-                .as_ref()
-                .map(|(request, state, account, _)| CumulativeSnapshot {
-                    request,
-                    state: *state,
-                    account,
+            TransitionProjection {
+                event_id: &event.event_id,
+                hold: &hold,
+                authorization_outcome: None,
+                invocation_before: hold.invocation_state,
+                invocation_after: hold.invocation_state,
+                monetary_before: hold.monetary_state,
+                monetary_after,
+                quota_before: &quota_states,
+                quota_after: &quota_states,
+                cumulative_before: cumulative_snapshot,
+                cumulative_after: cumulative.as_ref().map(|(request, state, account, _)| {
+                    CumulativeSnapshot {
+                        request,
+                        state: *state,
+                        account,
+                    }
                 }),
-            cumulative
-                .as_ref()
-                .and_then(|(_, _, _, digest)| digest.as_deref()),
-            None,
-            None,
+                approval_set_digest: cumulative
+                    .as_ref()
+                    .and_then(|(_, _, _, digest)| digest.as_deref()),
+                trusted_time: None,
+                expected_cumulative_state: None,
+            },
         )?;
         let decision = transition_decision_from_event(self, &transaction, event)?;
         self.append_joint_commit(
@@ -206,16 +223,18 @@ impl SqliteBudgetStore {
         if let Some(decision) = replay_transition(
             self,
             &transaction,
-            event_id,
-            reverse_kind,
-            hold_id,
-            &request.capability_id,
-            request.grant_index,
-            Some(request.reversed_exposure_units),
-            Some(0),
-            request.authority.as_ref(),
-            None,
-            request.expected_cumulative_approval_state,
+            TransitionReplay {
+                event_id,
+                kind: reverse_kind,
+                hold_id,
+                capability_id: &request.capability_id,
+                grant_index: request.grant_index,
+                exposure_units: Some(request.reversed_exposure_units),
+                realized_spend_units: Some(0),
+                authority: request.authority.as_ref(),
+                trusted_time: None,
+                expected_cumulative_state: request.expected_cumulative_approval_state,
+            },
         )? {
             transaction.rollback()?;
             return Ok(decision);
@@ -394,34 +413,36 @@ impl SqliteBudgetStore {
         )?;
         write_transition_projection(
             &transaction,
-            &event.event_id,
-            &hold,
-            None,
-            BudgetInvocationState::Authorized,
-            BudgetInvocationState::Reversed,
-            hold.monetary_state,
-            monetary_after,
-            &quota_before,
-            &quota_after,
-            cumulative_before
-                .as_ref()
-                .map(|(request, state, account, _)| CumulativeSnapshot {
-                    request,
-                    state: *state,
-                    account,
-                }),
-            cumulative_after
-                .as_ref()
-                .map(|(request, state, account, _)| CumulativeSnapshot {
-                    request,
-                    state: *state,
-                    account,
-                }),
-            cumulative_after
-                .as_ref()
-                .and_then(|(_, _, _, digest)| digest.as_deref()),
-            None,
-            request.expected_cumulative_approval_state,
+            TransitionProjection {
+                event_id: &event.event_id,
+                hold: &hold,
+                authorization_outcome: None,
+                invocation_before: BudgetInvocationState::Authorized,
+                invocation_after: BudgetInvocationState::Reversed,
+                monetary_before: hold.monetary_state,
+                monetary_after,
+                quota_before: &quota_before,
+                quota_after: &quota_after,
+                cumulative_before: cumulative_before.as_ref().map(
+                    |(request, state, account, _)| CumulativeSnapshot {
+                        request,
+                        state: *state,
+                        account,
+                    },
+                ),
+                cumulative_after: cumulative_after
+                    .as_ref()
+                    .map(|(request, state, account, _)| CumulativeSnapshot {
+                        request,
+                        state: *state,
+                        account,
+                    }),
+                approval_set_digest: cumulative_after
+                    .as_ref()
+                    .and_then(|(_, _, _, digest)| digest.as_deref()),
+                trusted_time: None,
+                expected_cumulative_state: request.expected_cumulative_approval_state,
+            },
         )?;
         let decision = transition_decision_from_event(self, &transaction, event)?;
         self.append_joint_commit(&transaction, reverse_kind, event_id, event_seq)?;
@@ -441,16 +462,18 @@ impl SqliteBudgetStore {
         if let Some(decision) = replay_transition(
             self,
             &transaction,
-            &request.event_id,
-            BudgetMutationKind::CancelCapturedBeforeDispatch,
-            &request.hold_id,
-            &request.capability_id,
-            request.grant_index,
-            None,
-            Some(0),
-            request.authority.as_ref(),
-            None,
-            Some(BudgetCumulativeApprovalState::Captured),
+            TransitionReplay {
+                event_id: &request.event_id,
+                kind: BudgetMutationKind::CancelCapturedBeforeDispatch,
+                hold_id: &request.hold_id,
+                capability_id: &request.capability_id,
+                grant_index: request.grant_index,
+                exposure_units: None,
+                realized_spend_units: Some(0),
+                authority: request.authority.as_ref(),
+                trusted_time: None,
+                expected_cumulative_state: Some(BudgetCumulativeApprovalState::Captured),
+            },
         )? {
             transaction.rollback()?;
             return Ok(
@@ -627,30 +650,32 @@ impl SqliteBudgetStore {
         )?;
         write_transition_projection(
             &transaction,
-            &event.event_id,
-            &hold,
-            None,
-            BudgetInvocationState::Captured,
-            BudgetInvocationState::Reversed,
-            hold.monetary_state,
-            monetary_after,
-            &quota_before,
-            &quota_after,
-            cumulative_before
-                .as_ref()
-                .map(|(request, state, account, _)| CumulativeSnapshot {
-                    request,
-                    state: *state,
-                    account,
+            TransitionProjection {
+                event_id: &event.event_id,
+                hold: &hold,
+                authorization_outcome: None,
+                invocation_before: BudgetInvocationState::Captured,
+                invocation_after: BudgetInvocationState::Reversed,
+                monetary_before: hold.monetary_state,
+                monetary_after,
+                quota_before: &quota_before,
+                quota_after: &quota_after,
+                cumulative_before: cumulative_before.as_ref().map(
+                    |(request, state, account, _)| CumulativeSnapshot {
+                        request,
+                        state: *state,
+                        account,
+                    },
+                ),
+                cumulative_after: Some(CumulativeSnapshot {
+                    request: &cumulative_after.0,
+                    state: cumulative_after.1,
+                    account: &cumulative_after.2,
                 }),
-            Some(CumulativeSnapshot {
-                request: &cumulative_after.0,
-                state: cumulative_after.1,
-                account: &cumulative_after.2,
-            }),
-            cumulative_after.3.as_deref(),
-            None,
-            Some(BudgetCumulativeApprovalState::Captured),
+                approval_set_digest: cumulative_after.3.as_deref(),
+                trusted_time: None,
+                expected_cumulative_state: Some(BudgetCumulativeApprovalState::Captured),
+            },
         )?;
         let decision = transition_decision_from_event(self, &transaction, event)?;
         self.append_joint_commit(
@@ -666,26 +691,11 @@ impl SqliteBudgetStore {
         ))
     }
 
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-    )]
     fn settle_composite_hold(
         &self,
-        capability_id: &str,
-        grant_index: usize,
-        exposed_units: u64,
-        realized_units: u64,
-        hold_id: &str,
-        event_id: &str,
-        authority: Option<&BudgetEventAuthority>,
-        kind: BudgetMutationKind,
-        monetary_after: BudgetMonetaryState,
+        settlement: CompositeSettlement<'_>,
     ) -> Result<BudgetHoldMutationDecision, BudgetStoreError> {
-        let mut connection = self.connection()?;
-        let transaction = self.begin_write(&mut connection)?;
-        let (decision, changed) = self.settle_composite_hold_in_transaction(
-            &transaction,
+        let CompositeSettlement {
             capability_id,
             grant_index,
             exposed_units,
@@ -695,6 +705,22 @@ impl SqliteBudgetStore {
             authority,
             kind,
             monetary_after,
+        } = settlement;
+        let mut connection = self.connection()?;
+        let transaction = self.begin_write(&mut connection)?;
+        let (decision, changed) = self.settle_composite_hold_in_transaction(
+            &transaction,
+            CompositeSettlement {
+                capability_id,
+                grant_index,
+                exposed_units,
+                realized_units,
+                hold_id,
+                event_id,
+                authority,
+                kind,
+                monetary_after,
+            },
         )?;
         if changed {
             self.commit_joint_transaction(transaction)?;
@@ -705,23 +731,22 @@ impl SqliteBudgetStore {
         Ok(decision)
     }
 
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-    )]
     fn settle_composite_hold_in_transaction(
         &self,
         transaction: &rusqlite::Transaction<'_>,
-        capability_id: &str,
-        grant_index: usize,
-        exposed_units: u64,
-        realized_units: u64,
-        hold_id: &str,
-        event_id: &str,
-        authority: Option<&BudgetEventAuthority>,
-        kind: BudgetMutationKind,
-        monetary_after: BudgetMonetaryState,
+        settlement: CompositeSettlement<'_>,
     ) -> Result<(BudgetHoldMutationDecision, bool), BudgetStoreError> {
+        let CompositeSettlement {
+            capability_id,
+            grant_index,
+            exposed_units,
+            realized_units,
+            hold_id,
+            event_id,
+            authority,
+            kind,
+            monetary_after,
+        } = settlement;
         if exposed_units == 0 || realized_units > exposed_units {
             return Err(BudgetStoreError::Invariant(
                 "monetary settlement requires positive exposure and spend not above exposure"
@@ -733,16 +758,18 @@ impl SqliteBudgetStore {
         if let Some(decision) = replay_transition(
             self,
             transaction,
-            event_id,
-            kind,
-            hold_id,
-            capability_id,
-            grant_index,
-            Some(exposed_units),
-            Some(realized_units),
-            authority,
-            None,
-            None,
+            TransitionReplay {
+                event_id,
+                kind,
+                hold_id,
+                capability_id,
+                grant_index,
+                exposure_units: Some(exposed_units),
+                realized_spend_units: Some(realized_units),
+                authority,
+                trusted_time: None,
+                expected_cumulative_state: None,
+            },
         )? {
             return Ok((decision, false));
         }
@@ -836,34 +863,36 @@ impl SqliteBudgetStore {
         )?;
         write_transition_projection(
             transaction,
-            &event.event_id,
-            &hold,
-            None,
-            hold.invocation_state,
-            hold.invocation_state,
-            hold.monetary_state,
-            monetary_after,
-            &quota_states,
-            &quota_states,
-            cumulative
-                .as_ref()
-                .map(|(request, state, account, _)| CumulativeSnapshot {
-                    request,
-                    state: *state,
-                    account,
+            TransitionProjection {
+                event_id: &event.event_id,
+                hold: &hold,
+                authorization_outcome: None,
+                invocation_before: hold.invocation_state,
+                invocation_after: hold.invocation_state,
+                monetary_before: hold.monetary_state,
+                monetary_after,
+                quota_before: &quota_states,
+                quota_after: &quota_states,
+                cumulative_before: cumulative.as_ref().map(|(request, state, account, _)| {
+                    CumulativeSnapshot {
+                        request,
+                        state: *state,
+                        account,
+                    }
                 }),
-            cumulative
-                .as_ref()
-                .map(|(request, state, account, _)| CumulativeSnapshot {
-                    request,
-                    state: *state,
-                    account,
+                cumulative_after: cumulative.as_ref().map(|(request, state, account, _)| {
+                    CumulativeSnapshot {
+                        request,
+                        state: *state,
+                        account,
+                    }
                 }),
-            cumulative
-                .as_ref()
-                .and_then(|(_, _, _, digest)| digest.as_deref()),
-            None,
-            None,
+                approval_set_digest: cumulative
+                    .as_ref()
+                    .and_then(|(_, _, _, digest)| digest.as_deref()),
+                trusted_time: None,
+                expected_cumulative_state: None,
+            },
         )?;
         let decision = transition_decision_from_event(self, transaction, event)?;
         self.append_joint_commit(transaction, kind, event_id, event_seq)?;
@@ -878,21 +907,25 @@ impl SqliteBudgetStore {
         request.validate()?;
         self.settle_composite_hold_in_transaction(
             transaction,
-            &request.capability_id,
-            request.grant_index,
-            request.exposed_cost_units,
-            request.realized_spend_units,
-            request.hold_id.as_deref().ok_or_else(|| {
-                BudgetStoreError::Invariant("composite reconciliation requires hold_id".to_string())
-            })?,
-            request.event_id.as_deref().ok_or_else(|| {
-                BudgetStoreError::Invariant(
-                    "composite reconciliation requires event_id".to_string(),
-                )
-            })?,
-            request.authority.as_ref(),
-            BudgetMutationKind::ReconcileSpend,
-            BudgetMonetaryState::Reconciled,
+            CompositeSettlement {
+                capability_id: &request.capability_id,
+                grant_index: request.grant_index,
+                exposed_units: request.exposed_cost_units,
+                realized_units: request.realized_spend_units,
+                hold_id: request.hold_id.as_deref().ok_or_else(|| {
+                    BudgetStoreError::Invariant(
+                        "composite reconciliation requires hold_id".to_string(),
+                    )
+                })?,
+                event_id: request.event_id.as_deref().ok_or_else(|| {
+                    BudgetStoreError::Invariant(
+                        "composite reconciliation requires event_id".to_string(),
+                    )
+                })?,
+                authority: request.authority.as_ref(),
+                kind: BudgetMutationKind::ReconcileSpend,
+                monetary_after: BudgetMonetaryState::Reconciled,
+            },
         )
     }
 
@@ -901,23 +934,23 @@ impl SqliteBudgetStore {
         request: BudgetReconcileHoldRequest,
     ) -> Result<BudgetReconcileHoldDecision, BudgetStoreError> {
         request.validate()?;
-        self.settle_composite_hold(
-            &request.capability_id,
-            request.grant_index,
-            request.exposed_cost_units,
-            request.realized_spend_units,
-            request.hold_id.as_deref().ok_or_else(|| {
+        self.settle_composite_hold(CompositeSettlement {
+            capability_id: &request.capability_id,
+            grant_index: request.grant_index,
+            exposed_units: request.exposed_cost_units,
+            realized_units: request.realized_spend_units,
+            hold_id: request.hold_id.as_deref().ok_or_else(|| {
                 BudgetStoreError::Invariant("composite reconciliation requires hold_id".to_string())
             })?,
-            request.event_id.as_deref().ok_or_else(|| {
+            event_id: request.event_id.as_deref().ok_or_else(|| {
                 BudgetStoreError::Invariant(
                     "composite reconciliation requires event_id".to_string(),
                 )
             })?,
-            request.authority.as_ref(),
-            BudgetMutationKind::ReconcileSpend,
-            BudgetMonetaryState::Reconciled,
-        )
+            authority: request.authority.as_ref(),
+            kind: BudgetMutationKind::ReconcileSpend,
+            monetary_after: BudgetMonetaryState::Reconciled,
+        })
     }
 
     pub(crate) fn capture_composite_hold(
@@ -925,24 +958,24 @@ impl SqliteBudgetStore {
         request: BudgetCaptureHoldRequest,
     ) -> Result<BudgetCaptureHoldDecision, BudgetStoreError> {
         request.validate()?;
-        self.settle_composite_hold(
-            &request.capability_id,
-            request.grant_index,
-            request.exposed_cost_units,
-            request.realized_spend_units,
-            request.hold_id.as_deref().ok_or_else(|| {
+        self.settle_composite_hold(CompositeSettlement {
+            capability_id: &request.capability_id,
+            grant_index: request.grant_index,
+            exposed_units: request.exposed_cost_units,
+            realized_units: request.realized_spend_units,
+            hold_id: request.hold_id.as_deref().ok_or_else(|| {
                 BudgetStoreError::Invariant(
                     "composite monetary capture requires hold_id".to_string(),
                 )
             })?,
-            request.event_id.as_deref().ok_or_else(|| {
+            event_id: request.event_id.as_deref().ok_or_else(|| {
                 BudgetStoreError::Invariant(
                     "composite monetary capture requires event_id".to_string(),
                 )
             })?,
-            request.authority.as_ref(),
-            BudgetMutationKind::CaptureSpend,
-            BudgetMonetaryState::Captured,
-        )
+            authority: request.authority.as_ref(),
+            kind: BudgetMutationKind::CaptureSpend,
+            monetary_after: BudgetMonetaryState::Captured,
+        })
     }
 }

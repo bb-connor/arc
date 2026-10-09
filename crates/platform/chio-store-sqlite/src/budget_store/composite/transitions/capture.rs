@@ -120,16 +120,18 @@ impl SqliteBudgetStore {
         if let Some(decision) = replay_transition(
             self,
             &transaction,
-            &request.event_id,
-            BudgetMutationKind::CaptureInvocation,
-            &request.hold_id,
-            &request.capability_id,
-            request.grant_index,
-            None,
-            Some(0),
-            request.authority.as_ref(),
-            request.trusted_time,
-            None,
+            TransitionReplay {
+                event_id: &request.event_id,
+                kind: BudgetMutationKind::CaptureInvocation,
+                hold_id: &request.hold_id,
+                capability_id: &request.capability_id,
+                grant_index: request.grant_index,
+                exposure_units: None,
+                realized_spend_units: Some(0),
+                authority: request.authority.as_ref(),
+                trusted_time: request.trusted_time,
+                expected_cumulative_state: None,
+            },
         )? {
             let decision = BudgetInvocationCaptureDecision::AlreadyCaptured(decision);
             let operation = match admission {
@@ -412,34 +414,36 @@ impl SqliteBudgetStore {
         )?;
         write_transition_projection(
             &transaction,
-            &event.event_id,
-            &hold,
-            None,
-            BudgetInvocationState::Authorized,
-            BudgetInvocationState::Captured,
-            hold.monetary_state,
-            hold.monetary_state,
-            &quota_before,
-            &quota_after,
-            cumulative_before
-                .as_ref()
-                .map(|(request, state, account, _)| CumulativeSnapshot {
-                    request,
-                    state: *state,
-                    account,
-                }),
-            cumulative_after
-                .as_ref()
-                .map(|(request, state, account, _)| CumulativeSnapshot {
-                    request,
-                    state: *state,
-                    account,
-                }),
-            cumulative_after
-                .as_ref()
-                .and_then(|(_, _, _, digest)| digest.as_deref()),
-            trusted_time,
-            None,
+            TransitionProjection {
+                event_id: &event.event_id,
+                hold: &hold,
+                authorization_outcome: None,
+                invocation_before: BudgetInvocationState::Authorized,
+                invocation_after: BudgetInvocationState::Captured,
+                monetary_before: hold.monetary_state,
+                monetary_after: hold.monetary_state,
+                quota_before: &quota_before,
+                quota_after: &quota_after,
+                cumulative_before: cumulative_before.as_ref().map(
+                    |(request, state, account, _)| CumulativeSnapshot {
+                        request,
+                        state: *state,
+                        account,
+                    },
+                ),
+                cumulative_after: cumulative_after
+                    .as_ref()
+                    .map(|(request, state, account, _)| CumulativeSnapshot {
+                        request,
+                        state: *state,
+                        account,
+                    }),
+                approval_set_digest: cumulative_after
+                    .as_ref()
+                    .and_then(|(_, _, _, digest)| digest.as_deref()),
+                trusted_time,
+                expected_cumulative_state: None,
+            },
         )?;
         let decision = transition_decision_from_event(self, &transaction, event)?;
         self.append_joint_commit(
