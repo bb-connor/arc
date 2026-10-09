@@ -1192,7 +1192,7 @@ pub(super) fn durable_admission_fixture(
     durable_admission_fixture_with_grants(request_id, vec![make_grant("durable-server", "mutate")])
 }
 
-fn durable_admission_fixture_with_grants(
+pub(super) fn durable_admission_fixture_with_grants(
     request_id: &str,
     grants: Vec<ToolGrant>,
 ) -> (

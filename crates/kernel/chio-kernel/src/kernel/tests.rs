@@ -295,6 +295,8 @@ mod drop_guard_proptest;
 mod formal_closure;
 #[path = "tests/invocation_dispatch.rs"]
 mod invocation_dispatch;
+#[path = "tests/pre_dispatch_exits.rs"]
+mod pre_dispatch_exits;
 
 #[path = "tests/automatic_active_response_fence.rs"]
 mod automatic_active_response_fence;

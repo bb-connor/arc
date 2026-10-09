@@ -220,3 +220,23 @@ impl ChioKernel {
         ))
     }
 }
+
+#[cfg(test)]
+impl ChioKernel {
+    /// The reserving authorization as a future, so a test can drop it at a
+    /// pre-dispatch await.
+    pub(crate) async fn authorize_tool_call_reserving(
+        &self,
+        request: &ToolCallRequest,
+    ) -> Result<ToolCallResponse, KernelError> {
+        self.evaluate_tool_call_async_with_session_context(
+            request,
+            None,
+            None,
+            None,
+            None,
+            EvaluationDisposition::legacy_reservation(),
+        )
+        .await
+    }
+}
