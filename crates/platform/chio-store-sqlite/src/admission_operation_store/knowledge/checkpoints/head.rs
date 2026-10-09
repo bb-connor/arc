@@ -85,6 +85,17 @@ pub(super) fn load_checkpoint(
     id: &CheckpointId,
     revision: u64,
 ) -> Result<Option<LabeledCheckpointV1>, AdmissionOperationStoreError> {
+    Ok(load_checkpoint_with_key(tx, scope, id, revision)?.map(|(checkpoint, _)| checkpoint))
+}
+
+/// Keep the physical source paired with the authenticated envelope selected by
+/// identity-safe resolution. A later mutation must not reselect it by presence.
+pub(super) fn load_checkpoint_with_key(
+    tx: &Connection,
+    scope: &RecoveryScopeV1,
+    id: &CheckpointId,
+    revision: u64,
+) -> Result<Option<(LabeledCheckpointV1, String)>, AdmissionOperationStoreError> {
     let key = if revision == 0 {
         checkpoint_key(scope, id)?
     } else {
@@ -92,7 +103,7 @@ pub(super) fn load_checkpoint(
     };
     if let Some(checkpoint) = load::<LabeledCheckpointV1>(tx, &key)? {
         validate_checkpoint_identity(&checkpoint, scope, id, revision)?;
-        return Ok(Some(checkpoint));
+        return Ok(Some((checkpoint, key)));
     }
 
     let legacy_key = legacy_checkpoint_key(scope, id, revision)?;
@@ -122,7 +133,7 @@ pub(super) fn load_checkpoint(
         };
     }
     validate_checkpoint_identity(&checkpoint, scope, id, revision)?;
-    Ok(Some(checkpoint))
+    Ok(Some((checkpoint, legacy_key)))
 }
 
 /// Only decimal revision suffixes can belong to this historical identity.
@@ -133,7 +144,7 @@ fn highest_legacy_checkpoint(
     tx: &Connection,
     scope: &RecoveryScopeV1,
     id: &CheckpointId,
-) -> Result<Option<LabeledCheckpointV1>, AdmissionOperationStoreError> {
+) -> Result<Option<(LabeledCheckpointV1, String)>, AdmissionOperationStoreError> {
     let latest = legacy_checkpoint_key(scope, id, 0)?;
     let prefix = format!("{latest}:");
     let upper = format!("{latest};");
@@ -164,7 +175,7 @@ fn highest_legacy_checkpoint(
             return Err(refused("legacy checkpoint history identity"));
         }
         if checkpoint.checkpoint == *id {
-            return Ok(Some(checkpoint));
+            return Ok(Some((checkpoint, key)));
         }
     }
     Ok(None)
