@@ -22,6 +22,7 @@ use super::project::{
     child_source_matches, SignedToolProjection, CHILD_SOURCE_PROJECTION_SQL,
     TOOL_SOURCE_PROJECTION_SQL,
 };
+use crate::capability_lineage::snapshot_from_row;
 use crate::receipt_store::support::{
     checkpoint_error_to_receipt_store, latest_watermark_archive_path,
     parse_persisted_checkpoint_row, retention_watermark, validate_checkpoint_base,
@@ -1251,14 +1252,25 @@ pub(super) fn verify_source_bijection(
     Ok(())
 }
 
-/// Read capability lineage rows above `after` for subject refresh, measuring
-/// each row's identifier and subject before allocating them.
+/// One capability lineage row read for subject refresh.
+#[derive(Debug)]
+pub(super) struct LineageRow {
+    pub(super) rowid: i64,
+    pub(super) capability_id: String,
+    /// The subject the canonical local reader accepts from this row, or why
+    /// it refuses the row.
+    pub(super) subject: Result<String, String>,
+}
+
+/// Read capability lineage rows above `after` for subject refresh through
+/// the canonical local decoder and validator, measuring every
+/// variable-length column of each row before allocating it.
 pub(super) fn copy_lineage(
     ctx: &WalkContext<'_>,
     after: i64,
     through: i64,
     limit: i64,
-) -> Result<Vec<(i64, String, String)>, WalkError> {
+) -> Result<Vec<LineageRow>, WalkError> {
     let mut connection = live_connection(ctx)?;
     let transaction = connection
         .transaction()
@@ -1266,7 +1278,13 @@ pub(super) fn copy_lineage(
     let guard = StepGuard::install(&transaction, ctx.limits.sql_steps, ctx.cancel)?;
     let sizes = (|| -> Result<Vec<(i64, u64)>, ReceiptStoreError> {
         let mut statement = transaction.prepare_cached(
-            "SELECT rowid, length(CAST(capability_id AS BLOB)) + length(CAST(subject_key AS BLOB))
+            "SELECT rowid,
+                    length(CAST(capability_id AS BLOB)) + length(CAST(subject_key AS BLOB))
+                    + length(CAST(issuer_key AS BLOB)) + length(CAST(grants_json AS BLOB))
+                    + COALESCE(length(CAST(parent_capability_id AS BLOB)), 0)
+                    + COALESCE(length(CAST(federated_parent_capability_id AS BLOB)), 0)
+                    + COALESCE(length(CAST(provenance AS BLOB)), 0)
+                    + COALESCE(length(CAST(signed_capability_json AS BLOB)), 0)
              FROM capability_lineage WHERE rowid > ?1 AND rowid <= ?2 ORDER BY rowid LIMIT ?3",
         )?;
         let rows = statement.query_map(params![after, through, limit], |row| {
@@ -1296,13 +1314,22 @@ pub(super) fn copy_lineage(
     let Some(last) = last else {
         return Ok(Vec::new());
     };
-    let rows = (|| -> Result<Vec<(i64, String, String)>, ReceiptStoreError> {
+    let rows = (|| -> Result<Vec<LineageRow>, ReceiptStoreError> {
+        // The column order is the canonical reader's, with rowid appended.
         let mut statement = transaction.prepare_cached(
-            "SELECT rowid, capability_id, subject_key FROM capability_lineage
-             WHERE rowid > ?1 AND rowid <= ?2 ORDER BY rowid",
+            "SELECT capability_id, subject_key, issuer_key, issued_at, expires_at, grants_json,
+                    delegation_depth, parent_capability_id, federated_parent_capability_id,
+                    provenance, signed_capability_json, rowid
+             FROM capability_lineage WHERE rowid > ?1 AND rowid <= ?2 ORDER BY rowid",
         )?;
         let rows = statement.query_map(params![after, last], |row| {
-            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+            Ok(LineageRow {
+                rowid: row.get(11)?,
+                capability_id: row.get(0)?,
+                subject: snapshot_from_row(row)
+                    .map(|snapshot| snapshot.subject_key)
+                    .map_err(|error| error.to_string()),
+            })
         })?;
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
     })()

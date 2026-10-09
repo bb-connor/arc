@@ -3,6 +3,8 @@
 mod build;
 #[path = "tests/capacity.rs"]
 mod capacity;
+#[path = "tests/lineage.rs"]
+mod lineage;
 #[path = "tests/memory.rs"]
 mod memory;
 #[path = "tests/publication.rs"]

@@ -10,7 +10,7 @@
 //! newest such checkpoint is published on receipt signatures alone.
 use std::time::Instant;
 
-use super::db::SnapshotBatch;
+use super::db::{SnapshotBatch, DIM_CAPABILITY};
 use super::service::Published;
 use super::walk::{
     authenticate, authenticate_checkpoints, check_sources, checked_prefix, commit_in_holds,
@@ -104,11 +104,14 @@ pub(super) fn extend_cycle(
     while after < observation.lineage_rowid {
         ctx.check_cancel()?;
         let rows = copy_lineage(ctx, after, observation.lineage_rowid, LINEAGE_CHUNK)?;
-        let Some(last) = rows.last().map(|(rowid, _, _)| *rowid) else {
+        let Some(last) = rows.last().map(|row| row.rowid) else {
             break;
         };
-        for (_, capability, subject) in rows {
-            refresh_capability(published, &capability, &subject)?;
+        for row in rows {
+            match row.subject {
+                Ok(subject) => refresh_capability(published, &row.capability_id, &subject)?,
+                Err(reason) => refuse_lineage(published, &row.capability_id, &reason)?,
+            }
         }
         after = last;
     }
@@ -181,6 +184,22 @@ fn publish_verified(
         }
         commit_in_holds(sink, &ctx.limits, tools, children, Vec::new())?;
         *next = last + 1;
+    }
+    Ok(())
+}
+
+/// A lineage row the canonical local reader refuses attributes nothing. When
+/// the snapshot holds receipts of its capability, the build and
+/// recertification projections of those receipts consult the same reader and
+/// refuse, so the snapshot cannot stand either. A row for a capability the
+/// snapshot does not hold is checked again when that capability's first
+/// receipt is authenticated.
+fn refuse_lineage(published: &Published, capability: &str, reason: &str) -> Result<(), WalkError> {
+    let held = published.with_db(|db| Ok(db.dim_id(DIM_CAPABILITY, capability).is_some()))?;
+    if held {
+        return Err(WalkError::Integrity(format!(
+            "capability lineage of {capability} is refused by the local reader: {reason}"
+        )));
     }
     Ok(())
 }
