@@ -1,0 +1,91 @@
+{
+  "schema": "chio.security.review-dispositions.v1",
+  "observed_utc": "2026-10-09T23:47:02.797201+00:00",
+  "reviewed_source": "67d5a2a226 (patch-identical landing7d1a89e354)",
+  "integrator": "codex",
+  "scope": "All six independent re-review findings retained. Reported P1s regraded P2: deterministic refusals serve no corrupt bundle and retain other-tenant service, but API and qualification defects must close before landing.",
+  "evidence": {
+    "root-f03-refix-review.md": {
+      "retained_path": "claude-pr1160-evidence/hammer/root-f03-refix-review.md",
+      "sha256": "e43c14fafc9fa5d39c17838baa2c2920242d42a83f6b7c40603bc0aa7e945294"
+    },
+    "root-f03-refix-review-repro.log": {
+      "retained_path": "claude-pr1160-evidence/hammer/root-f03-refix-review-repro.log",
+      "sha256": "7295b457bf64b2afaf430f609e3ce04da1030badc3657ab6bff9df28a17591d9"
+    },
+    "root-f03-refix-review-repro.patch": {
+      "retained_path": "claude-pr1160-evidence/hammer/root-f03-refix-review-repro.patch",
+      "sha256": "72e01aff32ae04c82bca77a4edaabdc20a2a01d619ba7cfe3c03aa48c956c6bb"
+    }
+  },
+  "findings": [
+    {
+      "label": "F03-REFIX-P1-A",
+      "reported_priority": "P1",
+      "priority": "P2",
+      "scope": "now",
+      "state": "review-confirmed-repair-in-progress",
+      "requirement": "Lineage and metadata export refusals must return typed422 without invalidating the shared snapshot.",
+      "remaining_acceptance": [
+        "Expected-safe HTTP Original then422/code/no bundle/Ready/other tenant200; no blanket Conflict mapping."
+      ]
+    },
+    {
+      "label": "F03-REFIX-P1-B",
+      "reported_priority": "P1",
+      "priority": "P2",
+      "scope": "now",
+      "state": "review-confirmed-repair-in-progress",
+      "requirement": "The real4097-receipt router budget control must wait for readiness using service notification.",
+      "remaining_acceptance": [
+        "Preserve unchanged production cap; retain slower-builder timeout failure and renew actual boundary test."
+      ]
+    },
+    {
+      "label": "F03-REFIX-P3-A",
+      "reported_priority": "P3",
+      "priority": "P3",
+      "scope": "now",
+      "state": "review-confirmed-repair-in-progress",
+      "requirement": "Nested Conflict wrapping must not duplicate refusal prefixes.",
+      "remaining_acceptance": [
+        "Preserve underlying reason in the typed outcome."
+      ]
+    },
+    {
+      "label": "F03-REFIX-P3-B",
+      "reported_priority": "P3",
+      "priority": "P3",
+      "scope": "now",
+      "state": "review-confirmed-repair-in-progress",
+      "requirement": "Negative export controls must distinguish intended refusal reasons.",
+      "remaining_acceptance": [
+        "Assert per-fixture typed errors and exact local export refusal."
+      ]
+    },
+    {
+      "label": "F03-REFIX-P3-C",
+      "reported_priority": "P3",
+      "priority": "P3",
+      "scope": "now",
+      "state": "review-confirmed-repair-in-progress",
+      "requirement": "Publication-core and mutable binding error classification must be explicit.",
+      "remaining_acceptance": [
+        "Document or repair classification and test malformed binding with database triggers enabled."
+      ]
+    },
+    {
+      "label": "F03-REFIX-P3-D",
+      "reported_priority": "P3",
+      "priority": "P3",
+      "scope": "now",
+      "state": "review-confirmed-repair-in-progress",
+      "requirement": "The child rotation export test must use condition-based readiness.",
+      "remaining_acceptance": [
+        "Reuse the readiness condition instead of short deadline polling."
+      ]
+    }
+  ],
+  "hosted_qualified": false,
+  "merged": false
+}

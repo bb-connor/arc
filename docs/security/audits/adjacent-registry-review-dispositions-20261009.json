@@ -1,0 +1,68 @@
+{
+  "schema": "chio.security.review-dispositions.v1",
+  "observed_utc": "2026-10-09T23:27:11.547226+00:00",
+  "reviewed_source": "15df68dd3a5f38f2b2dd0cca7e7cd6119cfd9994",
+  "integrator": "codex",
+  "scope": "Two registry transaction omissions adjacent to F13. These pre-exist on main and are not regressions introduced by F13. No specific owner risk acceptance has been located.",
+  "evidence": {
+    "prior_offer_ticket": {
+      "retained_path": "claude-pr1160-evidence/hammer/tickets/postmerge-offers.md",
+      "sha256": "ed6538d61e0240bd64e867275977f3c69d4b8b8201cf1bddbbe5b31c6e515478"
+    },
+    "prior_offer_original": {
+      "retained_path": "claude-pr1160-evidence/vfix/postmerge-offers/red-base.log",
+      "sha256": "ca50ac2af133db86f0bec612716ed976868605b0e4b2fad80052ad57fccc0a9f",
+      "scope": "Expected-safe Original at historical postmerge6d1f892555:0passed3failed. Current15df Original/composition still required."
+    },
+    "current_source_original": {
+      "retained_path": "pr1160-adjacent-registries-20261009/original-current-15df.log",
+      "sha256": "8325c14801eafa4b9a139d1eb3b6812a175568d62bcda5f9694e94192e1b4abe",
+      "scope": "Expected-safe Original at15df production:0passed4failed; offer double consumption, spent token reuse, lost offer creation, policy resurrection."
+    }
+  },
+  "preserved_unique_work": [
+    {
+      "commit": "513db20ce0083048e3804c03e0cbd80361c8d233",
+      "branch": "fix/pr1160-claude-pm-offers",
+      "disposition": "Preserved. In-process-only offer mutex/worker-lane repair is not integrated; current lane must account for its regression and admission obligations while extending same-file cross-process exclusion."
+    },
+    {
+      "commit": "6428aaf7c6e0c1004a0162221e66a9448e9f1242",
+      "branch": "fix/pr1160-claude-pm-offers",
+      "disposition": "Preserved. In-process-only offer mutex/worker-lane repair is not integrated; current lane must account for its regression and admission obligations while extending same-file cross-process exclusion."
+    }
+  ],
+  "source_observations": [
+    "Five offer/policy handler mutations and local CLI writers read, mutate and save without the F13 stable writer lock. No common process mutex is present in these handlers.",
+    "No-await synchronous bodies do not serialize calls running on different Tokio worker threads.",
+    "authority_handlers.rs policy removal is a distinct FederationPolicyRegistry, not a VerifierPolicyRegistry mutation; it is outside this two-registry repair inventory."
+  ],
+  "findings": [
+    {
+      "label": "F13-REVIEW-OFFERS",
+      "priority": "P1",
+      "scope": "now",
+      "state": "current-source-original-confirmed-repair-in-progress",
+      "requirement": "One-time passport offer and token consumption must not be restored by an overlapping file update from an HTTP handler or local CLI writer.",
+      "remaining_acceptance": [
+        "Inventory all shipped offer mutations and preserve issuance capacity and entitlement ordering.",
+        "Current-source deterministic expected-safe Original, stable writer transaction, cancellation-safe bounded HTTP lane, cross-process/CLI and healthy progress controls.",
+        "Account for preserved postmerge513db20ce0/6428aaf7c6 obligations without silently duplicating or dropping work."
+      ]
+    },
+    {
+      "label": "F13-REVIEW-VERIFIER-POLICY",
+      "priority": "P2",
+      "scope": "now",
+      "state": "current-source-original-confirmed-repair-in-progress",
+      "requirement": "Concurrent verifier policy updates must not erase a successful update or revive a removed policy through a stale registry copy.",
+      "remaining_acceptance": [
+        "Genuine expected-safe Original for stale delete/upsert and exact reopen.",
+        "Use the same-entry stable writer transaction for all HTTP and CLI mutations; preserve signature validation and explicit busy/refusal behavior."
+      ]
+    }
+  ],
+  "qualification_reopened": false,
+  "hosted_qualified": false,
+  "merged": false
+}
