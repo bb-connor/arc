@@ -707,21 +707,21 @@ impl HttpAuthority {
                 invalid_reason: Some(reason),
             }
         } else {
-            validate_presented_capability(
-                input.capability_id_hint,
-                input.presented_capability,
-                self.trusted_capability_issuers(),
-                binding.requested_tool_server.as_deref(),
-                binding.requested_tool_name.as_deref(),
-                binding.requested_arguments.as_ref(),
-                input.model_metadata,
+            validate_presented_capability(PresentedCapabilityCheck {
+                capability_id_hint: input.capability_id_hint,
+                presented_capability: input.presented_capability,
+                trusted_issuers: self.trusted_capability_issuers(),
+                requested_tool_server: binding.requested_tool_server.as_deref(),
+                requested_tool_name: binding.requested_tool_name.as_deref(),
+                requested_arguments: binding.requested_arguments.as_ref(),
+                model_metadata: input.model_metadata,
                 now,
-                &|capability_id| {
+                is_revoked: &|capability_id| {
                     self.kernel
                         .is_capability_revoked(capability_id)
                         .map_err(|error| HttpAuthorityError::Kernel(error.to_string()))
                 },
-            )
+            })
         };
 
         let chio_request = ChioHttpRequest {
@@ -1127,18 +1127,31 @@ fn decision_status(verdict: &Verdict) -> u16 {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-fn validate_presented_capability(
-    capability_id_hint: Option<&str>,
-    presented_capability: Option<&str>,
-    trusted_issuers: &[PublicKey],
-    requested_tool_server: Option<&str>,
-    requested_tool_name: Option<&str>,
-    requested_arguments: Option<&Value>,
-    model_metadata: Option<&ModelMetadata>,
+/// Parameters of `validate_presented_capability`.
+struct PresentedCapabilityCheck<'a> {
+    capability_id_hint: Option<&'a str>,
+    presented_capability: Option<&'a str>,
+    trusted_issuers: &'a [PublicKey],
+    requested_tool_server: Option<&'a str>,
+    requested_tool_name: Option<&'a str>,
+    requested_arguments: Option<&'a Value>,
+    model_metadata: Option<&'a ModelMetadata>,
     now: u64,
-    is_revoked: &dyn Fn(&str) -> Result<bool, HttpAuthorityError>,
-) -> PresentedCapabilityState {
+    is_revoked: &'a dyn Fn(&str) -> Result<bool, HttpAuthorityError>,
+}
+
+fn validate_presented_capability(params: PresentedCapabilityCheck<'_>) -> PresentedCapabilityState {
+    let PresentedCapabilityCheck {
+        capability_id_hint,
+        presented_capability,
+        trusted_issuers,
+        requested_tool_server,
+        requested_tool_name,
+        requested_arguments,
+        model_metadata,
+        now,
+        is_revoked,
+    } = params;
     let requested_tool = match (requested_tool_server, requested_tool_name) {
         (Some(server_id), Some(tool_name)) => Some(RequestedToolInvocation {
             server_id,
