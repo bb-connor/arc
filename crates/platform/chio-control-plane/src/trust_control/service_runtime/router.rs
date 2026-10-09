@@ -402,6 +402,10 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
             get(handle_internal_lineage_delta),
         )
         .route(RECEIPT_QUERY_PATH, get(handle_query_receipts))
+        .route(
+            RECEIPT_QUERY_SNAPSHOT_RECOVERY_PATH,
+            post(handle_receipt_query_snapshot_recovery),
+        )
         .route(RECEIPT_ANALYTICS_PATH, get(handle_receipt_analytics))
         .route(EVIDENCE_EXPORT_PATH, post(handle_evidence_export))
         .route(

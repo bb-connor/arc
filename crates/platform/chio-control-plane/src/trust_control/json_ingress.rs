@@ -134,6 +134,7 @@ fn contract(method: &str, path: &str) -> Option<(Mode, usize)> {
         ("POST", PUBLIC_PASSPORT_CHALLENGE_VERIFY_PATH) => Some((Mode::Signed, 1024 * 1024)),
         ("POST", PASSPORT_OID4VP_REQUESTS_PATH) => Some((Mode::Signed, 1024 * 1024)),
         ("POST", REVOCATIONS_PATH) => Some((Mode::Signed, 1024 * 1024)),
+        ("POST", RECEIPT_QUERY_SNAPSHOT_RECOVERY_PATH) => Some((Mode::Signed, 256)),
         ("POST", TOOL_RECEIPTS_PATH) => Some((Mode::Signed, 128 * 1024 * 1024)),
         ("POST", CHILD_RECEIPTS_PATH) => Some((Mode::Signed, 128 * 1024 * 1024)),
         ("POST", BUDGET_INCREMENT_PATH) => Some((Mode::Signed, 1024 * 1024)),

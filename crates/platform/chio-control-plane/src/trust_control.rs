@@ -358,6 +358,8 @@ mod passport_handlers;
 mod receipt_handlers;
 #[path = "trust_control/receipt_query_service.rs"]
 mod receipt_query_service;
+#[path = "trust_control/receipt_snapshot_admin.rs"]
+mod receipt_snapshot_admin;
 #[path = "trust_control/report_rendering.rs"]
 pub(crate) mod report_rendering;
 #[path = "trust_control/report_validation.rs"]
@@ -417,5 +419,8 @@ pub(crate) use self::fiscal_handlers::*;
 pub(crate) use self::fiscal_runtime::*;
 pub(crate) use self::passport_handlers::*;
 pub(crate) use self::receipt_handlers::*;
+pub(crate) use self::receipt_snapshot_admin::{
+    handle_receipt_query_snapshot_recovery, RECEIPT_QUERY_SNAPSHOT_RECOVERY_PATH,
+};
 pub(crate) use self::risk_finance_handlers::*;
 pub use self::underwriting_and_support::*;
