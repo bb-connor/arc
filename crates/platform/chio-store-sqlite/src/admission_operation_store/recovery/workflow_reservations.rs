@@ -267,11 +267,11 @@ impl WorkflowQuota {
         first.native_terminal = None;
         first.native_release = None;
         let counters = [self.planning, self.control, self.native];
-        for class in 0..13 {
+        for (class, counter) in counters.iter().map(Some).chain([None; 10]).enumerate() {
             let mut candidate = first.clone();
             let one = SafeInteger::new(1).map_err(|_| invariant("recovery quota unit refused"))?;
-            if class < 3 {
-                if counters[class].get() == 0 {
+            if let Some(counter) = counter {
+                if counter.get() == 0 {
                     continue;
                 }
                 match class {

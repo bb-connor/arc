@@ -247,6 +247,6 @@ fn ceil(value: u64, divisor: u64) -> Result<u64, AdmissionOperationStoreError> {
     }
     value
         .checked_div(divisor)
-        .and_then(|quotient| quotient.checked_add(u64::from(value % divisor != 0)))
+        .and_then(|quotient| quotient.checked_add(u64::from(!value.is_multiple_of(divisor))))
         .ok_or_else(|| invariant("original custody physical ceiling exhausted"))
 }

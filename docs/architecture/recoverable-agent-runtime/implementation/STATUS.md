@@ -444,3 +444,23 @@ require their own specified acceptance scope. There is no roadmap P7.
 [Cloud cleanup evidence](p6/CLEANUP.md) records the task-owned resources and their
 observed terminal/restored states when captured. It is retained historical
 evidence, not a fresh inspection of current cloud state.
+
+### Local Store idiom repairs
+
+Nine independently reviewed Store replacements preserve wire names, SQL,
+checked arithmetic, short-circuit order and history iteration behavior. Their
+exact GNU/Linux composition
+`dd4bddc0073f6488e716a489249c66ef4ba485a0339e41494261f1867482bc46`
+compiled all five owning library test targets. The retained original assertions
+passed in 38 cases, including the corrected six-case codec selector. The earlier
+empty selector was refused and remains recorded.
+
+The exact strict FIPS diagnostic comparison removes only the nine targeted
+path/message pairs, introduces none, and leaves 248 errors. Strict Store
+all-target Clippy still reports 401 errors. Neither command passes. Seven
+additional recovery controls failed before their declared capture cutpoint or
+because their measured reader was missing. Those actual failures remain open
+and receive no acceptance credit. These observations are retained under
+`target/recovery-pr/current-review-followup/linux-current/store-local-idioms-composition-20261009T0050/`.
+This narrow change does not complete the review, establish funded Native
+availability, or qualify the current runtime.
