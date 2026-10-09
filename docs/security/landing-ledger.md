@@ -66,7 +66,17 @@ not success. Both attempts and the earlier prepared-model mismatch are preserved
 The 26 GiB retry also ended with explicit out-of-memory stderr after 1,410.09
 seconds, with all source, model and tool hashes stable. Its 26 solver errors
 remain unproved. The exact solver input is retained for bounded diagnostics
-with another supported backend; no private tool is enrolled in CI. The 11
+with another supported backend; no private tool is enrolled in CI.
+The [CVC5 diagnostic record](audits/attestation-proof-resource-diagnostics-20261009.json)
+preserves ten expected component-control outcomes and native CVC5 input
+generation from the unchanged model. The solver then refused allocation under
+a 14 GiB address limit. A separate kernel-enforced 10 GiB RAM run with swap
+disabled also exhausted memory. Neither run proves the mandatory assertions
+or cover. A separate root-position-zero probe retained all 256 key seeds but
+timed out at 300 seconds without an assertion or completion-cover verdict.
+The scope checker correctly refused that partial domain. This probe does not
+establish that a complete 32-partition design is feasible, and no gate changed.
+The 11
 receipt HTTP tests passed on `1ba2c4628b`, and an independent read-only review
 found no P0/P1/P2 defect in the nine-file late-lineage repair. Main
 `3af65d2d23` is merged into the stage with both histories preserved; its changed

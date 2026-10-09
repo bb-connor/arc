@@ -87,6 +87,21 @@ stable and all owned children exited. The exact 582,631,570-byte solver input
 is preserved for supported-backend diagnostics. More memory alone has not
 closed the local proof or made the configuration suitable for hosted CI.
 
+Supported CVC5 1.3.0 passed ten positive and negative component controls,
+including strict completion-cover handling and solver-error refusal. Native
+CVC5 formula generation from the same prepared model succeeded. Its actual
+solve refused allocation after 66.65 seconds under a 14 GiB address limit.
+A follow-up with a kernel-enforced 10 GiB RAM ceiling and no swap was killed
+for exhausting that budget after 96.99 seconds. The service then terminated;
+source and tool hashes remained stable. These are resource refusals, not proof
+results. The [diagnostic audit](../security/audits/attestation-proof-resource-diagnostics-20261009.json)
+preserves commands, limits, hashes and component evidence. A separate native
+root-position-zero probe, retaining every key seed, timed out at 300 seconds
+without a terminal assertion or cover verdict. The current scope checker
+correctly refused its reduced domain. Its intermediate solver responses prove
+neither the partial obligation nor the full original domain. No partition
+design, tool change or weaker acceptance was enrolled.
+
 ## V25-C20-OBSERVER-CANCELLATION: P2, required before landing
 
 The new per-generation count observer executes while the production walker
