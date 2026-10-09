@@ -513,12 +513,14 @@ impl ToolOutcomeStore for SqliteToolOutcomeStore {
         let transaction = self.begin_write(&mut connection, active_fence, trusted_now_unix_ms)?;
         let next = self.stage_post_return_evaluation_tx(
             &transaction,
-            operation_id,
-            expected_version,
-            recovery_lease,
-            next,
-            active_fence,
-            trusted_now_unix_ms,
+            PostReturnEvaluationStage {
+                operation_id,
+                expected_version,
+                recovery_lease,
+                next,
+                active_fence,
+                trusted_now_unix_ms,
+            },
         )?;
         self.commit_write(transaction)?;
         self.sync_after_write(&connection)?;
@@ -579,27 +581,31 @@ impl ToolOutcomeStore for SqliteToolOutcomeStore {
                     .map_err(|error| invariant(error.to_string()))?;
                 current = self.stage_post_return_evaluation_tx(
                     &transaction,
-                    operation_id,
-                    version,
-                    recovery_lease,
-                    &next,
-                    active_fence,
-                    trusted_now_unix_ms,
+                    PostReturnEvaluationStage {
+                        operation_id,
+                        expected_version: version,
+                        recovery_lease,
+                        next: &next,
+                        active_fence,
+                        trusted_now_unix_ms,
+                    },
                 )?;
                 version = current.version();
             }
         }
         let terminal = self.finalize_post_return_tx(
             &transaction,
-            operation_id,
-            version,
-            recovery_lease,
-            terminal_evaluation,
-            expected_outcome_version,
-            terminal_outcome,
-            resolved_output,
-            active_fence,
-            trusted_now_unix_ms,
+            PostReturnFinalization {
+                operation_id,
+                expected_evaluation_version: version,
+                recovery_lease,
+                terminal_evaluation,
+                expected_outcome_version,
+                terminal_outcome,
+                resolved_output,
+                active_fence,
+                trusted_now_unix_ms,
+            },
         )?;
         // No pure prefix or terminal result is published until all ordinary
         // step and terminal checks pass and the anchor covers their commit.
@@ -625,21 +631,43 @@ impl ToolOutcomeStore for SqliteToolOutcomeStore {
     }
 }
 
+/// Parameters of `stage_post_return_evaluation_tx`.
+struct PostReturnEvaluationStage<'a> {
+    operation_id: &'a AdmissionOperationId,
+    expected_version: u64,
+    recovery_lease: &'a AdmissionRecoveryLease,
+    next: &'a PostReturnEvaluationRecordV1,
+    active_fence: &'a StoreMutationFence,
+    trusted_now_unix_ms: u64,
+}
+
+/// Parameters of `finalize_post_return_tx`.
+struct PostReturnFinalization<'a> {
+    operation_id: &'a AdmissionOperationId,
+    expected_evaluation_version: u64,
+    recovery_lease: &'a AdmissionRecoveryLease,
+    terminal_evaluation: &'a PostReturnEvaluationRecordV1,
+    expected_outcome_version: u64,
+    terminal_outcome: &'a ToolOutcomeRecordV1,
+    resolved_output: Option<&'a CanonicalResolvedOutputBlobV1>,
+    active_fence: &'a StoreMutationFence,
+    trusted_now_unix_ms: u64,
+}
+
 impl SqliteToolOutcomeStore {
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-    )]
     fn stage_post_return_evaluation_tx(
         &self,
         transaction: &Transaction<'_>,
-        operation_id: &AdmissionOperationId,
-        expected_version: u64,
-        recovery_lease: &AdmissionRecoveryLease,
-        next: &PostReturnEvaluationRecordV1,
-        active_fence: &StoreMutationFence,
-        trusted_now_unix_ms: u64,
+        params: PostReturnEvaluationStage<'_>,
     ) -> Result<PostReturnEvaluationRecordV1, ToolOutcomeStoreError> {
+        let PostReturnEvaluationStage {
+            operation_id,
+            expected_version,
+            recovery_lease,
+            next,
+            active_fence,
+            trusted_now_unix_ms,
+        } = params;
         let operation = load_operation_for_participant_tx(transaction, operation_id)
             .map_err(admission_error)?
             .ok_or(ToolOutcomeStoreError::NotFound)?;
@@ -659,13 +687,15 @@ impl SqliteToolOutcomeStore {
         let participant_digest = evaluation_participant_digest(next, &evaluation_json)?;
         update_evaluation_tx(
             transaction,
-            operation_id,
-            expected_version,
-            next,
-            &evaluation_json,
-            &participant_digest,
-            active_fence,
-            trusted_now_unix_ms,
+            EvaluationUpdate {
+                operation_id,
+                expected_version,
+                next,
+                encoded: &evaluation_json,
+                participant_digest: &participant_digest,
+                fence: active_fence,
+                trusted_now_unix_ms,
+            },
         )?;
         append_participant_update_tx(
             transaction,
@@ -679,23 +709,22 @@ impl SqliteToolOutcomeStore {
         Ok(next.clone())
     }
 
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-    )]
     fn finalize_post_return_tx(
         &self,
         transaction: &Transaction<'_>,
-        operation_id: &AdmissionOperationId,
-        expected_evaluation_version: u64,
-        recovery_lease: &AdmissionRecoveryLease,
-        terminal_evaluation: &PostReturnEvaluationRecordV1,
-        expected_outcome_version: u64,
-        terminal_outcome: &ToolOutcomeRecordV1,
-        resolved_output: Option<&CanonicalResolvedOutputBlobV1>,
-        active_fence: &StoreMutationFence,
-        trusted_now_unix_ms: u64,
+        params: PostReturnFinalization<'_>,
     ) -> Result<(PostReturnEvaluationRecordV1, ToolOutcomeRecordV1), ToolOutcomeStoreError> {
+        let PostReturnFinalization {
+            operation_id,
+            expected_evaluation_version,
+            recovery_lease,
+            terminal_evaluation,
+            expected_outcome_version,
+            terminal_outcome,
+            resolved_output,
+            active_fence,
+            trusted_now_unix_ms,
+        } = params;
         let operation = load_operation_for_participant_tx(transaction, operation_id)
             .map_err(admission_error)?
             .ok_or(ToolOutcomeStoreError::NotFound)?;
@@ -738,23 +767,27 @@ impl SqliteToolOutcomeStore {
         }
         update_outcome_tx(
             transaction,
-            operation_id,
-            expected_outcome_version,
-            terminal_outcome,
-            &outcome_json,
-            &participant_digest,
-            active_fence,
-            trusted_now_unix_ms,
+            OutcomeUpdate {
+                operation_id,
+                expected_version: expected_outcome_version,
+                next: terminal_outcome,
+                encoded: &outcome_json,
+                participant_digest: &participant_digest,
+                fence: active_fence,
+                trusted_now_unix_ms,
+            },
         )?;
         update_evaluation_tx(
             transaction,
-            operation_id,
-            expected_evaluation_version,
-            terminal_evaluation,
-            &evaluation_json,
-            &participant_digest,
-            active_fence,
-            trusted_now_unix_ms,
+            EvaluationUpdate {
+                operation_id,
+                expected_version: expected_evaluation_version,
+                next: terminal_evaluation,
+                encoded: &evaluation_json,
+                participant_digest: &participant_digest,
+                fence: active_fence,
+                trusted_now_unix_ms,
+            },
         )?;
         append_participant_update_tx(
             transaction,
@@ -1058,20 +1091,30 @@ fn insert_outcome_tx(
     Ok(())
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-)]
+/// Parameters of `update_outcome_tx`.
+struct OutcomeUpdate<'a> {
+    operation_id: &'a AdmissionOperationId,
+    expected_version: u64,
+    next: &'a ToolOutcomeRecordV1,
+    encoded: &'a [u8],
+    participant_digest: &'a str,
+    fence: &'a StoreMutationFence,
+    trusted_now_unix_ms: u64,
+}
+
 fn update_outcome_tx(
     transaction: &Transaction<'_>,
-    operation_id: &AdmissionOperationId,
-    expected_version: u64,
-    next: &ToolOutcomeRecordV1,
-    encoded: &[u8],
-    participant_digest: &str,
-    fence: &StoreMutationFence,
-    trusted_now_unix_ms: u64,
+    params: OutcomeUpdate<'_>,
 ) -> Result<(), ToolOutcomeStoreError> {
+    let OutcomeUpdate {
+        operation_id,
+        expected_version,
+        next,
+        encoded,
+        participant_digest,
+        fence,
+        trusted_now_unix_ms,
+    } = params;
     let changed = transaction
         .execute(
             r#"
@@ -1146,20 +1189,30 @@ fn insert_evaluation_tx(
     Ok(())
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-)]
+/// Parameters of `update_evaluation_tx`.
+struct EvaluationUpdate<'a> {
+    operation_id: &'a AdmissionOperationId,
+    expected_version: u64,
+    next: &'a PostReturnEvaluationRecordV1,
+    encoded: &'a [u8],
+    participant_digest: &'a str,
+    fence: &'a StoreMutationFence,
+    trusted_now_unix_ms: u64,
+}
+
 fn update_evaluation_tx(
     transaction: &Transaction<'_>,
-    operation_id: &AdmissionOperationId,
-    expected_version: u64,
-    next: &PostReturnEvaluationRecordV1,
-    encoded: &[u8],
-    participant_digest: &str,
-    fence: &StoreMutationFence,
-    trusted_now_unix_ms: u64,
+    params: EvaluationUpdate<'_>,
 ) -> Result<(), ToolOutcomeStoreError> {
+    let EvaluationUpdate {
+        operation_id,
+        expected_version,
+        next,
+        encoded,
+        participant_digest,
+        fence,
+        trusted_now_unix_ms,
+    } = params;
     let persisted = next.to_persisted();
     let changed = transaction
         .execute(
