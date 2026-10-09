@@ -1,7 +1,9 @@
 //! An interrupted setup creation keeps its original identity across replacement.
 use super::*;
 
-fn native_operations(f: &KnowledgeFixture) -> TestResult<Vec<(String, String, String, Vec<u8>)>> {
+type NativeOperationRow = (String, String, String, Vec<u8>);
+
+fn native_operations(f: &KnowledgeFixture) -> TestResult<Vec<NativeOperationRow>> {
     let connection = rusqlite::Connection::open_with_flags(
         f.f.path.join("admission.db"),
         rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,

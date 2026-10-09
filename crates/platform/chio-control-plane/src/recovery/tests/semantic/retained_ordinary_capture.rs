@@ -414,12 +414,9 @@ async fn ordinary_predecessor_recorded_return_retains_custody_and_reopens_its_re
             &request,
         )
         .await;
-    match delivery {
-        Ok(response) => {
-            assert_eq!(response.verdict, Verdict::Deny);
-            assert!(response.output.is_none());
-        }
-        Err(_) => {}
+    if let Ok(response) = delivery {
+        assert_eq!(response.verdict, Verdict::Deny);
+        assert!(response.output.is_none());
     }
     assert_eq!(
         completed_ordinary_custody(&fixture, &original, &request, &scope)?,
@@ -501,7 +498,7 @@ async fn ordinary_predecessor_recorded_return_retains_custody_and_reopens_its_re
     assert_eq!(fixture.process.process("root")?.tree_calls, 1);
     assert_eq!(
         original_process_calls(&path)?
-            + i64::try_from(current_process.process("current-root")?.tree_calls)?,
+            + i64::from(current_process.process("current-root")?.tree_calls),
         2
     );
     assert_eq!(
