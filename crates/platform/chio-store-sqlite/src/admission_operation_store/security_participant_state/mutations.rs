@@ -236,7 +236,16 @@ impl SqliteAdmissionOperationStore {
         // A first native write reserves the operation's later growth; a
         // dispatch join after its own preflight is already reserved.
         if !storage::preflight_recorded(&tx, operation.binding().operation_id())? {
-            storage::admit_operation(&tx, true)?;
+            storage::admit_operation(
+                &tx,
+                true,
+                storage::opens_identity(
+                    changes
+                        .iter()
+                        .filter(|change| change.before.is_none())
+                        .map(|change| change.table.as_str()),
+                ),
+            )?;
         }
         let record = history::Record {
             schema: history::format(command.input().is_some()),

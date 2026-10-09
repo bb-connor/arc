@@ -352,6 +352,23 @@ pub(super) fn preflight_recorded(
         .map_err(sqlite_error)
 }
 
+/// Native flow-identity tables. A write inserting into any of these opens a
+/// new context, session, principal, lineage, epoch or tenant sequence.
+const IDENTITY_TABLES: [&str; 7] = [
+    "security_flow_contexts",
+    "security_flow_sequences",
+    "security_isolation_epochs",
+    "security_lineage_flow_state",
+    "security_principal_flow_state",
+    "security_session_flow_state",
+    "security_session_memberships",
+];
+
+/// Whether a write's inserted rows open a new flow identity.
+pub(super) fn opens_identity<'a>(mut inserted: impl Iterator<Item = &'a str>) -> bool {
+    inserted.any(|table| IDENTITY_TABLES.contains(&table))
+}
+
 /// Unfinished operations that already hold native history, through the
 /// terminal index and the journals' unique operation indexes.
 fn unfinished_operations(connection: &Connection) -> Result<u64, AdmissionOperationStoreError> {
@@ -392,12 +409,14 @@ fn unfinished_operations(connection: &Connection) -> Result<u64, AdmissionOperat
 /// transaction. Every unfinished operation with native history keeps
 /// `OPERATION_ROWS` reserved, and so does the admitted operation itself when
 /// `operation` is set, so their later egress, commitment and output writes
-/// cannot cross the store-wide budget. A write that would leave less room is
-/// refused as a retryable operator resource condition, never an integrity
-/// verdict, and rolls back.
+/// cannot cross the store-wide budget. A write that opens a new flow identity
+/// must also leave one sixteenth of the budget for operations on existing
+/// identities. A write that would leave less room is refused as a retryable
+/// operator resource condition, never an integrity verdict, and rolls back.
 pub(super) fn admit_operation(
     connection: &Connection,
     operation: bool,
+    opens_identity: bool,
 ) -> Result<(), AdmissionOperationStoreError> {
     let budget = current_rows_budget();
     let total = current_rows(connection)?;
@@ -407,14 +426,16 @@ pub(super) fn admit_operation(
     let reserved = unfinished
         .checked_mul(OPERATION_ROWS)
         .ok_or_else(|| invalid("native reservation overflow"))?;
+    let floor = if opens_identity { budget / 16 } else { 0 };
     if total
         .checked_add(reserved)
+        .and_then(|required| required.checked_add(floor))
         .ok_or_else(|| invalid("native reservation overflow"))?
         > budget
     {
         return Err(capacity(format_args!(
             "{total} current rows, {reserved} reserved for {unfinished} unfinished operations, \
-             budget {budget}"
+             {floor} kept for existing flow identities, budget {budget}"
         )));
     }
     Ok(())

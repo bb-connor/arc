@@ -427,3 +427,45 @@ fn a_parked_approval_across_the_budget_completes_from_its_reservation() -> Ancho
         Ok(())
     })
 }
+#[test]
+fn existing_identities_keep_admitting_after_new_identities_are_refused() -> AnchoredTestResult {
+    const HEAD_ROOM: u64 = 300;
+    let _clock = clock();
+    let fixture = fixture();
+    hydrate(&fixture, &imported(&fixture, "source")?)?;
+    // A lasting identity: its session carries taint its principal lacks.
+    let existing = key("existing-principal", "capacity-lineage", "existing-session")?;
+    let bottom = InformationLabel::bottom();
+    finish(
+        &fixture,
+        "existing",
+        &existing,
+        &bottom,
+        &taint("existing-only")?,
+    )?;
+    let budget = rows(&fixture)? + HEAD_ROOM;
+    native::with_test_current_rows(budget, || -> AnchoredTestResult {
+        let mut opened = 0_u64;
+        let refusal = loop {
+            let name = format!("identity-{opened}");
+            match admit(&fixture, &format!("identity-principal-{opened}"), &name) {
+                Ok(_) => opened += 1,
+                Err(error) => break error,
+            }
+            if opened > HEAD_ROOM {
+                return Err("new flow identities were never refused".into());
+            }
+        };
+        assert!(exhausted(refusal.as_ref()).is_some(), "{refusal}");
+        // Two further operations on the existing identity are still admitted.
+        for index in 0..2 {
+            let name = format!("existing-again-{index}");
+            let (_, generation) = super::session_churn::observe(&fixture, &existing)?;
+            let (context, join) = request(&name, &existing, &bottom, &bottom)?;
+            pending_with(&fixture, &name, generation, context, join)
+                .map_err(|error| format!("existing identity operation {index}: {error}"))?;
+            assert!(rows(&fixture)? <= budget);
+        }
+        Ok(())
+    })
+}
