@@ -1,5 +1,37 @@
 # Security and process landing ledger
 
+## Current qualification checkpoint (October 9, 00:34 UTC)
+
+PR #1160 remains open and unmerged at `fd8bfdc947`. The local integration
+branch at `04f3527afe` has three unpublished commits: Python lint/layout
+repairs (`eb656fb745`), a comment-only stub-scanner repair (`70f288c057`),
+and moving the stub checks before expensive build gates (`04f3527afe`).
+The previous hosted Build check failed; its MSRV workspace lane is still
+running. Cargo Vet and Cargo Deny passed on that previous head. These
+results do not qualify the unpublished batch.
+
+The isolated Kani repair now checks unwinding and an exact reachable
+completion witness instead of accepting a truncated success path. Eight
+affected harnesses have passed within their recorded source/profile
+boundaries. Renewed receipt hash controls with the safe encoder passed,
+including the accepting case in 486.46 seconds with a 6.58 GiB peak.
+The original symbolic weights and attestation proofs remain open;
+timed-out and cancelled attempts are not proof evidence. No cryptographic
+assumption, input-domain reduction, assertion removal or baseline waiver
+has supplied acceptance.
+
+The changed Rust owners passed 925 tests with one existing ignored doctest.
+Wire compatibility and all 8,192 attestation seed/root cases passed as
+ordinary tests. A subsequent checked-index correction passed those wire
+controls and strict all-target Clippy for all four owning crates. These
+ordinary tests do not replace the outstanding symbolic proofs. The broader
+workspace runtime campaign encountered a load-only teardown regression
+and was cancelled after 3,403.33 seconds; its remaining tests were not run.
+Claude owns `CI-TEARDOWN-FAULTBOUND` and is triaging eight additional cleanup
+candidates against the foundation source. Confirmed foundation blockers
+require repair before landing; defects confined to later trains stay with
+those trains. The merge and pre-release boundaries below remain unchanged.
+
 ## Current CI closeout wave (October 8)
 
 [Five newly indexed component obligations](audits/ci-closeout-wave-20261008.json) bring the canonical ledger to 1799 requirements while preserving all 1794 prior rows. XTC001 covers formal and mediation contracts; ADI001 exact runtime inventories; APF001 approval fixture validity; CLOCK001 clock ownership; NCD001 private native diagnostics. Their genuine failures, repairs under review and remaining acceptance are separate records.
