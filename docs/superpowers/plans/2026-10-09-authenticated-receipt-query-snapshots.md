@@ -1,293 +1,220 @@
 # Authenticated receipt query snapshots implementation plan
 
-> Use superpowers:executing-plans inline. Root reviews each task before the next
-> one starts.
+> Use superpowers:executing-plans inline. Root reviews each task before the
+> next one starts. Snapshot production code waits until review of the spec
+> closes; test-only Task 0 may proceed.
 
-**Goal:** close V25. Receipt query pages and counts are answered from an owned,
-authenticated snapshot with a watermark and bounded freshness, so no request
-re-authenticates the corpus.
-**Architecture:** a walker authenticates the claim log once into a private SQLite
-temporary database with ordinary indexes and maintained counts. The snapshot
-extends with O(delta) work, recertifies periodically, and serves leaf-bound pages.
-**Tech stack:** Rust, rusqlite 0.39 (bundled), existing checkpoint, Merkle,
-receipt-verification and `SqlWorkBudget` primitives. No new dependencies.
-**Spec:** [design](../specs/2026-10-09-authenticated-receipt-query-snapshots-design.md).
-Acceptance ids A1-A17 and shapes S1-S5 refer to the spec.
+**Goal:** close V25 under the contracts in the
+[spec](../specs/2026-10-09-authenticated-receipt-query-snapshots-design.md).
+**Architecture:** an owned, authenticated projection, fixed indexed plans, a
+leaf-bound fetch, and an as-of watermark.
+**Tech stack:** Rust and rusqlite 0.39 (bundled SQLite 3.51.3), using existing
+checkpoint, Merkle, receipt verification and `SqlWorkBudget` primitives. No new
+dependencies.
 
-## Global constraints
+## Constraints
 
-- **Base and prerequisite.** Base a457a89c75. V25-PRE (persistent
-  `TrustServiceState` receipt store, writer readiness at startup) lands first.
-  Tasks 0-5 and 7-8 do not touch its paths. Task 6 starts after it.
-- **House rules.**
-  - Fail closed and keep error variants typed.
-  - No `unwrap` or `expect`, no em dashes, no raised hygiene allowances, no new
-    crates.
-- **Builds.**
-  - Every cargo command goes through `~/.local/bin/swarm build --class coder --`.
-  - Each lane uses its own `CARGO_TARGET_DIR`.
-  - Logs go to `claude-pr1160-evidence/vfix/v25/snap/<task>-{red,green}.log`.
+- **Base and order.** Base is a457a89c75. V25-PRE lands before Task 6, and the
+  Task 6 hunks are agreed with that lane first.
+- **House rules.** Fail closed with typed errors. No `unwrap` or `expect`, no em
+  dashes, no new crates, no raised hygiene allowances.
+- **Cargo.** Run every cargo command through
+  `~/.local/bin/swarm build --class coder --` with the lane's own
+  `CARGO_TARGET_DIR`.
+- **Logs.** Write to `claude-pr1160-evidence/vfix/v25/snap/<task>-{red,green}.log`.
 - **Original RED.**
-  1. The test-only commit lands first.
-  2. Run it with the fix withheld, and record the exact failure message.
-  3. Apply the fix and re-run for GREEN.
-  4. A pure addition with no prior behavior says so, and is covered by the
-     nearest behavioral RED.
-- **Unchanged paths.** `SqliteReceiptStore::query_receipts` and
-  `load_chio_receipt_with_context` keep full per-call authentication. Only
-  network handlers move to the snapshot.
+  1. Land the test-only commit first.
+  2. Run it with the fix withheld and record the exact failure.
+  3. Run it again after the fix for GREEN.
+- **Timing and storage.** Report measured values only. Assertions are
+  structural: counts, VM steps, bytes, states and codes. No wall-clock
+  deadlines are asserted.
 
-## Module ownership and interfaces
+## Modules and interfaces
 
-| Owner | Files | Interface |
+All paths are under `crates/`.
+
+| Area | Files | Contract |
 |---|---|---|
-| chio-kernel | `src/receipt_query.rs`, `src/receipt_store.rs` | `ReceiptSnapshotWatermark`; `ReceiptQueryResult.snapshot: Option<_>`; `ReceiptStoreError::QuerySnapshot(ReceiptQuerySnapshotError)` with variants `Building{authenticated_entries,target_entries}`, `Stale{observed_at_unix_ms}`, `Invalid{reason}`, `Unavailable{reason}`, `Busy`, `WorkBudgetExhausted{surface}`, each with `code()` |
-| chio-store-sqlite (new) | `src/receipt_query_snapshot.rs` and `src/receipt_query_snapshot/{config,schema,project,walk,extend,query,fetch,service}.rs`, plus `tests/` | `ReceiptQuerySnapshots::start(Arc<SqliteReceiptStore>, ReceiptQuerySnapshotConfig, Arc<dyn Clock>) -> Result<Arc<Self>>`; `query_receipts(&ReceiptQuery) -> Result<ReceiptQueryResult>`; `load_receipt(&str, &ReceiptReadContext) -> Result<(Option<ChioReceipt>, ReceiptSnapshotWatermark)>`; `status() -> ReceiptQuerySnapshotStatus`; `shutdown()` |
-| chio-store-sqlite (refactor) | `receipt_store/support/checkpoint_validate.rs`, `receipt_store/retained_projection.rs`, `receipt_store.rs` | per-checkpoint verification step shared by the full loop and the walker; one signed tool-projection rule shared by `retained_projection::validate` and the walker; `pub(crate) fn writer_head_poisoned(&self) -> bool`; a commit notification hook for the walker (a `Condvar` signal fired after a writer commit) |
-| chio-control-plane | `service_types/state.rs`, `service_runtime/init.rs`, `receipt_handlers.rs`, `service_types/{requests,responses}.rs`, `underwriting_and_support/policy_support.rs` (error mapping), health handler | `TrustServiceState.receipt_query_snapshots`, `receipt_query_lane`; handlers call the service in `spawn_blocking` |
-| spec and docs | `spec/WIRE_PROTOCOL.md` section 4.3, `spec/PROTOCOL.md` section 9, `docs/reference/RECEIPT_QUERY_API.md` | response `snapshot` object, error codes, freshness, short-page clarification |
-| SDKs | `sdks/typescript/chio-ts/src/receipt_query_client.ts` (+test), `sdks/python/chio-py/src/chio/receipt_query.py` (+test), `crates/products/chio-cli/dashboard/src/api.ts` (type) | optional `snapshot`; `QueryError.code`; bounded retry of building, stale and busy |
-| gates | `docs/security/trust-boundary-inventory.json`, `scripts/security-clock-inventory.json` | new readers, decode sites and clock consumers registered |
+| Kernel | `kernel/chio-kernel/src/receipt_query.rs`, `src/receipt_store.rs` | `ReceiptSnapshotWatermark`, `ReceiptQueryResult.snapshot`, `ReceiptStoreError::QuerySnapshot(ReceiptQuerySnapshotError)` with stable `code()` (spec 11) |
+| Snapshot module | `platform/chio-store-sqlite/src/receipt_query_snapshot.rs`, declared next to `pub mod receipt_query;` at `src/lib.rs:93`, with submodules `receipt_query_snapshot/{backend,schema,query,project,walk,extend,recertify,fetch,service}.rs` and `tests/` | `ReceiptQuerySnapshots::{start, query_receipts, load_receipt, status, shutdown}`. Uses `crate::receipt_store::support::SqlWorkBudget`, defined in `src/receipt_store/reports/analytics/work_budget.rs` |
+| Store refactor | `receipt_store/support/checkpoint_validate.rs`, `receipt_store/retained_projection.rs`, `receipt_store.rs` | per-checkpoint step; shared signed projection rule; `pub(crate) fn writer_head_poisoned()`; coalesced commit signal |
+| Control plane | `platform/chio-control-plane/src/trust_control/{service_types/state.rs, service_runtime/init.rs, receipt_handlers.rs, service_types/requests.rs, service_types/responses.rs, underwriting_and_support/policy_support.rs}` | state fields, `receipt_query_lane`, `evidence_export_lane`, error mapping, health |
+| Docs and SDKs | `spec/WIRE_PROTOCOL.md`, `spec/PROTOCOL.md`, `docs/reference/RECEIPT_QUERY_API.md`, `sdks/typescript/chio-ts/src/receipt_query_client.ts`, `sdks/python/chio-py/src/chio/receipt_query.py`, `products/chio-cli/dashboard/src/api.ts` | as listed in spec 11 |
+| Gate inventories | `docs/security/trust-boundary-inventory.json`, `scripts/security-clock-inventory.json` | new readers, decoders and clock consumers |
 
-## Migration and compatibility
+## Compatibility
 
-- **Receipt database.** No schema change and no migration. The snapshot is an
-  ephemeral temporary database rebuilt at each start.
-- **Configuration.** `ReceiptQuerySnapshotConfig` defaults (spec 6.6, 7, 10). No
-  new CLI flags in this landing. Operators set `SQLITE_TMPDIR` to a private
-  volume with at least 600 B per receipt free. The operator guide and the
-  `/health` field document it.
-- **Wire compatibility.** The new response fields are additive. Error bodies
-  gain `code`, also additive. Statuses: 503 for building, stale, busy and
-  unavailable; 500 for invalid (as today for integrity); 422 for the work
-  budget. Cursors are unchanged.
-- **Old SDKs** (TypeScript, Python, C++, Rust client, dashboard):
-  - unknown fields are ignored;
-  - new statuses surface as the existing non-2xx errors;
-  - paginators already continue on a short page with a non-null cursor.
-- **New SDKs:**
-  - expose `snapshot`;
-  - parse `code`;
-  - retry building, stale and busy, honoring Retry-After, up to a configurable
-    total wait (default 30 s);
-  - never retry 422 or 500.
-- **Test harnesses.** `chio-cli/tests/receipt_query*.rs` start `chio trust serve`
-  and query immediately. Their start helper waits for `/health`
-  `receiptQuerySnapshot.state == "ready"`, which is a change to the helper only.
+- **Receipt database.** No schema or migration change. The snapshot is rebuilt
+  at every start.
+- **Wire.** Additive. A new optional `snapshot` field and an error `code`; 503,
+  422 and 500 statuses per spec 11; seq cursors unchanged.
+- **Old SDKs** ignore the new field and surface the new statuses as existing
+  errors. **New SDKs** use bounded retries.
+- **`chio-cli` integration tests.** Their server-start helper
+  (`products/chio-cli/tests/support/`) waits until `/health` reports the
+  snapshot as `ready`.
 
-## Failure controls mapped to acceptance
+## Failure controls
 
-| Control | Asserts | Acceptance |
+| Id | Control | Spec |
 |---|---|---|
-| C1 work bound | after Ready, each tenant page over M archived plus N live costs at most L signature verifications and at most `query_sql_steps`; no request starts a writer or walker | A9, A13, V25 |
-| C2 interior tamper | an unreturned checkpointed claim is edited with triggers disabled (SQL), and an archive page is edited in place with the change counter preserved (raw). Answers stay pre-tamper; the next recertification goes Invalid with the exact error; later queries return 500 `receipt_query_snapshot_invalid` | A1, A3, A4 |
-| C3 returned-row tamper | a selected row is edited (live and archived, SQL and raw). The fetch leaf check fails closed, and the state becomes Invalid | A3, A4 |
-| C4 build-time tamper | claim, checkpoint row, archive projection, mixed signer, entry gap and duplicate cursor are each edited before or between build steps; the build refuses with the exact error and never publishes | A4, A8, A10 |
-| C5 unlogged row | a validly signed live source row with no claim entry: a457 `query_receipts` returns it (RED); the snapshot never serves it and the final phase goes Invalid | A6 |
-| C6 live projection drift | a live `tool_name` column is edited: a457's tool filter silently drops the row (RED); the snapshot filter keeps it and recertification goes Invalid | A1, A5 |
-| C7 one version | randomized differential parity against a457 SQL on clean stores, for every filter, cursor, empty result, unknown value, `cursor > i64::MAX`, uncheckpointed tail and tenant scope; page and total_count report one `snapshot.id` while extension commits concurrently | A5, A16 |
-| C8 membership | a validly signed checkpoint with a wrong predecessor or `chain_root`, inserted with triggers disabled, is refused at extension | A10 |
-| C9 tail swap | an ingested uncheckpointed entry is swapped on disk; the next checkpoint's owned root differs and the state becomes Invalid | A4, A5 |
-| C10 lifecycle | Building returns 503 with progress and no time cutoff; Ready serves; a stalled extension produces stale after `head_wait` plus `max_staleness`; recovery returns to Ready | A2, A12, A17 |
-| C11 no revive | a poisoned writer head goes Invalid with no service until reseed; Invalid rebuilds only with a new lineage id; no older `snapshot.id` is ever returned again | A7, A12 |
-| C12 bounded work under appends | the build finishes while appends continue; rotation during the build succeeds; every step stays within K entries and 64 MiB; WAL growth is bounded by one step | A11 |
-| C13 shutdown | `shutdown()` joins within one step, under a slow-step hook; a drop without shutdown detaches; a panic in a step goes Invalid(internal) | A11, A17 |
-| C14 budget refusal | an S5 shape above the budget returns 422 `receipt_query_work_budget_exhausted` with no receipts and no count | A13 |
-| C15 capacity | the Task 8 fixture | A15 |
+| C1 | After Ready, each tenant page costs at most L signature checks, stays within `query_sql_steps`, and never starts a writer or walker | 6.6 |
+| C2 | Unreturned row mutated by SQL (triggers disabled) and by a raw edit that preserves the change counter: answers unchanged, the next pass goes Invalid, and `recertifiedAt` and pass duration are reported | 5.4, 5.5 |
+| C3 | Returned row edited, or replaced by another validly signed receipt: refused by the leaf check, state Invalid | 6.4 |
+| C4 | Before or between build steps, each of these is refused with the exact error and nothing is published: claim edit, checkpoint row edit, archive projection drift, entry gap, duplicate cursor | 5.2 |
+| C5 | A signed live source row with no claim entry is never served, and the final check goes Invalid | 5.2 |
+| C6 | Live `tool_name` drift: the filter still uses signed content, and the next pass goes Invalid | 5.2, 5.4 |
+| C7 | Differential parity with a457 SQL on clean stores: every filter, empty and unknown values, cursor above `i64::MAX`, uncheckpointed tail, tenant scope. Page and count report one version while extension commits | 4.4, 6 |
+| C8a | A checkpoint with a wrong predecessor or `chain_root` is refused at extension | 5.3 |
+| C8b | Corruption late in a large batch during Building: no read is served, the build fails, state Invalid | 5.2 |
+| C9 | Mixed signers in a pending range are refused with the a457 error. A key rollover between batches is accepted. A checkpoint that straddles the rollover is refused | 5.2, 5.3 |
+| C10 | Swapping an ingested tail entry makes the next checkpoint root differ, state Invalid | 5.3 |
+| C11 | Under continuous appends, the fixed-target build publishes. `observedAt` is the target's observation time. A regressed head or W goes Invalid without refreshing `observedAt`. A stalled extension gives stale after `max_staleness`. A negative point read needs H0 | 5.2, 5.3, 6.5, 7.2 |
+| C12 | `waiting_for_writer_seed` has no deadline. Seed poison gives `Invalid(writer_head_poisoned)`. Invalid is never revived, and a rebuild gets a new lineage | 7, 9 |
+| C13 | Invalid or poison between selection and return refuses the request. A concurrent extension still serves the request's own version | 4.4 |
+| C14 | During recertification, request work stays within its budget, and its wait is at most one walker hold (`hold_sql_steps`) | 5.4, 6.6 |
+| C15 | A slow large row near `max_receipt_bytes`, or an external lock on live or archive, gives a busy retry without Invalid. Rotation under walker contention succeeds, or records busy and succeeds on retry. Shutdown in each phase returns after that phase | 5.1, 5.6, 9 |
+| C16 | An over-budget S5 query returns 422 with no rows and no count | 6.3 |
+| C17 | Quota exhausted during build or extension gives `Unavailable(capacity)` with no partial version. Long receipt ids, tool names and subjects are stored verbatim and counted in `used_bytes` | 4.3 |
+| C18 | Custody, Linux: a symlinked directory, wrong owner, group or other bits, or `.` give `Unavailable(custody)`. The spill file is unlinked, mode 0600, and inside the directory. A directory replaced after start gets no new temp file. Nothing is left over after shutdown or a killed child process. The `memory` backend is selected off Linux | 4.2 |
+| C19 | A second concurrent export gets 503 busy. A cancelled export request keeps its permit until the work stops | 12 |
+| C20 | Property test: maintained counts equal `GROUP BY` after every generation | 5.4 |
+| C21 | Source gate: no `trust_control` handler calls `.query_receipts(`, `.load_chio_receipt_with_context(` or `with_retained_snapshot` | 9 |
 
 ## Task 0: Original RED controls (test-only)
 
-Files: `chio-store-sqlite/src/receipt_query_snapshot/tests/original_red.rs`,
-plus the test-only all-thread verification counter on
-`decode_verified_{chio,child}_receipt` that the V25 lane already carries.
+- **Files:**
+  - a new `platform/chio-store-sqlite/src/receipt_query/tests/snapshot_red.rs`,
+    declared in `src/receipt_query/tests.rs`;
+  - the V25 lane's test-only counter
+    `ALL_THREAD_RECEIPT_SIGNATURE_VERIFICATIONS`
+    (`src/receipt_store/support/receipt_verify.rs`).
+- **RED expectations at a457:**
+  - C1 store form: "a 10-row page verified 620 receipt signatures".
+  - C5: the unlogged row is returned.
+  - C6: the drifted row is missing from the tool filter.
+  - A8: open and seed accept a drifted archive projection.
+  - C3: a substituted, validly signed receipt is returned after archive trust.
+  - C12: with an unlogged row, the seed poisons the writer, yet a457
+    `query_receipts` still succeeds.
+- **Command:**
+  `cargo test -p chio-store-sqlite --lib receipt_query::tests::snapshot_red -- --test-threads=1`
 
-- [ ] C1 store form: 200 archived plus 200 live receipts, batch 10; ten tenant
-  pages each verify at most 10 signatures. Expected RED at a457:
-  "a 10-row page verified 620 receipt signatures".
-- [ ] C5 and C6 against `SqliteReceiptStore::query_receipts`. Expected RED: the
-  unlogged row is returned; the drifted row is missing from the tool filter.
-- [ ] A8 control: open plus writer seed on a store whose archive projection
-  drifted. Expected RED: open succeeds and reports healthy.
-- [ ] Commands:
-  `swarm build --class coder -- cargo test -p chio-store-sqlite --lib receipt_query_snapshot::tests::original_red -- --test-threads=1`.
-  RED logs go to `snap/task0-red.log`.
+## Task 1: Kernel types
 
-## Task 1: Kernel watermark and typed snapshot errors
+- **Contract:** spec 11. Existing per-call results set `snapshot: None`.
+- **Test:** the code table. This task is a pure addition; Task 6 provides the
+  behavioral RED.
+- **Command:** `cargo test -p chio-kernel --lib receipt_query`
 
-Files: `chio-kernel/src/receipt_query.rs`, `chio-kernel/src/receipt_store.rs`,
-and the construction sites of `ReceiptQueryResult`.
+## Task 2: Snapshot storage and query engine
 
-- [ ] Add the types and stable codes (spec 11). Existing results set
-  `snapshot: None`.
-- [ ] Test: the code table is stable and the display strings are redaction-safe.
-  Pure addition, no Original RED; covered by Task 6.
-- [ ] `swarm build --class coder -- cargo test -p chio-kernel --lib receipt_query`.
+- **Files:** `receipt_query_snapshot/{backend,schema,query}.rs`.
+- **Contract:** spec 4 and 6.2-6.3.
+- **RED:** at a457, a tenant-plus-outcome count over a 200,000-row tenant
+  through `query_receipts_on_connection` takes more than 100,000 VM steps. The
+  snapshot S2 count takes at most 1,000 steps.
+- **Controls:** C7, C16, C17 (storage part), C18, C20.
+- **Command:**
+  `cargo test -p chio-store-sqlite --lib receipt_query_snapshot::tests::{query,backend}`
 
-## Task 2: Snapshot store and query engine
+## Task 3: Walker build
 
-Files: `receipt_query_snapshot/{config,schema,query}.rs`, `tests/query.rs`.
-Interface: crate-internal `SnapshotDb` with
-`insert_rows(&[ProjectedRow])`, `apply_lineage(..)`,
-`select(&ReceiptQuery, budget) -> Selection { rows, total_count, watermark }`,
-plus a test-only bulk loader.
+- **Files:** `receipt_query_snapshot/{project,walk}.rs` and the two refactors.
+- **Contract:** spec 5.1-5.2. The existing `retained_*`, `evidence_export` and
+  `receipt_query` suites pass unchanged, which shows the refactor preserved
+  behavior.
+- **RED:** the Task 0 A8 control.
+- **Controls:** C4, C5, C6, C8b, C9 (build part), C15 (copy and contention),
+  C17 (build part). Counters assert one signature check per entry and per
+  checkpoint.
+- **Command:**
+  `cargo test -p chio-store-sqlite --lib receipt_query_snapshot::tests::build -- --test-threads=1`
 
-- [ ] Schema and indexes (spec 4.3), dimension interning, maintained counts with
-  hour buckets, fixed plans S1-S5 with `INDEXED BY`, and `SqlWorkBudget` with a
-  typed refusal.
-- [ ] Original RED: a tenant plus outcome count over a 200k-row tenant on a457's
-  `query_receipts_on_connection` takes more than 100,000 VM steps (measured with
-  a progress counter). GREEN: the snapshot takes at most 1,000 steps (S2).
-- [ ] C7 parity (seeded random, 2,000 queries over 20k rows), C14, the empty and
-  unknown-value cases, and concurrent extension plus query keeping one
-  `snapshot.id`.
-- [ ] `swarm build --class coder -- cargo test -p chio-store-sqlite --lib receipt_query_snapshot::tests::query`.
+## Task 4: Extension, recertification and service
 
-## Task 3: Authentication walker (build)
+- **Files:** `receipt_query_snapshot/{extend,recertify,service}.rs` and the
+  `receipt_store.rs` accessor.
+- **Contract:** spec 5.3-5.4, 7 and 9.
+- **RED:** the Task 0 C12 control.
+- **Controls:** C2, C8a, C9, C10, C11, C12, C13, C14, C15 (shutdown). Counters
+  assert extension costs O(delta).
+- **Command:**
+  `cargo test -p chio-store-sqlite --lib receipt_query_snapshot::tests::{extend,recertify,lifecycle} -- --test-threads=1`
 
-Files: `receipt_query_snapshot/{project,walk}.rs`, and the refactors in
-`checkpoint_validate.rs` and `retained_projection.rs`. Tests in
-`tests/build.rs`.
+## Task 5: Fetch and point reads
 
-- [ ] Factor the per-checkpoint step out of
-  `verify_checkpoint_chain_integrity_with_frontier_at_watermark`, and the tool
-  projection rule out of `retained_projection::validate`. The existing retained
-  and evidence suites must stay green unchanged, proving behavior equivalence.
-- [ ] Chain, tail, newest-first batch and final phases (spec 5.1), with a
-  streaming RFC 6962 frontier. Test it against `MerkleTree::from_leaves` for
-  sizes 1 through 1,025.
-- [ ] Original RED: the Task 0 A8 control. GREEN: the build refuses with the
-  exact projection-drift error.
-- [ ] C4, C5, C12 and the oversized-row Unavailable case. Counters assert one
-  signature verification per entry and one per checkpoint.
-- [ ] `swarm build --class coder -- cargo test -p chio-store-sqlite --lib receipt_query_snapshot::tests::build`.
-
-## Task 4: Extension, recertification and service lifecycle
-
-Files: `receipt_query_snapshot/{extend,service}.rs`, the `receipt_store.rs`
-accessor and commit hook, and `tests/{extend,lifecycle}.rs`.
-
-- [ ] Extension (spec 5.2), recertification (5.3), the state machine (7.1),
-  freshness (7.2), poison handling (7.3), backoff, cancellation and panic
-  containment.
-- [ ] Original RED: a457 reads ignore a poisoned writer head. The fixture is a
-  store whose live source row has no claim entry, so the writer seed poisons the
-  head. a457 `query_receipts` still succeeds, and returns that row. GREEN: C11
-  (Invalid, no service until reseed) together with C5.
-- [ ] C2, C8, C9, C10, C11, C13. Counters assert extension costs O(delta)
-  verifications and never re-reads authenticated history.
-- [ ] `swarm build --class coder -- cargo test -p chio-store-sqlite --lib receipt_query_snapshot::tests::{extend,lifecycle} -- --test-threads=1`.
-
-## Task 5: Leaf-bound fetch and point reads
-
-Files: `receipt_query_snapshot/fetch.rs`, `tests/fetch.rs`.
-
-- [ ] Fetch by `entry_seq` from live, or from the archive at or below W, with
-  one retry. Verify the signature, the leaf and the tenant. Enforce the 64 MiB
-  page cap with continuation. Point reads wait for the head on a miss and serve
-  the newest-first suffix while Building.
-- [ ] Original RED: the a457 path reads page rows after verification and checks
-  only each row's own signature and tenant. A test hook runs after archive trust
-  (`load_retained_chio_receipt_after_archive_trust_for_test` pattern) and
-  replaces a returned row's `raw_json` with a different, validly signed receipt
-  from the same kernel key. a457 returns the substituted receipt. GREEN: C3
-  fails closed with `receipt_query_snapshot_invalid`, because the leaf differs.
-- [ ] Also: a row moved by rotation between selection and fetch is served; a
-  short page continues with the cursor.
-- [ ] `swarm build --class coder -- cargo test -p chio-store-sqlite --lib receipt_query_snapshot::tests::fetch`.
+- **Files:** `receipt_query_snapshot/fetch.rs`.
+- **Contract:** spec 6.4-6.5.
+- **RED:** the Task 0 C3 control.
+- **Controls:** C3; C11 (point-read negatives); C13. A row moved by rotation
+  between selection and fetch is still served; a short page continues.
+- **Command:**
+  `cargo test -p chio-store-sqlite --lib receipt_query_snapshot::tests::fetch`
 
 ## Task 6: Control-plane wiring (after V25-PRE)
 
-Files: as in the ownership table, plus
-`trust_control/receipt_query_snapshot_route_tests.rs`.
-
-- [ ] Start after writer readiness. Add the lane, `spawn_blocking`, error
-  mapping (spec 11), health, and shutdown ordering (spec 9).
-- [ ] Source gate test: no `trust_control` handler calls
-  `.query_receipts(`, `.load_chio_receipt_with_context(` or
-  `with_retained_snapshot` on the store.
-- [ ] Original RED (V25 itself): ten sequential tenant
-  `GET /v1/receipts/query` requests over 200 archived plus 200 live receipts
-  through the router. At a457 each costs about N + 2M + L verifications plus a
-  per-request seed (`vfix/v25/f1f2-per-request-open.log`). GREEN: C1 at most L
-  per request; 503 busy, building and stale; 422 budget; 500 invalid; the
-  watermark is present on all three routes and on point reads.
-- [ ] Commands:
-  - `swarm build --class coder -- cargo test -p chio-control-plane --lib receipt_query_snapshot_route_tests`
-  - `swarm build --class coder -- cargo test -p chio-cli --test receipt_query --test receipt_query_filters --test receipt_query_lineage --test receipt_query_export --test receipt_query_redaction`
+- **Files:** the control-plane rows of the module table, plus
+  `trust_control/service_runtime/router_tests/receipt_query_snapshot_tests.rs`,
+  declared in `router_tests.rs`.
+- **Contract:** spec 9 and 11-12.
+- **RED (V25 itself):** ten tenant requests to `GET /v1/receipts/query` over
+  200 archived and 200 live receipts. At a457 each request costs N + 2M + L
+  checks plus a seed (`vfix/v25/f1f2-per-request-open.log`).
+- **Controls:** C1 over HTTP, C19, C21, every error code, health, and
+  watermarks on all three routes.
+- **Commands:**
+  - `cargo test -p chio-control-plane --lib trust_control::service_runtime::router::tests::receipt_query_snapshot_tests`
+  - `cargo test -p chio-cli --test receipt_query --test receipt_query_filters --test receipt_query_lineage --test receipt_query_export --test receipt_query_redaction`
 
 ## Task 7: Spec, docs and SDKs
 
-- [ ] Wire, protocol and reference doc edits (spec 11).
-- [ ] TypeScript and Python. Original RED: the new tests fail on today's
-  clients. A 503 building response is not retried, and `code` is not exposed.
-  GREEN: bounded retry with Retry-After, 422 surfaced without retry, an
-  old-shape response still parses, and the short-page cursor continues.
-- [ ] Commands:
+- **Contract:** spec 11, including the plain as-of and recertification-lag
+  statement.
+- **RED:** today's TypeScript and Python clients neither retry a 503 building
+  response nor expose `code`.
+- **GREEN:**
+  - bounded retry honoring Retry-After;
+  - 422 surfaced without retry;
+  - old-shape responses still parse;
+  - short pages continue.
+- **Commands:**
   - `cd sdks/typescript/chio-ts && npm test`
   - `cd sdks/python/chio-py && uv run pytest tests/test_receipt_query.py`
-  - dashboard typecheck as in its README.
 
-## Task 8: Workload and capacity fixture (qualification, `#[ignore]`)
+## Task 8: Capacity evidence (`#[ignore]`, labeled)
 
-Files: `receipt_query_snapshot/tests/capacity.rs`, plus a runner note in the
-evidence directory.
+- **Projection capacity, synthetic.** 10,000,000 projected rows through the
+  test-only bulk loader, with a large-field slice. Record:
+  - bytes per row;
+  - VM steps per shape;
+  - the C16 refusal;
+  - the C17 quota exhaustion;
+  - a full count check (C20).
+- **Build capacity, signed.** 1,000,000 signed receipts, half archived and half
+  live, with one large batch. Record:
+  - throughput with one worker;
+  - peak walker memory;
+  - step durations;
+  - WAL growth;
+  - rotation during the build.
 
-- [ ] **Query capacity.** Load 10,000,000 synthetic projected rows with the
-  test-only bulk loader. Distribution:
-  - 10,000 tenants, the largest holding 40%, and one sparse tenant with
-    3 receipts;
-  - 200 servers, 2,000 tools, 50,000 capabilities, 20,000 subjects,
-    3 currencies;
-  - timestamps disordered by plus or minus 5 s;
-  - one adversarially disordered tenant.
+  Only the 1M signed build is claimed.
+- **Command:**
+  `cargo test --release -p chio-store-sqlite --lib receipt_query_snapshot::tests::capacity -- --ignored --test-threads=1`
 
-  Assert:
-  - storage at most 600 B per row (`dbstat`);
-  - S1, S2 and S4 at most 2,000 VM steps;
-  - S3 at most 50,000 steps at a 24 h window;
-  - the sparse-tenant page and count at most 1,000 steps;
-  - the adversarial S3 and a wide S5 refuse with exactly C14.
+## Task 9: Gates
 
-  Record wall times.
-- [ ] **Build capacity.** 1,000,000 signed receipts: 500,000 archived and
-  500,000 live, in batches of 100, with one 100,000-entry batch.
-
-  Assert:
-  - one verification per entry;
-  - peak walker allocation within the step cap plus the cache;
-  - WAL size bounded during the build;
-  - rotation and appends during the build succeed.
-
-  Record entries per second per verify thread. Above 1M the build is
-  extrapolated linearly (spec Q6).
-- [ ] Commands:
-  - `swarm build --class coder -- cargo test --release -p chio-store-sqlite --lib receipt_query_snapshot::tests::capacity -- --ignored --test-threads=1`
-  - output goes to `snap/capacity.log`.
-
-## Task 9: Gates and integrated qualification
-
-- [ ] Inventory updates: trust boundaries and security clocks.
-- [ ] Commands:
+- **Shared scanners.** All four pass on this docs commit; logs are in
+  `vfix/v25/snap-docs-gates/`.
   - `python3 scripts/check-trust-boundaries.py`
   - `python3 scripts/check-security-clocks.py`
   - `python3 scripts/check-rust-file-hygiene.py`
   - `python3 scripts/check-negative-assertions.py`
-- [ ] Strict lint and format:
-  - `swarm build --class coder -- cargo clippy -p chio-kernel -p chio-store-sqlite -p chio-control-plane --all-targets --locked -- -D warnings`
+- **Rust.**
+  - `cargo clippy -p chio-kernel -p chio-store-sqlite -p chio-control-plane --all-targets --locked -- -D warnings`
   - `cargo fmt --all -- --check`
-- [ ] Owning suites: `chio-store-sqlite` retained, evidence export and
-  `receipt_query`; `chio-control-plane` receipt routes; the `chio-cli`
-  `receipt_query*` integration tests.
-- [ ] Handoff: commit list, RED and GREEN log hashes, and the C1-C15 table with
-  results. Root runs the composed qualification.
-
-## Review focus
-
-- Every answer comes from owned state or from bytes the owned leaf binds. No
-  serving path trusts a mutable SQLite handle.
-- No version is served unless it was authenticated by a walk from checkpoint 1,
-  or extended from such a version by verified checkpoints.
-- Work per request is bounded by the lane, the step budget, L and the byte cap.
-  Refusals are typed and never partial.
-- State transitions never revive an invalid or superseded snapshot. Shutdown
-  and drop paths are accounted for.
+  - the owning suites of Tasks 2-6
+- **Handoff.** Commits, RED and GREEN log hashes, and the C1-C21 results. Root
+  runs the composed qualification.

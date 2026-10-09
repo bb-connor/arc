@@ -1,644 +1,706 @@
 # Authenticated receipt query snapshots
 
-Status: design for Root review (finding V25, PR #1160). No storage or API code
-lands before acceptance.
-Base: a457a89c75.
-Prerequisite: V25-PRE, one persistent trust-control receipt store with writer
-readiness awaited at startup (authorized 2026-10-09T05:16:44Z, claimed as
-`fix/pr1160-claude-v25`).
-Decision: Connor chose authenticated immutable query snapshots before #1160
-lands (2026-10-09T05:22:20Z through Claude's question tool; confirmed in Root's
-conversation, Codex 05:31:57Z). The alternative, strict synchronous budgets that
-permanently refuse healthy stores of roughly 60-80k receipts, was rejected.
-Inputs: Codex mailbox entries 04:44:55Z, 05:01:59Z, 05:11:06Z, 05:16:44Z,
-05:21:30Z, 05:23:00Z and 05:27:43Z. Evidence: `claude-pr1160-evidence/vfix/v25/`.
-Plan: [implementation plan](../plans/2026-10-09-authenticated-receipt-query-snapshots.md).
+- **Status.** Revision 2, written for Root review of finding V25 on PR #1160.
+  The direction was accepted at 05:55:09Z. Implementation is not accepted, and
+  no snapshot production code lands before this review closes. Test-only
+  prerequisites may proceed.
+- **Base.** a457a89c75.
+- **Prerequisite.** V25-PRE: one persistent trust-control receipt store, owned
+  by `TrustServiceState`. Section 9 lists what this design needs from it.
+- **Decision.** Connor chose authenticated query snapshots before #1160 lands.
+  He gave that answer at 2026-10-09T05:22:20Z through Claude's question tool,
+  and Codex confirmed it in Root's conversation at 05:31:57Z. He rejected
+  strict synchronous budgets that refuse healthy stores of roughly 60-80k
+  receipts.
+- **Inputs.** Codex mailbox entries 04:44:55Z, 05:01:59Z, 05:11:06Z, 05:16:44Z,
+  05:21:30Z, 05:23:00Z, 05:27:43Z and 05:55:09Z (the review this revision
+  answers).
+- **Evidence.** `claude-pr1160-evidence/vfix/v25/`.
+- **Plan.** [implementation plan](../plans/2026-10-09-authenticated-receipt-query-snapshots.md).
 
 ## 1. Problem
 
-At a457 every receipt query page authenticates the whole retained corpus before
-it reads one row:
+At a457, every receipt query page authenticates the whole retained corpus
+before it reads a single row:
 
 - `SqliteReceiptStore::query_receipts` calls `with_retained_snapshot`
-  (`chio-store-sqlite/src/receipt_query.rs:24`).
+  (`crates/platform/chio-store-sqlite/src/receipt_query.rs:24`). The same holds
+  for point reads through `load_chio_receipt_with_context`
+  (`receipt_store/support/store_impl.rs:6-17`).
 - `with_retained_connection_snapshot` (`receipt_store/retained_read.rs:52-77`)
-  opens the archive and authenticates its whole prefix
-  (`support/store_impl.rs:51-72`, `support/checkpoint_validate.rs:576-614`),
-  re-verifies the whole checkpoint chain with a Merkle rebuild over every live
-  claim above the watermark W (`checkpoint_validate.rs:661-734`, `:682-683`), and
-  then streams every archived claim again in `retained_projection::validate`
-  (`retained_projection.rs:38-171`).
-- The control plane calls this from `GET /v1/receipts`, `GET /v1/receipts/query`
-  and `GET /v1/agents/{subject}/receipts` for any principal, tenant-scoped ones
-  included (`trust_control/receipt_handlers.rs:86`, `:293`, `:968`), and it opens
-  a fresh store per request (`policy_support.rs:955-965`), so the writer seed
-  (`receipt_store.rs:1288-1293`, `:2574-2586`) adds another O(N) per request.
+  then does three full passes:
+  1. authenticates the archive prefix (`support/store_impl.rs:51-72`,
+     `support/checkpoint_validate.rs:576-614`);
+  2. re-verifies the whole checkpoint chain, including a Merkle rebuild over
+     every live claim above the watermark W (`checkpoint_validate.rs:661-734`);
+  3. streams every archived claim again (`retained_projection.rs:38-171`).
+- The control plane reaches this path from `GET /v1/receipts`,
+  `GET /v1/receipts/query` and `GET /v1/agents/{subject}/receipts` for any
+  principal (`trust_control/receipt_handlers.rs:86`, `:293`, `:968`).
 
-Measured at a457 (`vfix/v25/f1f2-evidence.txt`): one 10-row tenant page over 200
-archived plus 200 live receipts costs 1,220 signature verifications, linear in
-the corpus. A 1M live plus 5M archived store costs about 11M verifications per
-page. There is no row, byte, step or concurrency bound.
+Measured at a457: one 10-row tenant page over 200 archived and 200 live
+receipts verifies 1,220 signatures, and the count grows linearly with the
+corpus (`vfix/v25/f1f2-evidence.txt`).
 
-## 2. Acceptance points
+## 2. Acceptance points and rulings
 
-| Id | Requirement (source) | Met in |
+| Id | Requirement | Section |
 |---|---|---|
-| A1 | No undetected interior tamper or count drift in answers; no silent weakening of what reads accept today (04:44, 05:01) | 5.3, 5.5, 8 |
-| A2 | No permanent denial for healthy large stores; history growth alone never disables reads (05:01, 05:27) | 7.2, 10 |
-| A3 | Own the authenticated bytes and projection; a pinned transaction is not authentication; account for raw in-place edits (05:16) | 4.2, 6.4 |
-| A4 | Adversary boundary; disk changes during construction and after publication (05:23) | 3, 5.5 |
-| A5 | Rows and total_count bind to one version, including empty results, every filter, and uncheckpointed live rows (05:23) | 4.4, 6.2, 6.3 |
-| A6 | No authority for signed-but-unlogged source rows (05:23) | 5.1, 8 |
-| A7 | Writer seed is asynchronous and read checkout ignores a poisoned head (05:11) | 7.3, 9 |
-| A8 | Archive projections validated at build; startup does not do it today (05:11) | 5.1 |
-| A9 | Unbounded checkpoint batch size and linear counts: real CPU, row, byte and concurrency bounds (05:11, 05:27) | 5.4, 6.6 |
-| A10 | A covering checkpoint needs proven trusted-chain membership (05:11) | 5.1, 5.2 |
-| A11 | Bounded build memory and concurrency, coalesced rebuilds, cancellation, bounded WAL retention and rotation interference, progress under continuing appends (05:23) | 5.4, 9 |
-| A12 | Freshness bound never recreates permanent refusal; explicit building, stale and invalid states; never revive a superseded or poisoned snapshot (05:23) | 7 |
-| A13 | Real per-request bound on COUNT and filters through indexes or maintained cardinalities; an expensive unsupported filter gets a typed refusal, never a partial count; sparse tenants work (05:23, 05:27) | 6.2, 6.3, 6.6 |
-| A14 | Freshness is an API change across kernel, control plane, SDK and spec; smallest defensible change; old and new SDK behavior documented (05:11, 05:23) | 11 |
-| A15 | Tested supported capacity and storage and memory policy; no infinite history in bounded RAM (05:27) | 10 |
-| A16 | Existing primitives and dependencies, narrow APIs, complete results for every accepted query (05:27) | 4, 6, 11 |
-| A17 | No hard seed timeout cutoff; initializing distinct from failed; one owner; stated shutdown semantics (05:21) | 9 |
+| A1 | No answer reflects interior tamper or count drift. No silent weakening of what reads accept. | 5.5, 8 |
+| A2 | Large healthy stores are never permanently refused because history grew. | 7, 10 |
+| A3 | The snapshot owns the authenticated projection and binds every payload byte. A pinned transaction is not authentication. | 4, 6.4 |
+| A4 | The adversary boundary is defined, including disk changes during build and after publication. | 3, 5.5 |
+| A5 | Rows and total_count bind to one version: every filter, empty results, and the uncheckpointed tail. | 4.4, 6 |
+| A6 | Signed but unlogged source rows grant no authority. | 5.2 |
+| A7 | A poisoned writer head is observed. | 7.3, 9 |
+| A8 | Archive projections are validated at build. | 5.2 |
+| A9, A13 | Enforceable CPU, row, byte and concurrency limits. Typed refusal, never a partial count. Sparse tenants work. | 5.1, 6 |
+| A10 | Every covering checkpoint is a proven member of the chain. Signer binding holds. | 5.2, 5.3 |
+| A11 | Bounded build memory and steps. Coalescing, cancellation, WAL and rotation behavior. Progress under appends. | 5 |
+| A12 | Explicit building, stale and invalid states. No revival. No freshness cutoff on corpus size. | 7 |
+| A14 | The smallest defensible API change. Old and new SDK behavior. | 11 |
+| A15 | Capacity evidence, labeled. Storage and memory policy. | 10 |
+| A16 | Existing primitives. Narrow APIs. Complete results for every accepted query. | throughout |
+| A17 | No hard seed cutoff. Initializing is distinct from failed. One owner. Stated shutdown semantics. | 9 |
+
+Root rulings applied:
+
+- **Q1. As-of semantics.** Recertification starts once an hour by default. Lag
+  is reported honestly as the interval plus the pass duration. No sampling.
+- **Q2.** One snapshot connection, with every hold bounded and no unbounded
+  queue.
+- **Q3. Evidence export.** It keeps its authorization and its full per-call
+  authentication, behind a dedicated non-queued permit (section 12).
+- **Q4.** One verification worker. No configurable worker pool.
+- **Q5.** The unsigned-lineage trust boundary is unchanged.
+- **Q6.** Capacity evidence comes from 10M synthetic projected rows plus a
+  1M-receipt signed build, labeled distinctly. There is no extrapolated 10M
+  cryptographic claim.
 
 ## 3. Adversary and trust boundary
 
 The adversary can:
 
 - run arbitrary SQL against the receipt database and its archive, including with
-  triggers disabled per connection, and commit at any time;
-- edit the database, WAL, shared-memory and archive files in place by path,
-  including byte edits that preserve SQLite's change counter;
+  triggers disabled per connection, at any time;
+- edit those files, or their WAL and shm files, in place by path, including
+  edits that preserve SQLite's change counter;
 - replace or swap those files by path.
 
-The adversary cannot forge Ed25519 signatures under the kernel receipt key or the
-checkpoint key, and cannot read or write the trust-control process's memory or
-its open file descriptors (equivalently, cannot ptrace it). This is the same
-boundary a457 already assumes for its in-memory verification state. An attacker
-with ptrace access owns the process and is out of scope for any read path.
+The adversary cannot:
 
-The snapshot service is inside the boundary. The receipt database, archive and
-everything SQLite reads from them are outside it. Unsigned inputs that a457
-already trusts stay explicitly listed in section 8.
+- forge Ed25519 signatures under the receipt or checkpoint keys;
+- read or write the trust-control process's memory or open descriptors
+  (ptrace-level access to the process is out of scope for any read path);
+- write the validated private temp directory (section 4.2).
 
-## 4. The snapshot
+Inside the boundary: process memory, the snapshot connection and its custody
+storage. Everything SQLite reads from the receipt database and its archive is
+outside it.
 
-### 4.1 What it is
+## 4. Snapshot storage
 
-A query snapshot is a process-owned, authenticated projection of every tool
-receipt in the claim log through one claim-log entry E (the watermark). It is
-the only source of filter, count and page-selection answers. It holds no
-authority of its own: every row in it was derived from a receipt whose signature
-was verified, whose claim entry is in the contiguous claim log, and, once a
-checkpoint covers it, whose leaf is bound to a signed checkpoint that is a
-proven member of the checkpoint chain.
+### 4.1 Contents
 
-### 4.2 Storage and integrity binding
+The snapshot is a projection of every tool receipt whose claim-log entry is at
+or below a watermark E. Every row was derived from a receipt that meets three
+conditions:
 
-The snapshot lives in a private SQLite temporary database: a connection opened
-with an empty filename, owned by the snapshot service. Properties, all existing
-SQLite behavior under the bundled build (`rusqlite 0.39`, `libsqlite3-sys
-0.37.0`, which sets no `SQLITE_TEMP_STORE` on Linux):
+- its signature verified;
+- its claim entry is in the contiguous claim log;
+- once a checkpoint covers it, its leaf is bound to a signed checkpoint proven
+  to be a chain member.
 
-- pages live in the connection's page cache (`cache_size` bounded, 64 MiB
-  default) and spill to a temporary file;
-- the unix VFS unlinks that file immediately after creating it, so it has no
-  path; only this connection's descriptor reaches it;
-- it is never shared with another connection or process and disappears when the
-  connection closes.
+The snapshot answers filters, counts and page selection. It does not hold
+receipt JSON. Each row carries the receipt's RFC 6962 leaf
+(`chio-core-types/src/merkle.rs:4-5`), and fetched bytes must match it (6.4).
 
-The integrity binding is therefore the trust boundary itself: nothing outside the
-process can change snapshot pages. Bytes the snapshot does not hold (receipt
-JSON) are bound by a per-row RFC 6962 leaf hash (`chio_core::merkle::leaf_hash`
-over the canonical receipt bytes, `chio-core-types/src/merkle.rs:4-5`), which is
-exactly what checkpoints commit to. A page re-reads the receipt from the mutable
-database and accepts it only if its signature verifies and its leaf equals the
-owned leaf (6.4). Owned storage plus leaf binding means the snapshot never trusts
-a mutable SQLite handle for any answer.
+Every string value is interned verbatim and never truncated. The tables are:
 
-A pinned read transaction on the receipt database is not used for serving. It
-would not authenticate raw in-place edits (Codex 05:16).
-
-Temporary-file placement follows SQLite's rule (`SQLITE_TMPDIR`, `TMPDIR`,
-`/var/tmp`, `/usr/tmp`, `/tmp`). Deployments set `SQLITE_TMPDIR` to a private
-volume (systemd `PrivateTmp=` or a dedicated directory). The service checks free
-space there before it builds (10).
-
-### 4.3 Schema
-
-All string dimensions are interned to integers. Interning is per snapshot.
-
-- `snapshot_dim(id, kind, value)`, unique on `(kind, value)`. Kinds: tenant,
-  capability, tool_server, tool_name, tool (server and name pair), subject,
-  currency. Id 0 means "absent" (no tenant, no subject, no cost).
-- `snapshot_tool_receipt`: `seq` (source seq, the API cursor, primary key),
-  `entry_seq` (unique), `leaf_hash` (32 bytes), `receipt_id` (unique), `ts`,
-  `tenant`, `capability`, `tool_server`, `tool_name`, `tool`, `decision`
-  (allow, deny, cancelled, incomplete), `subject`, `subject_signed`,
-  `cost_currency`, `cost_charged` (8-byte big-endian, as `cost_charged_be` today).
-- Secondary indexes, each ending in `seq` so pages walk in cursor order:
-  `(tenant, seq)`; `(tenant, D, seq)` and `(D, seq)` for each equality dimension
-  D in {capability, tool_server, tool_name, tool, decision, subject};
-  `(tenant, ts, seq)` and `(ts, seq)`; `(tenant, cost_currency, cost_charged)`
-  and `(cost_currency, cost_charged)`.
-- `snapshot_count(scope, dim, value, n, min_seq, max_seq)`, primary key
-  `(scope, dim, value)`. Scope is a tenant id or the all-tenants marker. Rows
-  exist for the scope total, for every equality dimension value, and for every
-  hour bucket (`ts / 3600`). These are the maintained cardinalities.
+- `snapshot_dim(id, kind, value)`. Kinds are tenant, capability, tool_server,
+  tool_name, tool (the server and name pair), subject and currency. Id 0 means
+  absent.
+- `snapshot_signer(id, kernel_key)`.
+- `snapshot_tool_receipt`. Columns: `seq` (the source seq and API cursor; the
+  primary key), `entry_seq` (unique), `leaf_hash`, `signer`, `receipt_id`
+  (unique), `ts`, `tenant`, `capability`, `tool_server`, `tool_name`, `tool`,
+  `decision`, `subject`, `subject_signed`, `cost_currency` and `cost_charged`
+  (8-byte big-endian). Secondary indexes:
+  - `(tenant, seq)`;
+  - `(tenant, D, seq)` and `(D, seq)` for each equality dimension D;
+  - `(tenant, ts, seq)` and `(ts, seq)`;
+  - `(tenant, cost_currency, cost_charged)` and
+    `(cost_currency, cost_charged)`.
+- `snapshot_count(scope, dim, value, n, min_seq, max_seq)`. These are the
+  maintained cardinalities, held per scope (a tenant or all tenants) for each
+  total, each equality value and each hour bucket (`ts / 3600`).
 - `snapshot_checkpoint(seq, batch_start, batch_end, tree_size, merkle_root,
-  kernel_key)`: the verified chain, owned.
-- `snapshot_pending_leaf(entry_seq, kind, leaf_hash)`: leaves of entries above
-  the newest verified checkpoint (the uncheckpointed tail), both kinds.
-- `snapshot_child_cursor(source_seq, entry_seq)`: child receipt cursors, with
-  `source_seq` as the primary key. They are kept only to enforce the cursor
-  uniqueness rule that `retained_projection.rs:16-24` enforces today, and for
-  the final-phase source-row bijection.
+  kernel_key)`, the verified chain.
+- `snapshot_pending_leaf(entry_seq, kind, leaf_hash, signer)`, the leaves of
+  entries above the newest verified checkpoint.
+- `snapshot_child_cursor(source_seq, entry_seq, signer)`, which enforces the
+  cursor-uniqueness rule (`retained_projection.rs:16-24`) and supports the
+  source bijection check.
 
-Outside SQLite, the service holds the newest verified `KernelCheckpoint`, its
+Kept outside SQLite: the newest verified `KernelCheckpoint` and its
 `CheckpointChainFrontier` (`chio-kernel/src/checkpoint.rs:412-480`), E, the
-lineage rowid high-water mark, and the state machine (7).
+lineage rowid mark, and the state.
 
-### 4.4 What a snapshot version is
+### 4.2 Backends and custody
 
-A version is identified by `snapshotId = <lineage>:<generation>`. The lineage is
-a random 128-bit value drawn when a build starts; the generation increases by one
-on every committed change. A version's content is fixed. Version g+1 differs from
-g only by:
+Both backends below hold the projection on the single snapshot connection. The
+`backend` setting accepts `auto`, `private_temp_file` or `memory`. `auto` selects
+`private_temp_file` on Linux and `memory` on every other platform.
 
-- rows for entries in (E_g, E_g+1], which always carry higher `seq` than every
-  existing row (AUTOINCREMENT, `bootstrap/open.rs:621-623`), so a cursor obtained
-  at g stays valid at g+1;
-- newly verified checkpoints;
-- lineage refreshes that fill a previously absent unsigned subject (5.2).
+**`memory`**, all platforms. The connection is a `:memory:` database, so custody
+is process memory. No file exists. Capacity is bounded by the quota (4.3). This
+backend is the default on macOS and Windows, which ship in release builds
+(`.github/workflows/release-binaries.yml:49-70`). No private-temp-file claim is
+made for them.
 
-A query evaluates selection and total_count on one version inside one snapshot
-transaction, and the response names that version (11). Empty results are
-complete: an unknown filter value has no `snapshot_dim` id, and dimensions are
-inserted in the same transaction as the rows that use them.
+**`private_temp_file`**, Linux only in this landing. The connection is opened
+with an empty filename on the unix VFS. The bundled SQLite 3.51.3
+(`libsqlite3-sys-0.37.0/sqlite3/sqlite3.c`) behaves as follows:
 
-## 5. Construction: one authentication walker
+- It picks the temp directory from `sqlite3_temp_directory`, `SQLITE_TMPDIR`,
+  `TMPDIR`, `/var/tmp`, `/usr/tmp`, `/tmp` and `.`, taking the first that
+  exists and is writable (`:45460-45500`).
+- Delete-on-close files are created with mode 0600 (`:45703`), using
+  `O_EXCL|O_NOFOLLOW` (`:45869`).
+- Each file is unlinked immediately after open (`:45950`).
+- The temporary main database is opened exclusive and delete-on-close
+  (`:62617`). Whether it lives in memory is decided when it is opened
+  (`:74995-75004`).
 
-One walker authenticates receipts from the mutable database. It has three modes:
-build (insert), extension (append), and recertification (compare). All three
-reuse the existing verification primitives:
+Startup validation, fail-closed. Any failure makes the backend
+`Unavailable(custody)`. There is no silent fallback; the operator may choose
+`memory` explicitly.
+
+1. Resolve the directory exactly as SQLite does, then require all of:
+   - an absolute path, never `.`;
+   - `lstat` reports a directory, not a symlink;
+   - owned by the service uid;
+   - mode 0700, with no group or other bits.
+
+   Record the directory's `(st_dev, st_ino)`.
+2. Open the snapshot connection, then run `PRAGMA temp_store = MEMORY`, so
+   sorter and statement journals never create further temp files. The main
+   temp database stays file-backed, because that was fixed at open.
+3. Force a spill by writing past `cache_size`.
+4. Then compare `/proc/self/fd` before and after the spill. Exactly one new
+   descriptor must have appeared, and it must:
+   - is unlinked;
+   - has mode 0600;
+   - is owned by the service uid;
+   - lives on the recorded directory's device.
+
+   That descriptor is held for the connection's lifetime, and no later temp
+   file is opened (a control checks this after the directory is replaced).
+5. Run cleanup on close: the descriptor's file is gone. A control checks there
+   is no leftover entry in the directory after shutdown or a crash.
+
+### 4.3 Quota and accounting
+
+- **Hard limit.** `PRAGMA max_page_count` is set to `quota_bytes / page_size`.
+  `SQLITE_FULL` is returned when the quota is exceeded or the temp filesystem
+  is full, and an I/O error on the spill file is mapped the same way.
+- **What happens at the limit.** The step's snapshot transaction rolls back, the
+  state becomes `Unavailable(capacity { quota_bytes, used_bytes })`, and reads
+  get a typed 503. No row is truncated and no partial version is published.
+- **Accounting.** `status()` reports `used_bytes` (`page_count * page_size`),
+  the row count, the distinct-dimension count, and the dimension-value bytes.
+- **Defaults.** `private_temp_file` defaults to an 8 GiB quota and `memory` to
+  1 GiB. Rows per quota are an estimate that depends on value lengths
+  (section 10). Startup logs the estimate and the free space of the directory.
+  Only the quota is enforced.
+
+### 4.4 Versions, read lease and cursors
+
+- **Version id.** A version is identified by `<lineage>:<generation>`. The
+  lineage is random and drawn per build. The generation increases on every
+  committed change: new entries, new checkpoints, and lineage refreshes (5.3).
+  Rows never change except for the refresh.
+- **Selection and count.** Both run in one snapshot transaction on one version,
+  and that version's watermark is returned. Empty results are complete. An
+  unknown filter value has no dimension id, and dimensions are committed with
+  the rows that use them.
+- **Read lease.** At selection, a request records `(lineage, generation)` and
+  the invalidation epoch. Before it returns, after fetch, it re-checks two
+  things: that the epoch is unchanged (no Invalid transition, no rebuild), and
+  that the writer head is not poisoned. If either check fails, the request
+  returns `receipt_query_snapshot_invalid`. A newer generation of the same
+  lineage does not fail the lease, and the request returns its own version.
+- **No version-pinned cursors.** No request starts on a version older than the
+  current one. Once invalidated, a version is never served again.
+- **What `snapshot.id` is.** It is informational. It is not accepted as a
+  request parameter, and there is no version-pinned multi-page cursor.
+  Multi-page iteration uses today's seq cursor. A new generation only adds rows
+  with higher seq (AUTOINCREMENT, `bootstrap/open.rs:621-623`), plus the
+  subject refresh of 5.3. So `total_count` may change between pages, as it does
+  today.
+
+## 5. Walker
+
+One thread per store authenticates receipts from the mutable database, with
+one verification worker (Q4). It reuses existing primitives:
 
 - `parse_persisted_checkpoint_row` (`checkpoint_validate.rs:290-296`);
 - `validate_checkpoint_base` and `validate_checkpoint_predecessor`, and the
-  `chain_root` frontier check (`checkpoint_validate.rs:661-734`);
-- `validate_checkpoint_projection_rows` (`checkpoint_validate.rs:1472`);
+  `chain_root` frontier step (`checkpoint_validate.rs:661-734`, refactored into
+  a per-checkpoint step that the existing loop keeps calling);
+- `validate_checkpoint_projection_rows` (`:1472`);
 - `ArchiveCheckpointReader` (`support/checkpoint_read.rs:4-72`);
 - `decode_verified_chio_receipt` and `decode_verified_child_receipt`
-  (`support/receipt_verify.rs:123-163`), the signer binding of
-  `load_checkpoint_claim_tree_canonical_bytes_range`
-  (`support/checkpoint_projection.rs:707-748`), and the projection rule of
-  `retained_projection.rs:84-133`, factored into one shared function so live and
-  archived rows obey one rule.
+  (`support/receipt_verify.rs:123-163`);
+- the signer rule of `load_checkpoint_claim_tree_canonical_bytes_range`
+  (`support/checkpoint_projection.rs:707-748`);
+- the source-projection rule of `retained_projection.rs:84-133`, factored into
+  one function that both callers use;
+- `SqlWorkBudget` (`receipt_store/reports/analytics/work_budget.rs`, imported as
+  `crate::receipt_store::support::SqlWorkBudget`).
 
-The full-chain loop at `checkpoint_validate.rs:661-734` is refactored into a
-per-checkpoint step plus a driver. The existing per-call path keeps calling the
-driver, with unchanged behavior.
+### 5.1 Step contract
 
-### 5.1 Build
+Each step has four phases. Every limit below is enforced, not a timing target.
 
-A build runs at startup, and after an Invalid state (7.3). It targets E_target,
-the claim-log head when the build starts, and proceeds in bounded steps (5.4):
+1. **Copy.** One short read transaction on a pooled live connection, plus the
+   read-only archive connection when the range is at or below the W read in
+   that transaction. It only selects claim rows by `entry_seq` range, and it is
+   bounded by:
+   - `step_rows` (default 1,024);
+   - `step_bytes` (default 16 MiB, but at least one row);
+   - `copy_sql_steps` VM steps.
 
-1. **Chain phase.** Read `kernel_checkpoints` in pages of at most 1,024 rows, in
-   `checkpoint_seq` order. For each row: verify the signature and columns; verify
-   the base or predecessor link against the previous verified checkpoint held in
-   memory; check `chain_root` against the running `CheckpointChainFrontier`;
-   validate its projection rows; and for checkpoints at or below the live
-   watermark W, require the archived row to equal the live row. Append the row to
-   `snapshot_checkpoint`. Projection id-set completeness is checked in step 4 by
-   count and maximum, not with in-memory sets, so memory stays O(1) in the number
-   of checkpoints.
-2. **Tail phase.** Read the claim entries above the newest verified checkpoint's
-   `batch_end` through E_target. Require contiguous `entry_seq`. Signature-verify
-   each entry and store its leaf in `snapshot_pending_leaf`. For tool entries,
-   derive the projection from the signed receipt and insert the snapshot row.
-   Each entry's source row is checked as in step 3.
-3. **Batch phase, newest checkpoint first.** For each verified checkpoint, read
-   its claim range in steps from wherever it physically lives: the live claim
-   log if it is above the W read in that step's transaction, else the archive.
-   For each entry:
-   - enforce the per-row byte cap;
-   - verify the signature;
-   - require the signer to equal the checkpoint key;
-   - append its leaf to a streaming RFC 6962 frontier (O(log B) memory,
-     whatever the batch size B);
-   - for tool entries, derive the projection and insert the row; for child
-     entries, insert the cursor;
-   - check the source row, using exactly the rule `retained_projection.rs`
-     applies to archived rows today. The source row exists once, its `raw_json`
-     equals the claim's, and its columns equal the signed projection. An
-     archived source seq must not exist live and must not exceed the live
-     `sqlite_sequence` ceiling. Live entries get the same check. That is new on
-     the read path; today only the writer seed compares live claims with their
-     source rows.
+   Each row's length is read with `length(CAST(raw_json AS BLOB))` before its
+   text, and a row above `max_receipt_bytes` (default 128 MiB, the ingress cap
+   at `json_ingress.rs:137`) makes the state `Unavailable(row_cap)`. The rows
+   are copied into owned memory, and the transaction ends.
+2. **Authenticate.** No transaction or lock is held. Each entry gets its
+   signature, signer, canonical leaf, projection, and frontier append.
+   Cancellation is checked every 64 entries.
+3. **Check.** One short read transaction, bounded by `step_rows` lookups and
+   `check_sql_steps`. It reads each source row by seq (live, else archive) and
+   returns its projection columns and `raw_json = ?` equality. The comparison
+   happens after the transaction.
+4. **Insert.** Holds the snapshot connection for at most `insert_rows` (default
+   256) rows and `hold_sql_steps` per hold.
 
-   At the end of the batch, the frontier root must equal the signed
-   `merkle_root` and the entry count must equal `tree_size`. Batches are
-   processed newest first, so recent receipts become available to point reads
-   early (6.5).
-4. **Final phase.** This runs inside the last catch-up step's transaction, so
-   the live head, W and the counts are one consistent read:
-   - live tool and child source-row counts equal the snapshot tool rows and
-     child cursors located live (entry_seq above W). Together with per-entry
-     existence this is a bijection,
-     so a live source row with no claim entry fails the build (A6);
-   - each checkpoint projection table (tree heads, predecessor witnesses,
-     publication metadata) holds exactly the expected id set. The chain phase
-     checked each expected row exists, so a count and maximum comparison here
-     completes set equality, as `validate_checkpoint_projection_id_sets`
-     (`checkpoint_validate.rs:1541`) does with in-memory sets;
-   - every archived source seq is unique, enforced by the snapshot primary keys.
+Further rules for every step:
 
-   Maintained counts are computed with one `GROUP BY` pass over the snapshot,
-   the state becomes Ready, and the version is published.
+- Each `SqlWorkBudget` progress handler also checks the cancel flag, so
+  cancellation interrupts SQL within one progress interval (1,000 VM steps).
+- Shutdown waits for at most the current phase.
+- Elapsed durations are measured and reported (section 10), never promised.
+- Contention on any read gets SQLite's busy handling. A busy error ends the
+  step without effect, and the walker retries with backoff. It does not
+  invalidate the snapshot.
 
-After E_target the walker switches to extension until it reaches the live head,
-and then publishes. A build never restarts because new receipts arrive.
+### 5.2 Build
 
-Each checkpoint is accepted only as a member of the chain walked from seq 1,
-and every claim range is accepted only against such a checkpoint, so covering
-batch membership is proven (A10). Archived claims and archived projections are
-authenticated at build (A8).
+A build runs at start, and after Invalid with backoff. When it starts, it fixes
+the target as the claim-log head T0 = `MAX(entry_seq)`, or W if the live log is
+empty, together with the observation time t0. It then runs three phases, in
+steps:
 
-### 5.2 Extension
+1. **Chain.** Checkpoint rows in `checkpoint_seq` order. For each:
+   - signature and columns;
+   - the base, or the predecessor link to the previous verified checkpoint;
+   - `chain_root` against the running frontier;
+   - projection rows;
+   - for rows at or below W, equality with the archived row.
 
-The service extends a Ready snapshot when the writer commits (a notification
-from the store's commit path, coalesced) and on a 250 ms tick, which catches
-other processes writing the same database. One extension step:
+   Rows are appended to `snapshot_checkpoint`. Projection id-set completeness
+   is checked in the final step by count and maximum, since every expected row
+   was already checked.
+2. **Batches, in ascending order.** For each verified checkpoint, the claim
+   range is copied in steps from wherever it lives. For each entry:
+   - every signer must equal `checkpoint.kernel_key`, so a mixed signer or a
+     different key fails with the a457 errors;
+   - the leaf is appended to a streaming RFC 6962 frontier (O(log B) memory for
+     any batch size B);
+   - for tool entries, a row is inserted; for child entries, a cursor;
+   - the source row is checked with the retained projection rule: it exists
+     once, its `raw_json` is equal, and its columns equal the signed
+     projection. An archived seq must not be live and must not exceed the live
+     `sqlite_sequence` ceiling. The rule now applies to live entries too.
 
-1. Reads the claim entries in (E, min(H, E + K)], where H is the live head.
-   Each entry is signature-verified, its leaf is pending, and tool rows are
-   inserted.
-2. Accepts each new checkpoint with `batch_end` at most the new E, in sequence.
-   Its seq must be the owned head's seq plus one; its predecessor link and
-   `chain_root` are checked against the owned head and frontier; its Merkle root
-   is recomputed from the owned pending leaves, which are then deleted. The
-   mutable database is not re-read for this. If an uncheckpointed entry was
-   swapped on disk after the snapshot ingested it, the writer's checkpoint
-   commits the swapped bytes and the owned root differs, so the snapshot becomes
-   Invalid.
-3. Reads `capability_lineage` rows above the lineage rowid high-water mark.
-   Lineage only ever inserts a row or upgrades its signed token and provenance
-   (`capability_lineage.rs:207-220`), never its subject. A row whose unsigned
-   subject was absent therefore takes the lineage subject, and its counts move.
-   A row whose existing unsigned subject would change is drift, and the snapshot
-   becomes Invalid.
-4. Commits the inserts, counts and meta changes in one snapshot transaction,
-   which publishes generation g+1.
+   At the end of each batch, the frontier root must equal `merkle_root` and the
+   count must equal `tree_size`.
+3. **Tail.** Entries above the newest verified checkpoint through T0. They must
+   be contiguous. Each is signature-only, as at a457. Its leaf and signer go to
+   `snapshot_pending_leaf`, and its row and source check proceed as above.
 
-Extension costs O(delta) and never re-reads authenticated history. An old row
-tampered on disk after authentication cannot change any answer, because answers
-come from owned state. That tamper is caught by recertification, or by the leaf
-check if a page fetches the row.
+A final step runs in one read transaction:
 
-### 5.3 Recertification
+- Live tool and child source counts must equal the snapshot rows and cursors
+  located above W. The source rows counted are those with seq at most the
+  snapshot's maximum tool or child seq. W is read in the same transaction.
+  Later appends always get higher seq (AUTOINCREMENT), so they are excluded.
+  Combined with per-entry existence, this is a bijection, so an unlogged source
+  row fails the build. One added after T0 is caught by the next
+  recertification.
+- The projection id sets must be complete.
 
-While Ready, the walker repeats the build's chain, batch and final phases in
-compare mode over entries up to the E it started at. Extension keeps running.
-Every entry's leaf, projection and presence, and every checkpoint row, must equal
-the owned snapshot. Any difference makes the snapshot Invalid. Completion stamps
-`recertifiedAt`.
+Maintained counts are then computed with `GROUP BY`, before publication, while
+no reader holds the connection.
 
-The cadence is set by `recertify_interval` (default 1 hour between pass starts).
-The rate is limited to the walker's one thread. This is the same work a457
-performs on every page, done once per interval instead.
+The build then publishes version 1, with `E = T0` and `observedAt = t0`.
 
-### 5.4 Step bounds, WAL and rotation
+- **Fixed target.** The build target never moves, so the build ends after a
+  finite number of steps whatever the append rate. Appends during the build
+  are handled by extension after publication.
+- **Membership and archive projections.** Every checkpoint is accepted only as
+  part of the walk from seq 1, and every claim range only against such a
+  checkpoint (A10). Archive projections are validated here (A8).
+- **Building reads.** While Building, every read returns 503 `building`,
+  including point reads. That covers an early row in a batch whose later row is
+  corrupt (control C8b).
 
-- **Step size.** A step covers at most K = 4,096 entries or 64 MiB of `raw_json`,
-  and always at least one entry. Row sizes are read with
-  `length(CAST(raw_json AS BLOB))` before the text, the pattern
-  `session_certificate_read` uses. A row above `max_receipt_bytes` (default
-  128 MiB, the trust-control ingress cap at `json_ingress.rs:137`) moves the
-  service to Unavailable with the exact reason. That is a configured resource
-  limit, not tamper evidence.
-- **Transactions.** Each step is one short read transaction on a pooled live
-  connection, plus one on a read-only archive connection when the step's range
-  lies at or below W. The target is at most 100 ms. No read transaction spans
-  steps, so WAL checkpoints proceed between steps, and the WAL is retained no
-  longer than one step.
-- **Rotation** runs on the writer connection: it attaches the archive, copies,
-  deletes the live prefix and records W (`evidence_retention.rs:681`,
-  `:1444-1455`). Its busy timeout is 5,000 ms (`bootstrap/open.rs:47`), far above
-  one step, so a step can delay rotation by at most one step and never fail it.
-  The walker re-reads W in every step and reads each range from wherever it
-  lives. Physical location does not matter, because content is bound by the
-  signed root.
-- **Memory.** One step buffer (at most 64 MiB plus one row up to
-  `max_receipt_bytes`), the snapshot page cache (64 MiB), an O(log B) batch
-  frontier, and the owned head. Nothing scales with N.
-- **CPU and concurrency.**
-  - One walker thread per store, plus `verify_threads` (default 1) verification
-    workers.
-  - Only one of build or recertification is active at a time. Extension
-    interleaves with priority.
-  - Rebuild requests coalesce into one flag.
-- **Snapshot locking.** Signature verification runs outside the snapshot
-  connection mutex. Inserts hold it for at most 512 rows (about 10 ms).
-- **Cancellation.**
-  - A shutdown flag is checked between steps and every 512 rows inside a step,
-    so shutdown waits at most one step.
-  - A panic inside a step is caught and moves the state to Invalid(internal).
-    The snapshot is not reused afterwards.
+### 5.3 Extension
 
-### 5.5 Disk changes during construction and after publication
+A cycle starts when the writer commits (a coalesced signal) or on a 250 ms tick.
 
-- **During build.** Ranges are read in separate short transactions, so an edit
-  between steps is possible. Every checkpointed range is accepted only if its
-  streamed root equals the signed root, and the chain binds every root. An edit
-  to any checkpointed entry, a projection, or a checkpoint row before it is read
-  fails the build. An edit after it is read cannot enter the snapshot, which
-  already owns the authenticated value. Uncheckpointed tail entries are
-  signature-only, as at a457. A later checkpoint is verified against the owned
-  leaves (5.2).
-- **After publication.**
-  - SQL commits and raw edits to any receipt file cannot change snapshot answers.
-  - Edits to a row a page returns are refused at fetch by the leaf and signature
-    check (6.4). The snapshot then becomes Invalid.
-  - Edits to unreturned rows are detected by the next recertification pass.
-  - Edits to the uncheckpointed tail are detected by the next checkpoint's
-    verification.
+1. **Target.** Sample T = `MAX(entry_seq)` (or W when the live log is empty)
+   and the lineage rowid high-water mark, at time t.
+   - If T < E, or W is lower than the W last seen, the head or watermark has
+     regressed. The state becomes `Invalid(regressed)`, and `observedAt` is not
+     refreshed.
+2. **Entries.** Process the entries in (E, T] in steps, as in the tail phase.
+3. **Checkpoints.** Accept each new checkpoint whose `batch_end` is at most E,
+   in order:
+   - its seq is the owned head plus one;
+   - its predecessor link and `chain_root` match the owned head and frontier;
+   - every pending entry in its range has
+     `signer == checkpoint.kernel_key`, the same rule as the build;
+   - its root is recomputed from the owned pending leaves.
+
+   Then the pending leaves are deleted. A swapped tail entry changes the root,
+   and the state becomes Invalid.
+4. **Lineage refresh.** For capability lineage rows up to the sampled rowid
+   mark: lineage only inserts rows or upgrades their signed token and
+   provenance (`capability_lineage.rs:207-220`). An absent unsigned subject is
+   filled in, and its counts move. A changed existing subject is drift, and the
+   state becomes Invalid.
+5. **Freshness.** When E >= T, `observedAt` becomes t: the observation time of
+   the target, not the completion time.
+
+Each cycle has a fixed target, so it ends in finitely many steps. Freshness
+holds only while the sustained append rate stays below the measured walker
+throughput (section 10). Above that rate, `observedAt` ages, and reads follow
+section 7.2. No freshness or termination is promised for an unbounded append
+rate.
+
+### 5.4 Recertification
+
+A pass starts every `recertify_interval` (default 1 hour). It repeats the
+build's chain, batch and tail checks in compare mode, over entries up to the E
+fixed when the pass starts. Extension keeps running alongside it.
+
+- **Per step.** The pass copies and authenticates as in 5.1. Then, in one
+  bounded hold, it reads the snapshot rows for the same `entry_seq` range and
+  compares leaf, signer, projection and presence. Any difference makes the
+  state Invalid, with one exception. A subject that a lineage refresh filled in
+  after the pass derived it as absent is accepted, because that direction is
+  the refresh rule of 5.3.
+- **Counters.** A pass re-verifies rows, not counts, and never runs a
+  whole-table `GROUP BY` on the serving connection after publication.
+  - **Why counts are safe.** Maintained counts are owned state. They change only
+    inside the snapshot transaction that changes the rows they summarize, so no
+    database mutation can alter them. A wrong count could come only from a
+    defect in this code.
+  - **How correctness is tested.** A differential property test compares every
+    maintained count with `GROUP BY` after each generation of randomized
+    appends, refreshes and invalidations. The capacity fixture checks all counts
+    after its run.
+  - **If Root requires a bounded production audit,** the race-free form is:
+    split counts by pass epoch, defer lineage refreshes while a pass is active,
+    and compare per key in holds of at most 256 keys. It is not proposed,
+    because it adds a moving-target protocol in order to detect only
+    implementation defects.
+- **Reporting.** `recertifiedAt` (pass completion) and the last pass duration
+  are reported. A source mutation of a row no page returns is detected within
+  `recertify_interval` plus one pass duration. No answer reflects it in the
+  meantime. This is as-of semantics, not immediate whole-database tamper
+  detection, and the API docs say so (section 11).
+
+### 5.5 Disk changes during build and after publication
+
+- **During the build or a pass.** Ranges are copied in separate short
+  transactions, so an edit can land between them. Every checkpointed range is
+  accepted only if its streamed root equals the signed root, and the chain
+  binds the roots. An edit made before a range is copied fails the build or the
+  pass. An edit made after cannot enter the snapshot. Tail entries are
+  signature-only until the next checkpoint is checked against the owned leaves.
+- **After publication.** No database change alters a snapshot answer.
+  - A returned row that was edited or substituted fails the leaf check (6.4),
+    and the state becomes Invalid.
+  - An unreturned edit is caught by the next recertification.
+  - A tail edit is caught by the next checkpoint.
+  - A regressed head is caught by extension.
+
+### 5.6 Rotation and WAL
+
+- **Live database.** Walker transactions are short reads in WAL mode, so they
+  do not block the writer, and checkpoints of the WAL proceed between steps.
+- **Archive.** A reader can delay rotation's archive commit, and rotation waits
+  up to its `busy_timeout` (`bootstrap/open.rs:47`). A rotation that still
+  fails is recorded through `record_retention_rotation_outcome` and retried on
+  the next maintenance run, as today (`support/store_impl.rs:855-860`). A
+  control exercises rotation under walker contention.
+- **Location.** The walker reads W in every copy transaction and reads each
+  range from wherever it lives. Content is bound by the signed roots.
 
 ## 6. Serving
 
 ### 6.1 Request flow
 
-1. The handler takes a non-queued permit from `receipt_query_lane`
-   (default 4). If none is free, it returns 503 `receipt_query_busy`.
-2. On Tokio's blocking pool, the service validates the query exactly as today:
-   outcome values, cost-currency rules, and `effective_read_scope`
-   (`chio-kernel/src/receipt_query.rs:200-250`). The same errors are returned.
-3. Freshness wait (7.2).
-4. Selection and count run in one snapshot transaction under the
-   `SqlWorkBudget` progress handler (`reports/analytics/work_budget.rs:11-65`),
-   with a fixed plan.
-5. The rows are fetched and leaf-verified outside the snapshot mutex (6.4).
-6. The response carries the version watermark.
+1. Take a permit from `receipt_query_lane` (default 4). The lane is non-queued;
+   without a permit the request returns 503 `busy`.
+2. Move to the blocking pool, moving the permit into the closure.
+3. Validate exactly as today: outcome, currency rules and `effective_read_scope`
+   (`chio-kernel/src/receipt_query.rs:200-250`).
+4. Apply the freshness rule (7.2).
+5. Selection and count run in one snapshot transaction under `SqlWorkBudget`.
+6. Fetch the selected rows and check their leaves.
+7. Re-check the lease (4.4) and return the version watermark.
 
-### 6.2 Query shapes and plans
+### 6.2 Shapes and plans
 
-Filter values are resolved to dimension ids first. A missing id returns an
-exact empty page with `total_count` 0. Plans are chosen by fixed rules, using
-`INDEXED BY` so that work is analyzable:
+Filter values resolve to dimension ids. A missing id gives an exact empty page
+with `total_count` 0. Plans are fixed with `INDEXED BY`.
 
 | Shape | Page | Count |
 |---|---|---|
-| S1 scope only | `(tenant, seq)` or primary key from the cursor: O(log N + L) | maintained total: O(1) |
-| S2 scope plus one equality filter (capabilityId, toolServer, toolName, toolServer and toolName together, outcome, agentSubject, costCurrency without bounds) | `(tenant, D, seq)` from the cursor: O(log N + L) | maintained `(scope, D, value)`: O(1) |
-| S3 scope plus a time window (since, until or both) | seq window [s_lo, s_hi] from hour buckets (below), then a `(tenant, seq)` scan with a ts check: O(log N + hours + L + out-of-order rows) | sum of whole-hour counts plus two boundary-hour index ranges: O(hours + boundary-hour rows) |
-| S4 point read by receipt id | unique `receipt_id`: O(log N) | none |
-| S5 any other combination, including cost bounds | the equality filter with the smallest maintained count supplies the index, clipped to the S3 seq window if one exists; with no equality filter, the S3 window or the `(tenant, cost_currency, cost_charged)` range; other predicates are checked per row | the same index range |
+| S1 scope only | `(tenant, seq)` or the primary key, from the cursor | maintained total |
+| S2 scope plus one equality filter: capabilityId, toolServer, toolName, the toolServer and toolName pair, outcome, agentSubject, or costCurrency without bounds | `(tenant, D, seq)` from the cursor | maintained `(scope, D, value)` |
+| S3 scope plus a time window | a seq window [s_lo, s_hi] from hour buckets, then a `(tenant, seq)` scan with a ts check | whole-hour sums plus two boundary-hour index counts |
+| S4 point read | unique `receipt_id` | none |
+| S5 everything else | the index of the equality filter with the smallest maintained count, clipped to the S3 window if present; otherwise the S3 window or the cost index | the same range |
 
-For S3, s_lo is the smallest seq with ts at or above `since`. It is the minimum
-of `min_seq` over every hour bucket after hour(since), and an index scan of the
-boundary hour. s_hi is computed the same way from `max_seq`. Every matching row
-lies in [s_lo, s_hi], so the window is exact, not an estimate. Rows inside the
-window whose ts falls outside the range ("out-of-order rows") are scanned and
-skipped. With the kernel's clock they are a few seconds' worth at each edge.
+How S3 builds its window:
+
+- s_lo is the minimum of `min_seq` over the hour buckets after hour(since),
+  together with the boundary hour's index scan.
+- s_hi is built the same way from `max_seq`.
+- Every matching row lies in [s_lo, s_hi], so the window is exact.
+- Rows in the window whose ts falls outside the range are scanned and skipped.
 
 ### 6.3 Counts
 
-`total_count` is always exact over the version the page was selected from:
-- S1, S2: a maintained cardinality.
-- S3: maintained hour counts plus boundary index counts.
-- S5: a counted index range.
+`total_count` is exact for the version that was selected. It comes from three
+sources:
 
-Maintained counts are written in the same snapshot transaction as the rows they
-count. Recertification recomputes them with `GROUP BY` and compares, which
-detects implementation drift.
+- S1 and S2 use the maintained counts, written in the same snapshot transaction
+  as their rows;
+- S3 adds whole-hour counts to two boundary-hour index counts;
+- S5 counts its index range.
 
-An S5 count, or an S3 page with pathological timestamp disorder, that exceeds the
-per-request step budget is refused with `receipt_query_work_budget_exhausted`.
-The page and the count are both withheld, never partial (A13). S1 through S4 are
-bounded independently of the corpus apart from log factors, so a sparse tenant
-in a 10M-row corpus costs microseconds (10).
+Any shape that exceeds `query_sql_steps` returns 422
+`receipt_query_work_budget_exhausted`. Both rows and count are withheld; the
+response is never partial.
 
-### 6.4 Pages, fetch and the leaf binding
+### 6.4 Fetch and leaf binding
 
-Selection yields at most L = `min(limit, 200)` tuples of (seq, entry_seq,
-leaf_hash). For each tuple, in one short live read transaction (plus the archive
-when the entry is at or below that transaction's W):
+Selection returns up to L = `min(limit, 200)` tuples of `(seq, entry_seq,
+leaf_hash)`. Their raw rows are copied in one short read transaction on the
+live database, plus the archive for entries at or below that transaction's W.
+Steps 2 to 4 run after the transaction ends, outside any lock.
 
-1. read the claim entry's `raw_json` by `entry_seq` (primary key), enforcing the
-   per-row byte cap;
-2. decode and verify it (`decode_verified_chio_receipt`, Ed25519);
-3. recompute the canonical bytes and the leaf, and require it to equal the owned
-   leaf;
-4. apply the tenant check exactly as `read.rs:204-210` does today.
+1. Copy `raw_json` by `entry_seq`, under the per-row byte check and
+   `fetch_sql_steps`.
+2. Decode it and verify the signature.
+3. Recompute the canonical leaf, which must equal the owned leaf.
+4. Apply today's tenant check (`receipt_query/read.rs:204-210`).
 
-If the row is absent from both live and archive, the read is retried once in
-fresh transactions, because rotation may have moved it in between. Then a
-missing row, or any mismatch, fails the request closed with
-`receipt_query_snapshot_invalid` and moves the service to Invalid.
+A row absent from both the live database and the archive is retried once in
+fresh transactions, because rotation may have moved it. If it is still absent,
+or any check fails, the request returns `receipt_query_snapshot_invalid` and the
+state becomes Invalid.
 
-Pages also obey a 64 MiB response byte cap. A page stops early when the next row
-would cross the cap, but always returns at least one row. `next_cursor` is the
-last returned seq whenever more selected rows remain or the page is full,
-exactly as today when the cap is not hit. Today's paginators already continue on
-a short page that carries a non-null cursor
-(`sdks/typescript/chio-ts/src/receipt_query_client.ts:64-88`,
-`sdks/python/chio-py/src/chio/receipt_query.py:73-104`).
+A page stops before the row that would exceed `page_bytes` (default 16 MiB),
+but always returns at least one row. `next_cursor` is then the last returned
+seq. No receipt is ever truncated. Existing SDK paginators continue across such
+a short page (`receipt_query_client.ts:64-88`, `receipt_query.py:73-104`).
 
 ### 6.5 Point reads
 
-`load_chio_receipt_with_context` looks up `receipt_id` in the snapshot, fetches
-the receipt, and leaf-verifies it.
+- **Positive answers.** A Ready version that holds the id is fetched and its
+  leaf checked as in 6.4.
+- **Negative answers.** The snapshot must reach H0, the head read when the
+  request starts. Reaching H0 within `head_wait` gives a negative bound to every
+  commit made before the request. Otherwise the read returns 503 `stale`.
+- **While Building.** Point reads are unavailable (5.2).
 
-On a miss, the request waits for the snapshot to reach the head observed at
-request start (7.2), so a negative answer covers every commit that completed
-before the request. If the snapshot cannot catch up within the wait, the request
-returns 503 `receipt_query_snapshot_stale`. It never returns an unproven
-negative.
+### 6.6 Per-request limits
 
-While Building, a hit at or above the authenticated suffix floor (5.1, newest
-first) is served. Anything else returns 503 `receipt_query_snapshot_building`.
-This keeps the kernel's governed-chain point load
-(`receipt_handlers.rs:33-68`) available for recent receipts soon after a restart.
+All limits are enforced, and each has a typed outcome.
 
-### 6.6 Per-request bounds
+| Limit | Default | Outcome |
+|---|---|---|
+| Lane permits, non-queued | 4 | 503 `busy` |
+| `query_sql_steps` (snapshot) | 10,000,000 | 422 |
+| L signature checks and leaf hashes | at most 200 | none |
+| `fetch_sql_steps` | 1,000,000 | Invalid (primary-key reads cannot exceed it on an intact schema) |
+| `page_bytes` | 16 MiB, at least one row | short page with a cursor |
+| `max_receipt_bytes` per row | 128 MiB | Invalid on fetch (the row exceeds what the build accepted) |
+| `head_wait` (blocking wait holding a permit) | 2 s | falls through to 7.2 |
 
-| Resource | Bound |
-|---|---|
-| Concurrency | `receipt_query_lane` permits (default 4), non-queued; snapshot SQL serialized on one connection |
-| Snapshot SQL | `query_sql_steps` VM steps (default 10,000,000, about 0.13-0.5 s on the reference host), enforced by `SqlWorkBudget` |
-| Signature work | at most L (200) Ed25519 verifications plus L SHA-256 leaf hashes |
-| Receipt-database reads | at most two short read transactions (live, archive), at most L primary-key reads |
-| Bytes | 64 MiB per page (at least one row), each row at most `max_receipt_bytes` |
-| Wait | `head_wait` (default 2 s) of blocking wait, no CPU |
+Each walker hold is bounded by `hold_sql_steps`. Before each hold the walker
+checks a count of requests waiting for the connection, and it yields while that
+count is nonzero. A request therefore waits for at most one walker hold plus at
+most three requests ahead of it, each bounded by its own budget. Query work
+while a recertification runs is covered by control C14.
 
 ## 7. States and freshness
 
-### 7.1 State machine
+### 7.1 States
 
-`Building { authenticated_entries, target_entries, floor }`, `Ready`,
-`Invalid { reason, since }` and `Unavailable { reason }`, plus `Stopped`. A
-Ready snapshot has a staleness computed per request.
+- **`Building { phase, authenticated_entries, target_entries }`.** Phases are
+  `waiting_for_writer_seed`, `chain`, `batches`, `tail` and `final`. Reads get
+  503 `building`.
+- **`Ready`.** Reads are served subject to the freshness rule (7.2).
+- **`Invalid { reason, since }`.** Reasons are tamper, regression,
+  writer_head_poisoned, leaf mismatch and internal. Reads get 500 `invalid`. A
+  rebuild starts a new lineage on a fresh connection, with exponential backoff
+  from 5 minutes to 1 hour, and only while the writer head is not poisoned.
+- **`Unavailable { custody | capacity | row_cap | platform }`.** Reads get 503
+  `unavailable`. The state is rechecked when configuration or space changes,
+  and at restart.
 
-- Start goes to Building.
-- Building becomes Ready on success. An authentication failure makes it Invalid;
-  a storage or row-cap limit makes it Unavailable.
-- Ready advances its generation on each extension and recertification.
-  Extension or recertification failure, a leaf-check failure, a poisoned writer
-  head, or a walker panic makes it Invalid.
-- Invalid stays put until a scheduled rebuild. Rebuilds back off exponentially
-  from `invalid_retry_backoff` (default 5 min) up to 1 hour and run only while
-  the writer head is not poisoned. A rebuild starts a new lineage in a new
-  temporary database; the invalid snapshot is dropped and is never served again.
-- Unavailable is rechecked after the operator changes configuration or frees
-  space, and on restart.
-- Superseded versions are not retained, and no API republishes one.
+An invalid or superseded snapshot is dropped. It is never published again.
 
-### 7.2 Freshness contract
+### 7.2 Freshness
 
-- **Head wait.** Each request reads the claim-log head H0 (`MAX(entry_seq)`, a
-  primary-key read, or W when the live log is empty after a full rotation) and
-  waits up to `head_wait` (default 2 s) for the snapshot's
-  E to reach H0. H0 is a wait target only, never authority. An inflated head
-  makes the request time out into the rule below, and makes the walker fail to
-  authenticate the bogus entry.
-- **Serving after the wait.**
-  - If the snapshot reached H0, the request is served.
-  - If it did not, the request is still served from the current version when
-    `observedAt` (the last time the snapshot equalled the live head) is within
-    `max_staleness` (default 30 s).
-  - Otherwise it returns 503 `receipt_query_snapshot_stale` with Retry-After.
-- **Why this never strands a healthy store.** Staleness depends only on
-  extension throughput against the append rate. It is independent of corpus
-  size, because extension is O(delta) and full passes never gate freshness. A
-  large healthy store is never refused for its size. The first build after a
-  restart reports Building with progress until it completes (10 gives the
-  measured rate). Building always terminates for a healthy store: it has a
-  fixed target and finite steps.
+1. A page request reads H0 and waits up to `head_wait` for E >= H0.
+2. If E still falls short, the request is served from the current version only
+   when `now - observedAt` is at most `max_staleness` (default 30 s).
+3. Otherwise it returns 503 `stale` with Retry-After.
 
-### 7.3 Poisoned writer, superseded and invalid snapshots
+Staleness depends on the append rate measured against walker throughput, never
+on corpus size. Building ends after finitely many steps, because its target is
+fixed.
 
-The service reads a new crate-internal accessor for the writer's
-`head_poisoned` flag (`receipt_store.rs:645-656`) at every extension and request.
-A poisoned head means the writer's own seed or resync found an integrity
-failure. The service then moves to Invalid(writer_head_poisoned), stops
-extending, and refuses reads until an operator repair and restart reseed the
-writer. A writer that is down but not poisoned does not block reads, because
-extension reads the database independently. Its freshness is reported normally.
-At startup the service starts only after V25-PRE has awaited writer readiness,
-so the writer seed completes, or fails startup, before any snapshot is built.
+### 7.3 Writer poison
+
+The service reads a new crate-internal accessor for the writer's `head_poisoned`
+flag (`receipt_store.rs:645-656`) at three points: each extension cycle, each
+selection, and each lease re-check. A poisoned head moves the state to
+`Invalid(writer_head_poisoned)`, and reads are refused until an operator repair
+reseeds the writer. A writer thread that is down but not poisoned does not block
+reads, because extension reads the database directly.
 
 ## 8. Integrity compared with a457
 
 | Property | a457, every page | Snapshot |
 |---|---|---|
-| Checkpoint chain coherence and membership | re-verified | verified at build, per new checkpoint against the owned head, and again each recertification |
-| Checkpointed live and archived claims authenticate | re-verified | at build and each recertification; returned rows on every page (signature plus leaf) |
-| Archive source projections | re-verified | at build and each recertification |
-| Live source projections (for example, an edited `tool_name` column) | not checked; filters read unsigned columns, so a row silently leaves a filter | filters use signed content; drift is detected at build and recertification |
-| Signed but unlogged live source row | served | never served; detected at build and recertification |
-| Returned row replaced by a different validly signed receipt after verification | returned; only the row's own signature and tenant are checked | refused by the leaf check |
-| Tamper of an unreturned row after authentication | next page refuses | answers unaffected; detected within `recertify_interval` plus one pass, or at fetch |
+| Chain coherence and membership | re-verified | at build, for each new checkpoint against the owned head, and each recertification |
+| Claim authentication, live and archived | re-verified | at build and each recertification; returned rows on every page (signature and leaf) |
+| Archive projections | re-verified | at build and each recertification |
+| Live source projections | not checked; filters read unsigned columns | filters read signed content; drift detected at build and recertification |
+| Signed but unlogged live row | served | never served; detected at build and recertification |
+| Returned row replaced by another validly signed receipt | returned | refused by the leaf check |
+| Mutation of an unreturned row | the next page refuses | answers unchanged; detected within `recertify_interval` plus one pass |
 | Uncheckpointed tail | signature only | signature only, then bound to the owned leaves by the next checkpoint |
-| Unsigned lineage subject fallback | trusted | trusted (unchanged), pinned per version, subject changes are drift |
-| Work per page | O(N + 2M) signatures, unbounded SQL | at most 200 signatures, bounded SQL |
+| Unsigned lineage subject | trusted | trusted, and pinned per version (Q5) |
 
-The one place the snapshot detects later than a457 is the seventh row: tamper of
-rows a page does not return. a457 refuses on the next page. The snapshot keeps
-serving the authenticated pre-tamper answers until the next recertification
-completes, then refuses. Answers never reflect tampered data, counts cannot
-drift, and `recertifiedAt` in every response states the detection horizon. Every
-other row is equal or stronger. No read that a457 refuses on integrity grounds is
-accepted after detection, so this is not a silent weakening. It is an explicit,
-bounded detection latency, accepted by the owner's ruling for bounded reads, and
-listed as open question Q1.
+The snapshot uses as-of semantics. An answer is the authenticated state at its
+watermark. The difference from a457 is that mutation of unreturned rows is
+detected at the recertification cadence rather than on the next page (Q1).
 
 ## 9. Lifecycle and ownership
 
-- **Crate.** The snapshot service lives in `chio-store-sqlite`, because it needs
-  crate-internal verification helpers. Its public surface is
-  `ReceiptQuerySnapshots::start(Arc<SqliteReceiptStore>, config, clock)`,
-  `query_receipts`, `load_receipt`, `status` and `shutdown`. The store's
-  existing `query_receipts` and `load_chio_receipt_with_context` keep their full
-  per-call authentication for local operator tools (`chio receipt list` local
-  mode, evidence export internals, tests). Network handlers must use the
-  snapshot service, and a source gate enforces that (plan, Task 6).
-- **Owner.** `TrustServiceState` gains `receipt_query_snapshots:
-  Option<Arc<ReceiptQuerySnapshots>>` and `receipt_query_lane: Arc<Semaphore>`.
-  The service is started once in `serve_async_inner`, after V25-PRE's single
-  store has passed `wait_for_writer_ready` (`bootstrap/open.rs:335-348`). One
-  owner per database per process; no handler ever starts a writer or a walker.
-- **Startup.** The HTTP server starts immediately. Receipt query routes return
-  503 Building until Ready. There is no startup timeout, so Initializing
-  (Building) and Failed (Invalid or Unavailable) stay distinct. `/health` reports
-  the state, progress, `throughEntrySeq`, `observedAt` and `recertifiedAt`.
+- **Ownership with V25-PRE.**
+  - V25-PRE owns opening the store, writer readiness, `join_writer_on_reaper`,
+    and dropping the store at shutdown.
+  - V25-PRE's unanchored startup may serve while the writer is still Seeding.
+    Its anchored startup must meet the same no-hard-cutoff rule (Codex 05:21).
+    Both are V25-PRE's to implement.
+  - This design adds `TrustServiceState.receipt_query_snapshots:
+    Option<Arc<ReceiptQuerySnapshots>>` and `receipt_query_lane`, starts the
+    service once after the store exists, and stops it before the store is
+    dropped. The exact hunks are agreed with the V25-PRE lane before Task 6.
+- **Start, asynchronously.**
+  - `ReceiptQuerySnapshots::start` returns at once in
+    `Building(waiting_for_writer_seed)`.
+  - The walker thread polls writer readiness with its cancel flag and no
+    deadline, using the same classification V25-PRE uses. If the seed poisons
+    the writer, the state becomes `Invalid(writer_head_poisoned)`. Otherwise
+    the build starts.
+  - HTTP serves from the beginning and reports the state.
+  - `/health` reports the state, phase, progress, `throughEntrySeq`,
+    `observedAt`, `recertifiedAt` and `used_bytes`.
 - **Shutdown.**
-  1. The server stops accepting requests.
-  2. `ReceiptQuerySnapshots::shutdown` runs in `spawn_blocking`. It sets the
-     cancel flag, wakes the walker, and joins it within one step.
-  3. The state, and with it the store, is dropped as V25-PRE specifies.
+  1. The server drains.
+  2. `shutdown()` runs in `spawn_blocking`: it sets the cancel flag, wakes the
+     walker, and joins it after its current phase (5.1).
+  3. V25-PRE drops the store.
 
-  If the service is dropped without `shutdown` (a panic path), it sets the cancel
-  flag and detaches. The walker thread holds its own `Arc` of the store, so the
-  store's blocking writer join (`receipt_store.rs:821-836`) then runs on that
-  plain thread, never on a Tokio worker.
-- **Cluster.** Each node builds its own snapshot over its own database.
-  Replicated receipts are appended there and picked up by extension.
+  If the service is dropped without `shutdown()`, it sets the cancel flag and
+  detaches. The walker holds an `Arc` to the store, so any blocking writer join
+  (`receipt_store.rs:821-836`) happens on that plain thread.
+- **Local operator paths.** `SqliteReceiptStore::query_receipts` and
+  `load_chio_receipt_with_context` keep full per-call authentication for local
+  operator tools. A source gate keeps them out of trust-control handlers.
+- **Cluster.** Each node builds its snapshot from its own database.
 
-## 10. Capacity and resource policy
+## 10. Capacity evidence and resource policy
 
-Measured on this workstation with SQLite 3.50.4, using 1,000,000 synthetic
-projected rows, 2,000 tenants with the largest owning 40% of rows, one sparse
-tenant with 3 rows, and the index set of 4.3 without the tool-pair and
-count tables. Scripts and logs are in `claude-pr1160-evidence/vfix/v25/snapexp/`;
-the plan's fixture re-measures with the production schema.
+Measured on this workstation with system SQLite 3.50.4 (the production build
+bundles 3.51.3). The data was 1,000,000 synthetic projected rows with short
+values, using the 4.1 index set minus the tool-pair column and the count
+tables. Scripts and logs are in `vfix/v25/snapexp/`.
 
-- storage: 111 B/row in the table, 398 B/row with indexes;
-- sparse tenant: page and count under 0.1 ms;
-- largest tenant (400k rows): mid-cursor page 0.5 ms, 1,000 VM steps;
-- single-filter index count: about 3 VM steps per row (17 ms for 400k rows);
-- range plus sort: about 7 steps per row;
-- index plus table check: about 6.5 steps per row.
-
-Fixed plans matter. On the largest tenant, SQLite's own plan for a "last 1% of
-time" page took 1,979,000 steps (134 ms). For a 10% window, a `(tenant, ts)`
-range plus sort took 280,000 steps, and the S3 seq-window scan took 2,000 steps
-(0.3 ms).
-
-Policy:
-
-| Item | Value |
+| Measurement | Result |
 |---|---|
-| Supported capacity (qualified by the plan's fixture) | 10,000,000 tool receipts in one store (live plus archived, any split), up to 10,000 tenants, any single-tenant share; sparse tenant of at most 10 receipts |
-| Snapshot storage | at most 600 B per tool receipt, reserved before a build (6 GB at 10M) on SQLite's temp directory; insufficient space makes the service Unavailable(capacity), with the required bytes reported |
-| Snapshot RAM | 64 MiB page cache plus the walker step buffer (at most 64 MiB plus one row) plus O(log B) |
-| Build time | N divided by the measured walker rate. Each entry is verified once. The fixture measures 1,000,000 signed receipts and reports entries per second per verify thread. The build is linear, with constant per-entry work asserted by counters. |
-| Per-request work | 6.6 |
-| Above capacity | nothing is disabled because of history size. S1 to S4 stay O(log N). S5 refusals become more likely. Storage is the only hard requirement, and it is checked, never assumed. |
+| Storage | 398 B/row with indexes |
+| Sparse-tenant page and count | about 0 progress-handler steps |
+| Largest tenant (400,000 rows), mid-cursor page | 1,000 steps |
+| Single-filter index count | about 3 steps/row |
+| SQLite's own plan for a recent-window page | 1,979,000 steps |
+| Seq-window scan for a 10% window | 2,000 steps |
 
-The snapshot does not claim unbounded history in bounded RAM. RAM is fixed;
-storage grows at most 600 B per receipt on a disk the operator chooses.
+These are fixture measurements, not bounds. Per-row storage grows with value
+lengths.
+
+Capacity evidence that must exist before landing (plan Task 8), labeled
+distinctly:
+
+- **Projection capacity, synthetic.** 10,000,000 projected rows, with a
+  large-field slice (long receipt ids, tool names and subjects). It records
+  bytes per row, per-shape VM steps, the typed refusal of an over-budget S5
+  shape, and quota exhaustion giving `Unavailable(capacity)`.
+- **Build capacity, signed.** 1,000,000 signed receipts, half archived and half
+  live, including one large batch. It records walker throughput with one
+  worker, peak walker memory, step durations, and WAL growth during the build.
+  The supported append rate is stated as "below the measured throughput". No
+  10M signed-build claim is made.
+
+Resource policy:
+
+- RAM: the snapshot page cache (64 MiB), plus one step buffer (at most
+  `step_bytes` plus one row of at most `max_receipt_bytes`), plus O(log B).
+  The `memory` backend adds its quota.
+- Storage: the quota of 4.3.
+- Nothing is disabled because history grew. The limits that can refuse are the
+  configured quota and the per-row cap, both typed and reported.
 
 ## 11. API, spec and SDK changes
 
-**Kernel** (`chio-kernel/src/receipt_query.rs`, `receipt_store.rs`):
+**Kernel.**
 
 - New `ReceiptSnapshotWatermark { snapshot_id, through_entry_seq,
-  checkpoint_seq: Option<u64>, observed_at_unix_ms, recertified_at_unix_ms:
-  Option<u64> }`.
-- `ReceiptQueryResult` gains `snapshot: Option<ReceiptSnapshotWatermark>`. It is
-  `None` on the per-call authenticated path.
-- `ReceiptStoreError::QuerySnapshot(ReceiptQuerySnapshotError)` with variants
+  checkpoint_seq, observed_at_unix_ms, recertified_at_unix_ms }`.
+- New `ReceiptQueryResult.snapshot: Option<_>`. It is `None` on the per-call
+  path.
+- New `ReceiptStoreError::QuerySnapshot(ReceiptQuerySnapshotError)`. Variants:
   `Building`, `Stale`, `Invalid`, `Unavailable`, `Busy` and
-  `WorkBudgetExhausted`. Each has a stable `code()`.
+  `WorkBudgetExhausted`, each with a stable `code()`.
 
-**HTTP** (`service_types/requests.rs:519-526`, `responses.rs:269`):
-
-- `ReceiptQueryResponse` and `ReceiptListResponse` gain an optional `snapshot`
-  object: `{ "id", "throughEntrySeq", "checkpointSeq", "observedAt",
-  "recertifiedAt" }`. This covers `/v1/receipts/query`,
-  `/v1/agents/{subject}/receipts` and `/v1/receipts`, including point reads.
-- The error body becomes `{ "error", "code" }`, where `code` is an addition to
-  today's `plain_http_error` shape (`policy_support.rs:995-997`). Codes and
-  statuses:
+**HTTP.** The response gains an optional `snapshot` object:
+`{id, throughEntrySeq, checkpointSeq, observedAt, recertifiedAt}`. It applies to
+`/v1/receipts/query`, `/v1/agents/{subject}/receipts` and `/v1/receipts`,
+including point reads. Errors become `{error, code}`, where `code` is added to
+today's body (`policy_support.rs:995-997`).
 
 | Code | Status | Retry-After |
 |---|---|---|
@@ -646,83 +708,68 @@ storage grows at most 600 B per receipt on a disk the operator chooses.
 | `receipt_query_snapshot_stale` | 503 | yes |
 | `receipt_query_busy` | 503 | yes |
 | `receipt_query_snapshot_unavailable` | 503 | no |
-| `receipt_query_snapshot_invalid` | 500 | no; same status a457 returns for integrity failures |
-| `receipt_query_work_budget_exhausted` | 422 | no; narrow the filter |
+| `receipt_query_snapshot_invalid` | 500, as a457 for integrity failures | no |
+| `receipt_query_work_budget_exhausted` | 422 | no |
 
-**Request side.** No new request parameters. Cursor semantics are unchanged:
-seq, forward-only, stable across versions. Clarified: a page may hold fewer than
-`limit` receipts while `nextCursor` is non-null.
+- **No new request parameters.** Seq cursors are unchanged.
+- **Short pages.** A page with fewer than `limit` receipts may still carry a
+  non-null `nextCursor`.
+- **`throughEntrySeq` and `observedAt`** state the as-of point.
+- **`recertifiedAt`** states when the whole history was last re-checked.
+  Mutation of rows not returned can go undetected for up to the
+  recertification interval plus one pass, but never alters an answer.
 
-**Spec and docs:**
+**Spec and docs.**
 
-- `spec/WIRE_PROTOCOL.md` section 4.3 (`:394-425`) gains the response field,
-  freshness semantics, the error codes and the short-page clarification.
-- `spec/PROTOCOL.md` section 9 (`:2956`) gains one paragraph stating that
-  receipt query reads are served from an authenticated snapshot with a
-  watermark.
-- `docs/reference/RECEIPT_QUERY_API.md` gets the same changes.
+- `spec/WIRE_PROTOCOL.md` section 4.3 (`:394-425`): the response field, codes,
+  freshness, the as-of statement and short pages.
+- `spec/PROTOCOL.md` section 9 (`:2956`): one paragraph.
+- `docs/reference/RECEIPT_QUERY_API.md`: the same content.
 
-**SDKs:**
+**SDKs.**
 
-| Client | Old behavior against the new server | New behavior |
+| Client | Old behavior | New behavior |
 |---|---|---|
-| TypeScript `ReceiptQueryClient` | ignores `snapshot`. 503 and 422 throw `QueryError(status)`, as any non-2xx does today. `paginate` handles short pages. | `snapshot?` typed. `QueryError.code` parsed. `paginate` retries `building`, `stale` and `busy`, honoring Retry-After, up to a configurable total wait (default 30 s). |
-| Python `ReceiptQueryClient` | same as TypeScript (`TypedDict total=False`) | same as TypeScript |
-| C++ client | returns the raw body; 503 and 422 surface as status errors | no change required; the code is passed through |
-| Rust control-plane client (`service_runtime/client/operations.rs:527`) and `chio receipt list --remote` | deserializes without `deny_unknown_fields` | field added with `#[serde(default)]` |
-| Dashboard (`chio-cli/dashboard/src/api.ts`) | ignores the field | type only |
+| TypeScript, Python | ignore `snapshot`; 503 and 422 throw the existing status error; `paginate` handles short pages | typed `snapshot`; parse `code`; bounded retry of building, stale and busy honoring Retry-After (default 30 s total); never retry 422 or 500 |
+| C++ | raw body; status errors | unchanged |
+| Rust control-plane client and dashboard | no `deny_unknown_fields` | field added with `#[serde(default)]`, or type only |
 
-Old clients keep working. The only behavioral differences they see are 503
-during Building after a restart and 422 for expensive S5 filters. Both are
-errors they already surface.
+## 12. Evidence export (Q3)
 
-## 12. Formal, xtask and gate impact
+`POST /v1/evidence/export` keeps today's authorization and full per-call
+authentication. Changes:
 
-- `formal/` and `xtask/`: none. No formal model or xtask mirror references
-  retained reads, receipt query or the projection rule (searched at a457).
-- `docs/security/trust-boundary-inventory.json` (`scripts/check-trust-boundaries.py`):
-  - new shared-reader entries for the walker and fetch path (`:19543-19586`
-    hold today's `query_receipts` reader entries);
-  - new decode sites;
-  - the moved projection rule (`:3819-3841`).
-- `scripts/security-clock-inventory.json` (`scripts/check-security-clocks.py`):
-  `observedAt`, `recertifiedAt`, the recertification schedule and the retry
-  backoff read time through the store's injected clock, and each consumer is
-  registered.
-- `scripts/check-rust-file-hygiene.py`: each new file stays under its base
-  limit.
-- `scripts/check-negative-assertions.py`: new tests use exact error variants
-  and codes.
-- `docs/security/landing-ledger.json`: Root links this spec and plan.
+- It runs under a dedicated non-queued `evidence_export_lane` with 1 permit,
+  returning 503 `busy` when taken. The work runs in `spawn_blocking` with the
+  permit moved into the closure, so a cancelled HTTP request holds the permit
+  until the work stops.
+- The API docs state that a full export costs O(retained corpus).
 
-## 13. Risks and open questions
+V25 does not remove every lifetime-cost endpoint. Reports keep their own
+budgets, and export is bounded only in concurrency.
 
-- **Q1. Detection latency.** Tamper of unreturned rows is detected within
-  `recertify_interval` plus one pass, not on the next page (section 8). Accept
-  it with the 1 hour default? Options: a shorter interval, or sampled fetches of
-  unreturned rows per request. Sampling detects mass tamper fast but single-row
-  tamper only with probability k/N.
-- **Q2. Serialized snapshot SQL.** One connection serializes snapshot SQL. A
-  cheap query can wait behind one expensive S5 query, up to about 0.5 s at the
-  default budget. A multi-connection snapshot needs a named file and weakens the
-  boundary of 3, so it is not proposed.
-- **Q3. Evidence export.** `POST /v1/evidence/export` stays on the per-call
-  authenticated path. It is O(corpus) by contract and tenant-reachable. Proposal:
-  run it behind a dedicated one-permit, non-queued lane now, and move its
-  selection onto the snapshot as follow-up work. Alternatively, restrict it to
-  admin principals.
-- **Q4. Restart availability.** After a restart, receipt queries are
-  unavailable until the first build completes, roughly N divided by the walker
-  rate. Point reads for recent receipts come back early (6.5). Is a
-  `verify_threads` default above 1 at startup acceptable?
-- **Q5. Unsigned lineage subjects.** The lineage subject fallback stays as
-  trusted as it is today. Should a later change bind it to the signed capability
-  token held in `signed_capability_json`?
-- **Q6. Capacity claim.** 10M rows for query bounds and storage is qualified with
-  synthetic projected rows. Build throughput is qualified at 1M signed receipts
-  and extrapolated linearly. Is a 10M signed-receipt build required before
-  landing, or is it a scheduled qualification run?
-- **Risk: temp-directory capacity.** A deployment with a small temp directory
-  becomes Unavailable(capacity) instead of serving. The operator must set
-  `SQLITE_TMPDIR`. This is the one size-related refusal, and it is reported
-  exactly.
+## 13. Gate impact
+
+- **`formal/` and `xtask/`.** No impact. Nothing in them references retained
+  reads or receipt query.
+- **`scripts/check-trust-boundaries.py`.** New shared-reader entries and decode
+  sites, and the moved projection rule, are registered in
+  `docs/security/trust-boundary-inventory.json` (existing entries at
+  `:3819-3841` and `:19543-19586`).
+- **`scripts/check-security-clocks.py`.** `observedAt`, `recertifiedAt`, the
+  schedules and the backoff read time through the injected store clock. They
+  are registered in `scripts/security-clock-inventory.json`.
+- **`scripts/check-rust-file-hygiene.py` and
+  `scripts/check-negative-assertions.py`.** New files stay within their limits,
+  and tests assert exact variants and codes.
+
+## 14. Remaining risks
+
+- **Restart.** Receipt reads are unavailable after a restart until the first
+  build completes, at a duration that grows linearly with history (measured in
+  Task 8).
+- **Snapshot connection contention.** One snapshot connection means requests
+  can wait behind bounded holds.
+- **Unsupported platforms.** `private_temp_file` is unavailable outside Linux.
+  macOS and Windows use the `memory` backend within its quota. Extending
+  `private_temp_file` needs that platform's own evidence.
