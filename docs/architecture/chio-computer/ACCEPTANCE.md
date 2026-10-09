@@ -1,6 +1,6 @@
 # Computer: incremental delivery and acceptance
 
-Status: proposed acceptance contract, revision 2. No case below is reported as
+Status: proposed acceptance contract, revision 3. No case below is reported as
 executed by this documentation PR. Parent: [PROPOSAL.md](PROPOSAL.md).
 
 ## Prerequisite and delivery rule
@@ -24,6 +24,19 @@ dependency delta; a new feature name is not proof of isolation.
 | I3: existing work composition | Bind compiled work, protected verification and C5 closure/view | Real native execution, exact acceptance, six-dimensional observations and admission/closure races |
 | I4: independent computers | C4 owner bindings and qualified transfer/spending/host profiles | Separate operators, issuer keys and stores; receiver refusal; lost-reply and partition evidence |
 | I5: installed applications | SDK/CLI surface, dynamic collaboration and evidence export | Full hero plus a second application reusing the same owners, supported installation profiles and negative cases |
+
+**Roadmap mapping.** I1 to I5 are the unified roadmap's COMP-1 to COMP-5:
+
+| Increment | Rung | When it runs |
+| --- | --- | --- |
+| I1 | COMP-1 | Starts now |
+| I2 | COMP-2 | Starts now |
+| I3 | COMP-3 | After WORK-W1 and KERN-3 |
+| I4 | COMP-4 | Its exit is G4's complete run |
+| I5 | COMP-5 | Ships in the preview that G5 uses |
+
+COMP-6 runs the internal development swarm (#1197) on Computer after I3.
+Because that is same-domain, it never counts toward independence.
 
 Same-domain remote placement may be exercised before I4, but it cannot substitute
 for independent receiver ownership. Use deterministic non-LLM programs to isolate
@@ -53,6 +66,7 @@ profile passes the relevant acceptance.
 | C2-05 | Copy equal bytes from a different work item/tenant into a result | Provenance/resource/acceptance substitution refused |
 | C2-06 | Read restricted diff metadata or return data through logs/errors/status | Current release enforced on every qualified channel; recipient knowledge committed before disclosure |
 | C2-07 | Delete/discard a candidate with unresolved effects or referenced evidence | Retention pins/tombstones and financial/effect obligations remain |
+| C2-08 | A cross-organization run under the default profile tries to write through to the source repository | Writes land only in the receiver's overlay; source storage is unreachable; the sealed import is the only path back |
 
 ## C3: programs
 
@@ -65,6 +79,9 @@ profile passes the relevant acceptance.
 | C3-05 | Integrate untrusted/labeled results and try to rewrite the verifier | Labels/influence retained; protected evaluator and immutable result binding preserved |
 | C3-06 | Add a helper through an unapproved catalog, replayed continuation or stale graph head | Admission/extension refused without duplicate native dispatch |
 | C3-07 | Required stage fails while siblings have dispatched external effects | Dependent stages do not commit; cancellation/drain retains original effects and obligations |
+| C3-08 | `a & b & c \| d \| e` in Python and Rust, and `parallel(a, b, c).pipe(d).pipe(e)` in TypeScript | Identical canonical description and digest; parsing needs no parentheses |
+| C3-09 | A TaskLeaf whose requirements no receiver-admitted harness profile satisfies | Bounded typed refusal at the receiver; no fallback to an unadmitted harness |
+| C3-10 | A ProgramLeaf sent to a receiver that has no qualified KSPEC-07 confinement kind | Refused before any code transfer or materialization |
 
 ## C4: execution bindings
 
@@ -78,6 +95,8 @@ profile passes the relevant acceptance.
 | C4-06 | Partition a recipient holding a delegated monetary allocation | Parent cannot reclaim and respend outstanding exposure based only on timeout |
 | C4-07 | Expire/revoke/stop during remote execution, reconnect, or replace host evidence | No deadline renewal; future unauthorized commitments refused; stale/unqualified host cannot receive protected inputs or publish |
 | C4-08 | Parent fails after payable child acceptance, or source rejects its patch | Child's financial claim retains its contractual disposition; no automatic refund/free work |
+| C4-09 | Receiver helpers contend for the source's `/models/default` under `USD(5)` | The source's hold ledger, at the source's door, holds the cap across every receiver helper; no receiver-side counter substitutes |
+| C4-10 | A receiver helper presents the source's grant directly at the source's door | Refused as a second hop; only the receiver's broker custody path is admitted in Computer-0 |
 
 ## C5: execution and apply
 
@@ -101,8 +120,11 @@ Execute the exact hero from installed packages outside the source checkout:
 
 1. A owns a project and candidate; B has independent keys, store and operator.
 2. B admits the image and executes the composed program under the selected host.
+   At least one TaskLeaf runs on B's own admitted harness, and one ProgramLeaf runs
+   under qualified confinement.
 3. A program requests an approved helper through existing bounded work extension.
-4. All relevant charged execution uses the advertised consumption binding.
+4. All relevant charged execution uses the advertised consumption binding. Calls
+   to A's model route are charged at A's door by A's hold ledger.
 5. Inject a lost reply and recover the original operation without a second
    dispatch; retain the exact native evidence for the fault cutpoint.
 6. Freeze the integrated revision, obtain exact configured acceptance, and join
@@ -111,6 +133,13 @@ Execute the exact hero from installed packages outside the source checkout:
    conflict without automatic rebasing or replacement verification.
 8. Export evidence and verify it independently against the declared key/profile
    and witness requirements.
+
+Under the unified roadmap, Application A is two runs:
+
+- **G4:** the complete internal run, between two Backbay-operated domains with
+  independent keys.
+- **G5:** each outside team's run, from installed packages. Application B is
+  the G5 stretch goal.
 
 ### Application B: confined work beside private data
 

@@ -1,6 +1,6 @@
 # Computer and the completed Chio roadmap
 
-Status: proposed architectural crosswalk, revision 2. Parent: [PROPOSAL.md](PROPOSAL.md).
+Status: proposed architectural crosswalk, revision 3. Parent: [PROPOSAL.md](PROPOSAL.md).
 
 ## Assumption and precedence
 
@@ -18,7 +18,9 @@ Use this order when documents disagree:
 5. Older research where the above do not supersede it.
 
 These are pinned research views, not statements about today's merge or release
-status. The kernel and work specifications use internal historical names where
+status. Since these pins were taken, #1196 has merged into main. Its Computer
+amendment, [#1200](https://github.com/bb-connor/arc/pull/1200), adds Lane COMP
+and decisions D21 to D23, which revision 3 applies. The kernel and work specifications use internal historical names where
 necessary; public Computer examples retain the approved product vocabulary.
 
 ## Pinned program heads
@@ -62,6 +64,7 @@ The eight frozen-contract workstreams constrain Computer as follows:
 | COOP | Independent peers/keys, local doors, co-signing and evidence delivery | Source rights and receiver consent remain independent. |
 | REL | Qualified installation and supported host/provider distributions | Publish exact profile support, not source-only demonstrations. |
 | OUT | Outside operators and claim/evidence discipline | Qualify the two-computer application with genuinely independent operation. |
+| COMP | This proposal's own lane (#1200): rungs COMP-1 to COMP-6 | Computer-0 is the success-test profile. G4's complete run is Application A, and G5's outside teams run the installed hero. |
 
 Post-success-test scope also supplies sender-funded cross-organization holds,
 multi-hop independent keys, N-organization cooperation, witnessed evidence,
@@ -180,12 +183,12 @@ Strategy source: [strategy and roadmap](https://github.com/bb-connor/arc/blob/66
 
 ## Source and coverage accounting
 
-[source-evidence.json](source-evidence.json) separates the original inspection
+[source-evidence.json](research/source-evidence.json) separates the original inspection
 from the revision-2 selected program/owner corpus and manifest inventory. Hashes
 are reproducible against the pinned Git objects. Recording a source is not a
 claim that every line was reviewed or that a branch is merged or qualified.
 
-[CODEBASE-COVERAGE.md](CODEBASE-COVERAGE.md) inventories every crate manifest in
+[CODEBASE-COVERAGE.md](research/CODEBASE-COVERAGE.md) inventories every crate manifest in
 the union of the pinned #1160/#1173/#1179 views and records per-crate architectural
 relationships. SDK and non-crate topology were considered; external plugin
 repositories and every vendored dependency were not independently audited.

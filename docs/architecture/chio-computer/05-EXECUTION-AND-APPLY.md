@@ -1,6 +1,6 @@
 # C5: Execution observations, joins and exact apply
 
-Status: proposed contract, revision 2. Parent: [Computer proposal](PROPOSAL.md).
+Status: proposed contract, revision 3. Parent: [Computer proposal](PROPOSAL.md).
 
 ## Purpose and owner
 
@@ -121,9 +121,13 @@ governed read, including names and errors. Printing it is not human approval.
 4. Recheck current authority, revocation, stop/closure, resource scope,
    confidentiality and the action's required integrity. An endorsement, where
    required, binds the exact apply action and current influence/evaluator basis.
-5. Use the native crossing/intent protocol and resource owner commit fence to
-   compare the expected base and publish the new revision. The current checks
-   and generation validation must hold at that commit point, not only preflight.
+5. Publish through the resource owner's commit fence.
+   - Under Computer-0 this is a compare-and-swap of the project ref against
+     the expected base, on the git-native backend.
+   - KSPEC-10 crossing records take over this step when they land after the
+     success test.
+   - In both cases, the current checks and generation validation must hold at
+     the commit point itself, not only during preflight.
 6. Recover publication and durable outcome by the original apply identity. A
    lost response cannot cause another apply with substituted material.
 
@@ -136,7 +140,8 @@ If the source changed, return a conflict. Rebase/integration creates a new exact
 candidate and requires its applicable acceptance/authority. Do not mutate the
 old ChangeSet or reinterpret historical evidence using a new evaluator.
 
-The first backend's commit is managed revision publication. Live-directory
+The first backend's commit is a managed ref publication on the git-native
+backend. Live-directory
 materialization is a separate admitted operation with dirty-file checks and a
 recovery journal. Multi-owner resources use a qualified commit protocol or
 explicit per-resource outcomes. No sequence of file/HTTP/rail writes implies

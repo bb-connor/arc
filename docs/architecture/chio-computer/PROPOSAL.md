@@ -1,35 +1,47 @@
 # Chio Computer: versioned, runnable resource environments
 
-Status: proposed design, revision 2, 2026-10-09. All new APIs and types are
-proposed. This document assumes completion of the unified roadmap and its
-constituent programs, including their post-success-test scope. It does not
-claim those programs or the Computer API are implemented or qualified today.
+Status: proposed design, revision 3, 2026-10-09. All new APIs and types are
+proposed. Computer-0 (section 5) is the profile for the unified roadmap's
+success test. It assumes only that roadmap's G4 substrate. Later profiles
+assume the roadmap's post-success-test scope. Nothing in this document claims
+that those programs, or the Computer API, are implemented or qualified today.
 
-**A Computer is a versioned, runnable resource environment.**
+**A Computer is a versioned environment where authority, resources and work
+live. The host supplies isolation.**
 
 **The kernel enforces the relationships between computers, processes, resources,
 and authority.**
 
+A Computer is not a virtual machine or a sandbox. Process isolation always comes
+from the host (ADR-0038: isolation denies, Chio grants). What a Computer adds
+is the authority, resource, work and evidence relationships around it.
+
 ## 1. The proposed README example
 
-Shown inside an async application or a REPL supporting top-level await.
-`my_project` exports pinned program descriptors. The project already has an
-input, resource bindings and approved work/host/acceptance profiles. `boot`
-describes a program without starting it.
+Shown inside an async application, or in a REPL that supports top-level await.
+
+- `my_project` exports pinned program descriptors.
+- The project already has an input, resource bindings and approved work, host
+  and acceptance profiles.
+- `boot` describes a program without starting it.
 
 ```python
-from chio import Computer, USD
-from my_project import explore, prototype, challenge, integrate, verify
+from chio import Computer, USD, task
+from my_project import prototype, integrate, verify  # pinned ProgramLeaf bundles
+
+# TaskLeafs: the receiving computer's own admitted agents perform these contracts.
+explore = task("explore", contract="contracts/explore.toml")
+challenge = task("challenge", contract="contracts/challenge.toml")
 
 project = Computer.open("my-project")
-worker = Computer.connect("build-machine")
+worker = Computer.connect("acme/build")
 
 # Branch the project's managed state and give the candidate a boot program.
 candidate = await project.fork(
-    boot=(explore | prototype | challenge) >> integrate >> verify,
+    boot=explore & prototype & challenge | integrate | verify,
 )
 
-# Give another computer bounded access to that branch.
+# Give another organization's computer bounded access to that branch.
 grant = candidate.grant(
     to=worker,
     resources={
@@ -50,36 +62,53 @@ print(candidate.diff())
 await project.apply(candidate.changes)
 ```
 
-The alternative below executes the same program against the candidate namespace
-bound by the grant. It is a separate example, not an additional invocation to
-append to the first:
+The alternative below runs the same program against the candidate namespace
+that the grant binds. It is a separate example, not another call to append to
+the first one:
 
 ```python
 run = await worker.exec(
-    (explore | prototype | challenge) >> integrate >> verify,
+    explore & prototype & challenge | integrate | verify,
     authority=grant,
 )
 await run.join_tree()
 ```
 
-Both forms normalize to the same checked description when revision, input,
-program, profile and authority bindings match. They use the same owning services.
-Distinct calls still require distinct admission unless they explicitly recover
-the same original request identity.
+**Equivalence.** Both forms normalize to the same checked description when
+their revision, input, program, profile and authority bindings match. Both use
+the same owning services. Distinct calls still need distinct admission, unless
+they explicitly recover the same original request identity.
 
-The parentheses matter: Python shifts bind more tightly than bitwise OR.
-Operators create bounded immutable syntax and have no execution side effects.
-A bundle hash establishes content identity; trust and execution permission are
-separately admitted.
+**Composition syntax (D23).**
 
-The synchronous `open`, `connect`, `grant`, and `diff` spelling is a local
-facade convenience. The hero's project has a configured local owner.
-Connection names construct handles from configured peer descriptors;
-authentication and receiver admission precede remote work. Local grant issuance
-must durably complete through its owner before returning, and diff reads must
-perform release checks. A remote owner needs an awaited client operation;
-implementations must not hide a nested event loop or return pending issuance as
-an issued grant. The underlying contracts are independent of language spelling.
+- `&` composes in parallel.
+- `|` composes in sequence.
+- Python and Rust bind `&` more tightly than `|`, so the boot expression parses
+  as `((explore & prototype & challenge) | integrate) | verify` with no
+  parentheses.
+- The canonical form, used by TypeScript and every language without operator
+  overloading, is:
+
+```typescript
+const boot = parallel(explore, prototype, challenge).pipe(integrate).pipe(verify);
+```
+
+- Operators build bounded, immutable syntax and have no execution side effects.
+- A bundle hash establishes content identity only. Trust and execution
+  permission are admitted separately.
+
+**Synchronous calls.** `open`, `connect`, `grant` and `diff` are synchronous
+spellings of a local facade convenience. The hero's project has a configured
+local owner.
+
+- A connection name resolves through the receiver's partner card (COOP-2).
+  Authentication and receiver admission come before any remote work.
+- Local grant issuance must complete durably through its owner before it
+  returns.
+- Diff reads must perform release checks.
+- A remote owner needs an awaited client operation. Implementations must not
+  hide a nested event loop, or return a pending issuance as an issued grant.
+- The underlying contracts do not depend on how any language spells them.
 
 ## 2. Five new contracts
 
@@ -88,21 +117,32 @@ Computer adds these contracts on the completed substrate:
 | Contract | Incremental responsibility |
 | --- | --- |
 | [C1: Environments](01-ENVIRONMENTS.md) | Identity, ownership, namespaces, revisions, images and authorized handles |
-| [C2: Resource branches](02-RESOURCE-BRANCHES.md) | Snapshot, branch, stage, seal, diff, conflict and publication |
-| [C3: Programs](03-PROGRAMS.md) | Portable bundles, composition and compilation into existing work contracts |
-| [C4: Execution bindings](04-EXECUTION-BINDINGS.md) | Binding an image to admitted work, receiver-local execution and result custody |
+| [C2: Resource branches](02-RESOURCE-BRANCHES.md) | Snapshot, branch, stage, seal, diff, conflict and publication; git-native first backend |
+| [C3: Programs](03-PROGRAMS.md) | TaskLeaf and ProgramLeaf, composition, and compilation into existing work contracts |
+| [C4: Execution bindings](04-EXECUTION-BINDINGS.md) | Binding an image to admitted work, receiver-local execution, door-charged resources and result custody |
 | [C5: Execution and apply](05-EXECUTION-AND-APPLY.md) | Owner observations, durable joins, exact ChangeSets and independently admitted apply |
 
-The predecessor programs supply capabilities, work allocation, graph extension,
-process execution, consumption, recovery, acceptance, release and federation.
-Computer references and composes those owners.
+The predecessor programs supply:
 
-[Roadmap crosswalk](ROADMAP-CROSSWALK.md) records inherited contracts, all eleven
-kernel specifications, superseded assumptions and source precedence.
-[Codebase coverage](CODEBASE-COVERAGE.md) accounts for 158 distinct crate manifests
-across the inspected foundation/work/recovery heads, SDKs and adjacent surfaces.
-This is a branch-union inventory and focused architecture review, not a claim
-that all crates form one merged/default build or were audited line by line.
+- capabilities;
+- work allocation and graph extension;
+- process execution;
+- consumption;
+- recovery and acceptance;
+- release and federation.
+
+Computer references and composes those owners. Where an owner already defines
+a rule, these contracts cite the owner's rule rather than restating it. They
+state only the laws Computer adds.
+
+**Supporting material:**
+
+- The [roadmap crosswalk](ROADMAP-CROSSWALK.md) records inherited contracts,
+  all eleven kernel specifications, superseded assumptions and source
+  precedence.
+- The [research appendix](research/CODEBASE-COVERAGE.md) holds the 158-crate
+  coverage map and the pinned source evidence. It supports the design but does
+  not gate it.
 
 ## 3. Fundamental relationships
 
@@ -112,15 +152,18 @@ that all crates form one merged/default build or were audited line by line.
 | Computer to revision | A run freezes exact state, namespace, program and profile bindings. |
 | Process to computer | Receiver-local process identities execute the admitted image; OS PIDs and placement attempts are separate. |
 | Grant to resource | Rights bind resolved identities and generations, not mutable friendly aliases. |
+| Resource to its owner's door | A grant over a source-owned resource is enforced and charged by that resource's owner, at that owner's door. |
 | Child to parent work | Authority narrows; count/depth/consumption remain bounded; graph growth uses existing admitted continuations. |
 | Result to producer | Provenance, labels, producer operation and exact acceptance survive transfer and integration. |
 | ChangeSet to project | Acceptance does not grant apply authority; current checks and expected-base comparison remain necessary. |
 | Fork to history | Resource state can branch; authority, knowledge history, holds and external effects cannot be reset by a snapshot. |
 
-A source and executor may share an authority domain, or belong to independent
-organizations. In the latter case each owns its local process tree and keys.
-Their work commitment connects those trees without importing a delegated
-foreign capability as a new local root.
+**Two kinds of placement.** A source and an executor may share one authority
+domain, or they may belong to independent organizations. In the second case:
+
+- each organization owns its local process tree and keys;
+- their work commitment connects those trees, without importing a delegated
+  foreign capability as a new local root.
 
 ```text
 Source organization                         Executor organization
@@ -128,18 +171,22 @@ Source organization                         Executor organization
 Project -> candidate revision               Worker computer
 source resource owner                       local work admission
 source apply authority                      local process tree and host
+source model route (door-charged)           receiver's own harnesses
          |                                           |
          +--- agreed work, permitted inputs ----------+
          +--- sealed results, acceptance evidence ----+
 ```
 
-No source grant forces the receiver to execute. Receiver consent does not grant
-source data access. Spending, release, integrity, stop and revocation checks
-remain at their actual owners.
+**Each check stays with its owner.**
+
+- No source grant forces the receiver to execute.
+- Receiver consent does not grant access to source data.
+- Spending, release, integrity, stop and revocation checks all stay with their
+  actual owners.
 
 ## 4. Source ownership
 
-The completed W1 design establishes the public and service boundaries:
+The completed W1 design sets the public and service boundaries:
 
 | Proposed placement | Computer responsibility | Existing ownership retained |
 | --- | --- | --- |
@@ -151,70 +198,170 @@ The completed W1 design establishes the public and service boundaries:
 | `chio-process` and existing runner | Receiver-local processes and supervised execution | Native identity, worker protocol and closure |
 | SDKs and CLI | Authoring, inspection and control | Shared canonical contracts and test vectors |
 
-A new crate requires dependency/build justification. Computer does not introduce
-a new authority engine, scheduler, consumption ledger, federation protocol, or
-recovery reducer. Its coordination record references original owner operations;
-it cannot infer their outcomes from missing rows.
+**No new crate or engine by default.**
 
-Resource code that controls admitted bytes/effects remains part of the trusted
-enforcement path wherever it is packaged. Pure client syntax is untrusted input
-to authoritative validation.
+- A new crate needs a dependency and build justification.
+- Computer introduces no authority engine, scheduler, consumption ledger,
+  federation protocol or recovery reducer.
+- Its coordination record references the original owner operations. It cannot
+  infer their outcomes from missing rows.
 
-## 5. Scope and qualification
+**Trust boundary.** Resource code that controls admitted bytes or effects stays
+part of the trusted enforcement path, wherever it is packaged. Pure client
+syntax is untrusted input to authoritative validation.
 
-The initial Computer profile uses a managed workspace backend, pinned boot
-bundles, immutable artifact edges and all-success joins. It supports independent
-receiver ownership as an architectural requirement. Same-domain remote placement
-is another deployment profile.
+## 5. Computer-0: the success-test profile
 
-A candidate permits one mutating execution family, freezes a result revision,
-and becomes immutable once sealed. Protected verification reads that exact
-revision. Further editing requires a new branch and its applicable authority.
-A run starts a fresh boot program; arbitrary live-memory migration is excluded.
+Computer-0 is the profile the unified roadmap's success test runs (roadmap
+decision D21). It needs only the roadmap's G4 substrate:
 
-Inherited platform, provider, financial and confinement scope stays explicit.
-Completing a roadmap does not qualify an explicitly exploratory backend,
-arbitrary model billing route, public-money rail, or unknown peer. Paid work is
-optional. Dollar ceilings require the selected profile to bound the relevant
-exposure before dispatch.
+- COOP-1 to COOP-3
+- WORK-W1 and W2
+- REC
+- SHARE-2
+- KERN-3 and KERN-5
+- HOST-M2 on Linux
 
-The incremental delivery sequence and adverse-case criteria are in
-[ACCEPTANCE.md](ACCEPTANCE.md). The first complete demonstration is an accepted
-patch produced across two independently operated computers, including a dynamic
-helper, a lost reply, and a source apply conflict. A second application must
-reuse the same contracts without custom signing, retry, verifier or ledger code.
+It adds nothing from the post-test scope.
 
-## 6. Revision 2 decisions
-
-| Original proposal | Adopted revision |
+| Hero line | Computer-0 meaning |
 | --- | --- |
-| New Computer runtime crate as the default home | Extend the W1 facade/core/service boundaries first. |
-| Source owns the first remote process tree; independent authority deferred | Both same-domain placement and receiver-owned cross-organization execution are explicit. |
-| New shared spending and recovery machinery | Bind the completed SHARE/REC owners and qualify the new composition. |
-| Generic graph runner | Compile through existing work allocation, acceptance and graph-extension contracts. |
-| Snapshot excludes keys and live memory | Also preserve labels, observations, consumption, replay, revocation, stop and effect obligations. |
-| One run-success state | Preserve six WorkView dimensions; specify exact convenience-wait conditions. |
-| Passing checks followed by apply | Bind exact acceptance, then recheck current apply authority and integrity. |
-| Standalone remote launch service | Reuse work/host transports; add the missing image/resource bindings. |
+| `Computer.open("my-project")` | The source's environment on the git-native backend. A snapshot is a tree object and a revision head is a ref. |
+| `Computer.connect("acme/build")` | The receiver's computer, resolved through its partner card and authenticated over CT-CROSS. |
+| `project.fork(boot=...)` | A snapshot plus a candidate ref. `boot` composes TaskLeafs and ProgramLeafs (roadmap decision D22). |
+| `/workspace` read | A release-checked export of the immutable snapshot. |
+| `/workspace` write | Writes go to the receiver's own overlay, never to the source's storage. They come back only as a sealed import into the candidate ref. |
+| `/models/default` invoke | Resources are charged at their owner's door. Invocations reach the source's model route through the source's broker. The source's hold ledger enforces `USD(5)`. |
+| `delegable=True` | Delegation stays inside the receiver. The receiver's broker holds the source's grant as one hop, and its helpers reach the source's door through that broker. |
+| `worker.exec(...)` | A co-signed, unpaid WORK-W2 agreement. Admission is owned by the receiver, which runs the work in its own HOST-M2 tree. |
+| `run.join_tree()` | C5 closure through the existing graph-continuation and process-closure fences. |
+| A lost reply | Recovered by original identity through REC, with no second dispatch. |
+| `diff()` and `apply()` | Apply is a compare-and-swap of the source's project ref against the expected base, under the resource owner's commit fence. A moved base returns a conflict. |
+| Evidence | Exported and verified offline against the receiver's pinned partner card. |
 
-Confidence is high in these ownership and semantic decisions. Exact wire layouts,
+**Excluded from Computer-0:**
+
+- money that crosses organizations;
+- multi-hop across independent keys;
+- quorum, race and stream joins;
+- branch backends other than git;
+- the source-owned branch service between independent organizations;
+- KSPEC-10 crossing records, which Computer adopts when they land.
+
+**Always excluded:** live process migration.
+
+## 6. Scope and qualification
+
+**What the initial profile supports.**
+
+- A managed workspace backend (git-native under Computer-0).
+- Pinned boot bundles and task contracts.
+- Immutable artifact edges.
+- All-success joins.
+- Independent receiver ownership, which is an architectural requirement.
+- Same-domain remote placement, as another deployment profile.
+
+**Candidate lifecycle.**
+
+- A candidate permits one mutating execution family.
+- It freezes a result revision, then becomes immutable once sealed.
+- Protected verification reads that exact revision.
+- Further editing requires a new branch and its applicable authority.
+- A run starts a fresh boot program. Arbitrary live-memory migration is
+  excluded.
+
+**Scope does not widen by default.** Inherited platform, provider, financial
+and confinement scope stays explicit. Completing a roadmap does not qualify:
+
+- an explicitly exploratory backend;
+- an arbitrary model billing route;
+- a public-money rail;
+- an unknown peer.
+
+Paid work is optional, and Computer-0 is unpaid. A dollar ceiling requires the
+selected profile to bound the relevant exposure before dispatch. Under
+Computer-0, that means the source's own door.
+
+**Delivery and acceptance.** [ACCEPTANCE.md](ACCEPTANCE.md) maps the
+incremental delivery to the roadmap's COMP rungs and lists the adverse cases.
+
+- The first complete demonstration is an accepted patch produced across two
+  independently operated computers.
+- It includes a dynamic helper, a lost reply and a source apply conflict.
+- It exercises both leaf kinds.
+- A second application must reuse the same contracts without custom signing,
+  retry, verifier or ledger code.
+
+## 7. Claims under ADR-0011
+
+Each claim is limited to kernel-mediated operations. It carries the preview
+label until its COMP rung and gate pass.
+
+| Claim | `boundary_class` | `planning_status` |
+| --- | --- | --- |
+| The receiver admits or refuses a Computer execution at its own door before any effect. | `prevent` | `ready_after_adr` (CT-WORK, CT-CROSS) |
+| A grant over a source-owned resource is enforced and charged by the source's hold ledger at the source's door. | `prevent` | `ready_after_adr` (CT-COOP, ADR-0016, D21) |
+| Apply publishes the exact accepted ChangeSet only while the source ref equals the expected base. | `prevent` | `ready_after_adr` (CT-WORK, D21) |
+| A ProgramLeaf runs only under receiver code admission and a qualified KSPEC-07 confinement kind. | `prevent` | `ready_after_adr` (KSPEC-07, D22) |
+| A TaskLeaf's harness effects outside the kernel path, where no qualified confinement applies. | `cannot_see` | `ready_after_adr` (KSPEC-07) |
+| The evaluator's acceptance of the exact sealed revision is recorded and exported. | `detect_only` | `ready_after_adr` (CT-WORK) |
+| The source verifies the receiver's evidence offline against pinned partner keys, with no external witness. | `detect_only` | `ready_after_adr` (CT-COOP) |
+| Money that crosses organizations for Computer work. | `detect_only` | `deferred` |
+
+## 8. Revision history
+
+**Revision 3** applies the owner's 2026-10-09 decisions (roadmap D21 to D23,
+and Lane COMP in the unified roadmap):
+
+| Revision 2 | Revision 3 |
+| --- | --- |
+| Assumed post-success-test scope throughout | Computer-0 needs only G4's substrate; later profiles use post-test scope |
+| "A versioned, runnable resource environment" | Defined as where authority, resources and work live; the host supplies isolation |
+| Leaves are pinned program bundles | TaskLeaf and ProgramLeaf, both from day one |
+| `\|` parallel, `>>` sequence, parentheses required | `&` parallel, `\|` sequence, no parentheses; canonical `parallel().pipe()` |
+| First backend unnamed | Git-native: tree objects, refs, compare-and-swap apply |
+| Two remote realizations with no default | A receiver-local overlay plus sealed import between independent organizations; the branch service only within one domain |
+| Cross-org budget left to sender-funded holds | Resources are charged at their owner's door; no money crosses the boundary |
+| Restated owner invariants | Citations to owner rules; only Computer's own laws are stated |
+| Evidence and coverage in the design set | Moved to the research appendix |
+
+**Revision 2** made these changes:
+
+- extend the W1 boundaries instead of adding a new crate;
+- make both authority profiles explicit;
+- bind SHARE and REC rather than adding new machinery;
+- compile through existing work contracts;
+- preserve history through forks;
+- keep the six WorkView dimensions;
+- bind exact acceptance and then recheck apply;
+- reuse the work and host transports.
+
+Confidence is high in the ownership and semantic decisions. Exact wire layouts,
 backend limits and language ergonomics require implementation design and the
-named acceptance evidence; no schedule estimate is inferred from this research.
+named acceptance evidence. This research infers no schedule estimate.
 
-## 7. Evidence and document validation
+## 9. Evidence and document validation
 
-[source-evidence.json](source-evidence.json) retains the original 39-file
-inspection and the added pinned roadmap/owner/manifest corpus. Each view records
-its commit, file hashes and inspection purpose. Historical snapshots remain
-historical; they do not determine today's hosted qualification.
+The [research appendix](research/source-evidence.json) retains two bodies of
+evidence:
+
+- the original 39-file inspection;
+- the pinned roadmap, owner and manifest corpus.
+
+Each view records its commit, file hashes and inspection purpose. Historical
+snapshots remain historical; they do not determine today's hosted
+qualification.
 
 [validation.json](validation.json) records reproducible documentation checks.
 With Python 3.11 or later, run
-`python3 docs/architecture/chio-computer/validate.py` from the repository root
-to verify the document set and source objects available in the local Git object
-database. It performs no runtime qualification.
+`python3 docs/architecture/chio-computer/validate.py` from the repository root.
+It verifies the document set, the operator precedence and the source objects
+available in the local Git object database. It performs no runtime
+qualification. Folding its generic checks into a repository-wide documents gate
+is a follow-up, once the public-copy gate exists (roadmap OUT-2).
 
-The evidence includes divergent PR heads. Implementation must use their
-qualified integration, follow the unified schema ledger, and resolve actual
-migration/owner conflicts. The full-completion assumption determines this
-design's substrate, not the status of those branches today.
+The evidence includes divergent PR heads. Implementation must:
+
+- use their qualified integration;
+- follow the unified schema ledger;
+- resolve actual migration and owner conflicts.
