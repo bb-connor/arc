@@ -136,12 +136,13 @@ async fn a_fenced_wall_regression_does_not_fail_resilience_clock_reads() {
     let bucket = TokenBucket::with_clock(10.0, 10, clock.clone());
     cache.insert("key", "allow", Duration::from_secs(60));
     assert!(breaker.allow_call());
+    assert!(clock.unix_millis().is_ok());
 
     wall.set(5_000);
     tokio::time::advance(Duration::from_millis(1)).await;
 
+    assert_eq!(clock.unix_millis(), Err(ClockError::WallClockRegression));
     assert!(clock.monotonic().is_ok());
-    assert!(clock.unix_millis().is_ok());
     assert!(breaker.allow_call());
     assert_eq!(breaker.current_state(), CircuitState::Closed);
     assert_eq!(cache.get(&"key"), Some("allow"));
@@ -183,13 +184,15 @@ async fn a_wall_regression_never_skips_the_guard_even_when_open_circuits_allow()
     let guard = Arc::new(CountingGuard(AtomicU32::new(0)));
     let adapter = super::AsyncGuardAdapter::builder(Arc::clone(&guard))
         .circuit_open_verdict(super::CircuitOpenVerdict::Allow)
-        .clock(clock)
+        .clock(clock.clone())
         .build();
     let ctx = super::GuardCallContext::default();
+    assert!(clock.unix_millis().is_ok());
     assert_eq!(adapter.evaluate(&ctx).await, chio_kernel::Verdict::Deny);
 
     wall.set(5_000);
     tokio::time::advance(Duration::from_millis(1)).await;
+    assert_eq!(clock.unix_millis(), Err(ClockError::WallClockRegression));
 
     assert_eq!(adapter.evaluate(&ctx).await, chio_kernel::Verdict::Deny);
     assert_eq!(guard.0.load(Ordering::SeqCst), 2);
