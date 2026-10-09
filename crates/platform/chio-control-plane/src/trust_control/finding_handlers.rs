@@ -566,7 +566,10 @@ struct FindingSearchResponse {
     count: usize,
 }
 
-fn run_finding_search(state: &TrustServiceState, query: &FindingSearchQuery) -> Response {
+pub(super) fn run_finding_search(
+    state: &TrustServiceState,
+    query: &FindingSearchQuery,
+) -> Response {
     let clock_now = match unix_timestamp_now() {
         Ok(now) => now,
         Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
@@ -658,22 +661,6 @@ fn run_finding_search(state: &TrustServiceState, query: &FindingSearchQuery) -> 
         count,
     })
     .into_response()
-}
-
-/// GET /v1/findings/search (public).
-pub(crate) async fn handle_search_findings_get(
-    State(state): State<TrustServiceState>,
-    Query(query): Query<FindingSearchQuery>,
-) -> Response {
-    run_finding_search(&state, &query)
-}
-
-/// POST /v1/findings/search (public).
-pub(crate) async fn handle_search_findings_post(
-    State(state): State<TrustServiceState>,
-    Json(query): Json<FindingSearchQuery>,
-) -> Response {
-    run_finding_search(&state, &query)
 }
 
 /// POST /v1/findings/recipes (authenticated): digest-addressed retention

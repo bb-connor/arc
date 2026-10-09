@@ -342,6 +342,8 @@ pub mod finding_recovery_verifier;
 pub mod finding_retraction_resolver;
 #[path = "trust_control/finding_reveal_server.rs"]
 pub mod finding_reveal_server;
+#[path = "trust_control/finding_search_routes.rs"]
+mod finding_search_routes;
 #[path = "trust_control/finding_status_handlers.rs"]
 mod finding_status_handlers;
 #[path = "trust_control/finding_status_publisher.rs"]
@@ -399,6 +401,9 @@ pub(crate) use self::finding_operator_seller_routes::{
 pub(crate) use self::finding_purchase_routes::{
     handle_get_finding_proof_bundle, handle_publish_live_finding_status, handle_purchase_finding,
     FINDING_PURCHASE_MAX_BODY_BYTES,
+};
+pub(crate) use self::finding_search_routes::{
+    handle_search_findings_get, handle_search_findings_post,
 };
 pub use self::finding_status_handlers::build_operator_voluntary_retraction;
 pub(crate) use self::finding_status_handlers::*;

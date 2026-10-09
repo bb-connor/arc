@@ -3201,3 +3201,5 @@ fn activation_reverifies_profile_and_report_authority_lifecycle() -> TestResult 
 
 #[path = "finding_market_exit_tests/ingress.rs"]
 mod ingress;
+#[path = "finding_market_exit_tests/search_admission.rs"]
+mod search_admission;

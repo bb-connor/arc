@@ -536,7 +536,7 @@
       "semantics": "Authenticated collateral registration validates the retained account, amounts and evidence bindings before changing market state."
     },
     {
-      "source": "crates/platform/chio-control-plane/src/trust_control/finding_handlers.rs",
+      "source": "crates/platform/chio-control-plane/src/trust_control/finding_search_routes.rs",
       "owner": "handle_search_findings_post",
       "format": "json",
       "request_type": "FindingSearchQuery",

@@ -18144,7 +18144,6 @@
       "handle_publish_finding::shared-reader::crates/platform/chio-control-plane/src/trust_control/finding_handlers.rs::verify_retained_recipe_closure",
       "handle_register_finding_collateral::request-json::FindingCollateralRegistrationRequest",
       "handle_register_finding_profile::shared-reader::crates/platform/chio-control-plane/src/trust_control/finding_handlers.rs::strict_profile_registration_ingress",
-      "handle_search_findings_post::request-json::FindingSearchQuery",
       "handle_upload_finding_dependency::original-json-reader::UntrustedJsonText",
       "handle_upload_finding_dependency::shared-reader::crates/platform/chio-control-plane/src/trust_control/finding_handlers.rs::strict_artifact_ingress",
       "strict_artifact_ingress::original-json-reader::UntrustedJsonText",
@@ -18189,6 +18188,9 @@
     "crates/platform/chio-control-plane/src/trust_control/finding_retraction_resolver.rs": [
       "authenticated_status::shared-reader::crates/platform/chio-control-plane/src/trust_control/finding_status_verifier.rs::verify_proof_record",
       "authenticated_status::shared-reader::crates/platform/chio-control-plane/src/trust_control/finding_status_verifier.rs::verify_proof_record"
+    ],
+    "crates/platform/chio-control-plane/src/trust_control/finding_search_routes.rs": [
+      "handle_search_findings_post::request-json::FindingSearchQuery"
     ],
     "crates/platform/chio-control-plane/src/trust_control/finding_status_handlers.rs": [
       "handle_get_finding_status_proof::shared-reader::crates/platform/chio-control-plane/src/trust_control/finding_status_handlers.rs::require_current_epoch",
