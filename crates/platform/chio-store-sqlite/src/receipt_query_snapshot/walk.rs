@@ -486,6 +486,10 @@ pub(super) fn authenticate(
 /// Check each entry's stored source row against its signed projection, in one
 /// short read transaction on the live store and, for archived entries, the
 /// archive. Lineage fallback always reads the live store.
+///
+/// Returns the projections of a prefix of `entries`, one per checked entry:
+/// the step stops early when the bytes it would retain exceed `step_bytes`,
+/// and always checks its first entry.
 pub(super) fn check_sources(
     ctx: &WalkContext<'_>,
     entries: &[AuthenticatedEntry],
@@ -549,11 +553,18 @@ fn check_sources_in(
     };
     let mut tools = Vec::new();
     let mut children = Vec::new();
+    // Bytes this step retains: the copied claim rows plus every lineage
+    // subject a projection keeps. A step that would exceed its budget ends
+    // early; the caller resumes after the last checked entry.
+    let mut retained = 0_u64;
     for (index, entry) in entries.iter().enumerate() {
         if index % 64 == 0 && ctx.cancel.load(Ordering::SeqCst) {
             return Err(CopyError::Walk(WalkError::Cancelled));
         }
         let row = &entry.row;
+        let mut charge = crate::integer::count(row.raw_json.len())
+            .saturating_add(crate::integer::count(row.receipt_id.len()))
+            .saturating_add(crate::integer::count(row.kind.len()));
         if row.source_seq <= 0 {
             return Err(drift(row.entry_seq));
         }
@@ -569,16 +580,22 @@ fn check_sources_in(
                 let attribution =
                     crate::receipt_store::support::extract_receipt_attribution(receipt);
                 if attribution.subject_key.is_none() || attribution.issuer_key.is_none() {
-                    let bytes = lineage_row_bytes(live, &receipt.capability_id)
+                    let measured = lineage_row_bytes(live, &receipt.capability_id)
                         .map_err(CopyError::Store)?;
-                    if let Some(bytes) = bytes.filter(|bytes| *bytes > ctx.limits.max_receipt_bytes)
-                    {
-                        return Err(CopyError::Walk(WalkError::RowCap {
-                            what: format!("capability lineage {}", receipt.capability_id),
-                            bytes,
-                        }));
+                    if let Some((bytes, subject)) = measured {
+                        if bytes > ctx.limits.max_receipt_bytes {
+                            return Err(CopyError::Walk(WalkError::RowCap {
+                                what: format!("capability lineage {}", receipt.capability_id),
+                                bytes,
+                            }));
+                        }
+                        charge = charge.saturating_add(subject);
                     }
                 }
+                if index > 0 && retained.saturating_add(charge) > ctx.limits.step_bytes {
+                    break;
+                }
+                retained = retained.saturating_add(charge);
                 let projection =
                     SignedToolProjection::derive(receipt, live).map_err(CopyError::Store)?;
                 let statement = match (archived, archive_statements.as_mut()) {
@@ -611,6 +628,10 @@ fn check_sources_in(
                 });
             }
             Authenticated::Child(receipt) => {
+                if index > 0 && retained.saturating_add(charge) > ctx.limits.step_bytes {
+                    break;
+                }
+                retained = retained.saturating_add(charge);
                 if archived
                     && (row.source_seq > child_ceiling
                         || live_child_exists
@@ -1246,20 +1267,34 @@ pub(super) fn copy_lineage(
 fn lineage_row_bytes(
     connection: &Connection,
     capability_id: &str,
-) -> Result<Option<u64>, ReceiptStoreError> {
-    let bytes: Option<i64> = connection
+) -> Result<Option<(u64, u64)>, ReceiptStoreError> {
+    let bytes: Option<(i64, i64)> = connection
         .prepare_cached(
             "SELECT length(CAST(capability_id AS BLOB)) + length(CAST(subject_key AS BLOB))
                     + length(CAST(issuer_key AS BLOB)) + length(CAST(grants_json AS BLOB))
                     + COALESCE(length(CAST(parent_capability_id AS BLOB)), 0)
                     + COALESCE(length(CAST(federated_parent_capability_id AS BLOB)), 0)
                     + COALESCE(length(CAST(provenance AS BLOB)), 0)
-                    + COALESCE(length(CAST(signed_capability_json AS BLOB)), 0)
+                    + COALESCE(length(CAST(signed_capability_json AS BLOB)), 0),
+                    length(CAST(subject_key AS BLOB))
              FROM capability_lineage WHERE capability_id = ?1",
         )?
-        .query_row([capability_id], |row| row.get(0))
+        .query_row([capability_id], |row| Ok((row.get(0)?, row.get(1)?)))
         .optional()?;
-    Ok(bytes.map(|bytes| u64::try_from(bytes).unwrap_or(u64::MAX)))
+    Ok(bytes.map(|(row, subject)| {
+        (
+            u64::try_from(row).unwrap_or(u64::MAX),
+            u64::try_from(subject).unwrap_or(u64::MAX),
+        )
+    }))
+}
+
+/// The entries `check_sources` checked: a prefix of `checked` entries.
+pub(super) fn checked_prefix(
+    entries: &[AuthenticatedEntry],
+    checked: usize,
+) -> &[AuthenticatedEntry] {
+    entries.get(..checked).unwrap_or(entries)
 }
 
 /// Fold copied entries into tool rows, cursors and pending leaves.

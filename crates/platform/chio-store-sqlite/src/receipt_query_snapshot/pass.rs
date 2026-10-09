@@ -7,9 +7,9 @@ use chio_kernel::checkpoint::{CheckpointChainFrontier, KernelCheckpoint};
 
 use super::db::{ChildCursor, OwnedCheckpoint, ProjectedToolRow, SnapshotBatch, SnapshotDb};
 use super::walk::{
-    authenticate, authenticate_checkpoints, check_sources, commit_in_holds, copy_checkpoints,
-    copy_claims, owned_checkpoint, pending_leaves, verify_source_bijection, OwnedSink, WalkContext,
-    WalkError,
+    authenticate, authenticate_checkpoints, check_sources, checked_prefix, commit_in_holds,
+    copy_checkpoints, copy_claims, owned_checkpoint, pending_leaves, verify_source_bijection,
+    OwnedSink, WalkContext, WalkError,
 };
 
 /// Rows counted per hold while verifying the source bijection.
@@ -204,15 +204,16 @@ impl Pass {
         let rows = copy_claims(ctx, state.next_entry, checkpoint.batch_end)?;
         let entries = authenticate(ctx, rows, Some(&checkpoint))?;
         let (tools, children) = check_sources(ctx, &entries)?;
+        let entries = checked_prefix(&entries, tools.len() + children.len());
         let last = entries
             .last()
             .map_or(state.next_entry, |entry| entry.row.entry_seq);
         let mut leaves = state.leaves.clone();
-        for entry in &entries {
+        for entry in entries {
             leaves.append(chio_core::hashing::Hash::from_bytes(entry.leaf_hash));
         }
         let count = state.count + i64::try_from(entries.len()).unwrap_or(i64::MAX);
-        self.apply(owned, &entries, tools, children, Vec::new(), &ctx.limits)?;
+        self.apply(owned, entries, tools, children, Vec::new(), &ctx.limits)?;
         if last >= checkpoint.batch_end {
             if count != checkpoint.tree_size {
                 return Err(WalkError::Integrity(format!(
@@ -257,9 +258,10 @@ impl Pass {
         let rows = copy_claims(ctx, next, self.target.head)?;
         let entries = authenticate(ctx, rows, None)?;
         let (tools, children) = check_sources(ctx, &entries)?;
+        let entries = checked_prefix(&entries, tools.len() + children.len());
         let last = entries.last().map_or(next, |entry| entry.row.entry_seq);
-        let pending = pending_leaves(&entries);
-        self.apply(owned, &entries, tools, children, pending, &ctx.limits)?;
+        let pending = pending_leaves(entries);
+        self.apply(owned, entries, tools, children, pending, &ctx.limits)?;
         self.phase = Phase::Tail { next: last + 1 };
         Ok(PassProgress::Continue)
     }

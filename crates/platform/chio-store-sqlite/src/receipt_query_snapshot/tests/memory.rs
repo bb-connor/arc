@@ -136,3 +136,57 @@ fn an_oversized_lineage_row_is_refused_before_a_projection_allocates_it() {
     let entries = authenticate(&ctx, rows, None).unwrap();
     row_cap(check_sources(&ctx, &entries));
 }
+
+#[test]
+fn legacy_lineage_subjects_are_charged_to_the_step_budget_and_the_build_completes() {
+    let fixture = Fixture::new(0);
+    let subject_bytes = 300 * 1024;
+    for index in 0..5_u64 {
+        let mut spec = Spec::new(format!("legacy-{index}"), 1_700_000_000 + index);
+        spec.capability = format!("cap-legacy-{index}");
+        fixture.append(&spec);
+    }
+    fixture.flush();
+    for index in 0..5 {
+        insert_lineage(
+            &fixture,
+            &format!("cap-legacy-{index}"),
+            &format!("{index}{}", "s".repeat(subject_bytes)),
+            "[]",
+        );
+    }
+    let cancel = Arc::new(AtomicBool::new(false));
+    let mut wide = tight();
+    wide.step_rows = 5;
+    let ctx = context(&fixture.store, &cancel, wide);
+    let rows = copy_claims(&ctx, 1, 5).unwrap();
+    assert_eq!(
+        rows.len(),
+        5,
+        "claim rows are small and all fit the copy budget"
+    );
+    let entries = authenticate(&ctx, rows, None).unwrap();
+    let (tools, _) = check_sources(&ctx, &entries).unwrap();
+    let retained: u64 = tools
+        .iter()
+        .map(|row| u64::try_from(row.subject.as_ref().map_or(0, String::len)).unwrap())
+        .sum();
+    assert!(!tools.is_empty());
+    assert!(
+        retained <= tight().step_bytes,
+        "one step retained {retained} bytes of lineage subjects"
+    );
+    // Every subject is kept whole, and the build still completes.
+    assert!(tools.iter().all(|row| row
+        .subject
+        .as_ref()
+        .is_some_and(|s| s.len() == subject_bytes + 1)));
+    let (db, _) = super::super::pass::build_snapshot(
+        &ctx,
+        super::support::target(&ctx),
+        64 * 1024 * 1024,
+        &mut |_, _| {},
+    )
+    .unwrap();
+    assert_eq!(db.tool_row_count().unwrap(), 5);
+}

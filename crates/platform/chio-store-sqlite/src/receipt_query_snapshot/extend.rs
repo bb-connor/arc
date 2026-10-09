@@ -7,9 +7,9 @@ use std::time::Instant;
 use super::db::SnapshotBatch;
 use super::service::Published;
 use super::walk::{
-    authenticate, authenticate_checkpoints, check_sources, commit_in_holds, copy_checkpoints,
-    copy_claims, copy_lineage, observe, owned_checkpoint, pending_leaves, Observation, WalkContext,
-    WalkError,
+    authenticate, authenticate_checkpoints, check_sources, checked_prefix, commit_in_holds,
+    copy_checkpoints, copy_claims, copy_lineage, observe, owned_checkpoint, pending_leaves,
+    Observation, WalkContext, WalkError,
 };
 
 /// Lineage rows read per refresh step.
@@ -48,8 +48,9 @@ pub(super) fn extend_cycle(
         let rows = copy_claims(ctx, next, observation.head)?;
         let entries = authenticate(ctx, rows, None)?;
         let (tools, children) = check_sources(ctx, &entries)?;
+        let entries = checked_prefix(&entries, tools.len() + children.len());
         let last = entries.last().map_or(next, |entry| entry.row.entry_seq);
-        let pending = pending_leaves(&entries);
+        let pending = pending_leaves(entries);
         commit_in_holds(&mut sink, &ctx.limits, tools, children, pending)?;
         next = last + 1;
     }
