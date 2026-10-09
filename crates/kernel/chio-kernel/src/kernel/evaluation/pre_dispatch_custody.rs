@@ -353,7 +353,6 @@ pub(crate) struct HeldAdmission<'s, 'a> {
     pub(crate) lease_acquired: bool,
     pub(crate) metadata: Option<serde_json::Value>,
     pub(crate) evidence: &'s [GuardEvidence],
-    pub(crate) payee: Option<&'s VerifiedGovernedPayeeBinding>,
     pub(crate) credentials: &'s mut DispatchCredentialReservation<'a>,
     pub(crate) durable: Option<&'s mut DurableToolAdmission>,
 }
@@ -387,20 +386,12 @@ impl<'a> BudgetedAdmission<'a> {
         &mut self.custody.metadata
     }
 
-    pub(crate) fn evidence(&self) -> &[GuardEvidence] {
-        self.custody.evidence.as_deref().unwrap_or_default()
-    }
-
     pub(crate) fn payee(&self) -> Option<&VerifiedGovernedPayeeBinding> {
         self.custody.payee.as_ref()
     }
 
     pub(crate) fn payment(&self) -> Option<&PaymentAuthorization> {
         self.custody.payment.as_ref()
-    }
-
-    pub(crate) fn lease_acquired(&self) -> bool {
-        self.custody.lease_acquired
     }
 
     pub(crate) fn hold_lease(&mut self, acquired: bool) {
@@ -852,7 +843,6 @@ impl<'a> BudgetedAdmission<'a> {
             lease_acquired,
             metadata,
             evidence,
-            payee,
             credentials,
             durable,
             ..
@@ -870,7 +860,6 @@ impl<'a> BudgetedAdmission<'a> {
             lease_acquired: *lease_acquired,
             metadata: metadata.take(),
             evidence: evidence.as_deref().unwrap_or_default(),
-            payee: payee.as_ref(),
             credentials,
             durable: durable.as_mut(),
         })

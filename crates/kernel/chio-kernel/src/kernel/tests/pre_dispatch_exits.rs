@@ -563,3 +563,153 @@ async fn reserve_for_caller_preflight_drop_compensates_like_its_readiness_exit()
     );
     Ok(())
 }
+
+/// A trusted clock that counts its reads and fails exactly one of them.
+struct CountingClock {
+    inner: Arc<dyn chio_security_types::clock::Clock>,
+    reads: AtomicU64,
+    fail_at: AtomicU64,
+}
+
+impl chio_security_types::clock::Clock for CountingClock {
+    fn read(
+        &self,
+    ) -> Result<chio_security_types::clock::ClockReading, chio_security_types::clock::ClockError>
+    {
+        let read = self.reads.fetch_add(1, Ordering::SeqCst) + 1;
+        if read == self.fail_at.load(Ordering::SeqCst) {
+            return Err(chio_security_types::clock::ClockError::Unavailable);
+        }
+        self.inner.read()
+    }
+}
+
+/// Reserves a runtime lease and records how many clock reads the evaluation
+/// made before its readiness poll: the last of them is the reserve-for-caller
+/// preflight's own trusted-time sample.
+struct ReadinessReadCounter {
+    clock: Arc<CountingClock>,
+    reads_before_readiness: Arc<AtomicU64>,
+    releases: Arc<AtomicU64>,
+}
+
+impl RuntimeAdmissionHook for ReadinessReadCounter {
+    fn name(&self) -> &str {
+        "exit-table-clock-fault"
+    }
+
+    fn evaluate(
+        &self,
+        _context: &RuntimeAdmissionContext<'_>,
+    ) -> Result<RuntimeAdmissionDecision, KernelError> {
+        Ok(RuntimeAdmissionDecision::allow(Some(serde_json::json!({
+            "chio_runtime": {"reserved_destructive_lease_id": "lease-exit-table-clock"}
+        }))))
+    }
+
+    fn poll_ready_before_dispatch(
+        &self,
+        _request: &ToolCallRequest,
+        _cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<()> {
+        self.reads_before_readiness
+            .store(self.clock.reads.load(Ordering::SeqCst), Ordering::SeqCst);
+        std::task::Poll::Ready(())
+    }
+
+    fn release_reserved(&self, _metadata: &serde_json::Value) -> Result<(), KernelError> {
+        self.releases.fetch_add(1, Ordering::SeqCst);
+        Ok(())
+    }
+}
+
+struct ClockFaultRun {
+    result: Result<ToolCallResponse, KernelError>,
+    invocations_used: u32,
+    runtime_releases: u64,
+    receipts: usize,
+    reads_before_readiness: u64,
+}
+
+/// One reserve-for-caller preflight whose `fail_at`-th trusted clock read
+/// fails (`0` never fails).
+async fn run_reserving_preflight_with_clock_fault(fail_at: u64) -> TestResult<ClockFaultRun> {
+    let mut kernel = make_kernel(make_config());
+    kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
+    let config = ExecutionNonceConfig {
+        nonce_ttl_secs: 30,
+        nonce_store_capacity: 1024,
+        require_nonce: true,
+    };
+    kernel.set_execution_nonce_store(
+        config.clone(),
+        Box::new(InMemoryExecutionNonceStore::from_config(&config)),
+    );
+    let clock = Arc::new(CountingClock {
+        inner: chio_test_support::clock::clock(),
+        reads: AtomicU64::new(0),
+        fail_at: AtomicU64::new(0),
+    });
+    kernel.clock = clock.clone();
+    let reads_before_readiness = Arc::new(AtomicU64::new(0));
+    let releases = Arc::new(AtomicU64::new(0));
+    kernel.set_runtime_admission_hook(Arc::new(ReadinessReadCounter {
+        clock: clock.clone(),
+        reads_before_readiness: reads_before_readiness.clone(),
+        releases: releases.clone(),
+    }));
+    let agent = make_keypair();
+    let mut grant = make_grant("srv-a", "read_file");
+    grant.max_invocations = Some(4);
+    let cap = make_capability(&kernel, &agent, make_scope(vec![grant]), 300);
+    let request = make_request("exit-table-preflight-clock", &cap, "read_file", "srv-a");
+    let receipts_before = kernel.receipt_log().len();
+    clock.reads.store(0, Ordering::SeqCst);
+    clock.fail_at.store(fail_at, Ordering::SeqCst);
+
+    let result = kernel.authorize_tool_call_reserving(&request).await;
+
+    let invocations_used = kernel
+        .with_budget_store(|store| Ok(store.get_usage(&cap.id, 0)?))?
+        .map_or(0, |usage| usage.invocation_count);
+    Ok(ClockFaultRun {
+        result,
+        invocations_used,
+        runtime_releases: releases.load(Ordering::SeqCst),
+        receipts: kernel.receipt_log().len() - receipts_before,
+        reads_before_readiness: reads_before_readiness.load(Ordering::SeqCst),
+    })
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_clock_fault_after_admission_unwinds_the_reserving_preflight() -> TestResult {
+    // A clean run locates the preflight's trusted-time sample: the last read
+    // before the readiness poll, taken once the grant's admission is held.
+    let clean = run_reserving_preflight_with_clock_fault(0).await?;
+    let response = clean.result?;
+    assert_eq!(response.verdict, Verdict::Allow);
+    assert_eq!(clean.invocations_used, 1, "the reserved hold stays open");
+    let preflight_sample = clean.reads_before_readiness;
+    assert!(preflight_sample > 0);
+
+    let faulted = run_reserving_preflight_with_clock_fault(preflight_sample).await?;
+
+    assert!(
+        matches!(
+            faulted.result,
+            Err(KernelError::Clock(
+                chio_security_types::clock::ClockError::Unavailable
+            ))
+        ),
+        "{:?}",
+        faulted.result
+    );
+    assert_eq!(
+        faulted.reads_before_readiness, 0,
+        "readiness was never polled"
+    );
+    assert_eq!(faulted.invocations_used, 0, "the reserved slot is released");
+    assert_eq!(faulted.runtime_releases, 1);
+    assert_eq!(faulted.receipts, 0, "a clean unwind is receipt-free");
+    Ok(())
+}

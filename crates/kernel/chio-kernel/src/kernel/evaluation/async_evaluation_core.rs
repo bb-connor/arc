@@ -1,7 +1,11 @@
+use std::ops::ControlFlow;
+
 use super::async_nonce_preflight::StrictNoncePreflight;
 use super::caller_execution::CallerReservation;
 use super::evaluation_helpers::{OrdinaryRecoveryFinalization, PreDispatchCleanupDeny};
-use super::invocation_capture::NonDurableInvocationCapture;
+use super::pre_dispatch_custody::{
+    AdmissionDenial, AdmittedDispatch, OperationSettlement, PreparedAdmission, SelectedGrant,
+};
 use super::*;
 use crate::{finding_denial::denied_metadata, kernel::dispatch::dispatch_admission_error_reason};
 
@@ -389,24 +393,28 @@ impl ChioKernel {
                 return Ok(response);
             }
         }
+        let mut custody = PreparedAdmission::open(
+            self,
+            request,
+            now,
+            extra_metadata.clone(),
+            durable_admission,
+        );
 
         // Persistence was confirmed healthy at the pre-dispatch gate above, so the
         // writer-backed lineage write can run without racing a dead writer.
         if let Err(error) = self.record_observed_capability_snapshot(cap) {
             let msg = error.to_string();
             warn!(request_id = %request.request_id, reason = %redacted!(&msg), "failed to persist capability lineage");
-            self.compensate_durable_admission_after_pre_dispatch_cleanup(
-                durable_operation(durable_admission.as_ref()),
-                None,
-                None,
-            )?;
-            return self.build_deny_response_with_metadata(
-                request,
-                &msg,
-                now,
-                None,
-                extra_metadata.clone(),
-            );
+            return custody.settle_then(OperationSettlement::Compensate, || {
+                self.build_deny_response_with_metadata(
+                    request,
+                    &msg,
+                    now,
+                    None,
+                    extra_metadata.clone(),
+                )
+            });
         }
 
         let mut budget_error = None;
@@ -419,8 +427,8 @@ impl ChioKernel {
             if required_delivery_grant_index.is_some_and(|required| matching.index != required) {
                 continue;
             }
-            if durable_admission
-                .as_ref()
+            if custody
+                .durable()
                 .is_some_and(|admission| !admission.permits_matching_grant(matching))
             {
                 continue;
@@ -456,25 +464,12 @@ impl ChioKernel {
                     continue;
                 }
             };
-            let no_budget_mutation = PreExecutionBudgetMutation::None;
-            let mut guard_drop_guard = PostAdmissionDropGuard::new(
-                self,
-                request,
-                cap,
-                Some(matching.index),
-                &no_budget_mutation,
-                None,
-                PostAdmissionReceiptContext {
-                    extra_metadata: extra_metadata.clone(),
-                    runtime_reservation: RuntimeReservation::NONE,
-                    pre_invocation_guard_evidence: Vec::new(),
-                    verified_payee_binding: validated_governed_admission
-                        .as_ref()
-                        .and_then(|admission| admission.verified_payee_binding.clone()),
-                },
-                false,
-            )
-            .with_durable_operation(durable_operation(durable_admission.as_ref()));
+            custody.attempt(
+                matching.index,
+                validated_governed_admission
+                    .as_ref()
+                    .and_then(|admission| admission.verified_payee_binding.clone()),
+            );
             let guard_result = self
                 .run_guards_within_budget(
                     request,
@@ -484,8 +479,6 @@ impl ChioKernel {
                     security_context,
                 )
                 .await;
-            guard_drop_guard.disarm();
-            drop(guard_drop_guard);
             let pre_invocation_guard_evidence = match guard_result {
                 Ok(evidence) => evidence,
                 Err(error) => {
@@ -503,7 +496,7 @@ impl ChioKernel {
                 now_unix_ms,
                 matching.index,
                 dpop_required,
-                durable_admission.as_mut(),
+                custody.durable_mut(),
             );
             let runtime_reservation = RuntimeReservation::from_decision(&runtime_admission);
             let runtime_metadata =
@@ -515,26 +508,24 @@ impl ChioKernel {
                 warn!(request_id = %request.request_id, reason = %redacted!(&msg), "runtime admission denied");
                 let (runtime_metadata, runtime_release_confirmed) = self
                     .release_runtime_admission_reservations_for_pre_dispatch_denial(
-                        durable_operation(durable_admission.as_ref()),
+                        custody.operation(),
                         &runtime_reservation,
                         runtime_metadata,
                     );
-                if runtime_release_confirmed {
-                    self.compensate_durable_admission_after_pre_dispatch_cleanup(
-                        durable_operation(durable_admission.as_ref()),
-                        None,
-                        None,
-                    )?;
-                }
-                return self.with_pre_invocation_guard_evidence(
-                    &pre_invocation_guard_evidence,
+                return custody.settle_then(
+                    OperationSettlement::compensate_if(runtime_release_confirmed),
                     || {
-                        self.build_runtime_admission_deny_response_with_metadata(
-                            request,
-                            &msg,
-                            now,
-                            Some(matching.index),
-                            runtime_metadata,
+                        self.with_pre_invocation_guard_evidence(
+                            &pre_invocation_guard_evidence,
+                            || {
+                                self.build_runtime_admission_deny_response_with_metadata(
+                                    request,
+                                    &msg,
+                                    now,
+                                    Some(matching.index),
+                                    runtime_metadata,
+                                )
+                            },
                         )
                     },
                 );
@@ -545,7 +536,7 @@ impl ChioKernel {
                 cap,
                 std::slice::from_ref(matching),
                 self.execution_nonce_preflight_required(request),
-                durable_admission.as_mut(),
+                custody.durable_mut(),
                 now_unix_ms,
             ) {
                 Ok(BudgetAdmissionOutcome::Authorized {
@@ -555,26 +546,20 @@ impl ChioKernel {
                     if let Err(error) = self.reserve_validated_governed_approval(
                         request,
                         validated_governed_admission.as_ref(),
-                        durable_admission.as_mut(),
+                        custody.durable_mut(),
                         now_unix_ms,
                     ) {
                         let msg = error.to_string();
-                        return self.build_pre_dispatch_cleanup_deny_response(
-                            PreDispatchCleanupDeny {
-                                request,
-                                reason: &msg,
-                                timestamp: now,
-                                matched_grant_index: grant_index,
-                                cap,
-                                budget_mutation: mutation.as_ref(),
-                                payment_authorization: None,
-                                durable_operation: durable_operation(durable_admission.as_ref()),
-                                runtime_admission_metadata: runtime_metadata,
-                                runtime_reservation: &runtime_reservation,
-                                verified_payee_binding: None,
-                                budget_lease_acquired: false,
-                            },
-                        );
+                        return custody
+                            .select(SelectedGrant {
+                                grant_index,
+                                budget: *mutation,
+                                runtime: runtime_reservation,
+                                metadata: runtime_metadata,
+                                evidence: None,
+                                payee: None,
+                            })
+                            .deny(AdmissionDenial::new(&msg));
                     }
                     selected = Some((
                         grant_index,
@@ -593,7 +578,7 @@ impl ChioKernel {
                 }) => {
                     let (runtime_metadata, runtime_release_confirmed) = self
                         .release_runtime_admission_reservations_for_pre_dispatch_denial(
-                            durable_operation(durable_admission.as_ref()),
+                            custody.operation(),
                             &runtime_reservation,
                             runtime_metadata,
                         );
@@ -611,23 +596,26 @@ impl ChioKernel {
                         runtime_release_retained = true;
                         break;
                     }
-                    return self.with_pre_invocation_guard_evidence(
-                        &pre_invocation_guard_evidence,
-                        || {
-                            self.build_pending_approval_response_with_metadata(
-                                request,
-                                &proposal,
-                                now,
-                                grant_index,
-                                runtime_metadata,
-                            )
-                        },
-                    );
+                    // The parked operation keeps its durable state for approval.
+                    return custody.settle_then(OperationSettlement::Retain, || {
+                        self.with_pre_invocation_guard_evidence(
+                            &pre_invocation_guard_evidence,
+                            || {
+                                self.build_pending_approval_response_with_metadata(
+                                    request,
+                                    &proposal,
+                                    now,
+                                    grant_index,
+                                    runtime_metadata,
+                                )
+                            },
+                        )
+                    });
                 }
                 Err(error @ KernelError::BudgetExhausted(_)) => {
                     let (runtime_metadata, runtime_release_confirmed) = self
                         .release_runtime_admission_reservations_for_pre_dispatch_denial(
-                            durable_operation(durable_admission.as_ref()),
+                            custody.operation(),
                             &runtime_reservation,
                             runtime_metadata,
                         );
@@ -653,31 +641,29 @@ impl ChioKernel {
                     let msg = error.to_string();
                     let (runtime_metadata, runtime_release_confirmed) = self
                         .release_runtime_admission_reservations_for_pre_dispatch_denial(
-                            durable_operation(durable_admission.as_ref()),
+                            custody.operation(),
                             &runtime_reservation,
                             runtime_metadata,
                         );
-                    if runtime_release_confirmed {
-                        self.compensate_durable_admission_after_pre_dispatch_cleanup(
-                            durable_operation(durable_admission.as_ref()),
-                            None,
-                            None,
-                        )?;
-                    }
-                    let receipt_metadata = self.merge_budget_receipt_metadata(
-                        runtime_metadata,
-                        self.budget_backend_receipt_metadata()?,
-                    );
-                    return self.with_pre_invocation_guard_evidence(
-                        &pre_invocation_guard_evidence,
+                    return custody.settle_then(
+                        OperationSettlement::compensate_if(runtime_release_confirmed),
                         || {
-                            self.build_monetary_deny_response_with_metadata(
-                                request,
-                                &msg,
-                                now,
-                                &matching_grants,
-                                cap,
-                                receipt_metadata,
+                            let receipt_metadata = self.merge_budget_receipt_metadata(
+                                runtime_metadata,
+                                self.budget_backend_receipt_metadata()?,
+                            );
+                            self.with_pre_invocation_guard_evidence(
+                                &pre_invocation_guard_evidence,
+                                || {
+                                    self.build_monetary_deny_response_with_metadata(
+                                        request,
+                                        &msg,
+                                        now,
+                                        &matching_grants,
+                                        cap,
+                                        receipt_metadata,
+                                    )
+                                },
                             )
                         },
                     );
@@ -687,7 +673,7 @@ impl ChioKernel {
 
         let Some((
             matched_grant_index,
-            mut budget_mutation,
+            budget_mutation,
             validated_governed_admission,
             governed_call_chain_receipt_evidence,
             pre_invocation_guard_evidence,
@@ -702,24 +688,21 @@ impl ChioKernel {
             if budget_error.is_none() {
                 if let Some(denial) = guard_denial {
                     let msg = denial.error.to_string();
-                    self.compensate_durable_admission_after_pre_dispatch_cleanup(
-                        durable_operation(durable_admission.as_ref()),
-                        None,
-                        None,
-                    )?;
-                    let receipt_metadata = self.merge_budget_receipt_metadata(
-                        extra_metadata.clone(),
-                        self.budget_backend_receipt_metadata()?,
-                    );
-                    return self.with_pre_invocation_guard_evidence(&denial.evidence, || {
-                        self.build_monetary_deny_response_with_metadata(
-                            request,
-                            &msg,
-                            now,
-                            &matching_grants,
-                            cap,
-                            receipt_metadata,
-                        )
+                    return custody.settle_then(OperationSettlement::Compensate, || {
+                        let receipt_metadata = self.merge_budget_receipt_metadata(
+                            extra_metadata.clone(),
+                            self.budget_backend_receipt_metadata()?,
+                        );
+                        self.with_pre_invocation_guard_evidence(&denial.evidence, || {
+                            self.build_monetary_deny_response_with_metadata(
+                                request,
+                                &msg,
+                                now,
+                                &matching_grants,
+                                cap,
+                                receipt_metadata,
+                            )
+                        })
                     });
                 }
             }
@@ -731,33 +714,41 @@ impl ChioKernel {
             let msg = error.to_string();
             // An unconfirmed runtime release keeps the operation on its
             // recovery path, as at every other pre-dispatch denial.
-            if !runtime_release_retained
-                && durable_admission.as_ref().is_some_and(|admission| {
-                    admission.state()
+            let settlement = OperationSettlement::compensate_if(
+                !runtime_release_retained
+                    && custody.durable().is_some_and(|admission| {
+                        admission.state()
                     == crate::admission_operation::AdmissionOperationState::BrokerAttemptRegistered
-                })
-            {
-                self.compensate_durable_admission_after_pre_dispatch_cleanup(
-                    durable_operation(durable_admission.as_ref()),
-                    None,
-                    None,
-                )?;
-            }
-            return self.build_monetary_deny_response_with_metadata(
-                request,
-                &msg,
-                now,
-                &matching_grants,
-                cap,
-                self.merge_budget_receipt_metadata(
-                    error.rejection_metadata(merge_metadata_objects(
-                        extra_metadata.clone(),
-                        budget_error_metadata,
-                    )),
-                    self.budget_backend_receipt_metadata()?,
-                ),
+                    }),
             );
+            return custody.settle_then(settlement, || {
+                self.build_monetary_deny_response_with_metadata(
+                    request,
+                    &msg,
+                    now,
+                    &matching_grants,
+                    cap,
+                    self.merge_budget_receipt_metadata(
+                        error.rejection_metadata(merge_metadata_objects(
+                            extra_metadata.clone(),
+                            budget_error_metadata,
+                        )),
+                        self.budget_backend_receipt_metadata()?,
+                    ),
+                )
+            });
         };
+        let verified_governed_payee_binding = validated_governed_admission
+            .as_ref()
+            .and_then(|admission| admission.verified_payee_binding.clone());
+        let mut custody = custody.select(SelectedGrant {
+            grant_index: matched_grant_index,
+            budget: budget_mutation,
+            runtime: runtime_reservation,
+            metadata: extra_metadata,
+            evidence: Some(pre_invocation_guard_evidence),
+            payee: verified_governed_payee_binding,
+        });
         let matched_grant = matching_grants
             .iter()
             .find(|matching| matching.index == matched_grant_index)
@@ -774,14 +765,11 @@ impl ChioKernel {
                     .as_ref()
                     .and_then(|admission| admission.verified_runtime_attestation.clone()),
             );
-        let verified_governed_payee_binding = validated_governed_admission
-            .as_ref()
-            .and_then(|admission| admission.verified_payee_binding.clone());
         let _governed_call_chain_receipt_evidence_scope =
             scope_governed_call_chain_receipt_evidence(governed_call_chain_receipt_evidence);
 
         #[cfg(feature = "admission-test-support")]
-        if let Some(admission) = durable_admission.as_ref() {
+        if let Some(admission) = custody.durable() {
             self.reach_caller_execution_checkpoint(
                 super::super::CallerExecutionCheckpoint::BeforeShareAdmission,
                 admission.operation(),
@@ -793,37 +781,16 @@ impl ChioKernel {
         // holds instead, including during report reconciliation. Other paths
         // take one reference-counted lease per evaluation; cleanup releases
         // only that lease and cannot free an overlapping holder's share.
-        let budget_lease_acquired = match self.admit_capability_budget_for_dispatch(
-            cap,
-            durable_operation(durable_admission.as_ref()),
-        ) {
-            Ok(lease_acquired) => lease_acquired,
+        match self.admit_capability_budget_for_dispatch(cap, custody.operation()) {
+            Ok(lease_acquired) => custody.hold_lease(lease_acquired),
             Err(reason) => {
                 let msg = format!("sibling-sum budget admission failed: {reason}");
                 warn!(request_id = %request.request_id, reason = %redacted!(&msg), "capability rejected");
-                return self.with_pre_invocation_guard_evidence(
-                    &pre_invocation_guard_evidence,
-                    || {
-                        self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
-                            request,
-                            reason: &msg,
-                            timestamp: now,
-                            matched_grant_index,
-                            cap,
-                            budget_mutation: &budget_mutation,
-                            payment_authorization: None,
-                            durable_operation: durable_operation(durable_admission.as_ref()),
-                            runtime_admission_metadata: extra_metadata,
-                            runtime_reservation: &runtime_reservation,
-                            verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                            // Admission failed: this evaluation acquired no
-                            // lease, so there is nothing for cleanup to release.
-                            budget_lease_acquired: false,
-                        })
-                    },
-                );
+                // Admission failed: this evaluation acquired no lease, so
+                // there is nothing for cleanup to release.
+                return custody.deny(AdmissionDenial::new(&msg));
             }
-        };
+        }
 
         if self.execution_nonce_preflight_required(request) {
             return self
@@ -835,45 +802,21 @@ impl ChioKernel {
                     preflight_disposition,
                     receipt_admission: &receipt_admission,
                     now,
-                    cap,
                     matching_grants: &matching_grants,
                     dpop_required,
-                    matched_grant_index,
                     matched_grant,
-                    budget_mutation: &budget_mutation,
-                    durable_admission: &mut durable_admission,
-                    extra_metadata,
-                    runtime_reservation: &runtime_reservation,
-                    pre_invocation_guard_evidence: &pre_invocation_guard_evidence,
-                    verified_governed_payee_binding: &verified_governed_payee_binding,
-                    budget_lease_acquired,
+                    custody,
                 })
                 .await;
         }
 
-        if let Err(error) = self.validate_required_execution_nonce_for_admission(
-            request,
-            cap,
-            durable_admission.as_ref(),
-        ) {
+        if let Err(error) =
+            self.validate_required_execution_nonce_for_admission(request, cap, custody.durable())
+        {
             let msg = error.to_string();
             warn!(request_id = %request.request_id, rejection_code = %error.report().code, reason = %redacted!(&msg), "execution nonce denied");
-            return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
-                self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
-                    request,
-                    reason: &msg,
-                    timestamp: now,
-                    matched_grant_index,
-                    cap,
-                    budget_mutation: &budget_mutation,
-                    payment_authorization: None,
-                    durable_operation: durable_operation(durable_admission.as_ref()),
-                    runtime_admission_metadata: error.rejection_metadata(extra_metadata),
-                    runtime_reservation: &runtime_reservation,
-                    verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                    budget_lease_acquired,
-                })
-            });
+            let metadata = error.rejection_metadata(custody.metadata().clone());
+            return custody.deny(AdmissionDenial::new(&msg).with_metadata(metadata));
         }
 
         // An output-digest grant can only be honored at the durable,
@@ -902,31 +845,13 @@ impl ChioKernel {
                     .as_ref()
                     .and_then(|adapter| adapter.rail_mode())
                     .is_none_or(|mode| mode == crate::payment::PaymentRailMode::ReversibleHold);
-                if durable_admission.is_none()
+                if custody.durable().is_none()
                     || !rail_is_reversible
                     || Self::is_governed_mustprepay_request(request)
                 {
                     let reason = "output-digest delivery requires durable reversible-hold coverage";
                     warn!(request_id = %request.request_id, reason, "delivery contract denied");
-                    return self.with_pre_invocation_guard_evidence(
-                        &pre_invocation_guard_evidence,
-                        || {
-                            self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
-                                request,
-                                reason,
-                                timestamp: now,
-                                matched_grant_index,
-                                cap,
-                                budget_mutation: &budget_mutation,
-                                payment_authorization: None,
-                                durable_operation: durable_operation(durable_admission.as_ref()),
-                                runtime_admission_metadata: extra_metadata.clone(),
-                                runtime_reservation: &runtime_reservation,
-                                verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                                budget_lease_acquired,
-                            })
-                        },
-                    );
+                    return custody.deny(AdmissionDenial::new(reason));
                 }
             }
             // A purchase-marked grant additionally requires the verified
@@ -937,50 +862,16 @@ impl ChioKernel {
             // terminal from the frozen request.
             if let Err(denial) = self.verify_purchase_admission(selected.grant, request, now) {
                 warn!(request_id = %request.request_id, denial = %denial.code(), reason = %redacted!(denial.detail()), "finding purchase denied");
-                return self.with_pre_invocation_guard_evidence(
-                    &pre_invocation_guard_evidence,
-                    || {
-                        self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
-                            request,
-                            reason: denial.detail(),
-                            timestamp: now,
-                            matched_grant_index,
-                            cap,
-                            budget_mutation: &budget_mutation,
-                            payment_authorization: None,
-                            durable_operation: durable_operation(durable_admission.as_ref()),
-                            runtime_admission_metadata: denied_metadata(&extra_metadata, &denial),
-                            runtime_reservation: &runtime_reservation,
-                            verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                            budget_lease_acquired,
-                        })
-                    },
-                );
+                let metadata = denied_metadata(custody.metadata(), &denial);
+                return custody.deny(AdmissionDenial::new(denial.detail()).with_metadata(metadata));
             }
             // Recovery is a separate no-charge admission profile. Its
             // verifier atomically reserves the durable recovery-id quota
             // here, before dispatch, and never invokes payment handling.
             if let Err(denial) = self.verify_recovery_admission(selected.grant, request, now) {
                 warn!(request_id = %request.request_id, denial = %denial.code(), reason = %redacted!(denial.detail()), "finding recovery denied");
-                return self.with_pre_invocation_guard_evidence(
-                    &pre_invocation_guard_evidence,
-                    || {
-                        self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
-                            request,
-                            reason: denial.detail(),
-                            timestamp: now,
-                            matched_grant_index,
-                            cap,
-                            budget_mutation: &budget_mutation,
-                            payment_authorization: None,
-                            durable_operation: durable_operation(durable_admission.as_ref()),
-                            runtime_admission_metadata: denied_metadata(&extra_metadata, &denial),
-                            runtime_reservation: &runtime_reservation,
-                            verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                            budget_lease_acquired,
-                        })
-                    },
-                );
+                let metadata = denied_metadata(custody.metadata(), &denial);
+                return custody.deny(AdmissionDenial::new(denial.detail()).with_metadata(metadata));
             }
         }
 
@@ -992,30 +883,15 @@ impl ChioKernel {
         // ephemeral escape from another candidate. Reserve-for-caller mediation
         // returns before this point and does not dispatch on this kernel.
         if !self.unsafe_ephemeral_financial_dispatch
-            && durable_admission
-                .as_ref()
+            && custody
+                .durable()
                 .is_none_or(|admission| !admission.requires_payment())
-            && (budget_mutation.charge_result().is_some()
+            && (custody.budget().charge_result().is_some()
                 || Self::is_governed_mustprepay_request(request))
         {
             let reason = "financial tool dispatch requires durable admission coverage";
             warn!(request_id = %request.request_id, reason, "financial dispatch denied");
-            return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
-                self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
-                    request,
-                    reason,
-                    timestamp: now,
-                    matched_grant_index,
-                    cap,
-                    budget_mutation: &budget_mutation,
-                    payment_authorization: None,
-                    durable_operation: durable_operation(durable_admission.as_ref()),
-                    runtime_admission_metadata: extra_metadata,
-                    runtime_reservation: &runtime_reservation,
-                    verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                    budget_lease_acquired,
-                })
-            });
+            return custody.deny(AdmissionDenial::new(reason));
         }
 
         let server = match &dispatch_mode {
@@ -1031,27 +907,12 @@ impl ChioKernel {
             ));
             let reason = error.to_string();
             warn!(request_id = %request.request_id, reason = %redacted!(&reason), "tool server error");
-            return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
-                self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
-                    request,
-                    reason: &reason,
-                    timestamp: now,
-                    matched_grant_index,
-                    cap,
-                    budget_mutation: &budget_mutation,
-                    payment_authorization: None,
-                    durable_operation: durable_operation(durable_admission.as_ref()),
-                    runtime_admission_metadata: extra_metadata,
-                    runtime_reservation: &runtime_reservation,
-                    verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                    budget_lease_acquired,
-                })
-            });
+            return custody.deny(AdmissionDenial::new(&reason));
         }
-        let durable_execution_nonce = durable_admission
-            .as_ref()
+        let durable_execution_nonce = custody
+            .durable()
             .is_some_and(DurableToolAdmission::requires_execution_nonce);
-        let mut credential_reservation = match self
+        let credential_reservation = self
             .read_authority_time()
             .map_err(KernelError::from)
             .and_then(|time| {
@@ -1059,74 +920,35 @@ impl ChioKernel {
                     request,
                     dpop_required,
                     time.as_secs(),
-                    durable_admission.as_ref(),
+                    custody.durable(),
                     matched_grant_index,
                 )
-            }) {
-            Ok(reservation) => reservation,
+            });
+        let force_dispatch_revalidation = match credential_reservation {
+            Ok(reservation) => {
+                let force = reservation.requires_post_reservation_revalidation();
+                custody.hold_credentials(reservation);
+                force
+            }
             Err(error) => {
                 let reason = error.to_string();
                 warn!(request_id = %request.request_id, rejection_code = %error.report().code, reason = %redacted!(&reason), "dispatch credential reservation denied");
-                return self.with_pre_invocation_guard_evidence(
-                    &pre_invocation_guard_evidence,
-                    || {
-                        self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
-                            request,
-                            reason: &reason,
-                            timestamp: self
-                                .read_authority_time()
-                                .map(|time| time.as_secs())
-                                .unwrap_or(now),
-                            matched_grant_index,
-                            cap,
-                            budget_mutation: &budget_mutation,
-                            payment_authorization: None,
-                            durable_operation: durable_operation(durable_admission.as_ref()),
-                            runtime_admission_metadata: error
-                                .rejection_metadata(extra_metadata.clone()),
-                            runtime_reservation: &runtime_reservation,
-                            verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                            budget_lease_acquired,
-                        })
-                    },
+                let metadata = error.rejection_metadata(custody.metadata().clone());
+                return custody.deny(
+                    AdmissionDenial::new(&reason)
+                        .sampled()
+                        .with_metadata(metadata),
                 );
             }
         };
-        let force_dispatch_revalidation =
-            credential_reservation.requires_post_reservation_revalidation();
         let dispatch_context = server
             .as_ref()
-            .and_then(|_| Self::tool_dispatch_context(request, durable_admission.as_ref()));
-        let readiness_result = {
-            let mut readiness_drop_guard = PostAdmissionDropGuard::new(
-                self,
-                request,
-                cap,
-                Some(matched_grant_index),
-                &budget_mutation,
-                None,
-                PostAdmissionReceiptContext {
-                    extra_metadata: extra_metadata.clone(),
-                    runtime_reservation: runtime_reservation.clone(),
-                    pre_invocation_guard_evidence: pre_invocation_guard_evidence.clone(),
-                    verified_payee_binding: verified_governed_payee_binding.clone(),
-                },
-                budget_lease_acquired,
-            )
-            .with_durable_operation(durable_operation(durable_admission.as_ref()));
-            let result = self
-                .wait_for_tool_dispatch_readiness(
-                    request,
-                    server.as_ref(),
-                    dispatch_context.as_ref(),
-                )
-                .await;
-            readiness_drop_guard.disarm();
-            result
-        };
-        let mut extra_metadata = extra_metadata;
+            .and_then(|_| Self::tool_dispatch_context(request, custody.durable()));
+        let readiness_result = self
+            .wait_for_tool_dispatch_readiness(request, server.as_ref(), dispatch_context.as_ref())
+            .await;
         let (readiness_result, prepared_delivery) =
-            PreparedToolDelivery::retain(readiness_result, &mut extra_metadata);
+            PreparedToolDelivery::retain(readiness_result, custody.metadata_mut());
         let server = prepared_delivery
             .as_ref()
             .and_then(|prepared| prepared.connection.clone())
@@ -1140,7 +962,7 @@ impl ChioKernel {
             Ok(readiness_waited) => revalidation_time.map_err(KernelError::from).and_then(|_| {
                 self.revalidate_immediately_before_dispatch(
                     request,
-                    durable_admission.as_ref(),
+                    custody.durable(),
                     dpop_required,
                     matched_grant,
                     matched_grant_index,
@@ -1149,7 +971,7 @@ impl ChioKernel {
                     session_filesystem_roots,
                     security_context,
                     &receipt_admission,
-                    extra_metadata.as_ref(),
+                    custody.metadata().as_ref(),
                     dispatch_mode.caller_executed(),
                     durable_execution_nonce,
                     readiness_waited || force_dispatch_revalidation,
@@ -1166,122 +988,72 @@ impl ChioKernel {
             .unwrap_or_default();
         if let Err(error) = final_dispatch_admission {
             let mut reason = dispatch_admission_error_reason(&error);
-            if let Err(rollback_error) = credential_reservation.rollback_before_dispatch() {
+            if let Err(rollback_error) = custody.rollback_credentials() {
                 reason = format!("{reason}; {rollback_error}");
             }
             warn!(request_id = %request.request_id, reason = %redacted!(&reason), "immediate dispatch revalidation denied");
-            return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
-                self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
+            let metadata = error.denied_metadata(custody.metadata());
+            return custody.deny(
+                AdmissionDenial::new(&reason)
+                    .at(revalidation_now_unix_ms / 1000)
+                    .with_metadata(metadata),
+            );
+        }
+        if matches!(dispatch_mode, DispatchMode::ReserveForCaller) {
+            return custody.settle_with_credentials(|held| {
+                self.finish_caller_reservation(CallerReservation {
                     request,
-                    reason: &reason,
-                    timestamp: revalidation_now_unix_ms / 1000,
-                    matched_grant_index,
-                    cap,
-                    budget_mutation: &budget_mutation,
-                    payment_authorization: None,
-                    durable_operation: durable_operation(durable_admission.as_ref()),
-                    runtime_admission_metadata: error.denied_metadata(&extra_metadata),
-                    runtime_reservation: &runtime_reservation,
-                    verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                    budget_lease_acquired,
+                    durable_admission: held.durable,
+                    budget_mutation: held.budget,
+                    credential_reservation: held.credentials,
+                    extra_metadata: held.metadata,
+                    runtime_reservation: held.runtime,
+                    now,
+                    now_unix_ms,
+                    matched_grant_index: held.grant_index,
+                    pre_invocation_guard_evidence: held.evidence,
+                    budget_lease_acquired: held.lease_acquired,
                 })
             });
         }
-        if matches!(dispatch_mode, DispatchMode::ReserveForCaller) {
-            return self.finish_caller_reservation(CallerReservation {
-                request,
-                durable_admission: durable_admission.as_mut(),
-                budget_mutation: &budget_mutation,
-                credential_reservation: &mut credential_reservation,
-                extra_metadata: extra_metadata.clone(),
-                runtime_reservation: &runtime_reservation,
-                now,
-                now_unix_ms,
-                matched_grant_index,
-                pre_invocation_guard_evidence: &pre_invocation_guard_evidence,
-                budget_lease_acquired,
-            });
+        let capture_pending = custody
+            .durable_mut()
+            .map(|admission| self.mark_durable_capture_pending(admission, now_unix_ms));
+        if let Some(Err(error)) = capture_pending {
+            let reason = error.to_string();
+            warn!(request_id = %request.request_id, reason = %redacted!(&reason), "durable capture boundary could not be confirmed");
+            return custody.deny_capture_pending(&reason);
         }
-        if let Some(admission) = durable_admission.as_mut() {
-            if let Err(error) = self.mark_durable_capture_pending(admission, now_unix_ms) {
-                let reason = error.to_string();
-                warn!(request_id = %request.request_id, reason = %redacted!(&reason), "durable capture boundary could not be confirmed");
-                return self.build_deny_response_with_metadata(
-                    request,
-                    &reason,
-                    now,
-                    Some(matched_grant_index),
-                    self.retained_admission_receipt_metadata(
-                        &budget_mutation,
-                        extra_metadata.clone(),
-                    ),
-                );
-            }
-        }
-        if budget_mutation.durable_hold_result().is_some() && durable_admission.is_none() {
-            let denial = self.capture_non_durable_invocation(NonDurableInvocationCapture {
-                request,
-                cap,
-                budget_mutation: &mut budget_mutation,
-                now,
-                matched_grant_index,
-                extra_metadata: &extra_metadata,
-                runtime_reservation: &runtime_reservation,
-                budget_lease_acquired,
-                verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                pre_invocation_guard_evidence: &pre_invocation_guard_evidence,
-            })?;
-            if let Some(denial) = denial {
-                return Ok(denial);
-            }
-        }
+        let mut custody = match custody.capture_non_durable_invocation() {
+            ControlFlow::Continue(custody) => custody,
+            ControlFlow::Break(response) => return response,
+        };
 
-        let payment_authorization = match self.authorize_payment_if_needed(
+        let payment_authorization = self.authorize_payment_if_needed(
             request,
-            budget_mutation.charge_result(),
-            durable_admission.as_ref(),
+            custody.budget().charge_result(),
+            custody.durable(),
             now_unix_ms,
-            verified_governed_payee_binding.as_ref(),
-        ) {
-            Ok(authorization) => {
-                if authorization.is_some() {
-                    if let Err(error) = credential_reservation.retain_after_external_authorization()
-                    {
-                        let reason = format!(
-                            "dispatch credential retention failed after payment authorization: {error}"
-                        );
-                        warn!(request_id = %request.request_id, reason = %redacted!(&reason), "payment credential retention denied");
-                        return self.with_pre_invocation_guard_evidence(
-                            &pre_invocation_guard_evidence,
-                            || {
-                                self.build_pre_dispatch_cleanup_deny_response_with_credentials(
-                                    PreDispatchCleanupDeny {
-                                        request,
-                                        reason: &reason,
-                                        timestamp: self
-                                            .read_authority_time()
-                                            .map(|time| time.as_secs())
-                                            .unwrap_or(now),
-                                        matched_grant_index,
-                                        cap,
-                                        budget_mutation: &budget_mutation,
-                                        payment_authorization: authorization.as_ref(),
-                                        durable_operation: durable_operation(
-                                            durable_admission.as_ref(),
-                                        ),
-                                        runtime_admission_metadata: extra_metadata.clone(),
-                                        runtime_reservation: &runtime_reservation,
-                                        verified_payee_binding: verified_governed_payee_binding
-                                            .as_ref(),
-                                        budget_lease_acquired,
-                                    },
-                                    PaymentCredentialDisposition::RetentionOutcomeUnknown,
-                                )
-                            },
-                        );
-                    }
+            custody.payee(),
+        );
+        match payment_authorization {
+            Ok(None) => {}
+            Ok(Some(authorization)) => {
+                custody.hold_payment(authorization);
+                if let Err(error) = custody
+                    .credentials()
+                    .and_then(|credentials| credentials.retain_after_external_authorization())
+                {
+                    let reason = format!(
+                        "dispatch credential retention failed after payment authorization: {error}"
+                    );
+                    warn!(request_id = %request.request_id, reason = %redacted!(&reason), "payment credential retention denied");
+                    return custody.deny(
+                        AdmissionDenial::new(&reason).sampled().with_credentials(
+                            PaymentCredentialDisposition::RetentionOutcomeUnknown,
+                        ),
+                    );
                 }
-                authorization
             }
             Err(error) => {
                 let internal_reason = error.to_string();
@@ -1297,112 +1069,13 @@ impl ChioKernel {
                     &error,
                     PaymentError::Declined(_) | PaymentError::InsufficientFunds
                 ) {
-                    let mut denial_reason = reason.clone();
-                    let credential_disposition = if let Err(rollback_error) =
-                        credential_reservation.rollback_before_dispatch()
-                    {
-                        denial_reason = format!("{denial_reason}; {rollback_error}");
-                        PaymentCredentialDisposition::RetentionOutcomeUnknown
-                    } else {
-                        PaymentCredentialDisposition::NonePresent
-                    };
-                    let cleanup_metadata = self.merge_dispatch_credential_disposition_metadata(
-                        extra_metadata,
-                        credential_disposition,
-                    );
-                    if budget_mutation
-                        .charge_result()
-                        .and_then(|charge| charge.invocation_capture.as_ref())
-                        .is_some()
-                    {
-                        return self.with_pre_invocation_guard_evidence(
-                            &pre_invocation_guard_evidence,
-                            || {
-                                self.build_definite_payment_denial_after_capture(
-                                    request,
-                                    &denial_reason,
-                                    now,
-                                    cap,
-                                    &budget_mutation,
-                                    durable_operation(durable_admission.as_ref()),
-                                    cleanup_metadata,
-                                    &runtime_reservation,
-                                    budget_lease_acquired,
-                                    verified_governed_payee_binding.as_ref(),
-                                )
-                            },
-                        );
-                    }
-                    return self.with_pre_invocation_guard_evidence(
-                        &pre_invocation_guard_evidence,
-                        || {
-                            self.build_pre_dispatch_cleanup_deny_response_with_credentials(
-                                PreDispatchCleanupDeny {
-                                    request,
-                                    reason: &denial_reason,
-                                    timestamp: now,
-                                    matched_grant_index,
-                                    cap,
-                                    budget_mutation: &budget_mutation,
-                                    payment_authorization: None,
-                                    durable_operation: durable_operation(
-                                        durable_admission.as_ref(),
-                                    ),
-                                    runtime_admission_metadata: cleanup_metadata,
-                                    runtime_reservation: &runtime_reservation,
-                                    verified_payee_binding: verified_governed_payee_binding
-                                        .as_ref(),
-                                    budget_lease_acquired,
-                                },
-                                PaymentCredentialDisposition::NonePresent,
-                            )
-                        },
-                    );
+                    return custody.deny_declined_payment(reason);
                 }
-                let metadata = merge_metadata_objects(
-                    self.retained_admission_receipt_metadata(&budget_mutation, extra_metadata),
-                    Some(serde_json::json!({
-                        "financial": {
-                            "payment_authorization_ambiguous": true,
-                            "payment_authorization_error_code": error_code,
-                            "payment_attempt_reference": Self::payment_operation_reference(
-                                request,
-                                durable_operation(durable_admission.as_ref()),
-                            )
-                        }
-                    })),
-                );
-                let (denial_reason, credential_disposition) =
-                    match credential_reservation.commit() {
-                        Ok(disposition) => (reason, disposition),
-                        Err(retention_error) => (
-                            format!(
-                                "payment authorization outcome is ambiguous and credential retention failed: {retention_error}"
-                            ),
-                            PaymentCredentialDisposition::RetentionOutcomeUnknown,
-                        ),
-                    };
-                let metadata = self.merge_dispatch_credential_disposition_metadata(
-                    metadata,
-                    credential_disposition,
-                );
-                return self.with_pre_invocation_guard_evidence(
-                    &pre_invocation_guard_evidence,
-                    || {
-                        self.build_deny_response_with_metadata_and_payee_binding(
-                            request,
-                            &denial_reason,
-                            now,
-                            Some(matched_grant_index),
-                            metadata,
-                            verified_governed_payee_binding.as_ref(),
-                        )
-                    },
-                );
+                return custody.deny_ambiguous_payment(reason, error_code);
             }
-        };
+        }
 
-        if payment_authorization.is_some() {
+        if custody.payment().is_some() {
             let post_payment_time = self.read_authority_time();
             let post_payment_now_unix_ms = post_payment_time
                 .as_ref()
@@ -1412,7 +1085,7 @@ impl ChioKernel {
                 post_payment_time.map_err(KernelError::from).and_then(|_| {
                     self.revalidate_immediately_before_dispatch(
                         request,
-                        durable_admission.as_ref(),
+                        custody.durable(),
                         dpop_required,
                         matched_grant,
                         matched_grant_index,
@@ -1421,7 +1094,7 @@ impl ChioKernel {
                         session_filesystem_roots,
                         security_context,
                         &receipt_admission,
-                        extra_metadata.as_ref(),
+                        custody.metadata().as_ref(),
                         false,
                         durable_execution_nonce,
                         // External payment authorization may change mutable authority
@@ -1437,27 +1110,12 @@ impl ChioKernel {
             if let Err(error) = post_payment_admission {
                 let reason = dispatch_admission_error_reason(&error);
                 warn!(request_id = %request.request_id, reason = %redacted!(&reason), "post-payment dispatch revalidation denied");
-                return self.with_pre_invocation_guard_evidence(
-                    &pre_invocation_guard_evidence,
-                    || {
-                        self.build_pre_dispatch_cleanup_deny_response_with_credentials(
-                            PreDispatchCleanupDeny {
-                                request,
-                                reason: &reason,
-                                timestamp: post_payment_now_unix_ms / 1000,
-                                matched_grant_index,
-                                cap,
-                                budget_mutation: &budget_mutation,
-                                payment_authorization: payment_authorization.as_ref(),
-                                durable_operation: durable_operation(durable_admission.as_ref()),
-                                runtime_admission_metadata: error.denied_metadata(&extra_metadata),
-                                runtime_reservation: &runtime_reservation,
-                                verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                                budget_lease_acquired,
-                            },
-                            PaymentCredentialDisposition::RetainedAfterAuthorization,
-                        )
-                    },
+                let metadata = error.denied_metadata(custody.metadata());
+                return custody.deny(
+                    AdmissionDenial::new(&reason)
+                        .at(post_payment_now_unix_ms / 1000)
+                        .with_metadata(metadata)
+                        .with_credentials(PaymentCredentialDisposition::RetainedAfterAuthorization),
                 );
             }
         }
@@ -1465,29 +1123,10 @@ impl ChioKernel {
         if let Err(refusal) = self.start_session_request_dispatch(session_id, &request.request_id) {
             let reason = refusal.error.to_string();
             warn!(request_id = %request.request_id, reason = %redacted!(&reason), "session cancellation won the pre-dispatch boundary");
-            return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
-                let cleanup = PreDispatchCleanupDeny {
-                    request,
-                    reason: refusal.cancellation.as_deref().unwrap_or(&reason),
-                    timestamp: self
-                        .read_authority_time()
-                        .map(|time| time.as_secs())
-                        .unwrap_or(now),
-                    matched_grant_index,
-                    cap,
-                    budget_mutation: &budget_mutation,
-                    payment_authorization: payment_authorization.as_ref(),
-                    durable_operation: durable_operation(durable_admission.as_ref()),
-                    runtime_admission_metadata: extra_metadata.clone(),
-                    runtime_reservation: &runtime_reservation,
-                    verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                    budget_lease_acquired,
-                };
-                self.build_session_dispatch_refusal_response(
-                    cleanup,
-                    refusal.cancellation.is_some(),
-                )
-            });
+            return custody.deny_session_refusal(
+                refusal.cancellation.as_deref().unwrap_or(&reason),
+                refusal.cancellation.is_some(),
+            );
         }
 
         // The pool claim is a durable, idempotent participant in dispatch.
@@ -1503,9 +1142,9 @@ impl ChioKernel {
                     matched_grant,
                     request,
                     time.get(),
-                    durable_admission
-                        .as_ref()
-                        .map(|admission| admission.operation().binding().operation_id().as_str()),
+                    custody
+                        .operation()
+                        .map(|operation| operation.binding().operation_id().as_str()),
                 )
             });
         if let Ok(purchase) = &pool_claim {
@@ -1514,118 +1153,63 @@ impl ChioKernel {
         if let Err(error) = pool_claim {
             let reason = error.to_string();
             warn!(request_id = %request.request_id, reason = %redacted!(&reason), "finding pool dispatch claim denied");
-            return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
-                self.build_pre_dispatch_cleanup_deny_response_with_credentials(
-                    PreDispatchCleanupDeny {
-                        request,
-                        reason: &reason,
-                        timestamp: self
-                            .read_authority_time()
-                            .map(|time| time.as_secs())
-                            .unwrap_or(now),
-                        matched_grant_index,
-                        cap,
-                        budget_mutation: &budget_mutation,
-                        payment_authorization: payment_authorization.as_ref(),
-                        durable_operation: durable_operation(durable_admission.as_ref()),
-                        runtime_admission_metadata: error.denied_metadata(&extra_metadata),
-                        runtime_reservation: &runtime_reservation,
-                        verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                        budget_lease_acquired,
-                    },
-                    if payment_authorization.is_some() {
-                        PaymentCredentialDisposition::RetainedAfterAuthorization
-                    } else {
-                        PaymentCredentialDisposition::NonePresent
-                    },
-                )
-            });
+            let metadata = error.denied_metadata(custody.metadata());
+            let credentials = if custody.payment().is_some() {
+                PaymentCredentialDisposition::RetainedAfterAuthorization
+            } else {
+                PaymentCredentialDisposition::NonePresent
+            };
+            return custody.deny(
+                AdmissionDenial::new(&reason)
+                    .sampled()
+                    .with_metadata(metadata)
+                    .with_credentials(credentials),
+            );
         }
 
         #[cfg(feature = "admission-test-support")]
-        let mut credential_reservation = match self.evaluate_native_capture_checkpoint(
-            credential_reservation,
-            durable_admission.as_mut(),
-            &mut budget_mutation,
-            NativeCaptureCheckpointContext {
-                request,
-                security_context,
-                timestamp: now,
-                matched_grant_index,
-                payment_authorization: payment_authorization.as_ref(),
-                metadata: extra_metadata.as_ref(),
-                runtime_reservation: &runtime_reservation,
-                verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                budget_lease_acquired,
-                evidence: &pre_invocation_guard_evidence,
-            },
-        ) {
-            NativeCaptureCheckpointOutcome::Continue(credentials) => credentials,
-            NativeCaptureCheckpointOutcome::Break(response) => return response,
+        let mut custody = match custody.native_capture_checkpoint(security_context) {
+            ControlFlow::Continue(custody) => custody,
+            ControlFlow::Break(response) => return response,
         };
-        let mut security_pre_dispatch = match self.run_security_pre_dispatch_hook(
-            request,
-            security_context,
-            durable_admission.as_ref(),
-        ) {
-            Ok(outcome) => outcome,
-            Err(denial) => {
-                let mut denial_evidence = pre_invocation_guard_evidence.clone();
-                denial_evidence.push(denial.evidence);
-                let reason = denial.reason;
-                warn!(request_id = %request.request_id, reason, "security pre-dispatch denied");
-                return self.build_pre_commit_credential_rejection_response(
-                    PreDispatchCleanupDeny {
-                        request,
-                        reason,
-                        timestamp: now,
-                        matched_grant_index,
-                        cap,
-                        budget_mutation: &budget_mutation,
-                        payment_authorization: payment_authorization.as_ref(),
-                        durable_operation: durable_operation(durable_admission.as_ref()),
-                        runtime_admission_metadata: extra_metadata.clone(),
-                        runtime_reservation: &runtime_reservation,
-                        verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                        budget_lease_acquired,
-                    },
-                    credential_reservation,
-                    &denial_evidence,
-                );
-            }
-        };
+        let mut security_pre_dispatch =
+            match self.run_security_pre_dispatch_hook(request, security_context, custody.durable())
+            {
+                Ok(outcome) => outcome,
+                Err(denial) => {
+                    let reason = denial.reason;
+                    warn!(request_id = %request.request_id, reason, "security pre-dispatch denied");
+                    return custody.deny_security(reason, denial.evidence);
+                }
+            };
         // Security has accepted, but dispatch has not started. Retain on
         // uncertain commit/cancellation, never before a definite security denial.
-        if let Err(error) = credential_reservation.retain_if_dropped() {
+        if let Err(error) = custody
+            .credentials()
+            .and_then(|credentials| credentials.retain_if_dropped())
+        {
             let reason = format!("dispatch credential retention failed before dispatch: {error}");
-            let response =
-                self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
-                    self.build_pre_dispatch_cleanup_deny_response_with_credentials(
-                        PreDispatchCleanupDeny {
-                            request,
-                            reason: &reason,
-                            timestamp: self
-                                .read_authority_time()
-                                .map(|time| time.as_secs())
-                                .unwrap_or(now),
-                            matched_grant_index,
-                            cap,
-                            budget_mutation: &budget_mutation,
-                            payment_authorization: payment_authorization.as_ref(),
-                            durable_operation: durable_operation(durable_admission.as_ref()),
-                            runtime_admission_metadata: extra_metadata.clone(),
-                            runtime_reservation: &runtime_reservation,
-                            verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                            budget_lease_acquired,
-                        },
-                        PaymentCredentialDisposition::RetentionOutcomeUnknown,
-                    )
-                });
+            let response = custody.deny(
+                AdmissionDenial::new(&reason)
+                    .sampled()
+                    .with_credentials(PaymentCredentialDisposition::RetentionOutcomeUnknown),
+            );
             if let Some(outcome) = security_pre_dispatch.dispatch_outcome.take() {
                 outcome.record_dispatch_failed()?;
             }
             return response;
         }
+        let AdmittedDispatch {
+            durable: mut durable_admission,
+            budget: mut budget_mutation,
+            runtime: runtime_reservation,
+            lease_acquired: budget_lease_acquired,
+            payment: payment_authorization,
+            metadata: extra_metadata,
+            evidence: pre_invocation_guard_evidence,
+            payee: verified_governed_payee_binding,
+            credentials: mut credential_reservation,
+        } = custody.into_dispatch()?;
         let mut security_dispatch_outcome = security_pre_dispatch.dispatch_outcome.take();
         let mut security_request_lifecycle = security_pre_dispatch.request_lifecycle.take();
         let durable_return_context = if let Some(admission) = durable_admission.as_mut() {
