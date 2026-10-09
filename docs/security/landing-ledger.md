@@ -7,6 +7,24 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Bounded receipt export qualification (October 9)
+
+FINAL-F03 is integrated at `e7d5a7d0e3`. The [component audit](audits/receipt-bounded-export-qualification-20261009.json)
+retains the genuine Original failures and the composed results: 180 store tests
+passed (seven explicitly ignored), 16 HTTP tests passed, and the full 100,000
+receipt covered-range control passed. Strict owning lint, formatting and the
+reviewed trust-boundary inventory check also passed. The new HTTP export uses
+an authenticated snapshot, bounded payload and proof work, and an explicit local
+operator fallback when the existing evidence format exceeds its checkpoint-prefix
+ceiling. Receipt GET queries retain their existing authenticated snapshot contract.
+
+All 1,875 historical requirements remain. F03's previous current state is archived;
+this is local component qualification. The bounded F01 set, F02/F13 registry
+repairs, F04 operator entry point, F11 authority freshness and F12 composition
+remain in progress. Final independent review, protected hosted checks and merge
+are still required. KANI-PROOF-QUAL and SEC-1160-COLDSTATE retain their explicit
+open residuals and release/preview restrictions.
+
 ## Bounded capacity amendment and operator review (October 9)
 
 **SEC-1160-COLDSTATE remains OPEN P1 and blocks the G5 outside-team preview.**
