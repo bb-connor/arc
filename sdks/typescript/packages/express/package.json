@@ -39,13 +39,15 @@
     "esbuild": "^0.28.1",
     "express": "^5.1.0",
     "typescript": "~5.7.0",
-    "vitest": "^3.0.0"
+    "vitest": "^4.1.11"
   },
   "overrides": {
     "vite": {
       ".": "7.3.5",
       "esbuild": "0.28.1"
-    }
+    },
+    "proxy-addr": "2.0.8",
+    "source-map-js": "1.2.2"
   },
   "publishConfig": {
     "access": "public"

@@ -6,9 +6,9 @@
 # Cargo needs a Rust toolchain on PATH and either network access OR a
 # vendored ${SOURCE_PATH}/vendor/ directory.
 
-# release-cpp.yml tags releases as `cpp/v<X.Y.Z>` and computes the SHA512
-# against the corresponding archive. Use the same ref so the published
-# port resolves to the exact tarball the SHA was hashed against.
+# Release templates use the version tag for local package checks. Publishing
+# replaces REPO, REF and SHA512 with the qualified repository, immutable
+# commit and archive digest, and removes the moving HEAD_REF.
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO backbay-labs/chio

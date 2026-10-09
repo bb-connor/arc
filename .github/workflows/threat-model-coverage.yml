@@ -50,8 +50,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: threat-model-coverage-${{ github.ref }}
-  cancel-in-progress: true
+  group: threat-model-coverage-${{ github.workflow }}-${{ github.run_id }}-${{ github.run_attempt }}
+  cancel-in-progress: false
 
 jobs:
   coverage-gate:

@@ -10,6 +10,7 @@ on:
       - crates/platform/chio-store-sqlite/**
       - Cargo.toml
       - Cargo.lock
+      - third_party/aws-lc-rs-chio/**
   push:
     branches:
       - main
@@ -22,11 +23,12 @@ on:
       - crates/platform/chio-store-sqlite/**
       - Cargo.toml
       - Cargo.lock
+      - third_party/aws-lc-rs-chio/**
   workflow_dispatch:
 
 concurrency:
-  group: chio-tee-fips-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: chio-tee-fips-${{ github.workflow }}-${{ github.run_id }}-${{ github.run_attempt }}
+  cancel-in-progress: false
 
 permissions:
   contents: read

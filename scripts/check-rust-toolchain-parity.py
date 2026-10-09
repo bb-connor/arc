@@ -15,9 +15,13 @@ PRODUCTION_DOCKERFILES = (
     Path("deploy/docker/Dockerfile.sidecar"),
     Path("deploy/docker/Dockerfile.tee"),
     Path("deploy/sidecar/Dockerfile"),
+    Path("deploy/cognition-market/Dockerfile"),
 )
 ALPINE_DOCKERFILES = PRODUCTION_DOCKERFILES[:3]
-GENERATED_MANIFEST = Path("deploy/docker/chio-workspace/Cargo.toml")
+GENERATED_MANIFESTS = (
+    Path("deploy/docker/chio-workspace/Cargo.toml"),
+    Path("deploy/docker/proof-room-workspace/Cargo.toml"),
+)
 RUST_VERSION_RE = re.compile(r"(?m)^ARG RUST_VERSION=([^\s#]+)\s*$")
 RUST_FROM_RE = re.compile(r"(?m)^FROM rust:[^\s]+(?:\s+AS\s+\S+)?\s*$")
 DIGEST_RE = re.compile(r"@sha256:([0-9a-f]{64})(?=\s|$)")
@@ -54,7 +58,6 @@ def check(repo_root: Path) -> list[str]:
     errors: list[str] = []
     toolchain_path = repo_root / "rust-toolchain.toml"
     root_manifest_path = repo_root / "Cargo.toml"
-    generated_manifest_path = repo_root / GENERATED_MANIFEST
 
     try:
         toolchain = nested_string(
@@ -65,21 +68,23 @@ def check(repo_root: Path) -> list[str]:
             ("workspace", "package", "rust-version"),
             root_manifest_path,
         )
-        generated_msrv = nested_string(
-            read_toml(generated_manifest_path),
-            ("workspace", "package", "rust-version"),
-            generated_manifest_path,
-        )
         if release_prefix(toolchain) != workspace_msrv:
             errors.append(
                 f"workspace rust-version {workspace_msrv!r} must match the "
                 f"toolchain release {release_prefix(toolchain)!r}"
             )
-        if generated_msrv != workspace_msrv:
-            errors.append(
-                f"{GENERATED_MANIFEST} rust-version {generated_msrv!r} must "
-                f"match workspace rust-version {workspace_msrv!r}"
+        for relative_path in GENERATED_MANIFESTS:
+            generated_manifest_path = repo_root / relative_path
+            generated_msrv = nested_string(
+                read_toml(generated_manifest_path),
+                ("workspace", "package", "rust-version"),
+                generated_manifest_path,
             )
+            if generated_msrv != workspace_msrv:
+                errors.append(
+                    f"{relative_path} rust-version {generated_msrv!r} must "
+                    f"match workspace rust-version {workspace_msrv!r}"
+                )
     except ValueError as error:
         return [str(error)]
 

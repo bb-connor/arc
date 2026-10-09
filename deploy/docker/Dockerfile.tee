@@ -2,13 +2,13 @@
 # Chio TEE sidecar image. This mirrors Dockerfile.sidecar's workspace build
 # pattern so path dependencies and Cargo.lock resolution stay identical to CI.
 
-ARG RUST_VERSION=1.94.1
+ARG RUST_VERSION=1.95.0
 ARG ALPINE_VERSION=3.22
 
 ############################
 # Stage 1: build the binary
 ############################
-FROM rust:${RUST_VERSION}-alpine${ALPINE_VERSION}@sha256:797631f9efd6957d0013f200e410478c380907eee3b469c6f80d89022df28bc7 AS builder
+FROM rust:${RUST_VERSION}-alpine${ALPINE_VERSION}@sha256:064dfc925d68d1a63f4fd2871bd7dc6e6ea56692989a487185855d62885d90aa AS builder
 RUN apk add --no-cache build-base cmake openssl-dev openssl-libs-static perl pkgconf musl-dev protoc
 ENV OPENSSL_STATIC=1 \
     OPENSSL_DIR=/usr
@@ -23,6 +23,7 @@ WORKDIR /workspace
 # inputs aborts manifest loading or Rust compilation.
 COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
+COPY third_party ./third_party
 COPY bench ./bench
 COPY contracts ./contracts
 COPY integrations/editors ./integrations/editors
