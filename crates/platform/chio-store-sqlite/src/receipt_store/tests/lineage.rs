@@ -342,30 +342,30 @@ fn receipt_lineage_verification_backfills_from_governed_call_chain_metadata() {
         )
         .test_unwrap();
     store
-        .record_request_lineage_record(
-            "sess-lineage",
-            "req-parent-lineage",
-            None,
-            Some("anchor-child-lineage"),
-            2_091,
-            Some("req-parent-lineage-fingerprint"),
-            &request_lineage_json("req-parent-lineage", "anchor-child-lineage", None),
-        )
+        .record_request_lineage_record(RequestLineageInput {
+            session_id: "sess-lineage",
+            request_id: "req-parent-lineage",
+            parent_request_id: None,
+            session_anchor_id: Some("anchor-child-lineage"),
+            recorded_at: 2_091,
+            request_fingerprint: Some("req-parent-lineage-fingerprint"),
+            lineage_json: &request_lineage_json("req-parent-lineage", "anchor-child-lineage", None),
+        })
         .test_unwrap();
     store
-        .record_request_lineage_record(
-            "sess-lineage",
-            "req-child-lineage",
-            Some("req-parent-lineage"),
-            Some("anchor-child-lineage"),
-            2_092,
-            Some("req-child-lineage-fingerprint"),
-            &request_lineage_json(
+        .record_request_lineage_record(RequestLineageInput {
+            session_id: "sess-lineage",
+            request_id: "req-child-lineage",
+            parent_request_id: Some("req-parent-lineage"),
+            session_anchor_id: Some("anchor-child-lineage"),
+            recorded_at: 2_092,
+            request_fingerprint: Some("req-child-lineage-fingerprint"),
+            lineage_json: &request_lineage_json(
                 "req-child-lineage",
                 "anchor-child-lineage",
                 Some("req-parent-lineage"),
             ),
-        )
+        })
         .test_unwrap();
 
     let statement = ReceiptLineageStatement::sign(
@@ -388,17 +388,17 @@ fn receipt_lineage_verification_backfills_from_governed_call_chain_metadata() {
     .test_unwrap();
     let statement_json = serde_json::to_value(&statement).test_unwrap();
     store
-        .record_receipt_lineage_statement_record(
-            &child_receipt.id,
-            None,
-            Some("sess-lineage"),
-            None,
-            None,
-            None,
-            Some("chain-lineage"),
-            2_101,
-            &statement_json,
-        )
+        .record_receipt_lineage_statement_record(ReceiptLineageStatementRecord {
+            child_receipt_id: &child_receipt.id,
+            request_id: None,
+            session_id: Some("sess-lineage"),
+            session_anchor_id: None,
+            parent_request_id: None,
+            parent_receipt_id: None,
+            chain_id: Some("chain-lineage"),
+            recorded_at: 2_101,
+            statement_json: &statement_json,
+        })
         .test_unwrap();
 
     let parent_links = store

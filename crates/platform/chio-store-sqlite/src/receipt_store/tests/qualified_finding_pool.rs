@@ -362,17 +362,17 @@ fn qualified_receipt_sink_anchors_standalone_lineage_mutations(
     drop(connection);
     std::fs::copy(&database, &snapshot)?;
 
-    store.record_receipt_lineage_statement_record(
-        &receipt.id,
-        None,
-        None,
-        None,
-        None,
-        None,
-        Some("standalone-lineage-chain"),
-        2_101,
-        &serde_json::json!({"evidenceClass": "standalone"}),
-    )?;
+    store.record_receipt_lineage_statement_record(ReceiptLineageStatementRecord {
+        child_receipt_id: &receipt.id,
+        request_id: None,
+        session_id: None,
+        session_anchor_id: None,
+        parent_request_id: None,
+        parent_receipt_id: None,
+        chain_id: Some("standalone-lineage-chain"),
+        recorded_at: 2_101,
+        statement_json: &serde_json::json!({"evidenceClass": "standalone"}),
+    })?;
     let connection = rusqlite::Connection::open(&database)?;
     let lineage_after: i64 = connection.query_row(
         "SELECT COUNT(*) FROM receipt_lineage_statements WHERE receipt_id = ?1",

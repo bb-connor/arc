@@ -191,15 +191,15 @@ fn request_lineage_record_persistence_rejects_unsupported_schema() {
     let mut lineage_json = request_lineage_json("req-schema", "anchor-schema", None);
     lineage_json["schema"] = serde_json::Value::String("chio.request_lineage.v1".to_string());
 
-    let result = store.record_request_lineage_record(
-        "sess-schema",
-        "req-schema",
-        None,
-        Some("anchor-schema"),
-        1_710_000_000,
-        Some("req-schema-fingerprint"),
-        &lineage_json,
-    );
+    let result = store.record_request_lineage_record(RequestLineageInput {
+        session_id: "sess-schema",
+        request_id: "req-schema",
+        parent_request_id: None,
+        session_anchor_id: Some("anchor-schema"),
+        recorded_at: 1_710_000_000,
+        request_fingerprint: Some("req-schema-fingerprint"),
+        lineage_json: &lineage_json,
+    });
 
     let error = match result {
         Ok(()) => panic!("unsupported request lineage schema should fail"),

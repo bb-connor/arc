@@ -241,17 +241,17 @@ fn signed_readback_lineage_verifies_signature_and_binds_requested_child() {
         )
         .test_unwrap();
     store
-        .record_receipt_lineage_statement_record(
-            "child",
-            None,
-            Some("session"),
-            None,
-            None,
-            None,
-            None,
-            100,
-            &serde_json::to_value(&statement).test_unwrap(),
-        )
+        .record_receipt_lineage_statement_record(ReceiptLineageStatementRecord {
+            child_receipt_id: "child",
+            request_id: None,
+            session_id: Some("session"),
+            session_anchor_id: None,
+            parent_request_id: None,
+            parent_receipt_id: None,
+            chain_id: None,
+            recorded_at: 100,
+            statement_json: &serde_json::to_value(&statement).test_unwrap(),
+        })
         .test_unwrap();
     assert_eq!(
         store.receipt_lineage_statement("child").test_unwrap(),

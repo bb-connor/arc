@@ -247,6 +247,30 @@ fn load_receipt_lineage_statement_row(
         .transpose()
 }
 
+/// Parameters of `record_request_lineage_record`.
+pub struct RequestLineageInput<'a> {
+    pub session_id: &'a str,
+    pub request_id: &'a str,
+    pub parent_request_id: Option<&'a str>,
+    pub session_anchor_id: Option<&'a str>,
+    pub recorded_at: u64,
+    pub request_fingerprint: Option<&'a str>,
+    pub lineage_json: &'a serde_json::Value,
+}
+
+/// Parameters of `record_receipt_lineage_statement_record`.
+pub struct ReceiptLineageStatementRecord<'a> {
+    pub child_receipt_id: &'a str,
+    pub request_id: Option<&'a str>,
+    pub session_id: Option<&'a str>,
+    pub session_anchor_id: Option<&'a str>,
+    pub parent_request_id: Option<&'a str>,
+    pub parent_receipt_id: Option<&'a str>,
+    pub chain_id: Option<&'a str>,
+    pub recorded_at: u64,
+    pub statement_json: &'a serde_json::Value,
+}
+
 impl SqliteReceiptStore {
     pub fn record_session_anchor_record(
         &self,
@@ -267,33 +291,34 @@ impl SqliteReceiptStore {
                 connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
             persist_session_anchor_tx(
                 &tx,
-                &session_id,
-                &anchor_id,
-                &auth_context_fingerprint,
-                issued_at,
-                supersedes_anchor_id.as_deref(),
-                SESSION_ANCHOR_SOURCE_KIND,
-                &anchor_json,
+                SessionAnchorWrite {
+                    session_id: &session_id,
+                    anchor_id: &anchor_id,
+                    auth_context_fingerprint: &auth_context_fingerprint,
+                    issued_at,
+                    supersedes_anchor_id: supersedes_anchor_id.as_deref(),
+                    source_kind: SESSION_ANCHOR_SOURCE_KIND,
+                    anchor_json: &anchor_json,
+                },
             )?;
             tx.commit()?;
             Ok(())
         })
     }
 
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-    )]
     pub fn record_request_lineage_record(
         &self,
-        session_id: &str,
-        request_id: &str,
-        parent_request_id: Option<&str>,
-        session_anchor_id: Option<&str>,
-        recorded_at: u64,
-        request_fingerprint: Option<&str>,
-        lineage_json: &serde_json::Value,
+        params: RequestLineageInput<'_>,
     ) -> Result<(), ReceiptStoreError> {
+        let RequestLineageInput {
+            session_id,
+            request_id,
+            parent_request_id,
+            session_anchor_id,
+            recorded_at,
+            request_fingerprint,
+            lineage_json,
+        } = params;
         let session_id = session_id.to_string();
         let request_id = request_id.to_string();
         let parent_request_id = parent_request_id.map(ToString::to_string);
@@ -305,36 +330,37 @@ impl SqliteReceiptStore {
                 connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
             persist_request_lineage_tx(
                 &tx,
-                &session_id,
-                &request_id,
-                parent_request_id.as_deref(),
-                session_anchor_id.as_deref(),
-                recorded_at,
-                request_fingerprint.as_deref(),
-                REQUEST_LINEAGE_SOURCE_KIND,
-                &lineage_json,
+                RequestLineageWrite {
+                    session_id: &session_id,
+                    request_id: &request_id,
+                    parent_request_id: parent_request_id.as_deref(),
+                    session_anchor_id: session_anchor_id.as_deref(),
+                    recorded_at,
+                    request_fingerprint: request_fingerprint.as_deref(),
+                    source_kind: REQUEST_LINEAGE_SOURCE_KIND,
+                    lineage_json: &lineage_json,
+                },
             )?;
             tx.commit()?;
             Ok(())
         })
     }
 
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-    )]
     pub fn record_receipt_lineage_statement_record(
         &self,
-        child_receipt_id: &str,
-        request_id: Option<&str>,
-        session_id: Option<&str>,
-        session_anchor_id: Option<&str>,
-        parent_request_id: Option<&str>,
-        parent_receipt_id: Option<&str>,
-        chain_id: Option<&str>,
-        recorded_at: u64,
-        statement_json: &serde_json::Value,
+        params: ReceiptLineageStatementRecord<'_>,
     ) -> Result<(), ReceiptStoreError> {
+        let ReceiptLineageStatementRecord {
+            child_receipt_id,
+            request_id,
+            session_id,
+            session_anchor_id,
+            parent_request_id,
+            parent_receipt_id,
+            chain_id,
+            recorded_at,
+            statement_json,
+        } = params;
         let child_receipt_id = child_receipt_id.to_string();
         let request_id = request_id.map(ToString::to_string);
         let session_id = session_id.map(ToString::to_string);
@@ -346,16 +372,18 @@ impl SqliteReceiptStore {
         self.writer_handle().run_write_anchored_metadata(move |tx| {
             persist_receipt_lineage_statement_tx(
                 tx,
-                &child_receipt_id,
-                request_id.as_deref(),
-                session_id.as_deref(),
-                session_anchor_id.as_deref(),
-                parent_request_id.as_deref(),
-                parent_receipt_id.as_deref(),
-                chain_id.as_deref(),
-                recorded_at,
-                RECEIPT_LINEAGE_SOURCE_KIND,
-                &statement_json,
+                ReceiptLineageStatementWrite {
+                    child_receipt_id: &child_receipt_id,
+                    request_id: request_id.as_deref(),
+                    session_id: session_id.as_deref(),
+                    session_anchor_id: session_anchor_id.as_deref(),
+                    parent_request_id: parent_request_id.as_deref(),
+                    parent_receipt_id: parent_receipt_id.as_deref(),
+                    chain_id: chain_id.as_deref(),
+                    recorded_at,
+                    source_kind: RECEIPT_LINEAGE_SOURCE_KIND,
+                    statement_json: &statement_json,
+                },
             )?;
             Ok(())
         })
@@ -497,14 +525,16 @@ impl SqliteReceiptStore {
                 claim_log_entry_seq_for_source_tx(connection, "child_receipt", source_seq)?;
             persist_request_lineage_tx(
                 connection,
-                receipt.session_id.as_str(),
-                receipt.request_id.as_str(),
-                Some(receipt.parent_request_id.as_str()),
-                None,
-                receipt.timestamp,
-                None,
-                CHILD_RECEIPT_BACKFILL_SOURCE_KIND,
-                &lineage_json,
+                RequestLineageWrite {
+                    session_id: receipt.session_id.as_str(),
+                    request_id: receipt.request_id.as_str(),
+                    parent_request_id: Some(receipt.parent_request_id.as_str()),
+                    session_anchor_id: None,
+                    recorded_at: receipt.timestamp,
+                    request_fingerprint: None,
+                    source_kind: CHILD_RECEIPT_BACKFILL_SOURCE_KIND,
+                    lineage_json: &lineage_json,
+                },
             )?;
             Ok(entry_seq)
         })
@@ -974,7 +1004,7 @@ impl ReceiptStore for SqliteReceiptStore {
         request_fingerprint: Option<&str>,
         lineage_json: &serde_json::Value,
     ) -> Result<(), ReceiptStoreError> {
-        self.record_request_lineage_record(
+        self.record_request_lineage_record(RequestLineageInput {
             session_id,
             request_id,
             parent_request_id,
@@ -982,7 +1012,7 @@ impl ReceiptStore for SqliteReceiptStore {
             recorded_at,
             request_fingerprint,
             lineage_json,
-        )
+        })
     }
 
     fn record_receipt_lineage_statement(
@@ -997,7 +1027,7 @@ impl ReceiptStore for SqliteReceiptStore {
         recorded_at: u64,
         statement_json: &serde_json::Value,
     ) -> Result<(), ReceiptStoreError> {
-        self.record_receipt_lineage_statement_record(
+        self.record_receipt_lineage_statement_record(ReceiptLineageStatementRecord {
             child_receipt_id,
             request_id,
             session_id,
@@ -1007,7 +1037,7 @@ impl ReceiptStore for SqliteReceiptStore {
             chain_id,
             recorded_at,
             statement_json,
-        )
+        })
     }
 
     fn get_receipt_lineage_verification(

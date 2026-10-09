@@ -568,15 +568,15 @@ fn reader_pool_never_begins_a_write_transaction() -> Result<(), Box<dyn std::err
     // among others), unlike `record_session_anchor_record`'s unvalidated
     // passthrough JSON above; `request_lineage_json` builds a
     // schema-compliant payload.
-    store.record_request_lineage_record(
-        "sess-ro",
-        "req-ro",
-        None,
-        Some("anchor-ro"),
-        4,
-        None,
-        &request_lineage_json("req-ro", "anchor-ro", None),
-    )?;
+    store.record_request_lineage_record(RequestLineageInput {
+        session_id: "sess-ro",
+        request_id: "req-ro",
+        parent_request_id: None,
+        session_anchor_id: Some("anchor-ro"),
+        recorded_at: 4,
+        request_fingerprint: None,
+        lineage_json: &request_lineage_json("req-ro", "anchor-ro", None),
+    })?;
     let _links = store.list_receipt_lineage_statement_links("rcpt-ro-pool-0")?;
     let _verification = store.receipt_lineage_verification("rcpt-ro-pool-0")?;
     store.create_next_receipt_checkpoint(2, &keypair)?;

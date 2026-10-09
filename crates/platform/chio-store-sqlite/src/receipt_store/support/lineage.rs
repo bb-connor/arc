@@ -438,20 +438,30 @@ pub(crate) fn refresh_receipt_lineage_rows_for_parent_receipt_tx(
     Ok(())
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-)]
+/// Parameters of `persist_session_anchor_tx`.
+pub(crate) struct SessionAnchorWrite<'a> {
+    pub(crate) session_id: &'a str,
+    pub(crate) anchor_id: &'a str,
+    pub(crate) auth_context_fingerprint: &'a str,
+    pub(crate) issued_at: u64,
+    pub(crate) supersedes_anchor_id: Option<&'a str>,
+    pub(crate) source_kind: &'a str,
+    pub(crate) anchor_json: &'a serde_json::Value,
+}
+
 pub(crate) fn persist_session_anchor_tx(
     tx: &rusqlite::Transaction<'_>,
-    session_id: &str,
-    anchor_id: &str,
-    auth_context_fingerprint: &str,
-    issued_at: u64,
-    supersedes_anchor_id: Option<&str>,
-    source_kind: &str,
-    anchor_json: &serde_json::Value,
+    params: SessionAnchorWrite<'_>,
 ) -> Result<(), ReceiptStoreError> {
+    let SessionAnchorWrite {
+        session_id,
+        anchor_id,
+        auth_context_fingerprint,
+        issued_at,
+        supersedes_anchor_id,
+        source_kind,
+        anchor_json,
+    } = params;
     let session_id =
         sanitize_required_identifier("session anchor", anchor_id, "session_id", session_id)?;
     let anchor_id =
@@ -573,21 +583,32 @@ pub(crate) fn persist_session_anchor_tx(
     Ok(())
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-)]
+/// Parameters of `persist_request_lineage_tx`.
+pub(crate) struct RequestLineageWrite<'a> {
+    pub(crate) session_id: &'a str,
+    pub(crate) request_id: &'a str,
+    pub(crate) parent_request_id: Option<&'a str>,
+    pub(crate) session_anchor_id: Option<&'a str>,
+    pub(crate) recorded_at: u64,
+    pub(crate) request_fingerprint: Option<&'a str>,
+    pub(crate) source_kind: &'a str,
+    pub(crate) lineage_json: &'a serde_json::Value,
+}
+
 pub(crate) fn persist_request_lineage_tx(
     tx: &rusqlite::Transaction<'_>,
-    session_id: &str,
-    request_id: &str,
-    parent_request_id: Option<&str>,
-    session_anchor_id: Option<&str>,
-    recorded_at: u64,
-    request_fingerprint: Option<&str>,
-    source_kind: &str,
-    lineage_json: &serde_json::Value,
+    params: RequestLineageWrite<'_>,
 ) -> Result<(), ReceiptStoreError> {
+    let RequestLineageWrite {
+        session_id,
+        request_id,
+        parent_request_id,
+        session_anchor_id,
+        recorded_at,
+        request_fingerprint,
+        source_kind,
+        lineage_json,
+    } = params;
     let session_id =
         sanitize_required_identifier("request lineage", request_id, "session_id", session_id)?;
     let request_id =
@@ -687,23 +708,36 @@ pub(crate) fn persist_request_lineage_tx(
     Ok(())
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-)]
+/// Parameters of `persist_receipt_lineage_statement_tx`.
+pub(crate) struct ReceiptLineageStatementWrite<'a> {
+    pub(crate) child_receipt_id: &'a str,
+    pub(crate) request_id: Option<&'a str>,
+    pub(crate) session_id: Option<&'a str>,
+    pub(crate) session_anchor_id: Option<&'a str>,
+    pub(crate) parent_request_id: Option<&'a str>,
+    pub(crate) parent_receipt_id: Option<&'a str>,
+    pub(crate) chain_id: Option<&'a str>,
+    pub(crate) recorded_at: u64,
+    pub(crate) source_kind: &'a str,
+    pub(crate) statement_json: &'a serde_json::Value,
+}
+
 pub(crate) fn persist_receipt_lineage_statement_tx(
     tx: &rusqlite::Transaction<'_>,
-    child_receipt_id: &str,
-    request_id: Option<&str>,
-    session_id: Option<&str>,
-    session_anchor_id: Option<&str>,
-    parent_request_id: Option<&str>,
-    parent_receipt_id: Option<&str>,
-    chain_id: Option<&str>,
-    recorded_at: u64,
-    source_kind: &str,
-    statement_json: &serde_json::Value,
+    params: ReceiptLineageStatementWrite<'_>,
 ) -> Result<(), ReceiptStoreError> {
+    let ReceiptLineageStatementWrite {
+        child_receipt_id,
+        request_id,
+        session_id,
+        session_anchor_id,
+        parent_request_id,
+        parent_receipt_id,
+        chain_id,
+        recorded_at,
+        source_kind,
+        statement_json,
+    } = params;
     let child_receipt_id = sanitize_required_identifier(
         "receipt lineage statement",
         child_receipt_id,
@@ -955,16 +989,18 @@ pub(crate) fn ensure_receipt_lineage_statement_for_receipt_id_tx(
 
     persist_receipt_lineage_statement_tx(
         tx,
-        &receipt.id,
-        None,
-        None,
-        None,
-        Some(call_chain.parent_request_id.as_str()),
-        call_chain.parent_receipt_id.as_deref(),
-        Some(call_chain.chain_id.as_str()),
-        receipt.timestamp,
-        GOVERNED_RECEIPT_BACKFILL_SOURCE_KIND,
-        &serde_json::to_value(call_chain)?,
+        ReceiptLineageStatementWrite {
+            child_receipt_id: &receipt.id,
+            request_id: None,
+            session_id: None,
+            session_anchor_id: None,
+            parent_request_id: Some(call_chain.parent_request_id.as_str()),
+            parent_receipt_id: call_chain.parent_receipt_id.as_deref(),
+            chain_id: Some(call_chain.chain_id.as_str()),
+            recorded_at: receipt.timestamp,
+            source_kind: GOVERNED_RECEIPT_BACKFILL_SOURCE_KIND,
+            statement_json: &serde_json::to_value(call_chain)?,
+        },
     )?;
     Ok(())
 }
@@ -1064,14 +1100,16 @@ pub(crate) fn backfill_provenance_lineage_tables(
         )?;
         persist_request_lineage_tx(
             tx,
-            receipt.session_id.as_str(),
-            receipt.request_id.as_str(),
-            Some(receipt.parent_request_id.as_str()),
-            None,
-            receipt.timestamp,
-            None,
-            CHILD_RECEIPT_BACKFILL_SOURCE_KIND,
-            &child_receipt_request_lineage_json(&receipt)?,
+            RequestLineageWrite {
+                session_id: receipt.session_id.as_str(),
+                request_id: receipt.request_id.as_str(),
+                parent_request_id: Some(receipt.parent_request_id.as_str()),
+                session_anchor_id: None,
+                recorded_at: receipt.timestamp,
+                request_fingerprint: None,
+                source_kind: CHILD_RECEIPT_BACKFILL_SOURCE_KIND,
+                lineage_json: &child_receipt_request_lineage_json(&receipt)?,
+            },
         )?;
     }
 
