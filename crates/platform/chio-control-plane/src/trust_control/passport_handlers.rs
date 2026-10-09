@@ -365,24 +365,27 @@ pub(crate) async fn handle_publish_passport_status(
         Ok(now) => now,
         Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
     };
+    use super::registry_write_lane::{configured_registry_file, run_registry_update};
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    let (path, mut registry) = match load_passport_status_registry_for_admin(&state.config) {
-        Ok(values) => values,
-        Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
+    let path = match configured_registry_file(
+        state.config.passport_statuses_file.as_deref(),
+        "--passport-statuses-file",
+        "passport lifecycle",
+    ) {
+        Ok(path) => path,
+        Err(response) => return response,
     };
     if request.distribution.resolve_urls.is_empty() {
         request.distribution = default_passport_status_distribution(&state.config);
     }
-    let record = match registry.publish(&request.passport, clock_now, request.distribution) {
-        Ok(record) => record,
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    };
-    if let Err(error) = registry.save(&path) {
-        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-    }
-    Json(record).into_response()
+    run_registry_update(move || {
+        PassportStatusRegistry::update(&path, |registry| {
+            registry.publish(&request.passport, clock_now, request.distribution)
+        })
+    })
+    .await
 }
 
 pub(crate) async fn handle_resolve_passport_status(
@@ -435,25 +438,24 @@ pub(crate) async fn handle_revoke_passport_status(
     headers: HeaderMap,
     Json(request): Json<PassportStatusRevocationRequest>,
 ) -> Response {
+    use super::registry_write_lane::{configured_registry_file, run_registry_update};
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    let (path, mut registry) = match load_passport_status_registry_for_admin(&state.config) {
-        Ok(values) => values,
-        Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
+    let path = match configured_registry_file(
+        state.config.passport_statuses_file.as_deref(),
+        "--passport-statuses-file",
+        "passport lifecycle",
+    ) {
+        Ok(path) => path,
+        Err(response) => return response,
     };
-    let record = match registry.revoke(&passport_id, request.reason.as_deref(), request.revoked_at)
-    {
-        Ok(record) => record,
-        Err(error) if error.to_string().contains("was not found") => {
-            return plain_http_error(StatusCode::NOT_FOUND, &error.to_string());
-        }
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    };
-    if let Err(error) = registry.save(&path) {
-        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-    }
-    Json(record).into_response()
+    run_registry_update(move || {
+        PassportStatusRegistry::update(&path, |registry| {
+            registry.revoke(&passport_id, request.reason.as_deref(), request.revoked_at)
+        })
+    })
+    .await
 }
 
 pub(crate) async fn handle_list_verifier_policies(

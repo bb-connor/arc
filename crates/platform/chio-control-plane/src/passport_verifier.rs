@@ -32,7 +32,7 @@ mod bounded_persistence_tests;
 
 #[cfg(test)]
 #[path = "passport_verifier/tests/fixtures.rs"]
-mod test_fixtures;
+pub(crate) mod test_fixtures;
 
 #[cfg(test)]
 #[path = "passport_verifier/tests/revocation_capacity.rs"]
@@ -41,6 +41,10 @@ pub(crate) mod revocation_capacity_tests;
 #[cfg(test)]
 #[path = "passport_verifier/tests/older_registry_files.rs"]
 mod older_registry_files_tests;
+
+#[cfg(test)]
+#[path = "passport_verifier/tests/registry_writer_lock.rs"]
+mod registry_writer_lock_tests;
 
 const VERIFIER_POLICY_REGISTRY_VERSION: &str = "chio.passport-verifier-policies.v1";
 const PASSPORT_STATUS_REGISTRY_VERSION: &str = "chio.passport-status-registry.v1";
@@ -148,6 +152,51 @@ impl VerifierPolicyRegistry {
 
     pub fn remove(&mut self, policy_id: &str) -> bool {
         self.policies.remove(policy_id).is_some()
+    }
+}
+
+/// Why a registry update wrote nothing, or did not finish writing.
+#[derive(Debug)]
+pub enum RegistryUpdateError {
+    /// Another writer holds the registry's lock. Nothing was read or written;
+    /// the update may be retried.
+    Busy,
+    /// This platform has no writer lock, so registries are never written.
+    Unsupported,
+    /// The registry could not be locked or loaded. Nothing was written.
+    Load(CliError),
+    /// The change was refused. Nothing was written.
+    Refused(CliError),
+    /// The changed registry could not be persisted.
+    Persist(CliError),
+}
+
+impl std::fmt::Display for RegistryUpdateError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Busy => f.write_str(
+                "the registry file is being written by another writer; nothing was changed, retry",
+            ),
+            Self::Unsupported => f.write_str(
+                "registry files can be written only where an exclusive writer lock is available",
+            ),
+            Self::Load(error) | Self::Refused(error) | Self::Persist(error) => error.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for RegistryUpdateError {}
+
+impl From<RegistryUpdateError> for CliError {
+    fn from(error: RegistryUpdateError) -> Self {
+        match error {
+            RegistryUpdateError::Busy | RegistryUpdateError::Unsupported => {
+                CliError::cli_other_error(error.to_string())
+            }
+            RegistryUpdateError::Load(error)
+            | RegistryUpdateError::Refused(error)
+            | RegistryUpdateError::Persist(error) => error,
+        }
     }
 }
 
@@ -267,13 +316,22 @@ impl PassportStatusRegistry {
         }
     }
 
-    /// Persists the registry while keeping room for every record it holds to
-    /// be revoked, so a revocation of any admitted record always persists.
-    pub fn save(&self, path: &Path) -> Result<(), CliError> {
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        crate::signed_input::write_reserving_registry(path, self)
+    /// Loads the registry at `path` under its writer lock, applies `change`,
+    /// and persists the result, keeping room for every record to be revoked,
+    /// before the lock is released. This is the registry's only writer.
+    pub fn update<R>(
+        path: &Path,
+        change: impl FnOnce(&mut Self) -> Result<R, CliError>,
+    ) -> Result<R, RegistryUpdateError> {
+        crate::signed_input::update_registry(path, Self::load, change)
+    }
+
+    /// Persists this copy under the writer lock without loading the file
+    /// first; test fixtures only.
+    #[cfg(test)]
+    pub(crate) fn save(&self, path: &Path) -> Result<(), CliError> {
+        let lock = crate::signed_input::lock_registry(path).map_err(CliError::from)?;
+        crate::signed_input::write_reserving_registry(&lock, self)
     }
 
     pub fn get(&self, passport_id: &str) -> Option<&PassportLifecycleRecord> {

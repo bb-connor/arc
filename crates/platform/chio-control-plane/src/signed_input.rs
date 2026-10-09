@@ -7,6 +7,7 @@ use chio_core::canonical::UntrustedJsonText;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
+use crate::passport_verifier::RegistryUpdateError;
 use crate::CliError;
 
 pub(crate) const MAX_SIGNED_FILE_BYTES: usize = 16 * 1024 * 1024;
@@ -130,7 +131,135 @@ pub(crate) trait RevocationReserve: Serialize + DeserializeOwned {
     fn revocation_reserve(&self) -> Result<usize, CliError>;
 }
 
-/// Writes `registry` as compact JSON.
+/// Exclusive writer lock for one registry file.
+///
+/// The lock is an advisory `flock` on a sibling file in the registry's
+/// canonical directory. That file is never renamed, replaced or removed, so
+/// every writer that names the registry by any path through that directory
+/// contends on the same inode, in this process or another on the same host.
+/// The registry file itself is replaced by rename on every write and is
+/// therefore never the lock target. Writers on other hosts sharing the
+/// directory over a network filesystem are not excluded.
+pub(crate) struct RegistryLock {
+    _file: std::fs::File,
+    destination: std::path::PathBuf,
+}
+
+impl RegistryLock {
+    /// The canonical path of the registry this lock guards; every read and
+    /// write under the lock uses it.
+    pub(crate) fn destination(&self) -> &Path {
+        &self.destination
+    }
+}
+
+/// Loads the registry at `path` under its writer lock, applies `change`, and
+/// persists the result before the lock is released.
+///
+/// This is the only writer of a registry: the copy it persists is always the
+/// one it loaded under the same lock, so no copy loaded earlier can replace a
+/// later write. Without the lock the update is refused as busy, never queued.
+pub(crate) fn update_registry<T: RevocationReserve, R>(
+    path: &Path,
+    load: impl FnOnce(&Path) -> Result<T, CliError>,
+    change: impl FnOnce(&mut T) -> Result<R, CliError>,
+) -> Result<R, RegistryUpdateError> {
+    let lock = lock_registry(path)?;
+    let mut registry = load(lock.destination()).map_err(RegistryUpdateError::Load)?;
+    let outcome = change(&mut registry).map_err(RegistryUpdateError::Refused)?;
+    write_reserving_registry(&lock, &registry).map_err(RegistryUpdateError::Persist)?;
+    Ok(outcome)
+}
+
+/// Takes the writer lock of the registry at `path`.
+///
+/// The lock lives at `.<file name>.lock` in the canonicalized parent
+/// directory, so directory aliases of one registry share it. A hard link to
+/// the registry under another name is a different registry entry with its own
+/// lock; a write through it replaces only that entry. A registry path that is
+/// a symbolic link is refused, because a write would replace the link rather
+/// than the file it names.
+#[cfg(unix)]
+pub(crate) fn lock_registry(path: &Path) -> Result<RegistryLock, RegistryUpdateError> {
+    use std::os::unix::fs::OpenOptionsExt;
+    let load = |error: CliError| RegistryUpdateError::Load(error);
+    let file_name = path
+        .file_name()
+        .ok_or_else(|| load(CliError::cli_io_error("registry path has no file name")))?;
+    let parent = match path.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() => parent,
+        _ => Path::new("."),
+    };
+    std::fs::create_dir_all(parent).map_err(|error| load(CliError::Io(error)))?;
+    let directory = std::fs::canonicalize(parent).map_err(|error| load(CliError::Io(error)))?;
+    let destination = directory.join(file_name);
+    match std::fs::symlink_metadata(&destination) {
+        Ok(metadata) if metadata.file_type().is_symlink() => {
+            return Err(load(CliError::policy_constraint_error(format!(
+                "registry file `{}` is a symbolic link; registries are written only at their own path",
+                destination.display()
+            ))));
+        }
+        Ok(_) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(load(CliError::Io(error))),
+    }
+    let lock_path = directory.join(format!(".{}.lock", file_name.to_string_lossy()));
+    let flags = rustix::fs::OFlags::CLOEXEC | rustix::fs::OFlags::NOFOLLOW;
+    let flags = i32::try_from(flags.bits())
+        .map_err(|_| load(CliError::cli_io_error("registry lock flags are invalid")))?;
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .mode(0o600)
+        .custom_flags(flags)
+        .open(&lock_path)
+        .map_err(|error| load(CliError::Io(error)))?;
+    check_lock_identity(&lock_path, &file).map_err(load)?;
+    match rustix::fs::flock(&file, rustix::fs::FlockOperation::NonBlockingLockExclusive) {
+        Ok(()) => {}
+        Err(rustix::io::Errno::WOULDBLOCK) => return Err(RegistryUpdateError::Busy),
+        Err(error) => return Err(load(CliError::Io(error.into()))),
+    }
+    // The inode locked must still be the one at the lock path, or two writers
+    // could hold locks on different inodes.
+    check_lock_identity(&lock_path, &file).map_err(load)?;
+    Ok(RegistryLock {
+        _file: file,
+        destination,
+    })
+}
+
+#[cfg(not(unix))]
+pub(crate) fn lock_registry(_path: &Path) -> Result<RegistryLock, RegistryUpdateError> {
+    Err(RegistryUpdateError::Unsupported)
+}
+
+/// The lock file is a private regular file of this user with one link, and
+/// `file` is that file.
+#[cfg(unix)]
+fn check_lock_identity(lock_path: &Path, file: &std::fs::File) -> Result<(), CliError> {
+    use std::os::unix::fs::MetadataExt;
+    let at_path = std::fs::symlink_metadata(lock_path)?;
+    let held = file.metadata()?;
+    if !at_path.file_type().is_file()
+        || !held.file_type().is_file()
+        || at_path.dev() != held.dev()
+        || at_path.ino() != held.ino()
+        || held.nlink() != 1
+        || held.mode() & 0o077 != 0
+        || held.uid() != rustix::process::geteuid().as_raw()
+    {
+        return Err(CliError::policy_constraint_error(format!(
+            "registry lock `{}` is not a private regular file of this user with one link",
+            lock_path.display()
+        )));
+    }
+    Ok(())
+}
+
+/// Writes `registry` as compact JSON to the destination `lock` guards.
 ///
 /// A write whose reserved size fits the read cap is admitted. From such a
 /// file every sequence of revocations of its records persists, because a
@@ -143,9 +272,10 @@ pub(crate) trait RevocationReserve: Serialize + DeserializeOwned {
 ///
 /// The destination is untouched when the write is refused.
 pub(crate) fn write_reserving_registry<T: RevocationReserve>(
-    path: &Path,
+    lock: &RegistryLock,
     registry: &T,
 ) -> Result<(), CliError> {
+    let path = lock.destination();
     let reserved = registry.revocation_reserve()?;
     if let Some(limit) = MAX_SIGNED_FILE_BYTES.checked_sub(reserved) {
         if let Some(bytes) = encode_within(registry, limit)? {

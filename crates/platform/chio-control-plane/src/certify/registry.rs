@@ -1,9 +1,10 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
+use crate::passport_verifier::RegistryUpdateError;
 use crate::CliError;
 
-use super::helpers::{ensure_parent_dir, unix_now};
+use super::helpers::unix_now;
 use super::schema::{
     is_supported_certification_registry_version, CERTIFICATION_PUBLIC_SEARCH_SCHEMA,
     CERTIFICATION_PUBLIC_TRANSPARENCY_SCHEMA, CERTIFICATION_REGISTRY_VERSION,
@@ -33,6 +34,10 @@ pub(crate) mod revocation_capacity;
 #[cfg(test)]
 #[path = "registry/older_registry_files.rs"]
 mod older_registry_files;
+
+#[cfg(test)]
+#[path = "registry/registry_writer_lock.rs"]
+mod registry_writer_lock;
 
 impl Default for CertificationRegistry {
     fn default() -> Self {
@@ -67,11 +72,22 @@ impl CertificationRegistry {
         }
     }
 
-    /// Persists the registry while keeping room for every entry it holds to
-    /// be revoked, so a revocation of any admitted entry always persists.
+    /// Loads the registry at `path` under its writer lock, applies `change`,
+    /// and persists the result, keeping room for every entry to be revoked,
+    /// before the lock is released. This is the registry's only writer.
+    pub(crate) fn update<R>(
+        path: &Path,
+        change: impl FnOnce(&mut Self) -> Result<R, CliError>,
+    ) -> Result<R, RegistryUpdateError> {
+        crate::signed_input::update_registry(path, Self::load, change)
+    }
+
+    /// Persists this copy under the writer lock without loading the file
+    /// first; test fixtures only.
+    #[cfg(test)]
     pub(crate) fn save(&self, path: &Path) -> Result<(), CliError> {
-        ensure_parent_dir(path)?;
-        crate::signed_input::write_reserving_registry(path, self)
+        let lock = crate::signed_input::lock_registry(path).map_err(CliError::from)?;
+        crate::signed_input::write_reserving_registry(&lock, self)
     }
 
     pub(crate) fn get(&self, artifact_id: &str) -> Option<&CertificationRegistryEntry> {

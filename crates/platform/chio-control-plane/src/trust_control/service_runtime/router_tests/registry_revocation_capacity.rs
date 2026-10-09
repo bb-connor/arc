@@ -177,3 +177,54 @@ async fn certification_reason_or_dispute_note_past_the_bound_is_a_client_error()
     }
     Ok(())
 }
+
+#[tokio::test]
+async fn a_revocation_while_another_writer_holds_the_registry_is_busy_and_changes_nothing(
+) -> TestResult {
+    let directory = chio_test_support::private_tempdir()?;
+    let passports = directory.path().join("passport-statuses.json");
+    let passport = passport_fixture::passport(91)?;
+    let record = PassportStatusRegistry::update(&passports, |registry| {
+        registry.publish(
+            &passport,
+            passport_fixture::PUBLISHED_AT,
+            Default::default(),
+        )
+    })?;
+    let certifications = directory.path().join("certifications.json");
+    let (_, artifact_id) = certification_fixture::one_published(&certifications)?;
+    let cases = [
+        (
+            passport_state(&passports),
+            passports.clone(),
+            format!("/v1/passport/statuses/{}", record.passport_id),
+        ),
+        (
+            certification_state(&certifications),
+            certifications.clone(),
+            format!("/v1/certifications/{artifact_id}"),
+        ),
+    ];
+    for (state, path, resource) in cases {
+        let revoke = format!("{resource}/revoke");
+        let request = json!({ "reason": "compromised", "revokedAt": u64::MAX });
+        let held = crate::signed_input::lock_registry(&path).map_err(CliError::from)?;
+        let before = std::fs::read(&path)?;
+        let (status, body) = call(&state, "POST", &revoke, Some(request.clone())).await?;
+        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE, "{body}");
+        assert!(
+            body["error"]
+                .as_str()
+                .is_some_and(|error| error.contains("being written by another writer")),
+            "{body}"
+        );
+        assert_eq!(std::fs::read(&path)?, before);
+        assert_eq!(stored_status(&state, &resource).await?, json!("active"));
+
+        drop(held);
+        let (status, body) = call(&state, "POST", &revoke, Some(request)).await?;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(stored_status(&state, &resource).await?, json!("revoked"));
+    }
+    Ok(())
+}

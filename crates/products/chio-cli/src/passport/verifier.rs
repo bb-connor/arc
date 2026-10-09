@@ -839,10 +839,10 @@ pub(crate) fn cmd_passport_status_publish(
             })?
     } else {
         let path = require_passport_status_registry_path(passport_statuses_file)?;
-        let mut registry = load_passport_status_registry_for_admin(path)?;
-        let record = registry.publish(&passport, unix_now()?, distribution)?;
-        registry.save(path)?;
-        record
+        let published_at = unix_now()?;
+        PassportStatusRegistry::update(path, |registry| {
+            registry.publish(&passport, published_at, distribution)
+        })?
     };
 
     if json_output {
@@ -1022,10 +1022,9 @@ pub(crate) fn cmd_passport_status_revoke(
             )?
     } else {
         let path = require_passport_status_registry_path(passport_statuses_file)?;
-        let mut registry = load_passport_status_registry_for_admin(path)?;
-        let record = registry.revoke(passport_id, reason, revoked_at)?;
-        registry.save(path)?;
-        record
+        PassportStatusRegistry::update(path, |registry| {
+            registry.revoke(passport_id, reason, revoked_at)
+        })?
     };
 
     if json_output {

@@ -124,9 +124,8 @@ pub fn cmd_certify_registry_publish_local(
     json_output: bool,
 ) -> Result<(), CliError> {
     let artifact = load_signed_certification_check(input)?;
-    let mut registry = CertificationRegistry::load(registry_path)?;
-    let entry = registry.publish(artifact)?;
-    registry.save(registry_path)?;
+    let entry =
+        CertificationRegistry::update(registry_path, |registry| registry.publish(artifact))?;
     emit_registry_entry("published certification artifact", &entry, json_output)
 }
 
@@ -216,9 +215,9 @@ pub fn cmd_certify_registry_revoke_local(
     revoked_at: Option<u64>,
     json_output: bool,
 ) -> Result<(), CliError> {
-    let mut registry = CertificationRegistry::load(registry_path)?;
-    let entry = registry.revoke(artifact_id, reason, revoked_at)?;
-    registry.save(registry_path)?;
+    let entry = CertificationRegistry::update(registry_path, |registry| {
+        registry.revoke(artifact_id, reason, revoked_at)
+    })?;
     emit_registry_entry("revoked certification artifact", &entry, json_output)
 }
 
@@ -424,10 +423,7 @@ pub fn cmd_certify_registry_dispute(
                     .to_string(),
             )
         })?;
-        let mut registry = CertificationRegistry::load(path)?;
-        let entry = registry.dispute(artifact_id, &request)?;
-        registry.save(path)?;
-        entry
+        CertificationRegistry::update(path, |registry| registry.dispute(artifact_id, &request))?
     };
     emit_registry_entry("updated certification dispute state", &entry, json_output)
 }

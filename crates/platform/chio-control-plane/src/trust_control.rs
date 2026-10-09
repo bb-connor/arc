@@ -360,6 +360,8 @@ mod receipt_handlers;
 mod receipt_query_service;
 #[path = "trust_control/receipt_snapshot_admin.rs"]
 mod receipt_snapshot_admin;
+#[path = "trust_control/registry_write_lane.rs"]
+mod registry_write_lane;
 #[path = "trust_control/report_rendering.rs"]
 pub(crate) mod report_rendering;
 #[path = "trust_control/report_validation.rs"]

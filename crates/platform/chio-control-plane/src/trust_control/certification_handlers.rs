@@ -50,21 +50,22 @@ pub(crate) async fn handle_publish_certification(
     headers: HeaderMap,
     Json(artifact): Json<SignedCertificationCheck>,
 ) -> Response {
+    use super::registry_write_lane::{configured_registry_file, run_registry_update};
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    let (path, mut registry) = match load_certification_registry_for_admin(&state.config) {
-        Ok(values) => values,
-        Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
+    let path = match configured_registry_file(
+        state.config.certification_registry_file.as_deref(),
+        "--certification-registry-file",
+        "certification registry",
+    ) {
+        Ok(path) => path,
+        Err(response) => return response,
     };
-    let entry = match registry.publish(artifact) {
-        Ok(entry) => entry,
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    };
-    if let Err(error) = registry.save(&path) {
-        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-    }
-    Json(entry).into_response()
+    run_registry_update(move || {
+        CertificationRegistry::update(&path, |registry| registry.publish(artifact))
+    })
+    .await
 }
 
 pub(crate) async fn handle_resolve_certification(
@@ -409,24 +410,24 @@ pub(crate) async fn handle_revoke_certification(
     headers: HeaderMap,
     Json(request): Json<CertificationRevocationRequest>,
 ) -> Response {
+    use super::registry_write_lane::{configured_registry_file, run_registry_update};
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    let (path, mut registry) = match load_certification_registry_for_admin(&state.config) {
-        Ok(values) => values,
-        Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
+    let path = match configured_registry_file(
+        state.config.certification_registry_file.as_deref(),
+        "--certification-registry-file",
+        "certification registry",
+    ) {
+        Ok(path) => path,
+        Err(response) => return response,
     };
-    let entry = match registry.revoke(&artifact_id, request.reason.as_deref(), request.revoked_at) {
-        Ok(entry) => entry,
-        Err(error) if error.to_string().contains("was not found") => {
-            return plain_http_error(StatusCode::NOT_FOUND, &error.to_string());
-        }
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    };
-    if let Err(error) = registry.save(&path) {
-        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-    }
-    Json(entry).into_response()
+    run_registry_update(move || {
+        CertificationRegistry::update(&path, |registry| {
+            registry.revoke(&artifact_id, request.reason.as_deref(), request.revoked_at)
+        })
+    })
+    .await
 }
 
 pub(crate) async fn handle_dispute_certification(
@@ -435,24 +436,22 @@ pub(crate) async fn handle_dispute_certification(
     headers: HeaderMap,
     Json(request): Json<CertificationDisputeRequest>,
 ) -> Response {
+    use super::registry_write_lane::{configured_registry_file, run_registry_update};
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    let (path, mut registry) = match load_certification_registry_for_admin(&state.config) {
-        Ok(values) => values,
-        Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
+    let path = match configured_registry_file(
+        state.config.certification_registry_file.as_deref(),
+        "--certification-registry-file",
+        "certification registry",
+    ) {
+        Ok(path) => path,
+        Err(response) => return response,
     };
-    let entry = match registry.dispute(&artifact_id, &request) {
-        Ok(entry) => entry,
-        Err(error) if error.to_string().contains("was not found") => {
-            return plain_http_error(StatusCode::NOT_FOUND, &error.to_string());
-        }
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    };
-    if let Err(error) = registry.save(&path) {
-        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-    }
-    Json(entry).into_response()
+    run_registry_update(move || {
+        CertificationRegistry::update(&path, |registry| registry.dispute(&artifact_id, &request))
+    })
+    .await
 }
 
 fn certification_result<T: serde::Serialize>(result: Result<T, CliError>) -> Response {
