@@ -90,7 +90,7 @@ A run qualifies only if all of the following hold.
   - An independent-operation record (operators, hosts, key fingerprints, versions) is published and reviewed against ADR-0011.
 - **(g) Repeatable.** At least one team repeats a qualifying run without Backbay's hands-on help.
 
-**Which team executes (ruling, 2026-10-09).** The executing organization runs HOST-M2 (criterion c), and HOST-M2 is Linux-only before the test. So the executing organization runs Linux. Outside teams that are macOS-only take part as the counterparty (requesting) organization. macOS HOST-M2 is not pulled forward: that would reopen the approved design and put Apple's Endpoint Security entitlement approval, an outside party, on the critical path. G1 still requires a timed outsider install on both Linux and macOS.
+**Which team executes (ruling of 2026-10-09, made under the owner's delegation).** The executing organization runs HOST-M2 (criterion c), and HOST-M2 is Linux-only before the test. So the executing organization runs Linux. Outside teams that are macOS-only take part as the counterparty (requesting) organization. macOS HOST-M2 is not pulled forward: that would reopen the approved design and put Apple's Endpoint Security entitlement approval, an outside party, on the critical path. G1 still requires a timed outsider install on both Linux and macOS.
 
 **Strongest form.** Two outside teams cooperate with each other. Backbay as the counterparty also counts.
 
@@ -173,7 +173,7 @@ Gate 0 exists so that parallel lanes do not collide. Everything a lane builds ag
 | **CT-CTRL** | OpenAPI for trust-control and the `chio api protect` sidecar. Per-route principals in place of one shared service token. The KSPEC-08 stop routes. |
 | **CT-CROSS** | The cross-org transport for co-signing and bilateral delivery: HTTPS with mTLS or signed bodies by default; iroh as an optional lane with self-hosted relays (D4, decided 2026-10-09). |
 | **CT-REL** | The release channel. Details below the table. |
-| **CT-WIRE** | The freeze list for the preview window: receipt, capability, passport, challenge, issuance, evidence and co-sign bytes; process ABI v4; `chio.work.v1`. |
+| **CT-WIRE** | The freeze list for the preview window: receipt, capability, passport, challenge, issuance, evidence and co-sign bytes (which co-sign bytes: D18); process ABI v4; `chio.work.v1`. The preview version number is D20. |
 
 **CT-SETTLE in detail.**
 
@@ -315,7 +315,7 @@ Each lane is a ladder of rungs, and each rung ends in exit evidence. Lanes run i
   - Adopt process ABI v4 (KDEF-N13) and the cage port (KDEF-N16).
   - Fix KDEF-N15 (wall-clock time in authority evidence) during the rebase.
   - Fix every open P1.
-  - Take schema slots through the ledger lock.
+  - Take schema slots through the ledger lock (whether to collapse its intermediate formats: D17).
   - Regenerate the SDKs rather than merging 159 conflicted generated files by hand (158 Python, 1 TypeScript, at head `f217de1fb`).
 - **Order of landing.**
   - First a REC-P0 + REC-P1 slice: contracts and exact durable recovery.
@@ -415,7 +415,7 @@ Only the kernel hold ledger durably records consumption. Money is not pooled acr
 - **REL-1: the preview train.**
   - SEC-M9 packaging and SEC-M10 publishing.
   - #1160's post-merge obligations, or the CT-REL preview exception.
-  - Close out the AWS-LC fork audit. The source audit and its independent review are already on main (`docs/security/audits/aws-lc-rs-1.18.1-fork.md`, `aws-lc-rs-1.18.1-independent-review.md`). The audit states that it is not an approval to publish a release.
+  - Close out the AWS-LC fork audit (review sufficiency: D16). The source audit and its independent review are already on main (`docs/security/audits/aws-lc-rs-1.18.1-fork.md`, `aws-lc-rs-1.18.1-independent-review.md`). The audit states that it is not an approval to publish a release.
   - Turn the Release Qualification workflow green. `docs/release/RISK_REGISTER.md` requires hosted CI and Release Qualification success before tagging, and Release Qualification has failed on every recent push to main.
   - Retarget `release-tagged.yml`, which checks out `project/roadmap-04-25-2026`, a branch section 7 archives.
   - Signed binaries for Linux x86_64 and arm64 and macOS arm64.
@@ -587,7 +587,7 @@ None of these depend on #1160.
 | #1171 | Rebase and merge this PR (owner decision 2026-10-09: it lands by merging the PR, not by importing the draft elsewhere). Submit the -00 if U8 says so. Federation material goes to companion drafts later. |
 | #1164 | Close. Salvage its MCP adoption, activation and preview-distribution machinery into Lane REL. |
 | #1161, #1159, #1158 | Close as contained in #1173. #1161's peer transport is example-only and does not satisfy STRAT-F15. |
-| #1162 | Archive its evidence and `examples/repair-machine-proof`, then close. |
+| #1162 | Archive its evidence and `examples/repair-machine-proof`, then close. Its outcome-continuation code, carried in #1173, needs a slice or a drop (D19). |
 | #1163 | Decide whether the paper's bilateral-admission benchmark must be regenerated, then close. |
 | #1136 | Close after #1160 (patch contained). |
 | #1046 | **Salvage into REL-1.** Its workspace dependency versions make `cargo package` work. |
@@ -611,7 +611,7 @@ None of these depend on #1160.
 | D5 | Unpaid work agreement | Add an unpaid `Agreement` variant to `chio.work.v1`. | **Decided 2026-10-09:** the owner accepted the recommendation. Freezes the CT-WORK `Agreement` variant. | Gate 0 |
 | D6 | Holder possession | Require DPoP for federated grants at the door. | **Decided 2026-10-09:** the owner accepted the recommendation. Freezes the CT-COOP DPoP profile; COOP-2 implements it. | Gate 0, COOP-2 |
 | D7 | Canonical repositories | `bb-connor/arc` is the development repo; `backbay-labs/chio` is the distribution mirror, synced on every tag. | **Decided 2026-10-09:** the owner accepted the recommendation. Freezes the CT-REL repos; the REL-1 mirror sync assumes it. | Gate 0, REL-1 |
-| D8 | Preview exception | Allow tagged `0.2.0-alpha.N` previews before #1160's full-release obligations close. They are labelled as previews, with claims limited under ADR-0011. | Open | G1 |
+| D8 | Preview exception | Allow tagged `0.2.0-alpha.N` previews before #1160's full-release obligations close. They are labelled as previews, with claims limited under ADR-0011. | Open. Adopting it amends #1160's operator ruling of 2026-10-08 (`release_permitted: false` in `docs/security/audits/foundation-landing-boundary-20261008.json`), so the amendment is also recorded in the landing ledger. | G1 |
 | D9 | Licensing (STRAT-F5) | Apache-2.0 for verifiers, adapters and preview binaries. | Open | G1 |
 | D10 | crates.io | Yank 0.1.x with a pointer to the preview channel, unless the Rust library is in the preview's supported surface. | Open | G1 |
 | D11 | IETF -00 | Submit as an individual draft, with the multi-hop rule flagged as an open issue. | Open | OUT-3 |
@@ -619,6 +619,11 @@ None of these depend on #1160.
 | D13 | Recruiting owner and legal (STRAT-F4, F13) | Name the owner and start legal now. | Open | G2 |
 | D14 | Receipt privacy (STRAT-F10, ADR-0036) | Argument commitments before any outside run, or at minimum a rule of no personal data in arguments. | Open | G2 |
 | D15 | STRAT-F1 | Keep commercially sensitive and GTM material private; publish the rest after review. | Open | #1170 merge |
+| D16 | AWS-LC review sufficiency | None yet. The fork's source audit and its independent review were both done by agents. Do agent-only reviews suffice for a preview release, or does the fork need a human or external review? | Open (raised 2026-10-09) | REL-1 |
+| D17 | #1179's intermediate store formats | None yet. #1179 steps its never-released admission store through six formats (v35 to v40 on its branch). They could collapse into fewer slots when #1179 takes slots under the ledger lock (D3). Collapsing them breaks #1179's ignored legacy-capture tests. | Open (raised 2026-10-09) | REC rebase |
+| D18 | Co-sign bytes in CT-WIRE | None yet. Freeze #1160's bilateral DSSE predicate, or #1173 slice γ's revised specification with `reconstruct_dsse_pae`. γ lands after Gate 0, so freezing γ's bytes means CT-WIRE takes them before γ merges. | Open (raised 2026-10-09) | Gate 0 (CT-WIRE), slice γ |
+| D19 | #1162's outcome-continuation code | None yet. #1173 carries #1162's `chio-runtime-core` outcome continuation (`src/outcome_continuation.rs` and its SQLite store), but no slice names it. Assign it to γ with the treaty runtime-core, or drop it. | Open (raised 2026-10-09) | #1173 and #1162 closure |
+| D20 | Contract version number | None yet. Keep `spec/schemas/VERSION` at 1.0.0 with a preview label in CT-WIRE, or renumber it to the 0.x preview that Gate 0 describes. | Open (raised 2026-10-09) | CT-WIRE, G1 |
 
 **Recorded, not open:**
 
