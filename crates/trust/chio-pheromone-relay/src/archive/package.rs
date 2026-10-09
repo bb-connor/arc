@@ -80,24 +80,28 @@ pub fn sign_relay_alert_assurance_archive_package(
         push_archive_package_json_member(
             &mut members,
             &mut files,
-            &candidate.bundle_path,
-            &bundle_id,
-            "export_manifest",
-            PHEROMONE_RELAY_ALERT_ASSURANCE_EXPORT_MANIFEST_SCHEMA,
-            "manifest.json",
-            "incident_evidence",
-            &bundle.manifest,
+            ArchiveJsonMember {
+                bundle_path: &candidate.bundle_path,
+                bundle_id: &bundle_id,
+                artifact_role: "export_manifest",
+                schema: PHEROMONE_RELAY_ALERT_ASSURANCE_EXPORT_MANIFEST_SCHEMA,
+                relative_path: "manifest.json",
+                retention_class: "incident_evidence",
+                value: &bundle.manifest,
+            },
         )?;
         push_archive_package_json_member(
             &mut members,
             &mut files,
-            &candidate.bundle_path,
-            &bundle_id,
-            "export_report",
-            PHEROMONE_RELAY_ALERT_ASSURANCE_EXPORT_REPORT_SCHEMA,
-            "relay-alert-assurance-export-report.json",
-            "incident_evidence",
-            &bundle.report,
+            ArchiveJsonMember {
+                bundle_path: &candidate.bundle_path,
+                bundle_id: &bundle_id,
+                artifact_role: "export_report",
+                schema: PHEROMONE_RELAY_ALERT_ASSURANCE_EXPORT_REPORT_SCHEMA,
+                relative_path: "relay-alert-assurance-export-report.json",
+                retention_class: "incident_evidence",
+                value: &bundle.report,
+            },
         )?;
         for artifact in &bundle.manifest.body.artifacts {
             let file = bundle
@@ -113,13 +117,15 @@ pub fn sign_relay_alert_assurance_archive_package(
             push_archive_package_bytes_member(
                 &mut members,
                 &mut files,
-                &candidate.bundle_path,
-                &bundle_id,
-                &artifact.role,
-                &artifact.schema,
-                &artifact.path,
-                &artifact.retention_class,
-                &file.bytes,
+                ArchiveBytesMember {
+                    bundle_path: &candidate.bundle_path,
+                    bundle_id: &bundle_id,
+                    artifact_role: &artifact.role,
+                    schema: &artifact.schema,
+                    relative_path: &artifact.path,
+                    retention_class: &artifact.retention_class,
+                    bytes: &file.bytes,
+                },
             )?;
         }
         bundles.push(RelayAlertAssuranceArchivePackageBundle {
@@ -370,45 +376,73 @@ fn join_archive_package_path(base: &str, child: &str) -> Result<String, Pheromon
     Ok(path)
 }
 
-#[allow(clippy::too_many_arguments)]
+/// Parameters of `push_archive_package_json_member`.
+struct ArchiveJsonMember<'a, T> {
+    bundle_path: &'a str,
+    bundle_id: &'a str,
+    artifact_role: &'a str,
+    schema: &'a str,
+    relative_path: &'a str,
+    retention_class: &'a str,
+    value: &'a T,
+}
+
 fn push_archive_package_json_member<T: Serialize>(
     members: &mut Vec<RelayAlertAssuranceArchivePackageMember>,
     files: &mut Vec<RelayAlertAssuranceArchivePackageFile>,
-    bundle_path: &str,
-    bundle_id: &str,
-    artifact_role: &str,
-    schema: &str,
-    relative_path: &str,
-    retention_class: &str,
-    value: &T,
+    member: ArchiveJsonMember<'_, T>,
 ) -> Result<(), PheromoneRelayError> {
-    let bytes = canonical_json_bytes(value)
-        .map_err(|error| PheromoneRelayError::CanonicalJson(error.to_string()))?;
-    push_archive_package_bytes_member(
-        members,
-        files,
+    let ArchiveJsonMember {
         bundle_path,
         bundle_id,
         artifact_role,
         schema,
         relative_path,
         retention_class,
-        &bytes,
+        value,
+    } = member;
+    let bytes = canonical_json_bytes(value)
+        .map_err(|error| PheromoneRelayError::CanonicalJson(error.to_string()))?;
+    push_archive_package_bytes_member(
+        members,
+        files,
+        ArchiveBytesMember {
+            bundle_path,
+            bundle_id,
+            artifact_role,
+            schema,
+            relative_path,
+            retention_class,
+            bytes: &bytes,
+        },
     )
 }
 
-#[allow(clippy::too_many_arguments)]
+/// Parameters of `push_archive_package_bytes_member`.
+struct ArchiveBytesMember<'a> {
+    bundle_path: &'a str,
+    bundle_id: &'a str,
+    artifact_role: &'a str,
+    schema: &'a str,
+    relative_path: &'a str,
+    retention_class: &'a str,
+    bytes: &'a [u8],
+}
+
 fn push_archive_package_bytes_member(
     members: &mut Vec<RelayAlertAssuranceArchivePackageMember>,
     files: &mut Vec<RelayAlertAssuranceArchivePackageFile>,
-    bundle_path: &str,
-    bundle_id: &str,
-    artifact_role: &str,
-    schema: &str,
-    relative_path: &str,
-    retention_class: &str,
-    bytes: &[u8],
+    params: ArchiveBytesMember<'_>,
 ) -> Result<(), PheromoneRelayError> {
+    let ArchiveBytesMember {
+        bundle_path,
+        bundle_id,
+        artifact_role,
+        schema,
+        relative_path,
+        retention_class,
+        bytes,
+    } = params;
     validate_archive_package_identity(bundle_id, "bundle id")?;
     validate_archive_package_identity(artifact_role, "artifact role")?;
     validate_archive_package_identity(retention_class, "retention class")?;

@@ -120,15 +120,17 @@ pub(crate) fn review_archive_candidate(
         return Ok(archive_blocked_review(
             bundle,
             candidate,
-            manifest_sha256,
-            source_package_sha256,
-            artifact_count,
-            route_review_present,
-            checks,
-            "replay_mismatch",
-            "bundle did not replay to the exported assurance package",
-            false,
-            false,
+            BlockedReviewDetails {
+                manifest_sha256,
+                source_package_sha256,
+                artifact_count,
+                route_review_present,
+                checks,
+                code: "replay_mismatch",
+                detail: "bundle did not replay to the exported assurance package",
+                replay_matched: false,
+                recovery_drill_accepted: false,
+            },
         ));
     }
 
@@ -172,30 +174,34 @@ pub(crate) fn review_archive_candidate(
         return Ok(archive_blocked_review(
             bundle,
             candidate,
-            manifest_sha256,
-            source_package_sha256,
-            artifact_count,
-            route_review_present,
-            checks,
-            "recovery_drill_failed",
-            "bundle recovery drill did not complete",
-            replay_matched,
-            false,
+            BlockedReviewDetails {
+                manifest_sha256,
+                source_package_sha256,
+                artifact_count,
+                route_review_present,
+                checks,
+                code: "recovery_drill_failed",
+                detail: "bundle recovery drill did not complete",
+                replay_matched,
+                recovery_drill_accepted: false,
+            },
         ));
     }
     if !route_review_present {
         return Ok(archive_blocked_review(
             bundle,
             candidate,
-            manifest_sha256,
-            source_package_sha256,
-            artifact_count,
-            route_review_present,
-            checks,
-            "missing_route_review",
-            "bundle is missing route-owner review evidence",
-            replay_matched,
-            recovery_drill_accepted,
+            BlockedReviewDetails {
+                manifest_sha256,
+                source_package_sha256,
+                artifact_count,
+                route_review_present,
+                checks,
+                code: "missing_route_review",
+                detail: "bundle is missing route-owner review evidence",
+                replay_matched,
+                recovery_drill_accepted,
+            },
         ));
     }
 
@@ -254,20 +260,35 @@ pub(crate) fn archive_quarantine_review(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+/// Parameters of `archive_blocked_review`.
+pub(crate) struct BlockedReviewDetails<'a> {
+    pub(crate) manifest_sha256: Option<String>,
+    pub(crate) source_package_sha256: Option<String>,
+    pub(crate) artifact_count: u64,
+    pub(crate) route_review_present: bool,
+    pub(crate) checks: Vec<RelayAlertCheck>,
+    pub(crate) code: &'a str,
+    pub(crate) detail: &'a str,
+    pub(crate) replay_matched: bool,
+    pub(crate) recovery_drill_accepted: bool,
+}
+
 pub(crate) fn archive_blocked_review(
     bundle: &RelayAlertAssuranceExportBundle,
     candidate: &RelayAlertAssuranceArchiveBundleCandidate,
-    manifest_sha256: Option<String>,
-    source_package_sha256: Option<String>,
-    artifact_count: u64,
-    route_review_present: bool,
-    checks: Vec<RelayAlertCheck>,
-    code: &str,
-    detail: &str,
-    replay_matched: bool,
-    recovery_drill_accepted: bool,
+    params: BlockedReviewDetails<'_>,
 ) -> RelayAlertAssuranceArchiveBundleReview {
+    let BlockedReviewDetails {
+        manifest_sha256,
+        source_package_sha256,
+        artifact_count,
+        route_review_present,
+        checks,
+        code,
+        detail,
+        replay_matched,
+        recovery_drill_accepted,
+    } = params;
     RelayAlertAssuranceArchiveBundleReview {
         bundle_id: bundle.manifest.body.bundle_id.clone(),
         bundle_path: candidate.bundle_path.clone(),
