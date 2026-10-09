@@ -90,6 +90,11 @@ use chio_mcp_adapter::server::AdaptedMcpServer;
 
 use crate::policy::load_policy;
 
+#[cfg(test)]
+pub(crate) use cli::dispatch::{cmd_chio_attest_runtime_quote_verify, write_cli_error};
+pub(crate) use cli::doctor::{cmd_doctor, render_doctor_json, render_titled_human, DoctorArgs};
+pub(crate) use cli::security_preflight::{cmd_security_preflight, PreflightArgs, PreflightStores};
+pub(crate) use cli::security_supervise::{cmd_security_supervise, SuperviseArgs};
 pub(crate) use cli::types::{
     ApiCommands, ArenaCommands, AuthorityDeploymentCommands, AuthorityStoreCommands, CertCommands,
     CertifyCommands, CertifyRegistryCommands, CheckMode, ChioAttestCommands, ChioBuyerCommands,
@@ -114,11 +119,6 @@ pub(crate) use cli::types::{
 pub(crate) use cli::types::{
     FindingChallengeClassArg, FindingCommands, FindingOperatorCommands, FindingPackageCommands,
 };
-pub(crate) use cli::security_preflight::{cmd_security_preflight, PreflightArgs, PreflightStores};
-pub(crate) use cli::doctor::{cmd_doctor, render_doctor_json, render_titled_human, DoctorArgs};
-pub(crate) use cli::security_supervise::{cmd_security_supervise, SuperviseArgs};
-#[cfg(test)]
-pub(crate) use cli::dispatch::{cmd_chio_attest_runtime_quote_verify, write_cli_error};
 
 fn main() {
     #[cfg(not(windows))]
@@ -147,9 +147,15 @@ fn main() {
         }
     }
 }
+pub(crate) use cli::conformance::{cmd_conformance_fetch_peers, cmd_conformance_run};
+pub(crate) use cli::mcp::{cmd_mcp_governed_sim, cmd_mcp_wrap, GovernedSimArgs, McpWrapArgs};
+pub(crate) use cli::replay::{cmd_replay, load_trusted_kernel_pubkey};
 pub(crate) use cli::runtime::{
     cmd_api_protect, cmd_check, cmd_mcp_serve, cmd_mcp_serve_http, cmd_run, cmd_start,
     cmd_trust_revoke, cmd_trust_serve, cmd_trust_status, load_roster_policy,
+};
+pub(crate) use cli::session::{
+    handle_agent_message, print_summary, select_capability_for_request, SessionStats,
 };
 pub(crate) use cli::trust::{
     cmd_receipt_audit, cmd_receipt_checkpoint_create, cmd_receipt_checkpoint_status,
@@ -183,28 +189,8 @@ pub(crate) use cli::trust::{
     UnderwritingDecisionIssueArgs, UnderwritingDecisionListArgs, UnderwritingDecisionSimulateArgs,
     UnderwritingPolicyInputArgs,
 };
-pub(crate) use cli::session::{
-    handle_agent_message, print_summary, select_capability_for_request, SessionStats,
-};
-pub(crate) use cli::conformance::{cmd_conformance_fetch_peers, cmd_conformance_run};
-pub(crate) use cli::mcp::{cmd_mcp_governed_sim, cmd_mcp_wrap, GovernedSimArgs, McpWrapArgs};
-pub(crate) use cli::replay::{cmd_replay, load_trusted_kernel_pubkey};
 
-pub(crate) use cli::{input, process_host, process_response_verify, receipt_verify};
-use cli::chio::types::{
-    ChioAuthorityCommands, ChioPheromoneCommands, ChioPheromoneRelayAlertAssuranceArchiveCommands,
-    ChioPheromoneRelayAlertAssuranceArchivePackageCommands,
-    ChioPheromoneRelayAlertAssuranceArchiveRestoreDrillCommands,
-    ChioPheromoneRelayAlertAssuranceCloseoutCommands, ChioPheromoneRelayAlertAssuranceCommands,
-    ChioPheromoneRelayAlertAssurancePhysicalDrillCommands,
-    ChioPheromoneRelayAlertAssuranceRetentionCommands,
-    ChioPheromoneRelayAlertAssuranceRetentionHandoffCommands, ChioPheromoneRelayAlertCommands,
-    ChioPheromoneRelayAlertDeliveryCommands, ChioPheromoneRelayCommands,
-    ChioPheromoneRelayDirectoryCommands, ChioPheromoneRelaySupervisorCommands, ChioRuntimeCommands,
-    ChioRuntimeOpsCommands, ChioRuntimeOpsRetentionCommands, ChioRuntimeOrchestrateCommands,
-    ChioRuntimePeerWeightsCommands, ChioRuntimePheromoneCommands, ChioRuntimePolicyCommands,
-    ChioTreatyCommands, ChioTrustBundleCommands,
-};
+pub(crate) use cli::arena::{cmd_arena_evolve, cmd_arena_replay, cmd_arena_run};
 use cli::chio::dispatch::{
     cmd_chio_attest_buyer_explain, cmd_chio_attest_buyer_package, cmd_chio_attest_buyer_verify,
     cmd_chio_attest_buyer_verify_packet, cmd_chio_attest_buyer_verify_proof,
@@ -249,7 +235,21 @@ use cli::chio::dispatch::{
     cmd_chio_runtime_sign_peer_weights, cmd_chio_runtime_sign_pheromone_query_report,
     cmd_chio_runtime_sign_policy, cmd_chio_runtime_sign_trust_input, unix_now_ms,
 };
-pub(crate) use cli::arena::{cmd_arena_evolve, cmd_arena_replay, cmd_arena_run};
+use cli::chio::types::{
+    ChioAuthorityCommands, ChioPheromoneCommands, ChioPheromoneRelayAlertAssuranceArchiveCommands,
+    ChioPheromoneRelayAlertAssuranceArchivePackageCommands,
+    ChioPheromoneRelayAlertAssuranceArchiveRestoreDrillCommands,
+    ChioPheromoneRelayAlertAssuranceCloseoutCommands, ChioPheromoneRelayAlertAssuranceCommands,
+    ChioPheromoneRelayAlertAssurancePhysicalDrillCommands,
+    ChioPheromoneRelayAlertAssuranceRetentionCommands,
+    ChioPheromoneRelayAlertAssuranceRetentionHandoffCommands, ChioPheromoneRelayAlertCommands,
+    ChioPheromoneRelayAlertDeliveryCommands, ChioPheromoneRelayCommands,
+    ChioPheromoneRelayDirectoryCommands, ChioPheromoneRelaySupervisorCommands, ChioRuntimeCommands,
+    ChioRuntimeOpsCommands, ChioRuntimeOpsRetentionCommands, ChioRuntimeOrchestrateCommands,
+    ChioRuntimePeerWeightsCommands, ChioRuntimePheromoneCommands, ChioRuntimePolicyCommands,
+    ChioTreatyCommands, ChioTrustBundleCommands,
+};
+pub(crate) use cli::{input, process_host, process_response_verify, receipt_verify};
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]

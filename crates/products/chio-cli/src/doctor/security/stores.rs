@@ -125,7 +125,10 @@ impl Probe for DurableStoreProbe {
         } else if absent.is_empty() {
             ProbeReport::ok(
                 self.name(),
-                format!("{} durable stores open and pass quick_check", self.stores.len()),
+                format!(
+                    "{} durable stores open and pass quick_check",
+                    self.stores.len()
+                ),
             )
         } else {
             ProbeReport::fail(
@@ -149,9 +152,12 @@ mod tests {
 
     fn healthy_database(directory: &Path) -> PathBuf {
         let path = directory.join("healthy.sqlite3");
-        let connection = rusqlite::Connection::open(&path).unwrap_or_else(|error| panic!("{error}"));
+        let connection =
+            rusqlite::Connection::open(&path).unwrap_or_else(|error| panic!("{error}"));
         connection
-            .execute_batch("CREATE TABLE probe (id INTEGER PRIMARY KEY); INSERT INTO probe (id) VALUES (1);")
+            .execute_batch(
+                "CREATE TABLE probe (id INTEGER PRIMARY KEY); INSERT INTO probe (id) VALUES (1);",
+            )
             .unwrap_or_else(|error| panic!("{error}"));
         path
     }
@@ -160,11 +166,23 @@ mod tests {
     fn a_healthy_store_passes_and_an_absent_one_is_informational() {
         let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("{error}"));
         let healthy = healthy_database(directory.path());
-        assert!(matches!(inspect_store(&healthy), StoreState::Healthy { .. }));
-        assert_eq!(inspect_store(&directory.path().join("missing.sqlite3")), StoreState::Absent);
+        assert!(matches!(
+            inspect_store(&healthy),
+            StoreState::Healthy { .. }
+        ));
+        assert_eq!(
+            inspect_store(&directory.path().join("missing.sqlite3")),
+            StoreState::Absent
+        );
         let report = DurableStoreProbe::new(vec![
-            NamedStore { label: "receipts", path: healthy },
-            NamedStore { label: "sessions", path: directory.path().join("missing.sqlite3") },
+            NamedStore {
+                label: "receipts",
+                path: healthy,
+            },
+            NamedStore {
+                label: "sessions",
+                path: directory.path().join("missing.sqlite3"),
+            },
         ])
         .run(&ProbeConfig::default());
         assert_eq!(report.severity, ProbeSeverity::Info);
@@ -175,16 +193,23 @@ mod tests {
     fn a_damaged_or_linked_store_fails() {
         let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("{error}"));
         let damaged = directory.path().join("damaged.sqlite3");
-        std::fs::write(&damaged, b"not a sqlite database at all, just bytes").unwrap_or_else(|error| panic!("{error}"));
-        assert!(matches!(inspect_store(&damaged), StoreState::Unreadable(_) | StoreState::Corrupt(_)));
+        std::fs::write(&damaged, b"not a sqlite database at all, just bytes")
+            .unwrap_or_else(|error| panic!("{error}"));
+        assert!(matches!(
+            inspect_store(&damaged),
+            StoreState::Unreadable(_) | StoreState::Corrupt(_)
+        ));
         let healthy = healthy_database(directory.path());
         let link = directory.path().join("link.sqlite3");
         #[cfg(unix)]
         std::os::unix::fs::symlink(&healthy, &link).unwrap_or_else(|error| panic!("{error}"));
         #[cfg(unix)]
         assert_eq!(inspect_store(&link), StoreState::Symlink);
-        let report = DurableStoreProbe::new(vec![NamedStore { label: "receipts", path: damaged }])
-            .run(&ProbeConfig::default());
+        let report = DurableStoreProbe::new(vec![NamedStore {
+            label: "receipts",
+            path: damaged,
+        }])
+        .run(&ProbeConfig::default());
         assert_eq!(report.severity, ProbeSeverity::Error);
     }
 

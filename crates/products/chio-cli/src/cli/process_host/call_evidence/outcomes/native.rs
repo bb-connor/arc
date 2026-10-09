@@ -221,8 +221,10 @@ mod tests {
     fn historical_signed_outcomes_do_not_qualify_current_enforcement(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let key = PublicKey::from_hex(
-            include_str!("../../../../../tests/fixtures/process-worker-outcomes/v2-budget-kernel.pub")
-                .trim(),
+            include_str!(
+                "../../../../../tests/fixtures/process-worker-outcomes/v2-budget-kernel.pub"
+            )
+            .trim(),
         )?;
         // Preserve the original signed evidence. Its valid signature cannot
         // qualify a runtime with different reviewed enforcement dependencies.

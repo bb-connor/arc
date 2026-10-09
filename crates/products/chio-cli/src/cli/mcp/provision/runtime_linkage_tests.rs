@@ -3,8 +3,7 @@
 use super::*;
 
 #[test]
-fn elf_loader_alias_requires_the_exact_declared_file() -> Result<(), Box<dyn std::error::Error>>
-{
+fn elf_loader_alias_requires_the_exact_declared_file() -> Result<(), Box<dyn std::error::Error>> {
     let root = tempfile::tempdir()?;
     let loader = root.path().join("loader");
     let other = root.path().join("other");
@@ -37,8 +36,8 @@ fn missing_objects(error: &CliError) -> Result<String, Box<dyn std::error::Error
 }
 
 #[test]
-fn dynamic_target_must_declare_every_needed_shared_object(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn dynamic_target_must_declare_every_needed_shared_object() -> Result<(), Box<dyn std::error::Error>>
+{
     use linkage::tests::synthetic_dynamic_elf;
 
     let root = tempfile::tempdir()?;
@@ -122,10 +121,9 @@ fn the_test_executable_needs_every_loaded_shared_object_declared(
         }
     }
 
-    let refused =
-        require_target_linkage_declared(&target, &BTreeSet::from([interpreter.clone()]))
-            .err()
-            .ok_or("the interpreter alone must not satisfy DT_NEEDED")?;
+    let refused = require_target_linkage_declared(&target, &BTreeSet::from([interpreter.clone()]))
+        .err()
+        .ok_or("the interpreter alone must not satisfy DT_NEEDED")?;
     assert!(missing_objects(&refused)?.contains("libc.so.6"));
 
     let without_libc = loaded

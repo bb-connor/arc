@@ -44,7 +44,9 @@ pub(crate) use self::ndjson::open_ndjson;
 pub(crate) use self::policy_ref::{PolicyRef, PolicyRefError};
 pub(crate) use self::reader::{ReadError, ReceiptLogReader};
 pub(crate) use self::receipt_partition::{PartitionError, ReplayPartition, StorePartition};
-pub(crate) use self::report::{Divergence, DivergenceKind, ReplayReport, exit_code_for, render_json};
+pub(crate) use self::report::{
+    exit_code_for, render_json, Divergence, DivergenceKind, ReplayReport,
+};
 pub(crate) use self::schema_gate::{
     check_receipt_redaction, check_receipt_schema, ReceiptGateError,
     SUPPORTED_RECEIPT_REDACTION_PASS_ID, SUPPORTED_RECEIPT_SCHEMA,
@@ -55,8 +57,8 @@ pub(crate) use self::validate::{
     load_tenant_pubkey, load_trusted_kernel_pubkey, validate_frame, EXIT_BAD_TENANT_SIG,
     EXIT_REDACTION_MISMATCH, EXIT_SCHEMA_MISMATCH,
 };
-pub(crate) use self::verdict::{EXIT_VERDICT_DRIFT, VerdictError, rederive_verdict};
-pub(crate) use self::verify::{EXIT_BAD_SIGNATURE, verify_receipt};
+pub(crate) use self::verdict::{rederive_verdict, VerdictError, EXIT_VERDICT_DRIFT};
+pub(crate) use self::verify::{verify_receipt, EXIT_BAD_SIGNATURE};
 
 /// Dispatch entry-point for `chio replay`.
 pub(crate) fn cmd_replay(args: &ReplayArgs) -> Result<(), CliError> {

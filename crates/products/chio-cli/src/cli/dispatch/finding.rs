@@ -16,9 +16,7 @@ use challenge::cmd_finding_challenge;
 
 mod operator;
 use operator::cmd_finding_operator_repair_challenge_retention;
-use operator::{
-    cmd_finding_operator_init, cmd_finding_operator_serve, cmd_finding_operator_tick,
-};
+use operator::{cmd_finding_operator_init, cmd_finding_operator_serve, cmd_finding_operator_tick};
 
 mod hosted;
 use hosted::{cmd_finding_operator_evaluate_canary, cmd_finding_operator_validate_hosted};

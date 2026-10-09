@@ -1,5 +1,5 @@
-use super::*;
 use super::output::{write_bytes, write_pretty_json_line};
+use super::*;
 
 fn fiscal_marketplace_client(
     control_url: Option<&str>,

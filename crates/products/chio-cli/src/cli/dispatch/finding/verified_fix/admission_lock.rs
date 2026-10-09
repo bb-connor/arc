@@ -96,23 +96,16 @@ mod tests {
     #[test]
     fn admission_job_lock_serializes_independent_open_files() {
         let root = tempfile::tempdir().unwrap();
-        let first = FindingAdmissionJobLock::acquire_with_timeout(
-            root.path(),
-            Duration::from_millis(50),
-        )
-        .unwrap();
-        let blocked = FindingAdmissionJobLock::acquire_with_timeout(
-            root.path(),
-            Duration::from_millis(50),
-        )
-        .unwrap_err();
+        let first =
+            FindingAdmissionJobLock::acquire_with_timeout(root.path(), Duration::from_millis(50))
+                .unwrap();
+        let blocked =
+            FindingAdmissionJobLock::acquire_with_timeout(root.path(), Duration::from_millis(50))
+                .unwrap_err();
         assert!(blocked.to_string().contains("exceeded its deadline"));
         drop(first);
-        FindingAdmissionJobLock::acquire_with_timeout(
-            root.path(),
-            Duration::from_millis(50),
-        )
-        .unwrap();
+        FindingAdmissionJobLock::acquire_with_timeout(root.path(), Duration::from_millis(50))
+            .unwrap();
     }
 
     #[cfg(unix)]
@@ -127,7 +120,10 @@ mod tests {
                 .unwrap_err()
                 .to_string();
 
-        assert!(error.contains("failed to open admission-job lock"), "{error}");
+        assert!(
+            error.contains("failed to open admission-job lock"),
+            "{error}"
+        );
         assert!(error.contains("symbolic links"), "{error}");
         assert!(!elsewhere.exists());
     }

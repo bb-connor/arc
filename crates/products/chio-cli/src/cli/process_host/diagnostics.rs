@@ -262,7 +262,8 @@ pub(super) fn logs(path: &Path, process: &str, attempt: u32) -> Result<(), CliEr
 mod private_input_tests {
     use super::*;
 
-    fn state() -> Result<(tempfile::TempDir, PreparedPrivateDirectory), Box<dyn std::error::Error>> {
+    fn state() -> Result<(tempfile::TempDir, PreparedPrivateDirectory), Box<dyn std::error::Error>>
+    {
         let root = chio_test_support::private_tempdir()?;
         let directory = prepare_private_directory(&root.path().join("state"))?;
         directory.write_new_secret(Path::new("host.json"), b"{}")?;
@@ -286,8 +287,8 @@ mod private_input_tests {
     }
 
     #[test]
-    fn diagnostics_refuse_linked_shared_or_symlinked_files() -> Result<(), Box<dyn std::error::Error>>
-    {
+    fn diagnostics_refuse_linked_shared_or_symlinked_files(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let (root, directory) = state()?;
         let host = directory.path().join("host.json");
         let alias = root.path().join("alias.json");

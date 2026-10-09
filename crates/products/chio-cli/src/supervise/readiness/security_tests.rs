@@ -9,7 +9,10 @@ use super::{Readiness, ReadinessError};
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 fn http(url: String) -> Readiness {
-    Readiness::Http { url, bearer: Some("readiness-only-secret".to_string()) }
+    Readiness::Http {
+        url,
+        bearer: Some("readiness-only-secret".to_string()),
+    }
 }
 
 fn responder(
@@ -63,7 +66,10 @@ async fn readiness_never_follows_same_or_cross_origin_redirects() -> TestResult 
             destination_task.abort();
             let _ = source_task.await;
             let _ = destination_task.await;
-            assert!(!ready, "redirect status {status}, same origin {same_origin}");
+            assert!(
+                !ready,
+                "redirect status {status}, same origin {same_origin}"
+            );
             assert_eq!(source_count.load(Ordering::SeqCst), 1);
             assert_eq!(destination_count.load(Ordering::SeqCst), 0);
         }
@@ -115,7 +121,10 @@ async fn readiness_accepts_a_response_at_its_exact_byte_limit() -> TestResult {
         ),
         Arc::new(AtomicUsize::new(0)),
     );
-    let ready = http(format!("http://{address}/health")).prepare()?.probe().await;
+    let ready = http(format!("http://{address}/health"))
+        .prepare()?
+        .probe()
+        .await;
     task.abort();
     let _ = task.await;
     assert!(ready);
@@ -132,7 +141,10 @@ fn readiness_rejects_invalid_targets_and_headers_before_launch() {
         "http://localhost/health#fragment",
         "http://localhost:0/health",
     ] {
-        assert!(matches!(http(url.to_string()).prepare(), Err(ReadinessError::InvalidTarget)));
+        assert!(matches!(
+            http(url.to_string()).prepare(),
+            Err(ReadinessError::InvalidTarget)
+        ));
     }
     let invalid_header = Readiness::Http {
         url: "http://127.0.0.1/health".to_string(),

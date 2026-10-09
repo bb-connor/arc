@@ -19,14 +19,15 @@ mod settle_arena;
 mod trust;
 mod workflow;
 
-pub(crate) use self::attest::dispatch_chio_attest_command;
 #[cfg(test)]
 pub(crate) use self::attest::cmd_chio_attest_runtime_quote_verify;
+pub(crate) use self::attest::dispatch_chio_attest_command;
 pub(crate) use self::federation::dispatch_chio_federation_command;
 pub(crate) use self::lineage::dispatch_lineage;
 pub(crate) use self::market::{cmd_market_info, cmd_market_install, cmd_market_list};
 pub(crate) use self::pheromone::dispatch_chio_pheromone_command;
 pub(crate) use self::runtime::dispatch_chio_runtime_command;
+use self::trust::dispatch_trust;
 use api_mcp::{dispatch_api, dispatch_mcp};
 use certify_cert::{dispatch_cert, dispatch_certify};
 use did_passport::{dispatch_did, dispatch_passport};
@@ -37,7 +38,6 @@ use proof::{dispatch_commerce, dispatch_proof};
 use receipt_evidence::{dispatch_evidence, dispatch_receipt};
 use reputation_guard::{dispatch_conformance, dispatch_guard, dispatch_reputation};
 use settle_arena::{dispatch_arena, dispatch_settle};
-use self::trust::dispatch_trust;
 use workflow::dispatch_workflow;
 
 /// Control-encode a log field so untrusted content cannot forge log lines.
@@ -409,19 +409,21 @@ pub(crate) fn run() {
             receipt_retention,
             allow_ephemeral_receipts,
             print_config,
-        } => receipt_retention.into_config().and_then(|policy| cmd_start(
-            transport.into(),
-            &listen,
-            receipt_store.as_deref().or(receipt_db.as_deref()),
-            policy,
-            authority_seed_file.as_deref(),
-            budget_db.as_deref(),
-            revocation_db.as_deref(),
-            control_url.as_deref(),
-            control_token.as_deref(),
-            allow_ephemeral_receipts,
-            print_config,
-        )),
+        } => receipt_retention.into_config().and_then(|policy| {
+            cmd_start(
+                transport.into(),
+                &listen,
+                receipt_store.as_deref().or(receipt_db.as_deref()),
+                policy,
+                authority_seed_file.as_deref(),
+                budget_db.as_deref(),
+                revocation_db.as_deref(),
+                control_url.as_deref(),
+                control_token.as_deref(),
+                allow_ephemeral_receipts,
+                print_config,
+            )
+        }),
     };
 
     if let Err(e) = result {

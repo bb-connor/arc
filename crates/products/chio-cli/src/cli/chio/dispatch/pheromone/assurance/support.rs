@@ -207,7 +207,6 @@ fn ensure_clean_output_dir(out_dir: &Path) -> Result<(), CliError> {
     Ok(())
 }
 
-
 fn bundle_directories(root: &Path, budget: &mut Budget) -> Result<Vec<PathBuf>, CliError> {
     if fs::symlink_metadata(root.join("manifest.json")).is_ok() {
         return Ok(vec![root.to_owned()]);

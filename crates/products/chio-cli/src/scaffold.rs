@@ -31,11 +31,36 @@ pub(crate) fn cmd_init(path: &Path) -> Result<(), CliError> {
     replacements.insert("PROJECT_NAME", project_name.to_string());
     replacements.insert("PACKAGE_NAME", package_name.clone());
 
-    write_template(&directory, Path::new("Cargo.toml"), CARGO_TEMPLATE, &replacements)?;
-    write_template(&directory, Path::new("README.md"), README_TEMPLATE, &replacements)?;
-    write_template(&directory, Path::new("policy.yaml"), POLICY_TEMPLATE, &replacements)?;
-    write_template(&directory, Path::new("tools.json"), TOOLS_TEMPLATE, &replacements)?;
-    write_template(&directory, Path::new(".gitignore"), GITIGNORE_TEMPLATE, &replacements)?;
+    write_template(
+        &directory,
+        Path::new("Cargo.toml"),
+        CARGO_TEMPLATE,
+        &replacements,
+    )?;
+    write_template(
+        &directory,
+        Path::new("README.md"),
+        README_TEMPLATE,
+        &replacements,
+    )?;
+    write_template(
+        &directory,
+        Path::new("policy.yaml"),
+        POLICY_TEMPLATE,
+        &replacements,
+    )?;
+    write_template(
+        &directory,
+        Path::new("tools.json"),
+        TOOLS_TEMPLATE,
+        &replacements,
+    )?;
+    write_template(
+        &directory,
+        Path::new(".gitignore"),
+        GITIGNORE_TEMPLATE,
+        &replacements,
+    )?;
     directory.create_dir_all(Path::new("src/bin"))?;
     write_template(
         &directory,
@@ -66,7 +91,9 @@ pub(crate) fn cmd_init(path: &Path) -> Result<(), CliError> {
     Ok(())
 }
 
-fn ensure_target_dir(path: &Path) -> Result<chio_control_plane::PreparedPrivateDirectory, CliError> {
+fn ensure_target_dir(
+    path: &Path,
+) -> Result<chio_control_plane::PreparedPrivateDirectory, CliError> {
     let mut reached_named_component = false;
     for component in path.components() {
         match component {

@@ -1895,7 +1895,11 @@ fn inbound_authority_native_session_preserves_proof_and_authenticated_subject() 
                 &chio_core::canonical::canonical_json_bytes(&arguments).unwrap(),
             ),
             nonce: "native-proof".into(),
-            issued_at: kernel.authority_clock_reading().unwrap().unix_millis().as_secs(),
+            issued_at: kernel
+                .authority_clock_reading()
+                .unwrap()
+                .unix_millis()
+                .as_secs(),
             agent_key: agent.public_key(),
         },
         &agent,

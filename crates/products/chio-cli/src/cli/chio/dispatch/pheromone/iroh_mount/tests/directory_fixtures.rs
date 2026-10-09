@@ -12,7 +12,11 @@ pub(super) fn write_issuers_with_min_version(dir: &std::path::Path, min_version:
         }],
         "minVersion": min_version,
     });
-    std::fs::write(&issuers_path, serde_json::to_string(&issuers).test_unwrap("directory fixture")).test_unwrap("directory fixture");
+    std::fs::write(
+        &issuers_path,
+        serde_json::to_string(&issuers).test_unwrap("directory fixture"),
+    )
+    .test_unwrap("directory fixture");
     issuers_path
 }
 
@@ -36,6 +40,7 @@ pub(super) fn write_local_binding_bundle_at(
         previous_version_sha256,
     );
     std::fs::write(path, &bundle_json).test_unwrap("directory fixture");
-    let bundle: TransportDirectoryBundleDocument = crate::input::text(&bundle_json).test_unwrap("directory fixture");
+    let bundle: TransportDirectoryBundleDocument =
+        crate::input::text(&bundle_json).test_unwrap("directory fixture");
     sha256_hex(&canonical_json_bytes(&bundle).test_unwrap("directory fixture"))
 }

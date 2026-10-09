@@ -17,7 +17,9 @@ use super::state::error;
 use crate::CliError;
 pub(super) use chio_store_sqlite::admission_operation_store::ExecutionNonceEvidenceV1 as Evidence;
 
-pub(super) fn operation_id(receipt: &ChioReceipt) -> Result<Option<AdmissionOperationId>, CliError> {
+pub(super) fn operation_id(
+    receipt: &ChioReceipt,
+) -> Result<Option<AdmissionOperationId>, CliError> {
     let metadata = receipt
         .metadata
         .as_ref()

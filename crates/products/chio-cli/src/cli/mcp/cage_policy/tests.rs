@@ -266,16 +266,14 @@ fn cage_policy_requires_canonical_deny_unknown_json() {
 
     let mut noncanonical = canonical.clone();
     noncanonical.push(b'\n');
-    assert!(
-        decode_cage_policy(
-            Path::new("policy.json"),
-            &noncanonical,
-            &trusted_signer(&signer),
-        )
-        .test_unwrap_err()
-        .to_string()
-        .contains("canonical JSON")
-    );
+    assert!(decode_cage_policy(
+        Path::new("policy.json"),
+        &noncanonical,
+        &trusted_signer(&signer),
+    )
+    .test_unwrap_err()
+    .to_string()
+    .contains("canonical JSON"));
 
     let mut value = serde_json::to_value(signed).test_unwrap();
     value["unknown"] = serde_json::json!(true);
@@ -283,14 +281,12 @@ fn cage_policy_requires_canonical_deny_unknown_json() {
     assert!(
         decode_cage_policy(Path::new("policy.json"), &unknown, &trusted_signer(&signer)).is_err()
     );
-    assert!(
-        decode_cage_policy(
-            Path::new("policy.json"),
-            &canonical,
-            &trusted_signer(&chio_core::Keypair::from_seed(&[93; 32])),
-        )
-        .is_err()
-    );
+    assert!(decode_cage_policy(
+        Path::new("policy.json"),
+        &canonical,
+        &trusted_signer(&chio_core::Keypair::from_seed(&[93; 32])),
+    )
+    .is_err());
 
     let mut forged_body = serde_json::to_value(policy(
         chio_manifest::NativeSyscallProfile::NativeMinimalV1,
@@ -386,8 +382,7 @@ fn migration_posture_changes_with_every_authority_component() {
     assert_ne!(first_posture, changed_posture);
 }
 
-const IDENTITY_POINT_HEX: &str =
-    "0100000000000000000000000000000000000000000000000000000000000000";
+const IDENTITY_POINT_HEX: &str = "0100000000000000000000000000000000000000000000000000000000000000";
 
 #[test]
 fn an_identity_point_trust_root_cannot_authenticate_a_forged_policy() {
@@ -419,8 +414,9 @@ fn an_identity_point_trust_root_cannot_authenticate_a_forged_policy() {
     assert!(error
         .to_string()
         .contains("cage policy trust root must be strong Ed25519"));
-    let error = load_native_mcp_launch(&path, IDENTITY_POINT_HEX, "/operator/mcp-server", &[], None)
-        .test_expect_err("identity point trust root for a direct launch");
+    let error =
+        load_native_mcp_launch(&path, IDENTITY_POINT_HEX, "/operator/mcp-server", &[], None)
+            .test_expect_err("identity point trust root for a direct launch");
     assert!(error
         .to_string()
         .contains("cage policy trust root must be strong Ed25519"));
@@ -588,11 +584,9 @@ fn operator_runtime_file_cannot_widen_verified_manifest_authority() {
         None,
     )
     .test_unwrap_err();
-    assert!(
-        error
-            .to_string()
-            .contains("exact read paths in the verified manifest")
-    );
+    assert!(error
+        .to_string()
+        .contains("exact read paths in the verified manifest"));
 }
 
 #[test]
@@ -695,40 +689,32 @@ fn prepared_broker_rejects_another_endpoint_peer_or_binding() {
     };
     // Both listeners have identical kernel peer credentials. The signed
     // endpoint binding must still reject a different connected socket.
-    assert!(
-        retain_prepared_policy_broker(
-            binding.policy_binding(),
-            UnixStream::connect(&other_path).test_expect("other connection"),
-        )
-        .is_err()
-    );
+    assert!(retain_prepared_policy_broker(
+        binding.policy_binding(),
+        UnixStream::connect(&other_path).test_expect("other connection"),
+    )
+    .is_err());
     let mut wrong_peer = binding.policy_binding();
     wrong_peer.expected_peer_identity.pid += 1;
-    assert!(
-        retain_prepared_policy_broker(
-            wrong_peer,
-            UnixStream::connect(&path).test_expect("wrong peer connection"),
-        )
-        .is_err()
-    );
+    assert!(retain_prepared_policy_broker(
+        wrong_peer,
+        UnixStream::connect(&path).test_expect("wrong peer connection"),
+    )
+    .is_err());
     let mut ambiguous = binding.policy_binding();
     ambiguous.inherited_fd = Some(3);
-    assert!(
-        retain_prepared_policy_broker(
-            ambiguous,
-            UnixStream::connect(&path).test_expect("ambiguous connection"),
-        )
-        .is_err()
-    );
+    assert!(retain_prepared_policy_broker(
+        ambiguous,
+        UnixStream::connect(&path).test_expect("ambiguous connection"),
+    )
+    .is_err());
     let mut invalid_digest = binding.policy_binding();
     invalid_digest.authentication_digest = "invalid".to_string();
-    assert!(
-        retain_prepared_policy_broker(
-            invalid_digest,
-            UnixStream::connect(&path).test_expect("invalid digest connection"),
-        )
-        .is_err()
-    );
+    assert!(retain_prepared_policy_broker(
+        invalid_digest,
+        UnixStream::connect(&path).test_expect("invalid digest connection"),
+    )
+    .is_err());
 }
 
 #[test]
@@ -756,11 +742,9 @@ fn unprotected_wrapper_uses_signed_registry_flow_requirement() {
     assert!(registry.requires_flow_runtime());
     let error =
         super::super::wrap::require_unprotected_wrap_compatible(&registry).test_unwrap_err();
-    assert!(
-        error
-            .to_string()
-            .contains("rejects flow-required manifests")
-    );
+    assert!(error
+        .to_string()
+        .contains("rejects flow-required manifests"));
 
     let (signed_manifest, registered_key) =
         signed_manifest(chio_manifest::NativeSyscallProfile::NativeMinimalV1);
@@ -799,10 +783,8 @@ fn inactive_signed_policies_cannot_prepare_native_launches() {
             None,
         )
         .test_expect_err("inactive migration cannot authorize a native launch");
-        assert!(
-            error
-                .to_string()
-                .contains("requires an enforced migration stage")
-        );
+        assert!(error
+            .to_string()
+            .contains("requires an enforced migration stage"));
     }
 }
