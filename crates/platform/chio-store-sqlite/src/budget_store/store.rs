@@ -1578,6 +1578,28 @@ impl SqliteBudgetStore {
         )))
     }
 
+    /// The authority an existing authorization replays under after its
+    /// admitting leader renewed its lease. Only an original admitted by the same
+    /// authority at an earlier epoch, or under exactly `current`, is replayable,
+    /// and the replay then carries the original metadata unchanged.
+    pub(super) fn renewed_lease_replay_authority(
+        event_id: &str,
+        persisted: Option<&BudgetEventAuthority>,
+        current: &BudgetEventAuthority,
+    ) -> Result<BudgetEventAuthority, BudgetStoreError> {
+        match persisted {
+            Some(original)
+                if original.authority_id == current.authority_id
+                    && (original.lease_epoch < current.lease_epoch || original == current) =>
+            {
+                Ok(original.clone())
+            }
+            _ => Err(BudgetStoreError::Invariant(format!(
+                "budget event_id `{event_id}` authority metadata does not match the original mutation"
+            ))),
+        }
+    }
+
     fn existing_increment_allowed(
         transaction: &rusqlite::Transaction<'_>,
         event_id: Option<&str>,

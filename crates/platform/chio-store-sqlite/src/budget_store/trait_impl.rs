@@ -23,7 +23,7 @@ impl BudgetStore for SqliteBudgetStore {
             return self.authorize_composite_hold(request);
         }
         self.require_standalone_mutation("unbound authorization")?;
-        self.authorize_budget_hold_atomic(&request)
+        self.authorize_budget_hold_atomic(&request, None)
     }
 
     fn capture_invocation_reservations(
@@ -707,7 +707,7 @@ impl BudgetStore for SqliteBudgetStore {
             authority: authority.cloned(),
         };
         Ok(matches!(
-            self.authorize_budget_hold_atomic(&request)?,
+            self.authorize_budget_hold_atomic(&request, None)?,
             BudgetAuthorizeHoldDecision::Authorized(_)
         ))
     }

@@ -2,9 +2,36 @@
 use super::*;
 
 impl SqliteBudgetStore {
+    /// Replay an existing standalone authorization for a leader that renewed its
+    /// lease since admitting it. `current` is the caller's valid lease. Within one
+    /// write transaction the original event must exist, match `request`, and have
+    /// been admitted by the same authority no later than `current`; the replay
+    /// returns the original decision and metadata and never admits a new mutation.
+    pub fn replay_budget_authorization(
+        &self,
+        request: &BudgetAuthorizeHoldRequest,
+        current: &BudgetEventAuthority,
+    ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
+        request.validate()?;
+        if !request.invocation_quotas.is_empty()
+            || request.cumulative_approval.is_some()
+            || request.admission_binding.is_some()
+        {
+            return Err(BudgetStoreError::Invariant(
+                "budget authorization replay supports only standalone authorizations".to_string(),
+            ));
+        }
+        self.require_standalone_mutation("unbound authorization")?;
+        self.authorize_budget_hold_atomic(request, Some(current))
+    }
+
+    /// `replay_under` selects replay-only mode: the original event must already
+    /// exist and is validated against its own authority, which must be
+    /// replayable under that lease.
     pub(super) fn authorize_budget_hold_atomic(
         &self,
         request: &BudgetAuthorizeHoldRequest,
+        replay_under: Option<&BudgetEventAuthority>,
     ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
         validate_budget_grant_index(request.grant_index)?;
         budget_u64_to_sqlite(request.requested_exposure_units, "requested_exposure_units")?;
@@ -27,6 +54,30 @@ impl SqliteBudgetStore {
             Some(event_id) => Self::load_mutation_event(&transaction, event_id)?,
             None => None,
         };
+        let replay_authority = match replay_under {
+            None => None,
+            Some(current) => {
+                let event_id = request.event_id.as_deref().ok_or_else(|| {
+                    BudgetStoreError::Invariant(
+                        "budget authorization replay is missing its event id".to_string(),
+                    )
+                })?;
+                let original = request_event.as_ref().ok_or_else(|| {
+                    BudgetStoreError::Invariant(format!(
+                        "budget event_id `{event_id}` has no authorization to replay"
+                    ))
+                })?;
+                Some(Self::renewed_lease_replay_authority(
+                    event_id,
+                    original.authority.as_ref(),
+                    current,
+                )?)
+            }
+        };
+        let authority = match replay_under {
+            None => request.authority.as_ref(),
+            Some(_) => replay_authority.as_ref(),
+        };
         let existing = Self::existing_event_allowed(
             &transaction,
             request.event_id.as_deref(),
@@ -34,13 +85,18 @@ impl SqliteBudgetStore {
             &request.capability_id,
             request.grant_index,
             request.hold_id.as_deref(),
-            request.authority.as_ref(),
+            authority,
             request.requested_exposure_units,
             0,
             request.max_invocations,
             request.max_cost_per_invocation,
             request.max_total_cost_units,
         )?;
+        if existing.is_none() && replay_under.is_some() {
+            return Err(BudgetStoreError::Invariant(
+                "budget authorization replay found no original authorization".to_string(),
+            ));
+        }
         if existing.is_none() {
             if let Some(hold_id) = request.hold_id.as_deref() {
                 if Self::load_hold(&transaction, hold_id)?.is_some() {

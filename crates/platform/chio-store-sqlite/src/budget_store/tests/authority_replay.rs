@@ -251,3 +251,98 @@ fn sqlite_held_reconciliation_requires_invocation_capture() -> Result<(), Box<dy
     let _ = fs::remove_file(path);
     Ok(())
 }
+
+fn assert_replay_refused(
+    store: &SqliteBudgetStore,
+    case: &str,
+    current: &BudgetEventAuthority,
+    expected: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let before = rich_state(store, case)?;
+    let request = authorize_request(case, Some(current.clone()));
+    let error = store
+        .replay_budget_authorization(&request, current)
+        .expect_err("an unreplayable authorization must fail closed");
+    assert!(
+        matches!(&error, BudgetStoreError::Invariant(message) if message == expected),
+        "unexpected replay refusal: {error}"
+    );
+    assert_eq!(rich_state(store, case)?, before);
+    Ok(())
+}
+
+#[test]
+fn sqlite_renewed_lease_replays_an_authorization_under_its_original_authority(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-budget-renewed-lease-replay");
+    let store = SqliteBudgetStore::open(&path)?;
+    let original = authority("budget-primary", "budget-primary#term-2", 2);
+    let renewed = authority("budget-primary", "budget-primary#term-3", 3);
+    let mismatch = |case: &str| {
+        format!("budget event_id `{case}:authorize` authority metadata does not match the original mutation")
+    };
+    for case in ["renewed", "conflict", "foreign", "future", "same-epoch"] {
+        let admitted = match case {
+            "foreign" => authority("budget-standby", "budget-standby#term-2", 2),
+            "future" => authority("budget-primary", "budget-primary#term-4", 4),
+            _ => original.clone(),
+        };
+        store.authorize_budget_hold(authorize_request(case, Some(admitted)))?;
+    }
+
+    // The ordinary path keeps the exact-authority contract under the renewed lease.
+    let before = rich_state(&store, "renewed")?;
+    let error = store
+        .authorize_budget_hold(authorize_request("renewed", Some(renewed.clone())))
+        .expect_err("an ordinary authorization under another lease must fail closed");
+    assert!(
+        matches!(&error, BudgetStoreError::Invariant(message) if *message == mismatch("renewed"))
+    );
+    assert_eq!(rich_state(&store, "renewed")?, before);
+
+    // The replay-only path returns the original decision and metadata unchanged.
+    let decision =
+        store.replay_budget_authorization(&authorize_request("renewed", None), &renewed)?;
+    let BudgetAuthorizeHoldDecision::Authorized(authorized) = decision else {
+        return Err("renewed-lease replay did not return the original authorization".into());
+    };
+    assert_eq!(authorized.metadata.authority, Some(original.clone()));
+    assert_eq!(
+        authorized.metadata.event_id.as_deref(),
+        Some("renewed:authorize")
+    );
+    assert_eq!(rich_state(&store, "renewed")?, before);
+
+    // A changed payload, another authority, a later epoch than the caller's lease
+    // and a different lease at the same epoch all stay refused.
+    let before = rich_state(&store, "conflict")?;
+    let mut conflicting = authorize_request("conflict", Some(renewed.clone()));
+    conflicting.requested_exposure_units = 90;
+    let error = store
+        .replay_budget_authorization(&conflicting, &renewed)
+        .expect_err("a conflicting replay must fail closed");
+    assert!(matches!(&error, BudgetStoreError::Invariant(message)
+        if message == "budget event_id `conflict:authorize` was reused for a different mutation"));
+    assert_eq!(rich_state(&store, "conflict")?, before);
+    assert_replay_refused(&store, "foreign", &renewed, &mismatch("foreign"))?;
+    assert_replay_refused(&store, "future", &renewed, &mismatch("future"))?;
+    assert_replay_refused(
+        &store,
+        "same-epoch",
+        &authority("budget-primary", "budget-primary#reissued-2", 2),
+        &mismatch("same-epoch"),
+    )?;
+
+    // Replay never admits a mutation that does not already exist.
+    assert_replay_refused(
+        &store,
+        "missing",
+        &renewed,
+        "budget event_id `missing:authorize` has no authorization to replay",
+    )?;
+    let (usage, events, hold, _) = rich_state(&store, "missing")?;
+    assert!(usage.is_none() && events.is_empty() && hold.is_none());
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}

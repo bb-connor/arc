@@ -255,18 +255,46 @@ pub(crate) async fn handle_try_charge_cost(
             return budget_internal_error(&error, "budget authorization replay lookup failed")
         }
     };
+    // A retry of an existing authorization replays under the lease that
+    // admitted it, so a lease renewal by the same leader between the original
+    // request and its retry cannot strand the authorization. The store refuses
+    // the replay unless the original exists, matches, and came from this
+    // authority; it never admits a new mutation.
+    let replay_under = authority.as_ref().filter(|_| replayed_event);
     let (already_captured, admission, denied) = if payload.hold_id.is_none() {
-        let allowed = match store.try_charge_cost_with_ids_and_authority(
-            &payload.capability_id,
-            payload.grant_index,
-            payload.max_invocations,
-            payload.cost_units,
-            payload.max_cost_per_invocation,
-            payload.max_total_cost_units,
-            None,
-            Some(&effective_event_id),
-            authority.as_ref(),
-        ) {
+        let charged = match replay_under {
+            Some(current) => store
+                .replay_budget_authorization(
+                    &BudgetAuthorizeHoldRequest {
+                        capability_id: payload.capability_id.clone(),
+                        grant_index: payload.grant_index,
+                        max_invocations: payload.max_invocations,
+                        invocation_quotas: Vec::new(),
+                        cumulative_approval: None,
+                        admission_binding: None,
+                        requested_exposure_units: payload.cost_units,
+                        max_cost_per_invocation: payload.max_cost_per_invocation,
+                        max_total_cost_units: payload.max_total_cost_units,
+                        hold_id: None,
+                        event_id: Some(effective_event_id.clone()),
+                        authority: authority.clone(),
+                    },
+                    current,
+                )
+                .map(|decision| matches!(decision, BudgetAuthorizeHoldDecision::Authorized(_))),
+            None => store.try_charge_cost_with_ids_and_authority(
+                &payload.capability_id,
+                payload.grant_index,
+                payload.max_invocations,
+                payload.cost_units,
+                payload.max_cost_per_invocation,
+                payload.max_total_cost_units,
+                None,
+                Some(&effective_event_id),
+                authority.as_ref(),
+            ),
+        };
+        let allowed = match charged {
             Ok(allowed) => allowed,
             Err(error) => return budget_internal_error(&error, "budget authorization failed"),
         };
@@ -327,7 +355,7 @@ pub(crate) async fn handle_try_charge_cost(
             )
         }
     } else {
-        let decision = match store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
+        let request = BudgetAuthorizeHoldRequest {
             capability_id: payload.capability_id.clone(),
             grant_index: payload.grant_index,
             max_invocations: payload.max_invocations,
@@ -340,7 +368,12 @@ pub(crate) async fn handle_try_charge_cost(
             hold_id: payload.hold_id.clone(),
             event_id: Some(effective_event_id),
             authority: authority.clone(),
-        }) {
+        };
+        let decision = match replay_under {
+            Some(current) => store.replay_budget_authorization(&request, current),
+            None => store.authorize_budget_hold(request),
+        };
+        let decision = match decision {
             Ok(decision) => decision,
             Err(error) => return budget_internal_error(&error, "budget authorization failed"),
         };

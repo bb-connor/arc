@@ -14,6 +14,8 @@ mod cluster_and_reports_tests {
     mod budget_compensation;
     #[path = "budget_delta_authority.rs"]
     mod budget_delta_authority;
+    #[path = "budget_replay_lease_renewal.rs"]
+    mod budget_replay_lease_renewal;
     #[path = "cluster_fence.rs"]
     mod cluster_fence;
     #[path = "replication_heads.rs"]
