@@ -1,9 +1,9 @@
 # Authenticated receipt query snapshots
 
-- **Status.** Revision 2, written for Root review of finding V25 on PR #1160.
-  The direction was accepted at 05:55:09Z. Implementation is not accepted, and
-  no snapshot production code lands before this review closes. Test-only
-  prerequisites may proceed.
+- **Status.** Revision 3, written for Root review of finding V25 on PR #1160.
+  Root accepted the core architecture and authorized Tasks 0-5 at 06:09:22Z,
+  starting with the memory backend. The custody of the Linux file backend is
+  not yet accepted.
 - **Base.** a457a89c75.
 - **Prerequisite.** V25-PRE: one persistent trust-control receipt store, owned
   by `TrustServiceState`. Section 9 lists what this design needs from it.
@@ -13,8 +13,8 @@
   strict synchronous budgets that refuse healthy stores of roughly 60-80k
   receipts.
 - **Inputs.** Codex mailbox entries 04:44:55Z, 05:01:59Z, 05:11:06Z, 05:16:44Z,
-  05:21:30Z, 05:23:00Z, 05:27:43Z and 05:55:09Z (the review this revision
-  answers).
+  05:21:30Z, 05:23:00Z, 05:27:43Z, 05:55:09Z and 06:09:22Z (the rulings this
+  revision folds in).
 - **Evidence.** `claude-pr1160-evidence/vfix/v25/`.
 - **Plan.** [implementation plan](../plans/2026-10-09-authenticated-receipt-query-snapshots.md).
 
@@ -92,7 +92,7 @@ The adversary cannot:
 - forge Ed25519 signatures under the receipt or checkpoint keys;
 - read or write the trust-control process's memory or open descriptors
   (ptrace-level access to the process is out of scope for any read path);
-- write the validated private temp directory (section 4.2).
+- write a file-backend custody directory (once that backend is accepted, 4.2).
 
 Inside the boundary: process memory, the snapshot connection and its custody
 storage. Everything SQLite reads from the receipt database and its archive is
@@ -148,71 +148,61 @@ lineage rowid mark, and the state.
 
 ### 4.2 Backends and custody
 
-Both backends below hold the projection on the single snapshot connection. The
-`backend` setting accepts `auto`, `private_temp_file` or `memory`. `auto` selects
-`private_temp_file` on Linux and `memory` on every other platform.
+**First cut: `memory`, on every platform.**
+- The snapshot connection is a private `:memory:` database. Custody is process
+  memory, and no file exists.
+- Its quota is finite, reported and configurable (4.3). Exhausting the quota is
+  a typed capacity refusal. It never implies support for unlimited history.
+- Default Linux, macOS and Windows deployments (release targets at
+  `.github/workflows/release-binaries.yml:49-70`) need no new prerequisite.
 
-**`memory`**, all platforms. The connection is a `:memory:` database, so custody
-is process memory. No file exists. Capacity is bounded by the quota (4.3). This
-backend is the default on macOS and Windows, which ship in release builds
-(`.github/workflows/release-binaries.yml:49-70`). No private-temp-file claim is
-made for them.
+**Linux file backend: proposal pending, not accepted.** It will be delivered
+separately, together with its tests, under these constraints from the 06:09:22Z
+ruling:
+- a process-owned private directory, provisioned automatically, with no
+  operator `SQLITE_TMPDIR` prerequisite;
+- a dedicated named snapshot database under that directory, with no WAL and an
+  in-memory rollback journal;
+- the actual backing file bound to the custody directory inode, not only to its
+  device;
+- negative controls that replace the parent or the path;
+- cleanup of the directory;
+- no mutation of process-global SQLite temp settings, no custom VFS, and reuse
+  of the repository's file primitives (`chio-sqlite-file-identity`, `rustix`).
 
-**`private_temp_file`**, Linux only in this landing. The connection is opened
-with an empty filename on the unix VFS. The bundled SQLite 3.51.3
-(`libsqlite3-sys-0.37.0/sqlite3/sqlite3.c`) behaves as follows:
+Under the stated trust boundary (3), that private directory is part of the
+process's custody. Until the backend is accepted, `memory` is the only backend.
 
-- It picks the temp directory from `sqlite3_temp_directory`, `SQLITE_TMPDIR`,
-  `TMPDIR`, `/var/tmp`, `/usr/tmp`, `/tmp` and `.`, taking the first that
-  exists and is writable (`:45460-45500`).
-- Delete-on-close files are created with mode 0600 (`:45703`), using
-  `O_EXCL|O_NOFOLLOW` (`:45869`).
-- Each file is unlinked immediately after open (`:45950`).
-- The temporary main database is opened exclusive and delete-on-close
-  (`:62617`). Whether it lives in memory is decided when it is opened
-  (`:74995-75004`).
-
-Startup validation, fail-closed. Any failure makes the backend
-`Unavailable(custody)`. There is no silent fallback; the operator may choose
-`memory` explicitly.
-
-1. Resolve the directory exactly as SQLite does, then require all of:
-   - an absolute path, never `.`;
-   - `lstat` reports a directory, not a symlink;
-   - owned by the service uid;
-   - mode 0700, with no group or other bits.
-
-   Record the directory's `(st_dev, st_ino)`.
-2. Open the snapshot connection, then run `PRAGMA temp_store = MEMORY`, so
-   sorter and statement journals never create further temp files. The main
-   temp database stays file-backed, because that was fixed at open.
-3. Force a spill by writing past `cache_size`.
-4. Then compare `/proc/self/fd` before and after the spill. Exactly one new
-   descriptor must have appeared, and it must:
-   - is unlinked;
-   - has mode 0600;
-   - is owned by the service uid;
-   - lives on the recorded directory's device.
-
-   That descriptor is held for the connection's lifetime, and no later temp
-   file is opened (a control checks this after the directory is replaced).
-5. Run cleanup on close: the descriptor's file is gone. A control checks there
-   is no leftover entry in the directory after shutdown or a crash.
-
-### 4.3 Quota and accounting
+### 4.3 Quota, accounting and SQLite memory
 
 - **Hard limit.** `PRAGMA max_page_count` is set to `quota_bytes / page_size`.
-  `SQLITE_FULL` is returned when the quota is exceeded or the temp filesystem
-  is full, and an I/O error on the spill file is mapped the same way.
-- **What happens at the limit.** The step's snapshot transaction rolls back, the
-  state becomes `Unavailable(capacity { quota_bytes, used_bytes })`, and reads
-  get a typed 503. No row is truncated and no partial version is published.
-- **Accounting.** `status()` reports `used_bytes` (`page_count * page_size`),
-  the row count, the distinct-dimension count, and the dimension-value bytes.
-- **Defaults.** `private_temp_file` defaults to an 8 GiB quota and `memory` to
-  1 GiB. Rows per quota are an estimate that depends on value lengths
-  (section 10). Startup logs the estimate and the free space of the directory.
-  Only the quota is enforced.
+  SQLite returns `SQLITE_FULL` when a write would exceed it.
+- **Exhaustion.**
+  - The step's snapshot transaction rolls back.
+  - The state becomes `Unavailable(capacity { quota_bytes, used_bytes })`.
+  - Reads get a typed 503.
+  - No value is truncated, and no partial version is published.
+- **Accounting.** `status()` and `/health` report:
+  - `quota_bytes`;
+  - `used_bytes` (`page_count * page_size`);
+  - row count;
+  - distinct dimension count;
+  - dimension value bytes.
+- **Default quota.** `memory` defaults to 2 GiB. How many receipts fit is an
+  estimate that depends on value lengths (10).
+- **SQLite heap outside the page quota.** The page quota does not cap other
+  SQLite heap allocations, so the plans are written to avoid them:
+  - Fixed query plans walk an index in cursor order, so no sorter is used.
+  - The one exception is the S5 cost-range plan. Its sorter always runs under
+    `LIMIT L`, which keeps it to at most L rows.
+  - No plan uses a temporary b-tree for `DISTINCT` or `GROUP BY`.
+  - A control asserts every fixed plan's `EXPLAIN QUERY PLAN`.
+  - The capacity fixture measures process memory, so sorter and statement
+    allocations are counted.
+- **Per-row resource limit.** A receipt row larger than `max_receipt_bytes`
+  (default 128 MiB, the ingress cap at `json_ingress.rs:137`) is outside the
+  walker's resource limit. It yields `Unavailable(row_cap { entry_seq, bytes })`.
+  This is a resource boundary, not tamper evidence.
 
 ### 4.4 Versions, read lease and cursors
 
@@ -272,9 +262,9 @@ Each step has four phases. Every limit below is enforced, not a timing target.
    - `copy_sql_steps` VM steps.
 
    Each row's length is read with `length(CAST(raw_json AS BLOB))` before its
-   text, and a row above `max_receipt_bytes` (default 128 MiB, the ingress cap
-   at `json_ingress.rs:137`) makes the state `Unavailable(row_cap)`. The rows
-   are copied into owned memory, and the transaction ends.
+   text. A single row may exceed `step_bytes` up to `max_receipt_bytes`. A row
+   above that is the row-cap resource boundary of 4.3. The rows are copied into
+   owned memory, and the transaction ends.
 2. **Authenticate.** No transaction or lock is held. Each entry gets its
    signature, signer, canonical leaf, projection, and frontier append.
    Cancellation is checked every 64 entries.
@@ -287,22 +277,36 @@ Each step has four phases. Every limit below is enforced, not a timing target.
 
 Further rules for every step:
 
-- Each `SqlWorkBudget` progress handler also checks the cancel flag, so
-  cancellation interrupts SQL within one progress interval (1,000 VM steps).
-- Shutdown waits for at most the current phase.
-- Elapsed durations are measured and reported (section 10), never promised.
-- Contention on any read gets SQLite's busy handling. A busy error ends the
-  step without effect, and the walker retries with backoff. It does not
-  invalidate the snapshot.
+- **Cancellation.** Each `SqlWorkBudget` progress handler also checks the
+  cancel flag, so it interrupts SQL at its next progress callback (every 1,000
+  VM steps). Shutdown sets the flag and waits for the current phase to stop.
+  A phase blocked inside an uninterruptible filesystem call stops only when
+  that call returns. Cancellation ends in `Stopped`; it is not an integrity
+  outcome.
+- **Budget exhaustion.** When a walker SQL budget runs out, the step ends
+  without effect and the state becomes `Unavailable(walker_budget)`. The walker
+  retries with backoff. This is a resource outcome, not evidence of tamper.
+- **Contention.** A busy error from SQLite ends the step without effect, and the
+  walker retries with backoff. The state is unchanged.
+- **Durations.** Elapsed time is measured and reported (10), never promised.
+- **Integrity.** Only an authentication or comparison failure makes the state
+  Invalid.
 
 ### 5.2 Build
 
-A build runs at start, and after Invalid with backoff. When it starts, it fixes
-the target as the claim-log head T0 = `MAX(entry_seq)`, or W if the live log is
-empty, together with the observation time t0. It then runs three phases, in
-steps:
+A build runs at start, and after Invalid with backoff. It pins its target in one
+starting observation, a single read transaction that records:
 
-1. **Chain.** Checkpoint rows in `checkpoint_seq` order. For each:
+- T0 = `MAX(entry_seq)`, or W0 when the live log is empty;
+- the initial watermark W0;
+- c0, the newest checkpoint whose `batch_end` is at most T0;
+- the observation time t0.
+
+It then runs three phases, in steps:
+
+1. **Chain.** Checkpoint rows with seq at most c0, in `checkpoint_seq` order.
+   Checkpoints appended during the build, and any checkpoint whose `batch_end`
+   exceeds T0, belong to extension after publication. For each:
    - signature and columns;
    - the base, or the predecessor link to the previous verified checkpoint;
    - `chain_root` against the running frontier;
@@ -326,8 +330,7 @@ steps:
 
    At the end of each batch, the frontier root must equal `merkle_root` and the
    count must equal `tree_size`.
-3. **Tail.** Entries above the newest verified checkpoint through T0. They must
-   be contiguous. Each is signature-only, as at a457. Its leaf and signer go to
+3. **Tail.** Entries in (`batch_end(c0)`, T0]. They must be contiguous. Each is signature-only, as at a457. Its leaf and signer go to
    `snapshot_pending_leaf`, and its row and source check proceed as above.
 
 A final step runs in one read transaction:
@@ -341,14 +344,16 @@ A final step runs in one read transaction:
   recertification.
 - The projection id sets must be complete.
 
-Maintained counts are then computed with `GROUP BY`, before publication, while
-no reader holds the connection.
+Maintained counts are updated in each insert transaction, together with the
+rows they count. No phase runs a whole-table `GROUP BY`. The build then
+publishes version 1, with `E = T0`, the head checkpoint c0, and
+`observedAt = t0`.
 
-The build then publishes version 1, with `E = T0` and `observedAt = t0`.
-
-- **Fixed target.** The build target never moves, so the build ends after a
-  finite number of steps whatever the append rate. Appends during the build
-  are handled by extension after publication.
+- **Fixed target.** The target (T0, W0, c0) never moves, so the build ends after
+  a finite number of steps whatever the append rate. Appends and checkpoints
+  that arrive during the build are handled by extension after publication.
+  Control C11b appends a checkpoint during the build. Version 1 must stop at T0
+  and c0, and the next extension must accept the new checkpoint.
 - **Membership and archive projections.** Every checkpoint is accepted only as
   part of the walk from seq 1, and every claim range only against such a
   checkpoint (A10). Archive projections are validated here (A8).
@@ -412,11 +417,6 @@ fixed when the pass starts. Extension keeps running alongside it.
     maintained count with `GROUP BY` after each generation of randomized
     appends, refreshes and invalidations. The capacity fixture checks all counts
     after its run.
-  - **If Root requires a bounded production audit,** the race-free form is:
-    split counts by pass epoch, defer lineage refreshes while a pass is active,
-    and compare per key in holds of at most 256 keys. It is not proposed,
-    because it adds a moving-target protocol in order to detect only
-    implementation defects.
 - **Reporting.** `recertifiedAt` (pass completion) and the last pass duration
   are reported. A source mutation of a row no page returns is detected within
   `recertify_interval` plus one pass duration. No answer reflects it in the
@@ -540,9 +540,9 @@ All limits are enforced, and each has a typed outcome.
 | Lane permits, non-queued | 4 | 503 `busy` |
 | `query_sql_steps` (snapshot) | 10,000,000 | 422 |
 | L signature checks and leaf hashes | at most 200 | none |
-| `fetch_sql_steps` | 1,000,000 | Invalid (primary-key reads cannot exceed it on an intact schema) |
+| `fetch_sql_steps` | 1,000,000 | 503 `unavailable` (fetch budget); a resource outcome, not tamper |
 | `page_bytes` | 16 MiB, at least one row | short page with a cursor |
-| `max_receipt_bytes` per row | 128 MiB | Invalid on fetch (the row exceeds what the build accepted) |
+| `max_receipt_bytes` per row | 128 MiB | Invalid: the authenticated row was within the cap, so a larger row differs from it, the same outcome as a leaf mismatch |
 | `head_wait` (blocking wait holding a permit) | 2 s | falls through to 7.2 |
 
 Each walker hold is bounded by `hold_sql_steps`. Before each hold the walker
@@ -563,9 +563,12 @@ while a recertification runs is covered by control C14.
   writer_head_poisoned, leaf mismatch and internal. Reads get 500 `invalid`. A
   rebuild starts a new lineage on a fresh connection, with exponential backoff
   from 5 minutes to 1 hour, and only while the writer head is not poisoned.
-- **`Unavailable { custody | capacity | row_cap | platform }`.** Reads get 503
-  `unavailable`. The state is rechecked when configuration or space changes,
-  and at restart.
+- **`Unavailable { capacity | row_cap | walker_budget }`.** These are resource
+  outcomes, never integrity ones. Reads get 503 `unavailable`.
+  - `walker_budget` retries with backoff.
+  - `capacity` and `row_cap` are rechecked after a configuration change and at
+    restart.
+- **`Stopped`.** Entered after cancellation. Reads get 503 `unavailable`.
 
 An invalid or superseded snapshot is dropped. It is never published again.
 
@@ -631,8 +634,9 @@ detected at the recertification cadence rather than on the next page (Q1).
     `observedAt`, `recertifiedAt` and `used_bytes`.
 - **Shutdown.**
   1. The server drains.
-  2. `shutdown()` runs in `spawn_blocking`: it sets the cancel flag, wakes the
-     walker, and joins it after its current phase (5.1).
+  2. `shutdown()` runs in `spawn_blocking`. It sets the cancel flag, wakes the
+     walker, and waits for the current phase to stop (5.1). A phase blocked in
+     an uninterruptible filesystem call stops only when that call returns.
   3. V25-PRE drops the store.
 
   If the service is dropped without `shutdown()`, it sets the cancel flag and
@@ -677,10 +681,14 @@ distinctly:
 
 Resource policy:
 
-- RAM: the snapshot page cache (64 MiB), plus one step buffer (at most
-  `step_bytes` plus one row of at most `max_receipt_bytes`), plus O(log B).
-  The `memory` backend adds its quota.
-- Storage: the quota of 4.3.
+- **RAM.**
+  - The snapshot database, up to the `memory` quota (default 2 GiB, reported).
+  - One walker step buffer: at most `step_bytes`, or one row of at most
+    `max_receipt_bytes` when a single row is larger.
+  - O(log B) frontier state.
+  - Statement and sorter memory bounded by the fixed plans (4.3).
+- **Receipts per quota.** An estimate. The fixture records it; at the measured
+  short-value size it is about 2 GiB / 400-500 B. Long values lower it.
 - Nothing is disabled because history grew. The limits that can refuse are the
   configured quota and the per-row cap, both typed and reported.
 
@@ -770,6 +778,7 @@ budgets, and export is bounded only in concurrency.
   Task 8).
 - **Snapshot connection contention.** One snapshot connection means requests
   can wait behind bounded holds.
-- **Unsupported platforms.** `private_temp_file` is unavailable outside Linux.
-  macOS and Windows use the `memory` backend within its quota. Extending
-  `private_temp_file` needs that platform's own evidence.
+- **Memory backend capacity.** Until the Linux file backend is accepted, every
+  platform uses the `memory` backend. A store larger than the quota becomes
+  `Unavailable(capacity)` until the quota is raised or the file backend is
+  enabled. That limit is typed and reported, never silent.
