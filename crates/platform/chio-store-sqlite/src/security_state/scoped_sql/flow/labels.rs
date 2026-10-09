@@ -126,6 +126,21 @@ pub(in crate::security_state) const HAS_MEMBERSHIP: ReadQuery = ReadQuery {
             )"#,
 };
 
+/// Whether a session has a context under any lineage.
+pub(in crate::security_state) const SESSION_HAS_CONTEXT: ReadQuery = ReadQuery {
+    parameters: 4,
+    legacy: r#"SELECT EXISTS(
+                SELECT 1 FROM security_flow_contexts
+                WHERE tenant_id = ?1 AND principal_id = ?2
+                  AND session_id = ?3 AND isolation_epoch_id = ?4
+            )"#,
+    native: r#"SELECT EXISTS(
+                SELECT 1 FROM security_participant_state_flow_contexts
+                WHERE security_authority_id = ?1 AND tenant_id = ?2 AND principal_id = ?3
+                  AND session_id = ?4 AND isolation_epoch_id = ?5
+            )"#,
+};
+
 pub(in crate::security_state) const ALL_CONTEXTS: ReadQuery = ReadQuery {
     parameters: 0,
     legacy: r#"SELECT tenant_id, principal_id, lineage_id, session_id, isolation_epoch_id, generation FROM security_flow_contexts"#,

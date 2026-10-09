@@ -4,6 +4,8 @@
 mod capture;
 #[path = "native_authority_binding/egress_coordinator.rs"]
 mod egress_coordinator;
+#[path = "native_authority_binding/lineage_observation.rs"]
+mod lineage_observation;
 #[path = "native_authority_binding/observation.rs"]
 mod observation;
 #[path = "execution_nonce_kernel_lifecycle/support.rs"]

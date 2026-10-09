@@ -10,35 +10,50 @@ pub(super) fn load_scoped_flow_snapshot(
     let session = load_session_label(connection, key)?;
     let session_membership = session_membership_exists(connection, key)?;
     let context_generation = load_context_generation(connection, key)?;
+    if session.is_some() != session_membership {
+        return Err(PortError::integrity_failure());
+    }
+    // Principal and session rows carry no lineage. Before the first join under
+    // a new lineage they exist only through this principal epoch and a context
+    // of the same session under another lineage; that join copies the epoch
+    // and reads both rows. Nothing else creates a session without a context.
+    let session_elsewhere = session.is_some() && context_generation.is_none();
+    if session_elsewhere && !session_has_context(connection, key)? {
+        return Err(PortError::integrity_failure());
+    }
     if !epoch_exists {
-        if principal.is_some()
-            || session.is_some()
-            || session_membership
-            || context_generation.is_some()
+        // A context needs this exact epoch, and a principal or session row
+        // needs its epoch under some lineage.
+        if context_generation.is_some()
+            || ((principal.is_some() || session.is_some())
+                && !principal_epoch_exists(connection, key)?)
         {
             return Err(PortError::integrity_failure());
         }
         return Ok(None);
     }
-    if session.is_some() != session_membership {
-        return Err(PortError::integrity_failure());
-    }
     let (principal_label, principal_generation) =
         principal.ok_or_else(PortError::integrity_failure)?;
     let (lineage_label, lineage_generation) = lineage.ok_or_else(PortError::integrity_failure)?;
     let Some(context_generation) = context_generation else {
-        if session.is_some() {
-            return Err(PortError::integrity_failure());
-        }
-        let session_label = principal_label
+        // No context under this lineage yet. The session's row from another
+        // lineage is inherited exactly as the first join here will read it.
+        let mut session_label = principal_label
             .join_restrictions(&lineage_label)
             .map_err(|_| PortError::integrity_failure())?;
+        let mut generation = principal_generation.max(lineage_generation);
+        if let Some((stored, session_generation)) = session {
+            session_label = stored
+                .join_restrictions(&session_label)
+                .map_err(|_| PortError::integrity_failure())?;
+            generation = generation.max(session_generation);
+        }
         return Ok(Some(FlowStateSnapshot {
             key: key.clone(),
             principal_label,
             lineage_label,
             session_label,
-            context_generation: principal_generation.max(lineage_generation),
+            context_generation: generation,
         }));
     };
     let (stored_session_label, session_generation) =
@@ -276,6 +291,38 @@ pub(super) fn isolation_epoch_exists(
                 key.tenant_id.as_str(),
                 key.principal_id.as_str(),
                 key.lineage_id.as_str(),
+                key.isolation_epoch_id.as_str()
+            ],
+            |row| row.get(0),
+        )
+        .map_err(sqlite_error)
+}
+
+/// Whether this tenant, principal and isolation epoch has an epoch row under
+/// any lineage.
+fn principal_epoch_exists(connection: FlowReader<'_>, key: &FlowStateKey) -> PortResult<bool> {
+    connection
+        .query_row(
+            sql::HAS_PRINCIPAL_EPOCH,
+            params![
+                key.tenant_id.as_str(),
+                key.principal_id.as_str(),
+                key.isolation_epoch_id.as_str()
+            ],
+            |row| row.get(0),
+        )
+        .map_err(sqlite_error)
+}
+
+/// Whether this session has a context under any lineage.
+fn session_has_context(connection: FlowReader<'_>, key: &FlowStateKey) -> PortResult<bool> {
+    connection
+        .query_row(
+            sql::SESSION_HAS_CONTEXT,
+            params![
+                key.tenant_id.as_str(),
+                key.principal_id.as_str(),
+                key.session_id.as_str(),
                 key.isolation_epoch_id.as_str()
             ],
             |row| row.get(0),
