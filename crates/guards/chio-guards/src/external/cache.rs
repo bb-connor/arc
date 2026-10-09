@@ -23,9 +23,12 @@ use chio_security_types::clock::{ClockError, ClockReading, MonotonicInstant, Sys
 
 /// Clock backed by Tokio's pausable monotonic timer and native epoch time.
 ///
-/// The cache, circuit breaker and token bucket read only the monotonic
-/// component, so only that component is fenced. A wall-clock step changes the
-/// reported epoch time but never fails a read, and so never opens a circuit.
+/// The cache, circuit breaker and token bucket consume only
+/// [`Clock::monotonic`], which this type answers from the Tokio timer alone and
+/// never consults the wall source. A wall-clock step therefore cannot fail a
+/// resilience read, and so cannot open a circuit or skip the guarded call.
+/// [`Clock::read`] and [`Clock::unix_millis`] still return the fenced wall
+/// time and fail closed on a wall regression: no wall timestamp is invented.
 pub struct TokioClock {
     /// Timer origin and the highest monotonic reading returned.
     state: Mutex<(Instant, u64)>,
@@ -48,9 +51,8 @@ impl TokioClock {
             wall,
         }
     }
-}
-impl Clock for TokioClock {
-    fn read(&self) -> Result<ClockReading, ClockError> {
+
+    fn timer_nanos(&self) -> Result<MonotonicInstant, ClockError> {
         let mut state = self.state.lock().map_err(|_| ClockError::Unavailable)?;
         let elapsed = Instant::now()
             .checked_duration_since(state.0)
@@ -60,10 +62,17 @@ impl Clock for TokioClock {
             return Err(ClockError::MonotonicRegression);
         }
         state.1 = nanos;
-        Ok(ClockReading::new(
-            self.wall.unix_millis()?,
-            MonotonicInstant::from_nanos(nanos),
-        ))
+        Ok(MonotonicInstant::from_nanos(nanos))
+    }
+}
+impl Clock for TokioClock {
+    fn read(&self) -> Result<ClockReading, ClockError> {
+        let monotonic = self.timer_nanos()?;
+        Ok(ClockReading::new(self.wall.unix_millis()?, monotonic))
+    }
+
+    fn monotonic(&self) -> Result<MonotonicInstant, ClockError> {
+        self.timer_nanos()
     }
 }
 
