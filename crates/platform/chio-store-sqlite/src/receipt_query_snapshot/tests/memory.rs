@@ -10,7 +10,7 @@ use rusqlite::params;
 use super::super::walk::{
     authenticate, check_sources, copy_checkpoints, copy_claims, copy_lineage, WalkError, WalkLimits,
 };
-use super::support::{context, limits, Fixture, Spec};
+use super::support::{context, limits, target, Fixture, Spec};
 
 const MIB: u64 = 1024 * 1024;
 
@@ -189,4 +189,78 @@ fn legacy_lineage_subjects_are_charged_to_the_step_budget_and_the_build_complete
     )
     .unwrap();
     assert_eq!(db.tool_row_count().unwrap(), 5);
+}
+
+/// An unsigned lineage subject refreshed onto many receipts is interned
+/// once. Once the lineage row is gone the source derives no subject, so the
+/// source side of a recertification step is small; the owned side must be
+/// measured before it is read, or every row materializes its own copy of
+/// the shared subject.
+#[test]
+fn recertification_measures_owned_rows_before_reading_them() {
+    use super::super::pass::{build_snapshot, retry_busy, Pass, PassMode, PassProgress};
+    let fixture = Fixture::new(0);
+    let rows = 64_u64;
+    for index in 0..rows {
+        let mut spec = Spec::new(format!("shared-{index}"), 1_700_000_000 + index);
+        spec.capability = "cap-shared".into();
+        fixture.append(&spec);
+    }
+    fixture.flush();
+    let cancel = Arc::new(AtomicBool::new(false));
+    let step = WalkLimits {
+        step_rows: 128,
+        step_bytes: 64 * 1024,
+        ..tight()
+    };
+    let ctx = context(&fixture.store, &cancel, step);
+    let (mut db, _) = build_snapshot(&ctx, target(&ctx), 64 * MIB, &mut |_, _| {}).unwrap();
+
+    let subject = "s".repeat(256 * 1024);
+    insert_lineage(&fixture, "cap-shared", &subject, "[]");
+    let refreshed = db
+        .refresh_subject("cap-shared", &subject, 0, 1_024)
+        .unwrap()
+        .unwrap();
+    assert_eq!(refreshed.len(), 64);
+    fixture
+        .tamper()
+        .execute(
+            "DELETE FROM capability_lineage WHERE capability_id = 'cap-shared'",
+            [],
+        )
+        .unwrap();
+
+    db.max_owned_range_bytes.set(0);
+    let mut pass = Pass::new(PassMode::Recertify, target(&ctx));
+    while let PassProgress::Continue = retry_busy(&ctx, || pass.step(&ctx, &mut db)).unwrap() {}
+    let owned = db.max_owned_range_bytes.get();
+    let one_row = u64::try_from(subject.len()).unwrap() + 4 * 1024;
+    assert!(
+        owned <= step.step_bytes + one_row,
+        "one recertification step materialized {owned} owned bytes"
+    );
+    // The pass still compared every receipt and completed.
+    assert_eq!(pass.progress().0, rows);
+
+    // Narrowed steps waive no comparison: an owned row edited past the
+    // first steps is refused.
+    db.connection()
+        .unwrap()
+        .execute(
+            "UPDATE snapshot_tool_receipt SET ts = ts + 1 WHERE entry_seq = ?1",
+            [i64::try_from(rows).unwrap()],
+        )
+        .unwrap();
+    let mut pass = Pass::new(PassMode::Recertify, target(&ctx));
+    let outcome = loop {
+        match retry_busy(&ctx, || pass.step(&ctx, &mut db)) {
+            Ok(PassProgress::Continue) => {}
+            other => break other.map(drop),
+        }
+    };
+    assert!(
+        matches!(outcome, Err(WalkError::Integrity(_))),
+        "an edited owned row passed recertification: {outcome:?}"
+    );
 }

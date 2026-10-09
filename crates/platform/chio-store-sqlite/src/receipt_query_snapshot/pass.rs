@@ -9,7 +9,7 @@ use super::db::{ChildCursor, OwnedCheckpoint, ProjectedToolRow, SnapshotBatch, S
 use super::walk::{
     authenticate, authenticate_checkpoints, check_sources, checked_prefix, commit_in_holds,
     copy_checkpoints, copy_claims, owned_checkpoint, pending_leaves, verify_source_bijection,
-    OwnedSink, WalkContext, WalkError,
+    AuthenticatedEntry, OwnedSink, WalkContext, WalkError, WalkLimits,
 };
 
 /// Rows counted per hold while verifying the source bijection.
@@ -203,8 +203,9 @@ impl Pass {
         let checkpoint = state.checkpoint.clone();
         let rows = copy_claims(ctx, state.next_entry, checkpoint.batch_end)?;
         let entries = authenticate(ctx, rows, Some(&checkpoint))?;
-        let (tools, children) = check_sources(ctx, &entries)?;
+        let (mut tools, mut children) = check_sources(ctx, &entries)?;
         let entries = checked_prefix(&entries, tools.len() + children.len());
+        let entries = self.owned_prefix(owned, entries, &mut tools, &mut children, &ctx.limits)?;
         let last = entries
             .last()
             .map_or(state.next_entry, |entry| entry.row.entry_seq);
@@ -257,8 +258,9 @@ impl Pass {
         }
         let rows = copy_claims(ctx, next, self.target.head)?;
         let entries = authenticate(ctx, rows, None)?;
-        let (tools, children) = check_sources(ctx, &entries)?;
+        let (mut tools, mut children) = check_sources(ctx, &entries)?;
         let entries = checked_prefix(&entries, tools.len() + children.len());
+        let entries = self.owned_prefix(owned, entries, &mut tools, &mut children, &ctx.limits)?;
         let last = entries.last().map_or(next, |entry| entry.row.entry_seq);
         let pending = pending_leaves(entries);
         self.apply(owned, entries, tools, children, pending, &ctx.limits)?;
@@ -266,15 +268,43 @@ impl Pass {
         Ok(PassProgress::Continue)
     }
 
+    /// A recertification step compares only the entries whose owned rows
+    /// also fit the step's byte budget, measured before any owned value is
+    /// read, and then advances by exactly those entries. A build owns
+    /// nothing yet and keeps every checked entry.
+    fn owned_prefix<'e, S: OwnedSink>(
+        &self,
+        owned: &mut S,
+        entries: &'e [AuthenticatedEntry],
+        tools: &mut Vec<ProjectedToolRow>,
+        children: &mut Vec<ChildCursor>,
+        limits: &WalkLimits,
+    ) -> Result<&'e [AuthenticatedEntry], WalkError> {
+        let (PassMode::Recertify, Some(first), Some(last)) =
+            (self.mode, entries.first(), entries.last())
+        else {
+            return Ok(entries);
+        };
+        let (first, last) = (first.row.entry_seq, last.row.entry_seq);
+        let through = owned.read(|db| db.owned_prefix_end(first, last, limits.step_bytes))?;
+        tools.retain(|row| row.entry_seq <= through);
+        children.retain(|child| child.entry_seq <= through);
+        let kept = entries
+            .iter()
+            .take_while(|entry| entry.row.entry_seq <= through)
+            .count();
+        Ok(checked_prefix(entries, kept))
+    }
+
     /// Insert (build) or compare (recertification) one authenticated range.
     fn apply<S: OwnedSink>(
         &mut self,
         owned: &mut S,
-        entries: &[super::walk::AuthenticatedEntry],
+        entries: &[AuthenticatedEntry],
         tools: Vec<ProjectedToolRow>,
         children: Vec<ChildCursor>,
         pending: Vec<super::db::PendingLeaf>,
-        limits: &super::walk::WalkLimits,
+        limits: &WalkLimits,
     ) -> Result<(), WalkError> {
         let (Some(first), Some(last)) = (entries.first(), entries.last()) else {
             return Ok(());
@@ -284,7 +314,7 @@ impl Pass {
             PassMode::Build => commit_in_holds(owned, limits, tools, children, pending)?,
             PassMode::Recertify => {
                 let (owned_tools, owned_children) = owned.read(|db| db.owned_range(first, last))?;
-                compare_tools(&owned_tools, &tools)?;
+                compare_tools(owned_tools, &tools)?;
                 if owned_children != children {
                     return Err(WalkError::Integrity(format!(
                         "child receipt cursors in entries {first}..={last} differ from the authenticated snapshot"
@@ -342,7 +372,7 @@ impl Pass {
 /// difference is an unsigned subject that a lineage refresh filled in, in
 /// either order relative to this pass.
 fn compare_tools(
-    owned: &[ProjectedToolRow],
+    owned: Vec<ProjectedToolRow>,
     expected: &[ProjectedToolRow],
 ) -> Result<(), WalkError> {
     if owned.len() != expected.len() {
@@ -352,15 +382,14 @@ fn compare_tools(
             expected.len()
         )));
     }
-    for (owned, expected) in owned.iter().zip(expected) {
+    for (mut owned, expected) in owned.into_iter().zip(expected) {
         let subject_refreshed = !expected.subject_signed
             && !owned.subject_signed
             && (owned.subject.is_none() || expected.subject.is_none());
-        let mut comparable = owned.clone();
         if subject_refreshed {
-            comparable.subject.clone_from(&expected.subject);
+            owned.subject.clone_from(&expected.subject);
         }
-        if &comparable != expected {
+        if &owned != expected {
             return Err(WalkError::Integrity(format!(
                 "tool receipt at entry {} differs from the authenticated snapshot",
                 expected.entry_seq

@@ -5,7 +5,7 @@ use std::collections::HashMap;
 mod storage;
 use storage::Storage;
 
-use chio_kernel::ReceiptStoreError;
+use chio_kernel::{ReceiptQuerySnapshotError, ReceiptStoreError};
 use rusqlite::{params, Connection, ErrorCode, OptionalExtension};
 
 /// Interned dimension kinds. Count rows reuse them as their `dim` column.
@@ -191,9 +191,16 @@ pub(super) struct SnapshotDb {
     signers: HashMap<String, i64>,
     /// Bytes of every interned dimension value, maintained as values commit.
     dim_bytes: u64,
+    /// Byte length of each interned dimension value, by id, so owned rows
+    /// can be measured without reading their values.
+    dim_len: HashMap<i64, u64>,
     /// Largest number of pending leaves one snapshot transaction removed.
     #[cfg(test)]
     pub(super) max_settled_per_hold: std::cell::Cell<u64>,
+    /// Largest number of variable-length bytes one owned-range read
+    /// materialized.
+    #[cfg(test)]
+    pub(super) max_owned_range_bytes: std::cell::Cell<u64>,
 }
 
 impl SnapshotDb {
@@ -234,8 +241,11 @@ impl SnapshotDb {
             dims: HashMap::new(),
             signers: HashMap::new(),
             dim_bytes: 0,
+            dim_len: HashMap::new(),
             #[cfg(test)]
             max_settled_per_hold: std::cell::Cell::new(0),
+            #[cfg(test)]
+            max_owned_range_bytes: std::cell::Cell::new(0),
         };
         with_quota(db.connection()?, quota_bytes, page_size, |connection| {
             connection.execute_batch(SCHEMA)
@@ -361,10 +371,7 @@ impl SnapshotDb {
         );
         if result.is_ok() {
             let (dims, signers) = (dims.added, signers.added);
-            self.dim_bytes = dims.keys().fold(self.dim_bytes, |total, (_, value)| {
-                total.saturating_add(crate::integer::count(value.len()))
-            });
-            self.dims.extend(dims);
+            self.intern_committed(dims);
             self.signers.extend(signers);
         }
         result
@@ -432,13 +439,19 @@ impl SnapshotDb {
             },
         );
         if matches!(result, Ok(Ok(_))) {
-            let added = dims.added;
-            self.dim_bytes = added.keys().fold(self.dim_bytes, |total, (_, value)| {
-                total.saturating_add(crate::integer::count(value.len()))
-            });
-            self.dims.extend(added);
+            self.intern_committed(dims.added);
         }
         result
+    }
+
+    /// Record dimension values a committed transaction interned.
+    fn intern_committed(&mut self, added: HashMap<(i64, String), i64>) {
+        for ((_, value), id) in &added {
+            let bytes = crate::integer::count(value.len());
+            self.dim_bytes = self.dim_bytes.saturating_add(bytes);
+            self.dim_len.insert(*id, bytes);
+        }
+        self.dims.extend(added);
     }
 
     /// Remove at most `limit` settled pending leaves in `[start, end]`.
@@ -608,7 +621,117 @@ impl SnapshotDb {
                 children.push(row?);
             }
         }
+        #[cfg(test)]
+        {
+            let text = |value: &Option<String>| value.as_ref().map_or(0, String::len);
+            let bytes: usize = tools
+                .iter()
+                .map(|row| {
+                    row.signer.len()
+                        + row.receipt_id.len()
+                        + text(&row.tenant)
+                        + row.capability.len()
+                        + row.tool_server.len()
+                        + row.tool_name.len()
+                        + row.decision.len()
+                        + text(&row.subject)
+                        + text(&row.cost_currency)
+                        + row.cost_charged.as_ref().map_or(0, Vec::len)
+                })
+                .chain(children.iter().map(|child| child.signer.len()))
+                .sum();
+            let bytes = crate::integer::count(bytes);
+            self.max_owned_range_bytes
+                .set(self.max_owned_range_bytes.get().max(bytes));
+        }
         Ok((tools, children))
+    }
+
+    /// The last entry of `[start, end]` through which the owned rows fit in
+    /// `budget` bytes, measured from interned value lengths without reading
+    /// any value. The first owned entry is always included: one row may
+    /// exceed a step's budget, bounded by the per-row limit it was built
+    /// under.
+    pub(super) fn owned_prefix_end(
+        &self,
+        start: i64,
+        end: i64,
+        budget: u64,
+    ) -> Result<i64, SnapshotDbError> {
+        let interned = |id: i64| -> Result<u64, SnapshotDbError> {
+            if id == ABSENT {
+                return Ok(0);
+            }
+            self.dim_len.get(&id).copied().ok_or_else(|| {
+                SnapshotDbError::Store(
+                    ReceiptQuerySnapshotError::Invalid(format!(
+                        "snapshot row references dimension {id}, which was never interned"
+                    ))
+                    .into(),
+                )
+            })
+        };
+        let mut sizes: Vec<(i64, u64)> = Vec::new();
+        {
+            let mut statement = self.connection()?.prepare_cached(
+                "SELECT r.entry_seq,
+                        length(CAST(r.receipt_id AS BLOB)) + COALESCE(length(r.cost_charged), 0)
+                            + length(CAST(s.kernel_key AS BLOB)),
+                        r.tenant, r.capability, r.tool_server, r.tool_name, r.decision,
+                        r.subject, r.cost_currency
+                 FROM snapshot_tool_receipt r INDEXED BY sq_entry
+                 JOIN snapshot_signer s ON s.id = r.signer
+                 WHERE r.entry_seq >= ?1 AND r.entry_seq <= ?2 ORDER BY r.entry_seq",
+            )?;
+            let rows = statement.query_map(params![start, end], |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, i64>(1)?,
+                    [
+                        row.get::<_, i64>(2)?,
+                        row.get::<_, i64>(3)?,
+                        row.get::<_, i64>(4)?,
+                        row.get::<_, i64>(5)?,
+                        row.get::<_, i64>(6)?,
+                        row.get::<_, i64>(7)?,
+                        row.get::<_, i64>(8)?,
+                    ],
+                ))
+            })?;
+            for row in rows {
+                let (entry_seq, inline, ids) = row?;
+                let mut bytes = u64::try_from(inline).unwrap_or(u64::MAX);
+                for id in ids {
+                    bytes = bytes.saturating_add(interned(id)?);
+                }
+                sizes.push((entry_seq, bytes));
+            }
+        }
+        {
+            let mut statement = self.connection()?.prepare_cached(
+                "SELECT c.entry_seq, length(CAST(s.kernel_key AS BLOB)) FROM snapshot_child_cursor c
+                 JOIN snapshot_signer s ON s.id = c.signer
+                 WHERE c.entry_seq >= ?1 AND c.entry_seq <= ?2 ORDER BY c.entry_seq",
+            )?;
+            let rows = statement.query_map(params![start, end], |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?))
+            })?;
+            for row in rows {
+                let (entry_seq, bytes) = row?;
+                sizes.push((entry_seq, u64::try_from(bytes).unwrap_or(u64::MAX)));
+            }
+        }
+        sizes.sort_unstable_by_key(|(entry_seq, _)| *entry_seq);
+        let mut total = 0_u64;
+        let mut through: Option<i64> = None;
+        for (entry_seq, bytes) in sizes {
+            total = total.saturating_add(bytes);
+            if let Some(through) = through.filter(|_| total > budget) {
+                return Ok(through);
+            }
+            through = Some(entry_seq);
+        }
+        Ok(end)
     }
 
     /// Owned tool rows and child cursors with `entry_seq` in `(low, high]`.
