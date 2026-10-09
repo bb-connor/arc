@@ -112,6 +112,7 @@ impl SqliteAdmissionOperationStore {
                     .ok_or_else(|| invalid("native byte count overflow"))?;
             }
         }
+        super::super::storage::admit_operation(&tx)?;
         let record = Record {
             schema: Record::format(),
             authority: actual.authority.clone(),

@@ -142,6 +142,7 @@ impl SqliteAdmissionOperationStore {
         }
         let record = records::new(&source, observed, fence)?;
         storage::hydrate(&tx, &source)?;
+        storage::admit_operation(&tx)?;
         cutpoint(2)?;
         records::insert(&tx, &record)?;
         records::verify_all(&tx)?;

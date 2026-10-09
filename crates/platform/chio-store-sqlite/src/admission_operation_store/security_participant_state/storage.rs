@@ -292,10 +292,8 @@ fn current_rows_budget() -> u64 {
 /// Largest current-row delta one captured native event can introduce.
 const EVENT_ROWS: u64 = 4_096;
 
-/// Whether one more native event could exceed the store-wide row budget.
-pub(super) fn within_event_of_budget(
-    connection: &Connection,
-) -> Result<bool, AdmissionOperationStoreError> {
+/// Store-wide current native rows.
+fn current_rows(connection: &Connection) -> Result<u64, AdmissionOperationStoreError> {
     let mut total = 0_u64;
     for table in schema::TABLES {
         let count: i64 = connection
@@ -309,7 +307,35 @@ pub(super) fn within_event_of_budget(
             .checked_add(u64::try_from(count).map_err(invalid)?)
             .ok_or_else(|| invalid("native row count overflow"))?;
     }
-    Ok(total.saturating_add(EVENT_ROWS) > current_rows_budget())
+    Ok(total)
+}
+
+/// Whether one more native event could exceed the store-wide row budget.
+pub(super) fn within_event_of_budget(
+    connection: &Connection,
+) -> Result<bool, AdmissionOperationStoreError> {
+    Ok(current_rows(connection)?.saturating_add(EVENT_ROWS) > current_rows_budget())
+}
+
+fn capacity(detail: impl std::fmt::Display) -> AdmissionOperationStoreError {
+    AdmissionOperationStoreError::Unavailable(format!(
+        "native security current-row capacity is exhausted: {detail}"
+    ))
+}
+
+/// Admit a new native admission write after it is applied in the caller's
+/// transaction. A write that would leave more current rows than the
+/// store-wide budget is refused as a retryable operator resource condition,
+/// never an integrity verdict, and rolls back.
+pub(super) fn admit_operation(connection: &Connection) -> Result<(), AdmissionOperationStoreError> {
+    let budget = current_rows_budget();
+    let total = current_rows(connection)?;
+    if total > budget {
+        return Err(capacity(format_args!(
+            "{total} current rows, budget {budget}"
+        )));
+    }
+    Ok(())
 }
 
 pub(super) fn verify_no_orphans(

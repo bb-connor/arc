@@ -24,6 +24,8 @@ mod migration;
 mod portable;
 #[path = "egress/retention.rs"]
 mod retention;
+#[path = "egress/session_capacity.rs"]
+mod session_capacity;
 #[path = "egress/session_churn.rs"]
 mod session_churn;
 
