@@ -1,9 +1,264 @@
 import test from "node:test";
+import type { TestContext } from "node:test";
 import assert from "node:assert/strict";
 
 import { ReceiptQueryClient } from "../src/receipt_query_client.ts";
 import { QueryError, TransportError } from "../src/errors.ts";
 import type { ReceiptQueryResponse } from "../src/receipt_query_client.ts";
+
+const SNAPSHOT = {
+  id: "version:42", throughEntrySeq: 120345, checkpointSeq: null,
+  observedAt: 1760000000123, recertifiedAt: 1759996400456,
+};
+const RETRY_CODE = "receipt_query_snapshot_building";
+
+function retryClock(t: TestContext) {
+  const now = Date.UTC(2026, 9, 9);
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"], now });
+  t.mock.method(performance, "now", () => Date.now() - now);
+}
+
+async function flush() {
+  await new Promise<void>((resolve) => setImmediate(resolve));
+}
+
+function sequenceFetch(responses: Array<Response | Error>) {
+  const requests: RequestInit[] = [];
+  const fetchImpl: typeof fetch = async (_url, options) => {
+    requests.push(options ?? {});
+    const next = responses.shift();
+    assert.ok(next, "unexpected extra request");
+    if (next instanceof Error) throw next;
+    return next;
+  };
+  return { fetchImpl, requests };
+}
+
+function failure(status = 503, code = RETRY_CODE, retryAfter?: string) {
+  return new Response(JSON.stringify({ error: "snapshot pending", code }), {
+    status, headers: retryAfter === undefined ? {} : { "Retry-After": retryAfter },
+  });
+}
+
+function success(body: unknown = { totalCount: 0, nextCursor: null, receipts: [], snapshot: SNAPSHOT }) {
+  return new Response(JSON.stringify(body), { status: 200 });
+}
+
+test("query retries only the three transient snapshot codes and preserves metadata", async (t) => {
+  for (const code of [RETRY_CODE, "receipt_query_snapshot_stale", "receipt_query_busy"]) {
+    await t.test(code, async (t) => {
+      retryClock(t);
+      const { fetchImpl, requests } = sequenceFetch([failure(503, code, "2"), success()]);
+      const client = new ReceiptQueryClient("http://localhost", "tok", fetchImpl);
+      const pending = client.query();
+      const checked = assert.doesNotReject(pending);
+      await flush();
+      assert.equal(requests.length, 1);
+      t.mock.timers.tick(1999);
+      await flush();
+      assert.equal(requests.length, 1);
+      t.mock.timers.tick(1);
+      await checked;
+      assert.deepEqual((await pending).snapshot, SNAPSHOT);
+      assert.equal(requests.length, 2);
+    });
+  }
+});
+
+test("serverCode preserves HTTP status and query_error category without retrying terminal errors", async () => {
+  for (const [status, code] of [
+    [422, "receipt_query_work_budget_exhausted"], [500, "receipt_query_snapshot_invalid"],
+    [503, "receipt_query_snapshot_unavailable"], [503, "unknown"], [500, RETRY_CODE],
+  ] as const) {
+    const { fetchImpl, requests } = sequenceFetch([failure(status, code)]);
+    const client = new ReceiptQueryClient("http://localhost", "tok", fetchImpl);
+    await assert.rejects(client.query(), (error) => {
+      assert.ok(error instanceof QueryError);
+      assert.equal(error.code, "query_error");
+      assert.equal(error.status, status);
+      assert.equal(error.serverCode, code);
+      return true;
+    });
+    assert.equal(requests.length, 1);
+  }
+});
+
+test("attempt count and zero budget preserve typed last error and one initial request", async (t) => {
+  retryClock(t);
+  for (const options of [{ maxAttempts: 3 }, { retryBudgetMs: 0 }, { maxAttempts: 1 }]) {
+    const { fetchImpl, requests } = sequenceFetch(Array.from({ length: 3 }, () => failure(503, RETRY_CODE, "0")));
+    const client = new ReceiptQueryClient("http://localhost", "tok", fetchImpl, options);
+    const checked = assert.rejects(client.query(), (error) => {
+      assert.ok(error instanceof QueryError);
+      assert.equal(error.serverCode, RETRY_CODE);
+      return true;
+    });
+    await flush();
+    t.mock.timers.tick(0);
+    await flush();
+    t.mock.timers.tick(0);
+    await checked;
+    assert.equal(requests.length, options.maxAttempts ?? 1);
+  }
+});
+
+test("Retry-After HTTP dates are honored and excessive seconds/date/overflow never retry early", async (t) => {
+  retryClock(t);
+  const date = new Date(Date.now() + 2000).toUTCString();
+  const { fetchImpl, requests } = sequenceFetch([failure(503, RETRY_CODE, date), success()]);
+  const pending = new ReceiptQueryClient("http://localhost", "tok", fetchImpl).query();
+  const checked = assert.doesNotReject(pending);
+  await flush();
+  t.mock.timers.tick(1999);
+  await flush();
+  assert.equal(requests.length, 1);
+  t.mock.timers.tick(1);
+  await checked;
+  for (const header of ["31", "9".repeat(400), new Date(Date.now() + 60000).toUTCString()]) {
+    const attempt = sequenceFetch([failure(503, RETRY_CODE, header)]);
+    await assert.rejects(new ReceiptQueryClient("http://localhost", "tok", attempt.fetchImpl).query(), (error) => {
+      assert.ok(error instanceof QueryError);
+      assert.equal(error.serverCode, RETRY_CODE);
+      return true;
+    });
+    assert.equal(attempt.requests.length, 1);
+  }
+});
+
+test("missing/invalid Retry-After uses a bounded delay and elapsed retry budget stops requests", async (t) => {
+  retryClock(t);
+  const { fetchImpl, requests } = sequenceFetch([failure(), failure(503, RETRY_CODE, "invalid"), success()]);
+  const client = new ReceiptQueryClient("http://localhost", "tok", fetchImpl, { retryBudgetMs: 1500 });
+  const checked = assert.rejects(client.query(), (error) => {
+    assert.ok(error instanceof QueryError);
+    assert.equal(error.serverCode, RETRY_CODE);
+    return true;
+  });
+  await flush();
+  t.mock.timers.tick(999);
+  await flush();
+  assert.equal(requests.length, 1);
+  t.mock.timers.tick(1);
+  await checked;
+  assert.equal(requests.length, 2);
+});
+
+test("malformed and oversized errors keep QueryError status and are not retried", async () => {
+  for (const body of ["{broken", JSON.stringify({ code: RETRY_CODE }), JSON.stringify({ error: "x".repeat(17000), code: RETRY_CODE })]) {
+    const { fetchImpl, requests } = sequenceFetch([new Response(body, { status: 503 })]);
+    await assert.rejects(new ReceiptQueryClient("http://localhost", "tok", fetchImpl).query(), (error) => {
+      assert.ok(error instanceof QueryError);
+      assert.equal(error.status, 503);
+      assert.equal(error.serverCode, undefined);
+      return true;
+    });
+    assert.equal(requests.length, 1);
+  }
+});
+
+test("caller cancellation propagates during fetch and retry delay", async (t) => {
+  retryClock(t);
+  for (const delayed of [false, true]) {
+    const abort = new AbortController();
+    const reason = new Error("caller stopped");
+    let calls = 0;
+    const fetchImpl: typeof fetch = async () => {
+      calls += 1;
+      if (delayed) return failure(503, RETRY_CODE, "5");
+      return await new Promise<Response>(() => {});
+    };
+    const client = new ReceiptQueryClient("http://localhost", "tok", fetchImpl);
+    const checked = assert.rejects(client.query({}, { signal: abort.signal }), (error) => error === reason);
+    await flush();
+    abort.abort(reason);
+    await checked;
+    assert.equal(calls, 1);
+  }
+});
+
+test("a hung injected fetch or error body is bounded by the per-query deadline", async (t) => {
+  retryClock(t);
+  const fetchImpl: typeof fetch = async () => await new Promise<Response>(() => {});
+  const client = new ReceiptQueryClient("http://localhost", "tok", fetchImpl, { retryBudgetMs: 1000 });
+  const checked = assert.rejects(client.query(), TransportError);
+  await flush();
+  t.mock.timers.tick(1000);
+  await checked;
+});
+
+test("paginate continues short and empty pages and keeps legacy responses", async () => {
+  const { fetchImpl, requests } = sequenceFetch([
+    success({ totalCount: 2, nextCursor: 1, receipts: [] }),
+    success({ totalCount: 2, nextCursor: 2, receipts: [FAKE_RECEIPT] }),
+    success({ totalCount: 2, nextCursor: null, receipts: [FAKE_RECEIPT] }),
+  ]);
+  const collected = [];
+  for await (const page of new ReceiptQueryClient("http://localhost", "tok", fetchImpl).paginate({ limit: 100 })) collected.push(page);
+  assert.equal(collected.length, 2);
+  assert.equal(requests.length, 3);
+});
+
+test("retry options reject invalid counts and budgets instead of silently defaulting", () => {
+  for (const maxAttempts of [0, -1, 1.5, Infinity, NaN, null, true, "3"]) {
+    assert.throws(() => new ReceiptQueryClient("http://localhost", "tok", undefined, { maxAttempts } as never), RangeError);
+  }
+  for (const retryBudgetMs of [-1, Infinity, NaN, null, true, "30"]) {
+    assert.throws(() => new ReceiptQueryClient("http://localhost", "tok", undefined, { retryBudgetMs } as never), RangeError);
+  }
+});
+
+test("a hung error body retains HTTP category and is cancelled at the deadline", async (t) => {
+  retryClock(t);
+  let cancelled = false;
+  const body = new ReadableStream<Uint8Array>({ cancel() { cancelled = true; } });
+  const fetchImpl: typeof fetch = async () => new Response(body, { status: 503 });
+  const checked = assert.rejects(new ReceiptQueryClient("http://localhost", "tok", fetchImpl, { retryBudgetMs: 1000 }).query(), (error) => {
+    assert.ok(error instanceof QueryError);
+    assert.equal(error.status, 503);
+    assert.equal(error.serverCode, undefined);
+    return true;
+  });
+  await flush();
+  t.mock.timers.tick(1000);
+  await checked;
+  assert.equal(cancelled, true);
+});
+
+test("transport failure after a snapshot retry does not trigger another retry", async (t) => {
+  retryClock(t);
+  const { fetchImpl, requests } = sequenceFetch([failure(503, RETRY_CODE, "0"), new Error("connection lost")]);
+  const checked = assert.rejects(new ReceiptQueryClient("http://localhost", "tok", fetchImpl).query(), TransportError);
+  await flush();
+  t.mock.timers.tick(0);
+  await checked;
+  assert.equal(requests.length, 2);
+});
+
+test("a later terminal HTTP error keeps its own status when its body hangs", async (t) => {
+  retryClock(t);
+  const { fetchImpl } = sequenceFetch([
+    failure(503, RETRY_CODE, "0"), new Response(new ReadableStream(), { status: 500 }),
+  ]);
+  const checked = assert.rejects(new ReceiptQueryClient("http://localhost", "tok", fetchImpl, { retryBudgetMs: 1000 }).query(), (error) => {
+    assert.ok(error instanceof QueryError);
+    assert.equal(error.status, 500);
+    assert.equal(error.serverCode, undefined);
+    return true;
+  });
+  await flush();
+  t.mock.timers.tick(0);
+  await flush();
+  t.mock.timers.tick(1000);
+  await checked;
+});
+
+test("successful transport completion after the monotonic deadline is not accepted", async (t) => {
+  retryClock(t);
+  let elapsed = 0;
+  t.mock.method(performance, "now", () => elapsed);
+  const fetchImpl: typeof fetch = async () => { elapsed = 1001; return success(); };
+  await assert.rejects(new ReceiptQueryClient("http://localhost", "tok", fetchImpl, { retryBudgetMs: 1000 }).query(), TransportError);
+});
 
 // Minimal ChioReceipt fixture for response mocking
 const FAKE_RECEIPT = {

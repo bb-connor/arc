@@ -10,7 +10,7 @@ import type {
   Receipt,
   ReceiptAnalyticsFilters,
   ReceiptAnalyticsResponse,
-  ReceiptQueryResponse,
+  ReceiptQueryResponse as LegacyReceiptQueryResponse,
   RelayAlertAssuranceArchiveReport,
   RelayAlertAssuranceArchiveExtractionReport,
   RelayAlertAssuranceArchivePackageReport,
@@ -1246,11 +1246,24 @@ export async function fetchAgentCostSeries(
   }))
 }
 
+interface ReceiptQuerySnapshot {
+  id: string
+  throughEntrySeq: number
+  checkpointSeq: number | null
+  observedAt: number
+  recertifiedAt: number
+}
+
+type ReceiptQueryResponse = LegacyReceiptQueryResponse & {
+  snapshot?: ReceiptQuerySnapshot
+}
+
 // Re-export Receipt type for convenience
 export type {
   Receipt,
   ReceiptAnalyticsResponse,
   ReceiptQueryResponse,
+  ReceiptQuerySnapshot,
   CapabilitySnapshot,
   OperatorReport,
   Filters,

@@ -27,9 +27,12 @@ class ChioTransportError(ChioError):
 
 
 class ChioQueryError(ChioError):
-    def __init__(self, message: str, *, status: int | None = None):
+    def __init__(
+        self, message: str, *, status: int | None = None, server_code: str | None = None
+    ):
         super().__init__(message)
         self.status = status
+        self.server_code = server_code
 
 
 class ChioRpcError(ChioError):
@@ -50,7 +53,9 @@ def _unique_key_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     decoded: dict[str, Any] = {}
     for key, value in pairs:
         if key in decoded:
-            raise ChioInvariantError("json", f"input contains duplicate object key: {key}")
+            raise ChioInvariantError(
+                "json", f"input contains duplicate object key: {key}"
+            )
         decoded[key] = value
     return decoded
 
