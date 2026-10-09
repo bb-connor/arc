@@ -1,6 +1,6 @@
 # Final foundation review repairs
 
-**Objective:** Repair FINAL-F01 through FINAL-F11 from the independent review of
+**Objective:** Repair FINAL-F01 through FINAL-F12 from the independent review of
 candidate `63ae9a4f5c`, preserving receipt and authority integrity. Publish only
 after the repaired candidate has local acceptance and independent delta review.
 
@@ -19,8 +19,9 @@ KANI-PROOF-QUAL remains OPEN/UNPROVED under the recorded owner amendment.
 | F03 | Export helper | Tenant evidence export uses authenticated, bounded request work independent of unrelated history. Preserve complete selected evidence, attribution, proofs and tenant boundaries. Full local operator exports remain explicit offline work. |
 | F04 | Root | Transient backing exhaustion is recoverable and distinct from the configured quota. Actual quota exhaustion retains finite limits and an explicit recovery contract; no permanent silent latch or automatic unbounded allocation. |
 | F05-F08 | Root | Reconcile current acceptance with the owner proof amendment and completed capacity evidence, explicitly distinguish encoding noncollision from SHA assumptions, account for duplicate review IDs, and remove internal host aliases. Preserve historical source/evidence hashes and prior states. |
-| F09 | Root | Public health uses nonblocking, process-owned telemetry. It never takes receipt admission or the snapshot database lock, and its watermark identifies the sampled observation. Authenticated reads keep their original integrity checks. |
+| F09 | Root | Public health uses nonblocking, process-owned telemetry. It never takes receipt admission or the snapshot database lock, and exposes only configured/state. Detailed observations remain in the trusted owner API. Authenticated reads keep their original integrity checks. |
 | F10 | Cluster helper | Public forwarding has an independent bounded lane; cancellation retains its permit until work terminates. Authenticated forwarding retains its own capacity. |
+| F12 | Claude | A principal can refresh a new lineage before its first join; inconsistent materialized state still refuses. Deliver independently of capacity work. |
 | F11 | Cluster helper | Explicit bounded issue-time tolerance does not weaken expiry, signatures, epochs or replay. A stale replicated authority refuses trust reads and reports degraded health until verified synchronization recovers. |
 
 ## Task 1: Complete report and fixture acceptance
@@ -88,7 +89,18 @@ no egress fence or nonterminal operation retains their context. Non-dominated
 session taint and cross-principal lineage remain authoritative. New context
 admission must not cross the global authenticated bound or prevent already
 admitted operations from completing. A residual store-wide permanent denial is
-not accepted merely because another churn pattern reaches it.
+not accepted merely because another churn pattern reaches it. Per-principal sharing and
+reserved completion must cover parked approvals. Lineage, principal, epoch and
+declassification authority cannot be forgotten to reclaim capacity. Any cold
+state must authenticate current versions and absence, preserve cross-tier
+transition uniqueness, prevent stale resurrection and avoid full-history work
+on startup or admission. This architecture remains under design review.
+
+**F02 legacy-file boundary:** New per-record terminal headroom does not establish
+guaranteed revocation for an older file already at the read cap. Retain genuine
+old-format controls and qualify any no-regression fallback separately. A full
+legacy file needs a reviewed migration or explicit acceptance disposition; do
+not enlarge the cap or delete signed records to make a write pass.
 
 ## Task 4: Reconcile the authoritative record
 
