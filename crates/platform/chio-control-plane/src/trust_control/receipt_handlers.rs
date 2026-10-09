@@ -32,39 +32,40 @@ pub(crate) async fn handle_list_tool_receipts(
     // continuation. This endpoint retains its admin service contract and
     // passes that authenticated context to the store. Tenant read tokens use
     // the tenant-filtered list surface.
-    if let Some(receipt_id) = query.receipt_id.as_deref() {
+    if let Some(receipt_id) = query.receipt_id.clone() {
         if !matches!(principal, ResolvedControlReadPrincipal::AdminService) {
             return plain_http_error(
                 StatusCode::FORBIDDEN,
                 "receipt point-load by id requires the admin service token",
             );
         }
-        let (receipt, watermark) = match super::receipt_query_service::load(
+        return super::receipt_query_service::load_response(
             &state,
-            receipt_id.to_string(),
+            receipt_id.clone(),
             principal.receipt_read_context(),
+            move |receipt, watermark| {
+                let receipts = match receipt.map(serde_json::to_value).transpose() {
+                    Ok(receipt) => receipt.into_iter().collect::<Vec<_>>(),
+                    Err(error) => {
+                        return plain_http_error(
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            &error.to_string(),
+                        )
+                    }
+                };
+                Json(ReceiptListResponse {
+                    snapshot: Some(watermark),
+                    configured: true,
+                    backend: "sqlite".to_string(),
+                    kind: "tool".to_string(),
+                    count: receipts.len(),
+                    filters: json!({ "receiptId": receipt_id }),
+                    receipts,
+                })
+                .into_response()
+            },
         )
-        .await
-        {
-            Ok(result) => result,
-            Err(response) => return response,
-        };
-        let receipts = match receipt.map(serde_json::to_value).transpose() {
-            Ok(receipt) => receipt.into_iter().collect::<Vec<_>>(),
-            Err(error) => {
-                return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
-            }
-        };
-        return Json(ReceiptListResponse {
-            snapshot: Some(watermark),
-            configured: true,
-            backend: "sqlite".to_string(),
-            kind: "tool".to_string(),
-            count: receipts.len(),
-            filters: json!({ "receiptId": receipt_id }),
-            receipts,
-        })
-        .into_response();
+        .await;
     }
     let kernel_query = ReceiptQuery {
         capability_id: query.capability_id.clone(),
@@ -82,37 +83,36 @@ pub(crate) async fn handle_list_tool_receipts(
         tenant_filter: None,
         read_context: Some(principal.receipt_read_context()),
     };
-    let result = match super::receipt_query_service::query(&state, kernel_query).await {
-        Ok(result) => result,
-        Err(response) => return response,
-    };
-    let receipts = match result
-        .receipts
-        .into_iter()
-        .map(|stored| serde_json::to_value(stored.receipt))
-        .collect::<Result<Vec<_>, _>>()
-    {
-        Ok(receipts) => receipts,
-        Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-        }
-    };
+    super::receipt_query_service::query_response(&state, kernel_query, move |result| {
+        let receipts = match result
+            .receipts
+            .into_iter()
+            .map(|stored| serde_json::to_value(stored.receipt))
+            .collect::<Result<Vec<_>, _>>()
+        {
+            Ok(receipts) => receipts,
+            Err(error) => {
+                return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+            }
+        };
 
-    Json(ReceiptListResponse {
-        snapshot: result.snapshot,
-        configured: true,
-        backend: "sqlite".to_string(),
-        kind: "tool".to_string(),
-        count: receipts.len(),
-        filters: json!({
-            "capabilityId": query.capability_id,
-            "toolServer": query.tool_server,
-            "toolName": query.tool_name,
-            "decision": query.decision,
-        }),
-        receipts,
+        Json(ReceiptListResponse {
+            snapshot: result.snapshot,
+            configured: true,
+            backend: "sqlite".to_string(),
+            kind: "tool".to_string(),
+            count: receipts.len(),
+            filters: json!({
+                "capabilityId": query.capability_id,
+                "toolServer": query.tool_server,
+                "toolName": query.tool_name,
+                "decision": query.decision,
+            }),
+            receipts,
+        })
+        .into_response()
     })
-    .into_response()
+    .await
 }
 
 pub(crate) async fn handle_append_tool_receipt(
@@ -286,10 +286,10 @@ pub(crate) async fn handle_query_receipts(
     if let Err(error) = kernel_query.validated_cost_currency() {
         return plain_http_error(StatusCode::BAD_REQUEST, &error);
     }
-    let result = match super::receipt_query_service::query(&state, kernel_query).await {
-        Ok(result) => result,
-        Err(response) => return response,
-    };
+    super::receipt_query_service::query_response(&state, kernel_query, receipt_query_response).await
+}
+
+fn receipt_query_response(result: chio_kernel::receipt_query::ReceiptQueryResult) -> Response {
     let receipts = match result
         .receipts
         .into_iter()
@@ -959,28 +959,7 @@ pub(crate) async fn handle_agent_receipts(
         read_context: Some(principal.receipt_read_context()),
         ..Default::default()
     };
-    let result = match super::receipt_query_service::query(&state, kernel_query).await {
-        Ok(result) => result,
-        Err(response) => return response,
-    };
-    let receipts = match result
-        .receipts
-        .into_iter()
-        .map(|stored| serde_json::to_value(stored.receipt))
-        .collect::<Result<Vec<_>, _>>()
-    {
-        Ok(receipts) => receipts,
-        Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-        }
-    };
-    Json(ReceiptQueryResponse {
-        snapshot: result.snapshot,
-        total_count: result.total_count,
-        next_cursor: result.next_cursor,
-        receipts,
-    })
-    .into_response()
+    super::receipt_query_service::query_response(&state, kernel_query, receipt_query_response).await
 }
 
 pub(crate) async fn handle_append_child_receipt(

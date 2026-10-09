@@ -370,3 +370,106 @@ async fn http_pages_use_the_pinned_projection_and_refuse_a_changed_returned_leaf
     snapshots.shutdown();
     Ok(())
 }
+
+#[derive(Clone, Copy)]
+enum SnapshotReadKind {
+    Page,
+    Point,
+}
+
+async fn materialized_snapshot_read(
+    state: &TrustServiceState,
+    kind: SnapshotReadKind,
+    render: impl FnOnce() -> Response + Send + 'static,
+) -> Response {
+    use crate::trust_control::receipt_query_service::{load_response, query_response};
+    match kind {
+        SnapshotReadKind::Page => {
+            query_response(
+                state,
+                ReceiptQuery {
+                    read_context: Some(ReceiptReadContext::admin_service()),
+                    ..Default::default()
+                },
+                move |_| render(),
+            )
+            .await
+        }
+        SnapshotReadKind::Point => {
+            load_response(
+                state,
+                "absent".to_string(),
+                ReceiptReadContext::admin_service(),
+                move |_, _| render(),
+            )
+            .await
+        }
+    }
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn receipt_response_materialization_runs_off_the_async_worker() -> TestResult {
+    let (_directory, state) = fixture().await?;
+    let async_worker = std::thread::current().id();
+    let mut materialized_off_worker = Vec::new();
+    for kind in [SnapshotReadKind::Page, SnapshotReadKind::Point] {
+        let response = materialized_snapshot_read(&state, kind, move || {
+            Json(json!({"offWorker": std::thread::current().id() != async_worker})).into_response()
+        })
+        .await;
+        let bytes = axum::body::to_bytes(response.into_body(), 1024).await?;
+        let body: Value = serde_json::from_slice(&bytes)?;
+        materialized_off_worker.push(body["offWorker"] == true);
+    }
+    if let Some(snapshots) = &state.receipt_query_snapshots {
+        snapshots.shutdown();
+    }
+    assert_eq!(materialized_off_worker, vec![true, true]);
+    Ok(())
+}
+
+async fn finalization_retains_admission(kind: SnapshotReadKind) -> TestResult {
+    let (_directory, mut state) = fixture().await?;
+    state.receipt_query_lane = Arc::new(tokio::sync::Semaphore::new(1));
+    let lane = Arc::clone(&state.receipt_query_lane);
+    let worker_state = state.clone();
+    let (entered, entered_rx) = tokio::sync::oneshot::channel();
+    let (release, released) = std::sync::mpsc::channel();
+    let request = tokio::spawn(async move {
+        materialized_snapshot_read(&worker_state, kind, move || {
+            let _ = entered.send(());
+            match released.recv_timeout(Duration::from_secs(30)) {
+                Ok(()) => StatusCode::OK.into_response(),
+                Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+            }
+        })
+        .await
+    });
+    tokio::time::timeout(Duration::from_secs(30), entered_rx).await??;
+    let retained_during_render = lane.available_permits();
+    request.abort();
+    let next = materialized_snapshot_read(&state, kind, || StatusCode::OK.into_response()).await;
+    // Always release the paused renderer before asserting, including on the
+    // original path where it blocks one async worker after releasing admission.
+    release.send(())?;
+    let cancelled = request.await;
+    let returned = tokio::time::timeout(Duration::from_secs(30), lane.acquire_owned()).await??;
+    drop(returned);
+    if let Some(snapshots) = &state.receipt_query_snapshots {
+        snapshots.shutdown();
+    }
+    assert_eq!(retained_during_render, 0);
+    assert_eq!(next.status(), StatusCode::SERVICE_UNAVAILABLE);
+    assert!(matches!(cancelled, Err(error) if error.is_cancelled()));
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn cancelled_page_materialization_keeps_read_admission() -> TestResult {
+    finalization_retains_admission(SnapshotReadKind::Page).await
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn cancelled_point_materialization_keeps_read_admission() -> TestResult {
+    finalization_retains_admission(SnapshotReadKind::Point).await
+}

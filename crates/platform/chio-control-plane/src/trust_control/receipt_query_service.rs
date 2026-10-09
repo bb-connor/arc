@@ -50,29 +50,45 @@ pub(super) async fn run_bounded_response<T: IntoResponse + Send + 'static>(
     }
 }
 
-pub(super) async fn query(
+/// Query and fully render a page under one blocking-worker admission permit.
+pub(super) async fn query_response(
     state: &TrustServiceState,
     query: ReceiptQuery,
-) -> Result<ReceiptQueryResult, Response> {
-    let snapshots = snapshots(state)?;
-    run_bounded(Arc::clone(&state.receipt_query_lane), move || {
-        snapshots.query_receipts(&query)
-    })
-    .await?
-    .map_err(snapshot_error_response)
+    render: impl FnOnce(ReceiptQueryResult) -> Response + Send + 'static,
+) -> Response {
+    let snapshots = match snapshots(state) {
+        Ok(snapshots) => snapshots,
+        Err(response) => return response,
+    };
+    run_bounded_response(
+        Arc::clone(&state.receipt_query_lane),
+        move || match snapshots.query_receipts(&query) {
+            Ok(result) => render(result),
+            Err(error) => snapshot_error_response(error),
+        },
+    )
+    .await
 }
 
-pub(super) async fn load(
+/// Load and fully render a point lookup under the same admission permit.
+pub(super) async fn load_response(
     state: &TrustServiceState,
     id: String,
     context: ReceiptReadContext,
-) -> Result<(Option<ChioReceipt>, ReceiptSnapshotWatermark), Response> {
-    let snapshots = snapshots(state)?;
-    run_bounded(Arc::clone(&state.receipt_query_lane), move || {
-        snapshots.load_receipt(&id, &context)
-    })
-    .await?
-    .map_err(snapshot_error_response)
+    render: impl FnOnce(Option<ChioReceipt>, ReceiptSnapshotWatermark) -> Response + Send + 'static,
+) -> Response {
+    let snapshots = match snapshots(state) {
+        Ok(snapshots) => snapshots,
+        Err(response) => return response,
+    };
+    run_bounded_response(
+        Arc::clone(&state.receipt_query_lane),
+        move || match snapshots.load_receipt(&id, &context) {
+            Ok((receipt, watermark)) => render(receipt, watermark),
+            Err(error) => snapshot_error_response(error),
+        },
+    )
+    .await
 }
 
 pub(super) async fn health(state: &TrustServiceState) -> Value {
