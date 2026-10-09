@@ -20923,6 +20923,7 @@
       "cmd_chio_federation_treaty_verify_packet::shared-reader::crates/products/chio-cli/src/cli/chio/dispatch/treaty.rs::cmd_chio_attest_buyer_verify_packet"
     ],
     "crates/products/chio-cli/src/cli/conformance.rs": [
+      "cmd_conformance_fetch_peers::shared-reader::crates/products/chio-cli/src/cli/conformance.rs::resolve_peers_lock_path",
       "cmd_conformance_run::shared-reader::crates/tooling/chio-conformance/src/load.rs::load_results_from_dir",
       "cmd_conformance_run::shared-reader::crates/tooling/chio-conformance/src/load.rs::load_scenarios_from_dir",
       "cmd_conformance_run::shared-reader::crates/tooling/chio-conformance/src/runner.rs::default_run_options",
@@ -20942,7 +20943,8 @@
       "dispatch_certify::shared-reader::crates/platform/chio-control-plane/src/certify/network.rs::cmd_certify_registry_publish_network"
     ],
     "crates/products/chio-cli/src/cli/dispatch/federation.rs": [
-      "dispatch_chio_authority_command::shared-reader::crates/products/chio-cli/src/cli/dispatch/federation/replication.rs::pin"
+      "dispatch_chio_authority_command::shared-reader::crates/products/chio-cli/src/cli/dispatch/federation/replication.rs::pin",
+      "dispatch_chio_federation_command::shared-reader::crates/products/chio-cli/src/cli/dispatch/federation.rs::dispatch_chio_authority_command"
     ],
     "crates/products/chio-cli/src/cli/dispatch/federation/replication.rs": [
       "pin::original-json-reader::UntrustedJsonText"
@@ -21092,6 +21094,7 @@
       "run::shared-reader::crates/products/chio-cli/src/active_response_authority.rs::cmd_authority_deployment_validate",
       "run::shared-reader::crates/products/chio-cli/src/active_response_authority.rs::cmd_authority_store_build",
       "run::shared-reader::crates/products/chio-cli/src/active_response_authority.rs::cmd_authority_store_digest",
+      "run::shared-reader::crates/products/chio-cli/src/cli/dispatch/federation.rs::dispatch_chio_federation_command",
       "run::shared-reader::crates/products/chio-cli/src/cli/dispatch/lineage.rs::dispatch_lineage",
       "run::shared-reader::crates/products/chio-cli/src/cli/mcp/provision.rs::cmd_provision_native_mcp_demo",
       "run::shared-reader::crates/products/chio-cli/src/cli/mcp/provision/reference_runtime.rs::cmd_provision_reference_runtime",
@@ -21163,9 +21166,7 @@
       "write_failed_transaction_report_output::shared-reader::crates/products/chio-cli/src/cli/dispatch/proof.rs::failed_transaction_report"
     ],
     "crates/products/chio-cli/src/cli/dispatch/proof/artifacts.rs": [
-      "load_graph_artifacts_matching::shared-reader::crates/products/chio-cli/src/cli/dispatch/proof/artifacts.rs::parse_graph_artifact_paths",
       "load_graph_json_artifact::shared-reader::crates/products/chio-cli/src/cli/input.rs::json",
-      "load_optional_graph_json_artifact::shared-reader::crates/products/chio-cli/src/cli/dispatch/proof/artifacts.rs::load_graph_json_artifact",
       "load_optional_graph_json_artifacts::shared-reader::crates/products/chio-cli/src/cli/input.rs::json",
       "load_required_graph_json_artifact::shared-reader::crates/products/chio-cli/src/cli/input.rs::json",
       "load_required_graph_json_artifact_bounded::shared-reader::crates/products/chio-cli/src/cli/input.rs::json",
@@ -21674,6 +21675,7 @@
       "verify_native_start_file::shared-reader::crates/products/chio-cli/src/cli/receipt_verify.rs::verify_original_receipt"
     ],
     "crates/products/chio-cli/src/cli/mcp/manifest.rs": [
+      "cmd_mcp_print_scopes::shared-reader::crates/products/chio-cli/src/cli/mcp.rs::load_tools_fixture",
       "cmd_mcp_print_scopes::shared-reader::crates/products/chio-cli/src/cli/mcp/cage_policy.rs::load_native_mcp_launch",
       "load_manifest_allowlist::format-toml::from_str"
     ],
@@ -21889,19 +21891,16 @@
     "crates/products/chio-cli/src/cli/replay.rs": [
       "cmd_replay::shared-reader::crates/products/chio-cli/src/cli/replay.rs::cmd_replay_log",
       "cmd_replay::shared-reader::crates/products/chio-cli/src/cli/replay/bless.rs::cmd_replay_bless",
-      "cmd_replay::shared-reader::crates/products/chio-cli/src/cli/replay/traffic.rs::cmd_replay_traffic",
       "cmd_replay_log::shared-reader::crates/products/chio-cli/src/cli/replay.rs::run_log_replay",
       "run_log_replay::shared-reader::crates/products/chio-cli/src/cli/replay.rs::run_log_replay_from_tee",
       "run_log_replay_from_tee::shared-reader::crates/products/chio-cli/src/cli/replay/validate.rs::validate_frame"
     ],
     "crates/products/chio-cli/src/cli/replay/bless.rs": [
-      "cmd_replay_bless::shared-reader::crates/products/chio-cli/src/cli/replay/validate.rs::validate_frame",
       "cmd_replay_bless::shared-reader::crates/trust/chio-replay-corpus/src/fixture_writer.rs::write_fixture"
     ],
     "crates/products/chio-cli/src/cli/replay/execute.rs": [
       "recompute_decision::original-json-reader::UntrustedJsonText",
-      "run_traffic_replay::shared-reader::crates/products/chio-cli/src/cli/replay/execute.rs::recompute_decision",
-      "run_traffic_replay::shared-reader::crates/products/chio-cli/src/cli/replay/validate.rs::validate_frame"
+      "run_traffic_replay::shared-reader::crates/products/chio-cli/src/cli/replay/execute.rs::recompute_decision"
     ],
     "crates/products/chio-cli/src/cli/replay/ndjson.rs": [
       "next::shared-reader::crates/products/chio-cli/src/cli/input.rs::decode"
@@ -21912,11 +21911,6 @@
     ],
     "crates/products/chio-cli/src/cli/replay/reader.rs": [
       "parse::shared-reader::crates/products/chio-cli/src/cli/input.rs::decode"
-    ],
-    "crates/products/chio-cli/src/cli/replay/traffic.rs": [
-      "cmd_replay_traffic::shared-reader::crates/products/chio-cli/src/cli/replay/traffic.rs::cmd_replay_traffic_with_against",
-      "cmd_replay_traffic::shared-reader::crates/products/chio-cli/src/cli/replay/validate.rs::validate_frame",
-      "cmd_replay_traffic_with_against::shared-reader::crates/products/chio-cli/src/cli/replay/execute.rs::run_traffic_replay"
     ],
     "crates/products/chio-cli/src/cli/replay/validate.rs": [
       "validate_frame::shared-reader::crates/products/chio-cli/src/cli/replay/validate.rs::validate_invocation_canonical",
@@ -21940,9 +21934,14 @@
     ],
     "crates/products/chio-cli/src/cli/trust/receipt/explain.rs": [
       "cmd_receipt_explain::shared-reader::crates/products/chio-cli/src/cli/input.rs::json",
-      "inspect_bilateral_envelope_trace::shared-reader::crates/products/chio-cli/src/cli/input.rs::json"
+      "cmd_receipt_explain::shared-reader::crates/products/chio-cli/src/cli/trust/receipt/explain.rs::render_bilateral_explain",
+      "inspect_bilateral_envelope_trace::shared-reader::crates/products/chio-cli/src/cli/input.rs::json",
+      "render_bilateral_explain::shared-reader::crates/products/chio-cli/src/cli/trust/receipt/explain.rs::inspect_bilateral_envelope_trace"
     ],
     "crates/products/chio-cli/src/cli/trust/runtime_attestation.rs": [
+      "cmd_trust_runtime_attestation_appraisal_export::shared-reader::crates/products/chio-cli/src/cli/trust/runtime_attestation.rs::load_runtime_attestation_evidence",
+      "cmd_trust_runtime_attestation_appraisal_import::shared-reader::crates/products/chio-cli/src/cli/trust/runtime_attestation.rs::load_runtime_attestation_import_policy",
+      "cmd_trust_runtime_attestation_appraisal_result_export::shared-reader::crates/products/chio-cli/src/cli/trust/runtime_attestation.rs::load_runtime_attestation_evidence",
       "load_runtime_attestation_evidence::shared-reader::crates/products/chio-cli/src/cli/input/config.rs::load_document",
       "load_runtime_attestation_import_policy::shared-reader::crates/products/chio-cli/src/cli/input/config.rs::load_document"
     ],
@@ -21950,6 +21949,7 @@
       "load_json_or_yaml::shared-reader::crates/products/chio-cli/src/cli/input/config.rs::load"
     ],
     "crates/products/chio-cli/src/cli/trust/underwriting.rs": [
+      "cmd_trust_underwriting_decision_simulate::shared-reader::crates/products/chio-cli/src/cli/trust/underwriting.rs::load_underwriting_decision_policy",
       "load_underwriting_decision_policy::shared-reader::crates/products/chio-cli/src/cli/input/config.rs::load_document"
     ],
     "crates/products/chio-cli/src/doctor/chio_yaml.rs": [
