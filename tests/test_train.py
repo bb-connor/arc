@@ -1,10 +1,11 @@
+import fcntl
 import json
 import unittest
 from pathlib import Path
 
 from support import SwarmCase, commit_all, git
 
-from swarmlib import agents, claims, items, msgs, train
+from swarmlib import agents, claims, items, lifecycle, metrics, msgs, train
 from swarmlib.store import SwarmError
 
 WORKSPACE = {
@@ -14,6 +15,18 @@ WORKSPACE = {
     "crates/b/Cargo.toml": '[package]\nname = "crate-b"\nversion = "0.1.0"\n',
     "crates/b/src/lib.rs": "pub fn b() -> u32 {\n    2\n}\n",
 }
+
+
+CRATE_DIRS = {"crate-a": "crates/a", "crate-b": "crates/b"}
+
+
+def cargo_metadata(root: Path, deps=None, crates=None) -> str:
+    """What `cargo metadata --no-deps --format-version 1` prints: members only, with their path dependencies."""
+    crates, deps = crates or CRATE_DIRS, deps or {}
+    return json.dumps({"workspace_root": str(root), "packages": [
+        {"name": name, "manifest_path": str(root / rel / "Cargo.toml"),
+         "dependencies": [{"name": dep, "path": str(root / crates[dep]), "kind": None} for dep in deps.get(name, ())]}
+        for name, rel in crates.items()]})
 
 
 def write_tree(root: Path, files: dict) -> None:
@@ -49,15 +62,23 @@ class WorkspaceCase(SwarmCase):
         return head
 
 
-class CrateMapTest(unittest.TestCase):
-    def test_package_name_and_crate_lookup(self):
-        import tempfile
-        root = Path(tempfile.mkdtemp())
-        write_tree(root, WORKSPACE)
-        self.assertEqual(train.crate_of(root, "crates/a/src/lib.rs"), "crate-a")
-        self.assertEqual(train.crate_of(root, "crates/b/Cargo.toml"), "crate-b")
-        self.assertIsNone(train.crate_of(root, "Cargo.toml"))  # workspace manifest, no [package]
-        self.assertIsNone(train.crate_of(root, "docs/notes.md"))
+class WorkspaceTest(unittest.TestCase):
+    def test_members_come_from_cargo_metadata(self):
+        root = Path("/work/train")
+        ws = train.Workspace.parse("warning: unused manifest key\n" + cargo_metadata(root), root)
+        self.assertEqual(ws.crate_of("crates/a/src/lib.rs"), "crate-a")
+        self.assertEqual(ws.crate_of("crates/b/Cargo.toml"), "crate-b")
+        self.assertIsNone(ws.crate_of("Cargo.toml"))  # workspace manifest, no [package]
+        self.assertIsNone(ws.crate_of("docs/notes.md"))
+        self.assertIsNone(ws.crate_of("crates/ab/src/lib.rs"))  # a sibling directory, not crates/a
+        self.assertIsNone(ws.crate_of("fuzz/src/lib.rs"))  # a package outside the workspace is not a member
+
+    def test_upstream_is_every_workspace_crate_a_crate_depends_on(self):
+        root = Path("/work/train")
+        crates = {"crate-a": "crates/a", "crate-b": "crates/b", "crate-c": "crates/c"}
+        ws = train.Workspace.parse(cargo_metadata(root, {"crate-c": ["crate-b"], "crate-b": ["crate-a"]}, crates), root)
+        self.assertEqual(ws.upstream("crate-c"), {"crate-a", "crate-b"})
+        self.assertEqual(ws.upstream("crate-a"), set())
 
 
 class DiagnosticsTest(unittest.TestCase):
@@ -79,21 +100,35 @@ class DiagnosticsTest(unittest.TestCase):
 
 class AttributionTest(unittest.TestCase):
     def setUp(self):
-        import tempfile
-        self.root = Path(tempfile.mkdtemp())
-        write_tree(self.root, WORKSPACE)
+        self.root = Path("/work/train")
+        self.ws = train.Workspace.parse(cargo_metadata(self.root), self.root)
         self.a = train.Lane("A", "lane/A-x", "w1", changed=["crates/a/src/lib.rs"], merged=True)
         self.b = train.Lane("B", "lane/B-x", "w2", changed=["crates/b/src/lib.rs"], merged=True)
         self.c = train.Lane("C", "lane/C-x", "w3", changed=["crates/a/src/lib.rs"], conflict=["crates/a/src/lib.rs"])
 
     def test_file_then_crate_then_unattributed(self):
         per_lane, loose = train.attribute(
-            [self.a, self.b, self.c], self.root,
+            [self.a, self.b, self.c], self.ws,
             [("crates/b/src/lib.rs", "E1"), ("crates/a/src/other.rs", "E2"), ("tools/x.rs", "E3")],
             {"crate-a": "test a::t failed"},
         )
         self.assertEqual(per_lane, {"B": ["E1"], "A": ["E2", "test a::t failed"]})
         self.assertEqual(loose, ["E3"])  # C never merged, so it is never blamed
+
+    # Final review: a break in crate-b caused by lane A's API change in crate-a must not land on B alone.
+    def test_a_break_downstream_of_another_lane_is_not_pinned_on_a_bystander(self):
+        ws = train.Workspace.parse(cargo_metadata(self.root, {"crate-b": ["crate-a"]}), self.root)
+        bystander = train.Lane("B", "lane/B-x", "w2", changed=["crates/b/src/extra.rs"], merged=True)
+        per_lane, loose = train.attribute([self.a, bystander], ws, [("crates/b/src/lib.rs", "E0061")], {})
+        self.assertEqual(per_lane, {})
+        self.assertEqual(len(loose), 1)
+        self.assertIn("suspects: A, B", loose[0])
+
+    def test_a_break_downstream_of_exactly_one_lane_blames_it(self):
+        ws = train.Workspace.parse(cargo_metadata(self.root, {"crate-b": ["crate-a"]}), self.root)
+        per_lane, loose = train.attribute([self.a], ws, [("crates/b/src/lib.rs", "E0061")],
+                                          {"crate-b": "test b::t failed"})
+        self.assertEqual((per_lane, loose), ({"A": ["E0061", "test b::t failed"]}, []))
 
 
 class RemoteCommandTest(unittest.TestCase):
@@ -130,22 +165,28 @@ class ComposeTest(WorkspaceCase):
         self.assertIn("10", (workdir / "crates/a/src/lib.rs").read_text())
         self.assertIn("20", (workdir / "crates/b/src/lib.rs").read_text())
         self.assertEqual(git(workdir, "status", "--porcelain"), "")  # aborted merge leaves a clean tree
+        self.assertEqual(git(workdir, "log", "-1", "--format=%s"), "chore(train): merge B")  # conventional commits
 
 
 
 class FakeCargo:
     """Stands in for build-slot cargo: canned diagnostics per subcommand, failing crates for cargo test."""
 
-    def __init__(self, errors=None, failing_tests=(), silent_check_failure=False):
+    def __init__(self, errors=None, failing_tests=(), silent_check_failure=False, deps=None):
         self.errors = errors or {}
         self.failing_tests = set(failing_tests)
         self.silent_check_failure = silent_check_failure
+        self.deps = deps
         self.commands = []
+        self.cwds = []
 
     def __call__(self, command, cwd, log):
         self.commands.append(command)
+        self.cwds.append(cwd)
         sub = command[1]
         lines, code = [], 0
+        if sub == "metadata":
+            lines = [cargo_metadata(cwd, self.deps)]
         if sub == "check" and self.silent_check_failure:
             lines, code = ["error: could not compile (linker failed)"], 101
         for file_name, message in self.errors.get(sub, []):
@@ -160,13 +201,15 @@ class FakeCargo:
 
 
 class FakeGh:
-    def __init__(self, busy):
+    def __init__(self, busy, conclusion="success"):
         self.busy = busy
+        self.conclusion = conclusion
 
     def __call__(self, args):
         import subprocess
-        status = "in_progress" if self.busy else "completed"
-        return subprocess.CompletedProcess(args, 0, json.dumps([{"status": status}]), "")
+        run = {"status": "in_progress", "conclusion": ""} if self.busy else {"status": "completed",
+                                                                           "conclusion": self.conclusion}
+        return subprocess.CompletedProcess(args, 0, json.dumps([run]), "")
 
 
 class RunTrainTest(WorkspaceCase):
@@ -198,9 +241,9 @@ class RunTrainTest(WorkspaceCase):
         self.submitted("B", "lane/B-b", "codex-ws2-worker2")
         self.submitted("C", "lane/C-c", "codex-ws2-worker3")
 
-    def run_train(self, cargo, *, land=False, gh=None):
+    def run_train(self, cargo, *, land=False, gh=None, **kw):
         return train.run_train(self.integrator, repo=self.repo, lanes_dir=self.tmp / "lanes", repo_url=str(self.arc),
-                               runner=cargo, land=land, ci_runner=gh)
+                               runner=cargo, land=land, ci_runner=gh, **kw)
 
     def status(self, item_id):
         self.integrator.sync()
@@ -220,7 +263,6 @@ class RunTrainTest(WorkspaceCase):
         owner = self.clone("codex-ws2-worker2-reader", role="worker")
         owner.agent = "codex-ws2-worker2"
         self.assertTrue(any("failed check train" in m["subject"] for m in msgs.inbox(owner)))
-        self.assertFalse((self.tmp / "lanes" / f"train-{result.train_id}").exists())  # throwaway worktree removed
 
     def test_a_crate_test_failure_blames_the_lanes_that_touched_it(self):
         self.lanes_abc()
@@ -318,6 +360,111 @@ class RunTrainTest(WorkspaceCase):
         from swarmlib import lifecycle
         lifecycle.status(self.integrator, "A", "submitted", "integrator fixed the type error in place")
         self.assertEqual(self.status("A"), "submitted")
+
+    # Final review: an accepted whole-PR review item has a branch and sits in ready, but it is not a lane.
+    def test_whole_pr_review_items_are_never_composed_as_lanes(self):
+        self.push_lane("integration/process-security-m4", {"crates/b/src/lib.rs": "pub fn b() -> u32 {\n    77\n}\n"})
+        head = git(self.arc, "rev-parse", "integration/process-security-m4")
+        lifecycle.request_pr_review(self.integrator, 1160, head=head, branch="integration/process-security-m4",
+                                    author_vendor="claude", base="main")
+        lifecycle.status(self.conductor, "PR1160", "ready", "accepted")
+        before = git(self.arc, "rev-parse", "integration/beta-next")
+        result = self.run_train(FakeCargo(), land=True, gh=FakeGh(busy=False))
+        self.assertEqual(result.note, "nothing submitted")
+        self.assertEqual(git(self.arc, "rev-parse", "integration/beta-next"), before)
+        self.assertEqual(self.status("PR1160"), "ready")
+
+    # Final review: a test phase that dies without a failing test or a compiler error is not the lane's fault.
+    def test_a_test_phase_crash_with_no_failing_test_is_unattributed(self):
+        self.lanes_abc()
+
+        class LinkerKilled(FakeCargo):
+            def __call__(self, command, cwd, log):
+                if command[1] == "test" and command[3] == "crate-b":
+                    out = "error: linking with `cc` failed: signal: 9, SIGKILL: kill"
+                    log.parent.mkdir(parents=True, exist_ok=True)
+                    log.write_text(out)
+                    return 101, out
+                return super().__call__(command, cwd, log)
+
+        result = self.run_train(LinkerKilled())
+        self.assertEqual(result.red, [])
+        self.assertTrue(any("test:crate-b" in line for line in result.loose), result.loose)
+        self.assertEqual(self.status("B"), "submitted")
+
+    def test_a_compile_error_in_a_test_target_is_attributed_by_file(self):
+        self.lanes_abc()
+        cargo = FakeCargo(errors={"test": [("crates/b/src/lib.rs", "E0425 in a #[cfg(test)] module")]})
+        result = self.run_train(cargo)
+        self.assertEqual((result.red, result.loose), (["B"], []))
+        self.assertTrue(all("--message-format=json" in c and "--no-fail-fast" in c
+                            for c in cargo.commands if c[1] == "test"))
+
+    # Final review: arc has packages outside the workspace (fuzz/, sdks/...); `-p` on them fails every train.
+    def test_packages_outside_the_workspace_are_not_passed_to_cargo(self):
+        self.push_lane("lane/F-fuzz", {
+            "fuzz/Cargo.toml": '[package]\nname = "chio-fuzz"\nversion = "0.1.0"\n',
+            "fuzz/src/lib.rs": "pub fn f() {}\n",
+            "crates/a/src/lib.rs": "pub fn a() -> u32 {\n    10\n}\n",
+        })
+        self.submitted("F", "lane/F-fuzz", "codex-ws2-worker1")
+        cargo = FakeCargo()
+        result = self.run_train(cargo)
+        self.assertEqual(result.green, ["F"])
+        self.assertNotIn("chio-fuzz", [arg for command in cargo.commands for arg in command])
+        self.assertTrue(any(c[1] == "test" and "crate-a" in c for c in cargo.commands))
+
+    # Final review: every train rebuilt the workspace from cold inside a throwaway worktree.
+    def test_the_train_worktree_and_its_build_cache_survive_between_trains(self):
+        self.push_lane("lane/A-a", {"crates/a/src/lib.rs": "pub fn a() -> u32 {\n    10\n}\n"})
+        self.submitted("A", "lane/A-a", "codex-ws2-worker1")
+        self.run_train(FakeCargo())
+        workdir = self.tmp / "lanes" / "train"
+        (workdir / "target").mkdir(exist_ok=True)
+        (workdir / "target" / "cache").write_text("warm")
+        (workdir / "stray.txt").write_text("left behind by a crashed train")
+        cargo = FakeCargo()
+        self.run_train(cargo)  # A is ready, so it rides again
+        self.assertEqual((workdir / "target" / "cache").read_text(), "warm")
+        self.assertFalse((workdir / "stray.txt").exists())
+        self.assertEqual({Path(c).resolve() for c in cargo.cwds}, {workdir.resolve()})
+
+    # Final review: two trains on one host shared a worktree name and deleted each other's tree.
+    def test_a_second_train_on_the_same_host_refuses_while_one_runs(self):
+        self.lanes_abc()
+        lanes = self.tmp / "lanes"
+        lanes.mkdir()
+        with open(lanes / "train.lock", "w") as held:
+            fcntl.flock(held, fcntl.LOCK_EX)
+            with self.assertRaisesRegex(SwarmError, "another check train"):
+                self.run_train(FakeCargo())
+        self.assertEqual([self.status(i) for i in "ABC"], ["submitted", "submitted", "submitted"])
+
+    def test_train_ids_are_unique_within_a_second(self):
+        self.assertEqual(len({train.new_train_id() for _ in range(50)}), 50)
+
+    # Final review: landing on a red base piles new lanes onto a broken branch.
+    def test_red_ci_on_the_base_refuses_landing_unless_overridden(self):
+        self.push_lane("lane/A-a", {"crates/a/src/lib.rs": "pub fn a() -> u32 {\n    10\n}\n"})
+        self.submitted("A", "lane/A-a", "codex-ws2-worker1")
+        red = FakeGh(busy=False, conclusion="failure")
+        result = self.run_train(FakeCargo(), land=True, gh=red)
+        self.assertEqual(result.landed, "")
+        self.assertIn("--allow-red", result.note)
+        self.assertEqual(self.status("A"), "ready")
+        result = self.run_train(FakeCargo(), land=True, gh=red, allow_red=True)
+        self.assertTrue(result.landed)
+        self.assertEqual(self.status("A"), "integrated")
+
+    # Final review: lanes the train lands go submitted -> integrated, which the metrics did not count.
+    def test_landed_lanes_count_as_integrated_in_metrics(self):
+        from datetime import timedelta
+        from swarmlib import clock
+        self.push_lane("lane/A-a", {"crates/a/src/lib.rs": "pub fn a() -> u32 {\n    10\n}\n"})
+        self.submitted("A", "lane/A-a", "codex-ws2-worker1")
+        self.run_train(FakeCargo(), land=True, gh=FakeGh(busy=False))
+        self.integrator.sync()
+        self.assertEqual(metrics.integrated_since(self.integrator, clock.now() - timedelta(hours=1)), ["A"])
 
     def test_max_lanes_caps_the_train_by_severity(self):
         self.lanes_abc()

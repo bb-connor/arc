@@ -26,6 +26,10 @@ def status(store: Store, item_id: str, new_status: str, note: str = "") -> None:
         owner = item.meta["owner"]
         if store.role == "integrator" and new_status == "in-progress" and owner and not owner.startswith("cloud:"):
             msgs.write(store, owner, "blocker", item_id, f"{item_id} returned by the integrator", note or "see item log")
+        if (store.role == "integrator" and old == "in-progress" and new_status == "submitted" and owner
+                and owner != store.agent and not owner.startswith("cloud:")):
+            msgs.write(store, owner, "fyi", item_id, f"{item_id} fixed in place by the integrator",
+                       (note or "see item log") + "\n\nFetch your lane branch before you push to it again.")
         if new_status == "blocked":
             msgs.write(store, "conductor", "blocker", item_id, f"{item_id} blocked", note or "no note")
         items.save(store, item)
@@ -52,6 +56,13 @@ def record_evidence(store: Store, item_id: str, entry: dict, *, ci_failed: bool 
     store.transact(f"evidence {item_id}", mutate)
 
 
+def _remote_head(worktree: Path, repo_url: str, branch: str) -> str:
+    """The lane branch's commit on the remote, fetched locally, or "" when it is not there."""
+    fetched = gitio.run(worktree, *gitio.auth_args(), "fetch", "--quiet", repo_url,
+                        f"+refs/heads/{branch}:refs/remotes/swarm/{branch}", check=False)
+    return gitio.out(worktree, "rev-parse", f"refs/remotes/swarm/{branch}") if fetched.returncode == 0 else ""
+
+
 def submit(store: Store, item_id: str, worktree: Path, *, repo_url: str, base_branch: str) -> list[str]:
     """Push the lane branch and queue the item for the next check train."""
     store.sync()
@@ -70,7 +81,16 @@ def submit(store: Store, item_id: str, worktree: Path, *, repo_url: str, base_br
     commits = gitio.out(worktree, "rev-list", "--reverse", f"refs/remotes/swarm/{base_branch}..HEAD").split()
     if not commits:
         raise SwarmError(f"{branch} has no commits beyond {base_branch}")
-    gitio.run(worktree, *gitio.auth_args(), "push", "--quiet", "--force", repo_url, f"HEAD:refs/heads/{branch}")
+    remote = _remote_head(worktree, repo_url, branch)
+    if remote:
+        contained = gitio.run(worktree, "merge-base", "--is-ancestor", remote, "HEAD", check=False).returncode == 0
+        last = item.meta["commits"][-1:]
+        if not contained and not (last and remote.startswith(last[0])):
+            raise SwarmError(f"{branch} has commits you do not have (the integrator may have fixed it in place); "
+                             f"run `git pull --rebase \"$SWARM_GIT_URL\" {branch}` and submit again")
+    # Rewriting your own last submission is fine; the lease refuses if anyone pushed since we looked.
+    gitio.run(worktree, *gitio.auth_args(), "push", "--quiet", f"--force-with-lease=refs/heads/{branch}:{remote}",
+              repo_url, f"HEAD:refs/heads/{branch}")
     vendor = owner.split(":", 1)[1].split("-", 1)[0] if on_behalf else store.vendor
 
     def mutate() -> bool:

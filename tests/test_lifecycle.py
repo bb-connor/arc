@@ -194,6 +194,7 @@ class SubmitTest(SwarmCase):
         self.worker = self.clone("codex-ws2-worker1")
         agents.register(self.worker, agent_id=self.worker.agent, machine="ws2", vendor="codex", role="worker",
                         model="m", effort="", tiers=["mid"])
+        self.integrator = self.clone("codex-builder-integrator", role="integrator", vendor="codex")
 
     def test_submit_pushes_lane_and_requests_review(self):
         self.add_item(self.conductor, "F1", title="Stop the bleed")
@@ -209,6 +210,50 @@ class SubmitTest(SwarmCase):
         item = items.load(self.worker, "F1")
         self.assertEqual((item.status, item.meta["author_vendor"]), ("submitted", "codex"))
         self.assertFalse(list(self.worker.path("msgs", "reviewer").glob("*.md")))  # check trains, not item reviews
+
+    def _submitted_lane(self):
+        self.add_item(self.conductor, "F1", title="Stop the bleed")
+        claims.claim(self.worker, "F1", [])
+        lifecycle.status(self.worker, "F1", "in-progress")
+        lane = worktree.create(self.worker, "F1", repo=self.repo, lanes=self.tmp / "lanes", base_branch="integration/beta-next")
+        (lane / "fix.txt").write_text("fixed\n")
+        commit_all(lane, "fix: stop the bleed (F1)")
+        lifecycle.submit(self.worker, "F1", lane, repo_url=str(self.arc), base_branch="integration/beta-next")
+        return lane, git(lane, "rev-parse", "--abbrev-ref", "HEAD")
+
+    # Final review: the integrator's fix-in-place commit was erased by the owner's next force-pushed submit.
+    def test_submit_never_overwrites_commits_pushed_by_someone_else(self):
+        lane, branch = self._submitted_lane()
+        lifecycle.status(self.integrator, "F1", "in-progress", "check train T1: E0308")
+        fixer = self.tmp / "fixer"
+        git(self.tmp, "clone", "--quiet", "--branch", branch, str(self.arc), str(fixer))
+        (fixer / "fix.txt").write_text("fixed by the integrator\n")
+        fix = commit_all(fixer, "fix: integrator repairs F1 in place")
+        git(fixer, "push", "--quiet", "origin", branch)
+        (lane / "more.txt").write_text("owner keeps going\n")
+        commit_all(lane, "fix: owner follow-up (F1)")
+        with self.assertRaisesRegex(SwarmError, "commits you do not have"):
+            lifecycle.submit(self.worker, "F1", lane, repo_url=str(self.arc), base_branch="integration/beta-next")
+        self.assertEqual(git(self.arc, "rev-parse", branch), fix)
+        git(lane, "pull", "--quiet", "--rebase", str(self.arc), branch)
+        lifecycle.submit(self.worker, "F1", lane, repo_url=str(self.arc), base_branch="integration/beta-next")
+        git(self.arc, "merge-base", "--is-ancestor", fix, branch)  # raises if the fix was lost
+
+    def test_submit_may_rewrite_the_owners_own_branch(self):
+        lane, branch = self._submitted_lane()
+        lifecycle.status(self.integrator, "F1", "in-progress", "check train T1: E0308")
+        (lane / "fix.txt").write_text("fixed properly\n")
+        git(lane, "commit", "--quiet", "--amend", "-a", "--no-edit")
+        lifecycle.submit(self.worker, "F1", lane, repo_url=str(self.arc), base_branch="integration/beta-next")
+        self.assertEqual(git(self.arc, "rev-parse", branch), git(lane, "rev-parse", "HEAD"))
+
+    def test_owner_hears_when_the_integrator_fixes_a_lane_in_place(self):
+        self._submitted_lane()
+        lifecycle.status(self.integrator, "F1", "in-progress", "check train T1: E0308")
+        msgs.inbox(self.worker)  # the bounce
+        lifecycle.status(self.integrator, "F1", "submitted", "fixed the E0308 in place")
+        subjects = [m["subject"] for m in msgs.inbox(self.worker)]
+        self.assertEqual(subjects, ["F1 fixed in place by the integrator"])
 
     def test_submit_without_commits_refused(self):
         self.add_item(self.conductor, "F1")

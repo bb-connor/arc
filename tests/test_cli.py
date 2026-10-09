@@ -1,3 +1,4 @@
+import json
 import os
 import subprocess
 import sys
@@ -50,6 +51,25 @@ class CLITest(SwarmCase):
         self.assertIn("only the integrator or the conductor runs check trains", refused.stderr)
         recorded = self.run_cli(conductor, "record", "decision", "pilot-roster", "--file", str(brief))
         self.assertEqual((recorded.returncode, recorded.stdout.strip()), (0, "decisions/0001-pilot-roster.md"))
+
+
+    # Final review: the red-CI override must survive the hop to the train host.
+    def test_check_train_forwards_its_flags_to_the_train_host(self):
+        from swarmlib.store import set_config
+        set_config(self.clone("claude-ws2-conductor", role="conductor", vendor="claude"), "train_host", json.dumps("fakehost"))
+        integrator = self.clone("codex-ws2-integrator", role="integrator", vendor="codex")
+        fake_bin = self.tmp / "bin"
+        fake_bin.mkdir()
+        (fake_bin / "ssh").write_text('#!/bin/sh\nprintf "%s\\n" "$@"\n')
+        (fake_bin / "ssh").chmod(0o755)
+        env = {**os.environ, "SWARM_HOME": str(integrator.root), "SWARM_AGENT": integrator.agent,
+               "SWARM_ROLE": "integrator", "SWARM_VENDOR": "codex", "SWARM_MACHINE": "ws2",
+               "PATH": f"{fake_bin}:{os.environ['PATH']}"}
+        ran = subprocess.run([sys.executable, str(BIN), "check-train", "--land", "--allow-red"], env=env,
+                             capture_output=True, text=True)
+        self.assertEqual(ran.returncode, 0, ran.stderr)
+        self.assertIn("fakehost", ran.stdout.splitlines())
+        self.assertTrue(ran.stdout.rstrip().endswith("check-train --local --land --allow-red"), ran.stdout)
 
 
 if __name__ == "__main__":

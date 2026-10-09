@@ -15,6 +15,7 @@ from . import gitio
 Runner = Callable[[list[str]], subprocess.CompletedProcess]
 WORKFLOW = "lane-test.yml"
 ACTIVE = {"queued", "in_progress", "waiting", "pending", "requested"}
+RED = {"failure", "timed_out", "startup_failure"}
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
@@ -93,6 +94,14 @@ def busy(runner: Runner, branch: str, workflow: str = "CI") -> bool:
     runs = json.loads(gh(runner, "run", "list", "--repo", repo_slug(), "--workflow", workflow,
                          "--branch", branch, "--json", "status", "--limit", "20"))
     return any(run["status"] in ACTIVE for run in runs)
+
+
+def red(runner: Runner, branch: str, workflow: str = "CI") -> bool:
+    """True when the latest finished run of `workflow` on `branch` failed (integrator landing gate)."""
+    runs = json.loads(gh(runner, "run", "list", "--repo", repo_slug(), "--workflow", workflow,
+                         "--branch", branch, "--json", "status,conclusion", "--limit", "20"))
+    finished = [run for run in runs if run["status"] == "completed" and run["conclusion"] != "cancelled"]
+    return bool(finished) and finished[0]["conclusion"] in RED
 
 
 def green_rate(runner: Runner, branch: str, workflow: str = "CI") -> float | None:

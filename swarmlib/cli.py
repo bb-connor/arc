@@ -248,13 +248,14 @@ def cmd_merge(store: Store, a: argparse.Namespace) -> int:
 def cmd_check_train(store: Store, a: argparse.Namespace) -> int:
     store.sync()
     host = store.config()["train_host"]
-    args = (["--land"] if a.land else []) + (["--max-lanes", str(a.max_lanes)] if a.max_lanes else [])
+    args = ((["--land"] if a.land else []) + (["--max-lanes", str(a.max_lanes)] if a.max_lanes else [])
+            + (["--allow-red"] if a.allow_red else []))
     if host and host != os.environ.get("SWARM_MACHINE", "") and not a.local:
         return subprocess.call(train.remote_command(host, agent=store.agent, role=store.role, vendor=store.vendor, args=args))
     result = train.run_train(
         store, repo=_env_path("SWARM_REPO", "~/backbay/arc"), lanes_dir=_env_path("SWARM_LANES", "~/lanes/swarm"),
         repo_url=worktree.repo_url(), land=a.land, ci_runner=ci.default_runner if a.land else None,
-        max_lanes=a.max_lanes,
+        max_lanes=a.max_lanes, allow_red=a.allow_red,
     )
     print(f"train {result.train_id} on {result.base[:12] or '-'}: green {result.green or '-'}, red {result.red or '-'}, "
           f"conflicted {result.conflicted or '-'}")
@@ -456,6 +457,7 @@ def parser() -> argparse.ArgumentParser:
     s = sub.add_parser("check-train", help="integrator/conductor: verify submitted lanes in one build; --land pushes")
     s.add_argument("--land", action="store_true", help="push the train when every lane is green (integrator only)")
     s.add_argument("--max-lanes", type=int)
+    s.add_argument("--allow-red", action="store_true", help="land even though CI on the base is red (the train fixes it)")
     s.add_argument("--local", action="store_true", help="run here even if config train_host names another host")
     s.set_defaults(fn=cmd_check_train)
 

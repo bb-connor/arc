@@ -21,15 +21,22 @@ Every agent reads this at startup. It is short on purpose. The design is
    Linux x86_64-only tests run through `swarm ci <ID> --packages <crate>`.
 4. One commit per fix, containing the code and its regression test, on the
    item's `lane/<ID>-<slug>` branch, with a conventional message naming the
-   item ID. `swarm submit <ID>` pushes the lane and marks it `submitted`.
+   item ID. `swarm submit <ID>` pushes the lane and marks it `submitted`. It
+   refuses to overwrite commits someone else pushed to your lane (the integrator
+   fixing it in place); pull them with `git pull --rebase` and submit again.
 5. Check trains, not per-item reviews: the integrator's `swarm check-train`
-   builds every submitted lane in one pass. A failing or conflicting lane comes
-   back `in-progress` with the exact error; a green one becomes `ready`, and is
-   `integrated` when the train lands. Reviews are batched: one cross-vendor
-   whole-PR review per pushed head (`swarm review-pr`).
+   builds every submitted `lane/` branch in one pass, one train at a time per
+   host, in a reused worktree whose `target/` stays warm. A failing or
+   conflicting lane comes back `in-progress` with the exact error; a green one
+   becomes `ready`, and is `integrated` when the train lands. A failure no
+   single lane clearly owns (for example a break downstream of two lanes) is
+   reported as unattributed with its suspects and moves nobody. Reviews are
+   batched: one cross-vendor whole-PR review per pushed head (`swarm review-pr`).
 6. Only the integrator lands on `integration/beta-next`, through
-   `swarm check-train --land`, which will not push while CI is running. The
-   integrator fixes small integration breaks in place rather than bouncing them.
+   `swarm check-train --land`, which will not push while CI is running or while
+   its latest run is red (`--allow-red` when the train carries the fix). The
+   integrator fixes small integration breaks in place rather than bouncing them,
+   and the owner is told when it does.
 7. Only the integrator or the conductor merges to `main`, and only with `swarm merge`. Its gate
    requires, on the PR's head commit: the four required checks green, a completed Codex review,
    no open P0-P2 review-bot finding (fixed, or `wontfix` with a recorded reason), and an accepted

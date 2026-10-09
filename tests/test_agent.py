@@ -193,6 +193,90 @@ class LoopTest(SwarmCase):
         self.assertNotIn("--resume", commands[3])
         self.assertIn("conductor of the Chio swarm", commands[3][2])
 
+    # Final review ruling: a message that arrives while a turn runs was marked read without being seen.
+    def test_messages_arriving_during_a_turn_stay_unread(self):
+        conductor = self.clone("claude-ws2-conductor-8", role="conductor", vendor="claude")
+        agents.register(conductor, agent_id=conductor.agent, machine="ws2", vendor="claude", role="conductor",
+                        model="opus", effort="", tiers=["premium"])
+        meta = agents.load(conductor, conductor.agent)
+        msgs.send(self.worker, "conductor", "fyi", "", "before the turn", "seen")
+
+        def fake(command, cwd, log):
+            msgs.send(self.worker, "conductor", "blocker", "", "during the turn", "not seen yet")
+            return Execution(0, json.dumps({"type": "result", "session_id": "sess-1"}))
+
+        def waiter(store, timeout, **kw):
+            return lifecycle.wait(store, timeout=60, interval=30, sleep=lambda _s: None, **kw)
+
+        ctx = self.ctx(conductor, meta, fake, waiter=waiter)
+        self.assertEqual(agent.session_iteration(ctx), "turn")
+        self.assertEqual([m["subject"] for m in msgs.inbox(conductor, mark=False)], ["during the turn"])
+
+    def _rotating_conductor(self, name):
+        conductor = self.clone(name, role="conductor", vendor="claude")
+        agents.register(conductor, agent_id=conductor.agent, machine="ws2", vendor="claude", role="conductor",
+                        model="opus", effort="", tiers=["premium"])
+        from swarmlib.store import set_config
+        set_config(conductor, "session_max_turns", "1")
+        return conductor, agents.load(conductor, conductor.agent)
+
+    # Final review: the events that woke a rotating session were marked read and never handed on.
+    def test_rotation_hands_the_waking_events_to_the_successor(self):
+        conductor, meta = self._rotating_conductor("claude-ws2-conductor-5")
+        prompts = []
+
+        def fake(command, cwd, log):
+            prompts.append(command[2])
+            return Execution(0, json.dumps({"type": "result", "session_id": "sess-1"}))
+
+        def waiter(store, timeout, **kw):
+            return lifecycle.wait(store, timeout=60, interval=30, sleep=lambda _s: None, **kw)
+
+        ctx = self.ctx(conductor, meta, fake, waiter=waiter)
+        self.assertEqual(agent.session_iteration(ctx), "turn")
+        msgs.send(self.worker, "conductor", "blocker", "", "disk full on builder", "trains refused")
+        self.assertEqual(agent.session_iteration(ctx), "rotated")
+        self.assertIn("disk full on builder", prompts[1])
+        self.assertIn("disk full on builder", [m["subject"] for m in msgs.inbox(conductor, mark=False)])
+
+    # Final review: a failed handoff turn still retired the session, leaving the successor a stale handoff.
+    def test_a_session_retired_without_a_handoff_gets_one_from_the_runner(self):
+        conductor, meta = self._rotating_conductor("claude-ws2-conductor-6")
+        calls = []
+
+        def fake(command, cwd, log):
+            calls.append(command)
+            if len(calls) == 2:
+                return Execution(1, "error: context window exceeded")
+            return Execution(0, json.dumps({"type": "result", "session_id": "sess-1"}))
+
+        waits = iter([[], ["message from codex-ws2-worker1 [blocker] : disk full on builder"]])
+        ctx = self.ctx(conductor, meta, fake, waiter=lambda store, timeout, **kw: next(waits))
+        self.assertEqual([agent.session_iteration(ctx) for _ in range(2)], ["turn", "rotated"])
+        conductor.sync()
+        handoffs = sorted(conductor.path("digests").glob(f"{conductor.agent}-handoff-*.md"))
+        self.assertEqual(len(handoffs), 1)
+        text = handoffs[0].read_text()
+        self.assertIn("without writing a handoff", text)
+        self.assertIn("disk full on builder", text)
+
+    def test_a_handoff_the_session_wrote_is_kept(self):
+        import re
+        from swarmlib import store as swarm_store
+        conductor, meta = self._rotating_conductor("claude-ws2-conductor-7")
+
+        def fake(command, cwd, log):
+            named = re.search(r"swarm record digest (\S+-handoff-\d\S*) --file", command[2])
+            if named:
+                swarm_store.record(conductor, "digest", named.group(1), "handoff written by the session")
+            return Execution(0, json.dumps({"type": "result", "session_id": "sess-1"}))
+
+        ctx = self.ctx(conductor, meta, fake, waiter=lambda store, timeout, **kw: [])
+        self.assertEqual([agent.session_iteration(ctx) for _ in range(2)], ["turn", "rotated"])
+        conductor.sync()
+        handoffs = sorted(conductor.path("digests").glob(f"{conductor.agent}-handoff-*.md"))
+        self.assertEqual([p.read_text().strip() for p in handoffs], ["handoff written by the session"])
+
     def test_janitor_answers_requests_addressed_to_it(self):
         janitor = self.clone("hermes-ws2-janitor1", role="janitor", vendor="hermes")
         agents.register(janitor, agent_id=janitor.agent, machine="ws2", vendor="hermes", role="janitor",

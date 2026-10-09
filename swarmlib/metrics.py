@@ -12,6 +12,7 @@ from . import clock, items
 from .store import Store
 
 LOG_LINE = re.compile(r"^- (\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ) (\S+): (.*)$", re.M)
+INTEGRATED = re.compile(r"status \S+ -> integrated\b")  # ready -> or, for landed trains, submitted ->
 
 
 def events(item: items.Item) -> list[tuple[datetime, str, str]]:
@@ -22,7 +23,7 @@ def integrated_since(store: Store, since: datetime) -> list[str]:
     everything, _ = items.all_items(store)
     return sorted(
         i.id for i in everything
-        if any(at >= since and text.startswith("status ready -> integrated") for at, _, text in events(i))
+        if any(at >= since and INTEGRATED.match(text) for at, _, text in events(i))
     )
 
 

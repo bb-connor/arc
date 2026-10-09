@@ -10,6 +10,7 @@ from __future__ import annotations
 import fcntl
 import json
 import os
+import re
 import shutil
 import subprocess
 import time
@@ -97,8 +98,12 @@ def scope_prefix(build_class: str = "coder") -> list[str]:
     ]
 
 
+CREDENTIAL = re.compile(r"TOKEN|SECRET|API_KEY|PASSWORD", re.I)
+
+
 def build_env(base: dict[str, str]) -> dict[str, str]:
-    env = dict(base)
+    """Build settings, without credentials: dependency build scripts and proc macros run in this environment."""
+    env = {key: value for key, value in base.items() if not CREDENTIAL.search(key)}
     if setting("SWARM_SCCACHE", "1") != "0" and shutil.which("sccache"):
         env.setdefault("RUSTC_WRAPPER", "sccache")
         env.setdefault("SCCACHE_CACHE_SIZE", "60G")

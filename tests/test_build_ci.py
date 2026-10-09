@@ -36,6 +36,13 @@ class BuildTest(SwarmCase):
         self.assertIn("CPUWeight=20", prefix)
         self.assertIn("MemoryMax=14G", prefix)
 
+    # Final review ruling: build scripts and proc macros run with the build's environment; keep credentials out.
+    def test_build_env_drops_credentials(self):
+        env = build.build_env({"PATH": "/bin", "GH_TOKEN": "gho_x", "GITHUB_TOKEN": "ghs_y",
+                               "OPENROUTER_API_KEY": "sk-or-z", "AWS_SECRET_ACCESS_KEY": "s"})
+        self.assertEqual(env["PATH"], "/bin")
+        self.assertFalse({"GH_TOKEN", "GITHUB_TOKEN", "OPENROUTER_API_KEY", "AWS_SECRET_ACCESS_KEY"} & set(env))
+
     def test_build_env_disables_incremental_and_uses_sccache(self):
         with mock.patch.object(build.shutil, "which", return_value="/usr/bin/sccache"):
             env = build.build_env({"PATH": "/bin"})

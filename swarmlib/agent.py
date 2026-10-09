@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Callable
 
 from . import agents, board, ci, claims, clock, gitio, items, lifecycle, msgs, reviews, worktree
-from .store import Halted, Store, SwarmError
+from .store import Halted, Store, SwarmError, record
 
 RATE_LIMIT_RE = re.compile(
     r"(?i)rate.?limit|usage limit|quota exceeded|too many requests|\b429\b|limit reached|try again (?:at|in)"
@@ -257,34 +257,50 @@ def janitor_iteration(ctx: Context) -> list[str]:
     return done
 
 
+def ensure_handoff(store: Store, agent_id: str, stamp: str, outcome: str, events: str) -> None:
+    """A retired session must leave the newest handoff, so write a minimal one when it did not."""
+    name = f"{agent_id}-handoff-{stamp}"
+    store.sync()
+    if store.path("digests", f"{name}.md").exists():
+        return
+    record(store, "digest", name, (
+        f"# Handoff for {agent_id}\n\nThe previous session ended without writing a handoff ({outcome}). "
+        "Rebuild your picture from `swarm list`, the board, your items' logs and older handoffs before acting.\n\n"
+        f"Unhandled events when it retired (they are still unread in your inbox):\n{events}\n"
+    ))
+
+
 def session_iteration(ctx: Context, *, wait_timeout: float = 1200) -> str:
     store, meta = ctx.store, ctx.meta
     digest = {"digest_every": store.config()["digest_seconds"]} if meta["role"] == "conductor" else {}
     events = ctx.waiter(store, timeout=wait_timeout, **digest)
+    pending = [m["key"] for m in msgs.inbox(store, mark=False, sync=False)]  # what this turn is shown
     sid_path = state_dir() / f"{meta['id']}.session"
     turns_path = state_dir() / f"{meta['id']}.turns"
     sid = sid_path.read_text().strip() if sid_path.exists() else ""
     turns = int(turns_path.read_text() or "0") if turns_path.exists() and sid else 0
     rotating = bool(sid) and turns >= int(store.config()["session_max_turns"])
+    stamp = clock.stamp()
     if rotating:
-        prompt = render(ctx.prompts / "handoff.md", agent=meta["id"], stamp=clock.stamp())
+        listed = "\n".join(f"- {e}" for e in events) or "- none"
+        prompt = render(ctx.prompts / "handoff.md", agent=meta["id"], stamp=stamp, events=listed)
     elif sid:
         prompt = render(ctx.prompts / "event.md", events="\n".join(f"- {e}" for e in events) or "- periodic check, no new events")
     else:
         prompt = render(ctx.prompts / f"{meta['role']}.md", agent=meta["id"], base=store.config()["base_branch"])
     cwd = Path(os.environ.get("SWARM_SESSION_DIR", str(store.root))).expanduser()
-    result = ctx.executor(
-        vendor_command(meta, prompt, cwd, resume_id=sid, settings=ctx.settings), cwd,
-        ctx.logs / f"session-{clock.stamp()}.log",
-    )
+    log = ctx.logs / f"session-{stamp}.log"
+    result = ctx.executor(vendor_command(meta, prompt, cwd, resume_id=sid, settings=ctx.settings), cwd, log)
     if rate_limited(result):
         return throttle(store)
-    msgs.inbox(store, mark=True)  # the turn saw these events; do not replay them
     claims.heartbeat(store)
     if rotating:
+        # The inbox stays unread so the successor's first wait returns the events this session never acted on.
+        ensure_handoff(store, meta["id"], stamp, f"exit {result.returncode}; log {log}", listed)
         sid_path.unlink(missing_ok=True)  # the successor starts from the charter and reads the handoff
         turns_path.unlink(missing_ok=True)
         return "rotated"
+    msgs.mark_seen(store, pending)  # the turn saw these; anything that arrived meanwhile wakes the next one
     new_sid = session_id_from(meta["vendor"], result.output)
     if new_sid:
         sid_path.write_text(new_sid)
