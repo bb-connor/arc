@@ -10,40 +10,39 @@ a later requirement state or establish current candidate qualification.
 ## Current composed snapshot checkpoint (October 9)
 
 The canonical ledger contains **1,835 requirements**, each represented in
-`current_requirement_states`. All prior requirement objects remain preserved.
-Five existing CI closeout entries were copied into the previously incomplete
-current view without changing their evidence or qualification status.
+`current_requirement_states`. All historical requirement objects and evidence
+remain preserved.
 
-The isolated stage at `17c89ed9bd` includes the issuer trust/SSRF, public-worker,
-response-finalization and authority read-only repairs. The [authority qualification
-record](audits/authority-readonly-local-qualification-20261009.json) binds the
-61 public-route, 38 authority-store and 43 CLI controls, strict three-owner
-Clippy and six static gates to their source. One existing CLI test remains
-explicitly ignored. Both independent authority reviews are retained. Public readers no longer provision or write authority state;
-trusted CLI startup provisions its configured database once. This does not
-harden the unchanged seed-only status reader or qualify other platforms.
+The isolated stage at `6a1c7c5a9f` repairs checkpoint publication before root
+validation, unauthenticated checkpoint target selection, and lineage refresh
+that bypassed canonical validation. The [integrity qualification record](audits/receipt-snapshot-integrity-qualification-20261009.json)
+binds genuine Original failures to the repairs and composed **117 snapshot and
+backing tests, 61 public-route tests, strict three-owner Clippy and six static
+gates**. The first test selector omitted 27 backing controls; its rejected
+qualification result is retained and the disjoint complement supplies all
+expected names. Five snapshot tests remain explicitly ignored in this run.
 
-The [checkpoint-publication review](../reviews/2026-10-09-pr1160-checkpoint-publication-review.md)
-accepts the separately tested staging-race repair, while identifying a remaining
-P1: an unauthenticated end column can hide a committed covering checkpoint.
-Its service regression and repair remain assigned to the checkpoint lane.
-Lineage provenance validation, the C20 invalidation/rebuild count campaign,
-affected capacity renewal and the original-domain real-SHA proof also remain
-required. Source and the published PR have not advanced at this checkpoint.
+The [authority qualification record](audits/authority-readonly-local-qualification-20261009.json)
+retains the earlier 61 public, 38 authority-store and 43 CLI controls at
+`17c89ed9bd`, with strict and static checks and both independent reviews.
+Public authority readers no longer provision or write authority state; trusted
+CLI startup provisions the configured database once. One existing CLI ignore
+and the unchanged seed-only reader boundary remain explicit.
 
+The full 150k Original/final capacity comparison and the C20 randomized
+invalidation/rebuild count and query campaign remain pending. The restored
+builder will run both sides of the capacity comparison on the same host.
 [Earlier capacity measurements](audits/receipt-snapshot-capacity-20261009.json)
-remain bound to source `f24a5240e6`: one million signed Linux receipts and ten
-million synthetic projection rows passed distinct campaigns. Each signed build
-authenticated one million signatures with zero count mismatches. Rotation
-started during the contended build and finished afterward; RSS does not isolate
-walker allocations. Later integrity repairs require affected renewal.
+remain bound to predecessor source `f24a5240e6`: one million signed Linux
+receipts and ten million synthetic projection rows passed distinct campaigns.
+The later target query and signed-end comparison change initial-build work;
+no full-build byte-equivalence or renewed one-million-row result is claimed.
 
-The earlier full control-plane runs remain incomplete: one was deliberately
-cancelled after 456 observed passes, and the producer run was interrupted by
-provider preemption after 1,299 observed passes. Neither is a completed owning
-suite. The provider also interrupted an OID lint run; the new local strict run
-is separately recorded. No candidate, hosted, native-product, release or merge
-qualification is inferred from these focused results.
+The mandatory original-domain real-SHA proof also remains open. Source and the
+published PR have not advanced. Final review, exact protected hosted checks
+and protected merge follow the completed local batch. Previous cancelled or
+provider-interrupted full control-plane campaigns remain incomplete; these
+focused results do not establish full-suite, hosted, release or merge readiness.
 
 ## Current landing repair wave (October 9)
 
