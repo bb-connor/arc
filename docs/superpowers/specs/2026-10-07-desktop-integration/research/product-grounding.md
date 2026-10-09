@@ -19,8 +19,6 @@ required support and replaces mini-swe-first adoption assumptions.
 
 ## Product ambition
 
-**Chio is a Rust kernel for building agentic operating systems.**
-
 **Chio is a Rust kernel for agentic operating systems that coordinate work,
 share resources, and cooperate across organizational boundaries.**
 

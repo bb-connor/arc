@@ -1,106 +1,68 @@
-# Chio native host integration program
-
-**Chio is a Rust kernel for agentic operating systems that coordinate work,
-share resources, and cooperate across organizational boundaries.**
-
-This program makes that kernel useful as a native systems layer on Linux/Omarchy
-and macOS. External applications, agent harnesses and Herdr own their workflows
-and interfaces. Chio supplies reusable authority, process/resource custody,
-work evidence and recovery through qualified owner contracts above the OS.
+# Chio native host program
 
 Status: accepted planning direction, amended 2026-10-08 UTC. The specifications
 do not qualify an implementation, installed profile or release.
 `planning_status: ready_after_adr`; `boundary_class` belongs to each operation.
 Consumer presentation and the optional operator projection are `advisory_only`.
 
-The required first-class integrations are **Claude Code, Codex, Pi and Hermes**,
-plus **Herdr as a workspace/plugin consumer**. Each uses its existing integration
-owner and receives separate native acceptance. Mini-swe is an optional
-reference/test workload; it does not set platform requirements or harness
-priority. See [required integration scope](FIRST-CLASS-INTEGRATIONS.md).
+**Chio is a Rust kernel for agentic operating systems that coordinate work,
+share resources, and cooperate across organizational boundaries.**
+
+**Authority that only narrows. Work that survives. Evidence that travels.**
+
+[NORTH-STAR-FLOWS](NORTH-STAR-FLOWS.md) governs this program (approved
+2026-10-08). Other documents reference its flows instead of restating them.
+HOST-M1 code (Lane COOP in the unified roadmap) does not wait on this document
+restructure (roadmap section 7).
+
+## Three flows
+
+- **HOST-M1 Cooperate-0.** Two independently operated hosts run the shipped
+  passport, challenge, federated-issue and evidence loop; each admits at its
+  own door. [Flow M1](NORTH-STAR-FLOWS.md#3-flow-m1-cooperate-0).
+- **HOST-M2 One root grant, many agents.** Claude Code, Codex, Pi and Hermes
+  workers draw on one owner-metered pool and leave one authority tree that
+  survives restart. [Flow M2](NORTH-STAR-FLOWS.md#4-flow-m2-one-root-grant-many-agents).
+- **HOST-M3 Work that crosses an organization boundary and comes back
+  verified.** Co-signed work under #1173 W1/W2, run in the executing owner's
+  HOST-M2 tree and verified offline. [Flow M3](NORTH-STAR-FLOWS.md#5-flow-m3-work-that-crosses-an-organization-boundary-and-comes-back-verified).
+
+## Platform order
+
+From [NORTH-STAR-FLOWS section 6](NORTH-STAR-FLOWS.md#6-platform-delivery):
+
+1. HOST-M1 on both platforms together, server-first: portable Rust services
+   plus OS key custody and service packaging.
+2. HOST-M2 on Omarchy with Pi first, then Linux launchers one host at a time,
+   each promoted on its own doc 19 I01-I08 evidence.
+3. HOST-M2 on macOS after the success test (roadmap section 11), once the
+   Darwin runner, broker and resource backend land.
+4. HOST-M3 pairs platforms that have reached HOST-M2; until macOS does, the
+   executing organization runs Linux.
 
 ## Read in order
 
-0. [North-star flows](NORTH-STAR-FLOWS.md): proposed governing design, pending owner review. It turns the three verbs into the M1, M2 and M3 flows that the other documents will be restructured around.
-1. [Accepted native host decision](../../../adr/ADR-0038-native-host-program.md).
-2. [Product research and alternatives](research/product-grounding.md).
-3. [Capability and roadmap traceability](CAPABILITIES.md).
-4. [Native host contract and architecture](HOST-CONTRACT.md).
-5. [Pinned source owners and dependency gates](../../../architecture/PROGRAM-MAP.md).
-6. [Independent consumer acceptance](CONSUMERS.md).
-7. [Optional operator projection](OPERATOR.md).
-8. [Native qualification and release evidence](QUALIFICATION.md).
-9. [Qualification verifier and native activation](RELEASE.md).
-10. [Shared delivery plan](../../plans/2026-10-07-desktop-integration.md).
-11. [Omarchy/Linux annex](../2026-10-07-omarchy-integration/ANNEX.md).
+1. [NORTH-STAR-FLOWS](NORTH-STAR-FLOWS.md): north star, identity model, the three flows, exit criteria and the owner change register.
+2. [ADR-0038](../../../adr/ADR-0038-native-host-program.md): the decision and its 2026-10-08 amendment.
+3. [CASES](CASES.md): every acceptance case, by milestone.
+4. [CAPABILITIES](CAPABILITIES.md): verb, owner, status and platform matrix.
+5. [HOST-CONTRACT](HOST-CONTRACT.md): deployment profiles, native ports and the systems boundary.
+6. [PROGRAM-MAP](../../../architecture/PROGRAM-MAP.md): pinned sources and owner gates.
+7. The [Omarchy annex](../2026-10-07-omarchy-integration/ANNEX.md) and the [macOS annex](../2026-10-07-macos-integration/ANNEX.md).
 
-The [macOS annex](../2026-10-07-macos-integration/ANNEX.md) and its
-[implementation plan](../../plans/2026-10-07-macos-integration/IMPLEMENTATION.md)
-are the dependent platform change included in this composed branch. The shared
-directory name is retained for review continuity, not as a requirement to ship
-a Chio desktop.
+Supporting documents: [FIRST-CLASS-INTEGRATIONS](FIRST-CLASS-INTEGRATIONS.md)
+(required harnesses and Herdr), [CONSUMERS](CONSUMERS.md) (independent consumer
+design), [QUALIFICATION](QUALIFICATION.md) (profiles and release evidence),
+[RELEASE](RELEASE.md) (verifier and activation), [OPERATOR](OPERATOR.md)
+(optional operator projection), the [shared plan](../../plans/2026-10-07-desktop-integration.md),
+[product research](research/product-grounding.md) and [review records](REVIEW.md).
 
-## What a valuable integration proves
+## Boundaries
 
-Install the native candidate. Start the selected owner services or embed the
-qualified library profile. Connect an external harness and a materially different
-application without a Chio UI. Each performs useful authorized work, encounters
-an independently observed refusal, reconnects after a lost reply without duplicate
-effects, and reads the same owner evidence. Remove the frontend and repeat.
-
-Then prove the ambition's three dimensions through their proper owners:
-
-- **Coordinate work:** stable agent/process identities, bounded delegated authority,
-  accepted dependencies and original-operation recovery let applications divide
-  work without implementing a second authority or recovery machine.
-- **Share resources:** concurrent agents use one authoritative allowance/resource
-  owner, current assignment fences and explicit limits. Native resource denial
-  remains effective if clients crash or misreport their counters.
-- **Cooperate across organizations:** enrolled independent owners retain their
-  keys and policy, verify the other's evidence, refuse unauthorized work or
-  disclosure, and reconcile loss without inventing new rights or effects.
-
-Basic Observe, process/control and other narrow capabilities can ship independently
-with truthful scope. They do not alone complete the above ambition. Two local
-clients prove reuse; two independent organizations prove a separate trust boundary.
-Passports are credentials, OS identity identifies a local peer, and a current
-capability authorizes a specific action. The integration must preserve all three.
-
-## Deployment and consumer scope
-
-Embedded, user-session and separately enrolled service-principal profiles have
-different trust, credential and lifecycle requirements. Headless means a frontend
-is unnecessary; it does not automatically mean work may survive logout or boot.
-Platform plans own those distinctions and their tests.
-
-Existing Rust/SDK/CLI/native owner surfaces come first. `chio.operator.v1` is an
-optional view composition, not the generic kernel API or a required daemon.
-Megastart and Herdr demonstrate the application/host split; their mission API,
-coordinator logic and task layout remain application-specific. Workbench, menu
-bar, Omarchy plugin and notifications may consume qualified contracts later.
-
-Selected graphical clients retain keyboard/screen-reader access, inert artifact
-rendering, private notifications, exact native approvals and browser-origin
-security. Selected coding workloads retain evaluator confinement, safe patch
-export and separate publication authority. Those obligations do not become
-prerequisites for unrelated headless resource or process capabilities.
-
-## Coverage and change discipline
-
-| Concern | Governing artifact |
-| --- | --- |
-| Product direction, trusted core, external application role | ADR-0038 and HOST-CONTRACT |
-| Passports, recursive delegation, swarm authority, work, recovery and competitive choices | CAPABILITIES, product research and PROGRAM-MAP |
-| Real APIs/ABI, native owners, current versus proposed status | PROGRAM-MAP; owner source controls |
-| Native deployment, OS ports, credentials, IPC, lifecycle, resource custody | HOST-CONTRACT plus platform annexes |
-| Required Claude Code, Codex, Pi, Hermes and Herdr support | FIRST-CLASS-INTEGRATIONS, per-platform H01-H08 and existing I01-I08 |
-| Harness/application reuse, shared resources and independent-owner cooperation | CONSUMERS and QUALIFICATION |
-| Optional view correlation, approval display and browser/native clients | OPERATOR; only for consumers selecting this projection |
-| Native adversarial cases, measured budgets, release/update/removal | QUALIFICATION and platform executable case manifests |
-| Dependency order, owner handoffs and acceptance evidence | Shared and platform implementation plans |
-
-Every addition names its owner, native boundary, consumer benefit, selected
-profile, source status and independent acceptance. Missing owner semantics go
-back to that owner. A UI need cannot create a second signer, ledger, scheduler
-or retry model. [Review records](REVIEW.md) distinguish document validation from
-runtime and public release evidence.
+Hook-mode host activity is `detect_only`; hook failure does not block the host.
+Isolation always comes from the host backend (bubblewrap, Seatbelt, containers
+or VMs) and is credited through its #1174 S7 evidence kind; Chio grants, the
+host denies. A receipt can be missing after a tool has already been dispatched
+(#1174 KDEF-D1), so a missing receipt is not evidence that no effect occurred.
+Nothing in this program is qualified or released until its CASES rows pass on
+real hosts.
