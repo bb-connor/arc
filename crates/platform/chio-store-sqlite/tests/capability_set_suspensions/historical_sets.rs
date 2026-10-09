@@ -134,3 +134,35 @@ fn stale_apply_cannot_resurrect_a_lifted_set() {
     let _ = store.apply_capability_set_suspension(&applied.apply);
     assert!(!decision(&store, "historical-capability-0").denied);
 }
+
+#[test]
+fn contribution_without_state_row_fails_closed() {
+    let dir =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let path = dir.path().join("historical-orphan.db");
+    let action_id = action("historical-action");
+    let (store, work) = open_claimed_store(&path, &[action_id.as_str()]);
+    apply_set(&store, &work, &action_id, 0);
+    assert!(decision(&store, "historical-capability-0").denied);
+
+    let external = rusqlite::Connection::open(&path)
+        .unwrap_or_else(|error| panic!("open external connection: {error}"));
+    external
+        .execute_batch("PRAGMA foreign_keys=OFF")
+        .unwrap_or_else(|error| panic!("disable foreign keys: {error}"));
+    let deleted = external
+        .execute(
+            "DELETE FROM security_capability_set_suspension_state WHERE tenant_id = ?1",
+            rusqlite::params![tenant().as_str()],
+        )
+        .unwrap_or_else(|error| panic!("delete state row: {error}"));
+    assert_eq!(deleted, 1);
+
+    let refusal = require_error(
+        store.evaluate_capability_suspension(&CapabilitySuspensionQuery {
+            tenant_id: tenant(),
+            capability_id: record("historical-capability-0"),
+        }),
+    );
+    assert_eq!(refusal.kind(), PortErrorKind::IntegrityFailure);
+}
