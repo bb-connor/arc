@@ -2493,7 +2493,7 @@ async fn recovery_legacy_planning_history_preserves_current_operator_rotation() 
                 (SELECT count(*) FROM admission_operation_recovery_records WHERE record_key GLOB 'deployment-history:*')",
             [], |row| Ok((row.get(0)?,row.get(1)?)),
         )?;
-        assert!(events >= 30000 && events < 57344);
+        assert!((30000..57344).contains(&events));
         assert!(roots <= 3);
         let new_metadata: i64 = connection.query_row("SELECT count(*) FROM admission_operation_recovery_records WHERE record_key GLOB 'recovery-planning-quota:*'", [], |row| row.get(0))?;
         assert_eq!(new_metadata, 0, "legacy format fixture created new allocation metadata");

@@ -235,7 +235,7 @@ fn setup_genuine_legacy_completion_retires_without_renewing_old_process_credenti
     assert_eq!(report.body().probe, *probe.body());
     assert_eq!(
         selection["previous_fence"],
-        serde_json::to_value(&report.body().previous_serving_fence)?
+        serde_json::to_value(report.body().previous_serving_fence)?
     );
     assert_ne!(
         report.body().previous_serving_fence,
@@ -262,11 +262,11 @@ fn setup_genuine_legacy_completion_retires_without_renewing_old_process_credenti
     );
     assert_eq!(
         selection["evidence"]["benign_receipt"],
-        serde_json::to_value(&report.body().benign_receipt)?
+        serde_json::to_value(report.body().benign_receipt)?
     );
     assert_eq!(
         selection["evidence"]["denied_command"],
-        serde_json::to_value(&report.body().denied_command_digest)?
+        serde_json::to_value(report.body().denied_command_digest)?
     );
     assert_eq!(
         selection["receipt_key"],

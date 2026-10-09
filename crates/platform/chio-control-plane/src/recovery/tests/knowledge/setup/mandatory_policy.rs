@@ -1,6 +1,8 @@
 //! Trusted native setup policy closes new work before the first selection.
 use super::*;
 
+type NativeOperationRow = (String, String, String, Vec<u8>);
+
 #[tokio::test]
 async fn setup_required_policy_refuses_a_bare_runtime_before_any_selection_exists() -> TestResult {
     let f = KnowledgeFixture::from(super::super::super::semantic::native_fixture("read")?)?;
@@ -152,7 +154,7 @@ async fn setup_required_policy_accepts_the_exact_pinned_operator_and_live_mediat
         })?;
         Ok(rows.collect::<Result<_, _>>()?)
     };
-    let native_operations = || -> TestResult<Vec<(String, String, String, Vec<u8>)>> {
+    let native_operations = || -> TestResult<Vec<NativeOperationRow>> {
         let connection = rusqlite::Connection::open(f.f.path.join("admission.db"))?;
         let mut statement = connection.prepare(
             "SELECT operation_id,request_namespace_digest,request_id,operation_json FROM admission_operations ORDER BY operation_id",
