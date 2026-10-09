@@ -302,6 +302,21 @@ impl ChioKernel {
         let Some(operation) = operation else {
             return Ok(());
         };
+        // This sample is only a floor. The durable runtime refreshes it from
+        // its own fenced clock and refuses without trusted time, so a failed
+        // kernel sample is recorded and cannot skip the compensation.
+        let trusted_floor_unix_ms = match self.read_authority_time() {
+            Ok(time) => time.get(),
+            Err(error) => {
+                warn!(
+                    operation_id = operation.binding().operation_id().as_str(),
+                    reason = %redacted!(&error),
+                    audit_fault = "compensation_kernel_clock_unavailable",
+                    "kernel clock sample failed; compensation takes trusted time from the durable runtime"
+                );
+                0
+            }
+        };
         self.compensate_durable_admission_before_dispatch(
             operation,
             serde_json::json!({
@@ -312,7 +327,7 @@ impl ChioKernel {
                 "payment_authorization_id": payment_authorization
                     .map(|authorization| authorization.authorization_id.as_str())
             }),
-            self.read_authority_time()?.get(),
+            trusted_floor_unix_ms,
             payment_unwind,
         )
     }
