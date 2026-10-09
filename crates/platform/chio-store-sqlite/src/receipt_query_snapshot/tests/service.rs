@@ -500,3 +500,35 @@ fn point_reads_are_scoped_and_negatives_require_the_head() {
     }
     service.shutdown();
 }
+
+#[test]
+fn c12_a_poisoned_writer_head_invalidates_reads_and_is_never_revived() {
+    let fixture = mixed_fixture();
+    let service = ready(&fixture, config());
+    assert!(service.query_receipts(&admin(10)).is_ok());
+    // A checkpoint row diverges out of band; the writer's own reseed fails
+    // closed and poisons its verified head.
+    fixture
+        .tamper()
+        .execute(
+            "UPDATE kernel_checkpoints SET statement_json = replace(statement_json, '\"batch_end_seq\":4', '\"batch_end_seq\":3') WHERE checkpoint_seq = 1",
+            [],
+        )
+        .unwrap();
+    assert!(fixture.store.reseed_verified_head().is_err());
+    assert!(fixture.store.writer_serving_closed());
+    let error = service.query_receipts(&admin(10)).unwrap_err();
+    assert!(matches!(
+        snapshot_error(error),
+        ReceiptQuerySnapshotError::Invalid(_)
+    ));
+    wait_for(&service, "invalid", |state| {
+        matches!(state, ReceiptQuerySnapshotState::Invalid { .. })
+    });
+    // No rebuild is attempted while the head stays poisoned.
+    let deadline = Instant::now() + Duration::from_millis(500);
+    while Instant::now() < deadline {
+        assert!(service.query_receipts(&admin(10)).is_err());
+    }
+    service.shutdown();
+}
