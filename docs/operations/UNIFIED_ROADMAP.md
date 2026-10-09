@@ -523,7 +523,7 @@ Chio Computer (#1199) is the developer face of the substrate lanes. A developer 
   - **Exit (gates G5):** the hero runs from installed packages, outside the source checkout, on the release G5 uses.
 - **COMP-6: dogfood.** After COMP-3, #1197's development swarm runs its lanes as Computer forks, and its merge gate becomes an expected-base apply with exported evidence. This is same-domain, so it never counts toward independence.
   - **Exit:** Chio's own merges land through Computer.
-- **COMP-7: second-application reuse (required after G5).** Application C (versioned data curation) uses the installed Computer-0 surface qualified at COMP-5/G5. It may run internally and never substitutes for G5's outside-team runs. COMP-6 is not a prerequisite. Application B (confined work beside private data) remains optional stretch scope.
+- **COMP-7: second-application reuse (required; never gates G5).** Application C (versioned data curation) runs on the installed Computer-0 surface. It depends on COMP-5 only. It can start as soon as that surface exists, so a second consumer finds API problems before outside teams do. Its final evidence is recorded on the release G5 uses. It may run internally and never substitutes for G5's outside-team runs. COMP-6 is not a prerequisite. Application B (confined work beside private data) remains optional stretch scope.
   - **Exit:** Application C produces an accepted, sealed CSV/JSON dataset revision, releases its governed diff and publishes by expected-base apply. A source-conflict drill refuses stale publication and a lost-reply drill recovers the original operation. Record installed package identities and reuse evidence outside the source checkout. The application reuses the same owners and adds no custom signing, retry, verifier service or consumption ledger; domain predicates and transformations remain application code.
 
 ## 5. Gates
@@ -540,7 +540,7 @@ Gate 0 ─┬─ REL-1,REL-2 + KERN-1,KERN-2,KERN-6 + OUT-2 ──────> 
         └─ COOP-4 + COMP-5 ──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-KERN-3a has its own capability/process closure and process-exit evidence for G3. KERN-3b qualifies graph/delegation closure after WORK-W1 and before COMP-3/G4; it does not gate G3. Required second-application reuse follows G5 at COMP-7 and does not gate G5.
+KERN-3a has its own capability/process closure and process-exit evidence for G3. KERN-3b qualifies graph/delegation closure after WORK-W1 and before COMP-3/G4; it does not gate G3. Required second-application reuse is COMP-7. It depends on COMP-5, may finish before or after G5, and never gates G5.
 
 WORK, REC, COOP-3, KERN-3b, KERN-4 and COMP-1 to COMP-4 join at G4. G4's complete run needs co-signed work, lost-reply recovery, the HOST-M3 door and the Computer-0 hero that executes it. COOP-4 and COMP-5 join at G5 directly. G4 verifies evidence against pinned partner keys (COOP-1). COOP-4's checkpoint compatibility and edge audit serve outside counterparties. COMP-5 puts the hero into the installed release that outside teams run.
 
@@ -831,7 +831,7 @@ These are fixed facts, not projections.
 | --- | --- | --- |
 | `SEC-` | Security launch (#1160) | M0 to M11 |
 | `HOST-` | Native host (#1177) | M1 to M3 |
-| `WORK-` | Verifiable work (#1173) | W1.0 to W4.x; D1 dynamic delegation; S1 graph evolution |
+| `WORK-` | Verifiable work (#1173) | W1.0 to W4.x; D1 dynamic delegation; S1 swarm evolution |
 | `PAPER-` | Verifiable-work paper | P.1 to P.5 |
 | `REC-` | Recovery (#1172, #1179) | P0 to P6 |
 | `KSPEC-` | Kernel specs (#1174) | specs 1 to 11 (often written S1 to S11) |

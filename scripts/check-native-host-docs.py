@@ -121,16 +121,19 @@ class Layout:
         self.public = sorted({p for p in public if p.is_file()})
         # Inputs that quote retired phrases on purpose: the governing design
         # and ADR that retire them, the plan that removes them, and the
-        # dated architecture reviews that recorded them, and the unified
-        # roadmap's inventory of stale surfaces to fix.
+        # dated architecture reviews that recorded them.
         self.retired_allowlist = {
             self.spec / "NORTH-STAR-FLOWS.md",
             root / "docs/adr/ADR-0038-native-host-program.md",
             self.omarchy / "reviews/2026-10-07-architecture-review.md",
             self.macos / "reviews/2026-10-07-architecture-review.md",
             self.plans / "2026-10-08-north-star-restructure.md",
-            root / "docs/operations/UNIFIED_ROADMAP.md",
         }
+        # The unified roadmap quotes retired phrases only inside its inventory
+        # of stale surfaces to fix. Only that block is exempt; the rest of the
+        # file, including its positioning copy, is checked. If the block's
+        # marker is missing, nothing is exempt (fail closed).
+        self.retired_inventory = {root / "docs/operations/UNIFIED_ROADMAP.md"}
         # Every required shared document must exist; any other top-level
         # Markdown in the spec directory also counts toward the budget.
         # REVIEW.md and TRIM-LEDGER.md are audit records, not specification.
@@ -313,6 +316,26 @@ def visible_text(path: Path, text: str) -> str:
     return re.sub(r"\s+", " ", f"{attrs} {body}").lower()
 
 
+RETIRED_INVENTORY_START = "**Stale surfaces on main to fix (U3):**"
+
+
+def strip_retired_inventory(text: str) -> str:
+    """Blank the stale-surface inventory block, keeping line numbers.
+
+    The block runs from its marker line to the next bold paragraph or heading.
+    """
+    out, inside = [], False
+    for line in text.split("\n"):
+        if line.startswith(RETIRED_INVENTORY_START):
+            inside = True
+            out.append("")
+            continue
+        if inside and (line.startswith("**") or line.startswith("#")):
+            inside = False
+        out.append("" if inside else line)
+    return "\n".join(out)
+
+
 def check_retired(layout: Layout) -> list[str]:
     out = missing_inputs(layout, "retired-phrases", public=False) + missing_inputs(
         layout, "retired-phrases", public=True
@@ -320,7 +343,10 @@ def check_retired(layout: Layout) -> list[str]:
     for path in sorted(set(layout.program) | set(layout.public)):
         if path in layout.retired_allowlist:
             continue
-        text = visible_text(path, read(path))
+        raw = read(path)
+        if path in layout.retired_inventory:
+            raw = strip_retired_inventory(raw)
+        text = visible_text(path, raw)
         for phrase in RETIRED:
             # "verify-only protocol" is not an "only protocol" claim. The
             # count lets a baseline catch an added occurrence in a known file.

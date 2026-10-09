@@ -128,9 +128,15 @@ expect "program checks roadmap em dashes" 1 "em-dash: docs/operations/UNIFIED_RO
 new_fixture roadmap-missing
 rm "$fixture/docs/operations/UNIFIED_ROADMAP.md"
 expect "missing roadmap fails program check" 1 "links: docs/operations/UNIFIED_ROADMAP.md: required document missing" -- --scope program --rule links
-new_fixture roadmap-historical-copy
-printf '\nRetire "The kernel your agents answer to" from the README.\n' >>"$fixture/docs/operations/UNIFIED_ROADMAP.md"
-expect "roadmap may inventory retired copy" 0 "-" -- --scope program
+new_fixture roadmap-inventory-copy
+printf '\n**Stale surfaces on main to fix (U3):**\n\n- **README.md**:\n  - line 16: "The kernel your agents answer to";\n\n**How to describe payments.** Rails plug in.\n' >>"$fixture/docs/operations/UNIFIED_ROADMAP.md"
+expect "roadmap inventory may quote retired copy" 0 "-" -- --scope program
+new_fixture roadmap-positioning-copy
+printf '\nOur builder line: "The kernel your agents answer to."\n' >>"$fixture/docs/operations/UNIFIED_ROADMAP.md"
+expect "roadmap positioning copy is checked" 1 "retired-phrases: docs/operations/UNIFIED_ROADMAP.md: contains 'The kernel your agents answer to' (count 1)" -- --scope program
+new_fixture roadmap-after-inventory
+printf '\n**Stale surfaces on main to fix (U3):**\n\n- **README.md**: "only protocol".\n\n**How to describe payments.** Agents that pay each other.\n' >>"$fixture/docs/operations/UNIFIED_ROADMAP.md"
+expect "roadmap inventory ends at the next bold paragraph" 1 "retired-phrases: docs/operations/UNIFIED_ROADMAP.md: contains 'Agents that pay each other' (count 1)" -- --scope program
 
 # A retired phrase in Markdown is found even when wrapped across lines.
 new_fixture markdown-retired
