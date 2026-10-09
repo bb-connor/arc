@@ -585,8 +585,9 @@ pub use receipt_analytics::{
 };
 #[cfg(not(loom))]
 pub use receipt_query::{
-    EffectiveReceiptReadScope, ReceiptQuery, ReceiptQueryResult, ReceiptReadBoundary,
-    ReceiptReadContext, ReceiptReadContextSource, MAX_QUERY_LIMIT,
+    EffectiveReceiptReadScope, ReceiptQuery, ReceiptQueryResult, ReceiptQuerySnapshotError,
+    ReceiptReadBoundary, ReceiptReadContext, ReceiptReadContextSource, ReceiptSnapshotWatermark,
+    MAX_QUERY_LIMIT,
 };
 #[cfg(not(loom))]
 pub use receipt_store::{

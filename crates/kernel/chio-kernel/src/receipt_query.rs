@@ -325,4 +325,149 @@ pub struct ReceiptQueryResult {
     pub total_count: u64,
     /// Cursor for the next page: Some(last_seq) when more results exist, None on last page.
     pub next_cursor: Option<u64>,
+    /// As-of point of an authenticated query snapshot. `None` when the read
+    /// authenticated the retained corpus itself.
+    pub snapshot: Option<ReceiptSnapshotWatermark>,
+}
+
+/// As-of point of an answer served from an authenticated query snapshot.
+///
+/// Every claim-log entry at or below `through_entry_seq` is included and none
+/// above it. The identifier names a version for diagnostics only; it is never
+/// a request parameter or a cursor.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReceiptSnapshotWatermark {
+    #[serde(rename = "id")]
+    pub snapshot_id: String,
+    pub through_entry_seq: u64,
+    /// Newest verified checkpoint in this version. Entries above its range are
+    /// signature-authenticated only.
+    pub checkpoint_seq: Option<u64>,
+    /// Observation time of the newest head target this version fully covers.
+    #[serde(rename = "observedAt")]
+    pub observed_at_unix_ms: u64,
+    /// Completion time of the last full authentication of the whole history.
+    #[serde(rename = "recertifiedAt")]
+    pub recertified_at_unix_ms: u64,
+}
+
+/// Typed outcomes of a snapshot-served receipt read that carry no rows.
+///
+/// Only `Invalid` reports an integrity failure. Building, staleness, busy
+/// lanes, exhausted resources and work budgets are availability outcomes.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum ReceiptQuerySnapshotError {
+    #[error("receipt query snapshot is building ({authenticated_entries} of {target_entries} entries authenticated)")]
+    Building {
+        authenticated_entries: u64,
+        target_entries: u64,
+    },
+    #[error("receipt query snapshot has not reached the receipt log head")]
+    Stale,
+    #[error("receipt query lane is busy")]
+    Busy,
+    #[error("receipt query snapshot is unavailable: {0}")]
+    Unavailable(String),
+    #[error("receipt query snapshot failed authentication: {0}")]
+    Invalid(String),
+    #[error("{0} exhausted its SQL work budget")]
+    WorkBudgetExhausted(String),
+}
+
+impl ReceiptQuerySnapshotError {
+    /// Stable wire code carried in the HTTP error body.
+    #[must_use]
+    pub const fn wire_code(&self) -> &'static str {
+        match self {
+            Self::Building { .. } => "receipt_query_snapshot_building",
+            Self::Stale => "receipt_query_snapshot_stale",
+            Self::Busy => "receipt_query_busy",
+            Self::Unavailable(_) => "receipt_query_snapshot_unavailable",
+            Self::Invalid(_) => "receipt_query_snapshot_invalid",
+            Self::WorkBudgetExhausted(_) => "receipt_query_work_budget_exhausted",
+        }
+    }
+
+    /// Seconds a client should wait before retrying, or `None` when a retry
+    /// cannot succeed without operator action or a narrower query.
+    #[must_use]
+    pub const fn retry_after_seconds(&self) -> Option<u64> {
+        match self {
+            Self::Building { .. } => Some(5),
+            Self::Stale => Some(2),
+            Self::Busy => Some(1),
+            Self::Unavailable(_) | Self::Invalid(_) | Self::WorkBudgetExhausted(_) => None,
+        }
+    }
+}
+
+#[cfg(test)]
+mod snapshot_wire_tests {
+    use super::{ReceiptQuerySnapshotError, ReceiptSnapshotWatermark};
+
+    #[test]
+    fn watermark_serializes_to_the_documented_wire_shape() -> Result<(), serde_json::Error> {
+        let watermark = ReceiptSnapshotWatermark {
+            snapshot_id: "ab:3".to_string(),
+            through_entry_seq: 120,
+            checkpoint_seq: None,
+            observed_at_unix_ms: 1_760_000_000_123,
+            recertified_at_unix_ms: 1_759_996_400_456,
+        };
+        assert_eq!(
+            serde_json::to_value(&watermark)?,
+            serde_json::json!({
+                "id": "ab:3",
+                "throughEntrySeq": 120,
+                "checkpointSeq": null,
+                "observedAt": 1_760_000_000_123_u64,
+                "recertifiedAt": 1_759_996_400_456_u64,
+            })
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn snapshot_error_codes_and_retry_hints_are_stable() {
+        let cases = [
+            (
+                ReceiptQuerySnapshotError::Building {
+                    authenticated_entries: 1,
+                    target_entries: 2,
+                },
+                "receipt_query_snapshot_building",
+                Some(5),
+            ),
+            (
+                ReceiptQuerySnapshotError::Stale,
+                "receipt_query_snapshot_stale",
+                Some(2),
+            ),
+            (
+                ReceiptQuerySnapshotError::Busy,
+                "receipt_query_busy",
+                Some(1),
+            ),
+            (
+                ReceiptQuerySnapshotError::Unavailable("capacity".into()),
+                "receipt_query_snapshot_unavailable",
+                None,
+            ),
+            (
+                ReceiptQuerySnapshotError::Invalid("leaf".into()),
+                "receipt_query_snapshot_invalid",
+                None,
+            ),
+            (
+                ReceiptQuerySnapshotError::WorkBudgetExhausted("receipt query".into()),
+                "receipt_query_work_budget_exhausted",
+                None,
+            ),
+        ];
+        for (error, code, retry) in cases {
+            assert_eq!(error.wire_code(), code);
+            assert_eq!(error.retry_after_seconds(), retry);
+        }
+    }
 }

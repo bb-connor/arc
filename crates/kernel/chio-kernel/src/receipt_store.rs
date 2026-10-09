@@ -365,6 +365,8 @@ pub enum ReceiptStoreError {
     ReadBoundary(String),
     #[error(transparent)]
     ReadAuthorization(#[from] crate::receipt_query::ReceiptReadError),
+    #[error(transparent)]
+    QuerySnapshot(#[from] crate::receipt_query::ReceiptQuerySnapshotError),
 
     #[error("conflict: {0}")]
     Conflict(String),

@@ -171,6 +171,7 @@ pub(crate) fn query_receipts_on_connection(
                     receipts: Vec::new(),
                     total_count,
                     next_cursor: None,
+                    snapshot: None,
                 });
             }
         },
@@ -247,5 +248,6 @@ pub(crate) fn query_receipts_on_connection(
         receipts,
         total_count,
         next_cursor,
+        snapshot: None,
     })
 }
