@@ -207,6 +207,12 @@ pub(super) struct Published {
     /// Storage failure the next walker commit hold reports.
     #[cfg(test)]
     commit_fault: Mutex<Option<SnapshotDbError>>,
+    /// Outcome the next owned-snapshot read reports.
+    #[cfg(test)]
+    read_fault: Mutex<Option<ReceiptStoreError>>,
+    /// Storage failure the next status hold reports.
+    #[cfg(test)]
+    status_fault: Mutex<Option<SnapshotDbError>>,
 }
 
 /// Position an extension cycle starts from.
@@ -403,6 +409,8 @@ impl Published {
         let owned = self.owned.lock();
         waiting.fetch_sub(1, Ordering::SeqCst);
         let owned = owned.map_err(|_| poisoned())?;
+        #[cfg(test)]
+        self.injected_read_fault()?;
         let selection = select(&owned.db, query, sql_steps)?;
         Ok((selection, self.watermark_of(&owned.meta), owned.meta))
     }
@@ -417,11 +425,26 @@ impl Published {
         let owned = self.owned.lock();
         waiting.fetch_sub(1, Ordering::SeqCst);
         let owned = owned.map_err(|_| poisoned())?;
+        #[cfg(test)]
+        self.injected_read_fault()?;
         let located = locate(&owned.db, receipt_id, tenant)?;
         Ok((
             located.map(|located| located.row),
             self.watermark_of(&owned.meta),
         ))
+    }
+
+    #[cfg(test)]
+    fn injected_read_fault(&self) -> Result<(), ReceiptStoreError> {
+        match self
+            .read_fault
+            .lock()
+            .ok()
+            .and_then(|mut fault| fault.take())
+        {
+            Some(fault) => Err(fault),
+            None => Ok(()),
+        }
     }
 
     fn meta(&self) -> Result<Meta, ReceiptStoreError> {
@@ -546,10 +569,13 @@ impl ReceiptQuerySnapshots {
         let _permit = self.inner.admit()?;
         let (published, epoch) = self.inner.ready()?;
         self.inner.await_head(&published, false)?;
-        let (selection, watermark, _) = published.select(
-            &self.inner.waiting,
-            query,
-            self.inner.config.query_sql_steps,
+        let (selection, watermark, _) = self.inner.owned_read(
+            &published,
+            published.select(
+                &self.inner.waiting,
+                query,
+                self.inner.config.query_sql_steps,
+            ),
         )?;
         let page = self
             .inner
@@ -582,11 +608,16 @@ impl ReceiptQuerySnapshots {
             .effective_read_scope()?;
         let (published, epoch) = self.inner.ready()?;
         let tenant = scope.tenant.as_deref();
-        let (mut located, mut watermark) =
-            published.locate(&self.inner.waiting, receipt_id, tenant)?;
+        let locate = || {
+            self.inner.owned_read(
+                &published,
+                published.locate(&self.inner.waiting, receipt_id, tenant),
+            )
+        };
+        let (mut located, mut watermark) = locate()?;
         if located.is_none() {
             self.inner.await_head(&published, true)?;
-            (located, watermark) = published.locate(&self.inner.waiting, receipt_id, tenant)?;
+            (located, watermark) = locate()?;
         }
         let receipt = match located {
             None => None,
@@ -647,9 +678,19 @@ impl ReceiptQuerySnapshots {
         };
         if let Phase::Ready(published) = phase {
             // Every metric is maintained, so this is one bounded hold. A metric
-            // that cannot be read makes the state unavailable; it is never
-            // reported as a healthy zero.
+            // that cannot be read is never reported as a healthy zero: an
+            // integrity failure drops the lineage like any read, and anything
+            // else makes the state unavailable.
             let metrics = published.hold(|owned| {
+                #[cfg(test)]
+                if let Some(fault) = published
+                    .status_fault
+                    .lock()
+                    .ok()
+                    .and_then(|mut fault| fault.take())
+                {
+                    return Err(fault);
+                }
                 Ok((
                     published.watermark_of(&owned.meta),
                     owned.db.quota_bytes(),
@@ -666,6 +707,11 @@ impl ReceiptQuerySnapshots {
                     status.tool_receipts = rows;
                     status.dimensions = dimensions;
                     status.dimension_bytes = bytes;
+                }
+                Err(error @ (WalkError::Integrity(_) | WalkError::Regressed(_))) => {
+                    let reason = error.to_string();
+                    self.inner.invalidate_lineage(&published, &reason);
+                    status.state = ReceiptQuerySnapshotState::Invalid { reason };
                 }
                 Err(error) => {
                     status.state = ReceiptQuerySnapshotState::Unavailable {
@@ -719,19 +765,60 @@ impl Inner {
     }
 
     fn set_phase(&self, phase: Phase) {
-        if let Ok(mut current) = self.phase.lock() {
-            if matches!(*current, Phase::Stopped) {
-                return;
-            }
-            if !matches!(phase, Phase::Building { .. }) {
-                let epoch = self.epoch.fetch_add(1, Ordering::SeqCst) + 1;
-                if matches!(phase, Phase::Invalid(_)) {
-                    self.last_invalid_epoch.store(epoch, Ordering::SeqCst);
+        self.transition(phase, None);
+    }
+
+    /// Move to `phase`, or, with `serving`, only while that lineage is still
+    /// the one served. Returns whether the phase changed.
+    fn transition(&self, phase: Phase, serving: Option<&Arc<Published>>) -> bool {
+        let changed = match self.phase.lock() {
+            Ok(mut current) => {
+                let expected = match (serving, &*current) {
+                    (_, Phase::Stopped) => false,
+                    (None, _) => true,
+                    (Some(lineage), Phase::Ready(served)) => Arc::ptr_eq(lineage, served),
+                    (Some(_), _) => false,
+                };
+                if expected {
+                    if !matches!(phase, Phase::Building { .. }) {
+                        let epoch = self.epoch.fetch_add(1, Ordering::SeqCst) + 1;
+                        if matches!(phase, Phase::Invalid(_)) {
+                            self.last_invalid_epoch.store(epoch, Ordering::SeqCst);
+                        }
+                    }
+                    *current = phase;
                 }
+                expected
             }
-            *current = phase;
-        }
+            Err(_) => false,
+        };
         self.changed.notify_all();
+        changed
+    }
+
+    /// Drop a served lineage that failed authentication or custody. It is
+    /// never served again, even once its storage checks out; only a new
+    /// authenticated lineage replaces it.
+    fn invalidate_lineage(&self, published: &Arc<Published>, reason: &str) {
+        if self.transition(Phase::Invalid(reason.to_string()), Some(published)) {
+            tracing::error!(%reason, "receipt query snapshot invalidated");
+            self.wake();
+        }
+    }
+
+    /// The outcome of a read of an owned snapshot. A typed `Invalid` drops
+    /// that lineage; every other outcome passes through unchanged.
+    fn owned_read<T>(
+        &self,
+        published: &Arc<Published>,
+        result: Result<T, ReceiptStoreError>,
+    ) -> Result<T, ReceiptStoreError> {
+        if let Err(ReceiptStoreError::QuerySnapshot(ReceiptQuerySnapshotError::Invalid(reason))) =
+            &result
+        {
+            self.invalidate_lineage(published, reason);
+        }
+        result
     }
 
     fn ready(&self) -> Result<(Arc<Published>, u64), ReceiptStoreError> {
@@ -1093,6 +1180,10 @@ fn build_and_serve(inner: &Arc<Inner>) -> Result<(), WalkError> {
         hold_sql_steps: inner.config.hold_sql_steps,
         #[cfg(test)]
         commit_fault: Mutex::new(None),
+        #[cfg(test)]
+        read_fault: Mutex::new(None),
+        #[cfg(test)]
+        status_fault: Mutex::new(None),
     });
     inner.set_phase(Phase::Ready(Arc::clone(&published)));
     serve(inner, &extension_ctx, &ctx, &published)
@@ -1212,6 +1303,37 @@ impl ReceiptQuerySnapshots {
                 *slot = Some(fault);
             }
         }
+    }
+
+    /// Make the next owned-snapshot read report `fault`.
+    pub(super) fn fail_next_read_for_test(&self, fault: ReceiptStoreError) {
+        if let Phase::Ready(published) = self.inner.phase() {
+            if let Ok(mut slot) = published.read_fault.lock() {
+                *slot = Some(fault);
+            }
+        }
+    }
+
+    /// Make the next status hold fail with `fault`.
+    pub(super) fn fail_next_status_for_test(&self, fault: SnapshotDbError) {
+        if let Phase::Ready(published) = self.inner.phase() {
+            if let Ok(mut slot) = published.status_fault.lock() {
+                *slot = Some(fault);
+            }
+        }
+    }
+
+    /// The published snapshot's backing file, when its storage has one.
+    pub(super) fn backing_path_for_test(&self) -> Option<std::path::PathBuf> {
+        let Phase::Ready(published) = self.inner.phase() else {
+            return None;
+        };
+        let owned = published.owned.lock().ok()?;
+        let connection = owned.db.connection().ok()?;
+        connection
+            .path()
+            .filter(|path| !path.is_empty())
+            .map(std::path::PathBuf::from)
     }
 
     /// Poison the published snapshot's lock, as a panic inside a hold would.

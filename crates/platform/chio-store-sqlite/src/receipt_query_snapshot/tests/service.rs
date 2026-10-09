@@ -719,15 +719,19 @@ fn a_status_metric_that_cannot_be_read_is_never_reported_as_healthy_zeros() {
     let healthy = service.status();
     assert_eq!(healthy.state, ReceiptQuerySnapshotState::Ready);
     assert!(healthy.tool_receipts > 0 && healthy.dimensions > 0);
+    // A hold that panicked leaves the snapshot in an unknown state.
     service.poison_snapshot_for_test();
     let status = service.status();
     assert!(
         matches!(
             &status.state,
-            ReceiptQuerySnapshotState::Unavailable { reason }
-                if reason.contains("metrics are unavailable")
+            ReceiptQuerySnapshotState::Invalid { reason } if reason.contains("poisoned")
         ),
         "a failed metric read reported {status:?}"
+    );
+    assert_eq!(
+        (status.tool_receipts, status.dimensions, status.watermark),
+        (0, 0, None)
     );
     service.shutdown();
 }
@@ -824,6 +828,168 @@ fn a_custody_mismatch_in_a_walker_hold_stays_invalid() {
         matches!(&lease, ReceiptQuerySnapshotError::Invalid(_)),
         "an in-flight read across a custody mismatch refused as {lease:?}"
     );
+}
+
+/// Fail one public read on the published lineage's custody: the backing
+/// file's mode is changed for the read and restored afterwards. The lineage
+/// that failed custody must stay dropped although its storage checks out
+/// again, and an admitted lease must stay refused, until a new lineage is
+/// authenticated.
+#[cfg(target_os = "linux")]
+fn custody_failure_drops_the_lineage(
+    read: impl FnOnce(&ReceiptQuerySnapshots) -> Result<(), ReceiptQuerySnapshotError>,
+) {
+    use std::os::unix::fs::PermissionsExt;
+    let fixture = mixed_fixture();
+    let service = ready(
+        &fixture,
+        ReceiptQuerySnapshotConfig {
+            invalid_retry_backoff: Duration::from_secs(3),
+            ..config()
+        },
+    );
+    let first = service.query_receipts(&admin(1)).unwrap().snapshot.unwrap();
+    service.pause_extension_for_test(true);
+    let epoch = service.lease_for_test().unwrap();
+    let path = service
+        .backing_path_for_test()
+        .expect("a Linux snapshot has a private backing file");
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o640)).unwrap();
+    let refused = read(&service);
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+    let refused = refused.unwrap_err();
+    assert!(
+        matches!(refused, ReceiptQuerySnapshotError::Invalid(_)),
+        "a custody failure refused as {refused:?}"
+    );
+
+    let state = service.status().state;
+    assert!(
+        matches!(state, ReceiptQuerySnapshotState::Invalid { .. }),
+        "after a custody failure the lineage is {state:?}"
+    );
+    let served = service.query_receipts(&admin(1));
+    assert!(
+        matches!(
+            &served,
+            Err(ReceiptStoreError::QuerySnapshot(
+                ReceiptQuerySnapshotError::Invalid(_)
+            ))
+        ),
+        "the lineage that failed custody served again: {:?}",
+        served.map(|page| page.snapshot)
+    );
+    let lease = snapshot_error(service.recheck_lease_for_test(epoch).unwrap_err());
+    assert!(matches!(lease, ReceiptQuerySnapshotError::Invalid(_)));
+
+    service.pause_extension_for_test(false);
+    wait_for(&service, "a new lineage", |state| {
+        *state == ReceiptQuerySnapshotState::Ready
+    });
+    let rebuilt = service.query_receipts(&admin(1)).unwrap().snapshot.unwrap();
+    let lineage = |id: &str| id.split(':').next().unwrap().to_string();
+    assert_ne!(lineage(&first.snapshot_id), lineage(&rebuilt.snapshot_id));
+    let lease = snapshot_error(service.recheck_lease_for_test(epoch).unwrap_err());
+    assert!(matches!(lease, ReceiptQuerySnapshotError::Invalid(_)));
+    service.shutdown();
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn a_custody_failure_on_a_page_read_drops_the_lineage() {
+    custody_failure_drops_the_lineage(|service| {
+        service
+            .query_receipts(&admin(5))
+            .map(drop)
+            .map_err(snapshot_error)
+    });
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn a_custody_failure_on_a_point_read_drops_the_lineage() {
+    let id = Spec::varied(1).sign(&keypair()).id;
+    custody_failure_drops_the_lineage(|service| {
+        service
+            .load_receipt(&id, &ReceiptReadContext::admin_service())
+            .map(drop)
+            .map_err(snapshot_error)
+    });
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn a_custody_failure_on_a_negative_point_read_drops_the_lineage() {
+    custody_failure_drops_the_lineage(|service| {
+        service
+            .load_receipt("rcpt-missing", &ReceiptReadContext::admin_service())
+            .map(drop)
+            .map_err(snapshot_error)
+    });
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn a_custody_failure_seen_by_health_drops_the_lineage() {
+    custody_failure_drops_the_lineage(|service| match service.status().state {
+        ReceiptQuerySnapshotState::Invalid { reason } => {
+            Err(ReceiptQuerySnapshotError::Invalid(reason))
+        }
+        ReceiptQuerySnapshotState::Unavailable { reason } => {
+            Err(ReceiptQuerySnapshotError::Unavailable(reason))
+        }
+        _ => Ok(()),
+    });
+}
+
+#[test]
+fn resource_and_request_refusals_on_a_read_keep_the_lineage() {
+    let fixture = mixed_fixture();
+    let service = ready(&fixture, config());
+    service.pause_extension_for_test(true);
+    let first = service.query_receipts(&admin(1)).unwrap().snapshot.unwrap();
+    let epoch = service.lease_for_test().unwrap();
+    let faults = [
+        ReceiptQuerySnapshotError::Unavailable("snapshot backing storage I/O failed".into()),
+        ReceiptQuerySnapshotError::WorkBudgetExhausted("receipt query".into()),
+    ];
+    for fault in faults {
+        service.fail_next_read_for_test(fault.clone().into());
+        let refused = snapshot_error(service.query_receipts(&admin(1)).unwrap_err());
+        assert_eq!(refused, fault);
+        service.fail_next_read_for_test(fault.clone().into());
+        let refused = snapshot_error(
+            service
+                .load_receipt("rcpt-missing", &ReceiptReadContext::admin_service())
+                .unwrap_err(),
+        );
+        assert_eq!(refused, fault);
+    }
+    service.fail_next_status_for_test(SnapshotDbError::Store(
+        ReceiptQuerySnapshotError::Unavailable("snapshot backing storage I/O failed".into()).into(),
+    ));
+    let state = service.status().state;
+    assert!(
+        matches!(
+            &state,
+            ReceiptQuerySnapshotState::Unavailable { reason }
+                if reason.contains("snapshot backing storage I/O failed")
+        ),
+        "a resource failure seen by health reported {state:?}"
+    );
+    let invalid_request = ReceiptQuery {
+        outcome: Some("unknown".into()),
+        ..admin(1)
+    };
+    assert!(matches!(
+        service.query_receipts(&invalid_request),
+        Err(ReceiptStoreError::InvalidOutcome(_))
+    ));
+    assert_eq!(service.status().state, ReceiptQuerySnapshotState::Ready);
+    service.recheck_lease_for_test(epoch).unwrap();
+    let served = service.query_receipts(&admin(1)).unwrap().snapshot.unwrap();
+    assert_eq!(served.snapshot_id, first.snapshot_id);
+    service.shutdown();
 }
 
 #[test]
