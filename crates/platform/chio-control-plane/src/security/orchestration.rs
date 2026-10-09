@@ -57,6 +57,11 @@ pub struct ProductionActiveDefenseConfig {
     pub max_event_age_ms: u64,
     pub max_future_skew_ms: u64,
     pub response_recovery_limits: AttestedFindingResponseRecoveryLimits,
+    /// Monotonic time for the progress deadline of every response worker
+    /// these services start.
+    #[cfg(test)]
+    pub(in crate::security) worker_progress_clock:
+        Option<Arc<super::scheduler_worker::ManualProgressClock>>,
 }
 
 #[derive(Debug, Error)]
@@ -942,6 +947,10 @@ impl ProductionActiveDefenseOrchestrator {
                 Arc::clone(&lifecycle.runtime_leases),
             ));
         let worker = Arc::new(ProductionResponseWorker::new(Arc::clone(&worker_port))?);
+        #[cfg(test)]
+        if let Some(clock) = config.worker_progress_clock {
+            worker.use_progress_clock_for_test(clock);
+        }
         lifecycle.bind_worker(&worker)?;
         let services = Self {
             worker,
@@ -1004,6 +1013,10 @@ impl ProductionActiveDefenseOrchestrator {
         let worker = Arc::new(ProductionResponseWorker::new(Arc::clone(
             &self.worker_port,
         ))?);
+        #[cfg(test)]
+        if let Some(clock) = self.worker.progress_clock_for_test() {
+            worker.use_progress_clock_for_test(clock);
+        }
         let mut handle = worker.start_parked(config).await?;
         if let Err(error) = handle.arm().await {
             let _ = handle.shutdown().await;

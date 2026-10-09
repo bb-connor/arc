@@ -18,6 +18,47 @@ pub(super) struct ResponseWorkerProgress {
     published_at: Option<Instant>,
     tick_started_at: Option<Instant>,
     tick_completed_at: Option<Instant>,
+    #[cfg(test)]
+    clock: Option<Arc<ManualProgressClock>>,
+}
+
+impl ResponseWorkerProgress {
+    /// The monotonic instant the progress deadline is measured against.
+    fn now(&self) -> Instant {
+        #[cfg(test)]
+        if let Some(clock) = &self.clock {
+            return clock.now();
+        }
+        Instant::now()
+    }
+}
+
+/// Monotonic time for a worker's progress deadline that moves only when a
+/// test advances it, so scheduler delay never reads as a stalled worker.
+#[cfg(test)]
+#[derive(Debug)]
+pub(in crate::security) struct ManualProgressClock {
+    origin: Instant,
+    elapsed_nanos: AtomicU64,
+}
+
+#[cfg(test)]
+impl ManualProgressClock {
+    pub(in crate::security) fn new() -> Self {
+        Self {
+            origin: Instant::now(),
+            elapsed_nanos: AtomicU64::new(0),
+        }
+    }
+
+    pub(in crate::security) fn advance(&self, by: Duration) {
+        let by = u64::try_from(by.as_nanos()).unwrap_or(u64::MAX);
+        self.elapsed_nanos.fetch_add(by, Ordering::AcqRel);
+    }
+
+    fn now(&self) -> Instant {
+        self.origin + Duration::from_nanos(self.elapsed_nanos.load(Ordering::Acquire))
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -202,11 +243,11 @@ impl ProductionResponseWorker {
         config: ProductionResponseWorkerLoopConfig,
         shutdown_receiver: &mut watch::Receiver<bool>,
     ) -> Result<ResponseWorkerTick, ResponseWorkerTickError> {
-        let started_at = Instant::now();
+        let started_at = self.progress_now();
         let deadline = config.progress_deadline();
         loop {
             let result = self.tick_once_catching_crash();
-            let elapsed = started_at.elapsed();
+            let elapsed = self.progress_now().saturating_duration_since(started_at);
             match result {
                 Ok(report) if elapsed <= deadline => return Ok(report),
                 Ok(_) => {
@@ -485,6 +526,29 @@ impl ProductionResponseWorker {
         self.configure_progress(deadline);
     }
 
+    /// Measures this worker's progress deadline on `clock`. Must precede the
+    /// worker's start.
+    #[cfg(test)]
+    pub(in crate::security) fn use_progress_clock_for_test(&self, clock: Arc<ManualProgressClock>) {
+        if let Ok(mut progress) = self.progress.lock() {
+            progress.clock = Some(clock);
+        }
+    }
+
+    #[cfg(test)]
+    pub(in crate::security) fn progress_clock_for_test(&self) -> Option<Arc<ManualProgressClock>> {
+        self.progress
+            .lock()
+            .ok()
+            .and_then(|progress| progress.clock.clone())
+    }
+
+    fn progress_now(&self) -> Instant {
+        self.progress
+            .lock()
+            .map_or_else(|_| Instant::now(), |progress| progress.now())
+    }
+
     fn mark_armed(&self) {
         self.with_health(|health| {
             health.lifecycle = ResponseWorkerLifecycle::Created;
@@ -500,10 +564,9 @@ impl ProductionResponseWorker {
     }
 
     pub(super) fn mark_publication_ready(&self) -> Result<(), ResponseWorkerTickError> {
-        self.progress
-            .lock()
-            .map_err(|_| PortError::unavailable())?
-            .published_at = Some(Instant::now());
+        let mut progress = self.progress.lock().map_err(|_| PortError::unavailable())?;
+        progress.published_at = Some(progress.now());
+        drop(progress);
         self.publication_ready.store(true, Ordering::Release);
         Ok(())
     }
@@ -523,7 +586,7 @@ impl ProductionResponseWorker {
 
     fn mark_tick_started(&self, sequence: u64) {
         if let Ok(mut progress) = self.progress.lock() {
-            progress.tick_started_at = Some(Instant::now());
+            progress.tick_started_at = Some(progress.now());
         }
         self.with_health(|health| {
             health.last_tick_started_sequence = Some(sequence);
@@ -533,7 +596,7 @@ impl ProductionResponseWorker {
 
     fn mark_tick_completed(&self, sequence: u64) {
         if let Ok(mut progress) = self.progress.lock() {
-            progress.tick_completed_at = Some(Instant::now());
+            progress.tick_completed_at = Some(progress.now());
         }
         self.with_health(|health| {
             health.last_tick_completed_sequence = Some(sequence);
@@ -542,10 +605,10 @@ impl ProductionResponseWorker {
     }
 
     fn ensure_progress(&self) -> Result<(), ResponseWorkerTickError> {
-        let now = Instant::now();
-        let (deadline, published_at, tick_started_at, tick_completed_at) = {
+        let (now, deadline, published_at, tick_started_at, tick_completed_at) = {
             let progress = self.progress.lock().map_err(|_| PortError::unavailable())?;
             (
+                progress.now(),
                 progress.deadline,
                 progress.published_at,
                 progress.tick_started_at,

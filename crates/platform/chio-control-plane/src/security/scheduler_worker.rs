@@ -136,6 +136,8 @@ use outbox::DeclassificationReceiptOutboxPort;
 pub(in crate::security) use outbox::ProductionDeclassificationReceiptOutbox;
 
 mod worker;
+#[cfg(test)]
+pub(in crate::security) use worker::ManualProgressClock;
 pub use worker::ProductionResponseWorkerLoopConfig;
 use worker::{worker_task_crash_error, ResponseWorkerProgress, WORKER_CLAIM_DOMAIN};
 #[cfg(test)]

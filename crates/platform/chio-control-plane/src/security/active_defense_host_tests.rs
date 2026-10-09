@@ -13,6 +13,7 @@ use crate::security::event_consumer::{
     AttestedFindingResponseCoordinator, PreparedAttestedFindingResponse,
     ReservedAttestedFindingResponsePlan,
 };
+use crate::security::scheduler_worker::ManualProgressClock;
 use crate::security::{
     ActiveDefenseServiceRegistry, ActiveDefenseServices, AlertOutboxConfig,
     AttestedFindingResponsePolicyPlanner, AttestedFindingResponseRecoveryLimits,
@@ -282,6 +283,8 @@ struct HostFixture {
     registry: Arc<ActiveDefenseServiceRegistry>,
     config: ProductionActiveDefenseHostConfig,
     clock: Arc<FixedClock>,
+    /// Worker progress time; it moves only when a test advances it.
+    progress_clock: Arc<ManualProgressClock>,
     response_coordinator: Arc<FailClosedResponseCoordinator>,
 }
 
@@ -341,6 +344,7 @@ impl HostFixture {
         )
         .unwrap_or_else(|error| panic!("temporal rule: {error}"));
         let security_clock: Arc<dyn Clock> = clock.clone();
+        let progress_clock = Arc::new(ManualProgressClock::new());
         let response_coordinator = Arc::new(FailClosedResponseCoordinator::new());
         let config = ProductionActiveDefenseHostConfig {
             durability: SecurityDurability::persistent(),
@@ -388,6 +392,7 @@ impl HostFixture {
                     128, 4_096, 30_000,
                 )
                 .unwrap_or_else(|error| panic!("response recovery limits: {error}")),
+                worker_progress_clock: Some(Arc::clone(&progress_clock)),
             },
             worker_loop: ProductionResponseWorkerLoopConfig {
                 tick_interval: Duration::from_millis(10),
@@ -400,6 +405,7 @@ impl HostFixture {
             registry: Arc::new(ActiveDefenseServiceRegistry::default()),
             config,
             clock,
+            progress_clock,
             response_coordinator,
         }
     }
@@ -671,7 +677,7 @@ async fn wedged_synchronous_worker_tick_fails_full_host_readiness() {
     })
     .await
     .unwrap_or_else(|_| panic!("worker tick did not wedge"));
-    tokio::time::sleep(Duration::from_millis(40)).await;
+    fixture.progress_clock.advance(Duration::from_millis(40));
 
     let health = host.worker_health();
     assert!(health.tick_in_flight);
