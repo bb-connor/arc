@@ -614,16 +614,16 @@ pub fn verify_iou_envelope_v2<S: CreditAdmissionStore>(
     {
         return Err(IouEnvelopeV2Error::InvalidField("issuer_key_role"));
     }
-    let expected = build_body(
-        context.atom,
-        context.disposition,
-        context.settlement_lifecycle,
-        context.receipt,
-        &credit_facility_bind,
-        context.issuer_trust.issuer_id(),
-        context.issuer_trust.issuer_key_epoch(),
-        signed.body.issued_at_unix_ms,
-    )?;
+    let expected = build_body(IouBodyInputs {
+        atom: context.atom,
+        disposition: context.disposition,
+        settlement_lifecycle: context.settlement_lifecycle,
+        receipt: context.receipt,
+        credit_facility_bind: &credit_facility_bind,
+        issuer_id: context.issuer_trust.issuer_id(),
+        issuer_key_epoch: context.issuer_trust.issuer_key_epoch(),
+        issued_at_unix_ms: signed.body.issued_at_unix_ms,
+    })?;
     if signed.body != expected || signed.body.issued_at_unix_ms > context.trusted_now_unix_ms {
         return Err(IouEnvelopeV2Error::BindingMismatch("signed_body"));
     }
@@ -661,16 +661,16 @@ pub(crate) fn mint_iou_envelope_v2<B: SigningBackend, S: CreditAdmissionStore>(
     {
         return Err(IouEnvelopeV2Error::InvalidField("issuer_key_role"));
     }
-    let body = build_body(
-        context.atom,
-        context.disposition,
-        context.settlement_lifecycle,
-        context.receipt,
-        context.credit_facility_bind,
-        context.issuer_id,
-        context.issuer_key_epoch,
-        context.trusted_issued_at_unix_ms,
-    )?;
+    let body = build_body(IouBodyInputs {
+        atom: context.atom,
+        disposition: context.disposition,
+        settlement_lifecycle: context.settlement_lifecycle,
+        receipt: context.receipt,
+        credit_facility_bind: context.credit_facility_bind,
+        issuer_id: context.issuer_id,
+        issuer_key_epoch: context.issuer_key_epoch,
+        issued_at_unix_ms: context.trusted_issued_at_unix_ms,
+    })?;
     require_committed_credit_admission(
         credit_admission_store,
         context.atom,
@@ -693,17 +693,29 @@ fn require_committed_credit_admission<S: CreditAdmissionStore>(
         .map_err(|_| IouEnvelopeV2Error::BindingMismatch("committed_credit_admission"))
 }
 
-#[allow(clippy::too_many_arguments)]
-fn build_body(
-    atom: &ObligationAtomV1,
-    disposition: &ObligationDispositionRecordV1,
-    settlement_lifecycle: &ObligationSettlementLifecycleV1,
-    receipt: &ChioReceipt,
-    credit_facility_bind: &VerifiedCreditFacilityBindV1,
-    issuer_id: &str,
+/// Parameters of `build_body`.
+struct IouBodyInputs<'a> {
+    atom: &'a ObligationAtomV1,
+    disposition: &'a ObligationDispositionRecordV1,
+    settlement_lifecycle: &'a ObligationSettlementLifecycleV1,
+    receipt: &'a ChioReceipt,
+    credit_facility_bind: &'a VerifiedCreditFacilityBindV1,
+    issuer_id: &'a str,
     issuer_key_epoch: u64,
     issued_at_unix_ms: u64,
-) -> Result<IouEnvelopeBodyV2, IouEnvelopeV2Error> {
+}
+
+fn build_body(params: IouBodyInputs<'_>) -> Result<IouEnvelopeBodyV2, IouEnvelopeV2Error> {
+    let IouBodyInputs {
+        atom,
+        disposition,
+        settlement_lifecycle,
+        receipt,
+        credit_facility_bind,
+        issuer_id,
+        issuer_key_epoch,
+        issued_at_unix_ms,
+    } = params;
     atom.validate()
         .map_err(|_| IouEnvelopeV2Error::BindingMismatch("obligation_atom"))?;
     disposition
