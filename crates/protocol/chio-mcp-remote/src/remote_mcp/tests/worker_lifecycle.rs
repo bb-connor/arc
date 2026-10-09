@@ -10,12 +10,16 @@ use std::task::Poll;
 
 const TOKEN: &str = "worker-lifecycle-token";
 const WAIT: Duration = Duration::from_secs(4);
+// Session output lines in these fixtures are bounded far below the production
+// bound, so the projection that kills a worker is small.
+const SESSION_LINE_BYTES: usize = 256 * 1024;
 // The default output sanitizer truncates each string above 1,000,000 bytes, so
 // fixture output is split into text items that each stay below that limit.
 const TEXT_ITEM_BYTES: usize = 512 * 1024;
-// Below the 4 MiB upstream result bound, yet the edge projects it twice (result
-// and evidence) with two receipts, which exceeds the 8 MiB session line bound.
-const WORKER_KILLING_OUTPUT_BYTES: usize = 4 * 1024 * 1024 - 512;
+// Below the 4 MiB upstream result bound and the session line bound, yet the
+// edge projects it twice (result and evidence) with two receipts, which
+// exceeds the session line bound.
+const WORKER_KILLING_OUTPUT_BYTES: usize = SESSION_LINE_BYTES * 3 / 4;
 type DispatchGate = Arc<(StdMutex<bool>, Condvar)>;
 
 struct ReadTransport {
@@ -128,6 +132,7 @@ capabilities:
 "#,
     )
     .unwrap();
+    config.test_session_line_bytes = Some(SESSION_LINE_BYTES);
     config.test_transport = Some(Arc::new(ReadTransport {
         calls: calls.clone(),
         output_bytes,

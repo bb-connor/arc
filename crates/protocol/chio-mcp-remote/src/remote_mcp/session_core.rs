@@ -202,6 +202,9 @@ pub struct RemoteServeHttpConfig {
     pub(crate) test_transport: Option<Arc<dyn McpTransport>>,
     #[cfg(test)]
     pub(crate) test_lifecycle_policy: Option<SessionLifecyclePolicy>,
+    /// A session output line bound below the production bound.
+    #[cfg(test)]
+    pub(crate) test_session_line_bytes: Option<usize>,
     pub native_launch_factory: Arc<dyn chio_mcp_adapter::transport::NativeMcpLaunchFactory>,
     pub page_size: usize,
     pub tools_list_changed: bool,

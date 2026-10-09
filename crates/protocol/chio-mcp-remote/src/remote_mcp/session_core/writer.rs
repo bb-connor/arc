@@ -9,6 +9,7 @@ pub(super) struct BroadcastJsonRpcWriter {
     session_id: String,
     response_context: McpResponseContext,
     buffer: Vec<u8>,
+    line_bound: usize,
 }
 
 impl BroadcastJsonRpcWriter {
@@ -26,7 +27,18 @@ impl BroadcastJsonRpcWriter {
             session_id,
             response_context,
             buffer: Vec::new(),
+            line_bound: MAX_SESSION_JSON_BYTES,
         }
+    }
+
+    /// Bounds each session output line by `line_bound` instead of
+    /// `MAX_SESSION_JSON_BYTES`.
+    #[cfg(test)]
+    pub(super) fn with_line_bound(mut self, line_bound: Option<usize>) -> Self {
+        if let Some(line_bound) = line_bound {
+            self.line_bound = line_bound.min(MAX_SESSION_JSON_BYTES);
+        }
+        self
     }
 
     pub(super) fn next_event(&self, message: Value) -> std::io::Result<RemoteSessionEvent> {
@@ -86,12 +98,12 @@ impl BroadcastJsonRpcWriter {
 impl Write for BroadcastJsonRpcWriter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         for fragment in buf.split_inclusive(|byte| *byte == b'\n') {
-            if fragment.len() > MAX_SESSION_JSON_BYTES.saturating_sub(self.buffer.len()) {
+            if fragment.len() > self.line_bound.saturating_sub(self.buffer.len()) {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     chio_core::canonical::UntrustedJsonError::TooLarge {
                         bytes: self.buffer.len().saturating_add(fragment.len()),
-                        bound: MAX_SESSION_JSON_BYTES,
+                        bound: self.line_bound,
                     },
                 ));
             }

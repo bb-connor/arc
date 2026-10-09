@@ -631,6 +631,7 @@ pub fn base_remote_config(dir: &Path, listen: SocketAddr) -> RemoteServeHttpConf
             reaper_interval_millis: crate::DEFAULT_SESSION_REAPER_INTERVAL_MILLIS,
             tombstone_retention_millis: crate::DEFAULT_SESSION_TOMBSTONE_RETENTION_MILLIS,
         }),
+        test_session_line_bytes: None,
         page_size: 50,
         tools_list_changed: false,
         shared_hosted_owner: false,

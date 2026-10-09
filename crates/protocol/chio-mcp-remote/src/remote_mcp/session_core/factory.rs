@@ -501,6 +501,8 @@ impl RemoteSessionFactory {
             session.session_id.clone(),
             session.input_tx.response_context(),
         );
+        #[cfg(test)]
+        let writer = writer.with_line_bound(self.config.test_session_line_bytes);
         let worker_exit = session_worker::WorkerExit::new(&session);
         std::thread::spawn(move || {
             let _worker_exit = worker_exit;
@@ -719,6 +721,8 @@ impl RemoteSessionFactory {
             session.session_id.clone(),
             session.input_tx.response_context(),
         );
+        #[cfg(test)]
+        let writer = writer.with_line_bound(self.config.test_session_line_bytes);
         let worker_exit = session_worker::WorkerExit::new(&session);
         std::thread::spawn(move || {
             let _worker_exit = worker_exit;
