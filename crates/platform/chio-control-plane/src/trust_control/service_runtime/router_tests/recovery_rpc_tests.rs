@@ -12,18 +12,31 @@ use chio_kernel::admission_operation::{
 use chio_security_types::clock::FixedClock;
 use chio_store_sqlite::SqliteAdmissionOperationStore;
 use std::error::Error;
-use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, AtomicUsize, Ordering};
+use std::sync::mpsc;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 const AUTHORITY_TIME: u64 = 1_700_000_000_000;
+
+/// The authority serve task and the signal that begins its graceful shutdown.
+struct Server {
+    shutdown: tokio::sync::oneshot::Sender<()>,
+    task: tokio::task::JoinHandle<std::io::Result<()>>,
+}
 
 struct Fixture {
     _directory: tempfile::TempDir,
     database: std::path::PathBuf,
     authority: Arc<SqliteAuthorityStore>,
     executor: tokio::runtime::Runtime,
-    server: Option<tokio::task::JoinHandle<std::io::Result<()>>>,
+    server: Option<Server>,
+    /// Holds the authority port, bound but never listening, for the fixture's
+    /// lifetime, so a connection attempted after stop is refused instead of
+    /// reaching whatever socket could otherwise bind the released port.
+    _port: tokio::net::TcpSocket,
     reply_fault: Arc<AtomicU8>,
+    hold: Arc<RequestHold>,
+    accepted: Arc<AtomicUsize>,
     url: String,
     remote: crate::trust_control::service_runtime::remote_admission::RemoteAdmissionStores,
 }
@@ -45,18 +58,46 @@ impl Fixture {
         let mut state = metrics_state("recovery-rpc-secret");
         state.joint_authority_store = Some(authority.clone());
         let reply_fault = Arc::new(AtomicU8::new(0));
-        let router = crate::trust_control::service_runtime::router::build_router(state).layer(
-            axum::middleware::from_fn_with_state(reply_fault.clone(), fault_reply),
-        );
+        let hold = Arc::new(RequestHold::default());
+        let router = crate::trust_control::service_runtime::router::build_router(state)
+            .layer(axum::middleware::from_fn_with_state(
+                reply_fault.clone(),
+                fault_reply,
+            ))
+            .layer(axum::middleware::from_fn_with_state(
+                hold.clone(),
+                hold_request,
+            ));
+        let accepted = Arc::new(AtomicUsize::new(0));
+        let counter = accepted.clone();
         let executor = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
             .enable_all()
             .build()?;
-        let (url, server) = executor.block_on(async {
-            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
-            let url = format!("http://{}", listener.local_addr()?);
-            let server = tokio::spawn(async move { axum::serve(listener, router).await });
-            Ok::<_, std::io::Error>((url, server))
+        let (url, port, server) = executor.block_on(async {
+            use axum::serve::ListenerExt as _;
+            let socket = tokio::net::TcpSocket::new_v4()?;
+            socket.set_reuseport(true)?;
+            socket.bind(std::net::SocketAddr::from((
+                std::net::Ipv4Addr::LOCALHOST,
+                0,
+            )))?;
+            let address = socket.local_addr()?;
+            let port = tokio::net::TcpSocket::new_v4()?;
+            port.set_reuseport(true)?;
+            port.bind(address)?;
+            let listener = socket.listen(1024)?.tap_io(move |_| {
+                counter.fetch_add(1, Ordering::SeqCst);
+            });
+            let (shutdown, signal) = tokio::sync::oneshot::channel::<()>();
+            let task = tokio::spawn(async move {
+                axum::serve(listener, router)
+                    .with_graceful_shutdown(async move {
+                        let _ = signal.await;
+                    })
+                    .await
+            });
+            Ok::<_, std::io::Error>((format!("http://{address}"), port, Server { shutdown, task }))
         })?;
         let remote =
             crate::trust_control::service_runtime::remote_admission::build_remote_admission_stores(
@@ -71,7 +112,10 @@ impl Fixture {
             authority,
             executor,
             server: Some(server),
+            _port: port,
             reply_fault,
+            hold,
+            accepted,
             url,
             remote,
         })
@@ -81,13 +125,19 @@ impl Fixture {
         self.authority.admission_operation_store()
     }
 
-    fn stop_server(&mut self) {
-        if let Some(server) = self.server.take() {
-            server.abort();
-            self.executor.block_on(async {
-                let _ = server.await;
-            });
-        }
+    /// Returns only after every connection the authority accepted has finished,
+    /// so nothing accepted before the stop is answered after it.
+    fn stop_server(&mut self) -> TestResult {
+        let Some(server) = self.server.take() else {
+            return Ok(());
+        };
+        // A parked request would otherwise keep the graceful drain waiting.
+        self.hold.release.notify_one();
+        let _ = server.shutdown.send(());
+        // Graceful serve stops accepting, closes idle keep-alive connections,
+        // drains requests in flight, and resolves after every connection task ends.
+        self.executor.block_on(server.task)??;
+        Ok(())
     }
 
     fn fence(&self) -> StoreMutationFence {
@@ -271,9 +321,50 @@ fn has_source<T: Error + 'static>(error: &(dyn Error + 'static)) -> bool {
     false
 }
 
+/// Parks the next authority request inside the server until it is released.
+#[derive(Default)]
+struct RequestHold {
+    entered: std::sync::Mutex<Option<mpsc::Sender<bool>>>,
+    release: tokio::sync::Notify,
+    answered: AtomicBool,
+}
+
+impl RequestHold {
+    /// Arms the hold. The receiver yields `true` once a request is parked; the
+    /// returned sender lets the caller report `false` if it finished first.
+    fn arm(&self) -> TestResult<(mpsc::Sender<bool>, mpsc::Receiver<bool>)> {
+        let (sender, receiver) = mpsc::channel();
+        *self
+            .entered
+            .lock()
+            .map_err(|_| "request hold lock poisoned")? = Some(sender.clone());
+        Ok((sender, receiver))
+    }
+}
+
+async fn hold_request(
+    State(hold): State<Arc<RequestHold>>,
+    request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> Response {
+    let entered = hold
+        .entered
+        .lock()
+        .ok()
+        .and_then(|mut entered| entered.take());
+    let Some(entered) = entered else {
+        return next.run(request).await;
+    };
+    let _ = entered.send(true);
+    hold.release.notified().await;
+    let response = next.run(request).await;
+    hold.answered.store(true, Ordering::SeqCst);
+    response
+}
+
 impl Drop for Fixture {
     fn drop(&mut self) {
-        self.stop_server();
+        let _ = self.stop_server();
     }
 }
 
@@ -424,7 +515,8 @@ fn remote_recovery_rpc_clear_retains_attempt_history() -> TestResult {
 #[test]
 fn remote_recovery_rpc_transport_retains_actual_native_source() -> TestResult {
     let mut fixture = Fixture::new()?;
-    fixture.stop_server();
+    assert_eq!(fixture.accepted.load(Ordering::SeqCst), 1);
+    fixture.stop_server()?;
     let error = fixture
         .remote
         .operations
@@ -444,6 +536,64 @@ fn remote_recovery_rpc_transport_retains_actual_native_source() -> TestResult {
         error.kind(),
         chio_kernel::admission_operation::RemoteRecoveryFailureKind::Unavailable
     );
+    Ok(())
+}
+
+#[test]
+fn remote_recovery_rpc_stop_drains_and_closes_an_established_connection() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    // Building the stores left one pooled keep-alive connection to the authority.
+    assert_eq!(fixture.accepted.load(Ordering::SeqCst), 1);
+    let (caller_done, held) = fixture.hold.arm()?;
+    let operations = fixture.remote.operations.clone();
+    let fence = fixture.fence();
+    let caller = std::thread::spawn(move || {
+        let page = operations.recovery_page(AdmissionRecoveryPageQuery {
+            not_after_unix_ms: AUTHORITY_TIME,
+            candidate_limit: 1,
+            after_operation_id: None,
+            fence: &fence,
+        });
+        let _ = caller_done.send(false);
+        page
+    });
+    if !held.recv()? {
+        return Err("recovery request finished without reaching the authority".into());
+    }
+    assert_eq!(
+        fixture.accepted.load(Ordering::SeqCst),
+        1,
+        "held request did not ride the established keep-alive connection"
+    );
+    fixture.stop_server()?;
+    let answered_before_stop_returned = fixture.hold.answered.load(Ordering::SeqCst);
+    fixture.hold.release.notify_one();
+    let drained = caller
+        .join()
+        .map_err(|_| "recovery caller thread panicked")?;
+    assert!(
+        answered_before_stop_returned,
+        "stopped authority listener answered an established connection after stop returned"
+    );
+    let drained = drained?;
+    assert!(drained.operations.is_empty());
+    let error = fixture
+        .remote
+        .operations
+        .recovery_page(AdmissionRecoveryPageQuery {
+            not_after_unix_ms: AUTHORITY_TIME,
+            candidate_limit: 1,
+            after_operation_id: None,
+            fence: &fixture.fence(),
+        })
+        .err()
+        .ok_or("stopped authority served the established connection again")?;
+    assert!(has_source::<ureq::Transport>(&error));
+    assert_eq!(
+        error.kind(),
+        chio_kernel::admission_operation::RemoteRecoveryFailureKind::Unavailable
+    );
+    assert_eq!(fixture.accepted.load(Ordering::SeqCst), 1);
     Ok(())
 }
 
