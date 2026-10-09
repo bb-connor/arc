@@ -238,10 +238,13 @@ pub(super) fn remove_for_relocation(
 
 /// Whether this lock root bound `canonical_database_path` to `store_uuid`
 /// itself: its marker holds exactly the record `ensure` writes in place,
-/// naming the marker's own inode. Only provisioning, serving and a committed
-/// import write one. A marker copied from another lock root names the inode
-/// it was copied from and binds nothing here; relocation then removes it, or
-/// refuses it when it is not a marker of this authority.
+/// naming the marker's own device and inode. Only provisioning, serving and
+/// a committed import write one. A marker copied from another lock root names
+/// the device and inode of its original and binds nothing here; relocation
+/// then removes it, or refuses it when it is not a marker of this authority.
+/// The numbers are local identity evidence, not a global file identity: a
+/// copy from another host or filesystem whose numbers happen to coincide
+/// with its own reads as bound, and the import refuses rather than admits.
 pub(super) fn bound_in_place(
     lock_root: &Path,
     canonical_database_path: &Path,

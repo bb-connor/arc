@@ -16,7 +16,13 @@
 //! of that export there is refused, even after its anchor is emptied or
 //! truncated. Restoring or deleting the lock root removes that evidence with
 //! the anchor. Imports under distinct lock roots are not coordinated: each is
-//! its own serving lineage, sharing history only up to the seal.
+//! its own serving lineage, sharing history only up to the seal. A copied
+//! lock root at the same textual path on another host is such a distinct
+//! destination: the device and inode numbers its markers and the exported
+//! record name are the source host's, and they are local identity evidence
+//! only. Where they happen to coincide with the copy's own, a copied marker
+//! reads as bound and refuses the import, and a copied lock holding the
+//! retirement record reads as the export's own location.
 
 use chio_security_types::clock::{Clock, ClockError, SystemClock, UnixMillis};
 use std::fs::{self, File};
@@ -585,7 +591,7 @@ impl SqliteAuthorityStore {
         // when it records nothing beyond the exported state, and it stays
         // locked until the replacement is created.
         let lock_path = lock_root.join(format!("{}.lock", record.store_uuid));
-        let previous_anchor = lock_replaceable_anchor(
+        let previous_lock = lock_replaceable_anchor(
             &lock_root,
             &lock_path,
             &database_path,
@@ -599,12 +605,7 @@ impl SqliteAuthorityStore {
             seal.exported_at_ms
                 .max(admission.trusted_time_high_water_unix_ms),
         )?;
-        refuse_bound_destination(
-            &lock_root,
-            &database_path,
-            &record,
-            previous_anchor.as_ref().map(|(_, image)| *image),
-        )?;
+        refuse_bound_destination(&lock_root, &database_path, &record, previous_lock.as_ref())?;
         // Verification refusals are read-only. From here, authorized I/O can
         // partially complete and retains the normal import retry semantics.
         connection.set_db_config(DbConfig::SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE, false)?;
@@ -617,7 +618,7 @@ impl SqliteAuthorityStore {
             &database_path,
             Path::new(&record.database_path),
             &record.store_uuid,
-            previous_anchor.as_ref().map(|(anchor, _)| anchor),
+            previous_lock.as_ref().map(|lock| &lock.anchor),
         )?;
         let lock_file = create_lock_file(&lock_path)?;
         let lock_metadata = lock_file.metadata()?;
@@ -710,6 +711,15 @@ impl SqliteAuthorityStore {
     }
 }
 
+/// The destination's existing serving lock, held and proven replaceable.
+struct PreviousLock {
+    anchor: RollbackAnchor,
+    image: ReplaceableAnchor,
+    /// Local device and inode of the held lock, which `anchor` keeps bound to
+    /// the lock path.
+    identity: (u64, u64),
+}
+
 /// Lock the destination's existing serving lock and prove its rollback anchor
 /// records nothing beyond the exported state. Reads only; a refusal leaves the
 /// anchor, the lock and the path markers untouched.
@@ -719,22 +729,24 @@ fn lock_replaceable_anchor(
     database_path: &Path,
     store_uuid: &str,
     connection: &Connection,
-) -> Result<Option<(RollbackAnchor, ReplaceableAnchor)>, SqliteServingOwnerError> {
+) -> Result<Option<PreviousLock>, SqliteServingOwnerError> {
     match fs::symlink_metadata(lock_path) {
         Ok(_) => {
             let file = open_lock_file(lock_path)?;
             let metadata = file.metadata()?;
             validate_lock_metadata(lock_root, &metadata)?;
             acquire_serving_lock(&file, database_path)?;
-            let anchor = RollbackAnchor::new(
-                file,
-                lock_root,
-                store_uuid,
+            let identity = (
                 read_u64(metadata_device(&metadata)?, "lock_device")?,
                 read_u64(metadata_inode(&metadata)?, "lock_inode")?,
-            )?;
+            );
+            let anchor = RollbackAnchor::new(file, lock_root, store_uuid, identity.0, identity.1)?;
             let image = anchor.verify_replaceable_by_export(connection)?;
-            Ok(Some((anchor, image)))
+            Ok(Some(PreviousLock {
+                anchor,
+                image,
+                identity,
+            }))
         }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(error) => Err(error.into()),
@@ -745,20 +757,31 @@ fn lock_replaceable_anchor(
 ///
 /// A marker created in place for the destination is written only after
 /// provisioning, serving or an import commits there, and an interrupted
-/// import removes it before it seeds a new anchor. The exported store's own
-/// location, still holding its retirement record, carries its provisioning
-/// marker into an in-place import. Anywhere else the marker proves the
-/// destination committed a lineage that an emptied or truncated anchor may
-/// no longer show, so the exported copy cannot replace it.
+/// import removes it before it seeds a new anchor. Anywhere but the exported
+/// store's own location the marker proves the destination committed a
+/// lineage that an emptied or truncated anchor may no longer show, so the
+/// exported copy cannot replace it.
+///
+/// The exported store's own location carries its provisioning marker into an
+/// in-place import only while its retirement record sits in the very lock it
+/// was provisioned with. An import creates its replacement lock while the old
+/// one is still open, so the replacement never has the provisioned device
+/// and inode, and retirement bytes written into it do not reopen the
+/// exception. Device and inode numbers are local identity evidence, not a
+/// global file identity: a copy on another host whose lock happens to reuse
+/// the recorded numbers is treated as the source location.
 fn refuse_bound_destination(
     lock_root: &Path,
     database_path: &Path,
     record: &ProvisioningRecord,
-    anchor: Option<ReplaceableAnchor>,
+    previous_lock: Option<&PreviousLock>,
 ) -> Result<(), SqliteServingOwnerError> {
     let retired_source = Path::new(&record.database_path) == database_path
         && Path::new(&record.lock_root) == lock_root
-        && anchor == Some(ReplaceableAnchor::Retirement);
+        && previous_lock.is_some_and(|lock| {
+            lock.image == ReplaceableAnchor::Retirement
+                && lock.identity == (record.lock_device, record.lock_inode)
+        });
     if !retired_source
         && path_identity::bound_in_place(lock_root, database_path, &record.store_uuid)?
     {

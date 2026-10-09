@@ -637,3 +637,51 @@ fn an_emptied_or_damaged_anchor_cannot_hide_a_committed_import() {
         );
     }
 }
+
+#[test]
+fn retired_anchor_bytes_in_a_recreated_lock_do_not_reopen_an_in_place_import() {
+    let (temp, database, lock_root) = fixture();
+    SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
+    drop(crate::test_authority::open_serving(&database, &lock_root).expect("serve at source"));
+    let seal = SqliteAuthorityStore::export_for_relocation(&database, &lock_root).expect("export");
+    let retained = temp.path().join("retained.db");
+    fs::copy(&database, &retained).expect("retain export");
+    let lock = lock_root.join(format!("{}.lock", seal.store_uuid));
+    let retired_anchor = fs::read(&lock).expect("retirement anchor");
+    let provisioned_lock = lock_identity(&lock);
+    SqliteAuthorityStore::import_relocated_checked(&database, &lock_root, &seal, || Ok(()))
+        .expect("in-place import");
+    {
+        SqliteAuthorityStore::provision(&database, &lock_root).expect("re-provision");
+        let authority =
+            crate::test_authority::open_serving(&database, &lock_root).expect("serve in place");
+        assert!(matches!(
+            authority
+                .budget_store()
+                .authorize_budget_hold(structured_request(Some(active_authority(&authority))))
+                .expect("budget hold after import"),
+            BudgetAuthorizeHoldDecision::Authorized(_)
+        ));
+    }
+    assert_ne!(lock_identity(&lock), provisioned_lock);
+    // Only the database and the retired anchor bytes are restored; the lock
+    // inode and the marker the import bound stay current.
+    overwrite_lock_bytes(&lock, 0, &retired_anchor);
+    restore_database_in_place(&database, &retained);
+    let marker = path_identity_marker(&database, &lock_root);
+    let marker_bytes = fs::read(&marker).expect("bound marker");
+    let anchor = lock_state(&lock);
+
+    let result =
+        SqliteAuthorityStore::import_relocated_checked(&database, &lock_root, &seal, || Ok(()));
+    assert!(
+        matches!(
+            &result,
+            Err(SqliteServingOwnerError::RelocationDestinationAnchored(_))
+        ),
+        "{result:?}"
+    );
+    assert_eq!(lock_state(&lock), anchor);
+    assert_eq!(fs::read(&marker).expect("retained marker"), marker_bytes);
+    assert!(fs::read(&database).expect("refused export") == fs::read(&retained).expect("retained"));
+}
