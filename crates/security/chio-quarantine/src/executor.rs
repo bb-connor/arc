@@ -226,6 +226,12 @@ impl<
                 self.append_receipt(&current, None)?;
                 continue;
             }
+            if snapshot.state == ResponseState::RollbackPartial {
+                self.page_rollback_failure(&snapshot, &current)?;
+                if rollback_retry_budget_exhausted(&snapshot) {
+                    return Ok(current);
+                }
+            }
             if snapshot
                 .due_at_unix_ms
                 .is_some_and(|due| now_unix_ms >= due)
@@ -279,12 +285,6 @@ impl<
                 ResponseState::ApplyPartial
                 | ResponseState::Expiring
                 | ResponseState::RollbackPartial => {
-                    if snapshot.state == ResponseState::RollbackPartial {
-                        self.page_rollback_failure(&snapshot, &current)?;
-                        if rollback_retry_budget_exhausted(&snapshot) {
-                            return Ok(current);
-                        }
-                    }
                     current = self.state_machine().transition_scheduled(
                         &current,
                         work,

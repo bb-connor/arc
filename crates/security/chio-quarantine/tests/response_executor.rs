@@ -1,6 +1,8 @@
 #[path = "response_executor/execution_mode.rs"]
 mod execution_mode;
 mod response_support;
+#[path = "response_executor/rollback_budget.rs"]
+mod rollback_budget;
 
 use chio_core_types::receipt::security::{ActiveDefenseEffectOutcome, ActiveDefenseReceiptBody};
 use chio_quarantine::{
