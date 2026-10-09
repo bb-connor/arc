@@ -3199,6 +3199,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-custody-store"
+version = "0.1.0"
+dependencies = [
+ "chacha20poly1305",
+ "chio-core-types",
+ "chio-security-types",
+ "chio-test-support",
+ "r2d2",
+ "r2d2_sqlite",
+ "rusqlite",
+ "rustix",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tracing",
+ "uuid",
+ "zeroize",
+]
+
+[[package]]
 name = "chio-data-guards"
 version = "0.1.0"
 dependencies = [
@@ -4389,7 +4408,9 @@ dependencies = [
  "chio-core-types",
  "chio-kernel",
  "chio-runtime-core",
+ "chio-security-types",
  "chio-swarm-authority",
+ "chio-test-support",
  "chio-weights",
  "serde",
  "serde_json",
@@ -4462,6 +4483,7 @@ dependencies = [
  "chio-cage",
  "chio-control-plane",
  "chio-core-types",
+ "chio-custody-store",
  "chio-flow",
  "chio-kernel",
  "chio-keyring",
@@ -4673,6 +4695,7 @@ dependencies = [
  "chio-agent-web-interop",
  "chio-core-types",
  "chio-credit",
+ "chio-custody-store",
  "chio-federation",
  "chio-federation-authority",
  "chio-finding",

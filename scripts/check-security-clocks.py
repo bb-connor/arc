@@ -33,6 +33,7 @@ LEGACY_ROOTS = (
     "crates/kernel/",
     "crates/guards/",
     "crates/platform/chio-control-plane/",
+    "crates/platform/chio-custody-store/",
     "crates/platform/chio-store-sqlite/",
     "crates/platform/chio-http-core/src/authority.rs",
     "crates/platform/chio-finding-hosted-edge/src/server.rs",

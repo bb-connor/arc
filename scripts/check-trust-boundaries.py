@@ -14,7 +14,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CATALOG = "docs/security/trust-boundary-inventory.json"
-STORE = "crates/platform/chio-store-sqlite/src"
+STORE = ("crates/platform/chio-store-sqlite/src", "crates/platform/chio-custody-store/src")
 # Share the calibrated Rust lexer. Examples inside documentation and strings
 # cannot construct proof values or bypass a production reader.
 _spec = importlib.util.spec_from_file_location("accounting_lexer", ROOT / "scripts/check-accounting-arithmetic.py")

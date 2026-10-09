@@ -79,6 +79,7 @@ SECURITY_CRATES = (
     "crates/kernel/chio-kernel-browser/",
     "crates/kernel/chio-kernel-mobile/",
     "crates/platform/chio-control-plane/",
+    "crates/platform/chio-custody-store/",
     "crates/platform/chio-store-sqlite/",
     "crates/core/chio-core-types/",
 )

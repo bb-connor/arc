@@ -396,7 +396,7 @@
       "disposition": "fixture",
       "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
     },
-    "crates/platform/chio-store-sqlite/src/encrypted_blob.rs::now_secs": {
+    "crates/platform/chio-custody-store/src/encrypted_blob.rs::now_secs": {
       "occurrences": 1,
       "disposition": "migrated",
       "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
@@ -1372,8 +1372,8 @@
     "crates/platform/chio-control-plane/src/issuance/reputation.rs::inspect_local_reputation_with_read_context::native-adapter",
     "crates/platform/chio-control-plane/src/keyring_runtime.rs::load_keyring_runtime_composition::native-adapter",
     "crates/platform/chio-control-plane/src/keyring_runtime.rs::load_keyring_runtime_from_authority_seed::native-adapter",
-    "crates/platform/chio-store-sqlite/src/encrypted_blob.rs::open::native-adapter",
-    "crates/platform/chio-store-sqlite/src/encrypted_blob.rs::open_in_memory::native-adapter",
+    "crates/platform/chio-custody-store/src/encrypted_blob.rs::open::native-adapter",
+    "crates/platform/chio-custody-store/src/encrypted_blob.rs::open_in_memory::native-adapter",
     "crates/platform/chio-store-sqlite/src/finding_operator_bundle_store.rs::open::native-adapter",
     "crates/platform/chio-store-sqlite/src/finding_operator_bundle_store.rs::open_in_memory::native-adapter",
     "crates/platform/chio-store-sqlite/src/finding_operator_payment.rs::open::native-adapter",

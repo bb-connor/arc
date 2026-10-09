@@ -2547,13 +2547,13 @@
       "crates/platform/chio-store-sqlite/src/admission_operation_store.sql"
     ],
     "chio_encrypted_blobs": [
-      "crates/platform/chio-store-sqlite/src/encrypted_blob.rs"
+      "crates/platform/chio-custody-store/src/encrypted_blob.rs"
     ],
     "chio_encrypted_blob_references": [
-      "crates/platform/chio-store-sqlite/src/encrypted_blob.rs"
+      "crates/platform/chio-custody-store/src/encrypted_blob.rs"
     ],
     "chio_encrypted_blob_reference_mutations": [
-      "crates/platform/chio-store-sqlite/src/encrypted_blob.rs"
+      "crates/platform/chio-custody-store/src/encrypted_blob.rs"
     ],
     "chio_finding_payloads": [
       "crates/platform/chio-store-sqlite/src/finding_payload_store.rs"
@@ -2767,6 +2767,17 @@
     ]
   },
   "unscoped_sql": [
+    {
+      "path": "crates/platform/chio-custody-store/src/encrypted_blob.rs",
+      "owner": "exact_reference_mutation",
+      "sha256": "d0333d7e930cd7993c4f24a53fffdd721844c7acbcbccf6292fc4543250387dd",
+      "tables": [
+        "chio_encrypted_blob_reference_mutations"
+      ],
+      "sql": "SELECT mutation_digest, mutation_kind, namespace, tenant_id, reference_key, result_blob_id FROM chio_encrypted_blob_reference_mutations WHERE operation_id = ?1",
+      "principal": "blob-mutation",
+      "contract": "Global operation deduplication must compare stored tenant, namespace, reference key, mutation kind and digest before returning a replay."
+    },
     {
       "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs",
       "owner": "ensure_projection_absent",
@@ -3080,17 +3091,6 @@
       "sql": "SELECT (SELECT COUNT(*) FROM security_participant_state_initializations), (SELECT COUNT(*) FROM security_participant_state_mutations), (SELECT COUNT(*) FROM security_participant_egress_events), (SELECT COUNT(*) FROM security_participant_output_events), (SELECT COUNT(*) FROM authority_global_commits)",
       "principal": "kernel-admission",
       "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/encrypted_blob.rs",
-      "owner": "exact_reference_mutation",
-      "sha256": "d0333d7e930cd7993c4f24a53fffdd721844c7acbcbccf6292fc4543250387dd",
-      "tables": [
-        "chio_encrypted_blob_reference_mutations"
-      ],
-      "sql": "SELECT mutation_digest, mutation_kind, namespace, tenant_id, reference_key, result_blob_id FROM chio_encrypted_blob_reference_mutations WHERE operation_id = ?1",
-      "principal": "blob-mutation",
-      "contract": "Global operation deduplication must compare stored tenant, namespace, reference key, mutation kind and digest before returning a replay."
     },
     {
       "path": "crates/platform/chio-store-sqlite/src/evidence_export.rs",
@@ -11749,7 +11749,7 @@
       "evidence_kind": "exact-tenant-reopen",
       "tests": [
         {
-          "path": "crates/platform/chio-store-sqlite/src/encrypted_blob/tests/tenant_isolation.rs",
+          "path": "crates/platform/chio-custody-store/src/encrypted_blob/tests/tenant_isolation.rs",
           "test": "exact_blob_ids_and_mutation_replays_cannot_cross_tenants_after_restart"
         }
       ]

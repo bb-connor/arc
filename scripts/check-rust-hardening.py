@@ -142,7 +142,7 @@ def check(root):
             errors.extend(library_errors(path, (root / path).read_text(), catalog['unsafe_libraries']))
             if (path.startswith(('crates/security/', 'crates/kernel/'))
                     or package['name'] in {'chio-core-types', 'chio-bounded', 'chio-supervisor',
-                                          'chio-store-sqlite', 'chio-control-plane'}):
+                                          'chio-store-sqlite', 'chio-custody-store', 'chio-control-plane'}):
                 if catalog['tcb_libraries'].get(package['name']) != path:
                     errors.append(f'{path}: security library missing from TCB policy')
     for path in set(catalog['unsafe_libraries']) - libraries:

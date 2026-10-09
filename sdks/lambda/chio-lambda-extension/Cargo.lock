@@ -1777,6 +1777,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-custody-store"
+version = "0.1.0"
+dependencies = [
+ "chacha20poly1305",
+ "chio-core-types",
+ "chio-security-types",
+ "r2d2",
+ "r2d2_sqlite",
+ "rusqlite",
+ "rustix",
+ "thiserror 1.0.69",
+ "tracing",
+ "uuid",
+ "zeroize",
+]
+
+[[package]]
 name = "chio-data-guards-redactors-default"
 version = "0.1.0"
 dependencies = [
@@ -2202,6 +2219,7 @@ dependencies = [
  "chio-agent-web-interop",
  "chio-core-types",
  "chio-credit",
+ "chio-custody-store",
  "chio-federation",
  "chio-federation-authority",
  "chio-finding",

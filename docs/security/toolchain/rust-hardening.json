@@ -24,6 +24,7 @@
     "chio-quarantine": "crates/security/chio-quarantine/src/lib.rs",
     "chio-supervisor": "crates/core/chio-supervisor/src/lib.rs",
     "chio-swarm-authority": "crates/kernel/chio-swarm-authority/src/lib.rs",
+    "chio-custody-store": "crates/platform/chio-custody-store/src/lib.rs",
     "chio-store-sqlite": "crates/platform/chio-store-sqlite/src/lib.rs",
     "chio-cage": "crates/security/chio-cage/src/lib.rs",
     "chio-flow": "crates/security/chio-flow/src/lib.rs",

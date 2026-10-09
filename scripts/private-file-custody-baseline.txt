@@ -18,7 +18,7 @@
 1	creation-mode	crates/platform/chio-store-sqlite/src/caller_execution_ledger.rs
 1	no-follow	crates/platform/chio-store-sqlite/src/caller_execution_ledger.rs
 1	set-permissions	crates/platform/chio-store-sqlite/src/caller_execution_ledger/connection_recovery.rs
-1	no-follow	crates/platform/chio-store-sqlite/src/enterprise_migration_state.rs
+1	no-follow	crates/platform/chio-custody-store/src/enterprise_migration_state.rs
 1	creation-mode	crates/platform/chio-store-sqlite/src/finding_pool_ledger.rs
 3	creation-mode	crates/platform/chio-store-sqlite/src/finding_pool_ledger/qualification.rs
 2	no-follow	crates/platform/chio-store-sqlite/src/finding_pool_ledger/qualification.rs
