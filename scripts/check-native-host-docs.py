@@ -170,7 +170,7 @@ def check_em_dash(layout: Layout) -> list[str]:
     out = []
     for path in sorted(set(layout.program) | set(layout.public)):
         for number, line in enumerate(read(path).splitlines(), start=1):
-            if "—" in line:
+            if "\u2014" in line:
                 out.append(f"em-dash: {layout.rel(path)}: line {number} contains U+2014")
     return out
 
