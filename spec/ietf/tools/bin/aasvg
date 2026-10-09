@@ -3,12 +3,20 @@
 # output with a <style> element, which the RFC 7996 SVG profile does not allow.
 # This wrapper runs the real aasvg (the next one on PATH) with --compatible and
 # moves its style rules onto the elements as attributes.
+#
+# A pipeline reports only the status of its last command, so the renderer runs
+# on its own first: a failed figure stops the build instead of passing on
+# empty or partial SVG.
 self_dir=$(cd "$(dirname "$0")" && pwd)
 IFS=:
 for dir in $PATH; do
   [ "$dir" = "$self_dir" ] && continue
   if [ -x "$dir/aasvg" ]; then
-    "$dir/aasvg" "$@" --compatible | python3 "$self_dir/../svg_inline_styles.py"
+    unset IFS
+    svg=$(mktemp) || exit 1
+    trap 'rm -f "$svg"' EXIT
+    "$dir/aasvg" "$@" --compatible >"$svg" || exit $?
+    python3 "$self_dir/../svg_inline_styles.py" <"$svg"
     exit $?
   fi
 done

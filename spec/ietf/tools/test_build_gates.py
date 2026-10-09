@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
 """Regression checks for silent converter and validator acceptance failures."""
 import copy
+import os
+import subprocess
+import tempfile
 import unittest
 import xml.etree.ElementTree as ET
+from pathlib import Path
 from idnits_gate import validate
 from normalize_xml import normalize
+
+WRAPPER_DIR = Path(__file__).resolve().parent / "bin"
 
 CLEAN = {"result": "pass", "file": {"path": "draft.xml", "size": 100},
          "nitsBySeverity": {"error": 0, "warning": 0, "comment": 0}, "nits": []}
@@ -60,6 +66,30 @@ class IdnitsGate(unittest.TestCase):
         for report in reports:
             with self.subTest(report=report), self.assertRaises((ValueError, TypeError)):
                 validate(report)
+
+
+class AasvgWrapper(unittest.TestCase):
+    """tools/bin/aasvg must not hide a failure of the real renderer."""
+
+    def run_with_fake(self, body):
+        with tempfile.TemporaryDirectory() as tmp:
+            fake = Path(tmp) / "aasvg"
+            fake.write_text("#!/bin/sh\ncat >/dev/null\n" + body)
+            fake.chmod(0o755)
+            env = dict(os.environ, PATH=os.pathsep.join([str(WRAPPER_DIR), tmp, os.environ.get("PATH", "")]))
+            return subprocess.run(["sh", str(WRAPPER_DIR / "aasvg"), "--spaces=1"], input="+--+\n",
+                                  capture_output=True, text=True, env=env, check=False)
+
+    def test_a_renderer_failure_reaches_the_caller(self):
+        result = self.run_with_fake("printf '<svg>'\nexit 42\n")
+        self.assertEqual(result.returncode, 42)
+        self.assertEqual(result.stdout, "")
+
+    def test_a_rendered_figure_has_its_styles_inlined(self):
+        result = self.run_with_fake("printf '<svg><style>path{}</style><path d=\"M0 0\"/></svg>'\n")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("<style>", result.stdout)
+        self.assertIn('stroke="black"', result.stdout)
 
 
 class XmlNormalization(unittest.TestCase):
