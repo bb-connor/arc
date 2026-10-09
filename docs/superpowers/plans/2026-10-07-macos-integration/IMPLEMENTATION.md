@@ -35,7 +35,7 @@ are defined once in CASES; this plan names them and does not restate them.
   uncertain time refuses; there is no plaintext, unsandboxed, weaker-profile or
   cross-context fallback.
 - HOST-M1 is server-first (roadmap COOP-1). Native review window, menu bar and
-  notifications are optional follow-ons (COOP-1.12) and never gate a native
+  notifications are optional follow-ons (roadmap COOP-1) and never gate a native
   capability; when delivered they keep all their own tests.
 - User-session host and service host are separate, separately qualified
   deployment profiles. A GUI-free user service cannot claim login independence.
@@ -86,7 +86,7 @@ without linking any menu app. Record actual test commands in M0 before
 implementation.
 
 **Interfaces:** Consume `chio trust serve`, `chio api protect`, the passport and
-evidence CLI and `signing_custody` as they exist on main. Produce installed
+evidence CLI and `signing_custody` as they exist on main once #1160 lands (F). Produce installed
 service identities, authenticated reachability and a Keychain key reference
 accepted by every signing command. No new authority or recovery API.
 
@@ -147,9 +147,11 @@ accepted by every signing command. No new authority or recovery API.
   and stay unavailable while reconciliation runs. Closing a client never stops
   native custody (Q29).
 - [ ] **Listener pressure.** Confirm the shared owners' pre-authentication and
-  per-principal bounds hold for the installed listeners (Q10, Q16). macOS adds
-  no listener of its own; a missing bound in a shared owner is filed there.
-- [ ] **Optional review clients (COOP-1.12).** Only if a native review window,
+  per-principal bounds hold for the installed listeners (Q10, Q21). macOS adds
+  no listener of its own. A missing or ineffective bound in a shared owner makes
+  the affected door profile unavailable until that owner fixes it; it is never
+  shipped as a known gap.
+- [ ] **Optional review clients (roadmap COOP-1).** Only if a native review window,
   menu-bar item or notifications ship: notification clicks open a neutral view
   that re-reads owner state and can never approve, issue or retry; sensitive
   content clears on lock, switch and reboot; keyboard and VoiceOver access work;
@@ -174,8 +176,9 @@ unavailable`. The stop items of this packet are deferred with HOST-M2.
 lands the record is labelled `SharedCredential`). No optional client.
 
 **Files:** Native owners `crates/kernel/chio-kernel/src/{approval,custody}.rs`
-and their tests; the issuance approval route used by federated issue; optional
-client review code only when a client ships.
+and their tests; the issuance approval step that federated issue consumes (an
+approval route arrives with the roadmap COOP-1 issuance inbox and does not exist
+on main yet); optional client review code only when a client ships.
 
 **Interfaces:** Consume the delivered approval and roster types through
 supported bindings. Any human-endorsement client presents and binds the exact
@@ -303,9 +306,21 @@ allowlist (that is M10).
   bytes refuse before evidence admission (Q18).
 - [ ] **Timed outsider install (G1).** Install the downloaded candidate on a
   clean standard-user Mac with SIP and Gatekeeper on, timed, by someone outside
-  the core team following the published steps. Separately refuse every
+  the core team following the published steps through to connecting an agent and
+  seeing a signed deny receipt (C01). Separately refuse every
   permission, registration and enrollment; verify truthful unavailable states
   and no ES/NE request.
+- [ ] **Container ingestion bounds (Q20).** Inventory every DMG, archive,
+  installer-package and update-container ingestion path before validated staging
+  exists, with its owner, parser or extractor, privilege and any script seam.
+  Freeze finite compressed, expanded, allocated, entry-count, depth, CPU, time and
+  memory bounds at the actual processing boundary. Malformed or truncated
+  containers, traversal and absolute paths, escaping links, colliding names,
+  special files, sparse files and compression bombs refuse within those bounds
+  before any write outside private staging, privileged change, script execution
+  or activation; partial staging is cleaned up boundedly or kept unavailable.
+  Missing bounded handling disables that ingestion path. A valid container is the
+  positive control.
 - [ ] **Package admission (Q20).** One change per fixture through the shipped
   installer and updater: tampered resource without re-signing, removed
   signature, correctly signed wrong-architecture build (never silently run under
@@ -420,7 +435,17 @@ co-signing) and the shared W1/W2 owners: its own agent (Claude Code or Codex in
 MCP mode) proposes work, the operator co-signs through the W2 remote co-signer,
 and `chio evidence verify` checks the executing organization's receipts and
 acceptance offline against the pinned partner card (C06, C07). macOS adds no
-packet for this role.
+new owner for this role, but qualifies it on an installed Mac:
+
+- [ ] **Mac as requester.** With the Mac as organization A and a Linux
+  executing organization B: the Mac's agent proposes bounded unpaid work; the
+  operator reviews the exact predicate (treaty reference, action class, digest)
+  and co-signs through the W2 remote co-signer with an M3 passkey approval, where
+  deny or a changed predicate retains nothing (Q05); the Mac then verifies B's
+  evidence package, including B's door receipts, offline against B's pinned
+  partner card and refuses a package whose receipts or co-signature fail
+  verification (C06, C07, Q28). Depends on the shared W1 facade and W2
+  co-signer.
 
 ### M6: Optional sealed W1 coding-resource profile (executing owner)
 
@@ -461,8 +486,8 @@ only after the inspection. Update this plan with actual source locations.
   evidence export and verify, the approval and roster owners, and the release,
   install and floor owner (packet 2a-shared and 2a-macos). Absent support blocks
   the dependent step, not the whole packet.
-- [ ] Map each HOST-M1 and platform case (C09, Q05, Q06, Q10, Q16, Q18, Q20, Q24,
-  Q28, Q29, Q31) to its owner, packet, test command, positive control and
+- [ ] Map each HOST-M1 and platform case (C01, C09, Q02, Q05, Q06, Q10, Q14,
+  Q16, Q17, Q18, Q20, Q24, Q28, Q29, Q30, Q31) to its owner, packet, test command, positive control and
   independent negative observation. An absent test is an open obligation, never
   an implied pass. M10 rejects each missing mandatory case.
 - [ ] Inventory every helper invocation that consumes untrusted filenames, URLs

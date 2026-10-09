@@ -45,8 +45,7 @@ does not change that.
 ## HOST-M1 on macOS
 
 HOST-M1 is cut server-first (unified roadmap COOP-1): headless services, OS key
-custody and the door come first; desktop review moments are optional follow-ons
-(COOP-1.12). A Mac can play either organization in
+custody and the door come first; desktop review moments are optional follow-ons (roadmap COOP-1). A Mac can play either organization in
 [NORTH-STAR-FLOWS section 3](../2026-10-07-desktop-integration/NORTH-STAR-FLOWS.md#3-flow-m1-cooperate-0).
 HOST-M1 cases: C09, Q05, Q06, Q24, Q28, Q29, with platform cases Q18, Q20 and
 Q31 for the delivered install and its time-bounded authority.
@@ -103,7 +102,7 @@ the CLI; a review window is optional.
 
 **Optional desktop moments.** A notification that opens a native review window
 and a menu-bar item showing identity and the pending-review count are optional
-follow-ons (COOP-1.12), not HOST-M1 gates. When delivered they render owner
+follow-ons (roadmap COOP-1), not HOST-M1 gates. When delivered they render owner
 data as `advisory_only`, clear sensitive content on lock or user switch, route
 notification clicks only to a neutral view that re-reads owner state, and keep
 their accessibility, privacy and exact-intent rendering obligations (Q17).
@@ -129,7 +128,7 @@ macOS-only organization takes part in HOST-M3 as the requesting (counterparty)
 organization, and the executing organization runs Linux
 (NORTH-STAR-FLOWS section 5, platform note). The detailed pre-restructure
 design of this annex at commit `620c703d8` is the starting point when this
-work resumes; nothing below is scheduled before G5.
+work resumes; nothing in this section is scheduled before G5.
 
 Scope when resumed (NORTH-STAR-FLOWS sections 4 and 9; cases C02 to C05, C10,
 C11, Q03, Q07, Q08, Q11 to Q13, Q15, Q19, Q22, Q23, Q25 to Q27, H01 to H08):
@@ -198,8 +197,9 @@ packet for them.
 The Mac becomes an executing owner (work inside its own HOST-M2 tree, an
 evaluator, artifact capture, review and apply or export) only after macOS
 HOST-M2. That executing role, including the optional sealed W1 coding resource
-profile, is `planning_status: deferred` with HOST-M2 (cases C06 to C08, Q01,
-Q02, Q14). When it resumes, its obligations are unchanged from the
+profile, is `planning_status: deferred` with HOST-M2 (cases C08, Q01 and Q14,
+and C06 and C07 in their executing-owner form; Q02 still applies before then to
+every mutation a HOST-M1 Mac exposes). When it resumes, its obligations are unchanged from the
 pre-restructure design at `620c703d8`: repository capture refuses
 repository-controlled execution, lazy fetching and external objects and bounds
 object parsing, special entries, mounts, sizes and whole-generation coherence
