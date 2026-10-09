@@ -532,3 +532,78 @@ fn c12_a_poisoned_writer_head_invalidates_reads_and_is_never_revived() {
     }
     service.shutdown();
 }
+
+/// Pause extension at E = 12, then commit entries 13..=16 (a full checkpoint)
+/// and return the newest receipt. A rotation can then archive everything.
+fn torn_head_fixture() -> (
+    Fixture,
+    ReceiptQuerySnapshots,
+    chio_core::receipt::body::ChioReceipt,
+) {
+    let fixture = Fixture::new(4);
+    fixture.append_varied(0..12);
+    let service = ready(
+        &fixture,
+        ReceiptQuerySnapshotConfig {
+            head_wait: Duration::from_millis(100),
+            max_staleness: Duration::ZERO,
+            ..config()
+        },
+    );
+    service.pause_extension_for_test(true);
+    fixture.append_varied(12..15);
+    let newest = Spec::varied(15).sign(&keypair());
+    fixture
+        .store
+        .append_chio_receipt_returning_seq(&newest)
+        .unwrap();
+    fixture.flush();
+    (fixture, service, newest)
+}
+
+/// Archive every checkpointed receipt between the two reads of the next head
+/// observation on this thread.
+fn rotate_between_head_reads(fixture: &Fixture) {
+    let store = fixture.store.clone();
+    let archive = fixture.archive.to_str().unwrap().to_string();
+    super::super::service::head_hook::set(Some(Box::new(move || {
+        assert!(
+            store
+                .archive_receipts_before(1_800_000_000, &archive)
+                .unwrap()
+                > 0
+        );
+    })));
+}
+
+#[test]
+fn head_rotation_between_reads_never_yields_a_false_negative() {
+    let (fixture, service, newest) = torn_head_fixture();
+    rotate_between_head_reads(&fixture);
+    let result = service.load_receipt(&newest.id, &ReceiptReadContext::admin_service());
+    super::super::service::head_hook::set(None);
+    match result {
+        Err(error) => assert_eq!(snapshot_error(error), ReceiptQuerySnapshotError::Stale),
+        Ok((found, watermark)) => panic!(
+            "a negative lookup at entry {} skipped the committed head: {found:?}",
+            watermark.through_entry_seq
+        ),
+    }
+    service.shutdown();
+}
+
+#[test]
+fn head_rotation_between_reads_never_serves_an_uncovered_page() {
+    let (fixture, service, _) = torn_head_fixture();
+    rotate_between_head_reads(&fixture);
+    let result = service.query_receipts(&admin(200));
+    super::super::service::head_hook::set(None);
+    match result {
+        Err(error) => assert_eq!(snapshot_error(error), ReceiptQuerySnapshotError::Stale),
+        Ok(page) => panic!(
+            "a page at entry {} was treated as covering the committed head",
+            page.snapshot.unwrap().through_entry_seq
+        ),
+    }
+    service.shutdown();
+}

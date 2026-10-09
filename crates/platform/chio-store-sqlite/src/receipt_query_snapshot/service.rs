@@ -651,16 +651,39 @@ impl Inner {
         }
     }
 
+    /// The claim-log head: the live maximum entry, or the watermark when the
+    /// live log is empty. Both come from one read transaction, so a rotation
+    /// that commits in between cannot produce a torn, too-low head.
     fn head(&self) -> Result<i64, ReceiptStoreError> {
-        let connection = self.store.connection()?;
-        let watermark =
-            crate::receipt_store::support::retention_watermark(&connection)?.unwrap_or(0);
-        let max_entry: i64 = connection.query_row(
-            "SELECT COALESCE(MAX(entry_seq), 0) FROM claim_receipt_log_entries",
-            [],
-            |row| row.get(0),
+        let mut connection = self.store.connection()?;
+        let transaction = connection.transaction()?;
+        let budget = crate::receipt_store::support::SqlWorkBudget::new_for(
+            &transaction,
+            self.config.fetch_sql_steps,
+            "receipt query head",
         )?;
-        Ok(max_entry.max(i64::try_from(watermark).unwrap_or(i64::MAX)))
+        let observed = (|| -> Result<i64, ReceiptStoreError> {
+            let watermark =
+                crate::receipt_store::support::retention_watermark(&transaction)?.unwrap_or(0);
+            #[cfg(test)]
+            head_hook::run();
+            let max_entry: i64 = transaction.query_row(
+                "SELECT COALESCE(MAX(entry_seq), 0) FROM claim_receipt_log_entries",
+                [],
+                |row| row.get(0),
+            )?;
+            Ok(max_entry.max(i64::try_from(watermark).unwrap_or(i64::MAX)))
+        })();
+        let exhausted = budget.exhausted();
+        drop(budget);
+        let _ = transaction.commit();
+        if exhausted {
+            return Err(ReceiptQuerySnapshotError::Unavailable(
+                "receipt query head exhausted its SQL work budget".into(),
+            )
+            .into());
+        }
+        observed
     }
 
     /// Wait for the version to reach the head observed now. A page may then
@@ -981,5 +1004,26 @@ impl ReceiptQuerySnapshots {
 
     pub(super) fn recheck_lease_for_test(&self, epoch: u64) -> Result<(), ReceiptStoreError> {
         self.inner.recheck_lease(epoch)
+    }
+}
+
+/// Test-only interleaving point between the two reads of a head observation.
+#[cfg(test)]
+pub(super) mod head_hook {
+    use std::cell::RefCell;
+
+    thread_local! {
+        static HOOK: RefCell<Option<Box<dyn FnMut()>>> = RefCell::new(None);
+    }
+
+    pub(in super::super) fn set(hook: Option<Box<dyn FnMut()>>) {
+        HOOK.with(|slot| *slot.borrow_mut() = hook);
+    }
+
+    pub(super) fn run() {
+        let hook = HOOK.with(|slot| slot.borrow_mut().take());
+        if let Some(mut hook) = hook {
+            hook();
+        }
     }
 }
