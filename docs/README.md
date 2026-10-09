@@ -149,6 +149,7 @@ The primary live release documents. Auditors and operators start here.
 - [Changelog](operations/CHANGELOG.md) - internal pre-release notes, not public protocol version history
 - [Conformance Harness Plan](operations/CONFORMANCE_HARNESS_PLAN.md) - cross-language conformance plan for JS, Python, and spec fixtures
 - [HA Control Auth Plan](operations/HA_CONTROL_AUTH_PLAN.md) - HA replication and shared budget plan
+- [Unified Roadmap](operations/UNIFIED_ROADMAP.md) - success test, frozen contracts, parallel lanes, gates, and owner decisions toward the north star
 
 ## Guides
 
