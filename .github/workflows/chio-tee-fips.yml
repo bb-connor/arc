@@ -3,8 +3,8 @@ name: chio-tee-fips
 on:
   workflow_call:
   pull_request:
-    # Main PRs run through CI's required reusable call.
-    branches-ignore: [main]
+    # PRs to these bases run through CI's required reusable call.
+    branches-ignore: [main, research/openappa-recovery-20261001]
     paths:
       - .github/workflows/chio-tee-fips.yml
       - crates/trust/chio-tee/**
