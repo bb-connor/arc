@@ -12,15 +12,8 @@ source, authoritative owner, OS port, what stays application-owned, its status
 and a useful positive with an independent failure oracle. A feature name is
 never a reason to add a daemon, protocol, resource ledger or task language.
 
-Status values:
-
-- `shipped`: on `main` (T) with tests; not qualified as a native host profile.
-- `main (experimental)`: arrives with #1160 (F); the broker is Linux-only.
-- `W planned`: designed in #1173; no code. `WorkHandleV1`, `WorkViewV1`,
-  `WorkClient` and `WorkTransport` are design-only.
-- `R unqualified`: implemented in #1179, not qualified.
-- `library-only`: a crate exists, with no native host serving path in this
-  program.
+Status, `boundary_class` and `planning_status` terms are defined in
+[STATUS-GLOSSARY](STATUS-GLOSSARY.md).
 
 | Verb | Capability | Owner and source | Status | `boundary_class` | `planning_status` | Omarchy | macOS | Flow |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -43,8 +36,7 @@ Status values:
 
 ## What the matrix does not claim
 
-A row's `shipped` status is source and test evidence on `main`, not a native
-host profile; profiles qualify only through their CASES rows on real hosts.
-Hook-mode activity beside these capabilities is `detect_only`. No row implies a
-distributed atomic budget, a global scheduler or authority issued by an
-application or by Herdr.
+Profiles qualify only through their CASES rows on real hosts; the standing
+limits in STATUS-GLOSSARY apply to every row. No row implies a distributed
+atomic budget, a global scheduler or authority issued by an application or by
+Herdr.

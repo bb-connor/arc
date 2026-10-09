@@ -387,49 +387,32 @@ installed.
 
 ## 7. Program restructure
 
-These changes follow approval of this document. Each is a separate, reviewable
-commit.
+The restructure that followed approval is recorded in the DOCS-1177.0 to
+DOCS-1177.7 commits on #1177:
 
-| Today | After |
-| --- | --- |
-| ADR-0038 | Amended to record the north star, the "kernel" definition, the supporting line, the retired phrases, the domain model, the M1, M2, M3 order and the Megastart allowance decision. Rename the file to match its title. |
-| README (program index) | Leads with the three flows and the platform table |
-| CAPABILITIES | A verb × owner × status × platform matrix with corrected labels: W1 types are planned; settlement and federation cite their crates (`chio-settle`, `chio-metering`, `chio-federation-authority`, `chio-federation-transport-iroh`) |
-| C01 to C11, Q01 to Q31, H01 to H08 across CONSUMERS, QUALIFICATION and FIRST-CLASS-INTEGRATIONS | One `CASES.md` table: ID, milestone, owner, independent oracle, status and linked issue. Duplicated prose is removed. |
-| HOST-CONTRACT, RELEASE, OPERATOR | Kept and trimmed to what the flows consume. One status glossary replaces repeated disclaimers. |
-| Omarchy and macOS annexes and plans | Organized by M1, M2 and M3, then services, custody, IPC, packaging and lifecycle |
+- ADR-0038 is renamed to match its title and amended with the north star, the
+  kernel definition, the retired phrases, the domain model, the flow order and
+  the Megastart allowance decision.
+- The program [README](README.md) leads with the three flows;
+  [CAPABILITIES](CAPABILITIES.md) is a verb, owner, status and platform matrix.
+- [CASES](CASES.md) holds every C, Q and H case; [STATUS-GLOSSARY](STATUS-GLOSSARY.md)
+  replaces repeated disclaimers; HOST-CONTRACT, RELEASE and OPERATOR are
+  trimmed to what the flows consume.
+- The Omarchy and macOS annexes and plans are organized by flow. The Omarchy
+  annex records Herdr: "Herdr support" currently means Megastart's plugin, and
+  Linux Herdr cases stay blocked until the Megastart Linux port lands.
+- Public positioning copy (README, AGENTS, the SVGs, the competitive landscape
+  and the ADR index) belongs to the unified roadmap's U3 items, not to this
+  program's documents.
 
-### Word budgets
+`scripts/check-native-host-docs.py` gates links, retired phrases, em dashes,
+case IDs and these word budgets:
 
 | Document set | Budget |
 | --- | --- |
 | Shared specification | 15,000 words or fewer |
 | Each annex | 6,000 words or fewer |
 | Each implementation plan | 8,000 words or fewer |
-
-### Positioning copy
-
-The public copy (`README.md`, `AGENTS.md`, `docs/assets/*.svg`,
-`docs/reference/COMPETITIVE_LANDSCAPE.md`,
-`docs/start-here/FLAGSHIP_WALL_STOPS_MONEY.md`, the ADR index) is owned by the
-roadmap's positioning items (U3), not by this program's documents.
-`scripts/check-native-host-docs.py --rule retired-phrases` reports what remains.
-Within the program set:
-
-- Replace "kernel for building agentic operating systems" with the north-star
-  sentence in:
-  - `HOST-CONTRACT.md`;
-  - `research/product-grounding.md`;
-  - the macOS `ANNEX.md` and `README.md`;
-  - the macOS `research/native-host-services.md`.
-- Keep receipt limits in one Boundaries section rather than in per-sentence
-  qualifiers.
-
-### Herdr
-
-Record the upstream Herdr identity and pin. State plainly that "Herdr support"
-currently means Megastart's plugin. Linux Herdr cases stay blocked until the
-Megastart Linux port lands.
 
 ## 8. Exit criteria, testing and failure rules
 

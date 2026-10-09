@@ -8,12 +8,10 @@ surrounding design.
 
 ## Evidence identity and authority
 
-A qualification record binds the owner source commit, public release revision,
-host and plugin versions, client builds, OS version and architecture, backend
-and policy digest, artifact hashes, commands, raw outputs, expected outcomes and
-the reviewer decision. A prerequisite's green test does not qualify a different
-installed artifact. Public instructions reference only revisions that exist in
-the public repository.
+A qualification record binds the source commit, release revision, host and
+plugin versions, OS and architecture, backend and policy digest, artifact
+hashes, commands, raw outputs and the reviewer decision (CONSUMERS lists the
+manifest). A prerequisite's green test does not qualify a different artifact.
 
 Authoritative evidence stays with the owner under test; the release manifest
 references it without restating it. Omitted cases, zero evaluated profiles,
@@ -40,14 +38,11 @@ is `advisory_only`, and only a proven pre-effect gate is `prevent`.
 | Boundary interactive | Q02 to Q13, Q15 to Q22 as applicable; no mediated-local-effect claim | Deferred; independent backend evidence required. |
 | Managed endpoint | The platform annex's ES/NE matrix plus Q02, Q16 to Q20 | Deferred; restrictive-only authority. |
 
-Every row expands to an executable case manifest at implementation time. The
-manifest names each owner-approved exclusion; an unclassified case fails.
-Release qualification removes each required case in turn from a passing
-manifest and proves the affected surface cannot promote. The Q identifiers do
-not replace the consumed owner contracts: source reconciliation maps every
-HOST-CONTRACT, CAPABILITIES and CONSUMERS obligation (and OPERATOR's when the
-projection is selected) to an owner, packet, command, positive control and
-independent negative.
+Each row expands to an executable case manifest; release qualification removes
+each required case in turn and proves the surface cannot promote. The Q cases
+do not replace owner contracts: source reconciliation maps every HOST-CONTRACT,
+CAPABILITIES and CONSUMERS obligation (OPERATOR's when selected) to an owner,
+packet, command, positive control and independent negative.
 
 ## Effects without blanket keystone dependencies
 
@@ -75,41 +70,29 @@ without a task-lifetime dependency.
 
 ## Tracked owner defects
 
-These issues were verified open on 2026-10-09. An open issue is a recorded
-handoff, not a repair; each affected profile stays unavailable until its case
-passes on the installed binary.
-
-| Issue | Obligation |
-| --- | --- |
-| [chio-bridge#3](https://github.com/backbay-labs/chio-bridge/issues/3) | Repair `approval-decide` decision and approval-ID binding, replace the packaged archive and pass installed Q05, including direct invocation. Pi wrapper refusal is not a fix. |
-| [#1180](https://github.com/bb-connor/arc/issues/1180) | Emergency stop custody, route mounting, constant-time token check and S8 phase-1 durability (Q08). |
-| [#1181](https://github.com/bb-connor/arc/issues/1181) | Non-persisting recovery observation that never drains the settlement reserve (Q09, Q21). |
-| [#1182](https://github.com/bb-connor/arc/issues/1182) | Host-plugin and tool-server boundary wording against ADR-0011 (Q11). |
-
-Live process control, roster attribution and production endorsement keep their
-own owner gates in NORTH-STAR-FLOWS section 9.
+Open owner issues are linked from their CASES rows: chio-bridge#3 (Q05), #1180
+(Q08), #1181 (Q09, Q21) and #1182 (Q11). An open issue is a handoff, not a
+repair; the affected profile stays unavailable until its case passes on the
+installed binary. For chio-bridge#3, refusing `approval-decide` in the Pi
+wrapper is not a fix: the utility itself, its packaged archive and direct
+invocation must pass Q05.
 
 ## Performance, privacy and operations
 
-Use the S10 call classes and measurement conventions; mediate policy
-boundaries rather than adding a paid kernel call per HTTP fragment. Publish
-measured cold and warm latency, idle CPU and memory, stream buffer limits,
-restart recovery time and stop acknowledgement versus completed closure
-separately. Platform plans set numeric limits from those experiments before
-beta. Exceeding a bound degrades observation or refuses new work, never weakens
-authority or isolation. Logs and support bundles redact secrets, prompts,
+Use the S10 call classes. Publish measured latency, idle CPU and memory, stream
+buffers, restart recovery time and stop acknowledgement versus completed
+closure separately, and set numeric limits from them before beta. Exceeding a
+bound degrades observation or refuses new work, never weakens authority or
+isolation. Logs and support bundles redact secrets, prompts,
 private paths and artifact contents by default; export is previewed and
 consented. Tokens never enter UI URLs, argv, notifications or support bundles.
 Deleting UI caches neither erases owner receipts nor cancels work.
 
 ## Required provider limits
 
-Where the selected grant or claimed profile requires an inference dimension,
-the exact route enforces it before admission (Q15, Q27, C04). Unknown limits
-shown for display cannot pass. Cover route, model and account substitution,
-missing or ineffective ceilings, concurrent reservation exhaustion and
-post-dispatch loss with retained obligations. Removing required-limit evidence
-refuses the bounded profile and never silently selects a narrower one.
+HOST-CONTRACT's model-provider boundary applies wherever a grant or profile
+requires an inference dimension (Q15, Q27, C04). Removing required-limit
+evidence refuses the bounded profile and never silently selects a narrower one.
 
 ## Release sequence
 

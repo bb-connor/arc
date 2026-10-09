@@ -44,23 +44,20 @@ gaps; those observations are not installed acceptance.
   historical captures leave a target cell open; they neither promise
   availability nor drop the requirement.
 
-Herdr support is required; installing or running Herdr is optional. Herdr
-renders and operates an application contract. It never issues kernel authority,
-owns resource accounting or becomes a required daemon. Its Megastart plugin is
-the integration to preserve and extend, not evidence that any future Chio
-application already works with it.
+Herdr support is required; installing Herdr is optional. Herdr renders an
+application contract and never issues kernel authority, owns accounting or
+becomes a required daemon. Its Megastart plugin is the integration to extend,
+not evidence that other Chio applications already work with it.
 
 Cursor and OpenClaw remain obligations of the broader doc 19 six-host program;
 this document does not declare that program complete.
 
 ## Mini-swe's bounded role
 
-`chio-mini-swe` is an experimental adapter and reference workload. Its tests may
-exercise the owners they actually use. It is not the common host API, a
-required backend, the default harness or a first release, and it never gates
-the named harnesses unless a selected integration depends on it. Workloads
-that execute code keep every confinement, evaluator, export and uncertainty
-obligation; replacing the harness waives none of them.
+`chio-mini-swe` is an experimental reference workload, not the host API, a
+required backend, the default harness or a first release, and it gates no named
+harness. Workloads that execute code keep every confinement, evaluator, export
+and uncertainty obligation whichever harness runs them.
 
 ## Promotion rules
 
@@ -78,12 +75,10 @@ cases; they add no wire operations.
   H08b for all four Herdr selections. Cross-platform completion needs both
   platforms. Partial promotion closes neither aggregate claim.
 
-The release verifier selects the approved catalog independently of submitted
-results. Removing unrelated records from a complete single-host candidate still
-promotes it; removing that host's own required subcase refuses it; missing H06b
-or a Herdr selection refuses the aggregate claim without disabling a complete
-individual tuple. A caller cannot relabel an aggregate capability to evade its
-gates.
+The release verifier selects the catalog independently of submitted results:
+dropping unrelated records still promotes a complete single host, dropping its
+own required subcase refuses it, and missing H06b or a Herdr selection refuses
+only the aggregate claim.
 
 First-class does not mean every kernel capability works in every host. Keep a
 per-host capability map for passport admission, delegation, swarm authority,
@@ -97,7 +92,5 @@ composition; packet 6 and the platform plans own installed delivery. Native
 gaps go to the identity, IPC, process, credential and isolation owners; Herdr
 compatibility stays with its plugin and application owner.
 
-A partial release names its actual supported set. Record source discovery,
-implementation, installed qualification, public availability and public claims
-separately; a plugin README, prior Pi pass or Megastart recording supplies only
-its own scoped evidence.
+A partial release names its actual supported set; a plugin README, prior Pi
+pass or Megastart recording supplies only its own scoped evidence.

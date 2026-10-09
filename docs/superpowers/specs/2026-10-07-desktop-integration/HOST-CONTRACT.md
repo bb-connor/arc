@@ -1,40 +1,30 @@
 # Native host integration contract
 
-Status: accepted planning direction, amended 2026-10-08 UTC. Implementation and
-installed qualification remain open. This contract supplements the existing
+Status: accepted planning direction, amended 2026-10-08 UTC. See
+[STATUS-GLOSSARY](STATUS-GLOSSARY.md). This contract supplements the existing
 kernel and owner interfaces; it defines no new wire operation, signer, store or
-universal daemon. [ADR-0038](../../../adr/ADR-0038-native-host-program.md)
-owns the decision; [PROGRAM-MAP](../../../architecture/PROGRAM-MAP.md) owns exact
-source and dependency reconciliation.
+universal daemon. [ADR-0038](../../../adr/ADR-0038-native-host-program.md) owns
+the decision and [PROGRAM-MAP](../../../architecture/PROGRAM-MAP.md) owns source
+and dependency reconciliation.
 
 ## Product identity and boundary
-
-**Chio is a Rust kernel for building agentic operating systems.**
 
 **Chio is a Rust kernel for agentic operating systems that coordinate work,
 share resources, and cooperate across organizational boundaries.**
 
-The product is reusable systems infrastructure. Agent harnesses, Herdr,
-application coordinators and other operator tools consume it through supported
-bindings and native services. Their UX, planning, assignment strategy, model
-selection and business completion criteria remain application responsibilities.
-Chio owns its authority, admission, process/resource custody, governed work,
-knowledge/release, evidence and recovery contracts. A resource owner remains
-responsible for the actual effect and its independently observable state.
+Harnesses, Herdr, applications and operator tools consume Chio through
+supported bindings; their interface, planning, assignment and completion stay
+theirs. Chio owns authority, admission, process and resource custody, governed
+work, release, evidence and recovery; a resource owner stays responsible for
+the actual effect.
 
 Removing every Chio graphical client must not remove or weaken an advertised
-systems capability. Browser workbench, menu bar and Omarchy QML are optional
-consumers. A graphical approval mechanism may be required by a *selected approval
-policy*, but no named Chio frontend is the authority or a universal prerequisite.
-Loss of a consumer leaves original operations, capacity, fences and native
-recovery with their owners. An SDK/control-plane caller is authenticated and
-scoped like every other caller; automation is not an approval bypass.
-
-Required integration coverage is Claude Code, Codex, Pi and Hermes, plus the
-Herdr workspace plugin, as [FIRST-CLASS-INTEGRATIONS](FIRST-CLASS-INTEGRATIONS.md)
-specifies. Supporting a consumer is a product obligation; installing that
-consumer is the operator's choice. No one harness or mini-swe reference workload
-defines the kernel's API, mandatory execution backend or promotion order.
+systems capability. A selected approval policy may require a graphical approval
+mechanism, but no Chio frontend is the authority or a universal prerequisite.
+SDK and control-plane callers are authenticated and scoped like every other
+caller; automation is not an approval bypass. Required coverage is in
+[FIRST-CLASS-INTEGRATIONS](FIRST-CLASS-INTEGRATIONS.md); no single harness or
+mini-swe defines the kernel API, a mandatory backend or the promotion order.
 
 ## Layers and trust
 
@@ -48,159 +38,97 @@ flowchart TB
   A --> B --> C --> D --> E
 ```
 
-This is a logical decomposition, not a requirement to route everything through
-one new process. The portable Rust kernel can be embedded at an explicitly
-trusted host boundary; separately hosted process/control/resource services use
-their existing contracts. Each deployment inventories which components hold
-keys, assert facts, dispatch effects, own persistent state and enforce isolation.
-An application component performing one of those trusted roles is part of that
-role's declared TCB, even if the application's planner and UI are outside it.
+This is a logical decomposition, not one new process. Each deployment
+inventories which components hold keys, dispatch effects, own state and enforce
+isolation; an application component in such a role is inside its TCB.
 
-| Layer | Required ownership rule |
+| Layer | Ownership rule |
 | --- | --- |
-| L0 kernel | Reuse S1's closed operation registry and native admission/crossing semantics; no product-private evaluator or security callback that silently grants authority. |
-| L1 agent process | Durable agent identity and authority are distinct from the current OS worker PID/incarnation. Spawn, invoke, observe and control descend through the process owner. Reconcile incompatible historical ABI versions before binding. |
-| L2 work | Use landed W1 preparation, command, query and acceptance contracts only when exposed. App scheduling does not synthesize a work commitment or accepted result. |
-| L3 recovery | Retain original operation identity, revisions, exact endorsements and owner retry dispositions. A lost reply never becomes a fresh dispatch automatically. |
-| Native services | Reuse secure IPC, process host, secret broker, resource, storage, release and federation owners. Platform code extends their missing OS ports; it cannot introduce parallel custody. |
-| Consumer projection | `chio.operator.v1` remains an optional, proposed C-layer projection for composed operator views. Its controller is outside the TCB and is not the kernel ABI, authority ingress, mandatory host daemon or prerequisite for direct supported owner bindings. |
+| L0 kernel | Reuse S1's closed operation registry and native admission; no product-private evaluator or callback that grants authority. |
+| L1 agent process | Durable agent identity is distinct from the OS PID and incarnation; spawn, invoke, observe and control descend through the process owner. |
+| L2 work | Use landed W1 contracts only when exposed; application scheduling never synthesizes a commitment or accepted result. |
+| L3 recovery | Keep original operation identity, revisions, endorsements and owner retry dispositions; a lost reply never becomes a fresh dispatch. |
+| Native services | Reuse secure IPC, process host, secret broker, resource, storage, release and federation owners; platform code adds missing OS ports, never parallel custody. |
+| Consumer projection | `chio.operator.v1` stays an optional C-layer projection outside the TCB ([OPERATOR](OPERATOR.md)). |
 
-No claim of universal mediation follows from installing a service. Harnesses
-must route the selected calls and supply required provenance through qualified
-adapters. Native confinement must deny alternate paths before a protection claim
-is made. Observation hooks remain `detect_only`; unmediated activity remains
-`cannot_see`. Internal writes within an explicitly authorized sandbox execution
-are not automatically individual Chio calls or receipts.
+Projecting a Chio grant into an external runtime policy documents its semantic
+loss and rejects restrictions it cannot represent; an external policy approval
+is never a Chio grant. Installing a service claims no universal mediation. Harnesses route selected
+calls through qualified adapters, and native confinement denies alternate paths
+before any protection claim. Hooks are `detect_only` and unmediated activity is
+`cannot_see`. Writes inside an explicitly authorized sandbox execution are not
+automatically individual Chio calls or receipts.
 
 ## Deployment profiles
 
-These are planning labels, not S7 enum additions or released support claims.
-Every exposed capability selects exactly one qualified deployment context.
+Planning labels, not S7 enum additions; each exposed capability selects one.
 
-| Profile | Meaning and required scope |
+| Profile | Scope |
 | --- | --- |
-| Embedded host | A trusted application embeds the portable kernel and provides explicitly inventoried native ports. Portable evaluation alone does not qualify effect, credential, storage, transport or isolation ports. |
-| User-session host | Headless service/host bound to one explicitly enrolled native user session. No browser/menu/terminal workspace is needed to run it. Existing lock, logout, identity, credential and session-reconciliation fences remain effective. |
-| Service host | A separately enrolled service principal with explicit operator authorization, installation identity, scopes, expiry, credential custody, persistent state and boot/restart semantics. Its permitted unattended continuation is declared independently of any human login. A lingering user manager, root UID, detached process, launch registration or unlocked keychain alone grants no authority. |
-| Optional presentation deployment | Workbench, Herdr plugin, Omarchy panel, Mac menu app and diagnostic clients. Herdr support is a required delivery obligation even though operators may omit its installation. Closing or uninstalling a presentation component cannot delete native custody or replenish capacity. A consumer with its own application host preserves that host's declared ownership instead of registering a competing authority. |
+| Embedded host | A trusted application embeds the portable kernel and inventories its native ports. Portable evaluation alone qualifies no effect, credential, storage, transport or isolation port. |
+| User-session host | A headless service bound to one enrolled user session. Lock, logout, identity, credential and session fences stay effective. |
+| Service host | A separately enrolled service principal with explicit authorization, installation identity, scopes, expiry, credential custody, state and boot semantics. A lingering user manager, root UID, detached process, launch registration or unlocked keychain grants nothing. |
+| Optional presentation | Workbench, Herdr plugin, Omarchy panel, Mac menu app and diagnostic clients. Closing or removing one cannot delete native custody or replenish capacity. |
 
-A user-session host can qualify while the service-host profile remains
-unavailable, but it must not be advertised as login-independent. Service-host
-qualification cannot be inferred from GUI-free startup. The complete platform
-roadmap must disposition both profiles with exact supported scope and remaining
-gates; partial releases name the one they actually qualify.
-
-Service credentials and human credentials have distinct ownership. In
-particular, macOS per-user data-protection Keychain assumptions cannot be copied
-to a daemon/system context. Each native credential owner selects and qualifies a
-supported implementation and caller policy for its context. Missing credentials
-or consent refuse; no root impersonation, personal-login copying, weakened store
-or unattended permission approval is a fallback.
+A user-session host can qualify while the service host stays unavailable, but is
+never advertised as login-independent; GUI-free startup does not qualify a
+service host. Service and human credentials have distinct owners: a per-user
+data-protection Keychain assumption cannot be copied to a daemon context.
+Missing credentials or consent refuse; no root impersonation, copied personal
+login, weakened store or unattended permission approval is a fallback.
 
 ## Native port inventory
 
-Before implementation, resolve each row to existing source symbols, supported
-bindings, actual tests and runtime evidence in PROGRAM-MAP. Missing source is an
-owner delivery packet, never permission to fabricate an adapter API.
+Resolve each row to source symbols, bindings, tests and runtime evidence in
+PROGRAM-MAP before implementation; missing source is an owner delivery packet,
+never permission to fabricate an adapter. Each obligation is observed
+independently through the named cases.
 
-| Port | Native obligation | Independent acceptance observation |
+| Port | Obligation | Cases |
 | --- | --- | --- |
-| Identity and IPC | Authenticate the actual client and intended service, session/service principal, release and incarnation before private bytes or authority flow; bound pre-auth resources. | Wrong-code/user/service, endpoint replacement, handoff/reuse and overload cause no unauthorized bytes/effects; fresh authorized clients remain usable. |
-| Process lifecycle | Retain logical-to-OS incarnation mapping, scoped descendant custody, launch/control/closure and restart reconciliation. | Native process census and resource markers establish the exact closure; UI exit or PID disappearance alone cannot establish it. |
-| File/resource access | Bind caller authority to exact resource identity, audience, generation and owner-supported operation; recheck atomic owner conditions. | Stale assignment/version, path/alias substitution and concurrent access cannot modify or disclose another resource. |
-| Network/model access | Preserve brokered credential custody, exact destination/service identity and permitted egress; reject alternate routes under selected confinement. | Direct-route and fake-peer canaries show no credential or unauthorized payload release. |
-| Resource accounting | Enforce owner-defined invocation/token/money/time and host CPU/memory/storage/process/IPC bounds separately. | Concurrent reservations and saturation cannot overspend the same allowance or consume retained evidence/stop headroom. Unknown capacity is unavailable. |
-| Storage, clocks and recovery | Use owner commits and boot/incarnation-bound supported time; preserve receipt and original-operation continuity through crash, sleep, upgrade and restore. | No authority or budget renewal, lost tail accepted as current, duplicate effect or invented terminal outcome. |
-| OS delivery | Bind accepted source, component bytes, configuration, credential context and OS/backend tuple; preserve scoped custody during install/update/removal. | Clean installed headless consumers pass, including denial, interrupted lifecycle, cross-user and rollback cases. |
+| Identity and IPC | Authenticate client, service, principal, release and incarnation before private bytes or authority flow; bound pre-authentication resources so overload cannot starve authorized clients. | Q10 |
+| Process lifecycle | Keep the logical-to-OS incarnation map, descendant custody, closure and restart reconciliation; UI exit or PID disappearance never proves closure. | Q07, Q19 |
+| File and resource access | Bind authority to exact resource identity, audience and generation and recheck owner conditions atomically. | Q14, Q27 |
+| Network and model access | Keep brokered credential custody and exact destination identity; reject alternate routes under confinement. | Q12, Q13 |
+| Resource accounting | Enforce invocation, token, money and time limits and host CPU, memory, storage, process and IPC bounds as separate dimensions, keeping evidence and stop headroom; unknown capacity is unavailable. | Q15, Q27 |
+| Storage, clocks and recovery | Use owner commits and boot-bound time; keep receipt and original-operation continuity through crash, sleep, upgrade and restore without renewal or invented outcomes. | Q02, Q31 |
+| OS delivery | Bind source, bytes, configuration, credential context and OS tuple; keep custody through install, update, removal and rollback. | Q20 |
 
-## Coordination, shared resources and independent organizations
+## Coordination, shared resources and organizations
 
-Coordination is more than showing a list of agent tasks. A reusable host must
-carry stable process/work/resource references, authorized handoffs and retained
-outcomes between independently connected consumers. The application chooses
-which worker acts next; the receiving owner decides whether that worker may act.
+The application chooses which worker acts next; the receiving owner decides
+whether it may. Consumers in one authority domain share an owner-enforced
+capacity family; restarting or reopening a client never creates allowance.
 
-Within a single authority domain, consumers can share an owner-enforced capacity
-family. Read usage from that owner, not a UI counter or a new plugin ledger.
-Reserved in-flight capacity counts under the owner's rules; changing clients,
-restarting a host or reopening a workspace never creates a new allowance.
-Megastart's direct worker grants and persistent aggregate family illustrate this
-boundary; its current multi-hop limitation is not waived by this program.
+Across organizations each owner keeps its keys, policy, resources and refusal.
+Federation, treaty and work owners bind peer, audience, intent, resource and
+result release; transport authentication alone is not permission, and
+revocation or stale freshness fences new crossings. Never share databases or
+private keys, or present a local budget as a distributed atomic allowance. A
+release claiming cross-organization operation qualifies the enrolled-peer,
+custody, disclosure and bilateral recovery contracts (Q28); a two-user local
+demo does not count.
 
-For cross-organization cooperation, each organization retains independent keys,
-policy, resources and refusal authority. Use the actual federation/treaty/work
-owners to bind the enrolled peer, audience, intent, resource and result release.
-Transport authentication alone is not permission. A peer can refuse a locally
-valid request, and revocation or unavailable freshness must fence the relevant
-new crossing. Do not share databases/private keys or silently turn a local
-single-writer budget into a globally atomic distributed allowance. Name each
-owner's allocation and evidence boundary; any stronger shared accounting claim
-requires that owner's specific consistency and recovery contract.
-
-Basic local hosting does not require a marketplace, paid settlement, global
-scheduler or the complete W2-W4 programs. A release claiming cross-organization
-operation must nevertheless implement and qualify the applicable enrolled-peer,
-local policy, custody, disclosure and bilateral recovery contracts. Mark that
-capability unavailable until its owner gates pass; a two-user local demo does
-not demonstrate independent organizational control.
-
-## North-star alignment and release meaning
-
-The kernel roadmap remains the owner of the pure admission machine, common
-crossing transaction, closed layered ABI, integrity-gated admission, authority
-tree, durable stop, verified extension seams and independently verifiable evidence.
-Host integration supplies real OS ports and consumer conformance for these
-contracts. It must shrink duplication rather than adding a second runtime.
-
-Full keystone redesigns are not artificial blockers for every initial host read
-or supported operation. Every selected effect still must pass its present
-admission/crossing/receipt/recovery invariants. A host release cannot claim the
-roadmap's formal proof, target latency, complete injection resistance or witnessed
-log properties merely because the interfaces are compatible. Keep source,
-model/proof, benchmark, installed platform, independent organization and external
-consumer evidence as distinct qualification dimensions.
-
-[CONSUMERS](CONSUMERS.md) defines the required application/harness acceptance;
-[QUALIFICATION](QUALIFICATION.md) retains all applicable native failure cases.
-A useful first result is an external harness and an application coordinating
-through real Chio owners on an installed host, with every Chio frontend absent.
-The complete ambition additionally demonstrates shared resources and separately
-authorized organizational cooperation. A coding patch is one test workload,
-not the product definition or a mandatory frontend dependency.
+Host integration supplies OS ports for the kernel roadmap's owners and adds no
+runtime; a host release cannot claim that roadmap's proofs, latency targets or
+witnessed logs because its interfaces are compatible.
 
 ## Model-provider resource boundaries
 
-Bind each inference route to its actual harness, endpoint, model/account, credential
-custodian and resource-admission owner. Invocation, output-token, monetary and
-OS-local limits are distinct dimensions. Any dimension required by the selected
-grant, owner policy or advertised profile must have an enforceable bound before
-provider dispatch. Missing enforcement makes that requested capability unavailable;
-displaying an unknown limit does not authorize it.
+Bind each inference route to its harness, endpoint, model and account,
+credential custodian and admission owner. Invocation, output-token, money and
+OS-local limits are distinct. A dimension required by the grant, policy or
+advertised profile has an enforceable bound before dispatch, or the capability
+is unavailable; displaying an unknown limit authorizes nothing.
 
-An output-token claim requires a route-supported hard ceiling including reasoning
-output where applicable. A monetary claim additionally requires a defensible
-worst-case bound for applicable input/output/cache/pricing/fees and an atomic
-conservative reservation at the existing budget owner. An estimate or output
-ceiling alone cannot bound unknown total cost. If no finite bound can be
-established, that bounded request refuses before credential release or dispatch.
-Client byte truncation, timeouts and disconnects cannot prove provider work or
-billing stopped. Retain unresolved obligations across response loss, cancellation
-and restart; do not release the reservation or replay a call on those signals.
+An output-token claim needs a route-supported hard ceiling, reasoning output
+included; a money claim also needs a worst-case bound and an atomic
+reservation, or the request refuses before credential release. Timeouts and
+disconnects do not prove billing stopped, so obligations stay retained across
+loss and restart, with no replay.
 
-The pinned Pi fixed Codex-subscription route has no demonstrated enforceable
-output-token ceiling. It cannot satisfy a requested bounded-output or unsupported
-bounded-spend profile merely by reporting the missing dimension. This is a
-specific route limitation, not a finding about every Codex harness or endpoint.
-A separately approved narrower filesystem/egress-protected profile may remain
-usable with token/spend explicitly unclaimed, provided its grants/policy do not
-require them. No automatic switch to that profile, another account or API billing
-is permitted when a requested bound cannot be met.
-
-At each selected route owner, qualify useful bounded inference and pre-dispatch
-refusal for unsupported, stripped or ineffective required limits, route/model/
-account substitution and concurrent exhausted reservations. Use independent
-provider-dispatch/usage and native owner ledger observations. Lost post-dispatch
-replies, disconnect and restart retain original identity, charges/reservations
-and uncertainty without a fresh dispatch or renewed capacity. Mock provider
-behavior cannot establish a real route's ceiling. Q15/Q27/C04 and the release
-catalog retain the exact supported dimensions and route tuple.
+The pinned Pi Codex-subscription route has no demonstrated output-token
+ceiling, so it cannot satisfy a bounded-output or bounded-spend profile. A
+separately approved narrower profile may run with token and spend explicitly
+unclaimed if its grants do not require them; nothing switches to it, another
+account or API billing automatically. Q15, Q27 and C04 carry the route cases.

@@ -44,25 +44,24 @@ From [NORTH-STAR-FLOWS section 6](NORTH-STAR-FLOWS.md#6-platform-delivery):
 
 1. [NORTH-STAR-FLOWS](NORTH-STAR-FLOWS.md): north star, identity model, the three flows, exit criteria and the owner change register.
 2. [ADR-0038](../../../adr/ADR-0038-native-host-program.md): the decision and its 2026-10-08 amendment.
-3. [CASES](CASES.md): every acceptance case, by milestone.
+3. [CASES](CASES.md): every acceptance case, by milestone; status terms in [STATUS-GLOSSARY](STATUS-GLOSSARY.md).
 4. [CAPABILITIES](CAPABILITIES.md): verb, owner, status and platform matrix.
 5. [HOST-CONTRACT](HOST-CONTRACT.md): deployment profiles, native ports and the systems boundary.
 6. [PROGRAM-MAP](../../../architecture/PROGRAM-MAP.md): pinned sources and owner gates.
 7. The [Omarchy annex](../2026-10-07-omarchy-integration/ANNEX.md) and the [macOS annex](../2026-10-07-macos-integration/ANNEX.md).
 
-Supporting documents: [FIRST-CLASS-INTEGRATIONS](FIRST-CLASS-INTEGRATIONS.md)
-(required harnesses and Herdr), [CONSUMERS](CONSUMERS.md) (independent consumer
-design), [QUALIFICATION](QUALIFICATION.md) (profiles and release evidence),
-[RELEASE](RELEASE.md) (verifier and activation), [OPERATOR](OPERATOR.md)
-(optional operator projection), the [shared plan](../../plans/2026-10-07-desktop-integration.md),
-[product research](research/product-grounding.md) and [review records](REVIEW.md).
+Also: [FIRST-CLASS-INTEGRATIONS](FIRST-CLASS-INTEGRATIONS.md),
+[CONSUMERS](CONSUMERS.md), [QUALIFICATION](QUALIFICATION.md),
+[RELEASE](RELEASE.md), [OPERATOR](OPERATOR.md), the
+[shared plan](../../plans/2026-10-07-desktop-integration.md),
+[product research](research/product-grounding.md) and [reviews](REVIEW.md).
 
 ## Boundaries
 
 Hook-mode host activity is `detect_only`; hook failure does not block the host.
 Isolation always comes from the host backend (bubblewrap, Seatbelt, containers
-or VMs) and is credited through its #1174 S7 evidence kind; Chio grants, the
-host denies. A receipt can be missing after a tool has already been dispatched
-(#1174 KDEF-D1), so a missing receipt is not evidence that no effect occurred.
-Nothing in this program is qualified or released until its CASES rows pass on
-real hosts.
+or VMs) and is credited through its #1174 S7 evidence kind. A receipt can be
+missing after a tool has already been dispatched (#1174 KDEF-D1), so a missing
+receipt is not evidence that no effect occurred. Nothing in this program is
+qualified or released until its CASES rows pass on real hosts. Status terms and
+the full list of standing limits are in [STATUS-GLOSSARY](STATUS-GLOSSARY.md).
