@@ -26,6 +26,13 @@ mod health;
 #[path = "service/recovery.rs"]
 mod recovery;
 
+pub use recovery::{
+    ReceiptQuerySnapshotRecovery, ReceiptQuerySnapshotRecoveryError,
+    ReceiptQuerySnapshotRecoveryStatus,
+};
+#[cfg(test)]
+pub(super) use recovery::{WaitEnd, WaitRecord};
+
 #[cfg(test)]
 #[path = "tests/generation_observer.rs"]
 mod generation_observer_tests;
@@ -625,6 +632,8 @@ pub(super) struct Inner {
     pub(super) store: Arc<SqliteReceiptStore>,
     pub(super) config: ReceiptQuerySnapshotConfig,
     requested_quota_bytes: AtomicU64,
+    /// Operator retry requests and how the walker's backoff waits ended.
+    recovery: recovery::RecoveryState,
     cancel: Arc<AtomicBool>,
     phase: Mutex<Phase>,
     changed: Arc<Condvar>,
@@ -678,6 +687,7 @@ impl ReceiptQuerySnapshots {
         let inner = Arc::new(Inner {
             store,
             requested_quota_bytes: AtomicU64::new(config.quota_bytes),
+            recovery: recovery::RecoveryState::default(),
             config,
             cancel: Arc::new(AtomicBool::new(false)),
             phase: Mutex::new(Phase::Waiting),
@@ -1221,6 +1231,12 @@ fn run(inner: &Arc<Inner>) {
                 "receipt query snapshot walker panicked".into(),
             ))
         });
+        // A retry request ends only a resource wait; an integrity backoff is
+        // never shortened.
+        let answers_retry = !matches!(
+            outcome,
+            Err(WalkError::Integrity(_) | WalkError::Regressed(_))
+        );
         let retry_after = match outcome {
             Ok(()) | Err(WalkError::Cancelled) => break,
             Err(WalkError::Superseded) => resource_initial,
@@ -1258,7 +1274,7 @@ fn run(inner: &Arc<Inner>) {
                 resource_initial
             }
         };
-        sleep_until_cancelled(inner, retry_after, requested_quota);
+        sleep_until_cancelled(inner, retry_after, requested_quota, answers_retry);
     }
 
     if let Ok(mut phase) = inner.phase.lock() {
@@ -1268,18 +1284,33 @@ fn run(inner: &Arc<Inner>) {
     inner.changed.notify_all();
 }
 
-fn sleep_until_cancelled(inner: &Inner, wait: Duration, requested_quota: u64) {
+/// Wait out a backoff. A raised quota ends any wait and a retry request ends
+/// a resource wait; how the wait ended is recorded before the walker retries.
+fn sleep_until_cancelled(inner: &Inner, wait: Duration, requested_quota: u64, answers_retry: bool) {
+    #[cfg(test)]
+    inner.record_wait_start(wait, answers_retry);
     let deadline = Instant::now() + wait;
-    while !inner.cancel.load(Ordering::SeqCst) {
+    let end = loop {
+        #[cfg(test)]
+        let seen_retry = inner.retry_requested_for_test();
+        if inner.cancel.load(Ordering::SeqCst) {
+            break recovery::WaitEnd::Cancelled;
+        }
         if inner.requested_quota() != requested_quota {
-            return;
+            break recovery::WaitEnd::QuotaRaised;
+        }
+        if answers_retry && inner.retry_pending() {
+            break recovery::WaitEnd::RetryRequested;
         }
         let now = Instant::now();
         if now >= deadline {
-            return;
+            break recovery::WaitEnd::Deadline;
         }
+        #[cfg(test)]
+        inner.record_wait_check(seen_retry);
         inner.sleep(deadline - now);
-    }
+    };
+    inner.end_wait(end);
 }
 
 /// Wait without a deadline until the writer finished seeding its verified
@@ -1382,6 +1413,7 @@ fn build_and_serve(inner: &Arc<Inner>) -> Result<(), WalkError> {
     }
     published.refresh_health_sample()?;
     inner.set_phase(Phase::Ready(Arc::clone(&published)));
+    inner.answer_retries_by_publication();
     inner.published_since_failure.store(true, Ordering::SeqCst);
     serve(inner, &extension_ctx, &ctx, &published)
 }
