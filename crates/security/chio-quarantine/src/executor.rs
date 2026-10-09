@@ -152,6 +152,18 @@ pub struct ResponseExecutor<
     alerts: Arc<A>,
 }
 
+/// Parameters of `record_rollback_failure`.
+struct RollbackFailure<'a> {
+    current: ResponsePlanRecord,
+    effect_record: ResponseEffectRecord,
+    journal: EffectJournal,
+    attempt: u32,
+    installed_version_hash: Digest32,
+    error_code: ErrorCode,
+    work: &'a ScheduledWork,
+    now_unix_ms: u64,
+}
+
 impl<
         S: ResponseSchedulerStore + ?Sized,
         E: EffectPort + ?Sized,
@@ -1243,7 +1255,7 @@ impl<
                                 }
                                 Ok(_) => {
                                     let error_code = error_code("response.effect_result_invalid")?;
-                                    return self.record_rollback_failure(
+                                    return self.record_rollback_failure(RollbackFailure {
                                         current,
                                         effect_record,
                                         journal,
@@ -1252,10 +1264,10 @@ impl<
                                         error_code,
                                         work,
                                         now_unix_ms,
-                                    );
+                                    });
                                 }
                                 Err(error_code) => {
-                                    return self.record_rollback_failure(
+                                    return self.record_rollback_failure(RollbackFailure {
                                         current,
                                         effect_record,
                                         journal,
@@ -1264,7 +1276,7 @@ impl<
                                         error_code,
                                         work,
                                         now_unix_ms,
-                                    );
+                                    });
                                 }
                             }
                         }
@@ -1304,21 +1316,20 @@ impl<
         }
     }
 
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-    )]
     fn record_rollback_failure(
         &self,
-        current: ResponsePlanRecord,
-        effect_record: ResponseEffectRecord,
-        journal: EffectJournal,
-        attempt: u32,
-        installed_version_hash: Digest32,
-        error_code: ErrorCode,
-        work: &ScheduledWork,
-        now_unix_ms: u64,
+        params: RollbackFailure<'_>,
     ) -> Result<ResponsePlanRecord, ExecutorError> {
+        let RollbackFailure {
+            current,
+            effect_record,
+            journal,
+            attempt,
+            installed_version_hash,
+            error_code,
+            work,
+            now_unix_ms,
+        } = params;
         let failed = self.update_effect_record(
             &current,
             &effect_record,
