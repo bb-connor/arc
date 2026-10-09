@@ -1,4 +1,7 @@
 use super::*;
+
+#[path = "receipts/native_owner_registration.rs"]
+mod native_owner_registration;
 #[test]
 fn dead_commit_writer_denies_before_the_tool_executes() {
     let mut kernel = make_kernel(make_config());

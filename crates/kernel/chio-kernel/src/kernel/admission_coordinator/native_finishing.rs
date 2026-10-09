@@ -108,7 +108,19 @@ impl ChioKernel {
             .receipt_store
             .as_deref()
             .ok_or_else(|| invalid("native financing requires its configured receipt owner"))?;
-        let authority = authority.with_configured_receipt_store(configured_receipt_store);
+        let authority = match self.native_receipt_store_registration.as_ref() {
+            Some(registration) => {
+                if !std::ptr::addr_eq(configured_receipt_store, registration.receipt_store()) {
+                    return Err(invalid(
+                        "native receipt registration lost its configured sink",
+                    ));
+                }
+                authority.with_configured_receipt_registration(registration)
+            }
+            // Ordinary sink installation supplies no concrete Native identity.
+            // The Store retains its missing Receipt producer refusal.
+            None => authority,
+        };
         // This guard is not released between either database's COMMIT and the
         // authentic confirmation. The Store never calls back into Kernel locks.
         let preparation = store_call(|| {
