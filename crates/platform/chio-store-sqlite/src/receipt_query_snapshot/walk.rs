@@ -53,7 +53,7 @@ pub(super) enum WalkError {
     Integrity(String),
     #[error("receipt log regressed: {0}")]
     Regressed(String),
-    #[error("receipt query snapshot quota of {quota_bytes} bytes is exhausted ({used_bytes} bytes used)")]
+    #[error("receipt query snapshot storage is full: backing storage or configured quota may be exhausted ({quota_bytes} byte quota, {used_bytes} bytes used)")]
     Capacity { quota_bytes: u64, used_bytes: u64 },
     #[error("{what} holds {bytes} bytes, above the per-row limit")]
     RowCap { what: String, bytes: u64 },

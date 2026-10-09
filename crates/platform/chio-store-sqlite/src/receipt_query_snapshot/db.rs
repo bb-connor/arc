@@ -164,7 +164,7 @@ pub(super) struct SnapshotBatch {
 /// violation means the source offered the same cursor or receipt twice.
 #[derive(Debug, thiserror::Error)]
 pub(super) enum SnapshotDbError {
-    #[error("receipt query snapshot quota of {quota_bytes} bytes is exhausted ({used_bytes} bytes used)")]
+    #[error("receipt query snapshot storage is full: backing storage or configured quota may be exhausted ({quota_bytes} byte quota, {used_bytes} bytes used)")]
     Capacity { quota_bytes: u64, used_bytes: u64 },
     #[error("authenticated receipt history repeats a receipt or cursor: {0}")]
     Duplicate(String),
@@ -291,6 +291,24 @@ impl SnapshotDb {
 
     pub(super) fn quota_bytes(&self) -> u64 {
         self.quota_bytes
+    }
+
+    /// Apply only an explicit owner-requested increase; no write retries grow
+    /// the budget themselves. SQLite may clamp it to its maximum page count.
+    pub(super) fn increase_quota(&mut self, requested: u64) -> Result<(), SnapshotDbError> {
+        if requested <= self.quota_bytes {
+            return Ok(());
+        }
+        let pages = i64::try_from(requested / self.page_size).unwrap_or(i64::MAX);
+        let applied: i64 = self.connection()?.query_row(
+            &format!("PRAGMA max_page_count = {pages}"),
+            [],
+            |row| row.get(0),
+        )?;
+        self.quota_bytes = u64::try_from(applied)
+            .unwrap_or(0)
+            .saturating_mul(self.page_size);
+        Ok(())
     }
 
     pub(super) fn used_bytes(&self) -> Result<u64, SnapshotDbError> {
@@ -765,9 +783,10 @@ impl SnapshotDb {
     }
 }
 
-/// Run a snapshot write and map page-quota exhaustion to a typed capacity
-/// outcome. SQLite reports both an exceeded `max_page_count` and a full
-/// backing medium as `SQLITE_FULL`.
+/// Run a snapshot write and retain the capacity context for `SQLITE_FULL`.
+/// SQLite uses that code for both `max_page_count` and a full backing medium.
+/// Rollback may leave usage below the quota in either case, so usage cannot
+/// distinguish the causes. Neither is an integrity failure or a permanent latch.
 fn with_quota<T>(
     connection: &Connection,
     quota_bytes: u64,

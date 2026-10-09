@@ -19,3 +19,6 @@ mod query;
 mod service;
 #[path = "tests/support.rs"]
 mod support;
+
+#[path = "tests/recovery.rs"]
+mod recovery;

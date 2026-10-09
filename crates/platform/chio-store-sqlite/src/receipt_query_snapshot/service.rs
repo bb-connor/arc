@@ -21,6 +21,11 @@ use super::query::{locate, read_outcome, select, SelectedRow, Selection};
 use super::walk::{observe, Observation, OwnedSink, WalkContext, WalkError, WalkLimits};
 use crate::receipt_store::SqliteReceiptStore;
 
+#[path = "service/health.rs"]
+mod health;
+#[path = "service/recovery.rs"]
+mod recovery;
+
 #[cfg(test)]
 #[path = "tests/generation_observer.rs"]
 mod generation_observer_tests;
@@ -29,7 +34,7 @@ mod generation_observer_tests;
 /// promise.
 #[derive(Debug, Clone)]
 pub struct ReceiptQuerySnapshotConfig {
-    /// Page quota of the in-memory snapshot database.
+    /// Page quota of the process-owned snapshot database.
     pub quota_bytes: u64,
     /// Concurrent reads admitted; further reads are refused as busy.
     pub max_concurrent_reads: usize,
@@ -203,6 +208,7 @@ pub(super) struct Owned {
 pub(super) struct Published {
     lineage: String,
     owned: Mutex<Owned>,
+    health_sample: Mutex<Option<health::HealthSample>>,
     waiting: Arc<AtomicUsize>,
     changed: Arc<Condvar>,
     cancel: Arc<AtomicBool>,
@@ -618,6 +624,7 @@ fn poisoned() -> ReceiptStoreError {
 struct Inner {
     store: Arc<SqliteReceiptStore>,
     config: ReceiptQuerySnapshotConfig,
+    requested_quota_bytes: AtomicU64,
     cancel: Arc<AtomicBool>,
     phase: Mutex<Phase>,
     changed: Arc<Condvar>,
@@ -670,6 +677,7 @@ impl ReceiptQuerySnapshots {
         config.validate()?;
         let inner = Arc::new(Inner {
             store,
+            requested_quota_bytes: AtomicU64::new(config.quota_bytes),
             config,
             cancel: Arc::new(AtomicBool::new(false)),
             phase: Mutex::new(Phase::Waiting),
@@ -820,7 +828,7 @@ impl ReceiptQuerySnapshots {
                 Phase::Stopped => ReceiptQuerySnapshotState::Stopped,
             },
             watermark: None,
-            quota_bytes: self.inner.config.quota_bytes,
+            quota_bytes: self.inner.requested_quota(),
             used_bytes: 0,
             tool_receipts: 0,
             dimensions: 0,
@@ -1182,6 +1190,11 @@ impl Inner {
 /// Walker thread body.
 fn run(inner: &Arc<Inner>) {
     let mut backoff = inner.config.invalid_retry_backoff;
+    let resource_initial = inner
+        .config
+        .invalid_retry_backoff
+        .min(Duration::from_secs(30));
+    let mut resource_backoff = resource_initial;
     loop {
         if inner.cancel.load(Ordering::SeqCst) {
             break;
@@ -1189,6 +1202,7 @@ fn run(inner: &Arc<Inner>) {
         if !await_writer_seed(inner) {
             break;
         }
+        let requested_quota = inner.requested_quota();
         let outcome =
             std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| build_and_serve(inner)));
         let outcome = outcome.unwrap_or_else(|_| {
@@ -1198,13 +1212,7 @@ fn run(inner: &Arc<Inner>) {
         });
         let retry_after = match outcome {
             Ok(()) | Err(WalkError::Cancelled) => break,
-            // The phase that ended this lineage is already published.
-            Err(WalkError::Superseded) => Some(
-                inner
-                    .config
-                    .invalid_retry_backoff
-                    .min(Duration::from_secs(30)),
-            ),
+            Err(WalkError::Superseded) => resource_initial,
             Err(error @ (WalkError::Integrity(_) | WalkError::Regressed(_))) => {
                 inner.set_phase(Phase::Invalid(error.to_string()));
                 // Backoff grows only across failures with no lineage
@@ -1218,35 +1226,30 @@ fn run(inner: &Arc<Inner>) {
                 if let Ok(mut waits) = inner.integrity_waits.lock() {
                     waits.push(wait);
                 }
-                Some(wait)
+                wait
             }
             Err(error @ (WalkError::Capacity { .. } | WalkError::RowCap { .. })) => {
-                // A resource limit stays until the configuration or the stored
-                // history changes; the service does not rebuild on its own.
+                // SQLITE_FULL does not distinguish a configured page limit
+                // from transient backing pressure. Retry without growing the
+                // budget; repeated unsuccessful builds back off to one hour.
+                if matches!(inner.phase(), Phase::Ready(_)) {
+                    resource_backoff = resource_initial;
+                }
                 inner.set_phase(Phase::Unavailable(error.to_string()));
-                None
+                let wait = resource_backoff;
+                resource_backoff = (resource_backoff * 2).min(Duration::from_secs(3_600));
+                wait
             }
             Err(
                 error @ (WalkError::WalkerBudget | WalkError::Busy(_) | WalkError::Unavailable(_)),
             ) => {
                 inner.set_phase(Phase::Unavailable(error.to_string()));
-                Some(
-                    inner
-                        .config
-                        .invalid_retry_backoff
-                        .min(Duration::from_secs(30)),
-                )
+                resource_initial
             }
         };
-        match retry_after {
-            Some(wait) => sleep_until_cancelled(inner, wait),
-            None => {
-                while !inner.cancel.load(Ordering::SeqCst) {
-                    inner.sleep(Duration::from_secs(3_600));
-                }
-            }
-        }
+        sleep_until_cancelled(inner, retry_after, requested_quota);
     }
+
     if let Ok(mut phase) = inner.phase.lock() {
         *phase = Phase::Stopped;
     }
@@ -1254,9 +1257,12 @@ fn run(inner: &Arc<Inner>) {
     inner.changed.notify_all();
 }
 
-fn sleep_until_cancelled(inner: &Inner, wait: Duration) {
+fn sleep_until_cancelled(inner: &Inner, wait: Duration, requested_quota: u64) {
     let deadline = Instant::now() + wait;
     while !inner.cancel.load(Ordering::SeqCst) {
+        if inner.requested_quota() != requested_quota {
+            return;
+        }
         let now = Instant::now();
         if now >= deadline {
             return;
@@ -1320,7 +1326,7 @@ fn build_and_serve(inner: &Arc<Inner>) -> Result<(), WalkError> {
         }
     };
     let started = Instant::now();
-    let (db, result) = build_snapshot(&ctx, target, inner.config.quota_bytes, &mut report)?;
+    let (db, result) = build_snapshot(&ctx, target, inner.requested_quota(), &mut report)?;
     inner
         .last_recertification_ms
         .store(duration_ms(started.elapsed()), Ordering::SeqCst);
@@ -1341,6 +1347,7 @@ fn build_and_serve(inner: &Arc<Inner>) -> Result<(), WalkError> {
             watermark: observation.watermark,
             lineage_rowid: result.target.lineage_rowid,
         }),
+        health_sample: Mutex::new(None),
         waiting: Arc::clone(&inner.waiting),
         changed: Arc::clone(&inner.changed),
         cancel: Arc::clone(&inner.cancel),
@@ -1362,6 +1369,7 @@ fn build_and_serve(inner: &Arc<Inner>) -> Result<(), WalkError> {
     if let Ok(owned) = published.owned.lock() {
         published.observe(&owned);
     }
+    published.refresh_health_sample()?;
     inner.set_phase(Phase::Ready(Arc::clone(&published)));
     inner.published_since_failure.store(true, Ordering::SeqCst);
     serve(inner, &extension_ctx, &ctx, &published)
@@ -1400,11 +1408,13 @@ fn serve(
             inner.sleep(inner.config.extension_tick);
             continue;
         }
+        published.hold(|owned| owned.db.increase_quota(inner.requested_quota()))?;
         match extend_cycle(ctx, published, &|| inner.now_ms()) {
             Ok(observation) => covered = Some(observation),
             Err(WalkError::Busy(_)) => {}
             Err(error) => return Err(error),
         }
+        published.refresh_health_sample()?;
         // A pass targets an observation the snapshot has fully covered, so its
         // source maxima are pinned at the same moment as its claim-log head.
         let due = last_pass_start.elapsed() >= inner.config.recertify_interval;

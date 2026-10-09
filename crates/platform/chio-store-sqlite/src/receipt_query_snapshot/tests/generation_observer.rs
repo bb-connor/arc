@@ -43,6 +43,7 @@ fn published(hold_sql_steps: u64) -> TestResult<(Published, Observations)> {
             watermark: 0,
             lineage_rowid: 0,
         }),
+        health_sample: Mutex::new(None),
         waiting: Arc::new(AtomicUsize::new(0)),
         changed: Arc::new(Condvar::new()),
         cancel: Arc::new(AtomicBool::new(false)),

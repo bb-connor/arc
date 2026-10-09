@@ -80,6 +80,40 @@ pub(super) fn snapshot_error(error: ReceiptStoreError) -> ReceiptQuerySnapshotEr
 }
 
 #[test]
+fn a_cleared_storage_full_failure_recovers_without_restarting_the_service() {
+    let fixture = mixed_fixture();
+    let service = ready(&fixture, config());
+    service.pause_extension_for_test(true);
+    service.fail_next_commit_for_test(SnapshotDbError::Capacity {
+        quota_bytes: 2 * 1024 * 1024 * 1024,
+        used_bytes: 1024 * 1024,
+    });
+    fixture.append_varied(18..21);
+    service.pause_extension_for_test(false);
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let original_lineage = service
+        .query_receipts(&admin(1))
+        .ok()
+        .and_then(|r| r.snapshot);
+    let mut recovered = false;
+    while Instant::now() < deadline {
+        if let Ok(page) = service.query_receipts(&admin(100)) {
+            if page.total_count == 21 && page.snapshot != original_lineage {
+                recovered = true;
+                break;
+            }
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    let state = service.status().state;
+    service.shutdown();
+    assert!(
+        recovered,
+        "cleared storage failure never recovered: {state:?}"
+    );
+}
+
+#[test]
 fn served_pages_match_the_per_call_path_and_carry_a_watermark() {
     let fixture = mixed_fixture();
     let service = ready(&fixture, config());

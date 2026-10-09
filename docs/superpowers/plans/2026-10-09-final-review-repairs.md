@@ -49,6 +49,13 @@ KANI-PROOF-QUAL remains OPEN/UNPROVED under the recorded owner amendment.
    and reproduce failure to resume after a one-shot capacity fault clears.
 5. Implement explicit bounded resource retry/recovery. Test transient recovery,
    actual quota refusal, cancellation during backoff, and unchanged tamper refusal.
+   SQLite FULL is ambiguous even when post-rollback usage is below the quota;
+   report both possible resource causes instead of asserting quota exhaustion.
+   Capacity/per-row-limit backoff starts at the configured retry interval capped
+   at 30 seconds and grows to one hour across repeated failed builds. Other
+   resource refusals retain the existing fixed retry interval capped at 30 seconds. An explicit owner-only quota
+   increase wakes recovery and is applied by the walker; request traffic cannot
+   raise it. The existing CLI startup setting remains the deployment budget.
 6. Run focused snapshot and HTTP tests, owning strict Clippy, format and boundary
    scanners. Retain all failures; do not amend baselines to waive them.
 
@@ -60,6 +67,24 @@ KANI-PROOF-QUAL remains OPEN/UNPROVED under the recorded owner amendment.
 3. Run composition tests at the touched boundaries and strict owning lint.
    Expected: session churn, terminal revocation, bounded tenant export, separated
    forwarding and skew/stale-authority controls pass without weakening refusals.
+
+**F03 bounded-format ruling:** The existing unpaginated export verifier requires
+a complete checkpoint prefix from genesis. HTTP bundles therefore have explicit
+total ceilings: 4096 selected receipts, 32 MiB of payload/metadata, 4096 checkpoint
+prefix entries, and 131072 proof leaves. A prefix ceiling cannot be fixed by
+narrowing the time range; its error must direct the operator to the complete
+local export. An anchored/paginated format is a separate protocol follow-up.
+Receipt GET queries do not inherit these export ceilings. Optional live database
+retention diagnostics are unavailable in a snapshot-bound HTTP export; the
+existing complete local export still computes them. No source-index lookup may
+pretend to authenticate the minimum of a tamperable live table.
+
+**F01 preservation ruling:** Dominated session labels may be compacted only if
+no egress fence or nonterminal operation retains their context. Non-dominated
+session taint and cross-principal lineage remain authoritative. New context
+admission must not cross the global authenticated bound or prevent already
+admitted operations from completing. A residual store-wide permanent denial is
+not accepted merely because another churn pattern reaches it.
 
 ## Task 4: Reconcile the authoritative record
 

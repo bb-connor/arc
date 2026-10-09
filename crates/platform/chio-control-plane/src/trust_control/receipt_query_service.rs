@@ -95,19 +95,9 @@ pub(super) async fn health(state: &TrustServiceState) -> Value {
     let Some(snapshots) = state.receipt_query_snapshots.clone() else {
         return json!({"configured": state.receipt_store.is_some(), "state": if state.receipt_store.is_some() { "unavailable" } else { "unconfigured" }});
     };
-    let status = match run_bounded(Arc::clone(&state.receipt_query_lane), move || {
-        snapshots.status()
-    })
-    .await
-    {
-        Ok(status) => status,
-        Err(response) => {
-            return json!({
-                "configured": true,
-                "state": if response.status() == StatusCode::SERVICE_UNAVAILABLE { "busy" } else { "unavailable" },
-            })
-        }
-    };
+    // Process-owned telemetry only: public polls never borrow receipt admission
+    // or a snapshot database hold. The watermark identifies the sampled version.
+    let status = snapshots.health_status();
     let (phase, reason, progress) = match status.state {
         ReceiptQuerySnapshotState::WaitingForWriterSeed => ("waiting_for_writer_seed", None, None),
         ReceiptQuerySnapshotState::Building {

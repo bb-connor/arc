@@ -1,0 +1,252 @@
+{
+  "schema": "chio.receipt-recovery-health-qualification.v1",
+  "observed_at": "2026-10-09T20:54:41.176977+00:00",
+  "stage_parent": "bd9bd6a20183c6e29a17a076a4be556e41effed4",
+  "status": "LOCAL_COMPONENT_ACCEPTANCE_COMPLETE_EXACT_CANDIDATE_OPEN",
+  "findings": [
+    "FINAL-F04",
+    "FINAL-F09",
+    "FINAL-F10"
+  ],
+  "source_files": {
+    "crates/platform/chio-control-plane/src/trust_control/receipt_query_service.rs": "34cf5042681a3eaf7a5a1dcc04ff1b5a682655e6f3a7610d395c7df671b5f710",
+    "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/receipt_query_snapshot_tests.rs": "acb7d1664b376c0a26e805f1d6cf91867a23ff1dcc0e1d8b7736b326e8c59f73",
+    "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/db.rs": "25670d49e8e868418699371e7d723ddcf2160c9d0d1daed11e6753e400dbc13e",
+    "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service.rs": "92e8b356703e5f811f51e0005068e5e359d1952e45b02834b9b3d5738ea11428",
+    "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests.rs": "d33cc514060e779350728c00a7d1702f9c7dc2a7ebbbc48d6e0b50a14fadb919",
+    "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/generation_observer.rs": "b6c0f115020c9be4616afb3d80e2bb259f26f59b206f664965eaed51ee9c9150",
+    "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/service.rs": "f3d17e9e6fde8d83f13ded44adb584491ef109ea4b1f974b8c0d7d4adac268cc",
+    "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/walk.rs": "9f714cee492f79603fb73e449fa771b4b719d72f0c9bbfa659d34c768bbf9804",
+    "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service/health.rs": "746135c254f00c3ce5548361550a78af458b5f85485ac375b47b7996dbd4f3c3",
+    "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service/health_tests.rs": "707e5cbfcf0f3f9a6107b4238e5b6a07da0bc4c8c99bda442d633bfae1cd8aba",
+    "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service/recovery.rs": "e28a9e085fa874bf0ec9356e35acef47244dbbe5e03a94681884578c3fd35a8d",
+    "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/recovery.rs": "675e538e3f3a1a8928ccef2b64b89ad61b4607298d253ec2e7af16e622dee86a"
+  },
+  "records": [
+    {
+      "command": [
+        "swarm",
+        "build",
+        "--class",
+        "integrator",
+        "--",
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--lib",
+        "public_health_is_independent_of_receipt_read_admission",
+        "--",
+        "--show-output"
+      ],
+      "exit": 101,
+      "seconds": 307.0575168132782,
+      "sha256": "0db84438383e62eac52009585e17bf31781497ccc14059c46f81c1a4ddc388ce",
+      "label": "Original public health",
+      "evidence_path": "/tmp/pr1160-final-review-20261009/health/original.log",
+      "test_summaries": [
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1576 filtered out; finished in 0.35s"
+      ]
+    },
+    {
+      "command": [
+        "swarm",
+        "build",
+        "--class",
+        "integrator",
+        "--",
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-store-sqlite",
+        "--lib",
+        "a_cleared_storage_full_failure_recovers_without_restarting_the_service",
+        "--",
+        "--show-output"
+      ],
+      "exit": 101,
+      "seconds": 231.55489301681519,
+      "sha256": "940641e05271be0caf7e1392dd44f23d3245988fabf86de821afbb67c09c577b",
+      "label": "Original storage recovery",
+      "evidence_path": "/tmp/pr1160-final-review-20261009/recovery/original.log",
+      "test_summaries": [
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2274 filtered out; finished in 5.85s"
+      ]
+    },
+    {
+      "command": [
+        "swarm",
+        "build",
+        "--class",
+        "integrator",
+        "--",
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-store-sqlite",
+        "--lib",
+        "receipt_query_snapshot",
+        "--",
+        "--show-output"
+      ],
+      "exit": 0,
+      "seconds": 235.13532495498657,
+      "sha256": "d5673e1b77a796e3515dea831a4f77f0cf1be1283fe7a3c28c86b1205d24566d",
+      "source_stable": true,
+      "label": "Snapshot and backing suite",
+      "evidence_path": "/tmp/pr1160-final-review-20261009/composed/snapshots.log",
+      "test_summaries": [
+        "test result: ok. 138 passed; 0 failed; 7 ignored; 0 measured; 2135 filtered out; finished in 96.91s"
+      ]
+    },
+    {
+      "command": [
+        "/var/tmp/pr1160-root-final-20261009/debug/deps/chio_control_plane-bfa30dee57affd74",
+        "receipt_query_snapshot_tests",
+        "leader_forward_admission",
+        "public_passport_challenge_admission",
+        "--show-output"
+      ],
+      "exit": 0,
+      "seconds": 7.870958089828491,
+      "binary_sha256": "33ecbb257ee7d28781b5a988cfec43d26d26dfb1c237b25df8ca4d285f5e62fc",
+      "log_sha256": "29a0418fa73aeb26bfe130d2b66a6d50c008dc3f057658a3e34a06abb6b6916d",
+      "same_artifact_as": "http-green-export-original.log; separated green component filters, export Original failures retained",
+      "label": "HTTP health and forwarding",
+      "evidence_path": "/tmp/pr1160-final-review-20261009/composed/http-components-green.log",
+      "test_summaries": [
+        "test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 1555 filtered out; finished in 7.86s"
+      ]
+    },
+    {
+      "command": [
+        "swarm",
+        "build",
+        "--class",
+        "integrator",
+        "--",
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-control-plane",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 260.97589683532715,
+      "sha256": "6f85f9e344f4fe08c9a963d744fbe29319c823af2d9f9a5454c343d2d0865a91",
+      "label": "Strict store and control-plane lint",
+      "evidence_path": "/tmp/pr1160-final-review-20261009/composed/clippy.log",
+      "test_summaries": []
+    }
+  ],
+  "original_source": {
+    "base": "8f3dfac6b66b79ae04b745475a1a410000dbe06a",
+    "runtime_files": [
+      {
+        "path": "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service.rs",
+        "sha256": "17256aafe0368ffb4c4049310f076d1738498557abafa4bfff2927b8aeea1203",
+        "byte_identical_to_baseline": true
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/db.rs",
+        "sha256": "b7e48e2c0e09b993f8d5986c1e446bc58b803fe9090f0a2fd22b7245d35dcaa0",
+        "byte_identical_to_baseline": true
+      },
+      {
+        "path": "crates/platform/chio-control-plane/src/trust_control/receipt_handlers.rs",
+        "sha256": "9d00bac4032f3df3f2df21c27c538bb96cf43625f78d1217ea97270acf41ff95",
+        "byte_identical_to_baseline": true
+      },
+      {
+        "path": "crates/platform/chio-control-plane/src/trust_control/receipt_query_service.rs",
+        "sha256": "9922004ba76eb7ba0db66fd5bbbb8ddcf377d250e05caf0ed47e43eaae667773",
+        "byte_identical_to_baseline": true
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/evidence_export.rs",
+        "sha256": "ccb91ef185a5a96c2084ca5523d2b8d5097d5f47ad7d881a4c7771c071713a7c",
+        "byte_identical_to_baseline": true
+      }
+    ],
+    "unreferenced_new_health_and_recovery_modules": "Present but not enrolled or compiled; Original production runtime is unchanged."
+  },
+  "component_review": {
+    "reviewer": "codex receipt_lineage_review",
+    "scope": "Read-only FINAL-F04/F09 component patch; not full candidate qualification",
+    "source_files": {
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service.rs": "92e8b356703e5f811f51e0005068e5e359d1952e45b02834b9b3d5738ea11428",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/db.rs": "25670d49e8e868418699371e7d723ddcf2160c9d0d1daed11e6753e400dbc13e",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/walk.rs": "9f714cee492f79603fb73e449fa771b4b719d72f0c9bbfa659d34c768bbf9804",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service/health.rs": "746135c254f00c3ce5548361550a78af458b5f85485ac375b47b7996dbd4f3c3",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service/recovery.rs": "e28a9e085fa874bf0ec9356e35acef47244dbbe5e03a94681884578c3fd35a8d",
+      "crates/platform/chio-control-plane/src/trust_control/receipt_query_service.rs": "34cf5042681a3eaf7a5a1dcc04ff1b5a682655e6f3a7610d395c7df671b5f710"
+    },
+    "confirmed_P0_P1_P2_findings": [],
+    "wording_correction": "Only Capacity/RowCap exponential retries; other resource outcomes keep existing fixed capped interval. Corrected design/plan.",
+    "limitations": [
+      "No runtime test or proof execution by reviewer.",
+      "Health is sampled telemetry and contention can report temporary unavailable.",
+      "Explicit quota increase is an owner Rust API, not an HTTP administration route."
+    ]
+  },
+  "static_checks": [
+    {
+      "name": "clock",
+      "exit": 0,
+      "seconds": 28.561633586883545,
+      "sha256": "bd324fbc2aec503258f82917613ce9aeff2296a2cce36fc0e6f3285bcf158bd9"
+    },
+    {
+      "name": "negative",
+      "exit": 0,
+      "seconds": 1.3034934997558594,
+      "sha256": "49516e4ccc9c034cbb5fd748bdcae89b35f56d06d12a4c5e01ea61c0e17c45a6"
+    },
+    {
+      "name": "boundaries",
+      "exit": 0,
+      "seconds": 93.82456493377686,
+      "sha256": "1b8cb4595e959b1197f98ed5a16a9fb1b7c4256d29613c52f7662dce6d30ae51"
+    }
+  ],
+  "public_forwarding_integration": "bd9bd6a201",
+  "contract": [
+    "SQLite FULL retains both possible causes; Capacity/RowCap retries are bounded exponential, other transient refusals keep existing bounded interval.",
+    "Only the trusted owning Rust API can request monotonically increased quota. HTTP traffic cannot raise it. SQLite applies the finite page-rounded quota on the walker.",
+    "Public health reads walker-maintained sampled telemetry with try_lock; it takes neither query admission nor database holds. Inspecting status and authenticated query validation remain."
+  ],
+  "limitations": [
+    "138 snapshot/backing tests passed; seven existing ignored controls were not executed in this campaign.",
+    "The same CP test binary also reproduced both unresolved FINAL-F03 Original defects in a separate mixed 26PASS2FAIL campaign, retained without relabeling. The subsequent selected component campaign was 26PASS0FAIL.",
+    "Temporary copied F03 Original controls were removed after testing and preserved in external evidence; helper owns final controls and repair. This changes only test enrollment, not runtime source.",
+    "Full candidate review, exact-source hosted checks and protected merge remain pending. KANI-PROOF-QUAL remains OPEN/UNPROVED; no proof campaign was run."
+  ],
+  "format_original": {
+    "command": "cargo fmt --all -- --check",
+    "exit": 1,
+    "seconds": 28.820636510849,
+    "sha256": "e29c9640f7eb9961488c0f6fc690793eeed45262658da8623f9d9ce3460a14c1"
+  },
+  "format_repaired": {
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "exit": 0,
+    "seconds": 28.53419303894043,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "repair": "Removed only temporary F03 Original module/test copied from helper; preserved both in export evidence. F03 canonical repair remains in helper worktree."
+  }
+}

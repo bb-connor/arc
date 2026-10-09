@@ -89,6 +89,23 @@ async fn health_reports_snapshot_readiness_and_resource_usage() -> TestResult {
 }
 
 #[tokio::test]
+async fn public_health_is_independent_of_receipt_read_admission() -> TestResult {
+    let (_directory, state) = fixture().await?;
+    let _held = Arc::clone(&state.receipt_query_lane).try_acquire_many_owned(4)?;
+    let request = Request::builder().uri("/health").body(Body::empty())?;
+    let response = super::super::build_router(state.clone())
+        .oneshot(request)
+        .await?;
+    assert_eq!(response.status(), StatusCode::OK);
+    let bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024).await?;
+    let body: Value = serde_json::from_slice(&bytes)?;
+    assert_eq!(body["receiptQuerySnapshot"]["state"], "ready", "{body}");
+    assert!(body["receiptQuerySnapshot"]["watermark"]["id"].is_string());
+    assert_eq!(state.receipt_query_lane.available_permits(), 0);
+    Ok(())
+}
+
+#[tokio::test]
 async fn snapshot_errors_preserve_codes_status_and_retry_contracts() -> TestResult {
     use chio_kernel::receipt_query::ReceiptQuerySnapshotError as E;
     for (error, expected_status, retry) in [

@@ -216,12 +216,25 @@ process's custody. If `/tmp` is a `tmpfs`, the file occupies system memory.
   - The state becomes `Unavailable(capacity { quota_bytes, used_bytes })`.
   - Reads get a typed 503.
   - No value is truncated, and no partial version is published.
+  - SQLite FULL can also mean transient backing-storage exhaustion. A failed
+    transaction can roll back below the page ceiling, so usage alone cannot
+    identify which resource was exhausted. The diagnostic reports both possible
+    causes, with quota and usage, without calling either an integrity failure.
+  - Capacity and per-row-limit failures retry with exponential backoff (initial
+    configured retry interval capped at 30 seconds, maximum one hour). Busy,
+    other temporary unavailability and SQL work-budget outcomes keep the existing
+    fixed retry interval capped at 30 seconds. Quotas never grow automatically.
+    Cancellation interrupts either wait.
 - **Accounting.** `status()` and `/health` report:
   - `quota_bytes`;
   - `used_bytes` (`page_count * page_size`);
   - row count;
   - distinct dimension count;
   - dimension value bytes.
+  The inspecting `status()` API checks owned storage. Public `/health` instead
+  reads a coherent walker-maintained sample using nonblocking memory locks. It
+  never acquires receipt-read admission or a database connection. Its watermark
+  identifies the sampled version; it is not a fresh payload integrity check.
 - **Default quota and operator setting.** The quota defaults to 2 GiB
   (2147483648 bytes) on both backends. Operators set it with
   `chio trust serve --receipt-query-snapshot-quota-bytes <BYTES>`
@@ -231,6 +244,11 @@ process's custody. If `/tmp` is a `tmpfs`, the file occupies system memory.
   whole pages and capped at SQLite's maximum page count; `status()` reports the
   applied value. How many receipts fit is an estimate that depends on value
   lengths (10).
+  Embedded service owners may call `ReceiptQuerySnapshots::increase_quota_bytes`
+  to request a larger budget without restarting. The walker applies the increase
+  to the owned database or its next rebuild, and the request wakes resource
+  backoff. Decreases are refused. This owner API is not exposed to receipt-read
+  callers; CLI deployments continue to set their explicit startup budget.
 - **What the quota is not.** It bounds snapshot database pages only (the file
   on Linux, process memory elsewhere). It is not a limit on process RSS (10).
 - **SQLite heap outside the page quota.** The page quota does not cap other
@@ -980,6 +998,10 @@ budgets, and export is bounded only in concurrency.
   can wait behind bounded holds.
 - **Snapshot capacity.** Linux uses the private file backend under `/tmp`;
   other platforms use `memory`. On either backend a store larger than the quota
-  becomes `Unavailable(capacity)` and stays there until a restart with a larger
-  `--receipt-query-snapshot-quota-bytes`. That limit is typed and reported,
-  never silent.
+  becomes `Unavailable(capacity)`. The service retries without removing its
+  resource bound. Transient backing pressure can recover without restart;
+  genuine page-budget exhaustion requires an explicit larger owner budget.
+  An embedded owner can request the increase in process, while a CLI deployment
+  restarts with a larger `--receipt-query-snapshot-quota-bytes`. Repeated failed
+  rebuilds back off rather than permanently latching or repeatedly allocating
+  a larger projection. These limits remain typed and reported.
