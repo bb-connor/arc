@@ -34,6 +34,14 @@ fn backend(seed: u8, hybrid: bool) -> TestResult<Box<dyn SigningBackend>> {
 
 impl Fixture {
     fn new(hybrid_proposal: bool, hybrid_vote: bool) -> TestResult<Self> {
+        Self::with_grant(
+            hybrid_proposal,
+            hybrid_vote,
+            make_grant("threshold-server", "transfer"),
+        )
+    }
+
+    fn with_grant(hybrid_proposal: bool, hybrid_vote: bool, grant: ToolGrant) -> TestResult<Self> {
         let authority = backend(10, hybrid_proposal)?;
         let approver = backend(20, hybrid_vote)?;
         let issuer = backend(30, hybrid_proposal || hybrid_vote)?;
@@ -64,7 +72,7 @@ impl Fixture {
                 id: "threshold-floor-capability".into(),
                 issuer: issuer.public_key(),
                 subject: subject.public_key(),
-                scope: make_scope(vec![make_grant("threshold-server", "transfer")]),
+                scope: make_scope(vec![grant]),
                 issued_at: now - 1,
                 expires_at: now + 120,
                 delegation_chain: Vec::new(),
@@ -579,3 +587,6 @@ fn allow_classical_rejects_hybrid_threshold_artifacts() -> TestResult {
         .is_err());
     Ok(())
 }
+
+#[path = "threshold_crypto_floor/approval_reservation_cleanup.rs"]
+mod approval_reservation_cleanup;
