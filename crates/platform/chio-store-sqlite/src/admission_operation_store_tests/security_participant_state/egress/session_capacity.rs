@@ -469,3 +469,35 @@ fn existing_identities_keep_admitting_after_new_identities_are_refused() -> Anch
         Ok(())
     })
 }
+#[test]
+fn a_principal_at_its_share_is_refused_while_another_still_admits() -> AnchoredTestResult {
+    const HEAD_ROOM: u64 = 300;
+    let _clock = clock();
+    let fixture = fixture();
+    hydrate(&fixture, &imported(&fixture, "source")?)?;
+    let budget = rows(&fixture)? + HEAD_ROOM;
+    let only = taint("share-only")?;
+    let bottom = InformationLabel::bottom();
+    native::with_test_current_rows(budget, || -> AnchoredTestResult {
+        let mut opened = 0_u64;
+        let refusal = loop {
+            let name = format!("greedy-{opened}");
+            let identity = key("greedy-principal", "capacity-lineage", &name)?;
+            match finish(&fixture, &name, &identity, &bottom, &only) {
+                Ok(_) => opened += 1,
+                Err(error) => break error,
+            }
+            if opened > HEAD_ROOM {
+                return Err("the principal was never refused".into());
+            }
+        };
+        let detail = exhausted(refusal.as_ref()).ok_or_else(|| refusal.to_string())?;
+        assert!(detail.contains("principal share"), "{detail}");
+        // Another principal still opens new flow identities.
+        let other = key("other-principal", "capacity-lineage", "other-session")?;
+        finish(&fixture, "other", &other, &bottom, &only)?;
+        assert_eq!(session_rows(&fixture, &other)?, (1, 1, 1));
+        assert!(rows(&fixture)? <= budget);
+        Ok(())
+    })
+}

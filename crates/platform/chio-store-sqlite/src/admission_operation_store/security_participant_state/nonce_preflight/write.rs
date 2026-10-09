@@ -113,16 +113,21 @@ impl SqliteAdmissionOperationStore {
             }
         }
         // A preflight is always its operation's first native write.
-        super::super::storage::admit_operation(
-            &tx,
-            true,
-            super::super::storage::opens_identity(
-                changes
-                    .iter()
-                    .filter(|change| change.before.is_none())
-                    .map(|change| change.table.as_str()),
-            ),
-        )?;
+        let opens = super::super::storage::opens_identity(
+            changes
+                .iter()
+                .filter(|change| change.before.is_none())
+                .map(|change| change.table.as_str()),
+        );
+        if opens {
+            super::super::storage::admit_principal_share(
+                &tx,
+                actual.authority.as_str(),
+                intent.key().tenant_id.as_str(),
+                intent.key().principal_id.as_str(),
+            )?;
+        }
+        super::super::storage::admit_operation(&tx, true, opens)?;
         let record = Record {
             schema: Record::format(),
             authority: actual.authority.clone(),

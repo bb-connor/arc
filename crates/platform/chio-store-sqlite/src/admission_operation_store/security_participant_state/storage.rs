@@ -328,6 +328,8 @@ fn capacity(detail: impl std::fmt::Display) -> AdmissionOperationStoreError {
 /// transition), one egress fence, a declassified commitment (use, evidence
 /// and outbox rows), and one output join (a transition plus declassification
 /// evidence and outbox rows). Every other later change rewrites existing rows.
+/// This reserves rows only: the separate per-authority current-byte bound
+/// checked by each journal record is not reserved.
 pub(super) const OPERATION_ROWS: u64 = 8;
 
 /// Unfinished operations scanned through the terminal index before the
@@ -367,6 +369,56 @@ const IDENTITY_TABLES: [&str; 7] = [
 /// Whether a write's inserted rows open a new flow identity.
 pub(super) fn opens_identity<'a>(mut inserted: impl Iterator<Item = &'a str>) -> bool {
     inserted.any(|table| IDENTITY_TABLES.contains(&table))
+}
+
+/// Rows attributed to one principal, with weights. A copied isolation epoch
+/// counts twice: it stands for the lineage label it may have opened, which
+/// carries no principal.
+const PRINCIPAL_ROWS: [(&str, u64); 5] = [
+    ("security_participant_state_principal_flow_state", 1),
+    ("security_participant_state_session_flow_state", 1),
+    ("security_participant_state_session_memberships", 1),
+    ("security_participant_state_flow_contexts", 1),
+    ("security_participant_state_isolation_epochs", 2),
+];
+
+/// Admit a write that opens a new flow identity for one principal, after it is
+/// applied. No principal may hold more than one eighth of the store-wide
+/// budget in attributed identity rows, so one principal cannot take every
+/// other principal's room for new flow identities. Declassification rows are
+/// not attributed and share the remaining budget with every principal. Each
+/// count is a primary-key prefix lookup.
+pub(super) fn admit_principal_share(
+    connection: &Connection,
+    authority: &str,
+    tenant: &str,
+    principal: &str,
+) -> Result<(), AdmissionOperationStoreError> {
+    let share = current_rows_budget() / 8;
+    let mut held = 0_u64;
+    for (table, weight) in PRINCIPAL_ROWS {
+        let count: i64 = connection
+            .query_row(
+                &format!(
+                    "SELECT COUNT(*) FROM {table}
+                     WHERE security_authority_id = ?1 AND tenant_id = ?2 AND principal_id = ?3"
+                ),
+                params![authority, tenant, principal],
+                |row| row.get(0),
+            )
+            .map_err(sqlite_error)?;
+        held = u64::try_from(count)
+            .map_err(invalid)?
+            .checked_mul(weight)
+            .and_then(|rows| rows.checked_add(held))
+            .ok_or_else(|| invalid("native principal row count overflow"))?;
+    }
+    if held > share {
+        return Err(capacity(format_args!(
+            "principal share: {held} rows attributed to this principal, share {share}"
+        )));
+    }
+    Ok(())
 }
 
 /// Unfinished operations that already hold native history, through the
