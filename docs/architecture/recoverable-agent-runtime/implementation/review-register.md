@@ -245,6 +245,20 @@ retain every historical field, with additive successors and current status/reaso
 changes only. No native, provider, Linux, formal, hosted or whole-runtime
 qualification is added.
 
+## Model-response parser controls
+
+The [SF-R02 parser acceptance](reviews/model-response-parsing.md) records all four
+original local controls passing on unchanged maintained source. Three negatives
+reuse the current 133 normal/optimized fixture runs and their 663 stable inputs;
+only the missing original positive assertion set ran again, once per mode.
+Exact refusal categories, consumed attempts and positive metadata are preserved.
+The disclosed Python 3.12.11 profile supplies no provider, native, Linux, hosted
+or primary qualification. Companion independent spec and quality reports cover
+only this bounded local acceptance. `SF-R02` stays open for its original broader
+catalogue obligations.
+Its previous reason is retained in an additive successor; the other 394 records,
+all counts and original obligation references are unchanged.
+
 ## Source-pin audit
 
 The JSON records the inventory time, candidate HEAD, four source inventory

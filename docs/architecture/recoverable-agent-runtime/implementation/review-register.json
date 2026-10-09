@@ -6151,7 +6151,64 @@
         "reviewed#/rows/252/expected_remaining_obligations"
       ],
       "current_status": "open",
-      "current_reason": "No complete independent disposition is recorded. Retain the original obligation and every referenced current or historical owner check; partial observations do not close it."
+      "current_reason": "All four original local parser controls pass on the exact maintained source: three negatives reuse the current 133 normal/optimized fixture runs, and the unchanged original positive passed once per mode. No source repair was needed. Companion independent spec and quality reports cover only this bounded local acceptance; SF-R02 remains open for the preserved model-free native preflight, matched live cohort and applicable final-source/primary-lane obligations. No provider, native, Linux, hosted or whole-runtime qualification is credited.",
+      "current_successor": {
+        "scope": "Original SF-R02 ordinary malformed-usage and UTF-8 model-output parser defect only",
+        "status": "bounded_local_acceptance",
+        "previous_current_status": "open",
+        "previous_current_reason": "No complete independent disposition is recorded. Retain the original obligation and every referenced current or historical owner check; partial observations do not close it.",
+        "source_disposition": "verified_preexisting_fix",
+        "original_controls_passed": 4,
+        "review": "docs/architecture/recoverable-agent-runtime/implementation/reviews/model-response-parsing.md",
+        "review_sha256": "9602dfe857d9c31f1c81ca5752b80c72050a37ac64204938dd87ef3b3ed03d0d",
+        "acceptance": {
+          "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/model-response-validation/acceptance.json",
+          "sha256": "51392b3eae14360e9776f43f1bb920199fa762d5b96ea1fc545ba90e61558163"
+        },
+        "evidence_manifest": {
+          "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/model-response-validation/evidence-manifest.json",
+          "sha256": "3adfd737e022d980baea2072c377e6df15d02e9ca65ded0d8115dbd2f8b0ba91"
+        },
+        "source_pins": {
+          "fixtures/recovery-product/campaign_runner.py": "b7b29a576a6d78d00a57049fc84aefe0823c59b80342f7bdc873d44f1ceacc93",
+          "fixtures/recovery-product/test_campaign_runner.py": "a7f39b952d4c5aa243cf96a534f9bd3949ab930c02ce95ff0b3a7cec69b316a8",
+          "fixtures/recovery-product/qualification_runtime.py": "6eb20a2724ab2c033b6c5e33c4dcdf4871c0bfa31a268c233f3b22a7cbc49271"
+        },
+        "reused_current_runs": {
+          "normal_tests": 133,
+          "optimized_tests": 133,
+          "stable_inputs_per_run": 663,
+          "normal": {
+            "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/fixture-environment-continuity/installed-successor/normal.json",
+            "sha256": "a8d6557f9ceea7725968cefb965ffe0890a04f2965190b035affc35105b0a16c"
+          },
+          "optimized": {
+            "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/fixture-environment-continuity/installed-successor/optimized.json",
+            "sha256": "26815164ce5dc57841df0c075180f5da2fa628cbd40f47382e17f5fc47c132bc"
+          }
+        },
+        "missing_original_positive": {
+          "normal": {
+            "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/model-response-validation/positive-normal/verification.json",
+            "sha256": "d127f837fe2d2824e3f2dc0e5c0c580e95c17e8c3b49146734fb238ac37f85e0",
+            "tests": 1
+          },
+          "optimized": {
+            "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/model-response-validation/positive-optimized/verification.json",
+            "sha256": "782b83b0cc86b35a05f9f6caf6fcb3caaec0d4c737c54a35ee26e285bdeb5afd",
+            "tests": 1
+          }
+        },
+        "profile": "CPython 3.12.11 supported venv; exact maintained parser imports; reused disclosed fixture profile plus isolated empty-environment mock-only positive controls",
+        "remaining_obligations": [
+          "Existing exact owning regression/review plus applicable final source and primary lane; latest local pass is not global closure.",
+          "Model-free native preflight",
+          "Matched live cohort",
+          "Applicable primary qualification lanes"
+        ],
+        "whole_finding_closed": false,
+        "qualified": false
+      }
     },
     {
       "key": "NS-06",
@@ -10259,6 +10316,20 @@
       },
       "historical_recorded_counters_unchanged": true,
       "previous_fixture_review_remains_historical": "docs/architecture/recoverable-agent-runtime/implementation/reviews/fixture-lifecycle-and-sdk-readiness.md",
+      "qualified": false
+    },
+    {
+      "at_utc": "2026-10-09T20:00:21.404110+00:00",
+      "findings": [
+        "SF-R02"
+      ],
+      "review": "docs/architecture/recoverable-agent-runtime/implementation/reviews/model-response-parsing.md",
+      "review_sha256": "9602dfe857d9c31f1c81ca5752b80c72050a37ac64204938dd87ef3b3ed03d0d",
+      "evidence_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/model-response-validation/acceptance.json",
+      "evidence_sha256": "51392b3eae14360e9776f43f1bb920199fa762d5b96ea1fc545ba90e61558163",
+      "scope": "All four original local parser controls are accepted on exact maintained source. Reuse three negative controls from current 133 normal/optimized runs and add only the unchanged original positive once per mode. Preserve original obligations and previous reason; independent spec/quality review and broader native/live/primary acceptance remain separate.",
+      "current_status_changes": false,
+      "counts_changed": false,
       "qualified": false
     }
   ],
