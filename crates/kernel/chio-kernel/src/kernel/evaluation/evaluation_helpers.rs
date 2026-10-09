@@ -32,6 +32,33 @@ impl ChioKernel {
         })
     }
 
+    /// Recheck finding recovery status after an ordinary call ran. Only a
+    /// recovery baseline consumes the authority clock, so a clock fault cannot
+    /// discard the signed outcome of a tool that already ran without one; with
+    /// one, the fault withholds the output as an unavailable status.
+    pub(super) fn revalidate_ordinary_recovery_status(
+        &self,
+        matched_grant_index: usize,
+        request: &ToolCallRequest,
+        admission: &crate::kernel::dispatch::VerifiedFindingDispatchAdmission,
+    ) -> Result<(), crate::finding_denial::FindingDenial> {
+        if admission.recovery.is_none() {
+            return Ok(());
+        }
+        let now = self.read_authority_time().map_err(|error| {
+            crate::finding_denial::FindingDenial::unavailable(format!(
+                "completed recovery status cannot be rechecked: {error}"
+            ))
+        })?;
+        self.revalidate_completed_recovery_status(
+            matched_grant_index,
+            request,
+            admission.recovery_binding(),
+            admission.recovery_status(),
+            now.as_secs(),
+        )
+    }
+
     /// The legacy sidecar reservation response does not carry the qualified
     /// nonce participant. Reject that composition before acquiring participants.
     pub(super) fn reject_legacy_caller_reservation_for_durable_nonce(

@@ -1955,12 +1955,10 @@ impl ChioKernel {
                 security_request_lifecycle,
             );
         }
-        let recovery_status = self.revalidate_completed_recovery_status(
+        let recovery_status = self.revalidate_ordinary_recovery_status(
             matched_grant_index,
             request,
-            verified_finding_admission.recovery_binding(),
-            verified_finding_admission.recovery_status(),
-            self.read_authority_time()?.get() / 1_000,
+            &verified_finding_admission,
         );
         if let Err(denial) = recovery_status {
             return self.deny_changed_ordinary_recovery_status(
