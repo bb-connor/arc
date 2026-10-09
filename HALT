@@ -1,6 +1,0 @@
----
-scopes: ["all"]
-reason: "pilot prep: runners stay idle until #1160 merges and integration/beta-next exists"
-by: "connor"
-at: "2026-10-09T15:26:16Z"
----
