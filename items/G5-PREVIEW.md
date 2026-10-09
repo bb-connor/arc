@@ -7,7 +7,7 @@ tier: "cheap"
 status: "open"
 owner: ""
 assignee: ""
-depends_on: ["G4-DRILLS", "REL-1.9", "WORK-W2.5b"]
+depends_on: ["G4-DRILLS", "REL-1.9", "WORK-W2.5b", "SEC-1160-COLDSTATE"]
 paths: ["CHANGELOG.md", "docs/install/README.md"]
 branch: ""
 commits: []
@@ -29,3 +29,4 @@ Work on a `lane/<ID>-<slug>` branch off `integration/beta-next` (post-#1160 main
 
 ## Log
 - 2026-10-09T04:51:58Z connor: created
+- 2026-10-09T21:28:49Z connor: depends_on += SEC-1160-COLDSTATE (decision 0020)
