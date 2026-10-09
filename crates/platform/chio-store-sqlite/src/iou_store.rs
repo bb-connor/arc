@@ -146,21 +146,32 @@ fn verify_envelope(envelope: &IouEnvelope) -> Result<(), IouEnvelopeStoreError> 
     Ok(())
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-)]
+/// Parameters of `insert_envelope_on_connection`.
+struct IouEnvelopeRow<'a> {
+    receipt_id: &'a str,
+    iou_id: &'a str,
+    receipt_ts: i64,
+    tenant_id: Option<&'a str>,
+    amount: i64,
+    currency: &'a str,
+    issuer_key_str: &'a str,
+    canonical_str: &'a str,
+}
+
 fn insert_envelope_on_connection(
     connection: &rusqlite::Connection,
-    receipt_id: &str,
-    iou_id: &str,
-    receipt_ts: i64,
-    tenant_id: Option<&str>,
-    amount: i64,
-    currency: &str,
-    issuer_key_str: &str,
-    canonical_str: &str,
+    params: IouEnvelopeRow<'_>,
 ) -> Result<bool, IouEnvelopeStoreError> {
+    let IouEnvelopeRow {
+        receipt_id,
+        iou_id,
+        receipt_ts,
+        tenant_id,
+        amount,
+        currency,
+        issuer_key_str,
+        canonical_str,
+    } = params;
     let inserted = connection
         .execute(
             r#"
@@ -256,14 +267,16 @@ impl IouEnvelopeStore for SqliteIouEnvelopeStore {
                         // require.
                         insert_envelope_on_connection(
                             connection,
-                            &receipt_id,
-                            &iou_id,
-                            receipt_ts,
-                            tenant_id.as_deref(),
-                            amount,
-                            &currency,
-                            &issuer_key,
-                            &canonical,
+                            IouEnvelopeRow {
+                                receipt_id: &receipt_id,
+                                iou_id: &iou_id,
+                                receipt_ts,
+                                tenant_id: tenant_id.as_deref(),
+                                amount,
+                                currency: &currency,
+                                issuer_key_str: &issuer_key,
+                                canonical_str: &canonical,
+                            },
                         )
                         .map_err(|err| match err {
                             IouEnvelopeStoreError::Integrity(rule) => {
@@ -291,14 +304,16 @@ impl IouEnvelopeStore for SqliteIouEnvelopeStore {
                 let connection = self.connection()?;
                 insert_envelope_on_connection(
                     &connection,
-                    envelope.body.receipt_id.as_str(),
-                    envelope.body.iou_id.as_str(),
-                    receipt_ts,
-                    envelope.body.tenant_id.as_deref(),
-                    amount,
-                    envelope.body.currency.as_str(),
-                    issuer_key_str.as_str(),
-                    canonical_str,
+                    IouEnvelopeRow {
+                        receipt_id: envelope.body.receipt_id.as_str(),
+                        iou_id: envelope.body.iou_id.as_str(),
+                        receipt_ts,
+                        tenant_id: envelope.body.tenant_id.as_deref(),
+                        amount,
+                        currency: envelope.body.currency.as_str(),
+                        issuer_key_str: issuer_key_str.as_str(),
+                        canonical_str,
+                    },
                 )
             }
         }

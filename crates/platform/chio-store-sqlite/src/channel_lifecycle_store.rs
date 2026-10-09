@@ -242,14 +242,14 @@ struct StoredPreparedPlan {
 }
 
 /// Parameters of `stage_channel_reservation`.
-pub(crate) struct ChannelReservationStage<'a> {
-    pub(crate) advance: &'a VerifiedEconomicStateBatchAdvance,
-    pub(crate) operation: &'a AdmissionOperationV1,
-    pub(crate) recovery_lease: &'a AdmissionRecoveryLease,
-    pub(crate) replay_bytes: &'a [u8],
-    pub(crate) expected_authority_pins: &'a ChannelTransitionReplayAuthorityPinsV1,
-    pub(crate) fence: &'a StoreMutationFence,
-    pub(crate) trusted_now_unix_ms: u64,
+pub struct ChannelReservationStage<'a> {
+    pub advance: &'a VerifiedEconomicStateBatchAdvance,
+    pub operation: &'a AdmissionOperationV1,
+    pub recovery_lease: &'a AdmissionRecoveryLease,
+    pub replay_bytes: &'a [u8],
+    pub expected_authority_pins: &'a ChannelTransitionReplayAuthorityPinsV1,
+    pub fence: &'a StoreMutationFence,
+    pub trusted_now_unix_ms: u64,
 }
 
 impl SqliteChannelLifecycleStore {
@@ -327,7 +327,7 @@ impl SqliteChannelLifecycleStore {
         Ok(record)
     }
 
-    pub(crate) fn stage_channel_reservation(
+    pub fn stage_channel_reservation(
         &self,
         params: ChannelReservationStage<'_>,
     ) -> Result<ChannelReservationStageRecordV1, ChannelLifecycleStoreError> {

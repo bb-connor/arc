@@ -604,56 +604,56 @@ fn seller_artifact_capacity_bounds_database_and_file_storage() {
 
     assert_eq!(
         store
-            .reserve_seller_artifact_capacity_with_limits(
-                &first_request,
-                "seller-1",
-                &request_sha256,
-                40,
-                10,
-                100,
-                maximum_bytes,
-            )
+            .reserve_seller_artifact_capacity_with_limits(SellerArtifactCapacityRequest {
+                request_id: &first_request,
+                principal_id: "seller-1",
+                request_sha256: &request_sha256,
+                externally_retained_bytes: 40,
+                externally_reserved_bytes: 10,
+                requested_bytes: 100,
+                maximum_aggregate_bytes: maximum_bytes
+            })
             .unwrap(),
         FindingOperatorSellerArtifactCapacityOutcome::Reserved
     );
     assert_eq!(
         store
-            .reserve_seller_artifact_capacity_with_limits(
-                &first_request,
-                "seller-1",
-                &request_sha256,
-                40,
-                10,
-                100,
-                maximum_bytes,
-            )
+            .reserve_seller_artifact_capacity_with_limits(SellerArtifactCapacityRequest {
+                request_id: &first_request,
+                principal_id: "seller-1",
+                request_sha256: &request_sha256,
+                externally_retained_bytes: 40,
+                externally_reserved_bytes: 10,
+                requested_bytes: 100,
+                maximum_aggregate_bytes: maximum_bytes
+            })
             .unwrap(),
         FindingOperatorSellerArtifactCapacityOutcome::ExactReplay
     );
     assert_eq!(
         store
-            .reserve_seller_artifact_capacity_with_limits(
-                &second_request,
-                "seller-1",
-                &request_sha256,
-                40,
-                10,
-                100,
-                maximum_bytes,
-            )
+            .reserve_seller_artifact_capacity_with_limits(SellerArtifactCapacityRequest {
+                request_id: &second_request,
+                principal_id: "seller-1",
+                request_sha256: &request_sha256,
+                externally_retained_bytes: 40,
+                externally_reserved_bytes: 10,
+                requested_bytes: 100,
+                maximum_aggregate_bytes: maximum_bytes
+            })
             .unwrap(),
         FindingOperatorSellerArtifactCapacityOutcome::Reserved
     );
     assert!(matches!(
-        store.reserve_seller_artifact_capacity_with_limits(
-            &third_request,
-            "seller-1",
-            &request_sha256,
-            40,
-            10,
-            100,
-            maximum_bytes,
-        ),
+        store.reserve_seller_artifact_capacity_with_limits(SellerArtifactCapacityRequest {
+            request_id: &third_request,
+            principal_id: "seller-1",
+            request_sha256: &request_sha256,
+            externally_retained_bytes: 40,
+            externally_reserved_bytes: 10,
+            requested_bytes: 100,
+            maximum_aggregate_bytes: maximum_bytes
+        }),
         Err(FindingOperatorBundleStoreError::SellerArtifactCapacity)
     ));
 

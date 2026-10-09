@@ -253,6 +253,17 @@ pub struct SqliteFindingOperatorBundleStore {
     pool: Pool<SqliteConnectionManager>,
 }
 
+/// Parameters of `reserve_seller_artifact_capacity_with_limits`.
+struct SellerArtifactCapacityRequest<'a> {
+    request_id: &'a str,
+    principal_id: &'a str,
+    request_sha256: &'a str,
+    externally_retained_bytes: i64,
+    externally_reserved_bytes: i64,
+    requested_bytes: i64,
+    maximum_aggregate_bytes: i64,
+}
+
 impl SqliteFindingOperatorBundleStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, FindingOperatorBundleStoreError> {
         Self::open_with_clock(path, Arc::new(SystemClock))
@@ -1488,18 +1499,18 @@ impl SqliteFindingOperatorBundleStore {
         externally_reserved_bytes: u64,
         maximum_aggregate_bytes: u64,
     ) -> Result<FindingOperatorSellerArtifactCapacityOutcome, FindingOperatorBundleStoreError> {
-        self.reserve_seller_artifact_capacity_with_limits(
+        self.reserve_seller_artifact_capacity_with_limits(SellerArtifactCapacityRequest {
             request_id,
             principal_id,
             request_sha256,
-            i64::try_from(externally_retained_bytes)
+            externally_retained_bytes: i64::try_from(externally_retained_bytes)
                 .map_err(|_| FindingOperatorBundleStoreError::SellerArtifactCapacity)?,
-            i64::try_from(externally_reserved_bytes)
+            externally_reserved_bytes: i64::try_from(externally_reserved_bytes)
                 .map_err(|_| FindingOperatorBundleStoreError::SellerArtifactCapacity)?,
-            MAX_SELLER_ARTIFACT_BYTES,
-            i64::try_from(maximum_aggregate_bytes)
+            requested_bytes: MAX_SELLER_ARTIFACT_BYTES,
+            maximum_aggregate_bytes: i64::try_from(maximum_aggregate_bytes)
                 .map_err(|_| FindingOperatorBundleStoreError::SellerArtifactCapacity)?,
-        )
+        })
     }
 
     /// Release an uncommitted seller-artifact claim after packaging or
@@ -1558,20 +1569,19 @@ impl SqliteFindingOperatorBundleStore {
         Ok(true)
     }
 
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-    )]
     fn reserve_seller_artifact_capacity_with_limits(
         &self,
-        request_id: &str,
-        principal_id: &str,
-        request_sha256: &str,
-        externally_retained_bytes: i64,
-        externally_reserved_bytes: i64,
-        requested_bytes: i64,
-        maximum_aggregate_bytes: i64,
+        params: SellerArtifactCapacityRequest<'_>,
     ) -> Result<FindingOperatorSellerArtifactCapacityOutcome, FindingOperatorBundleStoreError> {
+        let SellerArtifactCapacityRequest {
+            request_id,
+            principal_id,
+            request_sha256,
+            externally_retained_bytes,
+            externally_reserved_bytes,
+            requested_bytes,
+            maximum_aggregate_bytes,
+        } = params;
         let now = self.now_secs()?;
         validate_digest(request_id, "request_id")?;
         validate_identifier(principal_id, "principal_id")?;

@@ -17,15 +17,17 @@ fn seed_history(connection: &Connection) -> TestResult {
     })?;
     append_entry(
         &transaction,
-        "baseline",
-        "baseline",
-        "",
-        0,
-        &reference,
-        &projection,
-        "schema-migration-fixture",
-        None,
-        0,
+        CommitChainEntry {
+            mutation_kind: "baseline",
+            projection_kind: "baseline",
+            projection_key: "",
+            projection_sequence: 0,
+            projection_reference_digest: &reference,
+            authority_projection_digest: &projection,
+            store_uuid: "schema-migration-fixture",
+            store_lease_id: None,
+            store_owner_epoch: 0,
+        },
     )?;
     transaction.commit()?;
     Ok(())

@@ -2,20 +2,30 @@
 
 use super::*;
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-)]
+/// Parameters of `try_append_effect_root_refresh`.
+pub(super) struct EffectRootRefresh<'a> {
+    pub(super) intent: &'a FindingEffectIntentRecord,
+    pub(super) existing: &'a FindingEffectRootBindingRecord,
+    pub(super) intent_key: &'a str,
+    pub(super) liability_key: &'a str,
+    pub(super) merkle_root: &'a str,
+    pub(super) evidence_hash: &'a str,
+    pub(super) now: u64,
+}
+
 pub(super) fn try_append_effect_root_refresh(
     transaction: &Transaction<'_>,
-    intent: &FindingEffectIntentRecord,
-    existing: &FindingEffectRootBindingRecord,
-    intent_key: &str,
-    liability_key: &str,
-    merkle_root: &str,
-    evidence_hash: &str,
-    now: u64,
+    params: EffectRootRefresh<'_>,
 ) -> Result<bool, FindingChallengeStoreError> {
+    let EffectRootRefresh {
+        intent,
+        existing,
+        intent_key,
+        liability_key,
+        merkle_root,
+        evidence_hash,
+        now,
+    } = params;
     if intent.kind != FindingEffectIntentKind::RootIntent
         || intent.liability_key.as_deref() != Some(liability_key)
         || intent.state != FindingEffectIntentState::Confirmed

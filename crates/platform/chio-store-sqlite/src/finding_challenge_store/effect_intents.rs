@@ -110,13 +110,15 @@ impl SqliteFindingChallengeStore {
             }
             if try_append_effect_root_refresh(
                 &transaction,
-                &intent,
-                &existing,
-                intent_key,
-                liability_key,
-                merkle_root,
-                evidence_hash,
-                now,
+                EffectRootRefresh {
+                    intent: &intent,
+                    existing: &existing,
+                    intent_key,
+                    liability_key,
+                    merkle_root,
+                    evidence_hash,
+                    now,
+                },
             )? {
                 self.commit_write(transaction)?;
                 self.sync_after_write(&connection)?;

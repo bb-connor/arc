@@ -15,8 +15,10 @@ use super::finding_market_snapshot_versions::{
 };
 use super::{read_u64, sqlite_u64, SqliteServingOwnerError};
 
+mod commit_entry;
 mod projection_reference;
 mod schema_migration;
+use commit_entry::{append_entry, CommitChainEntry};
 use projection_reference::projection_reference_digest;
 
 pub(crate) const GLOBAL_GENESIS_DIGEST: &str =
@@ -271,15 +273,17 @@ pub(crate) fn seed_global_baseline(
     })?;
     append_entry(
         &transaction,
-        "baseline",
-        "baseline",
-        "",
-        0,
-        &baseline_digest,
-        &projection_digest,
-        &store_uuid,
-        None,
-        0,
+        CommitChainEntry {
+            mutation_kind: "baseline",
+            projection_kind: "baseline",
+            projection_key: "",
+            projection_sequence: 0,
+            projection_reference_digest: &baseline_digest,
+            authority_projection_digest: &projection_digest,
+            store_uuid: &store_uuid,
+            store_lease_id: None,
+            store_owner_epoch: 0,
+        },
     )?;
     transaction.commit()?;
     Ok(())
@@ -320,15 +324,17 @@ pub(crate) fn append_global_commit(
     })?;
     append_entry(
         transaction,
-        mutation_kind,
-        projection_kind,
-        projection_key,
-        projection_sequence,
-        &reference_digest,
-        &projection_digest,
-        &fence.store_uuid,
-        Some(&fence.lease_id),
-        fence.owner_epoch,
+        CommitChainEntry {
+            mutation_kind,
+            projection_kind,
+            projection_key,
+            projection_sequence,
+            projection_reference_digest: &reference_digest,
+            authority_projection_digest: &projection_digest,
+            store_uuid: &fence.store_uuid,
+            store_lease_id: Some(&fence.lease_id),
+            store_owner_epoch: fence.owner_epoch,
+        },
     )
 }
 
@@ -490,86 +496,6 @@ pub(crate) fn append_finding_status_projection_if_changed(
         fence,
     )?;
     Ok(true)
-}
-
-#[allow(
-    clippy::too_many_arguments,
-    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-)]
-fn append_entry(
-    transaction: &Transaction<'_>,
-    mutation_kind: &str,
-    projection_kind: &str,
-    projection_key: &str,
-    projection_sequence: u64,
-    projection_reference_digest: &str,
-    authority_projection_digest: &str,
-    store_uuid: &str,
-    store_lease_id: Option<&str>,
-    store_owner_epoch: u64,
-) -> Result<(), SqliteServingOwnerError> {
-    let current = load_global_commit_head(transaction)?;
-    let next = current
-        .head_sequence
-        .checked_add(1)
-        .ok_or_else(|| invalid("global authority commit sequence overflowed"))?;
-    let chain_digest = chain_digest(&ChainEntry {
-        format: "chio.sqlite-authority-global-commit.v1",
-        previous_chain_digest: &current.chain_digest,
-        commit_sequence: next,
-        mutation_kind,
-        projection_kind,
-        projection_key,
-        projection_sequence,
-        projection_reference_digest,
-        authority_projection_digest,
-        store_uuid,
-        store_lease_id,
-        store_owner_epoch,
-    })?;
-    let inserted = transaction.execute(
-        r#"
-        INSERT INTO authority_global_commits (
-            commit_sequence, mutation_kind, projection_kind, projection_key,
-            projection_sequence, projection_reference_digest,
-            authority_projection_digest, previous_chain_digest, chain_digest,
-            store_uuid, store_lease_id, store_owner_epoch
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
-        "#,
-        params![
-            sqlite_u64(next, "commit_sequence")?,
-            mutation_kind,
-            projection_kind,
-            projection_key,
-            sqlite_u64(projection_sequence, "projection_sequence")?,
-            projection_reference_digest,
-            authority_projection_digest,
-            &current.chain_digest,
-            &chain_digest,
-            store_uuid,
-            store_lease_id,
-            sqlite_u64(store_owner_epoch, "store_owner_epoch")?,
-        ],
-    )?;
-    let advanced = transaction.execute(
-        r#"
-        UPDATE authority_global_commit_meta
-        SET head_sequence = ?1, head_chain_digest = ?2
-        WHERE singleton = 1 AND head_sequence = ?3 AND head_chain_digest = ?4
-        "#,
-        params![
-            sqlite_u64(next, "commit_sequence")?,
-            chain_digest,
-            sqlite_u64(current.head_sequence, "current_commit_sequence")?,
-            current.chain_digest,
-        ],
-    )?;
-    if inserted != 1 || advanced != 1 {
-        return Err(invalid(
-            "global authority commit chain did not advance exactly once",
-        ));
-    }
-    Ok(())
 }
 
 pub(crate) fn load_global_commit_head(
