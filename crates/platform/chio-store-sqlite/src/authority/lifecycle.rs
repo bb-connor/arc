@@ -10,6 +10,23 @@ pub(super) fn observe_time(
     connection: &Connection,
     now: UnixMillis,
 ) -> Result<(), AuthorityStoreError> {
+    validate_time_floor(connection, now)?;
+    connection.execute(
+        "UPDATE authority_state SET observed_ms = ?1 WHERE singleton_id = 1",
+        [authority_sqlite_integer(
+            now.get(),
+            "authority clock floor",
+        )?],
+    )?;
+    Ok(())
+}
+
+/// Refuse a reading below the persisted clock floor or the latest authority
+/// transition. Only `observe_time` advances the floor.
+pub(super) fn validate_time_floor(
+    connection: &Connection,
+    now: UnixMillis,
+) -> Result<(), AuthorityStoreError> {
     let (observed, changed): (i64, i64) = connection.query_row(
         "SELECT observed_ms, rotated_at FROM authority_state WHERE singleton_id = 1",
         [],
@@ -20,13 +37,6 @@ pub(super) fn observe_time(
     {
         return Err(ClockError::WallClockRegression.into());
     }
-    connection.execute(
-        "UPDATE authority_state SET observed_ms = ?1 WHERE singleton_id = 1",
-        [authority_sqlite_integer(
-            now.get(),
-            "authority clock floor",
-        )?],
-    )?;
     Ok(())
 }
 

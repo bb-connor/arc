@@ -20,8 +20,10 @@ use uuid::Uuid;
 mod boundaries;
 mod custody;
 mod lifecycle;
+mod read_only;
 mod replication;
 use boundaries::*;
+pub use read_only::{AuthorityInspectionError, SqliteAuthorityInspection};
 
 #[cfg(test)]
 mod transaction_tests;

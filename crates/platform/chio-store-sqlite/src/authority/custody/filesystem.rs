@@ -74,6 +74,60 @@ impl AuthorityCustody {
         Ok(custody)
     }
 
+    /// Custody of an existing, nonempty authority database, or `None` when the
+    /// database or any ancestor directory is absent or the file was never
+    /// initialized. Nothing is created and no permission is repaired.
+    pub(in crate::authority) fn inspect_existing(
+        path: &Path,
+    ) -> Result<Option<Self>, AuthorityStoreError> {
+        let parsed = path::parse(path)?;
+        let parent = parsed
+            .filesystem
+            .parent()
+            .ok_or_else(|| refused("database parent is missing"))?;
+        let directories = match prepare_directories(parent, false) {
+            Ok(directories) => directories,
+            Err(AuthorityStoreError::Io(error)) if error.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(None)
+            }
+            Err(error) => return Err(error),
+        };
+        validate_sidecars(&parsed.filesystem)?;
+        let metadata = match fs::symlink_metadata(&parsed.filesystem) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(error.into()),
+        };
+        validate_file(&metadata)?;
+        if metadata.len() == 0 {
+            return Ok(None);
+        }
+        let custody = Self {
+            path: parsed.filesystem,
+            directories,
+            identity: identity(&metadata),
+        };
+        custody.validate_filesystem()?;
+        Ok(Some(custody))
+    }
+
+    /// A connection that cannot write the database file. SQLite still keeps
+    /// its ordinary WAL shared-memory bookkeeping in the private sidecars.
+    pub(in crate::authority) fn open_read_only_connection(
+        &self,
+    ) -> Result<Connection, AuthorityStoreError> {
+        self.validate_filesystem()?;
+        let connection = Connection::open_with_flags(
+            &self.path,
+            OpenFlags::SQLITE_OPEN_READ_ONLY
+                | OpenFlags::SQLITE_OPEN_NOFOLLOW
+                | OpenFlags::SQLITE_OPEN_NO_MUTEX
+                | OpenFlags::SQLITE_OPEN_PRIVATE_CACHE,
+        )?;
+        self.validate(&connection)?;
+        Ok(connection)
+    }
+
     pub(in crate::authority) fn open_connection(&self) -> Result<Connection, AuthorityStoreError> {
         self.validate_filesystem()?;
         // The filename is already decoded and absolute. Do not let SQLite

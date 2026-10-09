@@ -29,6 +29,18 @@ impl AuthorityCustody {
         Err(refused("requires qualified Linux file custody"))
     }
 
+    pub(super) fn inspect_existing(
+        _path: &std::path::Path,
+    ) -> Result<Option<Self>, AuthorityStoreError> {
+        Err(refused("requires qualified Linux file custody"))
+    }
+
+    pub(super) fn open_read_only_connection(
+        &self,
+    ) -> Result<rusqlite::Connection, AuthorityStoreError> {
+        Err(refused("requires qualified Linux file custody"))
+    }
+
     pub(super) fn validate(
         &self,
         _connection: &rusqlite::Connection,
