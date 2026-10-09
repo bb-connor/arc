@@ -59,9 +59,9 @@
     "current_status": {
       "candidate_only": 44,
       "needs_revalidation": 41,
-      "open": 229,
+      "open": 228,
       "prerequisite_only": 1,
-      "recorded_scoped_closed": 80
+      "recorded_scoped_closed": 81
     },
     "needs_revalidation_by_category": {
       "additional": 10,
@@ -116,8 +116,8 @@
       },
       "additional": {
         "total": 21,
-        "scoped_dispositions": 20,
-        "open": 1
+        "scoped_dispositions": 21,
+        "open": 0
       },
       "supplemental_pr": {
         "total": 1,
@@ -125,10 +125,10 @@
         "open": 1
       },
       "maintained_or_executed_support": 350,
-      "scoped_dispositions": 121,
-      "currently_applicable_scoped_closed": 80,
+      "scoped_dispositions": 122,
+      "currently_applicable_scoped_closed": 81,
       "historical_scoped_needing_revalidation": 41,
-      "open": 229,
+      "open": 228,
       "qualified": 0
     }
   },
@@ -583,7 +583,45 @@
       "Independent review and strict Clippy of larger candidate; static backend API compatibility review"
     ],
     "qualified": false,
-    "integration_boundary": "The continuation describes private candidate work. Inventorying its controls does not install or qualify it."
+    "integration_boundary": "The continuation describes private candidate work. Inventorying its controls does not install or qualify it.",
+    "working_queue": {
+      "integration_branch": "feat/recoverable-agent-runtime-20261002",
+      "integrated_source_commit": "7f5163ac4e8d0ef10f8ca0af41f2c8ea82542b69",
+      "scope": "Execution states refer to existing register obligations, not a second findings inventory. Historical candidates and their results remain uninstalled unless explicitly recorded otherwise.",
+      "items": [
+        {
+          "area": "native_durable_lifecycle",
+          "state": "incomplete",
+          "next_exit": "Original-operation capture, interruption, restart, historical settlement, retention and retirement under pressure through real public entry points. The selected Native fixture depends on parked Capture work; no replacement fixture or imported overlay receives credit."
+        },
+        {
+          "area": "checkpoint_retirement",
+          "state": "reviewed_and_locally_accepted",
+          "finding": "CK-LEGACY-RETIREMENT-SOURCE-01",
+          "remaining": "Separate native-recipient prerequisite, full-module and strict-lint gates remain open; related canonical findings retain their statuses."
+        },
+        {
+          "area": "required_ci_and_build_environment",
+          "state": "routing_repaired_hosted_acceptance_pending",
+          "next_exit": "Required checks must finish on the final PR head. Use one Cargo stream, the shared target, two jobs, no incremental/debug data, and at least 10 GiB free before builds."
+        },
+        {
+          "area": "semantic_and_knowledge_integration",
+          "state": "incomplete",
+          "next_exit": "Native positive/refusal paths, restart, prerequisites, publication, restore, retention and collection on the integrated source."
+        },
+        {
+          "area": "confined_returns_and_product",
+          "state": "qualification_pending",
+          "next_exit": "Freeze supported source/profile before current GNU/musl channel acceptance, both native host integrations, overload and the declared matched 96-trial campaign."
+        },
+        {
+          "area": "whole_change_qualification",
+          "state": "incomplete",
+          "next_exit": "Revalidate earlier closures, finish strict lints, portability/formal and remaining findings, then independently review and qualify exact final sources and executed artifacts."
+        }
+      ]
+    }
   },
   "supplemental_existing_facets": [
     {
@@ -8336,8 +8374,40 @@
         "checked_pairs": 0,
         "changed_paths": []
       },
-      "current_status": "open",
-      "current_reason": "Source-confirmed finding remains without complete owning acceptance. Preserve every listed remaining obligation."
+      "current_status": "recorded_scoped_closed",
+      "current_reason": "All three original obligations have independent SPEC_PASS and QUALITY_PASS on the nine-file repair installed at 7f5163ac4e8d0ef10f8ca0af41f2c8ea82542b69. Genuine pre-fix owning failure and passing public retirement, foreign preservation, rollback, collection, replay, reopen and no-reset controls establish bounded local closure. The predecessor format is modeled, not executed from a historical binary. Full-module, strict-lint, native-prerequisite and whole-runtime qualification gates remain open.",
+      "current_successor": {
+        "recorded_at_utc": "2026-10-09T21:48:08.778078+00:00",
+        "recorded_disposition": "closed_scoped_local",
+        "previous_current_status": "open",
+        "previous_current_reason": "Source-confirmed finding remains without complete owning acceptance. Preserve every listed remaining obligation.",
+        "review_ref": "docs/architecture/recoverable-agent-runtime/implementation/reviews/checkpoint-source-retirement.md",
+        "review_sha256": "dea05f9062f322d813b7f28182ed612c65cfbafdd7bc24ad6acaf021ece2f7f6",
+        "evidence_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/checkpoint-retirement/installation.json",
+        "evidence_sha256": "d8bc31072c480b5471ed7797a3a7fa4ae8fd2f695b13fb5362bd820a5df93cb1",
+        "review_evidence": {
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/checkpoint-retirement/spec-review.json": "1cad18baa9c05caab81da0b30a217e0c43971a35bee8c65023cc16e3b46496e7",
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/checkpoint-retirement/quality-review.json": "b05f6d198c027e13deb6e6915464770bee7bd7458562d987892b1ee50590a69a"
+        },
+        "spec_verdict": "SPEC_PASS",
+        "quality_verdict": "QUALITY_PASS",
+        "original_remaining_obligations_satisfied": 3,
+        "installed": true,
+        "commit": "7f5163ac4e8d0ef10f8ca0af41f2c8ea82542b69",
+        "source_sha256": {
+          "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/checkpoints/head.rs": "ebf15b82d0e45c19d35ac99e7d8668af51fb9e91cbba1c0eac7d4742938d9d2e",
+          "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/checkpoints/retirement.rs": "21130e674b1342b7e2af628434809e24cc1d506712c7341a1876ff2692e53125",
+          "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/checkpoints.rs": "c023bee82361484528467149246cbd3fdb9fdeadac6bf401dc42f49b2722e7bd",
+          "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/checkpoints/legacy_test_support.rs": "916eea8c4459d3da1f1ab00a5e01b9354a2138823d60a632ec8ff327c9055efc",
+          "crates/platform/chio-control-plane/src/recovery/tests/knowledge.rs": "184ae2f11b697d95ff84bd115544f966d9bbe3154da6650d9cd113a1c61516ce",
+          "crates/platform/chio-control-plane/src/recovery/tests/knowledge/checkpoints.rs": "b58a9a34a0bec56e0ce7934f32958b05b6c77e5c89d882e575eb04812fd53a94",
+          "crates/platform/chio-control-plane/src/recovery/tests/knowledge/checkpoints/retirement_source.rs": "3d593f7a01ea3067a0d37c64ce4059d35ac7373597b68296b81e2267550c01c5",
+          "crates/platform/chio-control-plane/src/recovery/tests/knowledge/checkpoints/retirement_source/fixture.rs": "0ee48c2e63b999bcbab60386dbb5792e7a7d29dad95136ec574ddebe5ad19a94",
+          "crates/platform/chio-control-plane/src/recovery/tests/bootstrap.rs": "ebcf4ada5a2471dc37c81ff6d63d3a9ceef4821c331cf05720a8c52a74859e58"
+        },
+        "scope": "Exact requested checkpoint source retirement with modeled preactivation legacy originals and local public-interface controls. No closure of related canonical findings or qualification gates.",
+        "qualified": false
+      }
     },
     {
       "key": "NATIVE-PAYMENT-QUOTA-INDEX-TYPE-01",
@@ -10328,6 +10398,32 @@
       "evidence_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/model-response-validation/acceptance.json",
       "evidence_sha256": "51392b3eae14360e9776f43f1bb920199fa762d5b96ea1fc545ba90e61558163",
       "scope": "All four original local parser controls are accepted on exact maintained source. Reuse three negative controls from current 133 normal/optimized runs and add only the unchanged original positive once per mode. Preserve original obligations and previous reason; independent spec/quality review and broader native/live/primary acceptance remain separate.",
+      "current_status_changes": false,
+      "counts_changed": false,
+      "qualified": false
+    },
+    {
+      "at_utc": "2026-10-09T21:48:08.778078+00:00",
+      "findings": [
+        "CK-LEGACY-RETIREMENT-SOURCE-01"
+      ],
+      "review": "docs/architecture/recoverable-agent-runtime/implementation/reviews/checkpoint-source-retirement.md",
+      "review_sha256": "dea05f9062f322d813b7f28182ed612c65cfbafdd7bc24ad6acaf021ece2f7f6",
+      "evidence_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/checkpoint-retirement/installation.json",
+      "evidence_sha256": "d8bc31072c480b5471ed7797a3a7fa4ae8fd2f695b13fb5362bd820a5df93cb1",
+      "scope": "Bounded local closure of the additional checkpoint source-selection P2 after genuine owning reproduction, exact-source repair, local public regressions and two independent reviews. Preserve original obligations, failures and all related wider gates.",
+      "current_status_changes": true,
+      "counts_changed": true,
+      "qualified": false
+    },
+    {
+      "at_utc": "2026-10-09T21:48:08.778078+00:00",
+      "findings": [],
+      "review": "docs/architecture/recoverable-agent-runtime/implementation/reviews/checkpoint-source-retirement.md",
+      "review_sha256": "dea05f9062f322d813b7f28182ed612c65cfbafdd7bc24ad6acaf021ece2f7f6",
+      "commit": "f7ed089c5b9506a58b314a5de6efe1c4ad1f76a0",
+      "scope": "Required CI includes the exact stacked integration base; direct FIPS routing remains complementary. Both source reviews and local workflow checks pass. Required workflow exists for that commit, with 23 queued and two skipped jobs at readback. No hosted pass or finding closure follows.",
+      "evidence_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/ci-readiness/publication.json",
       "current_status_changes": false,
       "counts_changed": false,
       "qualified": false

@@ -13,15 +13,15 @@ The live inventory and effective scoped dispositions are:
 | Inventory | Records | Effective scoped dispositions | Currently open |
 | --- | ---: | ---: | ---: |
 | Canonical original findings | 328 | 101 | 227 |
-| Additional maintained or actually executed support findings | 21 | 20 | 1 |
+| Additional maintained or actually executed support findings | 21 | 21 | 0 |
 | Supplemental PR obligations | 1 | 0 | 1 |
-| Current or executed-support total | 350 | 121 | 229 |
+| Current or executed-support total | 350 | 122 | 228 |
 | Prevented candidate issues, counted separately | 31 | Not combined | Not combined |
 | Follow-up findings first observed in uninstalled candidates | 13 | Not combined | Not combined |
 | Provenance prerequisite, excluded from implementation findings | 1 | Not applicable | Not applicable |
 
-The 121 scoped dispositions include 41 historical closures whose current source
-applicability still needs review. They are not 121 current-source approvals.
+The 122 scoped dispositions include 41 historical closures whose current source
+applicability still needs review. They are not 122 current-source approvals.
 `counts.current_acceptance` separates these dispositions from current applicability.
 
 The explicitly historical **394-record baseline** retains 99 canonical closures
@@ -42,14 +42,14 @@ The current status counts are:
 
 | Status | Records | Meaning |
 | --- | ---: | --- |
-| `open` | 229 | No complete independent disposition is recorded. |
+| `open` | 228 | No complete independent disposition is recorded. |
 | `needs_revalidation` | 41 | Historical closure remains, but cited source or document pins differ without an accepted current continuity review. |
-| `recorded_scoped_closed` | 80 | Historical or additive accepted scoped disposition currently applies, with the limits stated per record. |
+| `recorded_scoped_closed` | 81 | Historical or additive accepted scoped disposition currently applies, with the limits stated per record. |
 | `candidate_only` | 44 | The defective candidate was uninstalled when found; corrected successors may have separate evidence. |
 | `prerequisite_only` | 1 | Provenance work, not a proved implementation defect. |
 
 The 41 remaining revalidation flags are part of the original 117 historical scoped
-closures. They are not added to the 229 currently open findings. No finding is declared
+closures. They are not added to the 228 currently open findings. No finding is declared
 regressed merely because its bytes changed, and no matching pin constitutes a
 new behavioral test. The initial audit flagged 48 closures. An independent
 [explanation evidence continuity review](reviews/explanation-evidence-continuity.md)
@@ -90,6 +90,18 @@ revalidation flag. The older retained-request execution snapshot for
 `SEMANTIC-REVALIDATION-APPROVAL-BINDING-01` remains within its existing flag;
 aggregate Kernel passes do not renew that obligation. The sealed audit is linked
 under `current_updates`; the original pin audit remains intact.
+
+The [checkpoint source retirement repair](reviews/checkpoint-source-retirement.md)
+closes only `CK-LEGACY-RETIREMENT-SOURCE-01` in bounded local scope at
+`7f5163ac4e8d0ef10f8ca0af41f2c8ea82542b69`. Genuine owning reproduction,
+public-interface regressions and independent spec/quality reviews satisfy its
+three preserved obligations. The original finding fields and historical counters
+remain unchanged; its additive successor supplies the current disposition.
+There are now 16 P1, 123 P2 and 89 P3 open records. Full-module, strict-lint,
+native-prerequisite and qualification gates remain open. The same review records
+the independently approved required-CI routing repair and its queued hosted run.
+`continuation.working_queue` holds the dependency-ordered execution queue within
+this existing register.
 
 ## Candidate follow-ups
 
