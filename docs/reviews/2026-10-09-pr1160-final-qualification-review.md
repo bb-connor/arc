@@ -1,10 +1,14 @@
 # Final foundation qualification review (October 9)
 
-This review records three obligations discovered while qualifying the isolated
+This review records obligations discovered while qualifying the isolated
 foundation composition. Source remains `3b0760cfe7c8bdd286fac137663872ab6ebc1e1d`
 and the published PR remains `fd8bfdc947bbaf070b39457a9190f032a018e55a`.
 The reviewed snapshot stage is `404064bb65cbf67c54ac76ec1be69359eb9adb59`.
 No result here establishes hosted qualification, merge or release readiness.
+
+The sections retain the original findings. The later disposition below binds
+the observer repair to its completed local evidence; it does not replace the
+failed predecessor results.
 
 ## V25-ARCHIVE-LATE-LINEAGE: P1, required before landing
 
@@ -77,3 +81,61 @@ The rejected long-run log is
 The evidence driver independently rejected an interleaved test-name line and
 exited 2, so its strict lint command did not run. Preserve this parser refusal
 separately from the substantive observer defect.
+
+### Observer disposition at dc21b41788
+
+The test-only repair is committed as
+`dc21b41788047c36016c0f532fcf92e9aff946e3`. Two deterministic Original
+failures and one positive control establish the cancellation and work-budget
+defects. The repaired default module passed 94 tests with five explicit
+ignores; the longer seeded campaign passed without observer interrupts.
+After replacing unwraps in the new fixture with fallible error handling,
+all three fixture controls and strict owning Clippy passed. The intermediate
+count mutant still fails at generation two, and the source was restored
+byte-for-byte. Seven static checks passed, with three affected checks renewed
+after the fixture correction. No baseline or limit was changed.
+
+[The source-bound qualification record](../security/audits/receipt-snapshot-observer-qualification-20261009.json)
+preserves the source manifests, command results, original failures, initial
+strict-lint failure, mutant and independent immutable-commit review. That
+review found no blocker. Two optional notes concern pre-existing errors during
+handler removal; they remain minor follow-ups rather than changes to production
+behavior in this test-only repair. Source promotion and final qualification
+remain pending.
+
+## RECOVERY-RPC-SHUTDOWN: P2, required before landing
+
+The complete control-plane run at `0fd8aa21ff` terminated with 1,573 passes,
+one failure and one ignore. The failing
+`remote_recovery_rpc_transport_retains_actual_native_source` reported that a
+stopped authority listener still returned a recovery page. Aborting the axum
+listener task does not establish that accepted keepalive connection tasks have
+stopped. The fixture must establish completed shutdown before asserting a
+native transport failure.
+
+Claude owns the isolated fixture repair. Require a genuine established-
+connection Original failure, cooperative shutdown joined to completion,
+unchanged typed unavailable/native transport-source assertions, the focused
+recovery RPC suite and strict owning lint. Do not add sleeps, assume an unused
+port, retry away failures or increase production deadlines. The original
+52-minute run remains failed even after a later focused repair passes.
+
+Its terminal review is
+`/tmp/pr1160-v25-final-20261009/full-cp-0fd8/TERMINAL-REVIEW.json`; the full log
+SHA-256 is `f57941525b53b6a1ae1266e308479f8877be644519ef25c55e978b1a9e149580`.
+
+## Capacity acceptance boundary
+
+The same-host 150k runs passed for contended Original, final source and quieter
+Original, in that order. Their elapsed times were 276.44, 271.23 and 271.89
+seconds. The initial contention and reversed comparison order remain explicit;
+one run per side does not establish a performance improvement or regression.
+
+These runs exercised tail settlement, checkpoint acceptance, rotation and
+initial observation. Most rows were already published as tail before signing,
+so they do not measure a large unpublished checkpoint-covered staging and
+reread path. A further test must pause extension, append and sign 100k entries,
+then resume and demonstrate actual staging and reread, bounded holds,
+authenticated page/count parity and measured resource use. Claude owns this
+test-only acceptance lane. Earlier one-million and ten-million measurements
+remain predecessor evidence.

@@ -1,0 +1,198 @@
+{
+  "schema": "chio.receipt-snapshot-observer-qualification.v1",
+  "observed_utc": "2026-10-09T15:53:51.155318+00:00",
+  "stage_head": "dc21b41788047c36016c0f532fcf92e9aff946e3",
+  "source_head": "3b0760cfe7c8bdd286fac137663872ab6ebc1e1d",
+  "published_head": "fd8bfdc947bbaf070b39457a9190f032a018e55a",
+  "stage_promoted_to_source": false,
+  "candidate_qualified": false,
+  "merged": false,
+  "repair": {
+    "id": "V25-C20-OBSERVER-CANCELLATION",
+    "source_repair": {
+      "commits": [
+        "dc21b41788047c36016c0f532fcf92e9aff946e3"
+      ],
+      "observed_source_head": "dc21b41788047c36016c0f532fcf92e9aff946e3",
+      "observed_source_tree": "4bb0de9259e192b788beacedcc419beb0c27f363",
+      "files": [
+        "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service.rs",
+        "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/count_parity_sequence.rs",
+        "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/generation_observer.rs"
+      ]
+    },
+    "contract": "Observe each successful hold after production progress-handler removal while retaining the same snapshot lock; assert the complete observation record after worker join. Production SQL cancellation and budgets remain enforced.",
+    "original": {
+      "passed": 1,
+      "failed": 2,
+      "exit_code": 101
+    },
+    "qualified_results": {
+      "snapshot_default": {
+        "passed": 94,
+        "ignored": 5
+      },
+      "explicit_long_seed": {
+        "passed": 1,
+        "operations": 1200,
+        "sample_checks": 2334,
+        "observed_generation_identities": 1527,
+        "observed_held_states": 23244
+      },
+      "final_fixture": {
+        "passed": 3
+      },
+      "strict_store_all_targets": "passed",
+      "static_gates": 7,
+      "final_fixture_static_renewals": 3
+    },
+    "source_applicability": {
+      "all_final_manifest_hashes_match_commit": true,
+      "green_to_final_changed_paths": [
+        "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/count_parity_sequence.rs",
+        "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/generation_observer.rs"
+      ],
+      "change_scope": "Fallible error handling in three new tests and tally documentation only; service and seeded campaign behavior unchanged."
+    },
+    "intermediate_count_mutant": {
+      "source_commit": "dc21b41788047c36016c0f532fcf92e9aff946e3",
+      "original_sha256": "17256aafe0368ffb4c4049310f076d1738498557abafa4bfff2927b8aeea1203",
+      "mutant_sha256": "cda34546c3a26e58e16f36cff573daa74e0f31a46e659f8b10da4b82712bd9bc",
+      "producer_mutant_patch_sha256": "7172a4be69aeb3d50fbc42ea84d3ce531634a301830bb462a5787b515e9f535d",
+      "command": [
+        "swarm",
+        "build",
+        "--class",
+        "integrator",
+        "--",
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-store-sqlite",
+        "--lib",
+        "--",
+        "receipt_query_snapshot::tests::count_parity_sequence::a_seeded_sequence_keeps_counts_and_pages_equal_to_the_authenticated_source",
+        "--exact",
+        "--show-output",
+        "--test-threads=1"
+      ],
+      "started_at": "2026-10-09T15:44:59.907688+00:00",
+      "exit_code": 101,
+      "actual_oracle_failure": true,
+      "log_sha256": "df1cedb045c14831f201ba2bc46ec9c43900f2235bf5067e2c51a228f38d0be0",
+      "source_restored": true,
+      "elapsed_seconds": 141.2474333080463,
+      "terminal_at": "2026-10-09T15:47:21.155146+00:00"
+    },
+    "coverage_boundary": "Observed identities include deliberately excluded corrupt-lineage states. The campaign does not claim valid parity for intentionally tampered attribution.",
+    "independent_review": {
+      "verdict": "accepted_no_blocking_finding",
+      "mailbox_commit": "080cea4c1734b4de8425c4c46d5d99fb74ed624c",
+      "entry_utc": "2026-10-09T15:45:33Z",
+      "deferred_minor_notes": [
+        "Pre-existing connection acquisition failure while removing the handler is fail-closed and detected by generation completeness.",
+        "Pre-existing ignored handler-removal error could gain test-only diagnostic assertion in follow-up; no new production behavior in this repair."
+      ]
+    },
+    "verification_evidence": [
+      {
+        "path": "/tmp/pr1160-v25-final-20261009/c20-observer-repair/red.log",
+        "sha256": "699e798e42f9f3289c8710730f574ea09492859521c9e49b154b508fce559827",
+        "scope": "Genuine Original cancellation and budget failures plus positive control."
+      },
+      {
+        "path": "/tmp/pr1160-v25-final-20261009/c20-observer-repair/green/RESULTS.json",
+        "sha256": "e47a4cc2b0507abd83bf61d076abb6168f405aaedc92c6376e8610eb4ded02e9",
+        "scope": "Default and explicit long seed pass; initial strict fixture unwrap refusal retained."
+      },
+      {
+        "path": "/tmp/pr1160-v25-final-20261009/c20-observer-repair/residual/RESULTS.json",
+        "sha256": "aefba86ac9ab3efaa23ce5c58135ce0a0b56d747c4e24f5efcb2ebfab2201b21",
+        "scope": "Final fallible fixture and strict owning lint pass."
+      },
+      {
+        "path": "/tmp/pr1160-v25-final-20261009/c20-observer-repair/residual/source.json",
+        "sha256": "8f8628c1eb8ceb8b9c1963f6ca7888b833c6183e5f6399d083660a1a85a2afe0",
+        "scope": "All final manifest hashes verified against staged source."
+      },
+      {
+        "path": "/tmp/pr1160-v25-final-20261009/c20-observer-repair/static/RESULTS.json",
+        "sha256": "f2f343e829483968bee6dd9f69f93e97e0e36ac3a4ba7b3f4d0522f51fec982f",
+        "scope": "Seven static and formatting checks pass."
+      },
+      {
+        "path": "/tmp/pr1160-v25-final-20261009/c20-observer-repair/residual-static/RESULTS.json",
+        "sha256": "bc2589363b4da3cfd852fc79eab651dfed8fc1eb2752bea486cfc24400c6e698",
+        "scope": "Three affected checks renewed after fixture-only correction."
+      },
+      {
+        "path": "/tmp/pr1160-v25-final-20261009/c20-observer-repair/intermediate-mutant/RESULT.json",
+        "sha256": "97f13c1c9cd3833e2b097c87de865cd740c16a3c86207d6cf718deaedf0477d0",
+        "scope": "Exact final-source intermediate corruption fails and source is restored."
+      },
+      {
+        "path": "/tmp/pr1160-v25-final-20261009/c20-observer-repair/independent-review-dc21.md",
+        "sha256": "0477d098aca1607d2f85f2464787ee74a3c3bcc2228c704e102625c53f7de0a7",
+        "scope": "Independent immutable-commit review; no blocking finding."
+      }
+    ],
+    "preserved_failures": [
+      "Composed 404064 long-seed observer interrupts despite reported test pass, plus separate parser refusal.",
+      "First repaired-source strict lint exit101 for new fixture unwraps, before fallible fixture correction."
+    ],
+    "remaining_acceptance": [
+      "Compose late-lineage and applicable final evidence; finalize proof batch and current review dispositions.",
+      "Promote qualified stage, obtain four exact protected checks and complete protected merge."
+    ]
+  },
+  "full_control_plane_predecessor": {
+    "source": "0fd8aa21ffb39805c1e742c763146ea5d28ba8fe",
+    "log_sha256": "f57941525b53b6a1ae1266e308479f8877be644519ef25c55e978b1a9e149580",
+    "announced": 1575,
+    "passed": 1573,
+    "failed": 1,
+    "ignored": 1,
+    "failed_tests": [
+      "trust_control::service_runtime::router::tests::recovery_rpc_tests::remote_recovery_rpc_transport_retains_actual_native_source"
+    ],
+    "message": "stopped authority listener returned a recovery page",
+    "diagnosis": "Listener-task abortion does not establish that accepted keepalive connection tasks have stopped. Fixture repair assigned to Claude; focused reproduction and joined shutdown required.",
+    "result": "terminal_failed_not_full_suite_qualification",
+    "scope": "All1575 announced cases reached a terminal summary. Original failed result is retained; no future focused repair will relabel this run green."
+  },
+  "capacity_comparison": {
+    "observed_at": "2026-10-09T15:33:40.017654+00:00",
+    "source_original": "0d919c3e58",
+    "source_final": "fa45e6df73",
+    "verified_artifacts": "verified-artifacts.json",
+    "runs_in_order": [
+      {
+        "kind": "original_contended",
+        "passed": 1,
+        "failed": 0,
+        "seconds": 276.44,
+        "peak_rss_kib": 436508
+      },
+      {
+        "kind": "final",
+        "passed": 1,
+        "failed": 0,
+        "seconds": 271.23,
+        "peak_rss_kib": 439416
+      },
+      {
+        "kind": "original_quieter",
+        "passed": 1,
+        "failed": 0,
+        "seconds": 271.89,
+        "peak_rss_kib": 436708
+      }
+    ],
+    "comparison": "Final then quieter Original, one run each, reversed order. No statistically established speedup/slowdown. Initial contended Original retained.",
+    "qualified_scope": "Uncheckpointed-tail settlement, checkpoint acceptance, rotation, initial observation and unchanged hold VM bounds at their stated sources. All three quota controls typed Unavailable.",
+    "not_qualified": "Large previously unpublished checkpoint-covered stage-and-reread path; current one-million-row throughput; final candidate/release.",
+    "additional_required_measurement": "Paused extension followed by100k signed checkpoint-covered entries, then resume with actual staging witness, bounded holds, authenticated queries and actual resource/timing evidence. Claude assigned, before landing."
+  },
+  "release_permitted": false
+}
