@@ -4,18 +4,50 @@
 use super::*;
 use chio_kernel::AuthorityStoreError;
 use chio_security_types::clock::{Clock, FixedClock};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 const IMPORTER_URL: &str = "http://127.0.0.1:3300";
 const REVOKED: &str = "cap-revoked-before-authority-sync";
+const REVOKED_LATER: &str = "cap-revoked-while-authority-is-held";
 const UNPINNED: &str = "authority replication requires an out-of-band pinned anchor";
 const OUTSIDE_FRESHNESS: &str = "authority envelope outside freshness window";
 const NO_LIVE_ENVELOPE: &str = "follower has no authenticated live envelope to relay";
 const RELAY_REGRESSES: &str = "authority envelope replay regresses issuance time";
 const UNPINNED_STARTUP: &str = "clustered trust control requires an out-of-band pinned authority replication anchor in --authority-db; initialize it on the signing custodian with `chio federation authority replication-init` and pin it on every follower with `chio federation authority replication-pin` before starting";
 
+/// Holds one numbered authority-snapshot request inside the exporter until
+/// the test releases it, so the importer is observable mid-round.
+struct AuthorityGate {
+    hold_request: usize,
+    seen: AtomicUsize,
+    entered: std::sync::mpsc::Sender<()>,
+    release: tokio::sync::Notify,
+}
+
+impl AuthorityGate {
+    fn holding(hold_request: usize) -> (Arc<Self>, std::sync::mpsc::Receiver<()>) {
+        let (entered, held) = std::sync::mpsc::channel();
+        let gate = Self {
+            hold_request,
+            seen: AtomicUsize::new(0),
+            entered,
+            release: tokio::sync::Notify::new(),
+        };
+        (Arc::new(gate), held)
+    }
+
+    async fn pass(&self) {
+        if self.seen.fetch_add(1, Ordering::SeqCst) + 1 == self.hold_request {
+            let _ = self.entered.send(());
+            self.release.notified().await;
+        }
+    }
+}
+
 /// One peer's internal cluster surface, served over loopback HTTP.
 struct ServedPeer {
     url: String,
+    gate: Option<Arc<AuthorityGate>>,
     shutdown: Option<tokio::sync::oneshot::Sender<()>>,
     server: Option<std::thread::JoinHandle<()>>,
 }
@@ -27,8 +59,24 @@ impl ServedPeer {
         (listener, url)
     }
 
-    fn serve(listener: std::net::TcpListener, url: String, state: TrustServiceState) -> Self {
+    fn serve(
+        listener: std::net::TcpListener,
+        url: String,
+        state: TrustServiceState,
+        gate: Option<Arc<AuthorityGate>>,
+    ) -> Self {
         use axum::routing::get;
+        let held_gate = gate.clone();
+        let gated_authority_snapshot =
+            move |state: State<TrustServiceState>, headers: HeaderMap| {
+                let gate = gate.clone();
+                async move {
+                    if let Some(gate) = gate {
+                        gate.pass().await;
+                    }
+                    handle_internal_authority_snapshot(state, headers).await
+                }
+            };
         let router = axum::Router::new()
             .route(
                 INTERNAL_CLUSTER_STATUS_PATH,
@@ -40,7 +88,7 @@ impl ServedPeer {
             )
             .route(
                 INTERNAL_AUTHORITY_SNAPSHOT_PATH,
-                get(handle_internal_authority_snapshot),
+                get(gated_authority_snapshot),
             )
             .route(
                 INTERNAL_REVOCATIONS_DELTA_PATH,
@@ -66,6 +114,7 @@ impl ServedPeer {
         });
         Self {
             url,
+            gate: held_gate,
             shutdown: Some(shutdown),
             server: Some(server),
         }
@@ -74,6 +123,10 @@ impl ServedPeer {
 
 impl Drop for ServedPeer {
     fn drop(&mut self) {
+        // A held request would otherwise keep graceful shutdown waiting.
+        if let Some(gate) = self.gate.as_ref() {
+            gate.release.notify_one();
+        }
         if let Some(shutdown) = self.shutdown.take() {
             let _ = shutdown.send(());
         }
@@ -100,6 +153,8 @@ struct ReplicationPair {
     _directory: tempfile::TempDir,
     exporter: ServedPeer,
     importer: TrustServiceState,
+    exporter_revocations: SqliteRevocationStore,
+    provisioned_at: u64,
 }
 
 fn fixed_clock(unix_seconds: u64) -> Arc<dyn Clock> {
@@ -109,6 +164,15 @@ fn fixed_clock(unix_seconds: u64) -> Arc<dyn Clock> {
 /// An exporter whose revocation store already holds `REVOKED`, and an importer
 /// whose signed-authority import from it is refused by `fault`.
 fn replication_pair(fault: AuthorityFault) -> ReplicationPair {
+    gated_replication_pair(fault, None)
+}
+
+fn gated_replication_pair(
+    fault: AuthorityFault,
+    gate: Option<Arc<AuthorityGate>>,
+) -> ReplicationPair {
+    let provisioned_at =
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let directory = chio_test_support::private_tempdir().test_unwrap();
     let exporter_authority = directory.path().join("exporter-authority.sqlite3");
     let importer_authority = directory.path().join("importer-authority.sqlite3");
@@ -140,8 +204,6 @@ fn replication_pair(fault: AuthorityFault) -> ReplicationPair {
             drop(SqliteCapabilityAuthority::open(&importer_authority).test_unwrap());
         }
         AuthorityFault::LaggingImporterClock => {
-            let provisioned_at = unix_timestamp_now()
-                .unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
             let custodian = SqliteCapabilityAuthority::open_with_clock(
                 &exporter_authority,
                 fixed_clock(provisioned_at),
@@ -173,8 +235,7 @@ fn replication_pair(fault: AuthorityFault) -> ReplicationPair {
                 .test_unwrap();
         }
         AuthorityFault::RelayedEnvelopeRegresses => {
-            let issued_at = unix_timestamp_now()
-                .unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
+            let issued_at = provisioned_at;
             let custodian = SqliteCapabilityAuthority::open_with_clock(
                 &importer_authority,
                 fixed_clock(issued_at),
@@ -204,9 +265,8 @@ fn replication_pair(fault: AuthorityFault) -> ReplicationPair {
         }
     }
 
-    exporter
-        .revocation_store()
-        .test_unwrap()
+    let exporter_revocations = exporter.revocation_store().test_unwrap();
+    exporter_revocations
         .upsert_revocation(&RevocationRecord {
             capability_id: REVOKED.to_string(),
             revoked_at: 10,
@@ -214,16 +274,22 @@ fn replication_pair(fault: AuthorityFault) -> ReplicationPair {
         .test_unwrap();
     ReplicationPair {
         _directory: directory,
-        exporter: ServedPeer::serve(listener, exporter_url, exporter),
+        exporter: ServedPeer::serve(listener, exporter_url, exporter, gate),
         importer,
+        exporter_revocations,
+        provisioned_at,
     }
 }
 
 fn importer_revoked(pair: &ReplicationPair) -> bool {
+    importer_holds(pair, REVOKED)
+}
+
+fn importer_holds(pair: &ReplicationPair, capability_id: &str) -> bool {
     pair.importer
         .revocation_store()
         .test_unwrap()
-        .is_revoked(REVOKED)
+        .is_revoked(capability_id)
         .test_unwrap()
 }
 
@@ -367,6 +433,79 @@ fn exporter_without_envelope_snapshot_still_recovers_revocations() {
 #[test]
 fn relayed_envelope_regression_snapshot_still_recovers_revocations() {
     assert_snapshot_survives_refused_authority(AuthorityFault::RelayedEnvelopeRegresses);
+}
+
+#[test]
+fn authority_refusal_stays_reported_until_an_authority_import_succeeds() {
+    let (gate, held) = AuthorityGate::holding(2);
+    let mut pair = gated_replication_pair(AuthorityFault::LaggingImporterClock, Some(gate.clone()));
+    let refusal =
+        CliError::from(AuthorityStoreError::Fence(OUTSIDE_FRESHNESS.to_string())).to_string();
+    let progress = pair
+        .importer
+        .cluster_progress
+        .as_ref()
+        .test_unwrap()
+        .subscribe();
+
+    let first = sync_peer(&pair.importer, &pair.exporter.url);
+    assert!(matches!(
+        &first,
+        Err(CliError::AuthorityStore(AuthorityStoreError::Fence(message)))
+            if message == OUTSIDE_FRESHNESS
+    ));
+    assert_eq!(
+        peer_view(&pair, |peer| peer.last_error.clone()),
+        Some(refusal.clone())
+    );
+
+    // The next round finalizes its streams, then blocks inside the second
+    // authority request. A stream success is not an authority success.
+    pair.exporter_revocations
+        .upsert_revocation(&RevocationRecord {
+            capability_id: REVOKED_LATER.to_string(),
+            revoked_at: 11,
+        })
+        .test_unwrap();
+    let round = {
+        let importer = pair.importer.clone();
+        let exporter_url = pair.exporter.url.clone();
+        std::thread::spawn(move || sync_peer(&importer, &exporter_url))
+    };
+    held.recv_timeout(Duration::from_secs(30)).test_unwrap();
+    assert!(
+        importer_holds(&pair, REVOKED_LATER),
+        "revocation lane starved"
+    );
+    assert_eq!(*progress.borrow(), 2, "stream round never finalized");
+    assert_eq!(
+        peer_view(&pair, |peer| peer.delta_records_since_snapshot),
+        2
+    );
+    assert_eq!(
+        peer_view(&pair, |peer| peer.last_error.clone()),
+        Some(refusal.clone()),
+        "stream finalization cleared an unresolved authority refusal"
+    );
+
+    gate.release.notify_one();
+    let second = round.join().test_unwrap();
+    assert!(matches!(
+        &second,
+        Err(CliError::AuthorityStore(AuthorityStoreError::Fence(message)))
+            if message == OUTSIDE_FRESHNESS
+    ));
+    assert_eq!(
+        peer_view(&pair, |peer| peer.last_error.clone()),
+        Some(refusal)
+    );
+
+    // Once the importer's clock reaches the signer's, an authority import
+    // succeeds and only then is the refusal resolved.
+    pair.importer.finding_challenge_clock = fixed_clock(pair.provisioned_at + 120);
+    sync_peer(&pair.importer, &pair.exporter.url).test_unwrap();
+    assert_eq!(peer_view(&pair, |peer| peer.last_error.clone()), None);
+    assert_eq!(*progress.borrow(), 3);
 }
 
 #[test]

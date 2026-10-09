@@ -455,7 +455,7 @@ pub(crate) fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(),
             return Err(error);
         }
         if let Err(error) = recover_cluster_snapshot(state, peer_url, snapshot)? {
-            update_peer_sync_error(state, peer_url, error.to_string());
+            update_peer_authority_error(state, peer_url, error.to_string());
         }
     }
     let mut delta_records = 0u64;
@@ -518,16 +518,22 @@ pub(crate) fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(),
     // Lane 3: signed authority replicates last, after finalization, so a refused
     // envelope (no pinned anchor, a local clock behind the signer, a relayed
     // envelope older than the one held) can never starve revocation propagation
-    // or ack finalization. The refusal stays recorded on the peer until a later
-    // round imports an envelope. Like lane 2 it skips a peer demoted this round.
+    // or ack finalization. The refusal stays the peer's reported error, through
+    // later stream finalizations, until an authority import from it succeeds.
+    // Like lane 2 it skips a peer demoted this round.
     if peer_was_demoted(state, peer_url) {
         return Ok(());
     }
-    if let Err(error) = sync_peer_authority(state, &client) {
-        update_peer_sync_error(state, peer_url, error.to_string());
-        return Err(error);
+    match sync_peer_authority(state, &client) {
+        Ok(()) => {
+            clear_peer_authority_error(state, peer_url);
+            Ok(())
+        }
+        Err(error) => {
+            update_peer_authority_error(state, peer_url, error.to_string());
+            Err(error)
+        }
     }
-    Ok(())
 }
 
 fn prepare_peer_revocation_sync(

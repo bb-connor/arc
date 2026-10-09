@@ -253,6 +253,9 @@ pub(crate) struct PeerSyncState {
     pub(crate) snapshot_applied_count: u64,
     pub(crate) last_snapshot_at: Option<u64>,
     pub(crate) force_snapshot: bool,
+    /// The peer's unresolved signed-authority refusal. Stream success never
+    /// clears it; only an authority import from this peer does.
+    pub(crate) authority_error: Option<String>,
 }
 
 /// One subject's in-window attempt timestamps together with the window (in
@@ -473,6 +476,7 @@ impl Default for PeerSyncState {
             snapshot_applied_count: 0,
             last_snapshot_at: None,
             force_snapshot: true,
+            authority_error: None,
         }
     }
 }

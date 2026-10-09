@@ -44,7 +44,7 @@ pub(crate) async fn handle_internal_cluster_partition(
                     peer_state.force_snapshot = true;
                 } else if was_partitioned {
                     peer_state.health = PeerHealth::Unknown;
-                    peer_state.last_error = None;
+                    peer_state.last_error = peer_state.authority_error.clone();
                     peer_state.force_snapshot = true;
                     peer_state.delta_records_since_snapshot = 0;
                 }
@@ -67,7 +67,7 @@ pub(crate) async fn handle_internal_cluster_partition(
                     peer_state.force_snapshot = true;
                 } else if was_partitioned {
                     peer_state.health = PeerHealth::Unknown;
-                    peer_state.last_error = None;
+                    peer_state.last_error = peer_state.authority_error.clone();
                     peer_state.force_snapshot = true;
                     peer_state.delta_records_since_snapshot = 0;
                 }
@@ -108,7 +108,7 @@ pub(crate) fn update_peer_success(state: &TrustServiceState, peer_url: &str) {
                     peer.health = PeerHealth::Healthy;
                     peer.last_contact_at = Some(now);
                     if !peer.partitioned {
-                        peer.last_error = None;
+                        peer.last_error = peer.authority_error.clone();
                     }
                     peer.force_snapshot = false;
                 }
@@ -119,7 +119,7 @@ pub(crate) fn update_peer_success(state: &TrustServiceState, peer_url: &str) {
                     peer.health = PeerHealth::Healthy;
                     peer.last_contact_at = Some(now);
                     if !peer.partitioned {
-                        peer.last_error = None;
+                        peer.last_error = peer.authority_error.clone();
                     }
                     peer.force_snapshot = false;
                 }
@@ -165,6 +165,34 @@ pub(crate) fn update_peer_sync_error(state: &TrustServiceState, peer_url: &str, 
     update_peer_state(state, peer_url, |peer| {
         peer.health = PeerHealth::Healthy;
         peer.last_error = Some(error);
+    });
+}
+
+/// Record a refused signed-authority import from a peer. Unlike a stream
+/// error, it stays the peer's reported error across successful stream rounds
+/// until `clear_peer_authority_error` records an authority import.
+pub(crate) fn update_peer_authority_error(
+    state: &TrustServiceState,
+    peer_url: &str,
+    error: String,
+) {
+    update_peer_state(state, peer_url, |peer| {
+        peer.health = PeerHealth::Healthy;
+        peer.last_error = Some(error.clone());
+        peer.authority_error = Some(error);
+    });
+}
+
+/// Resolve a peer's authority refusal after a signed-authority import from it
+/// succeeded. Any other error reported on the peer is left in place.
+pub(crate) fn clear_peer_authority_error(state: &TrustServiceState, peer_url: &str) {
+    update_peer_state(state, peer_url, |peer| {
+        let Some(resolved) = peer.authority_error.take() else {
+            return;
+        };
+        if peer.last_error.as_deref() == Some(resolved.as_str()) {
+            peer.last_error = None;
+        }
     });
 }
 
