@@ -37,8 +37,8 @@ dependency delta; a new feature name is not proof of isolation.
 
 | Increment | Rung | When it runs |
 | --- | --- | --- |
-| I1 | COMP-1 | Starts now |
-| I2 | COMP-2 | Starts now |
+| I1 | COMP-1 | Unblocked now; starts on the explicit start |
+| I2 | COMP-2 | Unblocked now; starts on the explicit start |
 | I3 | COMP-3 | After WORK-W1 and KERN-3 including KSPEC-04 phase 3 |
 | I4 | COMP-4 | Its exit is G4's complete run |
 | I5 | COMP-5 | Ships in the preview that G5 uses |
@@ -82,7 +82,7 @@ profile passes the relevant acceptance.
 | ID | Profile | Scenario | Required observation |
 | --- | --- | --- | --- |
 | C3-01 | Computer-0 | Construct both hero forms from equivalent bases in Rust/Python/TypeScript | Same canonical description; no effects during authoring; same native admission path |
-| C3-02 | Computer-0 | Compare `a \| a`, retried original request and distinct new request | Two occurrences for repeated leaf; retry keeps identities; new request cannot alias prior work |
+| C3-02 | Computer-0 | Compare `a & a`, retried original request and distinct new request | Two occurrences for repeated leaf; retry keeps identities; new request cannot alias prior work |
 | C3-03 | Computer-0 | Submit malformed/deep expressions, schema mismatch and widened requirements | Bounded preflight refusal; forged compiler output also refused by serving owners |
 | C3-04 | Computer-0 | Join a successful process with rejected or substituted work evidence | No dependent commitment without exact parent acceptance |
 | C3-05 | Computer-0 | Integrate untrusted/labeled results and try to rewrite the verifier | Labels/influence retained; protected evaluator and immutable result binding preserved |
@@ -157,8 +157,11 @@ Under the unified roadmap, Application A is two runs:
 
 - **G4:** the complete internal run, between two Backbay-operated domains with
   independent keys.
-- **G5:** each outside team's run, from installed packages. Application B is
-  the G5 stretch goal.
+- **G5:** each outside team's qualifying run, from installed packages, in its
+  roadmap section 1 role (requester or executor). Step 2's leaf requirement
+  applies to the executing organization. At G5, at least one ProgramLeaf runs in
+  some qualifying run, whichever organization executes it. Application B is the
+  G5 stretch goal.
 
 ### Application C: versioned data curation (required second application)
 
@@ -173,7 +176,8 @@ there is no application-specific signing, retry, verifier service or ledger.
 
 Record installed package identities and reuse evidence outside the source
 checkout. This second-consumer demonstration may run internally; it does not
-substitute for G5's independent outside-team runs of Application A. It requires
+substitute for G5's independent outside-team runs of Application A, and it does
+not gate G5. It requires
 no private-data return profile beyond Computer-0's already qualified contracts.
 
 ### Application B: confined work beside private data (optional stretch)
