@@ -1,0 +1,65 @@
+# native-host-docs.yml - Native host program document gate.
+#
+# Runs `scripts/check-native-host-docs.py --scope program` (links, retired
+# phrases, em dashes, case IDs and word budgets for the native host program
+# documents) and the checker's regression test when those documents or the
+# checker change. It is a separate job and not a required check; the
+# public-copy gate is added by the unified roadmap's positioning work.
+
+name: native-host-docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/superpowers/specs/2026-10-07-*/**"
+      - "docs/superpowers/specs/2026-10-07-omarchy-integration-design.md"
+      - "docs/superpowers/plans/2026-10-07-*"
+      - "docs/superpowers/plans/2026-10-07-*/**"
+      - "docs/superpowers/plans/2026-10-08-*"
+      - "docs/architecture/PROGRAM-MAP.md"
+      - "docs/adr/ADR-0038-*.md"
+      - "scripts/check-native-host-docs.py"
+      - "scripts/tests/check-native-host-docs.test.sh"
+      - ".github/workflows/native-host-docs.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "docs/superpowers/specs/2026-10-07-*/**"
+      - "docs/superpowers/specs/2026-10-07-omarchy-integration-design.md"
+      - "docs/superpowers/plans/2026-10-07-*"
+      - "docs/superpowers/plans/2026-10-07-*/**"
+      - "docs/superpowers/plans/2026-10-08-*"
+      - "docs/architecture/PROGRAM-MAP.md"
+      - "docs/adr/ADR-0038-*.md"
+      - "scripts/check-native-host-docs.py"
+      - "scripts/tests/check-native-host-docs.test.sh"
+      - ".github/workflows/native-host-docs.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-host-docs-${{ github.event_name == 'pull_request' && format('pr-{0}', github.ref) || format('main-{0}', github.sha) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  native-host-docs:
+    name: native-host-docs (program gate)
+    # owner: Chio maintainers
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+
+      - name: Program document gate
+        run: python3 -I scripts/check-native-host-docs.py --scope program
+
+      - name: Checker regression tests
+        run: bash scripts/tests/check-native-host-docs.test.sh
