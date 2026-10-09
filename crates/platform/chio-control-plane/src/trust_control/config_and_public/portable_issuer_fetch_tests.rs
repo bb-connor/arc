@@ -11,6 +11,7 @@ use chio_credentials::{
     OID4VP_CLIENT_ID_SCHEME_REDIRECT_URI, OID4VP_RESPONSE_MODE_DIRECT_POST_JWT,
     OID4VP_RESPONSE_TYPE_VP_TOKEN,
 };
+use futures_util::FutureExt;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -28,6 +29,7 @@ fn empty_config() -> TrustServiceConfig {
         tenant_read_tokens: BTreeMap::new(),
         authority_workload_token: None,
         receipt_db_path: None,
+        receipt_query_snapshot_quota_bytes: 2_147_483_648,
         revocation_db_path: None,
         authority_seed_path: None,
         authority_db_path: None,
@@ -296,6 +298,45 @@ async fn offload_refuses_when_no_permit_is_free() {
     let _held = Arc::clone(&lane).try_acquire_owned().test_unwrap();
     let outcome = run_portable_issuer_fetch_with_lane(lane, || 7u32).await;
     assert!(matches!(outcome, Err(PortableFetchRefusal::AtCapacity)));
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn cancellation_keeps_admission_until_the_blocking_fetch_finishes() {
+    let lane = Arc::new(tokio::sync::Semaphore::new(1));
+    let (entered_tx, entered_rx) = tokio::sync::oneshot::channel();
+    let (release_tx, release_rx) = mpsc::channel();
+    let fetch = tokio::spawn(run_portable_issuer_fetch_with_lane(
+        Arc::clone(&lane),
+        move || {
+            entered_tx.send(()).test_unwrap();
+            release_rx
+                .recv_timeout(Duration::from_secs(30))
+                .test_unwrap();
+        },
+    ));
+    tokio::time::timeout(Duration::from_secs(30), entered_rx)
+        .await
+        .test_unwrap()
+        .test_unwrap();
+
+    fetch.abort();
+    let cancelled = tokio::time::timeout(Duration::from_secs(30), fetch)
+        .await
+        .test_unwrap();
+    assert!(matches!(cancelled, Err(error) if error.is_cancelled()));
+    assert_eq!(lane.available_permits(), 0);
+    // One poll must return the refusal; queued admission is also a failure.
+    let refused = run_portable_issuer_fetch_with_lane(Arc::clone(&lane), || ())
+        .now_or_never()
+        .test_unwrap();
+    assert!(matches!(refused, Err(PortableFetchRefusal::AtCapacity)));
+
+    release_tx.send(()).test_unwrap();
+    let returned = tokio::time::timeout(Duration::from_secs(30), lane.acquire_owned())
+        .await
+        .test_unwrap()
+        .test_unwrap();
+    drop(returned);
 }
 
 #[tokio::test(flavor = "current_thread")]
