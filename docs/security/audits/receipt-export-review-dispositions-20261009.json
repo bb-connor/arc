@@ -1,0 +1,106 @@
+{
+  "schema": "chio.security.review-dispositions.v1",
+  "observed_utc": "2026-10-09T22:34:58.922296+00:00",
+  "reviewed_source": "e7d5a7d0e3bc21da866ddb6063eb5dc2c11582eb",
+  "reviewer": "Claude independent read-only F03 lane",
+  "integrator": "codex",
+  "evidence": {
+    "root-f03-export-review.md": {
+      "sha256": "db68af3efec1725cb46a12bebbc7098853ad11ccde6e8d95400f9f4432b5b663",
+      "retained_path": "claude-pr1160-evidence/hammer/root-f03-export-review.md"
+    },
+    "root-f03-export-review-repro.patch": {
+      "sha256": "d661966054c5932669fdbf88c0d81b1d9ba4cefa2ff0dc8e955f9070a5767b95",
+      "retained_path": "claude-pr1160-evidence/hammer/root-f03-export-review-repro.patch"
+    },
+    "root-f03-export-review-repro.log": {
+      "sha256": "187506d2dbfe3a5a1052f6ea7d738345e514837ff1714b62d70e48fcd45f6226",
+      "retained_path": "claude-pr1160-evidence/hammer/root-f03-export-review-repro.log"
+    }
+  },
+  "diagnostic_reproducer": "The retained log exits0 because it asserts the bad behavior. It confirms the regression but is not an expected-safe Original RED. A genuine failing negative control is assigned before repair.",
+  "findings": [
+    {
+      "label": "F03-REVIEW-P1-A",
+      "reported_priority": "P1",
+      "priority": "P1",
+      "scope": "now",
+      "state": "confirmed-repair-open",
+      "requirement": "A supported legacy live-lineage export must refuse only that request, without invalidating the shared authenticated snapshot or denying other tenants.",
+      "remaining_acceptance": [
+        "Convert the diagnostic bad-behavior reproducer to expected-safe Original RED, repair lineage error classification, and verify tenant B continues reading after tenant A refusal."
+      ]
+    },
+    {
+      "label": "F03-REVIEW-P2-A",
+      "reported_priority": "P2",
+      "priority": "P2",
+      "scope": "now",
+      "state": "coverage-repair-open",
+      "requirement": "Cover per-request live-lineage refusals and the actual HTTP work-budget refusal contract.",
+      "remaining_acceptance": [
+        "Legacy/depth/missing-parent refusal leaves Ready; HTTP budget refusal returns422 and receipt_query_work_budget_exhausted without a bundle, retaining healthy reads."
+      ]
+    },
+    {
+      "label": "F03-REVIEW-P3-A",
+      "reported_priority": "P3",
+      "priority": "P2",
+      "scope": "now",
+      "state": "effect-triage-open",
+      "requirement": "An ordinary admin child export racing rotation must not falsely invalidate the shared snapshot.",
+      "remaining_acceptance": [
+        "Reproduce the suggested missing-copy race; if confirmed, repair one bounded retry and retain true data-loss refusal. Root provisionally regrades availability impact to P2; no confirmed RED claimed yet."
+      ]
+    },
+    {
+      "label": "F03-REVIEW-P3-B",
+      "reported_priority": "P3",
+      "priority": "P2",
+      "scope": "now",
+      "state": "effect-triage-open",
+      "requirement": "Classify each export error according to authenticated projection corruption versus unsupported mutable metadata.",
+      "remaining_acceptance": [
+        "Inspect direct Invalid paths and live transparency enrichment. Repair confirmed false shared invalidations or missing genuine corruption transitions; preserve fail-closed payload/proof checks."
+      ]
+    },
+    {
+      "label": "F03-REVIEW-P3-C",
+      "reported_priority": "P3",
+      "priority": "P3",
+      "scope": "later",
+      "state": "open-followup",
+      "requirement": "Cover checkpoint advancement between capture and proof fetch, including receipts uncheckpointed at capture.",
+      "remaining_acceptance": [
+        "Add a deterministic checkpoint-advancement control in a follow-up; current captured-head bounds were source-reviewed without a defect."
+      ]
+    },
+    {
+      "label": "F03-REVIEW-P3-D",
+      "reported_priority": "P3",
+      "priority": "P3",
+      "scope": "later",
+      "state": "open-followup",
+      "requirement": "Replace remaining export fixture polling with notification-based readiness and advancement controls.",
+      "remaining_acceptance": [
+        "Keep bounded hang guards; remove pacing assumptions in a separate focused test-maintenance change."
+      ]
+    },
+    {
+      "label": "F03-REVIEW-P3-E",
+      "reported_priority": "P3",
+      "priority": "P3",
+      "scope": "later",
+      "state": "open-followup",
+      "requirement": "Add explicit tenant-A export filters that name only tenant-B capabilities or subjects.",
+      "remaining_acceptance": [
+        "Assert empty successful bundles without different failure shapes; current query predicates were source-reviewed without a tenant-isolation defect."
+      ]
+    }
+  ],
+  "prior_component_evidence": "The180store/16HTTP/full100k/strict campaign remains valid historical evidence for its tested cases. It did not exercise legacy live-lineage refusal and does not qualify this new finding.",
+  "repair_owner": "codex helper export_recovery, isolated branch, Root integration only",
+  "qualification_reopened": true,
+  "merged": false,
+  "hosted_qualified": false
+}
