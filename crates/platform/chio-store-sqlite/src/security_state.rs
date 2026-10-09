@@ -100,8 +100,8 @@ pub(crate) use declassification::{
 };
 use flow_state::load_flow_snapshot;
 pub(crate) use flow_state::{
-    observe_native_flow_state, resolve_native_input_join, resolve_native_label_join,
-    verify_native_flow_state,
+    native_session_dominated, observe_native_flow_state, resolve_native_input_join,
+    resolve_native_label_join, verify_native_flow_state,
 };
 pub(crate) use native_egress::{NativeEgressCommand, NativeEgressResult};
 pub(crate) use native_mutation::{

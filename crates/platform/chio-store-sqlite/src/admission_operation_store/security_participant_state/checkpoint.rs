@@ -6,6 +6,8 @@ mod compaction;
 mod record;
 mod rows;
 mod schema;
+#[cfg(test)]
+pub(in crate::admission_operation_store) use compaction::with_test_pinning_operations;
 pub(crate) use compaction::NativeCompactionAuthority;
 pub(super) use record::{FamilyHead, Record};
 pub(in crate::admission_operation_store) use schema::{require_absent, sql, verify_catalog};

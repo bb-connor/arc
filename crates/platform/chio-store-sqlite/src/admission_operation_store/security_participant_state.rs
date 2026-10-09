@@ -13,6 +13,8 @@ pub(crate) use output::NativeOutputJoinAuthority;
 mod history;
 #[cfg(feature = "admission-test-support")]
 mod image_visit_test_support;
+#[cfg(test)]
+pub(in crate::admission_operation_store) use checkpoint::with_test_pinning_operations;
 pub(crate) use checkpoint::NativeCompactionAuthority;
 pub(crate) use egress::NativeEgressAuthority;
 pub use egress::SecurityParticipantEgressHistory;

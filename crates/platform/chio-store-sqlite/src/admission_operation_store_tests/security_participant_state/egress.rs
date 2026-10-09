@@ -24,6 +24,8 @@ mod migration;
 mod portable;
 #[path = "egress/retention.rs"]
 mod retention;
+#[path = "egress/session_churn.rs"]
+mod session_churn;
 
 struct Pending {
     operation: AdmissionOperationV1,
@@ -81,6 +83,18 @@ fn renew(
 }
 
 fn pending(fixture: &Fixture, name: &str, generation: Option<u64>) -> AnchoredTestResult<Pending> {
+    let (context, join) = mutations::request(&format!("{name}-join"))?;
+    pending_with(fixture, name, generation, context, join)
+}
+
+/// The same custody fixture for a caller-chosen flow identity and join labels.
+fn pending_with(
+    fixture: &Fixture,
+    name: &str,
+    generation: Option<u64>,
+    mut context: SecurityInvocationContext,
+    join: chio_security_types::ports::FlowJoinRequest,
+) -> AnchoredTestResult<Pending> {
     let initialized = fixture
         .store
         .load_security_participant_state(
@@ -89,7 +103,6 @@ fn pending(fixture: &Fixture, name: &str, generation: Option<u64>) -> AnchoredTe
             now_ms(),
         )?
         .ok_or("native initialization absent")?;
-    let (mut context, join) = mutations::request(&format!("{name}-join"))?;
     if let Some(generation) = generation {
         context = SecurityInvocationContext::v1(
             context

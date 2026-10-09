@@ -242,6 +242,45 @@ impl SecurityStateWriteTransaction<'_> {
     }
 }
 
+/// Whether a stored native session label adds nothing to the principal label
+/// of the same tenant, principal and isolation epoch. Principal labels are only
+/// joined upward and never compacted, and every reader joins the principal into
+/// the session, so such a session row changes no effective label, now or for
+/// any later context under any lineage. Absent rows are never dominated.
+pub(crate) fn native_session_dominated(
+    connection: &Connection,
+    authority: &str,
+    session: [&str; 4],
+) -> PortResult<bool> {
+    let [tenant, principal, session, epoch] = session;
+    let reader = FlowReader::native(connection, authority);
+    let read = |row: &rusqlite::Row<'_>| Ok((row.get::<_, Vec<u8>>(0)?, row.get::<_, Vec<u8>>(1)?));
+    let Some((body, hash)) = reader
+        .query_row(
+            sql::LOAD_SESSION,
+            params![tenant, principal, session, epoch],
+            read,
+        )
+        .optional()
+        .map_err(sqlite_error)?
+    else {
+        return Ok(false);
+    };
+    let Some((principal_body, principal_hash)) = reader
+        .query_row(sql::LOAD_PRINCIPAL, params![tenant, principal, epoch], read)
+        .optional()
+        .map_err(sqlite_error)?
+    else {
+        return Ok(false);
+    };
+    let session = decode_label(body, hash)?;
+    let principal = decode_label(principal_body, principal_hash)?;
+    Ok(principal
+        .join_restrictions(&session)
+        .map_err(|_| PortError::integrity_failure())?
+        == principal)
+}
+
 /// Read-only semantic verification in addition to the byte-exact initialization
 /// fingerprints. An authority identifier selects data, never serving authority.
 pub(crate) fn verify_native_flow_state(connection: &Connection, authority: &str) -> PortResult<()> {

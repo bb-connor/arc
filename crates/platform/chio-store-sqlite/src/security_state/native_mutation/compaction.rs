@@ -2,10 +2,15 @@
 //!
 //! Only a checkpoint transaction can mint the owner. While it runs, the native
 //! trigger callbacks admit one thing: deleting a planned row of this authority
-//! from the transition or egress-fence table, without a replacement image.
-//! Every planned before-image must be consumed exactly once. Every exit,
-//! including errors and panics, restores the connection's denying callbacks
-//! and removes the authorizer before the transaction is released.
+//! from the transition, egress-fence, session-label, session-membership or
+//! flow-context table, without a replacement image. Every planned before-image
+//! must be consumed exactly once. Every exit, including errors and panics,
+//! restores the connection's denying callbacks and removes the authorizer
+//! before the transaction is released.
+//!
+//! A session leaves as one unit: its label, its membership and every context
+//! under any lineage. Its label must be dominated by its principal label and no
+//! egress fence may name it, both rechecked here in the same transaction.
 use super::*;
 use crate::admission_operation_store::NativeCompactionAuthority;
 use crate::security_state::decode_retained_security_row;
@@ -16,26 +21,79 @@ use std::collections::BTreeSet;
 struct Table {
     source: &'static str,
     native: &'static str,
-    identity: &'static str,
+    /// Primary-key columns after the authority, in delete parameter order.
+    keys: &'static [&'static str],
     delete: &'static str,
 }
 
-const TABLES: [Table; 2] = [
+const SESSION: [&str; 4] = [
+    "tenant_id",
+    "principal_id",
+    "session_id",
+    "isolation_epoch_id",
+];
+
+const TABLES: [Table; 5] = [
     Table {
         source: "security_transitions",
         native: "security_participant_state_transitions",
-        identity: "transition_id",
+        keys: &["tenant_id", "transition_id"],
         delete: "DELETE FROM security_participant_state_transitions
             WHERE security_authority_id = ?1 AND tenant_id = ?2 AND transition_id = ?3",
     },
     Table {
         source: "security_egress_fences",
         native: "security_participant_state_egress_fences",
-        identity: "fence_id",
+        keys: &["tenant_id", "fence_id"],
         delete: "DELETE FROM security_participant_state_egress_fences
             WHERE security_authority_id = ?1 AND tenant_id = ?2 AND fence_id = ?3",
     },
+    Table {
+        source: "security_session_flow_state",
+        native: "security_participant_state_session_flow_state",
+        keys: &SESSION,
+        delete: "DELETE FROM security_participant_state_session_flow_state
+            WHERE security_authority_id = ?1 AND tenant_id = ?2 AND principal_id = ?3
+              AND session_id = ?4 AND isolation_epoch_id = ?5",
+    },
+    Table {
+        source: "security_session_memberships",
+        native: "security_participant_state_session_memberships",
+        keys: &SESSION,
+        delete: "DELETE FROM security_participant_state_session_memberships
+            WHERE security_authority_id = ?1 AND tenant_id = ?2 AND principal_id = ?3
+              AND session_id = ?4 AND isolation_epoch_id = ?5",
+    },
+    Table {
+        source: "security_flow_contexts",
+        native: "security_participant_state_flow_contexts",
+        keys: &[
+            "tenant_id",
+            "principal_id",
+            "lineage_id",
+            "session_id",
+            "isolation_epoch_id",
+        ],
+        delete: "DELETE FROM security_participant_state_flow_contexts
+            WHERE security_authority_id = ?1 AND tenant_id = ?2 AND principal_id = ?3
+              AND lineage_id = ?4 AND session_id = ?5 AND isolation_epoch_id = ?6",
+    },
 ];
+
+/// Remaining rows that still name a session, and fences that name it.
+const SESSION_REFERENCES: &str = "SELECT
+    EXISTS(SELECT 1 FROM security_participant_state_session_flow_state
+        WHERE security_authority_id = ?1 AND tenant_id = ?2 AND principal_id = ?3
+          AND session_id = ?4 AND isolation_epoch_id = ?5)
+    OR EXISTS(SELECT 1 FROM security_participant_state_session_memberships
+        WHERE security_authority_id = ?1 AND tenant_id = ?2 AND principal_id = ?3
+          AND session_id = ?4 AND isolation_epoch_id = ?5)
+    OR EXISTS(SELECT 1 FROM security_participant_state_flow_contexts
+        WHERE security_authority_id = ?1 AND tenant_id = ?2 AND principal_id = ?3
+          AND session_id = ?4 AND isolation_epoch_id = ?5),
+    EXISTS(SELECT 1 FROM security_participant_state_egress_fences
+        WHERE security_authority_id = ?1 AND tenant_id = ?2 AND principal_id = ?3
+          AND session_id = ?4 AND isolation_epoch_id = ?5)";
 
 fn table(source: &str) -> Option<&'static Table> {
     TABLES.iter().find(|table| table.source == source)
@@ -192,7 +250,8 @@ fn text<'a>(table: &Table, values: &'a [Value], column: &str) -> PortResult<&'a 
 }
 
 /// Recheck the row-local half of the dead-row contract. Journal custody was
-/// established by the planning query in this same transaction.
+/// established by the planning query in this same transaction. Session rows
+/// are checked as whole sessions by `validate_sessions`.
 fn validate_dead(table: &Table, values: &[Value], compacted_at: i64) -> PortResult<()> {
     let dead = match table.source {
         "security_transitions" => text(table, values, "transition_kind")? == "flow_join",
@@ -205,10 +264,65 @@ fn validate_dead(table: &Table, values: &[Value], compacted_at: i64) -> PortResu
             (Value::Null, Value::Null, Value::Integer(expires_at)) => *expires_at <= compacted_at,
             _ => false,
         },
+        "security_session_flow_state"
+        | "security_session_memberships"
+        | "security_flow_contexts" => true,
         _ => false,
     };
     if !dead {
         return Err(PortError::integrity_failure());
+    }
+    Ok(())
+}
+
+type SessionKey = [String; 4];
+
+fn session_key(table: &Table, values: &[Value]) -> PortResult<SessionKey> {
+    Ok([
+        text(table, values, SESSION[0])?.to_owned(),
+        text(table, values, SESSION[1])?.to_owned(),
+        text(table, values, SESSION[2])?.to_owned(),
+        text(table, values, SESSION[3])?.to_owned(),
+    ])
+}
+
+fn session_references(
+    connection: &Connection,
+    authority: &str,
+    session: &SessionKey,
+) -> PortResult<(bool, bool)> {
+    connection
+        .query_row(
+            SESSION_REFERENCES,
+            rusqlite::params![authority, session[0], session[1], session[2], session[3]],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .map_err(sqlite_error)
+}
+
+/// Each planned session leaves whole: one label, one membership, and contexts
+/// only of planned sessions. Its label adds nothing to its principal label and
+/// no egress fence names it.
+fn validate_sessions(
+    connection: &Connection,
+    authority: &str,
+    labels: &BTreeSet<SessionKey>,
+    members: &BTreeSet<SessionKey>,
+    contexts: &BTreeSet<SessionKey>,
+) -> PortResult<()> {
+    if labels != members || !contexts.is_subset(labels) {
+        return Err(PortError::integrity_failure());
+    }
+    for session in labels {
+        let [tenant, principal, id, epoch] = session;
+        let dominated = super::super::native_session_dominated(
+            connection,
+            authority,
+            [tenant, principal, id, epoch],
+        )?;
+        if !dominated || session_references(connection, authority, session)?.1 {
+            return Err(PortError::integrity_failure());
+        }
     }
     Ok(())
 }
@@ -230,20 +344,39 @@ pub(crate) fn compact_native_rows<'connection>(
         i64::try_from(authorization.compacted_at()).map_err(|_| PortError::invalid_data())?;
     let mut keys = Vec::with_capacity(authorization.rows().len());
     let mut planned = BTreeSet::new();
+    let (mut labels, mut members, mut contexts) =
+        (BTreeSet::new(), BTreeSet::new(), BTreeSet::new());
     for (source, image) in authorization.rows() {
         let table = table(source).ok_or_else(PortError::integrity_failure)?;
         let values = decode_retained_security_row(table.source, image.as_bytes())
             .map_err(|_| PortError::integrity_failure())?;
         validate_dead(table, &values, compacted_at)?;
-        keys.push((
-            table,
-            text(table, &values, "tenant_id")?.to_owned(),
-            text(table, &values, table.identity)?.to_owned(),
-        ));
-        if !planned.insert(((*source).to_owned(), image.clone())) {
+        let unique = match table.source {
+            "security_session_flow_state" => labels.insert(session_key(table, &values)?),
+            "security_session_memberships" => members.insert(session_key(table, &values)?),
+            "security_flow_contexts" => {
+                contexts.insert(session_key(table, &values)?);
+                true
+            }
+            _ => true,
+        };
+        let key = table
+            .keys
+            .iter()
+            .map(|column| text(table, &values, column).map(str::to_owned))
+            .collect::<PortResult<Vec<_>>>()?;
+        keys.push((table, key));
+        if !unique || !planned.insert(((*source).to_owned(), image.clone())) {
             return Err(PortError::integrity_failure());
         }
     }
+    validate_sessions(
+        &transaction,
+        authorization.authority(),
+        &labels,
+        &members,
+        &contexts,
+    )?;
     let compaction = Arc::new(Compaction {
         authority: authorization.authority().to_owned(),
         enabled: AtomicBool::new(true),
@@ -252,12 +385,11 @@ pub(crate) fn compact_native_rows<'connection>(
     let deleted = {
         let scope = Scope::install(&transaction, compaction.clone())?;
         let mut deleted = 0_u64;
-        for (table, tenant, identity) in &keys {
+        for (table, key) in &keys {
+            let parameters = std::iter::once(compaction.authority.as_str())
+                .chain(key.iter().map(String::as_str));
             let changed = transaction
-                .execute(
-                    table.delete,
-                    rusqlite::params![compaction.authority.as_str(), tenant, identity],
-                )
+                .execute(table.delete, rusqlite::params_from_iter(parameters))
                 .map_err(sqlite_error)?;
             if changed != 1 {
                 return Err(PortError::integrity_failure());
@@ -277,5 +409,11 @@ pub(crate) fn compact_native_rows<'connection>(
         scope.finish()?;
         deleted
     };
+    // Every context of an evicted session was planned with it.
+    for session in &labels {
+        if session_references(&transaction, authorization.authority(), session)?.0 {
+            return Err(PortError::integrity_failure());
+        }
+    }
     Ok((transaction, deleted))
 }
