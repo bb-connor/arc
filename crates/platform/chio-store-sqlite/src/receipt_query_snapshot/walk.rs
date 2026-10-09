@@ -1094,7 +1094,9 @@ impl OwnedSink for SnapshotDb {
 }
 
 /// The claim-log head and watermark observed in one read transaction, with the
-/// newest checkpoint whose batch ends at or below that head.
+/// sequence of the newest checkpoint row. That checkpoint is not yet
+/// validated: its signed coverage is authenticated, and checked against
+/// `head`, before any range is classified by it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct Observation {
     pub(super) head: i64,
