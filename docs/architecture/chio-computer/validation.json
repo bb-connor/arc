@@ -1,0 +1,13 @@
+{
+  "schema": "chio.computer.design-check.v1",
+  "python_examples_syntax_checked": 3,
+  "operator_precedence_checked": true,
+  "source_files_recorded": 39,
+  "all_recorded_sources_match_view_head": true,
+  "no_em_dashes": true,
+  "runtime_tests_run": false,
+  "api_implemented": false,
+  "recorded_source_hashes_rechecked": true,
+  "no_trailing_whitespace": true,
+  "hosted_source_commit_hashes_rechecked": true
+}
