@@ -1,7 +1,7 @@
 # C1: Versioned resource environments
 
-Status: proposed contract, revision 3. Parent: [Computer proposal](PROPOSAL.md).
-Assumes the completed predecessor contracts in [the crosswalk](ROADMAP-CROSSWALK.md).
+Status: proposed contract, revision 4. Parent: [Computer proposal](PROPOSAL.md).
+Assumes the qualified predecessor profile in [the crosswalk](ROADMAP-CROSSWALK.md#qualification-profiles).
 
 ## Purpose and owner
 
@@ -52,7 +52,7 @@ through operator-configured catalogs/registries under current metadata access.
   governed resolution and cannot direct arbitrary URL/path fetches.
 - **ENV-07, current predicates.** The owner rules apply:
   - REC's HistoricalFact, CurrentPredicate and HeldReservation vocabulary;
-  - the KSPEC-08 durable stop;
+  - the qualified KSPEC-08 durable stop (Computer-0: phases 0 and 1);
   - COOP-2 lifecycle status.
 
   Computer adds one rule. It never caches a current predicate in a revision or

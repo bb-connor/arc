@@ -2052,6 +2052,20 @@
           "inspection": "architecture_contract"
         }
       ]
+    },
+    "computer_roadmap_revision_4": {
+      "head": "e9b2660f61c2526fae276fdf3d7664fb7f4da2b2",
+      "hosted_source_commit": "e9b2660f61c2526fae276fdf3d7664fb7f4da2b2",
+      "hosted_source_commit_matches_recorded_files": true,
+      "inspection": "Computer-0 closure prerequisites, security profiles, broker acceptance and application gates",
+      "sources": [
+        {
+          "path": "docs/operations/UNIFIED_ROADMAP.md",
+          "sha256": "62802aaf6da17ab5c876efb85465bbcf4576250c0a5293822038c2fffe9fe23f",
+          "lines": 868,
+          "matches_head": true
+        }
+      ]
     }
   },
   "repository": "https://github.com/bb-connor/arc.git",

@@ -1,12 +1,12 @@
 # C4: Binding a computer to admitted work
 
-Status: proposed contract, revision 3. Parent: [Computer proposal](PROPOSAL.md).
+Status: proposed contract, revision 4. Parent: [Computer proposal](PROPOSAL.md).
 
 ## Purpose and owner
 
 Bind an exact Computer image to the existing work commitment, receiver-local
-process admission, governed input transfer, and accepted result. Use completed
-WORK/COOP/HOST/SHARE contracts and their actual services. An ExecutionBinding is
+process admission, governed input transfer, and accepted result. Use qualified
+WORK/COOP/HOST/SHARE profiles and their actual services. An ExecutionBinding is
 a checked relationship among retained records, not a new signed capability or
 independent effect journal.
 
@@ -92,8 +92,9 @@ grant over a source-owned resource, such as `/models/default`, is enforced and
 charged where that resource is served. That is the source's door: the source's
 own hold ledger, reached through the source's broker.
 
-- The hero's `USD(5)` therefore needs no money to move between organizations,
-  and no hold store that spans both.
+- The hero's `USD(5)` therefore needs no funding transfer between the two
+  organizations, and no hold store that spans both. It caps source-owned
+  resources accessed through this grant, not the receiver's total run cost.
 - The receiver's own compute, harness and model use stay with the receiver,
   under its own ledger, unless a paid agreement binds them.
 - Sender-funded holds that cross organizations remain post-test scope.
@@ -120,8 +121,51 @@ Under Computer-0, delegation stays inside the receiver:
 
 - The receiver's broker holds the source's grant as a single hop.
 - Receiver helpers reach the source's door through that broker.
-- A helper that presents the source's grant directly is making a second hop.
-  It is refused until COOP's multi-hop work lands after the success test.
+- The source grant is holder-bound to the admitted receiver broker under
+  CT-COOP. A helper cannot authenticate as that broker or obtain its holder key. A copied token alone is refused. A request to re-delegate
+  source authority to an independent helper key is a different, unsupported
+  multi-hop profile. Token forwarding alone does not define a delegation hop.
+
+### Receiver broker contract
+
+The broker is a qualified native enforcement path under HOST/COOP/SHARE.
+Custody of the source grant is necessary but does not authorize every helper
+request. The retained C4 binding is applied to each resource operation:
+
+1. Authenticated ingress identifies the helper's durable process and current
+   attempt, receiver-issued local authority, work/run membership and original
+   local operation. Caller-supplied IDs cannot replace that authenticated basis.
+2. Bind the exact source grant, resource identity/generation, operation and
+   request digest to that run and local operation. Reject substitution across runs or
+   resources. Durable mappings use existing operation owners;
+   neither Computer nor the broker adds a parallel replay or authority store.
+3. Receiver admission enforces the intersection of current helper rights,
+   ancestor restrictions, work/profile limits and the source grant's scope.
+   Read-only, expired, revoked or closed helper authority cannot borrow the
+   broker's broader rights. Limits the selected path cannot enforce cause
+   refusal before forwarding; they are not dropped during policy projection.
+4. Carry the applicable REC labels, influence, provider context and release
+   basis through the request and reply. Broker custody cannot reset knowledge
+   or substitute a clean broker context for the helper's context. Required
+   context that cannot be bound or verified makes the path unavailable.
+5. The source authenticates the admitted broker holder/audience and proof of
+   possession, and independently validates current source authority, resource
+   generation, release and consumption at its native commitment. It does not
+   import the receiver's local issuer as authority over source resources.
+6. Retain one original source-operation identity and exact request binding
+   before forwarding. Retries, broker restart and lost replies reconcile that
+   same source operation and hold; changed material is a conflict. Unknown
+   source effects retain their native disposition and reserved exposure.
+
+Local revocation/closure linearizes at the receiver's forwarding admission;
+source revocation/closure linearizes at the source's native commitment. Recheck
+at those actual fences, not only in preflight. An operation already forwarded
+before a local fence remains outstanding until its native outcome is known;
+there is no atomic revocation instant across two independent stores. The
+receiver's evidence binds its local admission to the authenticated source
+operation, without claiming the source independently executed local policy.
+
+### Exposure and later funding profiles
 
 Model profiles reserve worst-case exposure before dispatch and reconcile down
 after a known outcome. Unknown replies retain exposure. Token quotas, money,
@@ -155,9 +199,10 @@ Payable accepted child work survives parent failure or rejection of a patch.
 - **EXE-05:** REC-P4 release governs inputs and results that cross the
   boundary. Computer adds that acceptance, signatures and settlement are never
   release authority.
-- **EXE-06:** KSPEC-04 and KSPEC-08 fences and native dispositions apply
-  unchanged. Computer adds only the binding of its execution family to those
-  fences.
+- **EXE-06:** the [qualified owner profile](ROADMAP-CROSSWALK.md#qualification-profiles)
+  supplies KSPEC-04 and KSPEC-08 fences and native dispositions. Computer-0
+  requires KSPEC-04 phases 1 to 3 and KSPEC-08 phases 0 and 1. Computer binds
+  its execution family to those fences without claiming later mechanisms.
 - **EXE-07:** a changed request uses a separately admitted linked continuation
   within existing limits. Uncertain work cannot be retried as new work to evade
   the unresolved-effect rule.
@@ -165,7 +210,9 @@ Payable accepted child work survives parent failure or rejection of a patch.
   enforced and charged only by that resource's owner, at its door. No
   receiver-side counter can substitute for it.
 - **EXE-09, delegation inside the receiver:** under Computer-0 the foreign grant
-  is held only in the receiver's broker custody, as one hop. Any further
-  presentation of it is refused.
+  is held only in the receiver's broker custody, as one authenticated hop.
+  Each helper request preserves its local authority and context through the
+  broker contract above. Direct helper impersonation and re-delegation to an
+  independent helper key are refused.
 
-Acceptance: **C4-01 through C4-08** in [ACCEPTANCE.md](ACCEPTANCE.md).
+Acceptance: **C4-01 through C4-15** in [ACCEPTANCE.md](ACCEPTANCE.md).

@@ -1,13 +1,14 @@
 # Computer and the completed Chio roadmap
 
-Status: proposed architectural crosswalk, revision 3. Parent: [PROPOSAL.md](PROPOSAL.md).
+Status: proposed architectural crosswalk, revision 4. Parent: [PROPOSAL.md](PROPOSAL.md).
 
 ## Assumption and precedence
 
-This design assumes completion of the unified roadmap and constituent programs,
-including their declared post-success-test scope. Completion establishes those
-contracts at supported profiles. Explicit experimental exclusions and unresolved
-profile choices do not become universal support by assumption.
+The full architecture assumes completion of the unified roadmap and constituent
+programs, including their declared post-success-test scope. Computer-0 instead
+uses the explicit initial profile below. Completion establishes contracts only
+at supported profiles. Experimental exclusions and unresolved profile choices
+do not become universal support by assumption.
 
 Use this order when documents disagree:
 
@@ -20,13 +21,15 @@ Use this order when documents disagree:
 These are pinned research views, not statements about today's merge or release
 status. Since these pins were taken, #1196 has merged into main. Its Computer
 amendment, [#1200](https://github.com/bb-connor/arc/pull/1200), adds Lane COMP
-and decisions D21 to D23, which revision 3 applies. The kernel and work specifications use internal historical names where
-necessary; public Computer examples retain the approved product vocabulary.
+and decisions D21 to D23. Revision 4 reconciles its closure prerequisites and
+qualification profiles. The kernel and work specifications use internal
+historical names where necessary; public Computer examples retain the approved product vocabulary.
 
 ## Pinned program heads
 
 | PR | Inspected head | Role |
 | --- | --- | --- |
+| [#1200](https://github.com/bb-connor/arc/pull/1200) | `e9b2660f61c2526fae276fdf3d7664fb7f4da2b2` | Revision-4 Computer-0 prerequisites, profiles and COMP gates |
 | [#1196](https://github.com/bb-connor/arc/pull/1196) | `c32c460fae67c6f21386ab3cffa425cd06f0433b` | Unified contracts, lane owners, gates and superseding decisions |
 | [#1174](https://github.com/bb-connor/arc/pull/1174) | `7419d56e98e84ee57212e293e5f2658f7fef7642` | FTL lessons and all eleven kernel specifications |
 | [#1173](https://github.com/bb-connor/arc/pull/1173) | `cafdc970e4f89bddf810647e4228a605ed9f498a` | Delegation/graph code and W1-W4 work architecture |
@@ -37,6 +40,36 @@ necessary; public Computer examples retain the approved product vocabulary.
 | [#1177](https://github.com/bb-connor/arc/pull/1177) | `01666b33b439d9e488ad7de6295a01eed25292c4` | Native host program and independent receiver model |
 | [#1171](https://github.com/bb-connor/arc/pull/1171) | `1a6f7bfccb1030c620eb7a2f9e3a06620196076b` | Protocol publication context |
 | [#1197](https://github.com/bb-connor/arc/pull/1197) | `3ab02761b9859be81e858ce3d6ef14da309f764c` | Internal development coordination, potential application consumer |
+
+## Qualification profiles
+
+The tables below describe the completed architecture; this table controls which
+parts Computer-0 may claim. A later profile must be separately admitted and
+qualified. Missing enforcement causes refusal, never silent downgrade.
+
+| Owner contract | Computer-0 prerequisite and guarantee | Later scope |
+| --- | --- | --- |
+| WORK-W1/W2 | Qualified allocation/graph issuer, protected exact acceptance, independent receiver offers and unpaid agreements | Funded W2.3 and W4 convergence |
+| KSPEC-04 | Phases 1 to 3 through KERN-3: process/capability closure plus graph tombstones, D1 issuance fences, closure-state recovery/migration and stranded-capacity accounting | Phase 4 |
+| KSPEC-08 | Phases 0 and 1 through KERN-1: the qualified durable stop and native identity dispositions | Phases 2 to 7; no implicit claim of their control-plane or epoch machinery |
+| KSPEC-07 | KERN-5's qualified confinement kinds and dispatch-bound launch evidence | Additional qualified backend/profile support |
+| REC | Retained labels/influence, current release, exact artifacts, original-operation recovery and qualified confined returns | Additional profile support must be separately declared |
+| KSPEC-09/10 | Existing qualified admission and resource commit owners; original operation journal and expected-base publication | Pure admission machine and crossing records when qualified |
+| KSPEC-11 | No KSPEC-11 integrity-admission claim. Preserve REC influence and protected acceptance; enforce the source's supported action policy. Refuse a request requiring an unavailable endorsement/integrity profile | Exact integrity-gated admission under KSPEC-11 |
+| SHARE/COOP/HOST | Source-resource holds at the source; authenticated receiver broker preserving local helper authority and context; receiver-local process ownership | Cross-organization funding, independent-key multi-hop and additional hosts |
+
+Phase 3's graph/D1 fences were previously post-test work. The #1200 correction
+moves them into KERN-3 before COMP-3/G4, after W1's qualified issuer. Preserve
+the constituent contract's canonical transactions, migration inventory,
+sealed-outstanding semantics and conformance obligations. This changes landing
+order, not fence ownership. Computer adds no closure store or mutable balance.
+
+Pinned amendment: [Computer roadmap revision 4](https://github.com/bb-connor/arc/blob/e9b2660f61c2526fae276fdf3d7664fb7f4da2b2/docs/operations/UNIFIED_ROADMAP.md).
+
+Apply acceptance remains distinct from action authority in every profile.
+Computer-0 can accept a revision and still refuse its apply when the source
+requires a later integrity profile. No descriptor or SDK chooses a weaker
+source policy on the caller's behalf.
 
 ## Unified lanes and contracts
 

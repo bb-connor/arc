@@ -1,6 +1,6 @@
 # C2: Resource branching and publication
 
-Status: proposed contract, revision 3. Parent: [Computer proposal](PROPOSAL.md).
+Status: proposed contract, revision 4. Parent: [Computer proposal](PROPOSAL.md).
 
 ## Purpose and owner
 
@@ -27,6 +27,18 @@ The backend may reuse the worktree and patch-review code salvaged from #1164
 boundaries. Content-addressed object identity is storage identity only. It
 never substitutes for the resource, label, producer or acceptance bindings
 that RES-02 requires.
+
+The initial profile snapshots only the owner's admitted managed revision.
+Dirty or untracked host files require a separate admitted import. The backend
+uses private object storage and an owner-controlled ref namespace; a receiver
+never receives the source's `.git` directory, unrelated objects or writable refs.
+Materialization cannot execute repository hooks, filters or configuration, or
+follow submodules, alternates or LFS fetches. Unsupported entries are refused
+before exposure. Authorized ordinary file content still passes RES-03 bounds.
+The owner durably binds the expected ref/object and Computer revision metadata
+to the original publication intent before changing the ref. Recovery reconciles
+that exact intent and publication; an uncertain outcome never permits a fresh
+apply or an unbound head. A Git ref update alone is not the full custody journal.
 
 ## Resource classes
 
@@ -79,9 +91,11 @@ Blob storage and metadata publication are not implicitly one transaction.
 - **RES-05, current release.** REC-P4's release contract governs every channel.
   Computer adds that diff metadata, filenames, logs and status are channels
   too.
-- **RES-06, preserved knowledge.** REC-P4 and KSPEC-11 label and influence rules
-  apply unchanged. Computer adds that a branch or restore never creates a clean
-  observation boundary.
+- **RES-06, preserved knowledge.** REC-P4 label, influence and release rules
+  apply in Computer-0. A branch or restore never creates a clean observation
+  boundary. Later profiles additionally bind KSPEC-11's integrity admission;
+  a request requiring that unavailable profile is refused, not downgraded.
+  See the [profile crosswalk](ROADMAP-CROSSWALK.md#qualification-profiles).
 - **RES-07, exact publication.** Apply compares the exact expected source revision
   and affected bindings at the authoritative commit point. A changed source is
   a conflict. There is no silent overwrite, rebase or reuse of old acceptance
@@ -107,15 +121,17 @@ The execution profile selects one of two realizations:
    - Writes stay in the receiver's confined overlay.
    - A sealed, labeled result is imported into the source-owned candidate under
      the original work and branch bindings.
-2. **Source-owned branch service.** This is for same-domain placement only.
+2. **Source-owned branch service.** Computer-0 offers this for same-domain
+   placement only.
    - Remote operations bind the source resource authority and the
      receiver-local execution identity through the admitted work.
-   - Between independent organizations it would let the receiver's processes
-     write into the source's storage, so it is not offered there.
+   - An independent-organization branch service would need its own qualified
+     resource API, mutation/release fences and acceptance evidence. That later
+     profile is not ruled out merely because the source owns the storage.
 
-The second profile does not transfer project ownership to the temporary remote
-filesystem. The first does not promise a Chio receipt for every ordinary syscall
-inside an admitted sandbox. Each profile names its actual mediation boundary.
+The receiver-local overlay does not transfer project ownership to the temporary
+remote filesystem. Neither profile promises a Chio receipt for every ordinary
+syscall inside an admitted sandbox. Each names its actual mediation boundary.
 
 ## Confined computations
 
@@ -126,4 +142,4 @@ and status channels are releases too. A public seed artifact or new process ID
 alone cannot clean a tainted parent's chosen input. Integrity and confidentiality
 have separate evidence requirements; valid JSON alone establishes neither.
 
-Acceptance: **C2-01 through C2-07** in [ACCEPTANCE.md](ACCEPTANCE.md).
+Acceptance: **C2-01 through C2-09** in [ACCEPTANCE.md](ACCEPTANCE.md).

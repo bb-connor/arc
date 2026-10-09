@@ -14,6 +14,68 @@ import tomllib
 from pathlib import Path
 
 
+CONTRACT_CASE_COUNTS = {1: 6, 2: 9, 3: 11, 4: 15, 5: 11}
+
+
+def validate_sources(evidence, root, pinned_links=()):
+    """Check mandatory canonical sources, independently of incidental Git objects."""
+    errors = []
+    records = 0
+    checks = 0
+    known = set()
+    manifests = {}
+    missing_commits = set()
+    for view in evidence["views"].values():
+        head = view["head"]
+        hosted = view.get("hosted_source_commit")
+        # A recorded equivalent selects the published source deterministically.
+        # It never makes that source optional, even when head == hosted.
+        if hosted and view.get("hosted_source_commit_matches_recorded_files") is True:
+            commits = (hosted,)
+        else:
+            commits = tuple(sorted({head, hosted} - {None}))
+        for record in view["sources"]:
+            records += 1
+            if record.get("inspection") == "manifest_inventory":
+                manifests[record["crate_name"]] = record["crate_group"]
+            for commit in commits:
+                known.add((commit, record["path"]))
+                if commit in missing_commits:
+                    continue
+                result = subprocess.run(
+                    ["git", "show", f"{commit}:{record['path']}"],
+                    cwd=root, capture_output=True, check=False,
+                )
+                if result.returncode:
+                    exists = subprocess.run(
+                        ["git", "cat-file", "-e", f"{commit}^{{commit}}"],
+                        cwd=root, capture_output=True, check=False,
+                    )
+                    if exists.returncode:
+                        missing_commits.add(commit)
+                        errors.append(f"Missing pinned Git object {commit}; fetch it before checking")
+                    else:
+                        errors.append(f"Missing source {commit}:{record['path']}")
+                    continue
+                checks += 1
+                data = result.stdout
+                if hashlib.sha256(data).hexdigest() != record["sha256"]:
+                    errors.append(f"Source hash mismatch: {commit}:{record['path']}")
+                if len(data.splitlines()) != record["lines"]:
+                    errors.append(f"Source line count mismatch: {commit}:{record['path']}")
+                if record.get("inspection") == "manifest_inventory":
+                    package_name = tomllib.loads(data.decode())["package"]["name"]
+                    if package_name != record["crate_name"]:
+                        errors.append(f"Manifest package-name mismatch: {record['path']}")
+                    if Path(record["path"]).parts[1] != record["crate_group"]:
+                        errors.append(f"Manifest group mismatch: {record['path']}")
+
+    for target in pinned_links:
+        if target not in known:
+            errors.append(f"Pinned document link lacks evidence: {target}")
+    return records, checks, manifests, errors
+
+
 def main():
     directory = Path(__file__).resolve().parent
     root = directory.parents[2]
@@ -23,9 +85,10 @@ def main():
     local_links = 0
     pinned_links = []
     cases = set()
+    profiles = {}
     expected_cases = {
         f"C{contract}-{number:02d}"
-        for contract, count in ((1, 6), (2, 8), (3, 10), (4, 10), (5, 9))
+        for contract, count in CONTRACT_CASE_COUNTS.items()
         for number in range(1, count + 1)
     }
 
@@ -63,9 +126,23 @@ def main():
             cases = set(listed)
             if len(listed) != len(cases):
                 errors.append("ACCEPTANCE.md: duplicate case IDs")
+            profiles = dict(re.findall(
+                r"^\| (C[1-5]-\d{2}) \| (Computer-0|Both|Later funded) \|",
+                source, re.MULTILINE,
+            ))
+        contract = re.match(r"0([1-5])-", document.name)
+        if contract:
+            number = int(contract.group(1))
+            expected_range = f"Acceptance: **C{number}-01 through C{number}-{CONTRACT_CASE_COUNTS[number]:02d}**"
+            if expected_range not in source:
+                errors.append(f"{document.name}: incomplete acceptance range")
 
     if cases != expected_cases:
         errors.append(f"Acceptance case mismatch: {sorted(cases ^ expected_cases)}")
+    if set(profiles) != cases:
+        errors.append("ACCEPTANCE.md: every case needs a recognized qualification profile")
+    if {case for case, profile in profiles.items() if profile == "Later funded"} != {"C4-06", "C4-08"}:
+        errors.append("ACCEPTANCE.md: funded cases must remain outside Computer-0")
     if syntax_count != 2:
         errors.append(f"Expected two proposed Python examples; found {syntax_count}")
 
@@ -86,74 +163,17 @@ def main():
 
     evidence_path = directory / "research" / "source-evidence.json"
     evidence = json.loads(evidence_path.read_text())
-    records = 0
-    checks = 0
-    known = set()
-    manifests = {}
-    missing_commits = set()
-    unpublished_heads_skipped = set()
-    for view in evidence["views"].values():
-        commits = set((view["head"], view.get("hosted_source_commit", view["head"])))
-        # A view may pin a local head that was never published, beside a hosted
-        # commit holding the same recorded files. The hosted commit is always
-        # checked; the unpublished head is checked only when available locally.
-        optional = set()
-        if view.get("hosted_source_commit") and view.get("hosted_source_commit_matches_recorded_files"):
-            head_present = subprocess.run(
-                ["git", "cat-file", "-e", f"{view['head']}^{{commit}}"],
-                cwd=root, capture_output=True, check=False,
-            ).returncode == 0
-            if not head_present:
-                optional.add(view["head"])
-                unpublished_heads_skipped.add(view["head"])
-        commits -= optional
-        for record in view["sources"]:
-            records += 1
-            if record.get("inspection") == "manifest_inventory":
-                manifests[record["crate_name"]] = record["crate_group"]
-            for commit in sorted(commits):
-                known.add((commit, record["path"]))
-                if commit in missing_commits:
-                    continue
-                result = subprocess.run(
-                    ["git", "show", f"{commit}:{record['path']}"],
-                    cwd=root, capture_output=True, check=False,
-                )
-                if result.returncode:
-                    exists = subprocess.run(
-                        ["git", "cat-file", "-e", f"{commit}^{{commit}}"],
-                        cwd=root, capture_output=True, check=False,
-                    )
-                    if exists.returncode:
-                        missing_commits.add(commit)
-                        errors.append(f"Missing pinned Git object {commit}; fetch it before checking")
-                    else:
-                        errors.append(f"Missing source {commit}:{record['path']}")
-                    continue
-                checks += 1
-                data = result.stdout
-                if hashlib.sha256(data).hexdigest() != record["sha256"]:
-                    errors.append(f"Source hash mismatch: {commit}:{record['path']}")
-                if len(data.splitlines()) != record["lines"]:
-                    errors.append(f"Source line count mismatch: {commit}:{record['path']}")
-                if record.get("inspection") == "manifest_inventory":
-                    package_name = tomllib.loads(data.decode())["package"]["name"]
-                    if package_name != record["crate_name"]:
-                        errors.append(f"Manifest package-name mismatch: {record['path']}")
-                    if Path(record["path"]).parts[1] != record["crate_group"]:
-                        errors.append(f"Manifest group mismatch: {record['path']}")
-
-    for target in pinned_links:
-        if target not in known:
-            errors.append(f"Pinned document link lacks evidence: {target}")
+    records, checks, manifests, source_errors = validate_sources(evidence, root, pinned_links)
+    errors.extend(source_errors)
     if len(manifests) != 158 or len(set(manifests.values())) != 12:
         errors.append("Manifest inventory does not cover 158 distinct crates in 12 groups")
 
     result = {
         "schema": "chio.computer.design-check.v1",
-        "design_revision": 3,
+        "design_revision": 4,
         "document_sha256": document_hashes,
         "validator_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        "validator_regression_sha256": hashlib.sha256((directory / "test_validate.py").read_bytes()).hexdigest(),
         "source_evidence_sha256": hashlib.sha256(evidence_path.read_bytes()).hexdigest(),
         "python_examples_syntax_checked": syntax_count,
         "operator_precedence_checked": precedence_ok,
@@ -161,10 +181,14 @@ def main():
         "pinned_source_links_checked": len(pinned_links),
         "source_records": records,
         "source_objects_hash_and_line_count_checked": checks,
-        "unpublished_heads_not_available_locally": sorted(unpublished_heads_skipped),
+        "source_selection": "canonical-published-equivalent-or-required-pins",
         "distinct_crate_manifests": len(manifests),
         "crate_groups": len(set(manifests.values())),
         "proposed_acceptance_cases": len(cases),
+        "acceptance_cases_by_profile": {
+            profile: sum(value == profile for value in profiles.values())
+            for profile in ("Computer-0", "Both", "Later funded")
+        },
         "runtime_tests_run": False,
         "api_implemented": False,
         "errors": errors,
