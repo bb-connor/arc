@@ -237,3 +237,25 @@ Relevant receipt source bytes match `77d94e11dc` except the test-only observer
 repair; separately qualified authority/custody files also differ. This accepts
 the previously missing source-family staging/reread capacity observation, without
 claiming an exact whole-candidate run or renewing the earlier 1M/10M campaigns.
+
+
+## LANDING-STORE-FIXTURES: P2, required CI fixture repair
+
+Exact candidate `63ae9a4f5c` fails three existing integration tests. The replay
+fixture signs an unbound intent, so its first dispatch denies before it can
+exercise durable replay. Two authority smoke fixtures put their databases
+in the shared temporary directory, violating the required private parent.
+
+Test-only repair: configure the same explicit tenant and approver roster on
+both kernels, bind the actual request through `bind_tool_approval_intent`,
+and sign that bound intent. Preserve the missing-server denial, initial Allow
+and restarted-store replay Deny assertions. Use `private_tempdir` guards for
+the authority fixtures so their databases have private parents throughout
+all handle lifetimes. Approval and custody production code remain unchanged.
+
+The exact Original returned three passes and three failures; the composed
+owning targets return six passes with no failures or ignores. Strict owning
+all-target Clippy passes. Source hashes, commands and logs are recorded in
+`docs/security/audits/landing-ci-store-fixtures-20261009.json`. Full candidate
+review, exact protected checks and merge remain pending. The separate
+production sidecar proposal remains in its postmerge lane.

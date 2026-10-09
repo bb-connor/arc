@@ -54,7 +54,7 @@ from the separately assumed SHA-256 noncollision property.
 - [x] Add a source-bound residual audit and update canonical current requirement
   states, landing boundary and final review without changing historical objects.
   Expected: ledger checker passes; old requirements preserved byte-for-value.
-- [ ] Record runtime and static evidence, commit a clean composition, and post
+- [x] Record runtime and static evidence, commit a clean composition, and post
   `LANDING CANDIDATE <full SHA>` for planner's independent review.
 - [ ] Address confirmed findings, then publish exact reviewed source as
   `LANDING HEAD <full SHA>`. Require the four protected exact-candidate checks
@@ -66,3 +66,25 @@ No arbitrary skip mechanism; residual cannot inflate passed counts; source pins
 still reject a narrower domain; noncollision and unfinished concrete properties
 remain distinct; other proof gates still execute; no release relies on the
 unproved obligation. Changing acceptance never changes a failed run to passed.
+
+## Task 3: Repair confirmed required-CI fixtures before publication
+
+The frozen 63ae9a4f5c candidate reproduced three store fixture failures. Two
+CLI service fixtures also fail custody under CI-style umask 022. Hold the
+landing-head push until these existing tests exercise the current contracts.
+
+- [x] Capture the exact candidate Original for both store integration targets:
+  three failures, unchanged source, concrete approval-binding/custody reasons.
+- [x] Compose only cd8e3395de's private-directory smoke fixtures. Keep the
+  separate production sidecar proposal in the postmerge track.
+- [x] Configure an explicit approval tenant/roster and sign the kernel-bound
+  tool invocation. Preserve missing-server denial, initial Allow and reopened
+  replay Deny assertions.
+- [x] Complete final owning store tests, strict lint and formatting, retaining
+  original and final source/log hashes.
+- [ ] Integrate Claude's two CLI fixture repairs after exact-candidate Original,
+  both umask controls and strict owning lint. No global umask or custody change.
+- [ ] Record both obligations and evidence in the authoritative ledger, preserve
+  the 1,840 prior requirements, and hand the final delta to the planner review.
+- [ ] Publish the reviewed frozen candidate and observe the exact protected
+  checks. No local result substitutes for hosted qualification or merge.
