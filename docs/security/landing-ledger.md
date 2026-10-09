@@ -7,6 +7,24 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Independent authority review reopened (October 9)
+
+**FINAL-F11 remains blocked by a confirmed P1 authority regression.** An elected
+former custodian can serve and issue using a superseded key because local key
+possession substitutes for current authority confirmation. Two confirmed P2s
+cover follower-relay replacement of the leader-confirmed envelope and governance
+evaluators reading unadmitted authority. The [review dispositions](audits/authority-final-review-dispositions-20261009.json)
+retain all eight findings, including three additional concerns regraded for
+P2 effect triage. Repairs require genuine expected-safe failing controls before
+implementation and renewed source-bound acceptance.
+
+The canonical ledger now holds **1,890 requirements**. All 1,882 previous
+requirement objects and sources are preserved; F11's prior current state is
+archived. Earlier component passes do not qualify these new cases. The registry
+transaction, export refusal and bounded capacity integrations continue, while
+publication stays held for the authority repair, remaining composition, final
+independent review and protected hosted checks. No merge or release is claimed.
+
 ## Independent export review reopened (October 9)
 
 **FINAL-F03 is reopened for a confirmed P1 availability regression.** A supported
