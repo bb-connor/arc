@@ -424,27 +424,44 @@ A cycle starts on the `extension_tick` (default 250 ms), or at once when a read
 is waiting for the head (7.2) or an invalidation wakes the walker. There is no
 writer commit signal.
 
-1. **Target.** Sample T = `MAX(entry_seq)` (or W when the live log is empty)
-   and the lineage rowid high-water mark, at time t.
+1. **Target.** In one observation, sample T = `MAX(entry_seq)` (or W when
+   the live log is empty), the newest checkpoint whose `batch_end` is at most
+   T, and the lineage rowid high-water mark, at time t.
    - If T < E, or W is lower than the W last seen, the head or watermark has
      regressed. The state becomes `Invalid(regressed)`, and `observedAt` is not
      refreshed.
-2. **Entries.** Process the entries in (E, T] in steps, as in the tail phase.
-3. **Checkpoints.** Accept each new checkpoint whose `batch_end` is at most E,
-   in order:
-   - its seq is the owned head plus one;
-   - its predecessor link and `chain_root` match the owned head and frontier;
-   - every pending entry in its range has
-     `signer == checkpoint.kernel_key`, the same rule as the build;
-   - its root is recomputed from the owned pending leaves.
+2. **Checkpoint-covered entries.** Process each checkpoint in the target in
+   order. Authenticate its signature, projection, predecessor link and
+   `chain_root`. Before publishing any new row in its covered range:
+   - authenticate claim entries in bounded steps and stage only their leaf
+     hashes and signers, without changing visible rows, counts or E;
+   - recompute the checkpoint root from those owned leaves and any previously
+     published pending tail leaves. Require contiguous entries, the exact
+     `tree_size`, and `signer == checkpoint.kernel_key` for every entry;
+   - after the root matches, re-read and authenticate the new entries, check
+     their source rows, and require each leaf and signer to match the owned
+     leaf that the root verified. Publish rows and their maintained counts in
+     bounded holds;
+   - accept the checkpoint as the owned head, then delete its pending leaves
+     in bounded holds. If a cycle is interrupted, retain the leaves of already
+     published entries; discard and stage again only those beyond E.
 
-   Then the pending leaves are deleted. A swapped tail entry changes the root,
-   and the state becomes Invalid.
+   Previously authenticated rows remain visible during staging. A validly
+   signed substitute that disagrees with an already observed covering root
+   must never become a visible page, point result or count contribution.
+3. **Uncheckpointed tail.** Process the remaining entries through T in steps
+   as in the build's tail phase. Publish rows and their pending leaves together.
+   These entries remain signature-only until a later checkpoint authenticates
+   the owned leaves. No newly observed covering checkpoint may be treated as
+   absent merely to publish its rows early.
 4. **Lineage refresh.** For capability lineage rows up to the sampled rowid
-   mark: lineage only inserts rows or upgrades their signed token and
-   provenance (`capability_lineage.rs:207-220`). An absent unsigned subject is
-   filled in, and its counts move. A changed existing subject is drift, and the
-   state becomes Invalid.
+   mark, apply the canonical local-read provenance validation before using the
+   subject. Preserve the existing unsigned `LegacyProjection` contract;
+   `SignedToken` and `SyntheticAnchor` must satisfy their own validation rules.
+   Lineage only inserts rows or upgrades their signed token and provenance
+   (`capability_lineage.rs:207-220`). An absent unsigned subject is filled in,
+   and its counts move. A changed existing subject is drift, and the state
+   becomes Invalid.
 5. **Freshness.** When E >= T, `observedAt` becomes t: the observation time of
    the target, not the completion time.
 
@@ -537,7 +554,10 @@ pass starts. Extension keeps running alongside it.
    Selection and count then run in one snapshot transaction under
    `SqlWorkBudget`.
 6. Fetch the selected rows and check their leaves.
-7. Re-check the lease (4.4) and return the version watermark.
+7. Re-check the lease (4.4) and return the version watermark to the control
+   plane's blocking adapter. That adapter converts and serializes the response
+   while it still owns the HTTP admission permit. Request cancellation does
+   not release the permit before the worker and response materialization end.
 
 ### 6.2 Shapes and plans
 
