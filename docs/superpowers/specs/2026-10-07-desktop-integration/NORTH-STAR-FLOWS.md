@@ -291,10 +291,13 @@ not undo effects. That text stays until live control and S4 closure land.
 
 ### Decision: Megastart's allowance moves to kernel holds
 
-Megastart's aggregate allowance is application-owned state (G in PROGRAM-MAP).
-An application counter is a competing ledger, and only a kernel-held pool
-survives a restart. The Megastart owner rebinds the allowance to a root grant
-and its holds.
+Megastart's aggregate allowance is one persistent aggregate family under its
+own SQLite admission owner (G in PROGRAM-MAP). Reopening that store preserves
+consumption, so the move is not about restart durability. It is a second
+ledger beside the M2 root grant: other harnesses cannot draw on it, and its
+pinned kernel rejects multi-hop aggregate delegation. The Megastart owner
+rebinds the allowance to a root grant and its holds, keeping the packaged v1
+behaviour compatible.
 
 ### Owner changes for M2
 
