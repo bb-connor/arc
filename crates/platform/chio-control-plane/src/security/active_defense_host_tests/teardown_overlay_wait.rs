@@ -224,6 +224,26 @@ async fn hold_while_ttl_live<F: Future<Output = u32>>(
     }
 }
 
+/// Polls a teardown that must stay pending after its TTL expired, running
+/// `advance_clock` before each poll, until `done` holds or `limit` passes.
+async fn hold_expired<F: Future<Output = u32>>(
+    teardown: &mut Pin<&mut F>,
+    limit: Duration,
+    mut advance_clock: impl FnMut(),
+    mut done: impl FnMut() -> bool,
+) {
+    let started = Instant::now();
+    while started.elapsed() < limit && !done() {
+        advance_clock();
+        tokio::select! {
+            attempts = teardown.as_mut() => {
+                panic!("teardown finished while the expired overlay was held: attempts={attempts}")
+            }
+            () = tokio::time::sleep(Duration::from_millis(100)) => {}
+        }
+    }
+}
+
 /// Polls a teardown that must stay pending after its TTL expired, with the
 /// trusted clock following wall time from expiry, until `done` holds or
 /// `limit` passes.
@@ -232,18 +252,15 @@ async fn hold_after_expiry<F: Future<Output = u32>>(
     ttl: &LongTtlHost,
     expired_at: Instant,
     limit: Duration,
-    mut done: impl FnMut() -> bool,
+    done: impl FnMut() -> bool,
 ) {
-    let started = Instant::now();
-    while started.elapsed() < limit && !done() {
-        ttl.follow_wall_clock_after_expiry(expired_at);
-        tokio::select! {
-            attempts = teardown.as_mut() => {
-                panic!("teardown finished while the expired overlay was held: attempts={attempts}")
-            }
-            () = tokio::time::sleep(Duration::from_millis(100)) => {}
-        }
-    }
+    hold_expired(
+        teardown,
+        limit,
+        || ttl.follow_wall_clock_after_expiry(expired_at),
+        done,
+    )
+    .await;
 }
 
 #[tokio::test]
@@ -452,8 +469,8 @@ async fn recovery_worker_crash_during_a_ttl_wait_still_spends_the_fault_budget()
 #[tokio::test]
 async fn expired_overlay_whose_rollback_keeps_failing_spends_the_fault_budget() {
     let mut faulted = LongTtlHost::new();
-    // Every retry backoff exceeds the clock steps below, so no retry is ever
-    // recorded at or before trusted time.
+    // Retries fall due one second after each failed attempt, and the operator
+    // is paged once failures have persisted for two seconds of trusted time.
     let policy = &mut faulted
         .fixture
         .config
@@ -517,6 +534,19 @@ async fn expired_overlay_whose_rollback_keeps_failing_spends_the_fault_budget() 
         || capture.parked(),
     )
     .await;
+    // Every due retry durably passes through RollingBack. Hold trusted time so
+    // no further retry falls due, and sample once the worker has completed a
+    // tick begun after the hold, when no rollback attempt can be in flight.
+    let started_before_hold = worker.health().last_tick_started_sequence;
+    let worker_settled = || worker.health().last_tick_completed_sequence > started_before_hold;
+    hold_expired(
+        &mut teardown.as_mut(),
+        HOST_LIFECYCLE_TEST_TIMEOUT,
+        || {},
+        worker_settled,
+    )
+    .await;
+    let settled = worker_settled();
     let response = faulted.response();
     let failure_codes = rollback_failure_codes(&response);
     let retry = faulted.scheduler_retry();
@@ -529,6 +559,10 @@ async fn expired_overlay_whose_rollback_keeps_failing_spends_the_fault_budget() 
     let fault_audits = capture.snapshot().len();
     drop(teardown);
 
+    assert!(
+        settled,
+        "the recovery worker completed no tick once trusted time was held: {health:?}"
+    );
     assert!(
         now_unix_ms > response.plan.expires_at_unix_ms,
         "the TTL had not expired: now={now_unix_ms} expires={}",
