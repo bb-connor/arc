@@ -1,6 +1,6 @@
 # Chio unified roadmap
 
-**Status:** design approved by the owner on 2026-10-08, section by section. Decisions D1 to D7 were recorded on 2026-10-09 (section 8). Nothing in this document starts work. Execution begins only on an explicit start.
+**Status:** design approved by the owner on 2026-10-08, section by section. Decisions D1 to D7 were recorded on 2026-10-09 (section 8). The Computer lane (COMP) and decisions D21 to D23 were added on 2026-10-09. Nothing in this document starts work. Execution begins only on an explicit start.
 
 **Chio is a Rust kernel for agentic operating systems that coordinate work, share resources, and cooperate across organizational boundaries.**
 
@@ -9,7 +9,7 @@
 This roadmap works backwards from one result: outside teams running Chio under their own agents and completing co-signed work across organizations. It has four parts:
 
 - **Gate 0:** the foundation, and the contracts every lane builds against.
-- **Seven lanes:** parallel work that agent swarms can execute.
+- **Eight lanes:** parallel work that agent swarms can execute. Seven build the substrate; COMP, the Computer developer surface, sits on top of them.
 - **Gates G1 to G5:** the points where the lanes join.
 - **Registers:** the decisions, dispositions and dates that serialize the work.
 
@@ -482,6 +482,42 @@ Only the kernel hold ledger durably records consumption. Money is not pooled acr
 - **OUT-4: records.** Independent-operation records and ADR-0011 claim reviews for every gate.
   - **Exit:** each gate's claims have a recorded ADR-0011 review before they are made, and G2 and G5 each publish an independent-operation record.
 
+### Lane COMP: the Computer developer surface
+
+Chio Computer (#1199) is the developer face of the substrate lanes. A developer forks a project, composes work, grants bounded access to another organization's computer, joins the run and applies the exact accepted change. Computer composes the existing owners. It adds no authority engine, ledger, scheduler or recovery reducer.
+
+**Computer-0** is the profile the success test uses (D21). It needs only G4's substrate:
+
+- **Backend:** git-native. Snapshots are tree objects, revision heads are refs, and apply is a compare-and-swap of a ref against the expected base. Apply uses the resource owner's commit fence. KSPEC-10's crossing primitive is adopted when it lands after the test.
+- **Independent organizations:** a receiver-local overlay plus sealed import. The source-owned branch service is for same-domain placement only.
+- **Resources are charged at their owner's door.** Grants over source-owned resources, such as a model route, are enforced and charged by the source's own hold ledger through the source's broker. No money crosses the boundary.
+- **Delegation stays inside the receiver.** The receiver's broker holds the foreign grant as one hop. Multi-hop across independent keys stays after the test (COOP).
+- **Agreements:** unpaid (D5).
+- **Two leaf kinds (D22):**
+  - a **TaskLeaf** is a contract that one of the receiver's own admitted harness profiles performs;
+  - a **ProgramLeaf** is the source's pinned bundle, run under the receiver's code admission and a qualified KSPEC-07 confinement kind.
+
+**Rungs.**
+
+- **COMP-1: closed descriptions.** C1 records, C3 descriptors for both leaf kinds, the canonical compiler, and Rust, Python and TypeScript vectors. It starts now; CT-WORK freezes the compile target.
+  - **Exit:** shared vectors, bounds, occurrence identity, operator-precedence vectors (D23) and refusal of forged plans.
+- **COMP-2: git-native managed branches.** Snapshot, branch, freeze, seal, release-checked diff, and apply by ref compare-and-swap. It starts now and binds REC-P4 labels when they land. It salvages #1164's worktree and patch-review code.
+  - **Exit:** branch isolation, recovery from interrupted publication, base conflict, and fencing of stale writers.
+- **COMP-3: composition on WORK.** Compile into WORK-W1 allocation, acceptance and graph extension; protected verification; the C5 view and `join_tree` closure. It depends on WORK-W1 and KERN-3.
+  - **Exit:** real native execution with exact acceptance, the six-dimension view, and evidence from admission and closure races.
+- **COMP-4: independent computers.** C4 bindings:
+  - TaskLeaf to the receiver's harness profiles (REL-3, SHARE-3);
+  - ProgramLeaf to KERN-5 confinement;
+  - door-charged resources (COOP-3, SHARE-2);
+  - lost-reply recovery (REC).
+
+  It depends on WORK-W2, REC, COOP-3, SHARE-2, KERN-5 and G3.
+  - **Exit:** G4's complete run executes as the Computer proposal's Application A.
+- **COMP-5: installed surface.** The SDK and CLI from installed packages, through WORK-W3, shipped in the preview (REL-1). A second application reuses the same owners.
+  - **Exit:** the hero runs from installed packages, outside the source checkout, on the release G5 uses.
+- **COMP-6: dogfood.** After COMP-3, #1197's development swarm runs its lanes as Computer forks, and its merge gate becomes an expected-base apply with exported evidence. This is same-domain, so it never counts toward independence.
+  - **Exit:** Chio's own merges land through Computer.
+
 ## 5. Gates
 
 ```text
@@ -491,12 +527,12 @@ Gate 0 ─┬─ REL-1,REL-2 + KERN-1,KERN-2,KERN-6 + OUT-2 ──────> 
         │                                                                              │
         ├─ SHARE-1..3 + KERN-3,KERN-5 + REL-3 + WORK slice β ──> G3 HOST-M2 on Linux ──┤
         │                                                                              │
-        ├─ WORK-W1,W2,W3 + REC + COOP-3 + KERN-4 ──────────────────────────────────────┴─> G4 internal HOST-M3 ──┐
+        ├─ WORK-W1,W2,W3 + REC + COOP-3 + KERN-4 + COMP-1..4 ──────────────────────────┴─> G4 internal HOST-M3 ──┐
         │                                                                                                        ├─> G5 outside HOST-M3 x2
-        └─ COOP-4 ───────────────────────────────────────────────────────────────────────────────────────────────┘
+        └─ COOP-4 + COMP-5 ──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-WORK, REC, COOP-3 and KERN-4 join at G4, because G4's complete run needs co-signed work, lost-reply recovery and the HOST-M3 door. COOP-4 is the only lane input that joins at G5 directly: G4 verifies evidence against pinned partner keys (COOP-1), and COOP-4's checkpoint compatibility and edge audit serve outside counterparties.
+WORK, REC, COOP-3, KERN-4 and COMP-1 to COMP-4 join at G4. G4's complete run needs co-signed work, lost-reply recovery, the HOST-M3 door and the Computer-0 hero that executes it. COOP-4 and COMP-5 join at G5 directly. G4 verifies evidence against pinned partner keys (COOP-1). COOP-4's checkpoint compatibility and edge audit serve outside counterparties. COMP-5 puts the hero into the installed release that outside teams run.
 
 **G1: an outsider can install the preview.**
 
@@ -504,6 +540,7 @@ WORK, REC, COOP-3 and KERN-4 join at G4, because G4's complete run needs co-sign
 - A timed install by someone outside the core team, on Linux and on macOS, through to a first receipt.
 - Current Claude Code and Codex connect over MCP and produce allow and deny receipts.
 - The CT-WIRE freeze list is published.
+- Not blocking: the preview carries whichever COMP rungs have passed, so recruits can try a local fork, diff and apply early.
 
 **G2: HOST-M1 with an outside team.** An outside team and its counterparty each run their own domain end to end:
 
@@ -539,12 +576,15 @@ Exit also requires:
   - stop;
   - revoke mid-work.
 - The requester verifies the package offline.
+- The run executes as the Computer proposal's Application A, through the Computer-0 hero. It exercises a TaskLeaf on B's own harness and a confined ProgramLeaf (COMP-4).
 
 **G5: the success test.**
 
 - A preview release that contains HOST-M3.
 - Two outside teams each complete a qualifying run, satisfying section 1 criteria (a) to (g).
 - At least one team repeats its run unassisted.
+- Each team runs the installed Computer hero (COMP-5), with at least one TaskLeaf performed by its own agents. At least one ProgramLeaf runs across the two teams.
+- Stretch: the Computer proposal's Application B, confined work beside another owner's private data.
 - The records are published and reviewed.
 
 **Critical path.** This document makes no capacity or duration projections, so it cannot say which branch finishes last. Every prerequisite of G4 in the graph above therefore stays on the critical path until it closes:
@@ -555,14 +595,16 @@ Exit also requires:
 - WORK-W1, W2 and W3;
 - REC;
 - COOP-3;
-- KERN-4.
+- KERN-4;
+- COMP-1 to COMP-4.
 
-G5 then waits on G4 and COOP-4.
+G5 then waits on G4, COOP-4 and COMP-5.
 
 The two riskiest unproven pieces get the largest swarm allocation and the earliest prototypes:
 
 - #1179's rebase and requalification;
-- WORK-W2.2's durable bilateral delivery.
+- WORK-W2.2's durable bilateral delivery;
+- COMP-3's `join_tree` closure, which needs the graph-continuation and process-closure fences.
 
 G2 and G3 run in parallel with the WORK, REC, COOP-3 and KERN-4 branches, but G4 waits on both, so neither is slack. HOST-M1 never depends on #1179.
 
@@ -580,6 +622,9 @@ G2 and G3 run in parallel with the WORK, REC, COOP-3 and KERN-4 branches, but G4
 | G4, G5 | The receiver admits a co-signed work commitment at its own door. | `prevent` | `ready_after_adr` (CT-WORK, CT-CROSS) |
 | G4, G5 | A lost reply is recovered by original identity with no second dispatch. | `prevent` | `blocked_by_adr` until CT-SETTLE is frozen (D1 and D2 decided 2026-10-09) |
 | G4, G5 | The evaluator's signed acceptance or rejection is recorded. | `detect_only` | `ready_after_adr` (CT-WORK) |
+| G4, G5 | Apply publishes the exact accepted ChangeSet only while the source ref still equals the expected base; a moved base is a conflict. | `prevent` | `ready_after_adr` (CT-WORK, D21) |
+| G4, G5 | Grants over source-owned resources are enforced and charged by the source's own hold ledger at the source's door. | `prevent` | `ready_after_adr` (CT-COOP, ADR-0016, D21) |
+| G4, G5 | A ProgramLeaf runs only under the receiver's code admission and a qualified KSPEC-07 confinement kind. | `prevent` | `ready_after_adr` (KSPEC-07, D22) |
 | After G5 | Rail settlement outcomes and cross-org money. | `detect_only` | `deferred` |
 
 ## 6. Start now
@@ -626,7 +671,9 @@ None of these depend on #1160.
 | #1177 | Merge this PR after the restructure and the server-first HOST-M1 re-cut (owner decision 2026-10-09: it lands by merging the PR, not by importing its documents elsewhere). Mark NORTH-STAR-FLOWS approved. Apply the ADR-0038 amendment. Rewrite the Clawdstrike material as prior art (U2). Move macOS HOST-M2 after the test. HOST-M1 code no longer waits on the docs restructure. |
 | #1170 | Split private material per U1. Void F-17. Scope ADR-0023 to ADR-0038 (thin OS adapters allowed; broker, cage and launchers not frozen). Scope ADR-0028 to "where an IdP exists". Replace the review criterion with section 1. Drop the capacity model. Merge the public remainder. |
 | #1171 | Rebase and merge this PR (owner decision 2026-10-09: it lands by merging the PR, not by importing the draft elsewhere). Submit the -00 if U8 says so. Federation material goes to companion drafts later. |
-| #1164 | Close. Salvage its MCP adoption, activation and preview-distribution machinery into Lane REL. |
+| #1164 | Close. Salvage its MCP adoption, activation and preview-distribution machinery into Lane REL, and its worktree and patch-review machinery into COMP-2. |
+| #1199 | Land revision 3 as the Computer design (Lane COMP; D21 to D23). |
+| #1197 | Internal development tooling. COMP-6 runs its lanes on Computer after COMP-3. |
 | #1161, #1159, #1158 | Close as contained in #1173. #1161's peer transport is example-only and does not satisfy STRAT-F15. |
 | #1162 | Archive its evidence and `examples/repair-machine-proof`, then close. Its outcome-continuation code, carried in #1173, needs a slice or a drop (D19). |
 | #1163 | Decide whether the paper's bilateral-admission benchmark must be regenerated, then close. |
@@ -665,10 +712,13 @@ None of these depend on #1160.
 | D18 | Co-sign bytes in CT-WIRE | None yet. Freeze #1160's bilateral DSSE predicate, or #1173 slice γ's revised specification with `reconstruct_dsse_pae`. γ lands after Gate 0, so freezing γ's bytes means CT-WIRE takes them before γ merges. | Open (raised 2026-10-09) | Gate 0 (CT-WIRE), slice γ |
 | D19 | #1162's outcome-continuation code | None yet. #1173 carries #1162's `chio-runtime-core` outcome continuation (`src/outcome_continuation.rs` and its SQLite store), but no slice names it. Assign it to γ with the treaty runtime-core, or drop it. | Open (raised 2026-10-09) | #1173 and #1162 closure |
 | D20 | Contract version number | None yet. Keep `spec/schemas/VERSION` at 1.0.0 with a preview label in CT-WIRE, or renumber it to the 0.x preview that Gate 0 describes. | Open (raised 2026-10-09) | CT-WIRE, G1 |
+| D21 | Computer-0 profile | Computer is the face of the success test, on G4's substrate only. The backend is git-native; independent organizations get a receiver-local overlay plus sealed import; resources are charged at their owner's door; delegation stays inside the receiver; agreements are unpaid. | **Decided 2026-10-09:** the owner accepted the recommendation. | COMP, G4, G5 |
+| D22 | Computer leaf kinds | TaskLeaf (the receiver's own admitted harness performs a contract) and ProgramLeaf (the source's pinned bundle under receiver code admission and KSPEC-07 confinement). | **Decided 2026-10-09:** the owner chose both from day one. | COMP-1, COMP-4, KERN-5 |
+| D23 | Composition syntax | `&` for parallel and `\|` for sequence, so `a & b & c \| d \| e` needs no parentheses in Python or Rust; canonical `parallel(...).pipe(...)` for TypeScript and every other language. | **Decided 2026-10-09:** the owner accepted the recommendation. | COMP-1 |
 
 **Recorded, not open:**
 
-- decisions D1 to D7 (2026-10-09, table above);
+- decisions D1 to D7 and D21 to D23 (2026-10-09, table above);
 - the executing team at the success test runs Linux; macOS-only outside teams take part as the counterparty; macOS HOST-M2 stays after the test (ruling of 2026-10-09, delegated by the owner; section 1);
 - #1174, #1177 and #1171 land by merging their PRs (owner decision 2026-10-09; section 7);
 - the success test and the qualifying-run definition (section 1);
@@ -699,6 +749,8 @@ ADR-0023, ADR-0028, ADR-0035 and ADR-0036 are candidate numbers inside #1170's s
 | Builders, harness and plugin authors, OS users | The north star and the supporting line, cross-org clause first | Install, connect their agent, see a deny receipt |
 | Counterparty pairs | "Verify the agent's authority at your door, not theirs." | A two-operator run with their own keys |
 | Standards bodies | No tagline; artifact names only | Interop vectors |
+
+**The developer example.** The Computer hero (#1199) is the README and recruiting example. It stays labelled as a preview until the rung behind each of its claims passes. Its builder line: "Chio gives agentic operating systems the Unix process model with authority attached: fork, exec, join and apply, across organizations."
 
 Platform and vendor audiences, channels and messaging are in the private GTM plan. This document keeps only the technical interoperability requirements (OUT-3).
 
@@ -776,6 +828,7 @@ These are fixed facts, not projections.
 | `ECON-` | Economy stack (#956 to #959) | M0 to M6 |
 | `MKT-` | Cognition market (historical) | M0 to M11 |
 | `UR-` | This roadmap | G0 to G5, lane rungs, CT- contracts, U- actions, D- decisions |
+| `CMP-` | Chio Computer (#1199) | contracts C1 to C5, acceptance cases `C<n>-<nn>`, increments I1 to I5 |
 | `FV-` | Formal verification | already prefixed |
 
 **Collisions this removes.** Each pair below has historically shared one letter:
