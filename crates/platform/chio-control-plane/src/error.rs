@@ -80,6 +80,11 @@ pub enum CliError {
     #[error("i/o error: {0}")]
     Io(#[from] std::io::Error),
 
+    /// The replacement file is in place and readable, but syncing its parent
+    /// directory failed, so the rename may not survive a crash.
+    #[error("registry file was replaced but its durability sync failed: {0}")]
+    PersistedWithoutDurability(std::io::Error),
+
     #[error("json error: {0}")]
     Json(#[from] serde_json::Error),
 
@@ -302,6 +307,11 @@ impl CliError {
                 "CHIO-CLI-IO",
                 serde_json::json!({ "source": error.to_string() }),
                 "Check file paths, permissions, and parent directories before retrying.",
+            ),
+            Self::PersistedWithoutDurability(error) => self.report_with_context(
+                "CHIO-CLI-IO",
+                serde_json::json!({ "source": error.to_string(), "replaced": true }),
+                "The new contents are in place; do not retry as if nothing changed. Verify the file and the storage device before continuing.",
             ),
             Self::Json(error) => self.report_with_context(
                 "CHIO-CLI-JSON",

@@ -300,4 +300,58 @@ mod custody {
         );
         Ok(())
     }
+
+    #[test]
+    fn failure_before_the_rename_preserves_prior_bytes_and_removes_its_temporary() -> TestResult {
+        let directory = chio_test_support::private_tempdir()?;
+        let path = directory.path().join("offers.json");
+        let template = template()?;
+        registry_of(&template, 1).save(&path)?;
+        let before = fs::read(&path)?;
+        let bytes = serde_json::to_vec(&registry_of(&template, 2))?;
+
+        let error = crate::signed_input::replace_file_with(&path, &bytes, "fixed", &|stage| {
+            if stage == crate::signed_input::ReplaceStage::BeforeRename {
+                Err(std::io::Error::other("injected pre-commit failure"))
+            } else {
+                Ok(())
+            }
+        })
+        .err()
+        .ok_or("injected pre-commit failure must surface")?;
+        assert!(
+            matches!(error, CliError::Io(ref io) if io.to_string() == "injected pre-commit failure")
+        );
+        assert_eq!(fs::read(&path)?, before);
+        assert!(!temporary_for(directory.path(), "fixed").exists());
+        Ok(())
+    }
+
+    #[test]
+    fn failure_after_the_rename_is_distinct_and_the_new_file_is_in_place() -> TestResult {
+        let directory = chio_test_support::private_tempdir()?;
+        let path = directory.path().join("offers.json");
+        let template = template()?;
+        registry_of(&template, 1).save(&path)?;
+        let replacement = registry_of(&template, 2);
+        let bytes = serde_json::to_vec(&replacement)?;
+
+        let error = crate::signed_input::replace_file_with(&path, &bytes, "fixed", &|stage| {
+            if stage == crate::signed_input::ReplaceStage::DirectorySync {
+                Err(std::io::Error::other("injected directory sync failure"))
+            } else {
+                Ok(())
+            }
+        })
+        .err()
+        .ok_or("injected post-commit failure must surface")?;
+        assert!(matches!(
+            error,
+            CliError::PersistedWithoutDurability(ref io) if io.to_string() == "injected directory sync failure"
+        ));
+        assert_eq!(fs::read(&path)?, bytes);
+        assert_eq!(PassportIssuanceOfferRegistry::load(&path)?, replacement);
+        assert!(!temporary_for(directory.path(), "fixed").exists());
+        Ok(())
+    }
 }

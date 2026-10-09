@@ -78,17 +78,40 @@ pub(crate) fn write_bounded_json_with_limit<T: Serialize>(
     replace_file(path, &buffer.bytes)
 }
 
+/// Points in `replace_file_with` where a failure can be injected.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ReplaceStage {
+    /// After the temporary is fully written and synced, before the rename.
+    BeforeRename,
+    /// After the rename, at the parent directory sync.
+    DirectorySync,
+}
+
 /// Replaces `path` through a freshly created, randomly named sibling that is
 /// opened exclusively with owner-only permissions (never more permissive than
-/// the file it replaces), synced, and renamed into place. A failure removes
-/// only the temporary file this call created and leaves the prior file intact.
+/// the file it replaces), synced, and renamed into place.
+///
+/// A failure before the rename removes only the temporary this call created
+/// and leaves the prior file intact. A failure of the parent directory sync
+/// happens after the rename: the new file is already in place, and the result
+/// is `CliError::PersistedWithoutDurability`. The directory sync is performed
+/// on Unix only; other platforms rely on the file sync and the atomic rename.
 fn replace_file(path: &Path, bytes: &[u8]) -> Result<(), CliError> {
     let random = chio_core::Keypair::generate().public_key().to_hex();
     replace_file_via(path, bytes, &random)
 }
 
-/// `nonce` names the temporary sibling; production passes a fresh random value.
 pub(crate) fn replace_file_via(path: &Path, bytes: &[u8], nonce: &str) -> Result<(), CliError> {
+    replace_file_with(path, bytes, nonce, &|_| Ok(()))
+}
+
+/// `nonce` names the temporary sibling; `inject` can fail a stage.
+pub(crate) fn replace_file_with(
+    path: &Path,
+    bytes: &[u8],
+    nonce: &str,
+    inject: &dyn Fn(ReplaceStage) -> std::io::Result<()>,
+) -> Result<(), CliError> {
     use std::io::Write;
     let directory = match path.parent() {
         Some(parent) if !parent.as_os_str().is_empty() => parent,
@@ -111,16 +134,27 @@ pub(crate) fn replace_file_via(path: &Path, bytes: &[u8], nonce: &str) -> Result
         options.mode(mode);
     }
     let mut file = options.open(&temporary)?;
-    let written = (|| -> std::io::Result<()> {
+    let committed = (|| -> std::io::Result<()> {
         file.write_all(bytes)?;
         file.sync_all()?;
-        std::fs::rename(&temporary, path)?;
-        std::fs::File::open(directory)?.sync_all()
+        inject(ReplaceStage::BeforeRename)?;
+        std::fs::rename(&temporary, path)
     })();
-    if let Err(error) = written {
+    if let Err(error) = committed {
         let _ = std::fs::remove_file(&temporary);
         return Err(CliError::Io(error));
     }
+    let durable = inject(ReplaceStage::DirectorySync).and_then(|()| sync_directory(directory));
+    durable.map_err(CliError::PersistedWithoutDurability)
+}
+
+#[cfg(unix)]
+fn sync_directory(directory: &Path) -> std::io::Result<()> {
+    std::fs::File::open(directory)?.sync_all()
+}
+
+#[cfg(not(unix))]
+fn sync_directory(_directory: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
