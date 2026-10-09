@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 152" width="480" height="152" role="img" aria-label="Signed receipts for routed calls, Authority that can only narrow, Agents that pay each other">
-  <text x="240" y="44" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="18" font-style="italic" fill="#ab8a52" fill-opacity="1">Signed receipts for routed calls</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 152" width="480" height="152" role="img" aria-label="A signed receipt for every call, Authority that can only narrow, Agents that pay each other">
+  <text x="240" y="44" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="18" font-style="italic" fill="#ab8a52" fill-opacity="1">A signed receipt for every call</text>
   <circle cx="240" cy="66" r="1.8" fill="#8f7ff2"/>
   <text x="240" y="92" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="18" font-style="italic" fill="#ab8a52" fill-opacity="1">Authority that can only narrow</text>
   <circle cx="240" cy="114" r="1.8" fill="#8f7ff2"/>

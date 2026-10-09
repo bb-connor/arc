@@ -16,7 +16,9 @@ operation below and follows [ADR-0011](../../../adr/ADR-0011-boundary-taxonomy-p
 > prose paragraphs.
 
 Source aliases (T, F, W, K, N, R, G) are the pins in
-[PROGRAM-MAP](../../../architecture/PROGRAM-MAP.md). T is current `main`.
+[PROGRAM-MAP](../../../architecture/PROGRAM-MAP.md). T is current `main`. F is
+`main` after the #1160 merge commit; its runtime is experimental and its
+broker is Linux-only.
 
 ## 1. North star and vocabulary
 
@@ -53,9 +55,9 @@ system's kernel services:
 | --- | --- | --- |
 | Agent passports, `did:chio` | Users and credentials | Shipped (T: `crates/trust/chio-credentials`, `crates/trust/chio-did`) |
 | Capabilities and attenuation | Permissions and handles | Shipped (T: `crates/core/chio-core-types/src/capability/attenuation.rs`) |
-| Durable process trees | Processes | F: `crates/kernel/chio-process` |
-| Holds, budgets, credential broker | Quotas and keychain | Holds shipped (T: `crates/kernel/chio-kernel/src/budget_store.rs`); broker in F |
-| Mailboxes, protocol edges | IPC and syscalls | Edges shipped; mailboxes in F |
+| Durable process trees | Processes | main (experimental; F: `crates/kernel/chio-process`) |
+| Holds, budgets, credential broker | Quotas and keychain | Holds shipped (T: `crates/kernel/chio-kernel/src/budget_store.rs`); broker on main (experimental; Linux-only) |
+| Mailboxes, protocol edges | IPC and syscalls | Edges shipped; mailboxes on main (experimental; `crates/kernel/chio-process/src/mailboxes`) |
 | Signed receipts | Audit log | Shipped |
 | Treaties and federation | Networking between systems | Shipped as libraries and CLI (T: `crates/trust/chio-federation`) |
 
@@ -225,12 +227,12 @@ leave **one authority tree**. Both survive restarts.
 | Step | What happens | Owner | Status |
 | --- | --- | --- | --- |
 | 1 | The owner creates a **root grant** with caps (`max_total_cost`, `max_invocations`). It is the shared pool. | Capability scope and hold ledger (T: `/v1/budgets/holds/*`) | Shipped |
-| 2 | The coordinator spawns Claude Code, Codex, Pi and Hermes workers in restricted modes. Each spawn is one signed, narrower hop with a basis-point share. | `chio-process spawn`, attenuation, sibling-sum split | Split shipped, in memory only (T: `crates/kernel/chio-kernel-core/src/budget_split.rs`); durable trees in F |
-| 3 | Swarm admission checks the whole graph before any child runs. | `chio-swarm-authority` with F: `crates/products/chio-cli/src/cli/process_host/swarm.rs` | Verifier shipped; serving install in F |
-| 4 | Workers call **kernel-owned** tools: gateway file tools, and the model through the relay with broker-held credentials. Each call takes a hold and produces a signed receipt. | Gateway, relay, broker | F; the broker is Linux-only |
-| 5 | Handoffs use durable mailboxes. Results are joined, and acceptance comes from the W1 evaluator. | `chio-ipc` mailboxes; W1 | F; W1 planned |
+| 2 | The coordinator spawns Claude Code, Codex, Pi and Hermes workers in restricted modes. Each spawn is one signed, narrower hop with a basis-point share. | `chio-process spawn`, attenuation, sibling-sum split | Split shipped, in memory only (T: `crates/kernel/chio-kernel-core/src/budget_split.rs`); durable trees on main (experimental) |
+| 3 | Swarm admission checks the whole graph before any child runs. | `chio-swarm-authority` with F: `crates/products/chio-cli/src/cli/process_host/swarm.rs` | Verifier shipped; serving install on main (experimental) |
+| 4 | Workers call **kernel-owned** tools: gateway file tools, and the model through the relay with broker-held credentials. Each call takes a hold and produces a signed receipt. | Gateway, relay, broker | main (experimental; broker Linux-only) |
+| 5 | Handoffs use durable mailboxes. Results are joined, and acceptance comes from the W1 evaluator. | `crates/kernel/chio-process/src/mailboxes`; W1 | main (experimental); W1 planned |
 | 6 | Stop: revoke a child, cancel a subtree, and later S4 closure. | Process host; K S4 | Cancel works only while the host is stopped (F: `crates/products/chio-cli/PROCESS_HOST.md`) |
-| 7 | Restarting, removing a client, or closing a Herdr pane never replenishes or loses the pool. | Durable journal and hold ledger | F |
+| 7 | Restarting, removing a client, or closing a Herdr pane never replenishes or loses the pool. | Durable journal and hold ledger | main (experimental) |
 
 ### What the user sees
 
@@ -341,7 +343,7 @@ on Omarchy with A on the Mac.
 | --- | --- | --- |
 | M1 services | systemd user units (user-session profile). TPM2 `systemd-creds` for an always-on service principal. | LaunchAgent through `SMAppService`. LaunchDaemon only for an enrolled service principal. |
 | Key custody | Secret Service; `systemd-creds` | Data-protection Keychain; passkey through Touch ID |
-| Local operator IPC | `chio-secure-ipc` `SO_PEERCRED` (F) | `LOCAL_PEERTOKEN` plus a code-signing check in the same crate (owner change) |
+| Local operator IPC | `chio-secure-ipc` `SO_PEERCRED` (main, experimental) | `LOCAL_PEERTOKEN` plus a code-signing check in the same crate (owner change) |
 | M1 desktop moments | A notification opens a review page. The QML bar shows identity and the count of pending reviews. A Walker entry opens reviews. | A notification opens a native review window. The menu bar shows identity and the pending count. |
 | M2 resource owner | F: `integrations/required-agents` container resource and four-tool gateway | Not yet available. Needs the VM or container backend under evaluation in the macOS annex. |
 | M2 process host and broker | F: `chio process`, which needs pidfd, and `chio-secret-broker` | Darwin process runner and a Keychain/XPC broker (owner changes) |

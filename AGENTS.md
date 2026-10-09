@@ -2,17 +2,15 @@
 
 ## What is Chio?
 
-Chio is a Rust kernel for agentic operating systems that coordinate work, share resources, and cooperate across organizational boundaries. Applications and agent harnesses own planning and user experience; Chio supplies reusable identity, delegated authority, resource accounting, execution rules and verifiable evidence. Native host integration connects these owners to OS services through explicitly qualified profiles. For calls routed through Chio, the kernel checks time-bounded capabilities, evaluates input/output guards and records signed decisions in an append-only receipt log. Native host activity outside those routes is not mediated; hook diagnostics are `detect_only`, and preventing alternate access requires a separately qualified host/runtime profile. Policy and guards ship as first-class native components (`chio-policy`, `chio-guards`, `chio-data-guards`, `chio-external-guards`, `chio-wasm-guards`); no external policy engine is required.
+Chio is a protocol for secure, attested tool access in AI agent systems. It replaces ad-hoc MCP-style wiring with a ground-up design built on capability-based security, cryptographic attestation, and privilege separation. The kernel mediates every tool call: capabilities are time-bounded and verifiable, guards evaluate input and output before anything crosses a trust boundary, and every decision is signed into an append-only receipt log. Policy and guards ship as first-class native components (`chio-policy`, `chio-guards`, `chio-data-guards`, `chio-external-guards`, `chio-wasm-guards`); no external policy engine is required.
 
 ## Five Components
 
 1. **Agent** - untrusted LLM-powered process that consumes tools via capability tokens.
 2. **Runtime Kernel** - trusted mediator (TCB) that validates capabilities, runs the guard pipeline, and signs receipts.
-3. **Tool Servers** - untrusted processes or services implementing tools. The selected host/runtime profile owns OS isolation; ordinary stdio launch does not establish sandboxing.
+3. **Tool Servers** - sandboxed processes implementing tools, isolated from each other and from the agent.
 4. **Capability Authority** - issues, scopes, and revokes time-bounded capability tokens.
-5. **Receipt Log** - append-only Merkle-committed store of signed decision receipts.
-
-Tool effects can precede receipt finalization. If output handling, signing or persistence fails after dispatch, preserve uncertainty and reconcile the original operation before retrying.
+5. **Receipt Log** - append-only Merkle-committed log of signed attestations over every decision and tool call.
 
 ## Crate Map
 
