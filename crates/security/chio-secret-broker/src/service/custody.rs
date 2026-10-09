@@ -48,4 +48,17 @@ impl BrokerService {
             .cloned()
             .collect())
     }
+
+    #[cfg(test)]
+    pub(super) fn poison_retained_prepared_dispatches_for_test(&self) {
+        let entries = &self.retained_dispatches.entries;
+        std::thread::scope(|scope| {
+            let _panicked = scope
+                .spawn(|| {
+                    let _held = entries.lock();
+                    panic!("test poisons the retained prepared-dispatch lock");
+                })
+                .join();
+        });
+    }
 }
