@@ -52,12 +52,12 @@
     "current_or_executed_support_findings": 348,
     "implementation_recorded_scoped_closed": 117,
     "implementation_recorded_not_closed": 231,
-    "findings_and_prevented_candidates": 385,
-    "all_records_including_provenance": 386,
+    "findings_and_prevented_candidates": 387,
+    "all_records_including_provenance": 388,
     "assigned_finding_ids_excluding_provenance": 371,
     "qualified": 0,
     "current_status": {
-      "candidate_only": 37,
+      "candidate_only": 39,
       "needs_revalidation": 47,
       "open": 231,
       "prerequisite_only": 1,
@@ -93,14 +93,14 @@
       "candidate_followup": {
         "P1": 1,
         "P2": 3,
-        "P3": 1,
+        "P3": 3,
         "unassigned": 1
       }
     },
     "candidate_followup": {
-      "total": 6,
+      "total": 8,
       "assigned_ids": 0,
-      "unassigned_records": 6
+      "unassigned_records": 8
     }
   },
   "pin_audit": {
@@ -9043,7 +9043,7 @@
       ],
       "recorded_disposition": "open_candidate_source_review_finding",
       "current_status": "candidate_only",
-      "current_reason": "The independent seven-file review proves that adding Any to the base ReceiptStore trait imposes a new static implementation requirement on ordinary borrowed backends. A subsequent owning compile reproduction exited 101 with E0478, E0803 and E0597 against source pinned stable for that run. Maintained receipt_store.rs remains unchanged and compatible. Repair and owning acceptance remain pending; this is an uninstalled candidate regression.",
+      "current_reason": "The original uninstalled-candidate Any lifetime regression and its three-error compile failure remain recorded. Independent spec and quality reviews approve an optional same-Arc owning registration while preserving the base borrowed-backend trait. The reviewed nine-path Kernel subset is installed at 032d773381dfa486e2997132a3cd4ab64c3ff6c2 and passed the maintained borrowed-backend control, 1472 library tests, 25 doctests, strict library Clippy and format. Store actor custody, the two new Store P3s, host activation and financing are separate; this historical finding remains candidate-only and the runtime remains unqualified.",
       "installed_when_found": false,
       "current_implementation_finding": false,
       "candidate_source": "target/recovery-pr/current-review-followup/local-native-process-owner-composition-20261009T0610/source",
@@ -9063,7 +9063,111 @@
         "tests_executed": false,
         "source_stable_during_run": true,
         "scope": "The genuine borrowed ordinary backend cannot implement or use the candidate ReceiptStore Any contract; no corrected successor is accepted."
+      },
+      "current_successor": {
+        "recorded_at_utc": "2026-10-09T16:55:02.154817+00:00",
+        "recorded_disposition": "candidate_source_correction_approved_with_bounded_kernel_installation",
+        "previous_current_reason": "The independent seven-file review proves that adding Any to the base ReceiptStore trait imposes a new static implementation requirement on ordinary borrowed backends. A subsequent owning compile reproduction exited 101 with E0478, E0803 and E0597 against source pinned stable for that run. Maintained receipt_store.rs remains unchanged and compatible. Repair and owning acceptance remain pending; this is an uninstalled candidate regression.",
+        "review_ref": "docs/architecture/recoverable-agent-runtime/implementation/reviews/receipt-owner-registration.md",
+        "evidence_refs": [
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/compatibility-successor-source.json",
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/compatibility-spec-review.md",
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-capture-quality/quality-review.md",
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-capture-quality/reviewed-source-manifest.json",
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-capture-quality/quality-seal.json",
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/installation/kernel-registration-selection-manifest.json",
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/installation/kernel-registration-applied.json",
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/installation/maintained-kernel-registration-verification.json"
+        ],
+        "source_scope": "SPEC_PASS for the standalone 15-path compatibility successor; QUALITY_PASS for Package A within the sealed 29-path receipt/Capture composition. Installation selects only nine standalone Kernel paths and excludes the Capture default overlay and all Store/Process changes.",
+        "candidate_validation": {
+          "borrowed_backend_passed": 1,
+          "kernel_library_passed": 1473,
+          "failed": 0,
+          "ignored": 0,
+          "evidence_refs": [
+            "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/borrowed-backend-after-first.json",
+            "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/borrowed-backend-after-first.log",
+            "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-receipt-capture-first.json",
+            "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-receipt-capture-first.log"
+          ]
+        },
+        "installation": {
+          "commit": "032d773381dfa486e2997132a3cd4ab64c3ff6c2",
+          "source_paths": 9,
+          "verification_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/installation/maintained-kernel-registration-verification.json",
+          "borrowed_backend_passed": 1,
+          "kernel_library_passed": 1472,
+          "kernel_doctests_passed": 25,
+          "failed": 0,
+          "ignored": 0,
+          "strict_kernel_library_clippy": "passed",
+          "format": "passed",
+          "all_targets_strict_clippy": "Prior 248 Store diagnostics remain open; not rerun for this Kernel-only selection.",
+          "candidate_only_test_names": [
+            "kernel::tests::native_dispatch_ledger::refused_native_ledger_callback_does_not_acquire_a_standalone_claim"
+          ]
+        },
+        "remaining_boundary": "The Store receipt foundation is not installed or accepted: P3-B1 and P3-B2 need repairs, independent reviews and genuine owning results; configured_owner still needs a closed consumer and isolated strict check. This registration supplies no Receipt price, account, phase loan or append authority. Productive Capture, completion funding, retained debt, interruption/reopen, historical settlement and retirement remain separate obligations. Production host activation is not installed.",
+        "confidence": "High for sealed corrective reviews and exact maintained local checks; no full receipt foundation or runtime qualification.",
+        "qualified": false
       }
+    },
+    {
+      "id": null,
+      "category": "candidate_followup",
+      "severity": "P3",
+      "recorded_disposition": "open_candidate_source_review_finding",
+      "current_status": "candidate_only",
+      "installed_when_found": false,
+      "current_implementation_finding": false,
+      "qualified": false,
+      "evidence_refs": [
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-capture-quality/base-quality.md",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-capture-quality/base-acceptance-gate.md",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-capture-quality/base-reviewed-source-manifest.json",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-capture-quality/base-quality-seal.json"
+      ],
+      "confidence": "High for the sealed independent source finding; no reproducing execution or repair acceptance is inferred.",
+      "key": "candidate:receipt-stored-original-comparison-control",
+      "reviewer_label": "P3-B1",
+      "title": "Stored-original integration control stops at request schema refusal",
+      "dependency_group": "historical_custody",
+      "source_path": "crates/platform/chio-store-sqlite/src/receipt_store/native_owner/tests.rs",
+      "reviewed_sha256": "6e2e99d10700e38dea2d3c69509da78589e6d5417d867125b62751545c5d713c",
+      "obligation": "Retain the invalid-request-schema control and add a genuine actor-committed row test. Keep the requested canonical original unchanged, mutate only stored raw JSON, prove the extra stored field and unchanged typed signed identity, require the exact production stored-original mismatch, and restore only original raw bytes to recover successful readback.",
+      "current_reason": "The predecessor assertion adds an unknown field to the requested original, so typed canonical decoding refuses before actual stored-row comparison. This is a causal test coverage gap, not an observed production comparison defect. Corrective source, independent review and actual owning acceptance remain pending.",
+      "predecessor_source_verdict": "QUALITY_PASS with two non-blocking P3 findings",
+      "installation_acceptance": "CHANGES_REQUIRED / NOT FULLY ACCEPTED until both findings are satisfied and the receipt-only dependency boundary is validated.",
+      "candidate_source": "target/recovery-pr/current-review-followup/local-native-process-owner-composition-20261009T0610/source"
+    },
+    {
+      "id": null,
+      "category": "candidate_followup",
+      "severity": "P3",
+      "recorded_disposition": "open_candidate_source_review_finding",
+      "current_status": "candidate_only",
+      "installed_when_found": false,
+      "current_implementation_finding": false,
+      "qualified": false,
+      "evidence_refs": [
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-capture-quality/base-quality.md",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-capture-quality/base-acceptance-gate.md",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-capture-quality/base-reviewed-source-manifest.json",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-capture-quality/base-quality-seal.json"
+      ],
+      "confidence": "High for the sealed independent source finding; no reproducing execution or repair acceptance is inferred.",
+      "key": "candidate:receipt-queued-lane-inflight-ownership",
+      "reviewer_label": "P3-B2",
+      "title": "Accepted queued Native lane can strand inflight health accounting",
+      "dependency_group": "historical_custody",
+      "source_path": "crates/platform/chio-store-sqlite/src/receipt_store/native_owner.rs",
+      "reviewed_sha256": "5920baef524b54dcf9a38cdda04dae75d6685456f9d494e8d1dfe18c41582f6d",
+      "obligation": "Give the Native command exactly-once inflight/failure accounting across queued, dispatched and returned states. Accept a lane behind a deliberately terminating actor, require the unavailable result and no stranded inflight increment, and prevent double decrement or interference with concurrently accepted requests.",
+      "current_reason": "Dropping an accepted queued LaneRequest before serve_lane closes ready without handing the increment to WriterInflightGuard. The caller returns writer_dead_error without compensating accounting. The actor is already dead and authority remains closed; no runtime reproduction is claimed by this source report. Corrective source, independent review and actual owning acceptance remain pending.",
+      "predecessor_source_verdict": "QUALITY_PASS with two non-blocking P3 findings",
+      "installation_acceptance": "CHANGES_REQUIRED / NOT FULLY ACCEPTED until both findings are satisfied and the receipt-only dependency boundary is validated.",
+      "candidate_source": "target/recovery-pr/current-review-followup/local-native-process-owner-composition-20261009T0610/source"
     }
   ],
   "inventory_confidence": "high: exact ID, row-count and recorded-disposition joins; current behavior is not requalified",
@@ -9167,6 +9271,34 @@
       ],
       "at_utc": "2026-10-09T16:22:42.241224+00:00",
       "scope": "Owning candidate compile reproduces the borrowed-backend regression with E0478, E0803 and E0597, exit 101. Maintained ReceiptStore unchanged; repair acceptance pending.",
+      "qualified": false
+    },
+    {
+      "findings": [
+        "candidate:receipt-owner-borrowed-backend-lifetime"
+      ],
+      "at_utc": "2026-10-09T16:55:02.154817+00:00",
+      "installed_commit": "032d773381dfa486e2997132a3cd4ab64c3ff6c2",
+      "review": "docs/architecture/recoverable-agent-runtime/implementation/reviews/receipt-owner-registration.md",
+      "scope": "Approved receipt lifetime compatibility successor, with only the nine-path optional Kernel registration installed and locally verified. The uninstalled Store receipt foundation and funding/retirement obligations remain separate.",
+      "qualified": false,
+      "review_sha256": "e04b2eb7c64ffb03a4dd05fabea73d7321ffedd124630eada747af8e7dca206a"
+    },
+    {
+      "findings": [
+        "candidate:receipt-stored-original-comparison-control",
+        "candidate:receipt-queued-lane-inflight-ownership"
+      ],
+      "at_utc": "2026-10-09T16:55:02.154817+00:00",
+      "scope": "Added two distinct candidate-only P3 source findings from the sealed receipt base review and acceptance gate. No corrective acceptance or maintained-source regression is inferred.",
+      "qualified": false
+    },
+    {
+      "findings": [],
+      "at_utc": "2026-10-09T16:55:02.154817+00:00",
+      "review": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-installed-pin-continuity.json",
+      "review_sha256": "9c167305133a41830c5020b8c3e4a988219a8a869a6d51dfe99e0dff7d5b2584",
+      "scope": "29 distinct installed Kernel paths intersect none of the 767 canonical, five document or 30 additional direct/current/accepted pin pairs. No new closure revalidation flag; existing 47 flags and four SDK continuity mappings preserved. Older semantic retained-request snapshot remains within its already-flagged ID.",
       "qualified": false
     }
   ],
@@ -9345,6 +9477,82 @@
       "receipt_owner_borrowed_backend_before_log": {
         "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/borrowed-backend-before.log",
         "sha256": "4fe260fb1f8f4b82f365ef9d2a17871f5ba626a4c518ec5594dc297b59f07c1c"
+      },
+      "receipt_owner_compatibility_source_manifest": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/compatibility-successor-source.json",
+        "sha256": "592e1911d8c0bdb2df8667d7da1ed97d7fe4abdd007083e75dcabef1ad99acc7"
+      },
+      "receipt_owner_compatibility_spec_review": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/compatibility-spec-review.md",
+        "sha256": "7fd446942549f7a3840cc07aab934f73e7d26fc937ce939b9dd5104e86fac1ec"
+      },
+      "receipt_registration_quality_review": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-capture-quality/quality-review.md",
+        "sha256": "36e6291a3f0f77a2501b3334eb9a3a2eac0a66e02ac72549073a90021bf2f343"
+      },
+      "receipt_registration_quality_source_manifest": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-capture-quality/reviewed-source-manifest.json",
+        "sha256": "f313923b6c29eb0bb3fba2dad24031e0065e0de21e65836252f67f6fcdbb4a47"
+      },
+      "receipt_registration_quality_seal": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-capture-quality/quality-seal.json",
+        "sha256": "e69f2485fa8481bf80dcf7bcec6a7bc6e1473f82fe26fbb1b990916c1ef41598"
+      },
+      "receipt_registration_candidate_borrowed_result": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/borrowed-backend-after-first.json",
+        "sha256": "1f1044b94c37934df5481e08f7b95fbcc83518d2d918675cc81e12d1c7773439"
+      },
+      "receipt_registration_candidate_borrowed_log": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/borrowed-backend-after-first.log",
+        "sha256": "1a44138d22728ac7ce301adc807c966da96d448fbe8473dba6887dcffe9f6440"
+      },
+      "receipt_registration_candidate_kernel_result": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-receipt-capture-first.json",
+        "sha256": "f38d1c7b251dca26eded933b487a0521a934331ac9959847fe78d58092dd003f"
+      },
+      "receipt_registration_candidate_kernel_log": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-receipt-capture-first.log",
+        "sha256": "28a9257cba67a43501bfd0e40f403fa7516f0babf8d893d336a2f8dd8b7ab77f"
+      },
+      "receipt_registration_selection": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/installation/kernel-registration-selection-manifest.json",
+        "sha256": "89e0857368e1baf3cf58025f5a997832381f69bf43162fbdc33b7563d0ebd694"
+      },
+      "receipt_registration_applied": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/installation/kernel-registration-applied.json",
+        "sha256": "a871c8967cddb2977a247f408dc25e28bb411e1c6c0ad2f6969e52b55322e6f1"
+      },
+      "receipt_registration_maintained_verification": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-owner-foundation/installation/maintained-kernel-registration-verification.json",
+        "sha256": "107d84b72843acb04eaead2b7e2e6d11d2299b7f6c591accd78b2a4cd4afbe1f"
+      },
+      "receipt_base_quality": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-capture-quality/base-quality.md",
+        "sha256": "560ec3a1d3421970800e33076d7fedb1ddabb24ca48b0991070c664a71ded6cf"
+      },
+      "receipt_base_acceptance_gate": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-capture-quality/base-acceptance-gate.md",
+        "sha256": "4ab0f8b0952b977a814faa8473c205af23c83cba7cbe403304fae9ec43b608a6"
+      },
+      "receipt_base_source_manifest": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-capture-quality/base-reviewed-source-manifest.json",
+        "sha256": "b09cf2b3620e54a0ec9ec3fd84f2b86a8b048a39c515942e80e171678528831f"
+      },
+      "receipt_base_diff": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-capture-quality/base-successor-vs-maintained.patch",
+        "sha256": "33fa9baba80f09ea707468df73f69fbc800e2d109e572280b8e8d42b3aee94c9"
+      },
+      "receipt_base_quality_seal": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-capture-quality/base-quality-seal.json",
+        "sha256": "de5fca4df083f1708eb1013af3c1424b9a9e07ff5fe7ffce774e7ec888e5bf25"
+      },
+      "kernel_installed_pin_continuity": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-installed-pin-continuity.json",
+        "sha256": "9c167305133a41830c5020b8c3e4a988219a8a869a6d51dfe99e0dff7d5b2584"
+      },
+      "kernel_installed_pin_continuity_summary": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/kernel-installed-pin-continuity.md",
+        "sha256": "7ba0713993adc705e369ee25f64ba42700ae3acc03ec4138d1df3652c1ef6328"
       }
     },
     "local_pass_recorded_at_utc": "2026-10-09T14:45:26.431181+00:00",
@@ -9384,6 +9592,8 @@
       "scope": "The 22-path maintained foundation uses the selected frozen preimages for two atomic-ledger overlaps. It passes 1468 library tests, including both eligibility controls; the separately excluded atomic-ledger callback regression is the sole additional test among the composed candidate 1469. ReceiptStore remains unchanged. No Store or Process implementation or atomic overlay was installed by this unit. Unsupported producer defaults and all-targets strict lint gap remain; funded Capture and whole-runtime qualification are not established.",
       "confidence": "High for sealed source selection and actual maintained check records; bounded local acceptance only.",
       "qualified": false
-    }
+    },
+    "receipt_registration_successor_recorded_at_utc": "2026-10-09T16:55:02.154817+00:00",
+    "receipt_base_findings_recorded_at_utc": "2026-10-09T16:55:02.154817+00:00"
   }
 }

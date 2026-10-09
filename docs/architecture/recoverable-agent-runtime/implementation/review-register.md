@@ -15,18 +15,18 @@ provider, formal, hosted, or release qualification.
 | Supplemental PR obligations | 1 | 0 | 1 |
 | Current or executed-support total | 348 | 117 | 231 |
 | Prevented candidate issues, counted separately | 31 | Not combined | Not combined |
-| Additional findings in uninstalled candidates | 6 | Not combined | Not combined |
+| Additional findings in uninstalled candidates | 8 | Not combined | Not combined |
 | Provenance prerequisite, excluded from implementation findings | 1 | Not applicable | Not applicable |
 
 The canonical 99 recorded closures comprise 92 source-only and seven scoped
 local closures. The additional 18 comprise seven source-only and eleven scoped
 local closures. These are recorded review classifications, not new acceptance.
 
-There are **385 findings or candidate issues**, plus the excluded provenance
-prerequisite, for **386 records**. The original prevented inventory retains 23
-assigned IDs and eight unassigned records. The six candidate follow-ups have
+There are **387 findings or candidate issues**, plus the excluded provenance
+prerequisite, for **388 records**. The original prevented inventory retains 23
+assigned IDs and eight unassigned records. The eight candidate follow-ups have
 register keys and null finding IDs. There are still 371 assigned finding IDs,
-or 372 IDs including the provenance prerequisite, and fourteen null IDs. Every
+or 372 IDs including the provenance prerequisite, and sixteen null IDs. Every
 original ID and exact unassigned reviewer label remains preserved.
 
 The current status counts are:
@@ -36,7 +36,7 @@ The current status counts are:
 | `open` | 231 | No complete independent disposition is recorded. |
 | `needs_revalidation` | 47 | Historical closure remains, but cited source or document pins differ without an accepted current continuity review. |
 | `recorded_scoped_closed` | 70 | The recorded scoped disposition is retained, with the limits stated per record. |
-| `candidate_only` | 37 | The defective candidate was uninstalled when found; corrected successors may have separate evidence. |
+| `candidate_only` | 39 | The defective candidate was uninstalled when found; corrected successors may have separate evidence. |
 | `prerequisite_only` | 1 | Provenance work, not a proved implementation defect. |
 
 The 47 remaining revalidation flags are part of the 117 historical scoped closures. They
@@ -56,6 +56,15 @@ record now states that its pins changed and links `current_continuity`. Its
 historical `pin_check`, disposition and classification remain unchanged. These
 four changes add no revalidation flag or runtime qualification.
 
+The subsequent [Kernel installation audit](reviews/receipt-owner-registration.md)
+checks 29 distinct paths from the finishing foundation and optional receipt
+registration. None intersects the 767 canonical, five document or 30 additional
+direct/current/accepted pin pairs for the 117 historical closures. It adds no
+revalidation flag. The older retained-request execution snapshot for
+`SEMANTIC-REVALIDATION-APPROVAL-BINDING-01` remains within its existing flag;
+aggregate Kernel passes do not renew that obligation. The sealed audit is linked
+under `current_updates`; the original pin audit remains intact.
+
 ## Candidate follow-ups
 
 Two independently reviewed source units have subsequently been installed and
@@ -64,11 +73,11 @@ and [explicit authority provisioning](reviews/native-authority-provisioning.md).
 Their evidence and remaining obligations are recorded in `current_updates`.
 H-SDK-01 remains open and provisioning is a prerequisite. Those installations
 did not change finding classifications or grant qualification. The subsequent
-foundation reviews add the four candidate records below.
+foundation reviews add the six candidate records below.
 
-The six additive `candidate_followup` records do not change canonical closure
+The eight additive `candidate_followup` records do not change canonical closure
 counts or installed-finding totals. All preserve their original finding evidence;
-the two Kernel records now add independently approved corrective successors. Their
+the Kernel and receipt lifetime records add independently approved corrective successors. Their
 exact local evidence hashes and accounting time are in `candidate_review_evidence`.
 
 - `candidate:checkpoint-receipt-confirmation-envelope` records the third real
@@ -103,13 +112,21 @@ exact local evidence hashes and accounting time are in `candidate_review_evidenc
   obligations while making the supported default target executable.
 - `candidate:receipt-owner-borrowed-backend-lifetime` is the P2 public trait
   compatibility regression: adding `Any` to the base `ReceiptStore` trait excludes
-  ordinary non-static borrowed backends. Maintained `receipt_store.rs` remains
-  unchanged and compatible. A subsequent genuine compile reproduction exited
-  101 with `E0478`, `E0803` and `E0597`; repair acceptance remains pending.
-  Concrete configured-owner identity and
-  unsupported Native refusal must survive the repair.
+  ordinary non-static borrowed backends. Its genuine compile reproduction exited
+  101 with `E0478`, `E0803` and `E0597`. The approved successor restores that
+  contract and confines concrete identity to optional same-Arc owning registration.
+  Only the nine-path Kernel subset is installed at `032d77338`: one borrowed
+  control, 1,472 library tests, 25 doctests, strict library Clippy and format passed.
+- `candidate:receipt-stored-original-comparison-control` preserves reviewer
+  label `P3-B1`: the added-field request control stops at schema validation before
+  stored raw JSON comparison. It needs a genuine committed-row substitution and
+  restoration control with the exact comparator refusal.
+- `candidate:receipt-queued-lane-inflight-ownership` preserves reviewer label
+  `P3-B2`: an accepted lane dropped while queued can strand its inflight count.
+  It needs exactly-once queued/dispatched/returned ownership and a terminating
+  actor control that preserves other accepted requests' accounting.
 
-All six records use register keys with null assigned finding IDs. The
+All eight records use register keys with null assigned finding IDs. The
 [Kernel foundation successor](reviews/kernel-foundation.md) also records 1,469
 passing Kernel library cases on the composed candidate. That candidate includes
 the separately approved atomic-ledger overlay, while the foundation source
@@ -126,6 +143,17 @@ finding has no accepted successor here. Earlier failures, original dispositions 
 candidate-only classifications remain unchanged. The original two-case receipt
 fault evidence is not retrospectively credited with the later, distinct
 retained-reservation test.
+
+The [receipt registration successor](reviews/receipt-owner-registration.md)
+separates its 1,473-test composed-candidate run from the 1,472-test maintained
+Kernel subset. The excluded atomic-ledger callback is the exact one-test delta.
+The two Store P3s remain open candidate findings with no repair acceptance here.
+The receipt base installation is **CHANGES_REQUIRED / NOT FULLY ACCEPTED** until
+both are satisfied and its closed `configured_owner` consumer and isolated strict
+check are established. No Store/Process implementation, production host activation
+or Capture overlay is imported by the Kernel registration installation. Complete
+funding, retained debt, interruption/reopen, historical settlement and retirement
+retain their own obligations.
 
 ## Source-pin audit
 
@@ -168,7 +196,7 @@ Each `records` entry has:
 
 - `key`: unique register identity. Assigned IDs are used verbatim. The eight
   `unassigned-prevented:<index>` values are register keys, not invented finding
-  IDs; the index resolves to the unchanged addendum record. The six descriptive
+  IDs; the index resolves to the unchanged addendum record. The eight descriptive
   `candidate:<behavior>` keys also identify records without assigned review IDs.
 - `id`, `severity`, `title`, and `dependency_group`: original identity and review
   priority, plus the execution workstream. A null severity means the reviewer
@@ -255,6 +283,14 @@ The installed Kernel successor adds its sealed selection, applied snapshot,
 maintained verification and two exact comparison records. All eight maintained
 gate records and logs match the verification hashes, including the retained lint
 failure. Its installation changes no finding classification or qualification.
+The latest receipt registration update preserves 385 of the 386 prior rows
+exactly. The P2 row changes only `current_reason` and adds `current_successor`,
+which retains the prior reason verbatim; all its historical fields remain exact.
+Two distinct P3 candidate rows produce 388 total records, eight candidate
+follow-ups, 39 candidate-only statuses and sixteen null IDs. Nineteen additive
+evidence pins, five maintained gate records/logs and the exact candidate versus
+maintained test-name difference were verified. Every canonical row, historical
+closure, original inventory and prior source pin remains unchanged.
 The installation-specific SDK continuity audit supplements the historical pin
 audit; it does not rerun unrelated flags. Confidence is high for this accounting;
 current integrated behavior remains unqualified.
