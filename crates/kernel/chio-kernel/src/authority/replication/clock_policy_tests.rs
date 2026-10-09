@@ -37,32 +37,32 @@ fn final_f11_future_skew_and_exclusive_expiry_have_independent_boundaries(
         (60, 400, true),
         (60, 401, false),
     ] {
-        assert_eq!(
-            signed
-                .verify_with_clock_policy(
-                    &anchor,
-                    &anchor.snapshot,
-                    &commitment,
-                    now,
-                    AuthorityEnvelopeClockPolicy::new(skew)?
-                )
-                .is_ok(),
-            valid,
-            "skew={skew}, now={now}"
+        let verified = signed.verify_with_clock_policy(
+            &anchor,
+            &anchor.snapshot,
+            &commitment,
+            now,
+            AuthorityEnvelopeClockPolicy::new(skew)?,
         );
+        if valid {
+            verified?;
+        } else {
+            assert!(
+                matches!(verified, Err(AuthorityStoreError::Fence(message)) if message == "authority envelope outside freshness window"),
+                "skew={skew}, now={now}"
+            );
+        }
     }
-    assert!(signed
-        .verify(&anchor, &anchor.snapshot, &commitment, 100)
-        .is_err());
-    assert!(signed
-        .verify_with_clock_policy(
+    assert!(
+        matches!(signed.verify(&anchor, &anchor.snapshot, &commitment, 100), Err(AuthorityStoreError::Fence(message)) if message == "authority envelope outside freshness window")
+    );
+    assert!(matches!(signed.verify_with_clock_policy(
             &anchor,
             &anchor.snapshot,
             &commitment,
             u64::MAX,
             AuthorityEnvelopeClockPolicy::new(60)?
-        )
-        .is_err());
+        ), Err(AuthorityStoreError::Fence(message)) if message == "authority envelope outside freshness window"));
     Ok(())
 }
 
@@ -70,8 +70,12 @@ fn final_f11_future_skew_and_exclusive_expiry_have_independent_boundaries(
 fn final_f11_future_skew_policy_rejects_unbounded_configuration() {
     assert!(AuthorityEnvelopeClockPolicy::new(0).is_ok());
     assert!(AuthorityEnvelopeClockPolicy::new(60).is_ok());
-    assert!(AuthorityEnvelopeClockPolicy::new(61).is_err());
-    assert!(AuthorityEnvelopeClockPolicy::new(u64::MAX).is_err());
+    assert!(
+        matches!(AuthorityEnvelopeClockPolicy::new(61), Err(AuthorityStoreError::Fence(message)) if message == "authority envelope future skew exceeds 60 seconds")
+    );
+    assert!(
+        matches!(AuthorityEnvelopeClockPolicy::new(u64::MAX), Err(AuthorityStoreError::Fence(message)) if message == "authority envelope future skew exceeds 60 seconds")
+    );
 }
 
 #[test]
@@ -80,7 +84,19 @@ fn final_f11_skew_never_bypasses_signature_domain_or_replay_checks(
     let (signed, anchor) = envelope()?;
     let commitment = anchor.commitment()?;
     let policy = AuthorityEnvelopeClockPolicy::new(1)?;
-    for tamper in ["signature", "domain", "commitment", "epoch", "lifetime"] {
+    for (tamper, refusal) in [
+        ("signature", "authority envelope signature invalid"),
+        ("domain", "authority envelope domain mismatch"),
+        (
+            "commitment",
+            "authority snapshot differs from authenticated chain",
+        ),
+        (
+            "epoch",
+            "authority snapshot differs from authenticated chain",
+        ),
+        ("lifetime", "authority envelope outside freshness window"),
+    ] {
         let mut forged = signed.clone();
         let proof = forged
             .proof
@@ -95,9 +111,7 @@ fn final_f11_skew_never_bypasses_signature_domain_or_replay_checks(
             _ => unreachable!(),
         }
         assert!(
-            forged
-                .verify_with_clock_policy(&anchor, &anchor.snapshot, &commitment, 100, policy)
-                .is_err(),
+            matches!(forged.verify_with_clock_policy(&anchor, &anchor.snapshot, &commitment, 100, policy), Err(AuthorityStoreError::Fence(message)) if message == refusal),
             "skew admitted a forged {tamper}"
         );
     }

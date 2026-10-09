@@ -566,7 +566,7 @@ fn clustered_startup_refuses_an_unpinned_authority_database() {
 #[test]
 fn final_f11_refused_authority_is_degraded_until_a_signed_import_recovers() {
     let mut pair = replication_pair(AuthorityFault::LaggingImporterClock);
-    assert!(sync_peer(&pair.importer, &pair.exporter.url).is_err());
+    assert_authority_freshness_refused(sync_peer(&pair.importer, &pair.exporter.url));
     assert!(importer_revoked(&pair), "revocations must keep progressing");
     assert!(peer_view(&pair, |peer| peer.health.is_reachable()));
     assert_eq!(peer_view(&pair, |peer| peer.health.label()), "degraded");
@@ -584,6 +584,12 @@ fn workload_headers() -> HeaderMap {
     let mut headers = HeaderMap::new();
     headers.insert(AUTHORIZATION, "Bearer token".parse().test_unwrap());
     headers
+}
+
+fn assert_authority_freshness_refused(result: Result<(), CliError>) {
+    assert!(
+        matches!(result, Err(CliError::AuthorityStore(AuthorityStoreError::Fence(message))) if message == OUTSIDE_FRESHNESS)
+    );
 }
 
 #[tokio::test]
@@ -611,7 +617,7 @@ async fn final_f11_known_stale_follower_refuses_authority_reads_and_reports_heal
     let compromised = custodian.status().test_unwrap().public_key;
     custodian.rotate().test_unwrap();
     custodian.revoke_issuer(&compromised).test_unwrap();
-    assert!(sync_peer(&pair.importer, &pair.exporter.url).is_err());
+    assert_authority_freshness_refused(sync_peer(&pair.importer, &pair.exporter.url));
     assert!(importer_revoked(&pair));
     let response = handle_authority_status(State(pair.importer.clone()), workload_headers()).await;
     let health = crate::trust_control::trust_control_health::install_health_routes(Router::new())

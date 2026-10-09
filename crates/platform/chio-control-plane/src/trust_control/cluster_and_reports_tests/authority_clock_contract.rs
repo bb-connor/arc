@@ -1,5 +1,25 @@
 use super::*;
 
+const UNRESOLVED_AUTHORITY_TRUST: &str =
+    "authority replication from the elected leader is unresolved";
+
+async fn assert_authority_status_refused(
+    result: Result<TrustAuthorityStatus, Response>,
+    reason: &str,
+) {
+    let response = result.test_unwrap_err();
+    assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    let bytes = to_bytes(response.into_body(), 64 * 1024)
+        .await
+        .test_unwrap();
+    let refusal: Value = serde_json::from_slice(&bytes).test_unwrap();
+    assert_eq!(refusal.get("error").and_then(Value::as_str), Some(reason));
+}
+
+fn freshness_refusal_reason() -> String {
+    CliError::from(AuthorityStoreError::Fence(OUTSIDE_FRESHNESS.to_string())).to_string()
+}
+
 #[test]
 fn final_f11_control_config_requires_explicit_bounded_authority_skew() {
     let mut config = base_config();
@@ -9,14 +29,14 @@ fn final_f11_control_config_requires_explicit_bounded_authority_skew() {
     for skew in [61, u64::MAX] {
         config.authority_replication_max_future_skew_seconds = skew;
         assert!(
-            config.validate().is_err(),
+            matches!(config.validate(), Err(CliError::AuthorityStore(AuthorityStoreError::Fence(message))) if message == "authority envelope future skew exceeds 60 seconds"),
             "unbounded skew {skew} was accepted"
         );
     }
 }
 
-#[test]
-fn final_f11_configured_one_second_skew_recovers_regular_and_snapshot_imports() {
+#[tokio::test]
+async fn final_f11_configured_one_second_skew_recovers_regular_and_snapshot_imports() {
     for force_snapshot in [false, true] {
         let mut pair = replication_pair(AuthorityFault::LaggingImporterClock);
         let custodian = SqliteCapabilityAuthority::open_with_clock(
@@ -28,10 +48,7 @@ fn final_f11_configured_one_second_skew_recovers_regular_and_snapshot_imports() 
         custodian.rotate().test_unwrap();
         custodian.retire_issuer(&compromised).test_unwrap();
         pair.importer.finding_challenge_clock = fixed_clock(pair.provisioned_at + 59);
-        assert!(
-            sync_peer(&pair.importer, &pair.exporter.url).is_err(),
-            "zero default admitted a future envelope"
-        );
+        assert_authority_freshness_refused(sync_peer(&pair.importer, &pair.exporter.url));
         assert!(importer_revoked(&pair));
         assert_eq!(peer_view(&pair, |peer| peer.health.label()), "degraded");
 
@@ -60,17 +77,20 @@ fn final_f11_configured_one_second_skew_recovers_regular_and_snapshot_imports() 
 
         // A configured future-issue tolerance never extends the signed expiry.
         pair.importer.finding_challenge_clock = fixed_clock(pair.provisioned_at + 360);
-        assert!(load_authority_status_for_state(&pair.importer).is_err());
-        assert!(public_authority_status(
+        assert_authority_status_refused(
+            load_authority_status_for_state(&pair.importer),
+            &freshness_refusal_reason(),
+        )
+        .await;
+        assert!(matches!(public_authority_status(
             &pair.importer.config,
             &pair.importer.finding_challenge_clock
-        )
-        .is_err());
+        ), Err(CliError::AuthorityStore(AuthorityStoreError::Fence(message))) if message == OUTSIDE_FRESHNESS));
     }
 }
 
-#[test]
-fn final_f11_follower_confirmation_is_bound_to_process_leader_and_term() {
+#[tokio::test]
+async fn final_f11_follower_confirmation_is_bound_to_process_leader_and_term() {
     let mut pair = replication_pair(AuthorityFault::LaggingImporterClock);
     pair.importer.finding_challenge_clock = fixed_clock(pair.provisioned_at + 60);
     sync_peer(&pair.importer, &pair.exporter.url).test_unwrap();
@@ -87,7 +107,11 @@ fn final_f11_follower_confirmation_is_bound_to_process_leader_and_term() {
         .election_term += 1;
     update_peer_success(&pair.importer, &pair.exporter.url);
     update_peer_reachable(&pair.importer, &pair.exporter.url);
-    assert!(load_authority_status_for_state(&pair.importer).is_err());
+    assert_authority_status_refused(
+        load_authority_status_for_state(&pair.importer),
+        UNRESOLVED_AUTHORITY_TRUST,
+    )
+    .await;
     sync_peer(&pair.importer, &pair.exporter.url).test_unwrap();
     load_authority_status_for_state(&pair.importer).test_unwrap();
 
@@ -109,7 +133,11 @@ fn final_f11_follower_confirmation_is_bound_to_process_leader_and_term() {
         current_leader_url(&pair.importer).as_deref(),
         Some(new_leader)
     );
-    assert!(load_authority_status_for_state(&pair.importer).is_err());
+    assert_authority_status_refused(
+        load_authority_status_for_state(&pair.importer),
+        UNRESOLVED_AUTHORITY_TRUST,
+    )
+    .await;
     pair.importer
         .cluster
         .as_ref()
@@ -118,7 +146,11 @@ fn final_f11_follower_confirmation_is_bound_to_process_leader_and_term() {
         .test_unwrap()
         .peers
         .remove(new_leader);
-    assert!(load_authority_status_for_state(&pair.importer).is_err());
+    assert_authority_status_refused(
+        load_authority_status_for_state(&pair.importer),
+        UNRESOLVED_AUTHORITY_TRUST,
+    )
+    .await;
     sync_peer(&pair.importer, &pair.exporter.url).test_unwrap();
     load_authority_status_for_state(&pair.importer).test_unwrap();
 
@@ -134,13 +166,17 @@ fn final_f11_follower_confirmation_is_bound_to_process_leader_and_term() {
     restarted.config = pair.importer.config.clone();
     restarted.finding_challenge_clock = pair.importer.finding_challenge_clock.clone();
     update_peer_reachable(&restarted, &pair.exporter.url);
-    assert!(load_authority_status_for_state(&restarted).is_err());
+    assert_authority_status_refused(
+        load_authority_status_for_state(&restarted),
+        UNRESOLVED_AUTHORITY_TRUST,
+    )
+    .await;
     sync_peer(&restarted, &pair.exporter.url).test_unwrap();
     load_authority_status_for_state(&restarted).test_unwrap();
 }
 
-#[test]
-fn final_f11_failed_snapshot_fetch_invalidates_authority_confirmation() {
+#[tokio::test]
+async fn final_f11_failed_snapshot_fetch_invalidates_authority_confirmation() {
     let mut pair = replication_pair(AuthorityFault::LaggingImporterClock);
     pair.importer.finding_challenge_clock = fixed_clock(pair.provisioned_at + 60);
     sync_peer(&pair.importer, &pair.exporter.url).test_unwrap();
@@ -152,11 +188,17 @@ fn final_f11_failed_snapshot_fetch_invalidates_authority_confirmation() {
     update_peer_state(&pair.importer, &pair.exporter.url, |peer| {
         peer.force_snapshot = true;
     });
-    assert!(sync_peer(&pair.importer, &pair.exporter.url).is_err());
-    assert!(
-        load_authority_status_for_state(&pair.importer).is_err(),
-        "a failed snapshot fetch retained issuer trust from an earlier import"
+    let snapshot_refusal = sync_peer(&pair.importer, &pair.exporter.url).test_unwrap_err();
+    assert!(matches!(&snapshot_refusal, CliError::Chio(_)));
+    assert_eq!(
+        snapshot_refusal.to_string(),
+        CliError::cli_other_error(json!({"error": "snapshot unavailable"}).to_string()).to_string()
     );
+    assert_authority_status_refused(
+        load_authority_status_for_state(&pair.importer),
+        UNRESOLVED_AUTHORITY_TRUST,
+    )
+    .await;
     assert!(peer_view(&pair, |peer| peer
         .authority_import_confirmation
         .is_none()));
@@ -223,7 +265,12 @@ async fn final_f11_public_issuer_trust_reads_require_current_leader_confirmation
             update_peer_reachable(&pair.importer, &pair.exporter.url);
         } else {
             pair.importer.finding_challenge_clock = fixed_clock(pair.provisioned_at + 59);
-            assert!(sync_peer(&pair.importer, &pair.exporter.url).is_err());
+            assert!(matches!(
+                sync_peer(&pair.importer, &pair.exporter.url),
+                Err(CliError::AuthorityStore(AuthorityStoreError::Clock(
+                    chio_security_types::clock::ClockError::WallClockRegression
+                )))
+            ));
             pair.importer.finding_challenge_clock = fixed_clock(pair.provisioned_at + 60);
         }
         let mut stale_paths = Vec::new();
@@ -522,40 +569,43 @@ fn custodian_and_relay() -> (tempfile::TempDir, ServedPeer, TrustServiceState, u
     (directory, relay, state, now)
 }
 
-#[test]
-fn final_f11_clustered_signing_custodian_requires_quorum_and_leader_confirmation() {
+#[tokio::test]
+async fn final_f11_clustered_signing_custodian_requires_quorum_and_leader_confirmation() {
     let (_directory, relay, state, _) = custodian_and_relay();
-    assert!(
-        load_authority_status_for_state(&state).is_err(),
-        "local signing seed substituted for quorum"
-    );
+    assert_authority_status_refused(
+        load_authority_status_for_state(&state),
+        UNRESOLVED_AUTHORITY_TRUST,
+    )
+    .await;
     update_peer_reachable(&state, &relay.url);
-    assert!(
-        load_authority_status_for_state(&state).is_err(),
-        "local signing seed substituted for elected-leader confirmation"
-    );
+    assert_authority_status_refused(
+        load_authority_status_for_state(&state),
+        UNRESOLVED_AUTHORITY_TRUST,
+    )
+    .await;
     sync_peer(&state, &relay.url).test_unwrap();
     load_authority_status_for_state(&state).test_unwrap();
 }
 
-#[test]
-fn final_f11_former_custodian_requires_an_unexpired_imported_envelope() {
+#[tokio::test]
+async fn final_f11_former_custodian_requires_an_unexpired_imported_envelope() {
     let (_directory, relay, mut state, now) = custodian_and_relay();
     sync_peer(&state, &relay.url).test_unwrap();
     load_authority_status_for_state(&state).test_unwrap();
     state.finding_challenge_clock = fixed_clock(now + 300);
-    assert!(
-        load_authority_status_for_state(&state).is_err(),
-        "follower's old local seed bypassed envelope expiry"
-    );
+    assert_authority_status_refused(
+        load_authority_status_for_state(&state),
+        &freshness_refusal_reason(),
+    )
+    .await;
     let mut standalone = state;
     standalone.cluster = None;
     standalone.config.peer_urls.clear();
     load_authority_status_for_state(&standalone).test_unwrap();
 }
 
-#[test]
-fn final_f11_former_custodian_cannot_refresh_leader_confirmation_by_resigning_locally() {
+#[tokio::test]
+async fn final_f11_former_custodian_cannot_refresh_leader_confirmation_by_resigning_locally() {
     let (_directory, relay, mut state, now) = custodian_and_relay();
     sync_peer(&state, &relay.url).test_unwrap();
     load_authority_status_for_state(&state).test_unwrap();
@@ -567,14 +617,15 @@ fn final_f11_former_custodian_cannot_refresh_leader_confirmation_by_resigning_lo
     .test_unwrap()
     .signed_snapshot()
     .test_unwrap();
-    assert!(
-        load_authority_status_for_state(&state).is_err(),
-        "a former custodian renewed its elected-leader confirmation with a locally signed envelope"
-    );
+    assert_authority_status_refused(
+        load_authority_status_for_state(&state),
+        UNRESOLVED_AUTHORITY_TRUST,
+    )
+    .await;
 }
 
-#[test]
-fn final_f11_new_import_waits_for_matching_leader_envelope_confirmation() {
+#[tokio::test]
+async fn final_f11_new_import_waits_for_matching_leader_envelope_confirmation() {
     let mut pair = replication_pair(AuthorityFault::LaggingImporterClock);
     pair.importer.finding_challenge_clock = fixed_clock(pair.provisioned_at + 60);
     sync_peer(&pair.importer, &pair.exporter.url).test_unwrap();
@@ -600,10 +651,11 @@ fn final_f11_new_import_waits_for_matching_leader_envelope_confirmation() {
     .test_unwrap()
     .apply_signed_snapshot(&next)
     .test_unwrap();
-    assert!(
-        load_authority_status_for_state(&pair.importer).is_err(),
-        "reader combined a new imported head with confirmation for a different envelope"
-    );
+    assert_authority_status_refused(
+        load_authority_status_for_state(&pair.importer),
+        UNRESOLVED_AUTHORITY_TRUST,
+    )
+    .await;
     sync_peer(&pair.importer, &pair.exporter.url).test_unwrap();
     let status = load_authority_status_for_state(&pair.importer).test_unwrap();
     assert_eq!(status.generation, Some(2));
