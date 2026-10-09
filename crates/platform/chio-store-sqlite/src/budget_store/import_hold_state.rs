@@ -102,15 +102,17 @@ impl SqliteBudgetStore {
                 if record.allowed == Some(true) {
                     Self::upsert_hold(
                         transaction,
-                        hold_id,
-                        &record.capability_id,
-                        crate::integer::checked::<_, usize>(record.grant_index)?,
-                        record.exposure_units,
-                        record.exposure_units,
-                        false,
-                        HoldDisposition::Open,
-                        record.authority.as_ref(),
-                        record.recorded_at,
+                        HoldUpsert {
+                            hold_id,
+                            capability_id: &record.capability_id,
+                            grant_index: crate::integer::checked::<_, usize>(record.grant_index)?,
+                            authorized_exposure_units: record.exposure_units,
+                            remaining_exposure_units: record.exposure_units,
+                            invocation_captured: false,
+                            disposition: HoldDisposition::Open,
+                            authority: record.authority.as_ref(),
+                            recorded_at: record.recorded_at,
+                        },
                     )
                 } else {
                     Self::delete_hold_if_exists(transaction, hold_id)
@@ -149,15 +151,17 @@ impl SqliteBudgetStore {
                 };
                 Self::upsert_hold(
                     transaction,
-                    hold_id,
-                    &record.capability_id,
-                    crate::integer::checked::<_, usize>(record.grant_index)?,
-                    hold.authorized_exposure_units,
-                    remaining,
-                    hold.invocation_captured,
-                    disposition,
-                    record.authority.as_ref().or(hold.authority.as_ref()),
-                    record.recorded_at,
+                    HoldUpsert {
+                        hold_id,
+                        capability_id: &record.capability_id,
+                        grant_index: crate::integer::checked::<_, usize>(record.grant_index)?,
+                        authorized_exposure_units: hold.authorized_exposure_units,
+                        remaining_exposure_units: remaining,
+                        invocation_captured: hold.invocation_captured,
+                        disposition,
+                        authority: record.authority.as_ref().or(hold.authority.as_ref()),
+                        recorded_at: record.recorded_at,
+                    },
                 )
             }
             BudgetMutationKind::CancelCapturedBeforeDispatch => {
@@ -187,15 +191,17 @@ impl SqliteBudgetStore {
                 }
                 Self::upsert_hold(
                     transaction,
-                    hold_id,
-                    &record.capability_id,
-                    crate::integer::checked::<_, usize>(record.grant_index)?,
-                    hold.authorized_exposure_units,
-                    0,
-                    false,
-                    HoldDisposition::Reversed,
-                    record.authority.as_ref().or(hold.authority.as_ref()),
-                    record.recorded_at,
+                    HoldUpsert {
+                        hold_id,
+                        capability_id: &record.capability_id,
+                        grant_index: crate::integer::checked::<_, usize>(record.grant_index)?,
+                        authorized_exposure_units: hold.authorized_exposure_units,
+                        remaining_exposure_units: 0,
+                        invocation_captured: false,
+                        disposition: HoldDisposition::Reversed,
+                        authority: record.authority.as_ref().or(hold.authority.as_ref()),
+                        recorded_at: record.recorded_at,
+                    },
                 )
             }
             BudgetMutationKind::CaptureInvocation => {
@@ -228,15 +234,17 @@ impl SqliteBudgetStore {
                 }
                 Self::upsert_hold(
                     transaction,
-                    hold_id,
-                    &record.capability_id,
-                    crate::integer::checked::<_, usize>(record.grant_index)?,
-                    hold.authorized_exposure_units,
-                    hold.remaining_exposure_units,
-                    true,
-                    hold.disposition,
-                    record.authority.as_ref().or(hold.authority.as_ref()),
-                    record.recorded_at,
+                    HoldUpsert {
+                        hold_id,
+                        capability_id: &record.capability_id,
+                        grant_index: crate::integer::checked::<_, usize>(record.grant_index)?,
+                        authorized_exposure_units: hold.authorized_exposure_units,
+                        remaining_exposure_units: hold.remaining_exposure_units,
+                        invocation_captured: true,
+                        disposition: hold.disposition,
+                        authority: record.authority.as_ref().or(hold.authority.as_ref()),
+                        recorded_at: record.recorded_at,
+                    },
                 )
             }
             BudgetMutationKind::ReverseExposure => {
@@ -257,15 +265,17 @@ impl SqliteBudgetStore {
                 }
                 Self::upsert_hold(
                     transaction,
-                    hold_id,
-                    &record.capability_id,
-                    crate::integer::checked::<_, usize>(record.grant_index)?,
-                    existing.authorized_exposure_units,
-                    0,
-                    false,
-                    HoldDisposition::Reversed,
-                    record.authority.as_ref(),
-                    record.recorded_at,
+                    HoldUpsert {
+                        hold_id,
+                        capability_id: &record.capability_id,
+                        grant_index: crate::integer::checked::<_, usize>(record.grant_index)?,
+                        authorized_exposure_units: existing.authorized_exposure_units,
+                        remaining_exposure_units: 0,
+                        invocation_captured: false,
+                        disposition: HoldDisposition::Reversed,
+                        authority: record.authority.as_ref(),
+                        recorded_at: record.recorded_at,
+                    },
                 )
             }
             BudgetMutationKind::ReconcileSpend => {
@@ -288,15 +298,17 @@ impl SqliteBudgetStore {
                 }
                 Self::upsert_hold(
                     transaction,
-                    hold_id,
-                    &record.capability_id,
-                    crate::integer::checked::<_, usize>(record.grant_index)?,
-                    existing.authorized_exposure_units,
-                    0,
-                    true,
-                    HoldDisposition::Reconciled,
-                    record.authority.as_ref(),
-                    record.recorded_at,
+                    HoldUpsert {
+                        hold_id,
+                        capability_id: &record.capability_id,
+                        grant_index: crate::integer::checked::<_, usize>(record.grant_index)?,
+                        authorized_exposure_units: existing.authorized_exposure_units,
+                        remaining_exposure_units: 0,
+                        invocation_captured: true,
+                        disposition: HoldDisposition::Reconciled,
+                        authority: record.authority.as_ref(),
+                        recorded_at: record.recorded_at,
+                    },
                 )
             }
             BudgetMutationKind::ReserveInvocation

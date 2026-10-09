@@ -57,6 +57,7 @@ mod rows;
 mod schema;
 mod snapshot;
 mod store;
+use store::{HoldUpsert, NewMutationEvent, ReplayedMutationEvent};
 mod trait_impl;
 
 pub use reaper::ReapSummary;

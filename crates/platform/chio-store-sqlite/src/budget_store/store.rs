@@ -49,6 +49,55 @@ const BUDGET_STORE_SCHEMA_KEY: &str = "budget";
 /// budget database rather than reject it as foreign.
 const BUDGET_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &["capability_grant_budgets"];
 
+/// Parameters of `upsert_hold`.
+pub(super) struct HoldUpsert<'a> {
+    pub(super) hold_id: &'a str,
+    pub(super) capability_id: &'a str,
+    pub(super) grant_index: usize,
+    pub(super) authorized_exposure_units: u64,
+    pub(super) remaining_exposure_units: u64,
+    pub(super) invocation_captured: bool,
+    pub(super) disposition: HoldDisposition,
+    pub(super) authority: Option<&'a BudgetEventAuthority>,
+    pub(super) recorded_at: i64,
+}
+
+/// Parameters of `existing_event_allowed`.
+pub(super) struct ReplayedMutationEvent<'a> {
+    pub(super) event_id: Option<&'a str>,
+    pub(super) kind: BudgetMutationKind,
+    pub(super) capability_id: &'a str,
+    pub(super) grant_index: usize,
+    pub(super) hold_id: Option<&'a str>,
+    pub(super) authority: Option<&'a BudgetEventAuthority>,
+    pub(super) exposure_units: u64,
+    pub(super) realized_spend_units: u64,
+    pub(super) max_invocations: Option<u32>,
+    pub(super) max_cost_per_invocation: Option<u64>,
+    pub(super) max_total_cost_units: Option<u64>,
+}
+
+/// Parameters of `append_mutation_event`.
+pub(super) struct NewMutationEvent<'a> {
+    pub(super) event_id: Option<&'a str>,
+    pub(super) hold_id: Option<&'a str>,
+    pub(super) authority: Option<&'a BudgetEventAuthority>,
+    pub(super) capability_id: &'a str,
+    pub(super) grant_index: usize,
+    pub(super) kind: BudgetMutationKind,
+    pub(super) allowed: Option<bool>,
+    pub(super) event_seq: u64,
+    pub(super) usage_seq: Option<u64>,
+    pub(super) exposure_units: u64,
+    pub(super) realized_spend_units: u64,
+    pub(super) max_invocations: Option<u32>,
+    pub(super) max_cost_per_invocation: Option<u64>,
+    pub(super) max_total_cost_units: Option<u64>,
+    pub(super) invocation_count_after: u32,
+    pub(super) total_cost_exposed_after: u64,
+    pub(super) total_cost_realized_spend_after: u64,
+}
+
 impl SqliteBudgetStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, BudgetStoreError> {
         Self::open_with_clock(path, Arc::new(SystemClock))
@@ -1456,22 +1505,21 @@ impl SqliteBudgetStore {
         Ok(())
     }
 
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-    )]
     pub(super) fn upsert_hold(
         transaction: &rusqlite::Transaction<'_>,
-        hold_id: &str,
-        capability_id: &str,
-        grant_index: usize,
-        authorized_exposure_units: u64,
-        remaining_exposure_units: u64,
-        invocation_captured: bool,
-        disposition: HoldDisposition,
-        authority: Option<&BudgetEventAuthority>,
-        recorded_at: i64,
+        params: HoldUpsert<'_>,
     ) -> Result<(), BudgetStoreError> {
+        let HoldUpsert {
+            hold_id,
+            capability_id,
+            grant_index,
+            authorized_exposure_units,
+            remaining_exposure_units,
+            invocation_captured,
+            disposition,
+            authority,
+            recorded_at,
+        } = params;
         let now = recorded_at;
         transaction.execute(
             r#"
@@ -1658,24 +1706,23 @@ impl SqliteBudgetStore {
         Ok(Some(existing_allowed.unwrap_or(0) > 0))
     }
 
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-    )]
     pub(super) fn existing_event_allowed(
         transaction: &rusqlite::Transaction<'_>,
-        event_id: Option<&str>,
-        kind: BudgetMutationKind,
-        capability_id: &str,
-        grant_index: usize,
-        hold_id: Option<&str>,
-        authority: Option<&BudgetEventAuthority>,
-        exposure_units: u64,
-        realized_spend_units: u64,
-        max_invocations: Option<u32>,
-        max_cost_per_invocation: Option<u64>,
-        max_total_cost_units: Option<u64>,
+        params: ReplayedMutationEvent<'_>,
     ) -> Result<Option<Option<bool>>, BudgetStoreError> {
+        let ReplayedMutationEvent {
+            event_id,
+            kind,
+            capability_id,
+            grant_index,
+            hold_id,
+            authority,
+            exposure_units,
+            realized_spend_units,
+            max_invocations,
+            max_cost_per_invocation,
+            max_total_cost_units,
+        } = params;
         let Some(event_id) = event_id else {
             return Ok(None);
         };
@@ -1756,31 +1803,30 @@ impl SqliteBudgetStore {
         Ok(Some(existing_allowed))
     }
 
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-    )]
     pub(super) fn append_mutation_event(
         &self,
         transaction: &rusqlite::Transaction<'_>,
-        event_id: Option<&str>,
-        hold_id: Option<&str>,
-        authority: Option<&BudgetEventAuthority>,
-        capability_id: &str,
-        grant_index: usize,
-        kind: BudgetMutationKind,
-        allowed: Option<bool>,
-        event_seq: u64,
-        usage_seq: Option<u64>,
-        exposure_units: u64,
-        realized_spend_units: u64,
-        max_invocations: Option<u32>,
-        max_cost_per_invocation: Option<u64>,
-        max_total_cost_units: Option<u64>,
-        invocation_count_after: u32,
-        total_cost_exposed_after: u64,
-        total_cost_realized_spend_after: u64,
+        params: NewMutationEvent<'_>,
     ) -> Result<BudgetMutationRecord, BudgetStoreError> {
+        let NewMutationEvent {
+            event_id,
+            hold_id,
+            authority,
+            capability_id,
+            grant_index,
+            kind,
+            allowed,
+            event_seq,
+            usage_seq,
+            exposure_units,
+            realized_spend_units,
+            max_invocations,
+            max_cost_per_invocation,
+            max_total_cost_units,
+            invocation_count_after,
+            total_cost_exposed_after,
+            total_cost_realized_spend_after,
+        } = params;
         validate_budget_grant_index(grant_index)?;
         let event_id = match event_id {
             Some(event_id) => event_id.to_string(),

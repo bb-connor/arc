@@ -56,19 +56,21 @@ impl BudgetStore for SqliteBudgetStore {
             SqliteBudgetStore::load_mutation_event(&transaction, &request.event_id)?;
         let existing = SqliteBudgetStore::existing_event_allowed(
             &transaction,
-            Some(&request.event_id),
-            BudgetMutationKind::CaptureInvocation,
-            &request.capability_id,
-            request.grant_index,
-            Some(&request.hold_id),
-            request.authority.as_ref(),
-            existing_event
-                .as_ref()
-                .map_or(0, |event| event.exposure_units),
-            0,
-            None,
-            None,
-            None,
+            ReplayedMutationEvent {
+                event_id: Some(&request.event_id),
+                kind: BudgetMutationKind::CaptureInvocation,
+                capability_id: &request.capability_id,
+                grant_index: request.grant_index,
+                hold_id: Some(&request.hold_id),
+                authority: request.authority.as_ref(),
+                exposure_units: existing_event
+                    .as_ref()
+                    .map_or(0, |event| event.exposure_units),
+                realized_spend_units: 0,
+                max_invocations: None,
+                max_cost_per_invocation: None,
+                max_total_cost_units: None,
+            },
         )?;
         let usage = transaction
             .prepare_cached(
@@ -234,23 +236,25 @@ impl BudgetStore for SqliteBudgetStore {
 
         self.append_mutation_event(
             &transaction,
-            Some(&request.event_id),
-            Some(&request.hold_id),
-            request.authority.as_ref(),
-            &request.capability_id,
-            request.grant_index,
-            BudgetMutationKind::CaptureInvocation,
-            Some(true),
-            event_seq,
-            Some(usage.0),
-            hold.remaining_exposure_units,
-            0,
-            None,
-            None,
-            None,
-            usage.1,
-            usage.2,
-            usage.3,
+            NewMutationEvent {
+                event_id: Some(&request.event_id),
+                hold_id: Some(&request.hold_id),
+                authority: request.authority.as_ref(),
+                capability_id: &request.capability_id,
+                grant_index: request.grant_index,
+                kind: BudgetMutationKind::CaptureInvocation,
+                allowed: Some(true),
+                event_seq,
+                usage_seq: Some(usage.0),
+                exposure_units: hold.remaining_exposure_units,
+                realized_spend_units: 0,
+                max_invocations: None,
+                max_cost_per_invocation: None,
+                max_total_cost_units: None,
+                invocation_count_after: usage.1,
+                total_cost_exposed_after: usage.2,
+                total_cost_realized_spend_after: usage.3,
+            },
         )?;
         transaction.commit()?;
         Ok(BudgetInvocationCaptureDecision::Captured(mutation(
@@ -462,25 +466,27 @@ impl BudgetStore for SqliteBudgetStore {
         )?;
         self.append_mutation_event(
             &transaction,
-            Some(&request.event_id),
-            Some(&request.hold_id),
-            request.authority.as_ref(),
-            &request.capability_id,
-            request.grant_index,
-            BudgetMutationKind::CancelCapturedBeforeDispatch,
-            Some(true),
-            event_seq,
-            Some(event_seq),
-            hold.authorized_exposure_units,
-            0,
-            None,
-            None,
-            None,
-            InvocationCount::new(current.0)
-                .try_sub(InvocationCount::new(1))?
-                .get(),
-            total_cost_exposed_after,
-            current.2,
+            NewMutationEvent {
+                event_id: Some(&request.event_id),
+                hold_id: Some(&request.hold_id),
+                authority: request.authority.as_ref(),
+                capability_id: &request.capability_id,
+                grant_index: request.grant_index,
+                kind: BudgetMutationKind::CancelCapturedBeforeDispatch,
+                allowed: Some(true),
+                event_seq,
+                usage_seq: Some(event_seq),
+                exposure_units: hold.authorized_exposure_units,
+                realized_spend_units: 0,
+                max_invocations: None,
+                max_cost_per_invocation: None,
+                max_total_cost_units: None,
+                invocation_count_after: InvocationCount::new(current.0)
+                    .try_sub(InvocationCount::new(1))?
+                    .get(),
+                total_cost_exposed_after,
+                total_cost_realized_spend_after: current.2,
+            },
         )?;
         transaction.commit()?;
 
@@ -760,17 +766,19 @@ impl BudgetStore for SqliteBudgetStore {
 
         if SqliteBudgetStore::existing_event_allowed(
             &transaction,
-            event_id,
-            BudgetMutationKind::ReverseExposure,
-            capability_id,
-            grant_index,
-            hold_id,
-            authority,
-            cost_units,
-            0,
-            None,
-            None,
-            None,
+            ReplayedMutationEvent {
+                event_id,
+                kind: BudgetMutationKind::ReverseExposure,
+                capability_id,
+                grant_index,
+                hold_id,
+                authority,
+                exposure_units: cost_units,
+                realized_spend_units: 0,
+                max_invocations: None,
+                max_cost_per_invocation: None,
+                max_total_cost_units: None,
+            },
         )?
         .is_some()
         {
@@ -902,25 +910,27 @@ impl BudgetStore for SqliteBudgetStore {
         }
         self.append_mutation_event(
             &transaction,
-            event_id,
-            hold_id,
-            authority,
-            capability_id,
-            grant_index,
-            BudgetMutationKind::ReverseExposure,
-            None,
-            seq,
-            Some(seq),
-            cost_units,
-            0,
-            None,
-            None,
-            None,
-            InvocationCount::new(invocation_count)
-                .try_sub(InvocationCount::new(1))?
-                .get(),
-            new_total_cost_exposed,
-            total_cost_realized_spend,
+            NewMutationEvent {
+                event_id,
+                hold_id,
+                authority,
+                capability_id,
+                grant_index,
+                kind: BudgetMutationKind::ReverseExposure,
+                allowed: None,
+                event_seq: seq,
+                usage_seq: Some(seq),
+                exposure_units: cost_units,
+                realized_spend_units: 0,
+                max_invocations: None,
+                max_cost_per_invocation: None,
+                max_total_cost_units: None,
+                invocation_count_after: InvocationCount::new(invocation_count)
+                    .try_sub(InvocationCount::new(1))?
+                    .get(),
+                total_cost_exposed_after: new_total_cost_exposed,
+                total_cost_realized_spend_after: total_cost_realized_spend,
+            },
         )?;
         transaction.commit()?;
         Ok(())
@@ -974,17 +984,19 @@ impl BudgetStore for SqliteBudgetStore {
 
         if SqliteBudgetStore::existing_event_allowed(
             &transaction,
-            event_id,
-            BudgetMutationKind::ReleaseExposure,
-            capability_id,
-            grant_index,
-            hold_id,
-            authority,
-            cost_units,
-            0,
-            None,
-            None,
-            None,
+            ReplayedMutationEvent {
+                event_id,
+                kind: BudgetMutationKind::ReleaseExposure,
+                capability_id,
+                grant_index,
+                hold_id,
+                authority,
+                exposure_units: cost_units,
+                realized_spend_units: 0,
+                max_invocations: None,
+                max_cost_per_invocation: None,
+                max_total_cost_units: None,
+            },
         )?
         .is_some()
         {
@@ -1117,23 +1129,25 @@ impl BudgetStore for SqliteBudgetStore {
         }
         self.append_mutation_event(
             &transaction,
-            event_id,
-            hold_id,
-            authority,
-            capability_id,
-            grant_index,
-            BudgetMutationKind::ReleaseExposure,
-            None,
-            seq,
-            Some(seq),
-            cost_units,
-            0,
-            None,
-            None,
-            None,
-            invocation_count,
-            new_total_cost_exposed,
-            total_cost_realized_spend,
+            NewMutationEvent {
+                event_id,
+                hold_id,
+                authority,
+                capability_id,
+                grant_index,
+                kind: BudgetMutationKind::ReleaseExposure,
+                allowed: None,
+                event_seq: seq,
+                usage_seq: Some(seq),
+                exposure_units: cost_units,
+                realized_spend_units: 0,
+                max_invocations: None,
+                max_cost_per_invocation: None,
+                max_total_cost_units: None,
+                invocation_count_after: invocation_count,
+                total_cost_exposed_after: new_total_cost_exposed,
+                total_cost_realized_spend_after: total_cost_realized_spend,
+            },
         )?;
         transaction.commit()?;
         Ok(())
@@ -1209,17 +1223,19 @@ impl BudgetStore for SqliteBudgetStore {
 
         if SqliteBudgetStore::existing_event_allowed(
             &transaction,
-            event_id,
-            BudgetMutationKind::ReconcileSpend,
-            capability_id,
-            grant_index,
-            hold_id,
-            authority,
-            exposed_cost_units,
-            realized_cost_units,
-            None,
-            None,
-            None,
+            ReplayedMutationEvent {
+                event_id,
+                kind: BudgetMutationKind::ReconcileSpend,
+                capability_id,
+                grant_index,
+                hold_id,
+                authority,
+                exposure_units: exposed_cost_units,
+                realized_spend_units: realized_cost_units,
+                max_invocations: None,
+                max_cost_per_invocation: None,
+                max_total_cost_units: None,
+            },
         )?
         .is_some()
         {
@@ -1357,23 +1373,25 @@ impl BudgetStore for SqliteBudgetStore {
         }
         self.append_mutation_event(
             &transaction,
-            event_id,
-            hold_id,
-            authority,
-            capability_id,
-            grant_index,
-            BudgetMutationKind::ReconcileSpend,
-            None,
-            seq,
-            Some(seq),
-            exposed_cost_units,
-            realized_cost_units,
-            None,
-            None,
-            None,
-            invocation_count,
-            new_total_cost_exposed,
-            new_total_cost_realized_spend,
+            NewMutationEvent {
+                event_id,
+                hold_id,
+                authority,
+                capability_id,
+                grant_index,
+                kind: BudgetMutationKind::ReconcileSpend,
+                allowed: None,
+                event_seq: seq,
+                usage_seq: Some(seq),
+                exposure_units: exposed_cost_units,
+                realized_spend_units: realized_cost_units,
+                max_invocations: None,
+                max_cost_per_invocation: None,
+                max_total_cost_units: None,
+                invocation_count_after: invocation_count,
+                total_cost_exposed_after: new_total_cost_exposed,
+                total_cost_realized_spend_after: new_total_cost_realized_spend,
+            },
         )?;
         transaction.commit()?;
         Ok(())

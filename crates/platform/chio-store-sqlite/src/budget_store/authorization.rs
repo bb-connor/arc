@@ -29,17 +29,19 @@ impl SqliteBudgetStore {
         };
         let existing = Self::existing_event_allowed(
             &transaction,
-            request.event_id.as_deref(),
-            BudgetMutationKind::AuthorizeExposure,
-            &request.capability_id,
-            request.grant_index,
-            request.hold_id.as_deref(),
-            request.authority.as_ref(),
-            request.requested_exposure_units,
-            0,
-            request.max_invocations,
-            request.max_cost_per_invocation,
-            request.max_total_cost_units,
+            ReplayedMutationEvent {
+                event_id: request.event_id.as_deref(),
+                kind: BudgetMutationKind::AuthorizeExposure,
+                capability_id: &request.capability_id,
+                grant_index: request.grant_index,
+                hold_id: request.hold_id.as_deref(),
+                authority: request.authority.as_ref(),
+                exposure_units: request.requested_exposure_units,
+                realized_spend_units: 0,
+                max_invocations: request.max_invocations,
+                max_cost_per_invocation: request.max_cost_per_invocation,
+                max_total_cost_units: request.max_total_cost_units,
+            },
         )?;
         if existing.is_none() {
             if let Some(hold_id) = request.hold_id.as_deref() {
@@ -214,23 +216,25 @@ impl SqliteBudgetStore {
             };
         let event = self.append_mutation_event(
             &transaction,
-            request.event_id.as_deref(),
-            request.hold_id.as_deref(),
-            request.authority.as_ref(),
-            &request.capability_id,
-            request.grant_index,
-            BudgetMutationKind::AuthorizeExposure,
-            Some(allowed),
-            event_seq,
-            usage_seq,
-            request.requested_exposure_units,
-            0,
-            request.max_invocations,
-            request.max_cost_per_invocation,
-            request.max_total_cost_units,
-            invocation_count_after,
-            exposed_after,
-            realized_after,
+            NewMutationEvent {
+                event_id: request.event_id.as_deref(),
+                hold_id: request.hold_id.as_deref(),
+                authority: request.authority.as_ref(),
+                capability_id: &request.capability_id,
+                grant_index: request.grant_index,
+                kind: BudgetMutationKind::AuthorizeExposure,
+                allowed: Some(allowed),
+                event_seq,
+                usage_seq,
+                exposure_units: request.requested_exposure_units,
+                realized_spend_units: 0,
+                max_invocations: request.max_invocations,
+                max_cost_per_invocation: request.max_cost_per_invocation,
+                max_total_cost_units: request.max_total_cost_units,
+                invocation_count_after,
+                total_cost_exposed_after: exposed_after,
+                total_cost_realized_spend_after: realized_after,
+            },
         )?;
         let decision = Self::authorize_event_decision(self, event)?;
         transaction.commit()?;
