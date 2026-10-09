@@ -52,12 +52,12 @@
     "current_or_executed_support_findings": 348,
     "implementation_recorded_scoped_closed": 117,
     "implementation_recorded_not_closed": 231,
-    "findings_and_prevented_candidates": 379,
-    "all_records_including_provenance": 380,
+    "findings_and_prevented_candidates": 381,
+    "all_records_including_provenance": 382,
     "assigned_finding_ids_excluding_provenance": 371,
     "qualified": 0,
     "current_status": {
-      "candidate_only": 31,
+      "candidate_only": 33,
       "needs_revalidation": 47,
       "open": 231,
       "prerequisite_only": 1,
@@ -89,7 +89,16 @@
       },
       "provenance_prerequisite": {
         "unassigned": 1
+      },
+      "candidate_followup": {
+        "P3": 1,
+        "unassigned": 1
       }
+    },
+    "candidate_followup": {
+      "total": 2,
+      "assigned_ids": 0,
+      "unassigned_records": 2
     }
   },
   "pin_audit": {
@@ -8697,6 +8706,89 @@
       "recorded_disposition": "provenance_prerequisite_not_proved_production_defect",
       "current_status": "prerequisite_only",
       "current_reason": "Exact archived fd374/f67 provenance is now verified, and originalHybrid205 hook is genuinely absent. A distinct existing070252 predecessor has compatible source, but producer lifecycle/capture/current consumers remain separate pending gates. No production or native failure is inferred from the absent hook."
+    },
+    {
+      "key": "candidate:checkpoint-receipt-confirmation-envelope",
+      "id": null,
+      "category": "candidate_followup",
+      "severity": null,
+      "severity_reason": "The source diagnosis and observed run assign no review priority.",
+      "title": "Native checkpoint confirmation prices an obsolete Process receipt envelope",
+      "dependency_group": "checkpoints_and_knowledge_lifecycle",
+      "obligation": "Price the complete supported Process receipt and Native framing before original publication; preserve the producer receipt ceiling, original retained maximum and underpriced-original refusal. Demonstrate actual checkpoint success and exact replay alongside the existing receipt INSERT rollback control.",
+      "evidence_refs": [
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/checkpoint-integration-source.json",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/checkpoint-profile-integrated-third.log",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/checkpoint-profile-integrated-third.json",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/checkpoint-receipt-envelope/review-notes.md",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/checkpoint-receipt-envelope/spec-review.md"
+      ],
+      "recorded_disposition": "candidate_local_controls_passed_independent_source_review_approved",
+      "current_status": "candidate_only",
+      "current_reason": "The uninstalled candidate first passed the real receipt INSERT fault case while its positive committed Process and failed Native confirmation with OutcomeUnknown. Source diagnosis found v1 receipt pricing missing v2 result_basis and using the wrong sequence-domain spelling. The shared 8192-byte producer-ceiling correction subsequently passed three envelope controls and both mandatory external checkpoint cases. Independent spec review of that repair passed; the separate source-quality review remains pending; this scoped local pass changes no canonical disposition or qualification.",
+      "installed_when_found": false,
+      "current_implementation_finding": false,
+      "candidate_source": "target/recovery-pr/current-review-followup/local-native-process-owner-composition-20261009T0610/source",
+      "confidence": "High for the source mismatch, observed before/after local outcomes and independent source review; broader acceptance remains separate.",
+      "local_validation": {
+        "evidence_refs": [
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-envelope-controls-first.json",
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-envelope-controls-first.log",
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/checkpoint-profile-integrated-fourth.json",
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/checkpoint-profile-integrated-fourth.log",
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/checkpoint-confirmation-source.json"
+        ],
+        "envelope_controls": {
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0
+        },
+        "checkpoint_cases": {
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0
+        },
+        "scope": "Local selected-candidate controls and independent source review; uninstalled, qualified false."
+      },
+      "qualified": false,
+      "quality_review": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/checkpoint-receipt-envelope/quality-review.md",
+        "sha256": "7af122f80aa32bb53a74035a30f4896c40e5728d6b0d20c226b44883cea3c96d",
+        "verdict": "approve",
+        "scope": "Three Store files plus the coordinated shared receipt limit; source review and retained local results only",
+        "qualified": false
+      }
+    },
+    {
+      "key": "candidate:checkpoint-stage-error-source-chain",
+      "id": null,
+      "category": "candidate_followup",
+      "severity": "P3",
+      "title": "Checkpoint stage context discards the original error and source chain",
+      "dependency_group": "checkpoints_and_knowledge_lifecycle",
+      "obligation": "Retain the original concrete error, Debug representation and Error::source chain while adding stage context; preserve all migrated checkpoint assertions and required outcomes.",
+      "evidence_refs": [
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/checkpoint-integration/quality-review.md",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/checkpoint-integration/quality-review-successor.md",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/checkpoint-integration/stage-error-successor/verification.json",
+        "target/recovery-pr/current-review-followup/local-native-process-owner-composition-20261009T0610/source/crates/kernel/chio-process/tests/native_checkpoint_coordination.rs"
+      ],
+      "recorded_disposition": "candidate_source_correction_approved",
+      "current_status": "candidate_only",
+      "current_reason": "The original P3 finding concerned formatting errors into replacement strings. An independent source-only successor approves CheckpointStageError owning the original boxed error and forwarding source(); all 45 assertion expressions and both case bodies remain unchanged. That exact test successor subsequently compiled and passed both local external checkpoint cases. The candidate remains uninstalled and unqualified; the source review and local execution retain their separate scopes.",
+      "installed_when_found": false,
+      "current_implementation_finding": false,
+      "candidate_source": "target/recovery-pr/current-review-followup/local-native-process-owner-composition-20261009T0610/source",
+      "confidence": "High for the authenticated finding and source-only corrective review; no runtime qualification is credited.",
+      "local_validation": {
+        "evidence_refs": [
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/checkpoint-profile-integrated-fourth.json",
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/checkpoint-profile-integrated-fourth.log",
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/checkpoint-confirmation-source.json"
+        ],
+        "scope": "The independently reviewed test hash is unchanged in the passing two-case local run; no broader qualification."
+      },
+      "qualified": false
     }
   ],
   "inventory_confidence": "high: exact ID, row-count and recorded-disposition joins; current behavior is not requalified",
@@ -8706,6 +8798,87 @@
       "at_utc": "2026-10-09T14:21:52.537022+00:00",
       "review": "docs/architecture/recoverable-agent-runtime/implementation/reviews/explanation-evidence-continuity.md",
       "scope": "source-only continuity"
+    },
+    {
+      "findings": [
+        "candidate:checkpoint-receipt-confirmation-envelope",
+        "candidate:checkpoint-stage-error-source-chain"
+      ],
+      "at_utc": "2026-10-09T14:44:23.785269+00:00",
+      "scope": "Two uninstalled candidate follow-ups; original 380 records and historical status counts preserved.",
+      "evidence_packet": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-envelope-register-update"
+    },
+    {
+      "findings": [
+        "candidate:checkpoint-receipt-confirmation-envelope",
+        "candidate:checkpoint-stage-error-source-chain"
+      ],
+      "at_utc": "2026-10-09T14:45:26.431181+00:00",
+      "scope": "Recorded three envelope and two actual checkpoint local passes against the preserved successor manifest; candidate-only classification and all counts unchanged."
     }
-  ]
+  ],
+  "candidate_review_evidence": {
+    "recorded_at_utc": "2026-10-09T14:44:23.785269+00:00",
+    "scope": "Additive candidate-only findings and exact local evidence pins; historical inventory and source-pin audit unchanged.",
+    "files": {
+      "checkpoint_candidate_baseline": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/checkpoint-integration-source.json",
+        "sha256": "40821ba13cea3dd2581ce5d5834c45241722cf524f10aae98f5eb8239c83d4ae"
+      },
+      "checkpoint_third_run_log": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/checkpoint-profile-integrated-third.log",
+        "sha256": "9c5485166feec7db8d9a719e60a41d9d6bfe2f26b277fd616516156d392e7cff"
+      },
+      "checkpoint_third_run_result": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/checkpoint-profile-integrated-third.json",
+        "sha256": "322aa9362caca38492fbd6a4117b1e00ddae7101c76b5573bbfe564846b72476"
+      },
+      "receipt_envelope_source_diagnosis": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/checkpoint-receipt-envelope/review-notes.md",
+        "sha256": "4f028e7f49022d006b44334afbbe5fb89760eaad2a68ffbaa38c40c0fa5e50d2"
+      },
+      "checkpoint_quality_finding": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/checkpoint-integration/quality-review.md",
+        "sha256": "13369001783bb352e67cf4c96c586ac4589c950165107b6217df0aeac329eee2"
+      },
+      "checkpoint_quality_successor": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/checkpoint-integration/quality-review-successor.md",
+        "sha256": "802e568ae059044c6a03b670d4b3c4f3b2c5330dcbef22378f5e7ae487dc7917"
+      },
+      "checkpoint_stage_repair_verification": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/checkpoint-integration/stage-error-successor/verification.json",
+        "sha256": "b9a3120b3cde7cbf88595231b0d60abf051591950c4225b3f2faacfb9c85a133"
+      },
+      "checkpoint_stage_repaired_source": {
+        "path": "target/recovery-pr/current-review-followup/local-native-process-owner-composition-20261009T0610/source/crates/kernel/chio-process/tests/native_checkpoint_coordination.rs",
+        "sha256": "43c0dd189c3af8ed85483eb220420ad5e4bc5bf98aa70614f6cdc2b8aa14e12e"
+      },
+      "receipt_envelope_local_result": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-envelope-controls-first.json",
+        "sha256": "284b9f640165646125a3e77d867f8842b5ca3b4b2aa10cc20cd3f6bd6f1c81cf"
+      },
+      "receipt_envelope_local_log": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/receipt-envelope-controls-first.log",
+        "sha256": "521074af4a89c18ad708781d9d0141f27e39797bbc7c12307920873a699f07c6"
+      },
+      "checkpoint_fourth_run_result": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/checkpoint-profile-integrated-fourth.json",
+        "sha256": "c22d3383cc5adc1b15eeb754fe4d03e8548dd07fd7a584d98e3a111a3e6321bd"
+      },
+      "checkpoint_fourth_run_log": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/checkpoint-profile-integrated-fourth.log",
+        "sha256": "80d7360819c8f0cd27829af526570d08666dc4466c3f8e7dd9f8aee7eac415d1"
+      },
+      "checkpoint_confirmation_candidate": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/checkpoint-confirmation-source.json",
+        "sha256": "3321342a894a0b41d180e20374bff47272653abf60909570e5f8e17dca09a87b"
+      },
+      "receipt_envelope_spec_review": {
+        "path": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/checkpoint-receipt-envelope/spec-review.md",
+        "sha256": "8f85e413d5c2ee632095a86becde86cc217692b4bb62892ffd2df973e252eb51"
+      }
+    },
+    "local_pass_recorded_at_utc": "2026-10-09T14:45:26.431181+00:00",
+    "spec_review_recorded_at_utc": "2026-10-09T14:46:39.681718+00:00"
+  }
 }

@@ -24,12 +24,12 @@ acceptance and isolated candidate passes retain their original scope.
 
 - [x] Reconcile the canonical catalog, additions, candidate defects and source
       drift into a sanitized, tracked review register.
-- [ ] Inventory the existing combined runtime candidate against the maintained
+- [x] Inventory the existing combined runtime candidate against the maintained
       branch. Select one candidate and explicitly preserve newer maintained fixes.
 - [ ] Replace excessive internal argument lists with coherent borrowed contexts;
       retain all authority checks, call ordering and lifetime constraints. Derive
       the unchanged sequence-domain default. Run strict owning Clippy.
-- [ ] Reproduce checkpoint coordination through normal library dependencies in an
+- [x] Reproduce checkpoint coordination through normal library dependencies in an
       integration test. Do not relax concrete provider checks to accommodate the
       distinct unit-test crate identity.
 - [ ] Complete actual completion-resource producers and their retained lifecycle,
@@ -38,6 +38,18 @@ acceptance and isolated candidate passes retain their original scope.
       its completion reservation.
 - [ ] Independently review each completed implementation package, install it in
       the integration branch, and rerun its owning checks on the combined source.
+
+The selected local candidate is
+`target/recovery-pr/current-review-followup/local-native-process-owner-composition-20261009T0610/source`.
+Its initial successor inventory is retained at
+`target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/selected-candidate.json`.
+Later source changes have additive manifests and owning results in the same
+successor directory. The candidate includes the newer maintained rusqlite fixes;
+it is not installed or qualified. Completed source reviews and focused controls
+do not mark the remaining integration steps above complete.
+The [checkpoint coordination review](reviews/checkpoint-coordination.md) records
+the completed local controls and their limits, including the outstanding lint
+failure and missing broader runtime acceptance.
 
 ## Acceptance order
 
