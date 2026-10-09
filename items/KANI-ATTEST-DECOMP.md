@@ -29,3 +29,4 @@ evidence: []
 
 ## Log
 - 2026-10-09T19:16:55Z connor: created
+- 2026-10-09T21:54:20Z connor: design input from the #1160 Claude lead: ws2 coord lane claude-pr1160-evidence/hammer/kani-attest-decomp-design.md (908 lines, sha256 prefix 8e101e5ca477cb3e, read-only, code-cited at 8f3dfac6b6; no proof run). Start from it.
