@@ -2,6 +2,8 @@ use super::*;
 use chio_security_types::ports::{
     SchedulerRelativeRetryRequest, SchedulerWorkKey, MAX_SCHEDULER_RETRY_BACKOFF_MS,
 };
+use std::sync::atomic::AtomicUsize;
+use std::sync::Mutex;
 
 #[test]
 fn terminal_response_work_rejects_scheduler_lease_renewal() {
@@ -680,4 +682,239 @@ fn relative_retry_deadline_follows_trusted_time_read_after_the_write_lock() {
     store
         .validate_lease(&absolute_work)
         .unwrap_or_else(|error| panic!("refused backoffs changed the lease: {error}"));
+}
+
+fn relative_retry_request(
+    work: &ScheduledWork,
+    now_unix_ms: u64,
+    backoff_ms: u64,
+    transition_id: &str,
+) -> SchedulerRelativeRetryRequest {
+    SchedulerRelativeRetryRequest {
+        work: work.clone(),
+        expected_attempts: 0,
+        error_code: ErrorCode::new("response.rollback_partial")
+            .unwrap_or_else(|error| panic!("retry error code failed: {error}")),
+        first_failure_at_unix_ms: now_unix_ms,
+        now_unix_ms,
+        backoff_ms,
+        health_event_id: None,
+        transition_id: record_id(transition_id),
+    }
+}
+
+fn transition_count(connection: &rusqlite::Connection) -> i64 {
+    connection
+        .query_row("SELECT COUNT(*) FROM security_transitions", [], |row| {
+            row.get(0)
+        })
+        .unwrap_or_else(|error| panic!("transition count failed: {error}"))
+}
+
+#[test]
+fn relative_retry_replay_refuses_a_deadline_changed_after_recording() {
+    const RECORDED_AT: u64 = 100_000;
+    const BACKOFF_MS: u64 = 1_000;
+    let directory = chio_test_support::private_tempdir()
+        .unwrap_or_else(|error| panic!("temporary directory creation failed: {error}"));
+    let path = directory.path().join("relative-retry-deadline-binding.db");
+    let clock = Arc::new(MutableSecurityStateClock::new(RECORDED_AT));
+    let store = Arc::new(
+        SqliteSecurityStateStore::open_with_trusted_clock(
+            &path,
+            Arc::clone(&clock) as Arc<dyn Clock>,
+        )
+        .unwrap_or_else(|error| panic!("security store open failed: {error}")),
+    );
+    let (_, work) = claim_due_planned_response(
+        &store,
+        "action-relative-retry-binding",
+        "relative-retry-binding-claim",
+        "relative-retry-binding-owner",
+        RECORDED_AT,
+    );
+    let request = relative_retry_request(
+        &work,
+        RECORDED_AT,
+        BACKOFF_MS,
+        "relative-retry-deadline-binding",
+    );
+    let recorded = store
+        .record_relative_retry(&request)
+        .unwrap_or_else(|error| panic!("relative retry failed: {error}"));
+    assert_eq!(recorded.not_before_unix_ms, RECORDED_AT + BACKOFF_MS);
+
+    // A late identical replay returns the deadline fixed at recording.
+    clock.set(RECORDED_AT + BACKOFF_MS / 2);
+    assert_eq!(
+        store
+            .record_relative_retry(&request)
+            .unwrap_or_else(|error| panic!("late relative retry replay failed: {error}")),
+        recorded
+    );
+
+    let connection = rusqlite::Connection::open(&path)
+        .unwrap_or_else(|error| panic!("deadline corruption connection failed: {error}"));
+    let tampered_not_before = recorded.not_before_unix_ms + 60_000;
+    connection
+        .execute(
+            "UPDATE security_scheduler_retries SET not_before = ?3 WHERE tenant_id = ?1 AND action_id = ?2",
+            rusqlite::params![
+                work.tenant_id.as_str(),
+                work.action_id.as_str(),
+                i64::try_from(tampered_not_before)
+                    .unwrap_or_else(|error| panic!("tampered deadline: {error}"))
+            ],
+        )
+        .unwrap_or_else(|error| panic!("deadline corruption failed: {error}"));
+    let transitions_before = transition_count(&connection);
+
+    let refusal = rejected(
+        store.record_relative_retry(&request),
+        "a replay accepted a retry deadline changed after recording",
+    );
+    assert_eq!(refusal.kind(), PortErrorKind::IntegrityFailure);
+    let key = SchedulerWorkKey {
+        tenant_id: work.tenant_id.clone(),
+        action_id: work.action_id.clone(),
+    };
+    let after = store
+        .load_retry(&key)
+        .unwrap_or_else(|error| panic!("retry readback failed: {error}"))
+        .unwrap_or_else(|| panic!("retry row disappeared"));
+    assert_eq!(
+        (after.attempts, after.not_before_unix_ms),
+        (1, tampered_not_before)
+    );
+    assert_eq!(transition_count(&connection), transitions_before);
+}
+
+/// A trusted clock that, while armed, probes whether the store's write lock
+/// is held at each read by attempting a non-waiting write transaction on
+/// its own connection.
+struct WriteLockProbeClock {
+    now_unix_ms: AtomicU64,
+    probe: Mutex<Option<rusqlite::Connection>>,
+    reads_with_lock_held: AtomicUsize,
+    reads_without_lock: AtomicUsize,
+}
+
+impl WriteLockProbeClock {
+    fn new(now_unix_ms: u64) -> Self {
+        Self {
+            now_unix_ms: AtomicU64::new(now_unix_ms),
+            probe: Mutex::new(None),
+            reads_with_lock_held: AtomicUsize::new(0),
+            reads_without_lock: AtomicUsize::new(0),
+        }
+    }
+
+    fn arm(&self, path: &std::path::Path) {
+        let probe = rusqlite::Connection::open(path)
+            .unwrap_or_else(|error| panic!("lock probe connection failed: {error}"));
+        probe
+            .busy_timeout(Duration::ZERO)
+            .unwrap_or_else(|error| panic!("lock probe timeout failed: {error}"));
+        *self
+            .probe
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(probe);
+        self.reads_with_lock_held.store(0, Ordering::Release);
+        self.reads_without_lock.store(0, Ordering::Release);
+    }
+
+    fn disarm(&self) {
+        *self
+            .probe
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
+    }
+
+    fn reads(&self) -> (usize, usize) {
+        (
+            self.reads_with_lock_held.load(Ordering::Acquire),
+            self.reads_without_lock.load(Ordering::Acquire),
+        )
+    }
+}
+
+impl chio_security_types::clock::Clock for WriteLockProbeClock {
+    fn read(
+        &self,
+    ) -> core::result::Result<
+        chio_security_types::clock::ClockReading,
+        chio_security_types::clock::ClockError,
+    > {
+        let probe = self
+            .probe
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some(probe) = probe.as_ref() {
+            match probe.execute_batch("BEGIN IMMEDIATE") {
+                Ok(()) => {
+                    probe
+                        .execute_batch("ROLLBACK")
+                        .unwrap_or_else(|error| panic!("lock probe release failed: {error}"));
+                    self.reads_without_lock.fetch_add(1, Ordering::AcqRel);
+                }
+                Err(rusqlite::Error::SqliteFailure(error, _))
+                    if error.code == rusqlite::ErrorCode::DatabaseBusy =>
+                {
+                    self.reads_with_lock_held.fetch_add(1, Ordering::AcqRel);
+                }
+                Err(error) => panic!("lock probe failed: {error}"),
+            }
+        }
+        chio_security_types::clock::Clock::read(
+            &chio_security_types::clock::FixedClock::from_millis(
+                self.now_unix_ms.load(Ordering::Acquire),
+            ),
+        )
+    }
+}
+
+#[test]
+fn relative_retry_reads_trusted_time_only_with_the_write_lock_held() {
+    const NOW: u64 = 100_000;
+    let directory = chio_test_support::private_tempdir()
+        .unwrap_or_else(|error| panic!("temporary directory creation failed: {error}"));
+    let path = directory.path().join("relative-retry-lock-probe.db");
+    let clock = Arc::new(WriteLockProbeClock::new(NOW));
+    let store = Arc::new(
+        SqliteSecurityStateStore::open_with_trusted_clock(
+            &path,
+            Arc::clone(&clock) as Arc<dyn Clock>,
+        )
+        .unwrap_or_else(|error| panic!("security store open failed: {error}")),
+    );
+    let (_, work) = claim_due_planned_response(
+        &store,
+        "action-relative-retry-lock-probe",
+        "relative-retry-lock-probe-claim",
+        "relative-retry-lock-probe-owner",
+        NOW,
+    );
+
+    // Counter-control: a read outside any store transaction is seen unlocked.
+    clock.arm(&path);
+    chio_security_types::clock::Clock::read(clock.as_ref())
+        .unwrap_or_else(|error| panic!("probe clock read failed: {error}"));
+    assert_eq!(clock.reads(), (0, 1));
+
+    clock.arm(&path);
+    let recorded = store
+        .record_relative_retry(&relative_retry_request(
+            &work,
+            NOW,
+            1_000,
+            "relative-retry-lock-probe",
+        ))
+        .unwrap_or_else(|error| panic!("relative retry failed: {error}"));
+    let (with_lock_held, without_lock) = clock.reads();
+    clock.disarm();
+    assert_eq!(recorded.not_before_unix_ms, NOW + 1_000);
+    assert!(
+        with_lock_held >= 1 && without_lock == 0,
+        "the retry deadline read trusted time outside the write lock: with_lock_held={with_lock_held} without_lock={without_lock}"
+    );
 }

@@ -487,6 +487,53 @@ struct SchedulerRetryRecord<'a> {
     deadline: RetryDeadline,
 }
 
+const RELATIVE_RETRY_DEADLINE_KIND: &str = "scheduler_relative_retry_deadline";
+
+/// Transition evidence binding a store-generated retry deadline to the
+/// relative request that produced it, so a replay can authenticate the
+/// recorded deadline rather than trust the retry row.
+struct RelativeRetryDeadlineBinding {
+    transition_id: RecordId,
+    hash: [u8; 32],
+}
+
+impl RelativeRetryDeadlineBinding {
+    fn new(
+        request_transition_id: &RecordId,
+        request_hash: &[u8; 32],
+        not_before_unix_ms: u64,
+    ) -> PortResult<Self> {
+        let transition_id = RecordId::new(format!(
+            "scheduler-relative-retry-deadline-{}",
+            hex::encode(canonical_request_hash(request_transition_id)?)
+        ))
+        .map_err(|_| PortError::integrity_failure())?;
+        let hash = canonical_request_hash(&(
+            RELATIVE_RETRY_DEADLINE_KIND,
+            request_hash,
+            not_before_unix_ms,
+        ))?;
+        Ok(Self {
+            transition_id,
+            hash,
+        })
+    }
+
+    fn is_recorded(&self, transaction: &Transaction<'_>, tenant_id: &str) -> PortResult<bool> {
+        let recorded: Option<(String, Vec<u8>)> = transaction
+            .query_row(
+                "SELECT transition_kind, request_hash FROM security_transitions WHERE tenant_id = ?1 AND transition_id = ?2",
+                params![tenant_id, self.transition_id.as_str()],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()
+            .map_err(sqlite_error)?;
+        Ok(recorded.is_some_and(|(kind, hash)| {
+            kind == RELATIVE_RETRY_DEADLINE_KIND && hash.as_slice() == self.hash
+        }))
+    }
+}
+
 fn record_scheduler_retry(
     store: &SqliteSecurityStateStore,
     request: SchedulerRetryRecord<'_>,
@@ -534,6 +581,16 @@ fn record_scheduler_retry(
             || stored.health_event_id.as_ref() != request.health_event_id
         {
             return Err(PortError::integrity_failure());
+        }
+        if let RetryDeadline::After(_) = request.deadline {
+            let binding = RelativeRetryDeadlineBinding::new(
+                request.transition_id,
+                &request_hash,
+                stored.not_before_unix_ms,
+            )?;
+            if !binding.is_recorded(&transaction, request.work.tenant_id.as_str())? {
+                return Err(PortError::integrity_failure());
+            }
         }
         transaction.commit().map_err(sqlite_error)?;
         return Ok(stored);
@@ -605,6 +662,20 @@ fn record_scheduler_retry(
         request.transition_kind,
         &request_hash,
     )?;
+    if let RetryDeadline::After(_) = request.deadline {
+        let binding = RelativeRetryDeadlineBinding::new(
+            request.transition_id,
+            &request_hash,
+            not_before_unix_ms,
+        )?;
+        record_transition(
+            &transaction,
+            request.work.tenant_id.as_str(),
+            binding.transition_id.as_str(),
+            RELATIVE_RETRY_DEADLINE_KIND,
+            &binding.hash,
+        )?;
+    }
     let retry = SchedulerRetryState {
         key,
         attempts: next_attempts,
