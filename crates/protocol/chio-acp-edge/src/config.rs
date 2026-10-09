@@ -1,3 +1,5 @@
+use crate::types::AcpCategory;
+
 // Edge configuration controlling permission defaults and categorization.
 
 /// Configuration for the ACP edge.

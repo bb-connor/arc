@@ -1,3 +1,20 @@
+use crate::conversion::ensure_chio_metadata;
+use crate::error::{record_receipt_write_bridge_error, AcpEdgeError};
+use crate::request_error::AcpRequestError;
+use crate::types::AcpCategory;
+use chio_cross_protocol::capability_bridge::{CapabilityBridge, CrossProtocolCapabilityRef};
+use chio_cross_protocol::discovery::{DiscoveryProtocol, TargetProtocolRegistry};
+use chio_cross_protocol::error::BridgeError;
+use chio_cross_protocol::execution::{CrossProtocolExecutionRequest, OpenAiTargetExecutor};
+use chio_cross_protocol::lifecycle::{runtime_lifecycle_contract, RuntimeLifecycleSurface};
+use chio_cross_protocol::orchestrator::{CrossProtocolOrchestrator, OrchestratedToolCall};
+use chio_cross_protocol::semantic_hints::{semantic_hints_for_tool, BridgeFidelity};
+use chio_kernel::ChioKernel;
+use chio_manifest::{BridgeSecurityMetadata, ToolDefinition, VerifiedManifestRegistry};
+use chio_mcp_edge::McpTargetExecutor;
+use serde_json::{json, Value};
+use std::collections::BTreeSet;
+
 // Cross-protocol capability bridge, target bindings, ACP categorization,
 // fidelity evaluation, and the authoritative target registry / orchestration.
 
@@ -7,20 +24,20 @@ static MCP_TARGET_EXECUTOR: McpTargetExecutor = McpTargetExecutor {
     peer_supports_chio_tool_streaming: false,
 };
 static OPENAI_TARGET_EXECUTOR: OpenAiTargetExecutor = OpenAiTargetExecutor;
-const MAX_DEFERRED_ACP_TASKS: usize = 1024;
-const DEFERRED_ACP_TASK_TTL_MILLIS: u64 = 5 * 60 * 1000;
+pub(super) const MAX_DEFERRED_ACP_TASKS: usize = 1024;
+pub(super) const DEFERRED_ACP_TASK_TTL_MILLIS: u64 = 5 * 60 * 1000;
 
 #[derive(Debug, Clone)]
-struct CapabilityBinding {
-    target_protocol: DiscoveryProtocol,
-    server_id: String,
-    tool_name: String,
-    security: BridgeSecurityMetadata,
+pub(super) struct CapabilityBinding {
+    pub(super) target_protocol: DiscoveryProtocol,
+    pub(super) server_id: String,
+    pub(super) tool_name: String,
+    pub(super) security: BridgeSecurityMetadata,
 }
 
-struct AcpRequestIds {
-    origin_request_id: String,
-    kernel_request_id: String,
+pub(super) struct AcpRequestIds {
+    pub(super) origin_request_id: String,
+    pub(super) kernel_request_id: String,
 }
 
 impl CapabilityBridge for AcpCapabilityBridge {
@@ -66,7 +83,7 @@ impl CapabilityBridge for AcpCapabilityBridge {
 }
 
 /// Infer the ACP category for a Chio tool based on its name and properties.
-fn infer_acp_category(tool: &ToolDefinition, default: AcpCategory) -> AcpCategory {
+pub(super) fn infer_acp_category(tool: &ToolDefinition, default: AcpCategory) -> AcpCategory {
     let name_lower = tool.name.to_lowercase();
     if name_lower.contains("read_file")
         || name_lower.contains("write_file")
@@ -91,7 +108,7 @@ fn infer_acp_category(tool: &ToolDefinition, default: AcpCategory) -> AcpCategor
 }
 
 /// Evaluate bridge fidelity for a Chio tool to ACP mapping.
-fn evaluate_bridge_fidelity(
+pub(super) fn evaluate_bridge_fidelity(
     tool: &ToolDefinition,
     category: AcpCategory,
     target_protocol: DiscoveryProtocol,
@@ -166,7 +183,7 @@ fn evaluate_bridge_fidelity(
 }
 
 #[cfg(test)]
-fn current_unix_timestamp() -> u64 {
+pub(super) fn current_unix_timestamp() -> u64 {
     chio_security_types::clock::Clock::read(&chio_security_types::clock::SystemClock)
         .unwrap_or_else(|error| panic!("test clock: {error}"))
         .unix_millis()
@@ -174,7 +191,7 @@ fn current_unix_timestamp() -> u64 {
         / 1000
 }
 
-fn execute_orchestrated_acp_request(
+pub(super) fn execute_orchestrated_acp_request(
     peer: &chio_core::capability::features::CapabilityNegotiation,
     kernel: &ChioKernel,
     manifest_registry: &VerifiedManifestRegistry,
@@ -200,13 +217,16 @@ fn execute_orchestrated_acp_request(
     }
 }
 
-fn authoritative_target_registry() -> TargetProtocolRegistry<'static> {
+pub(super) fn authoritative_target_registry() -> TargetProtocolRegistry<'static> {
     TargetProtocolRegistry::new(DiscoveryProtocol::Native)
         .with_executor(&MCP_TARGET_EXECUTOR)
         .with_executor(&OPENAI_TARGET_EXECUTOR)
 }
 
-fn capability_collision_reason(capability_id: &str, sources: &BTreeSet<String>) -> String {
+pub(super) fn capability_collision_reason(
+    capability_id: &str,
+    sources: &BTreeSet<String>,
+) -> String {
     let source_list = sources.iter().cloned().collect::<Vec<_>>().join(", ");
     format!(
         "ACP capability `{capability_id}` is withheld from discovery because multiple manifests map it to different upstream bindings: {source_list}"

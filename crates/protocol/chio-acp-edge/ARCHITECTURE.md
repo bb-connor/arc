@@ -9,15 +9,14 @@ kernel remains the sole point of capability and guard evaluation. It is a
 projector, not a proxy: it turns Chio's own `ToolManifest`s into an outward
 ACP capability surface, the reverse of `chio-acp-proxy`, which sits in front
 of a third-party ACP agent and enforces Chio checks on that agent's own
-calls. The crate root is assembled from focused source fragments merged with
-`include!` into one module scope (`lib.rs` declares the sequence); item
-visibility resolves as if the fragments were written inline.
+calls. The crate is split into focused modules declared from `lib.rs`, and the
+public items are re-exported from the crate root.
 
 ## Module map
 
 | Path | Responsibility |
 |------|----------------|
-| `src/lib.rs` | Crate doc, imports, and the `include!` sequence. Declares the public `metrics` module and the feature-gated `fuzz` module. |
+| `src/lib.rs` | Crate doc, module declarations, and the public re-exports. Declares the public `metrics` module and the feature-gated `fuzz` module. |
 | `src/error.rs` | `AcpEdgeError` and receipt-write error accounting for bridge failures. |
 | `src/config.rs` | `AcpEdgeConfig`: permission default and fallback ACP category. |
 | `src/types.rs` | ACP wire types (`AcpCapability`, `AcpCategory`, `PermissionRequest`/`PermissionDecision`, `AcpInvocationResult`, `AcpInvocationTask`/`AcpTaskStatus`, `AcpJsonRpcResponse`) and `AcpKernelExecutionContext`. |
@@ -27,7 +26,7 @@ visibility resolves as if the fragments were written inline.
 | `src/jsonrpc.rs` | Bounded original-byte JSON-RPC parsing, parameter extraction and typed local rejection causes. |
 | `src/metrics.rs` | This crate's `ReceiptWriteCounters` instance and Prometheus rendering, built on `chio-edge-metrics`. |
 | `src/fuzz.rs` | `fuzz` feature only: a deterministic kernel/edge/capability fixture plus `fuzz_acp_envelope_decode`, the libFuzzer entry point. |
-| `src/tests/all.rs`, `src/tests/nonce_preflight.rs` | Unit tests, merged into the crate root under `#[cfg(test)]` (`include!` and `#[path]` respectively). |
+| `src/tests.rs`, `src/tests/` | Unit tests: shared helpers in `tests.rs` and one module per area under `tests/`, compiled under `#[cfg(test)]`. |
 
 ## Capability construction
 

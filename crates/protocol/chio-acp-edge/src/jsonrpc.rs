@@ -1,13 +1,20 @@
+use crate::error::AcpEdgeError;
+use crate::request_error::{AcpField, AcpRequestError};
+use crate::types::{AcpJsonRpcResponse, PermissionRequest};
+use crate::{AcpKernelExecutionContext, ChioAcpEdge};
+use chio_kernel::ChioKernel;
+use serde_json::{json, Value};
+
 // JSON-RPC request-boundary parsing for the ACP edge.
 
 #[derive(Debug)]
-struct AcpJsonRpcEnvelope {
-    id: Option<Value>,
-    method: String,
-    params: Value,
+pub(super) struct AcpJsonRpcEnvelope {
+    pub(super) id: Option<Value>,
+    pub(super) method: String,
+    pub(super) params: Value,
 }
 
-const ACP_JSONRPC_KNOWN_METHODS: &[&str] = &[
+pub(super) const ACP_JSONRPC_KNOWN_METHODS: &[&str] = &[
     "session/list_capabilities",
     "session/request_permission",
     "tool/invoke",
@@ -17,7 +24,7 @@ const ACP_JSONRPC_KNOWN_METHODS: &[&str] = &[
 ];
 
 impl ChioAcpEdge {
-    fn jsonrpc_serialized_response(
+    pub(super) fn jsonrpc_serialized_response(
         id: Value,
         result: serde_json::Result<Value>,
     ) -> AcpJsonRpcResponse {
@@ -29,7 +36,7 @@ impl ChioAcpEdge {
         }
     }
 
-    fn jsonrpc_error_response(id: Value, error: AcpEdgeError) -> AcpJsonRpcResponse {
+    pub(super) fn jsonrpc_error_response(id: Value, error: AcpEdgeError) -> AcpJsonRpcResponse {
         let code = if matches!(error, AcpEdgeError::UnknownMethod) {
             -32601
         } else if matches!(
@@ -56,7 +63,9 @@ impl ChioAcpEdge {
         )
     }
 
-    fn parse_jsonrpc_envelope(message: &Value) -> Result<AcpJsonRpcEnvelope, AcpEdgeError> {
+    pub(super) fn parse_jsonrpc_envelope(
+        message: &Value,
+    ) -> Result<AcpJsonRpcEnvelope, AcpEdgeError> {
         let id = message.get("id").cloned();
         if id
             .as_ref()
@@ -79,7 +88,7 @@ impl ChioAcpEdge {
         })
     }
 
-    fn ensure_jsonrpc_params_object_for_known_method(
+    pub(super) fn ensure_jsonrpc_params_object_for_known_method(
         _id: &Value,
         method: &str,
         params: &Value,
@@ -92,14 +101,16 @@ impl ChioAcpEdge {
         }
     }
 
-    fn jsonrpc_permission_request(params: &Value) -> Result<PermissionRequest, AcpEdgeError> {
+    pub(super) fn jsonrpc_permission_request(
+        params: &Value,
+    ) -> Result<PermissionRequest, AcpEdgeError> {
         Ok(PermissionRequest {
             capability_id: Self::jsonrpc_capability_id(params, "session/request_permission")?,
             arguments: Self::jsonrpc_arguments(params),
         })
     }
 
-    fn jsonrpc_invocation_params(
+    pub(super) fn jsonrpc_invocation_params(
         params: &Value,
         operation: &str,
     ) -> Result<(String, Value), AcpEdgeError> {
@@ -109,15 +120,22 @@ impl ChioAcpEdge {
         ))
     }
 
-    fn jsonrpc_task_id_params(params: &Value, _operation: &str) -> Result<String, AcpEdgeError> {
-        Ok(request_error::validate_field(AcpField::TaskId, params.get("taskId"))?.to_owned())
+    pub(super) fn jsonrpc_task_id_params(
+        params: &Value,
+        _operation: &str,
+    ) -> Result<String, AcpEdgeError> {
+        Ok(
+            crate::request_error::validate_field(AcpField::TaskId, params.get("taskId"))?
+                .to_owned(),
+        )
     }
 
     fn jsonrpc_capability_id(params: &Value, _operation: &str) -> Result<String, AcpEdgeError> {
-        Ok(
-            request_error::validate_field(AcpField::CapabilityId, params.get("capabilityId"))?
-                .to_owned(),
-        )
+        Ok(crate::request_error::validate_field(
+            AcpField::CapabilityId,
+            params.get("capabilityId"),
+        )?
+        .to_owned())
     }
 
     fn jsonrpc_arguments(params: &Value) -> Value {
@@ -137,9 +155,8 @@ impl ChioAcpEdge {
         kernel: &ChioKernel,
         execution: &AcpKernelExecutionContext,
     ) -> Result<AcpJsonRpcResponse, AcpEdgeError> {
-        let message =
-            chio_core::canonical::DocumentJson::from_wire(bytes, MAX_ACP_REQUEST_BYTES)?
-                .decode()?;
+        let message = chio_core::canonical::DocumentJson::from_wire(bytes, MAX_ACP_REQUEST_BYTES)?
+            .decode()?;
         Ok(self.handle_jsonrpc_value(message, kernel, execution))
     }
 }

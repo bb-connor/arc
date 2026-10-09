@@ -1,3 +1,12 @@
+use crate::types::AcpInvocationResult;
+use chio_core::session::OperationTerminalState;
+use chio_cross_protocol::error::BridgeError;
+use chio_cross_protocol::lifecycle::{runtime_lifecycle_metadata, RuntimeLifecycleSurface};
+use chio_cross_protocol::orchestrator::OrchestratedToolCall;
+use chio_kernel::ToolCallOutput;
+use chio_kernel::Verdict as KernelVerdict;
+use serde_json::{json, Value};
+
 // Kernel-output conversion, Chio metadata envelope builders, and the
 // surface/lifecycle metadata for kernel-mediated execution.
 
@@ -15,7 +24,7 @@ fn kernel_output_to_value(output: Option<&ToolCallOutput>) -> Value {
     }
 }
 
-fn authoritative_surface_metadata() -> Value {
+pub(super) fn authoritative_surface_metadata() -> Value {
     json!({
         "chio": {
             "authorityPath": "cross_protocol_orchestrator",
@@ -36,7 +45,7 @@ fn authoritative_surface_metadata() -> Value {
     })
 }
 
-fn pending_stream_task_metadata(authority_path: &str) -> Value {
+pub(super) fn pending_stream_task_metadata(authority_path: &str) -> Value {
     json!({
         "chio": {
             "receiptId": Value::Null,
@@ -59,7 +68,7 @@ fn pending_stream_task_metadata(authority_path: &str) -> Value {
     })
 }
 
-fn cancelled_stream_task_metadata(authority_path: &str) -> Value {
+pub(super) fn cancelled_stream_task_metadata(authority_path: &str) -> Value {
     json!({
         "chio": {
             "receiptId": Value::Null,
@@ -81,7 +90,7 @@ fn cancelled_stream_task_metadata(authority_path: &str) -> Value {
     })
 }
 
-fn acp_invocation_result_from_orchestrated(
+pub(super) fn acp_invocation_result_from_orchestrated(
     orchestrated: OrchestratedToolCall,
 ) -> AcpInvocationResult {
     let data = chio_cross_protocol::execution::pending_approval_result(
@@ -124,7 +133,10 @@ fn terminal_state_reason(terminal_state: &OperationTerminalState) -> Option<Stri
     }
 }
 
-fn build_acp_source_envelope(capability_id: &str, arguments: Value) -> Result<Value, BridgeError> {
+pub(super) fn build_acp_source_envelope(
+    capability_id: &str,
+    arguments: Value,
+) -> Result<Value, BridgeError> {
     let mut envelope = json!({
         "capabilityId": capability_id,
         "arguments": arguments,
@@ -133,7 +145,7 @@ fn build_acp_source_envelope(capability_id: &str, arguments: Value) -> Result<Va
     Ok(envelope)
 }
 
-fn ensure_chio_metadata(
+pub(super) fn ensure_chio_metadata(
     envelope: &mut Value,
 ) -> Result<&mut serde_json::Map<String, Value>, BridgeError> {
     let Some(object) = envelope.as_object_mut() else {
@@ -157,7 +169,7 @@ fn ensure_chio_metadata(
     })
 }
 
-fn permission_preview_metadata(path: &str) -> Value {
+pub(super) fn permission_preview_metadata(path: &str) -> Value {
     json!({
         "chio": {
             "receiptId": Value::Null,

@@ -1,3 +1,14 @@
+use crate::error::AcpEdgeError;
+use chio_core::capability::governance::{
+    GovernedApprovalToken, GovernedTransactionIntent, ThresholdApprovalProposal,
+};
+use chio_core::capability::scope::ModelMetadata;
+use chio_core::capability::token::CapabilityToken;
+use chio_cross_protocol::semantic_hints::BridgeFidelity;
+use chio_kernel::{dpop, SignedExecutionNonce};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
 // ACP protocol wire types and the kernel execution context.
 
 /// An ACP capability advertisement derived from a Chio tool.
@@ -112,7 +123,7 @@ impl AcpJsonRpcResponse {
         }
     }
 
-    fn with_error(value: Value, error: AcpEdgeError) -> Self {
+    pub(super) fn with_error(value: Value, error: AcpEdgeError) -> Self {
         Self {
             value: Some(value),
             local_error: Some(std::sync::Arc::new(error)),
@@ -124,7 +135,7 @@ impl AcpJsonRpcResponse {
         self.local_error.as_deref()
     }
 
-    fn respond_if(mut self, should_respond: bool) -> Self {
+    pub(super) fn respond_if(mut self, should_respond: bool) -> Self {
         if !should_respond {
             self.value = None;
         }

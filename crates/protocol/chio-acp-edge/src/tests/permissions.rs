@@ -1,4 +1,15 @@
-use super::*;
+use crate::bridge::current_unix_timestamp;
+use crate::tests::{
+    capability_for_tool, capability_for_tool_with_dpop_requirement, dpop_proof_for_request,
+    dpop_proof_for_request_issued_at, kernel_execution, new_test_edge, test_kernel_config,
+    test_manifest, test_server,
+};
+use crate::types::{AcpCategory, PermissionDecision, PermissionRequest};
+use crate::{AcpEdgeConfig, AcpKernelExecutionContext};
+use chio_core::crypto::Keypair;
+use chio_kernel::{dpop, ChioKernel};
+use chio_test_support::prelude::*;
+use serde_json::json;
 
 // ---- Category inference tests ----
 

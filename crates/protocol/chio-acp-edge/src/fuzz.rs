@@ -1,5 +1,4 @@
 //! libFuzzer entry-point module for `chio-acp-edge`. Gated behind `fuzz` feature.
-
 use std::sync::OnceLock;
 
 use chio_core::capability::{
@@ -27,7 +26,7 @@ const FUZZ_AGENT_SEED: [u8; 32] = [
 
 /// Cached agent identifier (hex-encoded public key) for the fuzz fixture.
 /// Built once per process so successive iterations see a stable identifier.
-fn agent_id() -> &'static str {
+pub(super) fn agent_id() -> &'static str {
     static AGENT_ID: OnceLock<String> = OnceLock::new();
     AGENT_ID
         .get_or_init(|| Keypair::from_seed(&FUZZ_AGENT_SEED).public_key().to_hex())

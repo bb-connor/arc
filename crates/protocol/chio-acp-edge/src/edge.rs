@@ -1,11 +1,47 @@
+use crate::bridge::{
+    authoritative_target_registry, capability_collision_reason, evaluate_bridge_fidelity,
+    execute_orchestrated_acp_request, infer_acp_category, AcpRequestIds, CapabilityBinding,
+    DEFERRED_ACP_TASK_TTL_MILLIS, MAX_DEFERRED_ACP_TASKS,
+};
+use crate::conversion::{
+    acp_invocation_result_from_orchestrated, authoritative_surface_metadata,
+    build_acp_source_envelope, cancelled_stream_task_metadata, pending_stream_task_metadata,
+    permission_preview_metadata,
+};
+use crate::error::AcpEdgeError;
+use crate::jsonrpc::{AcpJsonRpcEnvelope, ACP_JSONRPC_KNOWN_METHODS};
+use crate::request_error::{AcpField, AcpRequestError};
+use crate::types::{
+    AcpCapability, AcpInvocationResult, AcpInvocationTask, AcpJsonRpcResponse, AcpTaskStatus,
+    PermissionDecision, PermissionRequest,
+};
+use crate::{AcpEdgeConfig, AcpKernelExecutionContext};
+use chio_core::capability::token::CapabilityToken;
+#[cfg(test)]
+use chio_core::session::OperationTerminalState;
+use chio_cross_protocol::discovery::{target_protocol_for_tool_with_registry, DiscoveryProtocol};
+use chio_cross_protocol::execution::CrossProtocolExecutionRequest;
+use chio_cross_protocol::semantic_hints::BridgeFidelity;
+#[cfg(test)]
+use chio_kernel::Verdict as KernelVerdict;
+use chio_kernel::{
+    capability_matches_request_with_model_metadata,
+    capability_request_requires_dpop_with_model_metadata, dpop, ChioKernel,
+};
+use chio_manifest::{ToolManifest, VerifiedManifestRegistry};
+use chio_security_types::clock::{AuthorityDeadline, ClockError, ClockReading};
+use serde_json::{json, Value};
+use std::cell::{Cell, RefCell};
+use std::collections::{BTreeMap, BTreeSet};
+
 // The ACP edge server, its deferred-task state, and the explicit
 // kernel-mediated invocation and deferred task custody.
 
 #[derive(Debug, Clone)]
-struct DeferredAcpTask {
+pub(super) struct DeferredAcpTask {
     owner_agent_id: String,
-    request: CrossProtocolExecutionRequest,
-    task: AcpInvocationTask,
+    pub(super) request: CrossProtocolExecutionRequest,
+    pub(super) task: AcpInvocationTask,
     result: Option<AcpInvocationResult>,
     error: Option<std::sync::Arc<AcpEdgeError>>,
     deadline: AuthorityDeadline,
@@ -22,11 +58,11 @@ pub struct ChioAcpEdge {
     capability_fidelity: BTreeMap<String, BridgeFidelity>,
     /// Maps capability ID to authoritative target binding metadata.
     capability_bindings: BTreeMap<String, CapabilityBinding>,
-    task_counter: Cell<u64>,
-    tasks: RefCell<BTreeMap<String, DeferredAcpTask>>,
+    pub(super) task_counter: Cell<u64>,
+    pub(super) tasks: RefCell<BTreeMap<String, DeferredAcpTask>>,
 }
 
-fn validate_execution_context(
+pub(super) fn validate_execution_context(
     execution: &AcpKernelExecutionContext,
     peer: &chio_core::capability::features::CapabilityNegotiation,
 ) -> Result<(), AcpEdgeError> {
@@ -60,7 +96,10 @@ fn validate_execution_context(
 }
 
 fn validate_execution_agent_id(agent_id: &str) -> Result<(), AcpEdgeError> {
-    Ok(request_error::validate_text(AcpField::AgentId, agent_id)?)
+    Ok(crate::request_error::validate_text(
+        AcpField::AgentId,
+        agent_id,
+    )?)
 }
 
 fn reject_request_bound_artifacts_without_stable_request_id(
@@ -222,14 +261,17 @@ impl ChioAcpEdge {
         Ok(())
     }
 
-    fn capability_binding(&self, capability_id: &str) -> Result<CapabilityBinding, AcpEdgeError> {
+    pub(super) fn capability_binding(
+        &self,
+        capability_id: &str,
+    ) -> Result<CapabilityBinding, AcpEdgeError> {
         self.capability_bindings
             .get(capability_id)
             .cloned()
             .ok_or_else(|| AcpEdgeError::ToolNotFound(capability_id.to_string()))
     }
 
-    fn build_execution_request(
+    pub(super) fn build_execution_request(
         capability_id: &str,
         arguments: Value,
         execution: &AcpKernelExecutionContext,
@@ -556,7 +598,7 @@ impl ChioAcpEdge {
     ///
     /// `session/request_permission` becomes a capability-aware preview, while
     /// `tool/invoke` produces receipt-bearing kernel decisions.
-    fn handle_jsonrpc_value(
+    pub(super) fn handle_jsonrpc_value(
         &self,
         message: Value,
         kernel: &ChioKernel,
@@ -711,7 +753,7 @@ impl ChioAcpEdge {
         }
     }
 
-    fn start_stream_task(
+    pub(super) fn start_stream_task(
         &self,
         capability_id: &str,
         arguments: Value,
@@ -794,7 +836,7 @@ impl ChioAcpEdge {
         Ok(task)
     }
 
-    fn cancel_stream_task(
+    pub(super) fn cancel_stream_task(
         &self,
         task_id: &str,
         execution: &AcpKernelExecutionContext,
@@ -825,7 +867,7 @@ impl ChioAcpEdge {
         }
     }
 
-    fn resume_stream_task(
+    pub(super) fn resume_stream_task(
         &self,
         task_id: &str,
         kernel: &ChioKernel,

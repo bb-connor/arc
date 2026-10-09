@@ -9,15 +9,14 @@ evaluates and receipt-signs it. It is the reverse of `chio-a2a-adapter`
 (wraps an upstream MCP server) / `chio-mcp-edge` (MCP hosting runtime) split.
 The crate has no HTTP server dependency: it builds JSON-RPC responses and
 Agent Card JSON for a caller to serve over whatever transport it chooses.
-`lib.rs` merges most of the crate into one crate-root scope via `include!`
-rather than nested `pub mod` declarations; `metrics` and `otel` are ordinary
-submodules instead.
+`lib.rs` declares the crate's modules and re-exports their public items from
+the crate root; `metrics` and `otel` are public submodules.
 
 ## Module map
 
 | Path | Responsibility |
 |------|----------------|
-| `src/lib.rs` | Crate-root facade. Composes `error`, `config`, `types`, `bridge`, `conversion`, `edge`, `jsonrpc`, and the test modules into one scope via `include!`; declares `metrics` and (feature-gated) `otel` as real submodules. |
+| `src/lib.rs` | Crate-root facade. Declares `error`, `config`, `types`, `bridge`, `conversion`, `edge`, `jsonrpc`, and the test modules, re-exporting their public items; declares `metrics` and (feature-gated) `otel` as public submodules. |
 | `src/error.rs` | `A2aEdgeError` and the receipt-write error-accounting helpers called from bridge orchestration. |
 | `src/config.rs` | `A2aEdgeConfig` and its construction-time Agent Card field validation. |
 | `src/types.rs` | A2A wire types (`AgentCard`, `SendMessageRequest`, `A2aMessage`, `A2aPart`, `TaskResponse`, `TaskStatus`, `A2aJsonRpcResponse`) and `A2aKernelExecutionContext`. |

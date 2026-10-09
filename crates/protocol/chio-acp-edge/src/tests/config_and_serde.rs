@@ -1,3 +1,12 @@
+use crate::error::AcpEdgeError;
+use crate::request_error::AcpRequestError;
+use crate::tests::{colliding_search_manifest, new_test_edge, test_manifest};
+use crate::types::{AcpCategory, PermissionDecision};
+use crate::AcpEdgeConfig;
+use chio_cross_protocol::semantic_hints::BridgeFidelity;
+use chio_test_support::prelude::*;
+use serde_json::json;
+
 // ---- Deduplication tests ----
 
 #[test]
