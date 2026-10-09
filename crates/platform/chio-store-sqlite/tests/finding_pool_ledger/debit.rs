@@ -42,7 +42,6 @@ pub(super) fn debit_at_with_status(
     )
 }
 
-/// Parameters of `debit_at_with_policy`.
 pub(super) struct DebitStatusPolicy<'a> {
     pub(super) status_verifier: Option<Arc<dyn FindingStatusProofVerifier>>,
     pub(super) status_proof_b64: Option<&'a str>,
@@ -80,7 +79,6 @@ pub(super) fn debit_at_with_policy(
     )
 }
 
-/// Parameters of `debit_at_with_policy_and_kernel_key`.
 pub(super) struct DebitKernelPolicy<'a> {
     pub(super) status_verifier: Option<Arc<dyn FindingStatusProofVerifier>>,
     pub(super) status_proof_b64: Option<&'a str>,
@@ -122,7 +120,6 @@ pub(super) fn debit_at_with_policy_and_kernel_key(
     )
 }
 
-/// Parameters of `debit_at_with_policy_and_authority`.
 pub(super) struct DebitAuthorityPolicy<'a> {
     pub(super) status_verifier: Option<Arc<dyn FindingStatusProofVerifier>>,
     pub(super) status_proof_b64: Option<&'a str>,
@@ -170,7 +167,6 @@ pub(super) fn debit_at_with_policy_and_authority(
     )
 }
 
-/// Parameters of `debit_at_with_policy_and_authority_and_tenant`.
 pub(super) struct DebitPolicy<'a> {
     pub(super) status_verifier: Option<Arc<dyn FindingStatusProofVerifier>>,
     pub(super) status_proof_b64: Option<&'a str>,

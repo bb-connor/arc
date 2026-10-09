@@ -438,7 +438,6 @@ pub(crate) fn refresh_receipt_lineage_rows_for_parent_receipt_tx(
     Ok(())
 }
 
-/// Parameters of `persist_session_anchor_tx`.
 pub(crate) struct SessionAnchorWrite<'a> {
     pub(crate) session_id: &'a str,
     pub(crate) anchor_id: &'a str,
@@ -583,7 +582,6 @@ pub(crate) fn persist_session_anchor_tx(
     Ok(())
 }
 
-/// Parameters of `persist_request_lineage_tx`.
 pub(crate) struct RequestLineageWrite<'a> {
     pub(crate) session_id: &'a str,
     pub(crate) request_id: &'a str,
@@ -708,7 +706,6 @@ pub(crate) fn persist_request_lineage_tx(
     Ok(())
 }
 
-/// Parameters of `persist_receipt_lineage_statement_tx`.
 pub(crate) struct ReceiptLineageStatementWrite<'a> {
     pub(crate) child_receipt_id: &'a str,
     pub(crate) request_id: Option<&'a str>,

@@ -253,7 +253,6 @@ pub struct SqliteFindingOperatorBundleStore {
     pool: Pool<SqliteConnectionManager>,
 }
 
-/// Parameters of `reserve_seller_artifact_capacity_with_limits`.
 struct SellerArtifactCapacityRequest<'a> {
     request_id: &'a str,
     principal_id: &'a str,

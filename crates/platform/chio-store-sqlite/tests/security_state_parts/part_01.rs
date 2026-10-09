@@ -243,7 +243,6 @@ pub(super) fn overlay_apply_request(
     )
 }
 
-/// Parameters of `overlay_apply_request_with_expiry`.
 pub(super) struct OverlayApplyExpiry<'a> {
     pub(super) session_id: &'a str,
     pub(super) action_id: ActionId,

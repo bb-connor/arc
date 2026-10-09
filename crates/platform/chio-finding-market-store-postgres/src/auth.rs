@@ -83,7 +83,7 @@ pub enum HostedSecurityEventOutcome {
     ExactReplay,
 }
 
-/// Parameters of `put_api_key`.
+/// An API key record to store for a tenant, with its validity window and optional rotation predecessor.
 pub struct ApiKeyWrite<'a> {
     pub key_id: &'a str,
     pub principal_id: &'a str,
@@ -95,7 +95,7 @@ pub struct ApiKeyWrite<'a> {
     pub now: u64,
 }
 
-/// Parameters of `put_api_key_with_security_event`.
+/// An API key record stored together with the security event that records its issuance.
 pub struct ApiKeyWithSecurityEvent<'a> {
     pub key_id: &'a str,
     pub principal_id: &'a str,
@@ -758,7 +758,6 @@ pub(crate) fn validate_principal_lifecycle_event(
     Ok(envelope)
 }
 
-/// Parameters of `put_api_key_tx`.
 struct ApiKeyTxWrite<'a> {
     key_id: &'a str,
     principal_id: &'a str,

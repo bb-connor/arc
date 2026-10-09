@@ -588,7 +588,6 @@ fn load_network_finding_pool(
     Ok((sha256_hex(&pool_bytes), candidates))
 }
 
-/// Parameters of `publish_fresh_network_finding`.
 struct FreshFindingPublication<'a> {
     tenant_id: &'a str,
     seller_key_id: &'a str,
@@ -707,7 +706,6 @@ fn finding_catalog_path(finding_id: &str) -> Result<String, &'static str> {
     Ok("/v1/findings?limit=1".to_owned())
 }
 
-/// Parameters of `try_publish_network_finding`.
 struct FindingPublication<'a> {
     tenant_id: &'a str,
     key_id: &'a str,

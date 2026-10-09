@@ -2,7 +2,6 @@
 
 use super::*;
 
-/// Parameters of `try_append_effect_root_refresh`.
 pub(super) struct EffectRootRefresh<'a> {
     pub(super) intent: &'a FindingEffectIntentRecord,
     pub(super) existing: &'a FindingEffectRootBindingRecord,

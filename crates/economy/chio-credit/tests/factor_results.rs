@@ -425,7 +425,6 @@ fn verify_not_applied(
     )
 }
 
-/// Parameters of `verify_not_applied_with`.
 struct ObservedObligationState<'a> {
     observed_disposition: &'a ObligationDispositionRecordV1,
     observed_settlement: &'a ObligationSettlementLifecycleV1,

@@ -1,6 +1,5 @@
 use super::*;
 
-/// Parameters of `assert_catalog_retractions`.
 pub(crate) struct CatalogRetractionCase<'a> {
     pub(crate) other_tenant: &'a HostedTenantId,
     pub(crate) signer: &'a Keypair,
@@ -10,7 +9,6 @@ pub(crate) struct CatalogRetractionCase<'a> {
     pub(crate) authority_now: u64,
 }
 
-/// Parameters of `assert_terminal_job_retention_gc`.
 pub(crate) struct TerminalJobRetentionCase<'a> {
     pub(crate) retention_signer: &'a Keypair,
     pub(crate) retention_public_key: &'a chio_core_types::crypto::PublicKey,
@@ -19,7 +17,6 @@ pub(crate) struct TerminalJobRetentionCase<'a> {
     pub(crate) payload: &'a [u8],
 }
 
-/// Parameters of `apply_authority_transition`.
 pub(crate) struct AuthorityTransition<'a> {
     pub(crate) signer: &'a Keypair,
     pub(crate) operation: HostedAuthorityTransitionOperation,

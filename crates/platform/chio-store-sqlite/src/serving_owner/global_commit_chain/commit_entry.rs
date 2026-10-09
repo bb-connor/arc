@@ -1,6 +1,5 @@
 use super::*;
 
-/// Parameters of `append_entry`.
 pub(super) struct CommitChainEntry<'a> {
     pub(super) mutation_kind: &'a str,
     pub(super) projection_kind: &'a str,

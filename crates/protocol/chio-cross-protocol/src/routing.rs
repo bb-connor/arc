@@ -361,7 +361,6 @@ fn planned_protocols_for_target(
     }
 }
 
-/// Parameters of `planned_outcome`.
 struct PlannedOutcome<'a> {
     decision: RouteSelectionDecision,
     source_protocol: DiscoveryProtocol,

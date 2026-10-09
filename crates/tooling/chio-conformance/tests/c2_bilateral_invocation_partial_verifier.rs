@@ -178,7 +178,6 @@ fn setup() -> Setup {
     }
 }
 
-/// Parameters of `run_invocation_with`.
 struct InvocationVerifiers<'a> {
     receipt_store: &'a dyn ReceiptStore,
     lease_registry: &'a dyn chio_federation::bilateral_verifier::CapabilityLeaseRegistry,

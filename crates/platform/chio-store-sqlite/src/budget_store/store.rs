@@ -49,7 +49,6 @@ const BUDGET_STORE_SCHEMA_KEY: &str = "budget";
 /// budget database rather than reject it as foreign.
 const BUDGET_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &["capability_grant_budgets"];
 
-/// Parameters of `upsert_hold`.
 pub(super) struct HoldUpsert<'a> {
     pub(super) hold_id: &'a str,
     pub(super) capability_id: &'a str,
@@ -62,7 +61,6 @@ pub(super) struct HoldUpsert<'a> {
     pub(super) recorded_at: i64,
 }
 
-/// Parameters of `existing_event_allowed`.
 pub(super) struct ReplayedMutationEvent<'a> {
     pub(super) event_id: Option<&'a str>,
     pub(super) kind: BudgetMutationKind,
@@ -77,7 +75,6 @@ pub(super) struct ReplayedMutationEvent<'a> {
     pub(super) max_total_cost_units: Option<u64>,
 }
 
-/// Parameters of `append_mutation_event`.
 pub(super) struct NewMutationEvent<'a> {
     pub(super) event_id: Option<&'a str>,
     pub(super) hold_id: Option<&'a str>,

@@ -241,7 +241,7 @@ struct StoredPreparedPlan {
     created_at_unix_ms: u64,
 }
 
-/// Parameters of `stage_channel_reservation`.
+/// Verified inputs a channel reservation stage consumes: the economic advance, operation, recovery lease, replay and fence.
 pub struct ChannelReservationStage<'a> {
     pub advance: &'a VerifiedEconomicStateBatchAdvance,
     pub operation: &'a AdmissionOperationV1,

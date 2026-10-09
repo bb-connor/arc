@@ -1,6 +1,5 @@
 use super::*;
 
-/// Parameters of `signed_receipt_for_server`.
 pub(super) struct ServerReceiptSpec<'a> {
     pub(super) timestamp: u64,
     pub(super) tool_server: &'a str,

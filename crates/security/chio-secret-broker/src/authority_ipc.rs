@@ -846,7 +846,6 @@ fn verify_authority_response(
     Ok(())
 }
 
-/// Parameters of `validate_signed_frame_identity`.
 struct SignedFrameIdentity<'a> {
     schema: &'a str,
     request_id: &'a str,

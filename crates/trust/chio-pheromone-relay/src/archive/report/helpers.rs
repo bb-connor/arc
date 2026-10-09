@@ -260,7 +260,6 @@ pub(crate) fn archive_quarantine_review(
     }
 }
 
-/// Parameters of `archive_blocked_review`.
 pub(crate) struct BlockedReviewDetails<'a> {
     pub(crate) manifest_sha256: Option<String>,
     pub(crate) source_package_sha256: Option<String>,

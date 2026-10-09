@@ -458,7 +458,6 @@ pub(super) fn qualify_governed_operation(
     Ok(())
 }
 
-/// Parameters of `qualify_effect_binding`.
 pub(super) struct EffectBindingQualification<'a> {
     pub(super) operation: &'a AdmissionOperationV1,
     pub(super) head: &'a EconomicResourceHeadV1,

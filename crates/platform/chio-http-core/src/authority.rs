@@ -1127,7 +1127,6 @@ fn decision_status(verdict: &Verdict) -> u16 {
     }
 }
 
-/// Parameters of `validate_presented_capability`.
 struct PresentedCapabilityCheck<'a> {
     capability_id_hint: Option<&'a str>,
     presented_capability: Option<&'a str>,

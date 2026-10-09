@@ -565,7 +565,6 @@ fn request_action_hash(request: &HostedAuthRequest) -> Result<String, HostedEdge
     .map_err(|_| HostedEdgeError::InvalidRequest)
 }
 
-/// Parameters of `verify_dpop_stateless`.
 struct DpopExpectation<'a> {
     expected_server: &'a str,
     expected_action: &'a str,

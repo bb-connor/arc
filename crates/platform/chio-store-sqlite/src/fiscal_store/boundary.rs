@@ -35,7 +35,6 @@ pub(super) fn read_u64(value: i64, field: &str) -> Result<u64, FiscalStoreError>
     u64::try_from(value).map_err(|_| invariant(format!("{field} is negative")))
 }
 
-/// Parameters of `persist_immutable_artifact`.
 pub(super) struct ImmutableArtifact<'a> {
     pub(super) table: &'a str,
     pub(super) id_column: &'a str,
@@ -47,7 +46,6 @@ pub(super) struct ImmutableArtifact<'a> {
     pub(super) fence: &'a StoreMutationFence,
 }
 
-/// Parameters of `verify_exact_genesis`.
 pub(super) struct ExactGenesis<'a> {
     pub(super) policy_json: &'a [u8],
     pub(super) authority_json: &'a [u8],

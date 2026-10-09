@@ -1,7 +1,6 @@
 #![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use super::*;
 
-/// Parameters of `settle_composite_hold_in_transaction`.
 struct CompositeSettlement<'a> {
     capability_id: &'a str,
     grant_index: usize,

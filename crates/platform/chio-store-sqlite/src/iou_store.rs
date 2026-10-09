@@ -146,7 +146,6 @@ fn verify_envelope(envelope: &IouEnvelope) -> Result<(), IouEnvelopeStoreError> 
     Ok(())
 }
 
-/// Parameters of `insert_envelope_on_connection`.
 struct IouEnvelopeRow<'a> {
     receipt_id: &'a str,
     iou_id: &'a str,

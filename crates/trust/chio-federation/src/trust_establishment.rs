@@ -315,7 +315,7 @@ pub struct PeerHandshakeEnvelope {
     pub signature: Signature,
 }
 
-/// Parameters of `sign_with_backend_capabilities_and_ladder_ref`.
+/// Tier, signing backend, negotiated capabilities and optional ladder reference bound into a trust establishment signature.
 pub struct BackendSigning<'a> {
     pub conformance_tier: ConformanceTier,
     pub local_backend: &'a dyn SigningBackend,

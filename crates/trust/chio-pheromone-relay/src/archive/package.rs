@@ -376,7 +376,6 @@ fn join_archive_package_path(base: &str, child: &str) -> Result<String, Pheromon
     Ok(path)
 }
 
-/// Parameters of `push_archive_package_json_member`.
 struct ArchiveJsonMember<'a, T> {
     bundle_path: &'a str,
     bundle_id: &'a str,
@@ -418,7 +417,6 @@ fn push_archive_package_json_member<T: Serialize>(
     )
 }
 
-/// Parameters of `push_archive_package_bytes_member`.
 struct ArchiveBytesMember<'a> {
     bundle_path: &'a str,
     bundle_id: &'a str,

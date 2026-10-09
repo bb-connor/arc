@@ -693,7 +693,6 @@ fn require_committed_credit_admission<S: CreditAdmissionStore>(
         .map_err(|_| IouEnvelopeV2Error::BindingMismatch("committed_credit_admission"))
 }
 
-/// Parameters of `build_body`.
 struct IouBodyInputs<'a> {
     atom: &'a ObligationAtomV1,
     disposition: &'a ObligationDispositionRecordV1,

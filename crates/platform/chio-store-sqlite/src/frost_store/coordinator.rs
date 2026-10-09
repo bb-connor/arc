@@ -126,7 +126,6 @@ struct CoordinatorRecordPreimage<'a> {
     updated_at_unix_ms: u64,
 }
 
-/// Parameters of `claim_and_reconcile_existing`.
 struct CoordinatorLeaseClaim<'a> {
     worker_id: &'a str,
     lease_id: &'a str,

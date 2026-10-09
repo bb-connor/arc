@@ -1,6 +1,5 @@
 use super::*;
 
-/// Parameters of `record_rollback_failure`.
 pub(super) struct RollbackFailure<'a> {
     pub(super) current: ResponsePlanRecord,
     pub(super) effect_record: ResponseEffectRecord,

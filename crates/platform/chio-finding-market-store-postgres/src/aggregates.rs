@@ -148,7 +148,6 @@ impl PostgresFindingMarketStore {
     }
 }
 
-/// Parameters of `aggregate_event_digest`.
 pub(crate) struct AggregateEventDigestInput<'a> {
     pub(crate) aggregate_kind: HostedAggregateKind,
     pub(crate) aggregate_id: &'a str,

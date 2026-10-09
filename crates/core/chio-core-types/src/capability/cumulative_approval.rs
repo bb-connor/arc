@@ -768,7 +768,6 @@ fn root_commitment_hash_from_body(
     })
 }
 
-/// Parameters of `root_commitment_hash_parts`.
 struct RootCommitmentParts<'a> {
     id: &'a str,
     issuer: &'a PublicKey,

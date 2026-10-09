@@ -1,6 +1,5 @@
 use super::*;
 
-/// Parameters of `write_authorization_event_projection`.
 pub(super) struct AuthorizationEventProjection<'a> {
     pub(super) event_id: &'a str,
     pub(super) admission: &'a BudgetAdmissionBinding,
@@ -16,7 +15,6 @@ pub(super) struct AuthorizationEventProjection<'a> {
     pub(super) requested_exposure_units: u64,
 }
 
-/// Parameters of `authorization_decision`.
 pub(super) struct AuthorizationDecisionInput {
     pub(super) request: BudgetAuthorizeHoldRequest,
     pub(super) outcome: BudgetAuthorizationOutcome,

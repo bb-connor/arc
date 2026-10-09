@@ -1207,7 +1207,6 @@ pub(super) fn signed_credit_facility_fixture(
     })
 }
 
-/// Parameters of `signed_underwriting_decision_fixture`.
 pub(super) struct UnderwritingDecisionFixture<'a> {
     pub(super) subject_key: &'a str,
     pub(super) decision_id: &'a str,
@@ -1287,7 +1286,6 @@ pub(super) fn signed_underwriting_decision_fixture(
     })
 }
 
-/// Parameters of `signed_credit_bond_fixture`.
 pub(super) struct CreditBondFixture<'a> {
     pub(super) subject_key: &'a str,
     pub(super) facility_id: &'a str,
@@ -1362,7 +1360,6 @@ pub(super) fn signed_credit_bond_fixture(
     })
 }
 
-/// Parameters of `signed_credit_loss_lifecycle_fixture`.
 pub(super) struct CreditLossLifecycleFixture<'a> {
     pub(super) subject_key: &'a str,
     pub(super) facility_id: &'a str,

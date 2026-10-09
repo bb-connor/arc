@@ -107,7 +107,6 @@ pub(super) fn channel_reservation_participant_digest(
         .map_err(|error| invalid(error.to_string()))
 }
 
-/// Parameters of `insert_pending_reservation_tx`.
 pub(super) struct PendingReservationInsert<'a> {
     pub(super) prepared: &'a ChannelPreparedAdmissionRecordV1,
     pub(super) reservation: &'a SignedChannelReservationV1,

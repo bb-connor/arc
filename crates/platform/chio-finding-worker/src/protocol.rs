@@ -677,7 +677,6 @@ pub struct FindingWorkerAttestedResult {
 
 pub type SignedFindingWorkerResult = SignedExportEnvelope<FindingWorkerAttestedResult>;
 
-/// Parameters of `from_guest`.
 pub(crate) struct GuestCompletion {
     pub(crate) result: FindingWorkerResult,
     pub(crate) worker_binary_sha256: String,

@@ -247,7 +247,7 @@ fn load_receipt_lineage_statement_row(
         .transpose()
 }
 
-/// Parameters of `record_request_lineage_record`.
+/// A request lineage entry to record for a session, with its optional parent and session anchor.
 pub struct RequestLineageInput<'a> {
     pub session_id: &'a str,
     pub request_id: &'a str,
@@ -258,7 +258,7 @@ pub struct RequestLineageInput<'a> {
     pub lineage_json: &'a serde_json::Value,
 }
 
-/// Parameters of `record_receipt_lineage_statement_record`.
+/// A receipt lineage statement to record, naming the child receipt and the request, session and chain it descends from.
 pub struct ReceiptLineageStatementRecord<'a> {
     pub child_receipt_id: &'a str,
     pub request_id: Option<&'a str>,

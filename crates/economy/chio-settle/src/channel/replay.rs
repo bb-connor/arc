@@ -328,7 +328,7 @@ pub struct ChannelTransitionReplayDescriptorV1 {
     descriptor_digest: String,
 }
 
-/// Parameters of `for_terminal`.
+/// Verified artifacts and views from which a terminal channel transition replay is assembled.
 pub struct TerminalReplayInputs<'a> {
     pub context: &'a ChannelReservationReplayContextV1,
     pub open_artifacts: &'a ChannelTransitionReplayOpenArtifactsV1,

@@ -631,7 +631,6 @@ impl ToolOutcomeStore for SqliteToolOutcomeStore {
     }
 }
 
-/// Parameters of `stage_post_return_evaluation_tx`.
 struct PostReturnEvaluationStage<'a> {
     operation_id: &'a AdmissionOperationId,
     expected_version: u64,
@@ -641,7 +640,6 @@ struct PostReturnEvaluationStage<'a> {
     trusted_now_unix_ms: u64,
 }
 
-/// Parameters of `finalize_post_return_tx`.
 struct PostReturnFinalization<'a> {
     operation_id: &'a AdmissionOperationId,
     expected_evaluation_version: u64,
@@ -1091,7 +1089,6 @@ fn insert_outcome_tx(
     Ok(())
 }
 
-/// Parameters of `update_outcome_tx`.
 struct OutcomeUpdate<'a> {
     operation_id: &'a AdmissionOperationId,
     expected_version: u64,
@@ -1189,7 +1186,6 @@ fn insert_evaluation_tx(
     Ok(())
 }
 
-/// Parameters of `update_evaluation_tx`.
 struct EvaluationUpdate<'a> {
     operation_id: &'a AdmissionOperationId,
     expected_version: u64,

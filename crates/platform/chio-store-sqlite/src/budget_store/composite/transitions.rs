@@ -255,7 +255,6 @@ pub(super) fn load_event_admission(
     Ok(admission)
 }
 
-/// Parameters of `write_transition_projection`.
 struct TransitionProjection<'a> {
     event_id: &'a str,
     hold: &'a StructuredHold,
@@ -644,7 +643,6 @@ fn validate_transition_identity(
     Ok(())
 }
 
-/// Parameters of `replay_transition`.
 struct TransitionReplay<'a> {
     event_id: &'a str,
     kind: BudgetMutationKind,
