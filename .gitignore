@@ -147,3 +147,6 @@ _apalache-out/
 audits/evidence/**/mutants.out/*.txt
 # Local environment documented by the repository review example.
 /examples/repository-review/.venv/
+
+# Intermediate vocabulary conversion for the IETF draft.
+spec/ietf/*.v3.xml

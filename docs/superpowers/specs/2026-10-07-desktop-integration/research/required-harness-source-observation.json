@@ -1,0 +1,153 @@
+{
+  "megastart": {
+    "status": 200,
+    "url": "https://www.chio.computer/examples/megastart.zip",
+    "bytes": 335069,
+    "sha256": "9dcbecec5bf9681c301ffd0bf7a2eeea685ec8b8b5911ac180692f66cf292050",
+    "members": 59,
+    "lock_hashes": {
+      "megastart/Cargo.lock": "64b1a6079697fe10a586b3f18c497a7fdc5b07c60678a703907bbf7570db67b0",
+      "megastart/herdr/Cargo.lock": "5033b1d3fa697618f2017a0d3b1a5819b4869cc240ffc6167658e29321e7a039"
+    },
+    "file_sha256": {
+      "megastart/Cargo.toml": "8382c9fd15041e6d4facabff8053f284d9a36a49897bbb73a4e9cda92f954d36",
+      "megastart/README.md": "ac23b9a07a329a874fdbb154671605c254099cb051057173dbca94900c1d9fb5",
+      "megastart/herdr/CONTRACT.md": "1282916aefb717e28f11b7ccb62f7ef2d1f30f393eb381b5c0b0bb192f9591e4",
+      "megastart/herdr/Cargo.toml": "b0f0e0700f228ffe4e23b0b3b4a3941d50767e0c70aa00905a91b7b75f09d0f4",
+      "megastart/herdr/README.md": "24aad864660aa92cdfaa6715fd107f9f78375bd364ef2636d70f32028be73a8d",
+      "megastart/support/runtime/Cargo.toml": "978fe44fcfe45a5ea79757d275fcdbb22179b030f00de3759a070c7eace23ff3",
+      "megastart/support/runtime/README.md": "bcbe9e0662d937b227d41b7175e446c61f1cfa36b02b125c06cd6a1839a218ee",
+      "megastart/support/shared/Cargo.toml": "7a6ae6f249efb9e897bcbcf57530228daa43c24d7ac20f040417903070019a36"
+    }
+  },
+  "chio-claude-code-plugin/commits/main": {
+    "status": 200,
+    "url": "https://api.github.com/repos/backbay-labs/chio-claude-code-plugin/commits/main",
+    "sha": "65ac8390c57a5292c055fba50caa1aafbd915848",
+    "date": "2026-09-10T13:12:59Z"
+  },
+  "chio-claude-code-plugin/releases?per_page=5": {
+    "status": 200,
+    "url": "https://api.github.com/repos/backbay-labs/chio-claude-code-plugin/releases?per_page=5",
+    "releases": []
+  },
+  "chio-claude-code-plugin/tags?per_page=10": {
+    "status": 200,
+    "url": "https://api.github.com/repos/backbay-labs/chio-claude-code-plugin/tags?per_page=10",
+    "tags": []
+  },
+  "chio-codex-plugin/commits/main": {
+    "status": 200,
+    "url": "https://api.github.com/repos/backbay-labs/chio-codex-plugin/commits/main",
+    "sha": "deefb3a85001ee47a22fcfbb43ab6749c4944004",
+    "date": "2026-09-10T13:13:02Z"
+  },
+  "chio-codex-plugin/releases?per_page=5": {
+    "status": 200,
+    "url": "https://api.github.com/repos/backbay-labs/chio-codex-plugin/releases?per_page=5",
+    "releases": []
+  },
+  "chio-codex-plugin/tags?per_page=10": {
+    "status": 200,
+    "url": "https://api.github.com/repos/backbay-labs/chio-codex-plugin/tags?per_page=10",
+    "tags": []
+  },
+  "chio-pi-plugin/commits/main": {
+    "status": 200,
+    "url": "https://api.github.com/repos/backbay-labs/chio-pi-plugin/commits/main",
+    "sha": "4214a5a8ddec776a5ff9ec78007442683fd8df03",
+    "date": "2026-10-05T19:23:21Z"
+  },
+  "chio-pi-plugin/releases?per_page=5": {
+    "status": 200,
+    "url": "https://api.github.com/repos/backbay-labs/chio-pi-plugin/releases?per_page=5",
+    "releases": []
+  },
+  "chio-pi-plugin/tags?per_page=10": {
+    "status": 200,
+    "url": "https://api.github.com/repos/backbay-labs/chio-pi-plugin/tags?per_page=10",
+    "tags": []
+  },
+  "npm/@chio/claude-code-plugin": {
+    "error": "HTTP Error 404: Not Found",
+    "url": "https://registry.npmjs.org/%40chio%2Fclaude-code-plugin"
+  },
+  "npm/@chio/codex-plugin": {
+    "error": "HTTP Error 404: Not Found",
+    "url": "https://registry.npmjs.org/%40chio%2Fcodex-plugin"
+  },
+  "npm/@chio/pi-plugin": {
+    "error": "HTTP Error 404: Not Found",
+    "url": "https://registry.npmjs.org/%40chio%2Fpi-plugin"
+  },
+  "npm/@chio-protocol/claude-code": {
+    "error": "HTTP Error 404: Not Found",
+    "url": "https://registry.npmjs.org/%40chio-protocol%2Fclaude-code"
+  },
+  "npm/@chio-protocol/pi": {
+    "error": "HTTP Error 404: Not Found",
+    "url": "https://registry.npmjs.org/%40chio-protocol%2Fpi"
+  },
+  "observed_at": "2026-10-08T04:06:20.541504+00:00",
+  "additional": {
+    "claude-rc5": {
+      "status": 200,
+      "url": "https://api.github.com/repos/backbay-labs/chio-claude-code-plugin/commits/65e3f6639b7cc3fa6e6090304e1ef7b9f8da2047",
+      "sha": "65e3f6639b7cc3fa6e6090304e1ef7b9f8da2047",
+      "version": null
+    },
+    "pi-published-example-pin": {
+      "status": 200,
+      "url": "https://api.github.com/repos/backbay-labs/chio-pi-plugin/commits/cd3dbf90974687d30f23f989173bd8c155b016d3",
+      "sha": "cd3dbf90974687d30f23f989173bd8c155b016d3",
+      "version": null
+    },
+    "chio-example-pin": {
+      "status": 200,
+      "url": "https://api.github.com/repos/backbay-labs/chio/commits/6753edbc365f5ea820224b96a59940feedbfca94",
+      "sha": "6753edbc365f5ea820224b96a59940feedbfca94",
+      "version": null
+    },
+    "chio-hermes-doc-pin": {
+      "status": 200,
+      "url": "https://api.github.com/repos/backbay-labs/chio/commits/70071260afe514b06cac1c319487bd48e465d39e",
+      "sha": "70071260afe514b06cac1c319487bd48e465d39e",
+      "version": null
+    },
+    "chio-main": {
+      "status": 200,
+      "url": "https://api.github.com/repos/backbay-labs/chio/commits/main",
+      "sha": "5b8bec41d32f3838b880576fe6123c983ecebf8d",
+      "version": null
+    },
+    "pypi-hermes": {
+      "url": "https://pypi.org/pypi/chio-hermes/json",
+      "error": "HTTP Error 404: Not Found"
+    }
+  },
+  "package-candidates": {
+    "@chio-protocol/claude-code-plugin": {
+      "url": "https://registry.npmjs.org/%40chio-protocol%2Fclaude-code-plugin",
+      "error": "HTTP Error 404: Not Found"
+    },
+    "@chio-protocol/pi-plugin": {
+      "url": "https://registry.npmjs.org/%40chio-protocol%2Fpi-plugin",
+      "error": "HTTP Error 404: Not Found"
+    },
+    "chio-claude-code-plugin/3040dba8557e3e839a43162abe72e7e2f197675f": {
+      "status": 200,
+      "url": "https://api.github.com/repos/backbay-labs/chio-claude-code-plugin/commits/3040dba8557e3e839a43162abe72e7e2f197675f",
+      "sha": "3040dba8557e3e839a43162abe72e7e2f197675f",
+      "dist-tags": null,
+      "versions": []
+    },
+    "chio-pi-plugin/09a0117cc942663b0fe7eae06fde11f74a99abfd": {
+      "status": 200,
+      "url": "https://api.github.com/repos/backbay-labs/chio-pi-plugin/commits/09a0117cc942663b0fe7eae06fde11f74a99abfd",
+      "sha": "09a0117cc942663b0fe7eae06fde11f74a99abfd",
+      "dist-tags": null,
+      "versions": []
+    }
+  },
+  "scope": "Source and public availability observation only; no new installed runtime qualification."
+}
