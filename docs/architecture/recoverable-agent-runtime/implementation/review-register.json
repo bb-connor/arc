@@ -32,7 +32,7 @@
       "recorded_not_closed": 229
     },
     "additional": {
-      "total": 20,
+      "total": 21,
       "recorded_scoped_closed": 19,
       "recorded_not_closed": 1
     },
@@ -49,23 +49,23 @@
       "total": 1,
       "excluded_from_implementation_finding_counts": true
     },
-    "current_or_executed_support_findings": 349,
+    "current_or_executed_support_findings": 350,
     "implementation_recorded_scoped_closed": 118,
     "implementation_recorded_not_closed": 231,
-    "findings_and_prevented_candidates": 393,
-    "all_records_including_provenance": 394,
+    "findings_and_prevented_candidates": 394,
+    "all_records_including_provenance": 395,
     "assigned_finding_ids_excluding_provenance": 371,
     "qualified": 0,
     "current_status": {
       "candidate_only": 44,
-      "needs_revalidation": 42,
-      "open": 231,
+      "needs_revalidation": 41,
+      "open": 229,
       "prerequisite_only": 1,
-      "recorded_scoped_closed": 76
+      "recorded_scoped_closed": 80
     },
     "needs_revalidation_by_category": {
       "additional": 10,
-      "canonical": 32
+      "canonical": 31
     },
     "severity_by_category": {
       "canonical": {
@@ -75,7 +75,7 @@
       },
       "additional": {
         "P1": 2,
-        "P2": 10,
+        "P2": 11,
         "P3": 8
       },
       "supplemental_pr": {
@@ -101,6 +101,35 @@
       "total": 13,
       "assigned_ids": 0,
       "unassigned_records": 13
+    },
+    "historical_recorded_disposition_counter_scope": {
+      "baseline_records": 394,
+      "baseline_register_sha256": "234dcd1456b15f1e89a9b3908f6488bcb7a6d19a7e7713a2a8702f70e08dc67e",
+      "scope": "All recorded_* counters and implementation_recorded_* counters preserve the prior baseline. Category total and current-status fields include the added record. New accepted successors are counted only in current_acceptance; original recorded dispositions are not overwritten."
+    },
+    "current_acceptance": {
+      "scope": "Effective scoped dispositions include historical closures requiring revalidation. Current applicability is separately counted; no qualification follows.",
+      "canonical": {
+        "total": 328,
+        "scoped_dispositions": 101,
+        "open": 227
+      },
+      "additional": {
+        "total": 21,
+        "scoped_dispositions": 20,
+        "open": 1
+      },
+      "supplemental_pr": {
+        "total": 1,
+        "scoped_dispositions": 0,
+        "open": 1
+      },
+      "maintained_or_executed_support": 350,
+      "scoped_dispositions": 121,
+      "currently_applicable_scoped_closed": 80,
+      "historical_scoped_needing_revalidation": 41,
+      "open": 229,
+      "qualified": 0
     }
   },
   "pin_audit": {
@@ -3402,8 +3431,26 @@
       "remaining_obligation_refs": [
         "reviewed#/rows/119/expected_remaining_obligations"
       ],
-      "current_status": "open",
-      "current_reason": "No complete independent disposition is recorded. Retain the original obligation and every referenced current or historical owner check; partial observations do not close it."
+      "current_status": "recorded_scoped_closed",
+      "current_reason": "Independent spec and quality accept the complete original architecture header, fixed-commit drift/rename description and additive anchor-map obligation. The two reviewed documents are installed at 14b5b4170cf06a4a2e43c665028ac31cb8c0e2fe. Counts refer to c5f53a96dbfc836bfc42805c2fee2d393dd78821; no runtime acceptance is transferred.",
+      "current_successor": {
+        "recorded_at_utc": "2026-10-09T19:40:34.494945+00:00",
+        "recorded_disposition": "closed_source_only",
+        "previous_current_status": "open",
+        "previous_current_reason": "No complete independent disposition is recorded. Retain the original obligation and every referenced current or historical owner check; partial observations do not close it.",
+        "review_ref": "docs/architecture/recoverable-agent-runtime/implementation/reviews/source-map-and-fixture-environment.md",
+        "review_sha256": "75a80a3ebfdb147f285360682f8790e5dbf8468871d106e7b3e2e35c9ed57de3",
+        "evidence_ref": "#/source_map_fixture_environment_evidence",
+        "evidence_refs": [
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/evidence-documentation-continuity/spec-review.json",
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/evidence-documentation-continuity/quality-review.json",
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/evidence-documentation-continuity/installation.json"
+        ],
+        "scope": "Independent spec and quality accept the complete original architecture header, fixed-commit drift/rename description and additive anchor-map obligation. The two reviewed documents are installed at 14b5b4170cf06a4a2e43c665028ac31cb8c0e2fe. Counts refer to c5f53a96dbfc836bfc42805c2fee2d393dd78821; no runtime acceptance is transferred.",
+        "spec_verdict": "SPEC_PASS",
+        "quality_verdict": "QUALITY_PASS",
+        "qualified": false
+      }
     },
     {
       "key": "R2-R-origin-01",
@@ -4592,8 +4639,27 @@
       "remaining_obligation_refs": [
         "reviewed#/rows/180/expected_remaining_obligations"
       ],
-      "current_status": "open",
-      "current_reason": "No complete independent disposition is recorded. Retain the original obligation and every referenced current or historical owner check; partial observations do not close it."
+      "current_status": "recorded_scoped_closed",
+      "current_reason": "Independent spec and quality accept the original changed-cwd/import defect on the disclosed Python 3.12.11 supported profile with the exact five-value relative parent environment. Both full owner runs pass 133 cases on 663 stable inputs, including the original regression. Interpreter and audit-wrapper substitutions remain explicit; literal catalogue equality and qualification remain false.",
+      "current_successor": {
+        "recorded_at_utc": "2026-10-09T19:40:34.494945+00:00",
+        "recorded_disposition": "closed_scoped_local",
+        "previous_current_status": "open",
+        "previous_current_reason": "No complete independent disposition is recorded. Retain the original obligation and every referenced current or historical owner check; partial observations do not close it.",
+        "review_ref": "docs/architecture/recoverable-agent-runtime/implementation/reviews/source-map-and-fixture-environment.md",
+        "review_sha256": "75a80a3ebfdb147f285360682f8790e5dbf8468871d106e7b3e2e35c9ed57de3",
+        "evidence_ref": "#/source_map_fixture_environment_evidence",
+        "evidence_refs": [
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/fixture-environment-continuity/installed-successor/environment-spec-review.json",
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/fixture-environment-continuity/installed-successor/environment-quality-review.json",
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/fixture-environment-continuity/installed-successor/installation.json"
+        ],
+        "scope": "Independent spec and quality accept the original changed-cwd/import defect on the disclosed Python 3.12.11 supported profile with the exact five-value relative parent environment. Both full owner runs pass 133 cases on 663 stable inputs, including the original regression. Interpreter and audit-wrapper substitutions remain explicit; literal catalogue equality and qualification remain false.",
+        "spec_verdict": "SPEC_PASS",
+        "quality_verdict": "QUALITY_PASS",
+        "qualified": false,
+        "literal_catalog_command_equality": false
+      }
     },
     {
       "key": "QF-05",
@@ -7176,8 +7242,33 @@
           "Cargo.toml"
         ]
       },
-      "current_status": "needs_revalidation",
-      "current_reason": "Recorded closure is preserved; a cited source or document pin differs. Review continuity and relevant controls on the integrated candidate. A hash difference is not a demonstrated regression."
+      "current_status": "recorded_scoped_closed",
+      "current_reason": "Independent spec and quality restore only the original source-only obsolete-comment closure. The seven-line comment and workspace dependency table are unchanged, while the root manifest pin differs outside that scope. Historical pins and the prior revalidation reason remain preserved; no dependency, build or naming-gate acceptance is added.",
+      "current_successor": {
+        "recorded_at_utc": "2026-10-09T19:40:34.494945+00:00",
+        "recorded_disposition": "original_source_only_continuity_restored",
+        "previous_current_status": "needs_revalidation",
+        "previous_current_reason": "Recorded closure is preserved; a cited source or document pin differs. Review continuity and relevant controls on the integrated candidate. A hash difference is not a demonstrated regression.",
+        "review_ref": "docs/architecture/recoverable-agent-runtime/implementation/reviews/source-map-and-fixture-environment.md",
+        "review_sha256": "75a80a3ebfdb147f285360682f8790e5dbf8468871d106e7b3e2e35c9ed57de3",
+        "evidence_ref": "#/source_map_fixture_environment_evidence",
+        "evidence_refs": [
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/workspace-comment-continuity/spec-review.json",
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/workspace-comment-continuity/quality-review.json"
+        ],
+        "scope": "Independent spec and quality restore only the original source-only obsolete-comment closure. The seven-line comment and workspace dependency table are unchanged, while the root manifest pin differs outside that scope. Historical pins and the prior revalidation reason remain preserved; no dependency, build or naming-gate acceptance is added.",
+        "spec_verdict": "SPEC_PASS",
+        "quality_verdict": "QUALITY_PASS",
+        "qualified": false,
+        "historical_source_pins": {
+          "Cargo.toml": "61ef68e3f430a9d32ffd8eaa52e162a5be6c0ff4adae08dbec1eebfc85aebaec",
+          "deploy/docker/chio-workspace/Cargo.toml": "b080c06ece139fd12c4b4db9f4e7358968853289000805c9f84fa48b8f022592"
+        },
+        "current_source_pins": {
+          "Cargo.toml": "2206ee43db4dca795b25b8146c3e2f9b310a9e98664b099440f3124c84abf666",
+          "deploy/docker/chio-workspace/Cargo.toml": "b080c06ece139fd12c4b4db9f4e7358968853289000805c9f84fa48b8f022592"
+        }
+      }
     },
     {
       "key": "SOURCE-HYGIENE-SUPPORT-04",
@@ -9697,6 +9788,56 @@
       },
       "confidence": "High for preserved independent finding and corrective reviews with the recorded local owning controls; no native or runtime qualification.",
       "qualified": false
+    },
+    {
+      "key": "additional:assurance-map-removed-begin-anchor",
+      "id": null,
+      "category": "additional",
+      "severity": "P2",
+      "title": "Assurance map retains a removed begin declaration anchor",
+      "reviewer_label": "assurance-map-removed-begin-anchor",
+      "dependency_group": "qualification_and_portability",
+      "obligation": "Replace the removed begin_tx locator with both current prepare_begin_tx and publish_begin_tx declarations for each affected transition group. Preserve all group coverage, scalar schema, source hashing, verifier semantics and proof limitations; prove either missing declaration or required entry is refused.",
+      "evidence_refs": [
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/fixture-environment-continuity/assurance-map-successor/spec-review.json#/preserved_maintained_defect_assessment",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/fixture-environment-continuity/assurance-map-successor/quality-review.json#/preserved_maintained_defect_assessment",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/fixture-environment-continuity/normal.json",
+        "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/fixture-environment-continuity/normal.log"
+      ],
+      "recorded_disposition": "open_maintained_source_review_finding",
+      "current_status": "recorded_scoped_closed",
+      "current_reason": "The authentic maintained P2 is distinct from QF-04. Its original full gate recorded 129 passes and one missing-owner error among 130 cases. Both independent source-map reviews accept the two-file correction installed at 59431cb6be36cd68e9e2a34901ab80c9f217a1fd. Installed full suites then passed 133 cases in each Python mode. The bounded local closure preserves the original failure and grants no native or formal meaning to source locators.",
+      "installed_when_found": true,
+      "current_implementation_finding": true,
+      "original_observation": {
+        "result_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/fixture-environment-continuity/normal.json",
+        "log_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/fixture-environment-continuity/normal.log",
+        "tests_run": 130,
+        "passed": 129,
+        "errors": 1,
+        "exit_code": 1,
+        "error": "assurance.missing_owner_or_cutpoint",
+        "distinct_from": "QF-04"
+      },
+      "current_successor": {
+        "recorded_at_utc": "2026-10-09T19:40:34.494945+00:00",
+        "recorded_disposition": "closed_scoped_local",
+        "review_ref": "docs/architecture/recoverable-agent-runtime/implementation/reviews/source-map-and-fixture-environment.md",
+        "review_sha256": "75a80a3ebfdb147f285360682f8790e5dbf8468871d106e7b3e2e35c9ed57de3",
+        "evidence_ref": "#/source_map_fixture_environment_evidence",
+        "evidence_refs": [
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/fixture-environment-continuity/assurance-map-successor/spec-review.json",
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/fixture-environment-continuity/assurance-map-successor/quality-review.json",
+          "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/fixture-environment-continuity/installed-successor/installation.json"
+        ],
+        "spec_verdict": "SPEC_PASS",
+        "quality_verdict": "QUALITY_PASS",
+        "installed": true,
+        "commit": "59431cb6be36cd68e9e2a34901ab80c9f217a1fd",
+        "qualified": false
+      },
+      "confidence": "High for the independently authenticated maintained finding, preserved failed run, exact reviewed installation and bounded local owning results.",
+      "qualified": false
     }
   ],
   "inventory_confidence": "high: exact ID, row-count and recorded-disposition joins; current behavior is not requalified",
@@ -10088,6 +10229,36 @@
       "scope": "Later full fixture discovery ran 130 tests: 129 passed and one assurance-map error. Source inputs remained stable and no remote attempt was recorded. This distinct broader gate remains failed, without erasing focused local evidence, changing QF-04 or adding an unclassified duplicate. Scope diagnosis remains separate.",
       "evidence_ref": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/fixture-environment-continuity/normal.json",
       "current_status_changes": false,
+      "qualified": false
+    },
+    {
+      "at_utc": "2026-10-09T19:40:34.494945+00:00",
+      "findings": [
+        "R2-R-evidence-06",
+        "QF-04",
+        "SOURCE-HYGIENE-SUPPORT-03",
+        "additional:assurance-map-removed-begin-anchor"
+      ],
+      "review": "docs/architecture/recoverable-agent-runtime/implementation/reviews/source-map-and-fixture-environment.md",
+      "review_sha256": "75a80a3ebfdb147f285360682f8790e5dbf8468871d106e7b3e2e35c9ed57de3",
+      "evidence_ref": "#/source_map_fixture_environment_evidence",
+      "scope": "Two canonical findings receive new scoped successor closures; one existing comment closure regains current source-only applicability; one distinct maintained P2 is added with accepted installed correction. All original recorded dispositions, failed observations, source inventories and historical counters are preserved. Effective-current acceptance is separately counted.",
+      "counts_before": {
+        "candidate_only": 44,
+        "needs_revalidation": 42,
+        "open": 231,
+        "prerequisite_only": 1,
+        "recorded_scoped_closed": 76
+      },
+      "counts_after": {
+        "candidate_only": 44,
+        "needs_revalidation": 41,
+        "open": 229,
+        "prerequisite_only": 1,
+        "recorded_scoped_closed": 80
+      },
+      "historical_recorded_counters_unchanged": true,
+      "previous_fixture_review_remains_historical": "docs/architecture/recoverable-agent-runtime/implementation/reviews/fixture-lifecycle-and-sdk-readiness.md",
       "qualified": false
     }
   ],
@@ -10667,5 +10838,45 @@
       "remote_attempts": 0,
       "scope": "Separate full discovery gate using recorded catalog environment and supported Python 3.12 audit wrapper. The focused passes remain valid; broader acceptance is pending. No finding closure or new record is inferred."
     }
+  },
+  "source_map_fixture_environment_evidence": {
+    "recorded_at_utc": "2026-10-09T19:40:34.494945+00:00",
+    "review_ref": "docs/architecture/recoverable-agent-runtime/implementation/reviews/source-map-and-fixture-environment.md",
+    "review_sha256": "75a80a3ebfdb147f285360682f8790e5dbf8468871d106e7b3e2e35c9ed57de3",
+    "scope": "Four bounded accepted items; source documentation, installed local source-map repair, disclosed supported-profile QF-04 acceptance, and original workspace comment continuity. Historical evidence remains unchanged.",
+    "files": {
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/evidence-documentation-continuity/installation.json": "b51395ec178e1e466cd0293e7a563ec58029f40bc0ffdefcfae0c71f2e611646",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/evidence-documentation-continuity/spec-review.json": "1df3ca37fa72668958afdc6c48438202eff8fa5175fdfe6d76642d5cfe417dab",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/evidence-documentation-continuity/quality-review.json": "3da44afd86506036c36df44b59b88bd3d4ac7de8cd94d53b80b06ea09587becd",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/fixture-environment-continuity/assurance-map-successor/spec-review.json": "b31b1ffaa2889bef664c6138bfc28cb46bc53ab9888b0cb4255a369d0e5c9eb9",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/fixture-environment-continuity/assurance-map-successor/quality-review.json": "6dab46c79b16d3c67d7254c797a5c82896612fdecf62885644e9aa764ec18f4f",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/fixture-environment-continuity/assurance-map-successor/installed-source-selection.json": "8064681168690f22f4f8aa252a62b2e8685e6c0a33cac6eeadf5e08a3a7ba9c7",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/fixture-environment-continuity/installed-successor/installation.json": "cc0c11ef417dbad8bff21d686e7a55decd5f3d3999a91480df11be527d0fd231",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/fixture-environment-continuity/installed-successor/normal.json": "a8d6557f9ceea7725968cefb965ffe0890a04f2965190b035affc35105b0a16c",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/fixture-environment-continuity/installed-successor/normal.log": "206d79926dea078af79965a8f185436e54d7135185d6c6404143e79f91bf5338",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/fixture-environment-continuity/installed-successor/optimized.json": "26815164ce5dc57841df0c075180f5da2fa628cbd40f47382e17f5fc47c132bc",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/fixture-environment-continuity/installed-successor/optimized.log": "af478445ef8640dcf86ebe47edd42d8d22dd6738a96a18f1e561174ee0931b22",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/fixture-environment-continuity/installed-successor/environment-spec-review.json": "ee21373ecb89b37af505999a96078028d4905ddfd627efaf4554376a435d9c0e",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/fixture-environment-continuity/installed-successor/environment-quality-review.json": "4f8c0579d554010b949bd14d04f1869b1bae6c88ee90809150720f5215bce3c0",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/workspace-comment-continuity/spec-review.json": "4078ec69b29e74befe8df0fd00573b6a779d0bc64e0816f64b40ff4d3eb6ae10",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/workspace-comment-continuity/quality-review.json": "025862192ade717aee606012e43305ed1bdb74bbde09c342bbe097972b48d8f1",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/fixture-environment-continuity/normal.json": "2d647a2b74aeab112a3520c4c239fdba258c468958b536abcc36f5f70691d928",
+      "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/fixture-environment-continuity/normal.log": "80a75f9bf988c9c87a3a690b14926cf499f7e34473c2e4a20c32da970c549453"
+    },
+    "installed_source_commits": {
+      "documentation": "14b5b4170cf06a4a2e43c665028ac31cb8c0e2fe",
+      "assurance_map": "59431cb6be36cd68e9e2a34901ab80c9f217a1fd"
+    },
+    "full_fixture_runs": {
+      "normal_passed": 133,
+      "optimized_passed": 133,
+      "skipped": 0,
+      "inputs": 663,
+      "source_stable": true,
+      "external_attempts": 0,
+      "original_130_case_identities_preserved": true
+    },
+    "literal_catalog_command_equality": false,
+    "qualified": false
   }
 }
