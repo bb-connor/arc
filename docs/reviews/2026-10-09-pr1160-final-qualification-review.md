@@ -19,7 +19,9 @@ The original mandatory-domain and guard findings below remain historical;
 the guard repair still needs composition checks, while the unfinished proof is
 now an explicitly accepted landing residual, never a passed obligation.
 
-Noncollision remains the separately approved SHA-256 assumption. The concrete
+Full-domain attestation-encoding noncollision remains UNPROVED. SHA-256 collision
+resistance is the separate approved ASSUME-SHA256 assumption; it does not
+establish encoding noncollision. The concrete
 attestation harness also lacks a complete real-SHA determinism, upper-half
 padding and context-binding result over all 256 seeds and 32 root positions.
 Neither is relabeled proved. The complete source and completion cover remain
@@ -259,3 +261,45 @@ all-target Clippy passes. Source hashes, commands and logs are recorded in
 `docs/security/audits/landing-ci-store-fixtures-20261009.json`. Full candidate
 review, exact protected checks and merge remain pending. The separate
 production sidecar proposal remains in its postmerge lane.
+
+
+## Focused residual-review dispositions (candidate 63ae9a4f5c)
+
+The independent focused review found no P0/P1/P2 runtime defect and listed seven
+P3 observations. Integration regrades two observations to P2 before landing:
+final release-path reporting must preserve the exact open-proof disclosure,
+and report provenance must bind every newly introduced proof-decision input.
+`LANDING-PROOF-REPORT-RESIDUAL` owns that narrow repair; it requires failing
+Original controls and repaired report fixtures without executing proof tools.
+
+Three scope corrections accompany that repair. The encoder observation is a
+historical one-off local run whose harness is not retained or CI-enrolled.
+The unfinished attestation domain uses uncompressed P-256 fixtures and cannot
+establish the production Ed25519 kernel-key binding. KANI-ATTEST-DECOMP must
+state that distinction and separately review any production-domain extension.
+The revocation freshness harness covers the Boolean denial/retry projection;
+epoch installation retains its TLA abstraction anchor without Kani credit.
+The original residual audit and historical requirement objects remain unchanged;
+a later source-bound clarification records the precise current domain.
+
+The remaining two observations stay explicit follow-ups: hosted timing of the
+strict real-SHA checks needs actual runner evidence, and the specialized path
+filter/FIPS feature selection may be narrowed in a later tooling change. The
+unconditional CI manifest job currently covers core-types changes; the software
+SHA backend preserves hash output. No timeout, path filter, backend feature or
+proof acceptance has been changed speculatively for these observations.
+
+## Final review repair batch
+
+The independent review of `63ae9a4f5c` identified eleven additional pre-landing
+findings. Their contracts, ownership and acceptance are tracked in the
+[repair plan](../superpowers/plans/2026-10-09-final-review-repairs.md). Publication
+remains held while the native-state, registry, export, recovery, health and
+cluster repairs are composed. Prior local passes are source-specific evidence,
+not acceptance of these remaining findings.
+
+The report-disclosure and input-binding repairs are integrated at `b36fe5a404`;
+all three owning script suites pass in the composed checkout using inert proof
+tool fixtures. The contract-sync fixture dependency repair at `91d990454c` passes
+all ten controls. These are reporting and fixture checks, not new proof results.
+CLI fixtures have terminal 16/16 test and strict owning all-target lint results.

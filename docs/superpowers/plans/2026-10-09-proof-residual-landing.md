@@ -88,3 +88,22 @@ landing-head push until these existing tests exercise the current contracts.
   the 1,840 prior requirements, and hand the final delta to the planner review.
 - [ ] Publish the reviewed frozen candidate and observe the exact protected
   checks. No local result substitutes for hosted qualification or merge.
+
+## Task 4: Close report and scope precision findings
+
+The independent focused review at 63ae9a4f5c lists seven P3 observations.
+Integration promotes release-report residual disclosure and missing decision
+input digests to P2 because report consumers otherwise see incomplete claims
+or retain stale provenance. This task does not authorize proof execution.
+
+- [x] Repair the required stub scanner's manifest-comment false positive with
+  parsed Cargo TOML equality; preserve actual failure and passing full scan.
+- [x] Clarify the historical, unretained encoder observation, P-256 fixture
+  domain versus production Ed25519 binding, and TLA-only epoch installation.
+  Keep original proof audit and historical requirement objects unchanged.
+- [ ] Compose Claude's report repair after actual Original fixture failures,
+  positive/negative report controls and strict metadata-only verification.
+- [ ] Regenerate final coverage once, preserve all review observations in the
+  ledger and include the report/scoping delta in the planner's final review.
+- [ ] Keep hosted timing and specialized path-filter/FIPS observations explicit
+  follow-ups; change their disposition only with actual failing evidence.

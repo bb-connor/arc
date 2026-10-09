@@ -9,7 +9,7 @@ receipt, checkpoint, model-weight and TEE report-data bindings.
 | Surface | Mandatory concrete check | Domain | Separate unproved obligation |
 | --- | --- | --- | --- |
 | `weights_hash_of` | Deterministic 64-character lowercase encoding | All four-byte messages | Distinct digest after flipping bit zero at each of four input positions |
-| `expect_report_data` | OPEN/UNPROVED: determinism, zero upper-half padding and context-wrapper equivalence | All 256 key seeds and 32 root-byte positions | Distinct digest after reverting the selected root byte |
+| `expect_report_data` | OPEN/UNPROVED: determinism, zero upper-half padding and context-wrapper equivalence | All 256 P-256 fixture key seeds and 32 root-byte positions | Distinct digest after reverting the selected root byte |
 
 ## Open attestation residual (owner decision, October 9)
 
@@ -23,7 +23,11 @@ For #1160 landing, exactly this attestation enrollment carries
 `open_residual = "KANI-ATTEST-DECOMP"`. The runner reports OPEN/UNPROVED,
 does not execute it, and excludes it from passed/executed totals. The complete
 source, all 256 key seeds and 32 root positions, assertions and exact completion
-cover remain pinned. Other enrollments remain required. No new proof campaign
+cover remain pinned. This domain uses an uncompressed P-256 fixture; it does
+not cover the production Ed25519 kernel-key binding. `KANI-ATTEST-DECOMP`
+must distinguish those domains explicitly. Closing the existing fixture
+obligation cannot establish a production Ed25519 proof; that requires a
+separately reviewed harness and completed evidence. Other enrollments remain required. No new proof campaign
 is authorized for #1160; postmerge decomposition requires a reviewed contract.
 
 No release claim, including D8 previews under ADR-0011, may state or rely on
@@ -73,8 +77,11 @@ binding/tamper tests (including 1024 seeded four-byte bit-flip controls in
 `hash_binding.rs`), all 8192 attestation seed/root cases in
 `report_data_symbolic_domain.rs`, and the encoder's independent byte/hex
 oracle. The runtime cases are concrete controls, not a proof of general
-collision resistance. The encoder proof covers all 32-byte inputs and compares
-every output digit against an independent nibble oracle.
+collision resistance. The landing ledger retains a historical one-off local
+encoder run over arbitrary 32-byte inputs with an independent nibble oracle.
+Its harness is not retained in the tree or enrolled in CI. That observation
+does not establish a reproducible current encoder proof or discharge the
+attestation residual.
 
 `check-kani-crypto-scope.py` checks the mandatory/research separation, retained
 source hashes, opt-in feature and explicit assumption. The scope manifest pins

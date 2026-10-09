@@ -123,11 +123,11 @@ covered_rust_symbols = [
   "chio_kernel_core::formal_aeneas::ledger_is_terminal",
   "chio_kernel_core::formal_aeneas::ledger_apply",
   "chio_kernel_core::formal_core::delivery_contract_admits",
-  # Surfaces witnessed by the Kani harnesses and Lean
-  # delegation theorems.
+  # Delegation surfaces witnessed by Kani and Lean; the epoch-installation
+  # entry is a TLA abstraction anchor, not an enrolled Kani target.
   "chio_core_types::capability::delegate",
   "chio_core_types::delegation_receipt::DelegationReceipt::canonical_bytes",
-  "chio_kernel_core::revocation_view::RevocationView::install_if_newer",
+  "chio_kernel_core::revocation_view::RevocationView::install_if_newer", # TLA only
   "chio_federation::revocation_gossip::RevocationRootGossip::validate_envelope",
   "chio_federation::revocation_gossip::RevocationGossipPushQueue::enqueue_signed_root",
   "chio_federation::revocation_gossip::RevocationGossipPushQueue::flush_batches_at",

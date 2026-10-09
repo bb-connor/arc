@@ -1,10 +1,18 @@
 # Planner-side cross-vendor review of #1160 at fd8bfdc947bb
 
-Seven fresh reviewers (Claude, independent of both ws2 sessions) reviewed main...fd8bfdc by risk area: kernel; core/trust/guards/economy; store-sqlite; control plane and other platform crates; security crates; protocol/products; CI workflows and supply chain. Docs, third-party contents, examples and the Python SDK were out of scope. Every finding is limited to lines this PR adds or changes and was traced through the code; the planner re-checked both P1s at fd8bfdc.
+Seven fresh reviewers (Claude, independent of both integration sessions) reviewed main...fd8bfdc by risk area: kernel; core/trust/guards/economy; store-sqlite; control plane and other platform crates; security crates; protocol/products; CI workflows and supply chain. Docs, third-party contents, examples and the Python SDK were out of scope. Every finding is limited to lines this PR adds or changes and was traced through the code; the planner re-checked both P1s at fd8bfdc.
 
 Result: 0 P0, 2 P1, 20 confirmed P2, 6 plausible P2.
 
 Owner decision (2026-10-09): the 10 findings below must be fixed before #1160 merges (both P1s plus the P2s that are security or integrity defects or permanent denial under normal use). The 12 lower-risk P2s and the 6 plausible ones are tracked as swarm items for integration/beta-next after the merge; do not hold #1160 for them.
+
+## Numbering disposition
+
+V13, V14 and V15 were duplicate entries consolidated into V10, V11 and V12,
+respectively, before this review was published. The planner confirmed this
+disposition in the October 9 final candidate review. They introduce no separate
+repair obligation. The 28 distinct findings and their original classifications
+remain unchanged; this note accounts for the numbering gaps.
 
 ## Fix before merge
 

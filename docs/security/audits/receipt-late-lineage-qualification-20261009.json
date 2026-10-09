@@ -302,7 +302,7 @@
       "divisor": 1,
       "host": {
         "cpus": 48,
-        "hostname": "chio-builder-1",
+        "hostname": "isolated-build-host",
         "mem_total_kib": 131879976
       },
       "label": "linux-file",

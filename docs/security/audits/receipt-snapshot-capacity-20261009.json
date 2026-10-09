@@ -53,7 +53,7 @@
     "n": 1000000,
     "host": {
       "cpus": 48,
-      "hostname": "chio-builder-1",
+      "hostname": "isolated-build-host",
       "mem_total_kib": 131882484
     },
     "history": {
