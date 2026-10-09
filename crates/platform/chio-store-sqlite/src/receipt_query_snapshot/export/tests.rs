@@ -443,3 +443,119 @@ fn benign_head_advancement_during_multiple_payload_pages_does_not_starve_export(
     assert!(snapshots.status().watermark.unwrap().through_entry_seq > watermark.through_entry_seq);
     snapshots.shutdown();
 }
+
+#[test]
+fn missing_owned_checkpoint_prefix_invalidates_the_shared_snapshot() {
+    let (_directory, _store, snapshots) = fixture(3, 1, ReceiptQuerySnapshotConfig::default());
+    let corrupted = Arc::clone(&snapshots);
+    AFTER_SELECTION.with(|hook| {
+        *hook.borrow_mut() = Some(Box::new(move |_| {
+            let (published, _) = corrupted.inner.ready().unwrap();
+            let owned = published.owned.lock().unwrap();
+            assert_eq!(
+                owned
+                    .db
+                    .connection()
+                    .unwrap()
+                    .execute("DELETE FROM snapshot_checkpoint WHERE seq = 1", [])
+                    .unwrap(),
+                1
+            );
+        }))
+    });
+    let error = snapshots
+        .build_evidence_export_bundle_with_transparency(&EvidenceExportQuery::tenant_scoped("a"))
+        .unwrap_err();
+    assert!(
+        matches!(&error, EvidenceExportError::ReceiptStore(ReceiptStoreError::QuerySnapshot(ReceiptQuerySnapshotError::Invalid(reason))) if reason.contains("checkpoint prefix")),
+        "{error:?}"
+    );
+    assert!(matches!(
+        snapshots.status().state,
+        ReceiptQuerySnapshotState::Invalid { .. }
+    ));
+    snapshots.shutdown();
+}
+
+#[test]
+fn mutable_publication_metadata_refusal_keeps_the_snapshot_ready() {
+    let (directory, _store, snapshots) = fixture(
+        1,
+        1,
+        ReceiptQuerySnapshotConfig {
+            extension_tick: Duration::from_secs(60),
+            ..ReceiptQuerySnapshotConfig::default()
+        },
+    );
+    let path = directory.path().join("live.db");
+    AFTER_SELECTION.with(|hook| *hook.borrow_mut() = Some(Box::new(move |_| {
+        let connection = rusqlite::Connection::open(path).unwrap();
+        connection.set_db_config(rusqlite::config::DbConfig::SQLITE_DBCONFIG_ENABLE_TRIGGER, false).unwrap();
+        assert_eq!(connection.execute("UPDATE checkpoint_publication_metadata SET publication_schema = 'unsupported-export-metadata' WHERE checkpoint_seq = 1", []).unwrap(), 1);
+    })));
+    let error = snapshots
+        .build_evidence_export_bundle_with_transparency(&EvidenceExportQuery::tenant_scoped("a"))
+        .unwrap_err();
+    assert_eq!(
+        snapshots.status().state,
+        ReceiptQuerySnapshotState::Ready,
+        "{error:?}"
+    );
+    assert!(
+        matches!(
+            error,
+            EvidenceExportError::ReceiptStore(ReceiptStoreError::Conflict(_))
+        ),
+        "{error:?}"
+    );
+    assert_eq!(
+        snapshots
+            .query_receipts(&EvidenceExportQuery::tenant_scoped("a").as_receipt_query(None))
+            .unwrap()
+            .total_count,
+        1
+    );
+    snapshots.shutdown();
+}
+
+#[test]
+fn child_rotation_after_capture_preserves_admin_export_and_snapshot_custody() {
+    let (directory, store, first) = fixture(1, 1, ReceiptQuerySnapshotConfig::default());
+    first.shutdown();
+    store
+        .append_child_receipt(&child_receipt_with_ts_and_key(
+            "rotating-child",
+            100,
+            &evidence_receipt_keypair(),
+        ))
+        .unwrap();
+    store.flush_receipt_writes().unwrap();
+    let snapshots = ReceiptQuerySnapshots::start(
+        Arc::clone(&store),
+        ReceiptQuerySnapshotConfig {
+            extension_tick: Duration::from_secs(60),
+            ..ReceiptQuerySnapshotConfig::default()
+        },
+    )
+    .unwrap();
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while snapshots.status().state != ReceiptQuerySnapshotState::Ready {
+        assert!(Instant::now() < deadline, "snapshot did not become ready");
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    let archive = directory.path().join("archive.db");
+    let rotated_store = Arc::clone(&store);
+    let archive_check = archive.clone();
+    AFTER_SELECTION.with(|hook| *hook.borrow_mut() = Some(Box::new(move |_| {
+        assert_eq!(rotated_store.archive_receipts_before(101, archive.to_str().unwrap()).unwrap(), 1);
+        let archived = rusqlite::Connection::open(archive_check).unwrap();
+        assert_eq!(archived.query_row("SELECT COUNT(*) FROM claim_receipt_log_entries WHERE receipt_kind = 'child_receipt'", [], |row| row.get::<_, i64>(0)).unwrap(), 1);
+    })));
+    let (bundle, _, _) = snapshots
+        .build_evidence_export_bundle_with_transparency(&EvidenceExportQuery::admin_all())
+        .unwrap();
+    assert_eq!(bundle.tool_receipts.len(), 1);
+    assert_eq!(bundle.child_receipts.len(), 1);
+    assert_eq!(snapshots.status().state, ReceiptQuerySnapshotState::Ready);
+    snapshots.shutdown();
+}

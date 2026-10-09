@@ -41,10 +41,10 @@ pub(super) fn collect(
         if selected.is_empty() {
             continue;
         }
-        let leaves_count = end
-            .checked_sub(start)
-            .and_then(|n| n.checked_add(1))
-            .ok_or_else(|| super::invalid("checkpoint export range is invalid"))?;
+        let leaves_count = match end.checked_sub(start).and_then(|n| n.checked_add(1)) {
+            Some(count) => count,
+            None => return lease.invalid("checkpoint export range is invalid"),
+        };
         if leaves_count > limit.saturating_sub(used) {
             return Err(refuse("HTTP evidence export proof-leaf allowance; narrow the selected checkpoint batches or use local operator export"));
         }
@@ -73,20 +73,24 @@ pub(super) fn collect(
             }
             after = high + 1;
         }
-        let tree =
-            MerkleTree::from_hashes(leaves).map_err(|error| super::invalid(error.to_string()))?;
+        let tree = match MerkleTree::from_hashes(leaves) {
+            Ok(tree) => tree,
+            Err(error) => return lease.invalid(error.to_string()),
+        };
         if tree.root() != checkpoint.body.merkle_root {
             return lease
                 .invalid("authenticated checkpoint proof hashes do not reproduce the signed root");
         }
         for seq in selected {
-            let proof = build_inclusion_proof(
+            let proof = match build_inclusion_proof(
                 &tree,
                 crate::integer::checked::<_, usize>(seq - start)?,
                 checkpoint.body.checkpoint_seq,
                 seq,
-            )
-            .map_err(|error| super::invalid(error.to_string()))?;
+            ) {
+                Ok(proof) => proof,
+                Err(error) => return lease.invalid(error.to_string()),
+            };
             bytes.charge(&proof)?;
             proofs.push(proof);
             covered.insert(seq);

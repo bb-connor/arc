@@ -138,3 +138,54 @@ async fn tenant_export_does_not_reauthenticate_unselected_tenant_payloads() -> T
     snapshots.shutdown();
     Ok(())
 }
+
+#[tokio::test]
+async fn oversized_tenant_export_returns_422_without_bundle_or_snapshot_invalidation() -> TestResult
+{
+    let directory = chio_test_support::private_tempdir()?;
+    let store = Arc::new(SqliteReceiptStore::open(
+        directory.path().join("receipts.db"),
+    )?);
+    let signer = Keypair::from_seed(&[43; 32]);
+    let template = super::receipt_store_ownership_tests::signed_receipt(&signer)?.body();
+    for index in 0..4_097_u64 {
+        let mut body = template.clone();
+        body.id = format!("over-budget-{index}");
+        body.tenant_id = Some("tenant-a".into());
+        body.timestamp = 100 + index;
+        store.append_chio_receipt(&ChioReceipt::sign(body, &signer)?)?;
+    }
+    let snapshots = Arc::new(ReceiptQuerySnapshots::start(
+        Arc::clone(&store),
+        ReceiptQuerySnapshotConfig::default(),
+    )?);
+    tokio::time::timeout(Duration::from_secs(10), async {
+        while snapshots.status().state != ReceiptQuerySnapshotState::Ready {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await?;
+    let mut state = metrics_state("snapshot-secret");
+    state.receipt_store = Some(store);
+    state.receipt_query_snapshots = Some(Arc::clone(&snapshots));
+    state
+        .config
+        .tenant_read_tokens
+        .insert("tenant-a".into(), "tenant-secret".into());
+    let (status, body) = export(state).await?;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+    assert_eq!(body["code"], "receipt_query_work_budget_exhausted");
+    assert!(body.get("bundle").is_none(), "{body}");
+    assert_eq!(snapshots.status().state, ReceiptQuerySnapshotState::Ready);
+    assert_eq!(
+        snapshots
+            .query_receipts(
+                &chio_kernel::evidence_export::EvidenceExportQuery::tenant_scoped("tenant-a")
+                    .as_receipt_query(None)
+            )?
+            .total_count,
+        4_097
+    );
+    snapshots.shutdown();
+    Ok(())
+}

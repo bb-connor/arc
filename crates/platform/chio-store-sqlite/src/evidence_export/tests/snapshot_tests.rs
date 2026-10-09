@@ -369,3 +369,115 @@ fn originally_unknown_unsigned_attribution_keeps_empty_lineage_export_semantics(
     assert_eq!(snapshots.status().state, ReceiptQuerySnapshotState::Ready);
     snapshots.shutdown();
 }
+
+#[derive(Clone, Copy)]
+enum UnexportableLineage {
+    Legacy,
+    Deep,
+    Cycle,
+    MissingParent,
+}
+
+fn assert_lineage_refusal_keeps_other_tenant_readable(kind: UnexportableLineage) {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("live.db");
+    let store = Arc::new(SqliteReceiptStore::open(&path).unwrap());
+    let connection = Connection::open(&path).unwrap();
+    if matches!(kind, UnexportableLineage::Legacy) {
+        assert_eq!(connection.execute(
+            "INSERT INTO capability_lineage (capability_id, subject_key, issuer_key, issued_at, expires_at, grants_json, delegation_depth, provenance) VALUES ('cap-0', 'legacy-subject', 'legacy-issuer', 1, 100, '{}', 0, 'legacy_projection')",
+            [],
+        ).unwrap(), 1);
+    } else {
+        let count = match kind {
+            UnexportableLineage::Deep => 33,
+            UnexportableLineage::Cycle => 2,
+            _ => 1,
+        };
+        let issuer = Keypair::from_seed(&[13; 32]);
+        let subject = Keypair::from_seed(&[14; 32]);
+        for index in 0..count {
+            let capability = capability_with_id(&format!("cap-{index}"), &subject, &issuer, None);
+            let parent = match kind {
+                UnexportableLineage::MissingParent => Some("missing-federated-parent".to_string()),
+                UnexportableLineage::Cycle => Some(format!("cap-{}", (index + 1) % count)),
+                _ if index + 1 < count => Some(format!("cap-{}", index + 1)),
+                _ => None,
+            };
+            assert_eq!(connection.execute(
+                "INSERT INTO capability_lineage (capability_id, subject_key, issuer_key, issued_at, expires_at, grants_json, delegation_depth, federated_parent_capability_id, provenance, signed_capability_json) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, ?7, 'signed_token', ?8)",
+                params![capability.id, capability.subject.to_hex(), capability.issuer.to_hex(), i64::try_from(capability.issued_at).unwrap(), i64::try_from(capability.expires_at).unwrap(), serde_json::to_string(&capability.scope).unwrap(), parent, serde_json::to_string(&capability).unwrap()],
+            ).unwrap(), 1);
+        }
+    }
+    drop(connection);
+    assert!(store.get_lineage("cap-0").unwrap().is_some());
+    for (id, capability, tenant) in [("selected", "cap-0", "a"), ("other", "other-cap", "b")] {
+        store
+            .append_chio_receipt_returning_seq(&receipt_with_ts_and_tenant(
+                id,
+                capability,
+                100,
+                Some(tenant),
+            ))
+            .unwrap();
+    }
+    let snapshots = start(Arc::clone(&store));
+    let query = EvidenceExportQuery::tenant_scoped("a");
+    assert!(store.build_evidence_export_bundle(&query).is_err());
+    let other_query = EvidenceExportQuery::tenant_scoped("b").as_receipt_query(None);
+    assert_eq!(
+        snapshots.query_receipts(&other_query).unwrap().total_count,
+        1
+    );
+    let error = snapshots
+        .build_evidence_export_bundle_with_transparency(&query)
+        .unwrap_err();
+    let state = snapshots.status().state;
+    let other = snapshots.query_receipts(&other_query);
+    assert_eq!(
+        state,
+        ReceiptQuerySnapshotState::Ready,
+        "export error: {error:?}; other tenant: {other:?}"
+    );
+    assert_eq!(other.unwrap().total_count, 1);
+    assert!(
+        matches!(
+            error,
+            EvidenceExportError::ReceiptStore(ReceiptStoreError::Conflict(_))
+        ),
+        "{error:?}"
+    );
+    assert_eq!(
+        snapshots
+            .build_evidence_export_bundle_with_transparency(&EvidenceExportQuery::tenant_scoped(
+                "b"
+            ))
+            .unwrap()
+            .0
+            .tool_receipts
+            .len(),
+        1
+    );
+    snapshots.shutdown();
+}
+
+#[test]
+fn legacy_lineage_export_refusal_keeps_other_tenant_readable() {
+    assert_lineage_refusal_keeps_other_tenant_readable(UnexportableLineage::Legacy);
+}
+
+#[test]
+fn deep_lineage_export_refusal_keeps_other_tenant_readable() {
+    assert_lineage_refusal_keeps_other_tenant_readable(UnexportableLineage::Deep);
+}
+
+#[test]
+fn cyclic_lineage_export_refusal_keeps_other_tenant_readable() {
+    assert_lineage_refusal_keeps_other_tenant_readable(UnexportableLineage::Cycle);
+}
+
+#[test]
+fn missing_parent_lineage_export_refusal_keeps_other_tenant_readable() {
+    assert_lineage_refusal_keeps_other_tenant_readable(UnexportableLineage::MissingParent);
+}

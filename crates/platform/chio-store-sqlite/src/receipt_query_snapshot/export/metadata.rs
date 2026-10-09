@@ -26,6 +26,13 @@ use crate::receipt_store::SqliteReceiptStore;
 
 const CHUNK: i64 = 128;
 
+/// Mutable export metadata may be unusable without contradicting anything the
+/// owned snapshot authenticated. Refuse this request without dropping serving
+/// custody for other tenants, as the local full export reader does.
+fn metadata_refusal(reason: impl Into<String>) -> ReceiptStoreError {
+    ReceiptStoreError::Conflict(reason.into())
+}
+
 fn live_read<T>(
     lease: &Lease<'_>,
     read: impl FnOnce(&Connection) -> Result<T, ReceiptStoreError>,
@@ -287,9 +294,14 @@ pub(super) fn checkpoints(
     }
     let mut checkpoints = Vec::new();
     for seq in 1..=high {
-        let authenticated = lease
+        let authenticated = match lease
             .read(|db| db.load_checkpoint(seq).map_err(snapshot_error))?
-            .ok_or_else(|| invalid(format!("authenticated checkpoint prefix is missing {seq}")))?;
+        {
+            Some(checkpoint) => checkpoint,
+            None => {
+                return lease.invalid(format!("authenticated checkpoint prefix is missing {seq}"))
+            }
+        };
         let checkpoint = live_read(lease, |live| {
             let length: Option<i64> = live.query_row("SELECT length(CAST(merkle_root AS BLOB)) + length(CAST(statement_json AS BLOB)) + length(CAST(signature AS BLOB)) + length(CAST(kernel_key AS BLOB)) + COALESCE(length(CAST(previous_checkpoint_sha256 AS BLOB)), 0) FROM kernel_checkpoints WHERE checkpoint_seq = ?1", [seq], |row| row.get(0)).optional()?;
             let length = length
@@ -314,7 +326,7 @@ pub(super) fn checkpoints(
         checkpoints.push(checkpoint);
     }
     let mut summary = validate_checkpoint_transparency(&checkpoints)
-        .map_err(|error| invalid(error.to_string()))?;
+        .map_err(|error| metadata_refusal(error.to_string()))?;
     for publication in &mut summary.publications {
         let partial = CheckpointTransparencySummary {
             publications: vec![publication.clone()],
@@ -332,14 +344,16 @@ pub(super) fn checkpoints(
                 .transpose()?
                 .unwrap_or(0);
             bytes.preflight(core_bytes.saturating_add(binding_bytes))?;
-            SqliteReceiptStore::enrich_transparency_on_connection(live, partial)
-                .map_err(|error| invalid(error.to_string()))
+            SqliteReceiptStore::enrich_transparency_on_connection(live, partial).map_err(|error| {
+                match error {
+                    chio_kernel::evidence_export::EvidenceExportError::ReceiptStore(error) => error,
+                    error => metadata_refusal(error.to_string()),
+                }
+            })
         })?;
-        *publication = enriched
-            .publications
-            .into_iter()
-            .next()
-            .ok_or_else(|| invalid("checkpoint publication enrichment omitted its record"))?;
+        *publication = enriched.publications.into_iter().next().ok_or_else(|| {
+            metadata_refusal("checkpoint publication enrichment omitted its record")
+        })?;
         bytes.charge(publication)?;
     }
     Ok((checkpoints, summary))
@@ -359,8 +373,9 @@ pub(super) fn lineage(
         let mut chain = BTreeSet::new();
         while let Some(capability) = current.take() {
             if !chain.insert(capability.clone()) || chain.len() > 32 {
-                return lease
-                    .invalid("export capability lineage contains a cycle or exceeds 32 records");
+                return Err(metadata_refusal(
+                    "export capability lineage contains a cycle or exceeds 32 records",
+                ));
             }
             if let Some(cached) = records.get(&capability) {
                 current = cached
@@ -410,12 +425,14 @@ pub(super) fn lineage(
                 };
                 snapshot
                     .validate_for_transport()
-                    .map_err(|error| invalid(error.to_string()))?;
+                    .map_err(|error| metadata_refusal(error.to_string()))?;
                 Ok(Some(snapshot))
             })?;
             let Some(snapshot) = snapshot else {
                 if chain.len() > 1 {
-                    return lease.invalid("export capability lineage references a missing parent");
+                    return Err(metadata_refusal(
+                        "export capability lineage references a missing parent",
+                    ));
                 }
                 // A missing first capability preserves the old empty-lineage
                 // semantics only when selection knew no unsigned subject. A
