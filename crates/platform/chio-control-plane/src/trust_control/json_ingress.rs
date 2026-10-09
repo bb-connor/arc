@@ -219,6 +219,28 @@ fn validate_document(bytes: &[u8], bound: usize) -> Result<(), UntrustedJsonErro
     Ok(())
 }
 
+/// Axum's Json media-type rule: an `application` type whose subtype is `json`
+/// or whose structured suffix is `json`. The subtype ends at the last `+`, so
+/// `application/json+x` selects Json as `application/x+json` does. Parameters
+/// and media-type token syntax are not checked, which only widens the set.
+fn selects_json(headers: &HeaderMap) -> bool {
+    let Some(essence) = headers
+        .get(CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.split(';').next())
+    else {
+        return false;
+    };
+    let essence = essence.trim().to_ascii_lowercase();
+    let Some(("application", subtype)) = essence.split_once('/') else {
+        return false;
+    };
+    match subtype.rsplit_once('+') {
+        Some((subtype, suffix)) => subtype == "json" || suffix == "json",
+        None => subtype == "json",
+    }
+}
+
 fn request_contract(request: &Request) -> Result<Option<(Mode, usize, &str)>, Response> {
     let Some(path) = request.extensions().get::<MatchedPath>() else {
         return Ok(None);
@@ -315,21 +337,13 @@ pub(super) async fn validate(request: Request, next: Next) -> Response {
         Ok(None) => return next.run(request).await,
         Err(response) => return response,
     };
-    // Let Axum retain its own media-type rejection and +json handling. Only
-    // requests whose media type can select Json need original-token validation.
-    let is_json = request
-        .headers()
-        .get(CONTENT_TYPE)
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.split(';').next())
-        .map(str::trim)
-        .is_some_and(|value| {
-            let lower = value.to_ascii_lowercase();
-            lower == "application/json"
-                || (lower.starts_with("application/") && lower.ends_with("+json"))
-        });
-    if !is_json {
-        return next.run(request).await;
+    // Every contract route extracts Json. A media type that cannot select it
+    // is refused here, so no body reaches an extractor unvalidated.
+    if !selects_json(request.headers()) {
+        return plain_http_error(
+            StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            "JSON request body requires an application/json media type",
+        );
     }
     let (parts, body) = request.into_parts();
     let bytes = match read_body(body, bound).await {

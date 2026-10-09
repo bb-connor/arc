@@ -85,8 +85,11 @@ finding inputs, retain their existing readers and limits.
 
 Once a request reaches original-byte validation, malformed input returns HTTP
 400; an oversized stream returns 413;
-transport read failure returns 400. Typed shape errors remain Axum's 422, and
-media-type rejection remains Axum's 415. JSON suffix media types remain supported.
+transport read failure returns 400. Typed shape errors remain Axum's 422.
+Original-byte validation covers every media type that can select Axum's Json
+extractor: an `application` type whose subtype before the last `+` is `json`
+(`application/json+x` included) or whose suffix after it is `json`. A contract
+route refuses any other media type with 415 before reading the body.
 The reader stops consuming an oversized stream before dispatching the handler.
 Body and parser error sources are retained internally; public errors do not echo
 untrusted parser or transport details.
