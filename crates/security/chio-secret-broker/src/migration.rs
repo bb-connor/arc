@@ -4,6 +4,8 @@ use std::sync::Arc;
 use std::collections::BTreeSet;
 #[cfg(test)]
 use std::sync::atomic::{AtomicBool, Ordering};
+#[cfg(test)]
+use std::sync::Mutex;
 
 use chio_core_types::{canonical_json_bytes, sha256};
 use chio_security_types::ports::{Digest32, RecordId};
@@ -175,6 +177,11 @@ impl BrokerMigrationEnforcer for ProductionBrokerMigrationEnforcer {
     }
 }
 
+/// Runs on every quota-enforcement check of a test enforcer. An error denies
+/// that check.
+#[cfg(test)]
+pub(crate) type QuotaCheckHook = Box<dyn FnMut() -> Result<()> + Send>;
+
 #[cfg(test)]
 pub(crate) struct TestBrokerMigrationEnforcer {
     credential_providers: BTreeSet<String>,
@@ -182,6 +189,7 @@ pub(crate) struct TestBrokerMigrationEnforcer {
     credential_custody_enforced: AtomicBool,
     #[cfg(test)]
     quota_enforcement_enforced: AtomicBool,
+    quota_check_hook: Mutex<Option<QuotaCheckHook>>,
 }
 
 #[cfg(test)]
@@ -193,7 +201,15 @@ impl TestBrokerMigrationEnforcer {
             credential_custody_enforced: AtomicBool::new(true),
             #[cfg(test)]
             quota_enforcement_enforced: AtomicBool::new(true),
+            quota_check_hook: Mutex::new(None),
         })
+    }
+
+    pub(crate) fn on_quota_check(&self, hook: QuotaCheckHook) -> Result<()> {
+        *self.quota_check_hook.lock().map_err(|_| {
+            BrokerError::Invariant("test quota check hook lock is poisoned".to_string())
+        })? = Some(hook);
+        Ok(())
     }
 
     #[cfg(test)]
@@ -249,7 +265,13 @@ impl BrokerMigrationEnforcer for TestBrokerMigrationEnforcer {
                 "test broker quota enforcement migration enforcement denied".to_string(),
             ));
         }
-        Ok(())
+        let mut hook = self.quota_check_hook.lock().map_err(|_| {
+            BrokerError::Invariant("test quota check hook lock is poisoned".to_string())
+        })?;
+        match hook.as_mut() {
+            Some(hook) => hook(),
+            None => Ok(()),
+        }
     }
 }
 

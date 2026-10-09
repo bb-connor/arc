@@ -511,9 +511,16 @@ impl BrokerService {
             );
             return Err(execution_failure_after_capture_release(error, released));
         }
-        let retained = {
-            let mut retained = self.retained_prepared_dispatches()?;
-            retained.remove(&ids.operation_id)
+        let retained = match self.retained_prepared_dispatches() {
+            Ok(mut retained) => retained.remove(&ids.operation_id),
+            Err(error) => {
+                let released = self.attempts.release_captured_attempt_claim(
+                    &ids.attempt_id,
+                    &dispatch_claim_id,
+                    now_unix_seconds,
+                );
+                return Err(execution_failure_after_capture_release(error, released));
+            }
         };
         let Some(retained) = retained else {
             let released = self.attempts.release_captured_attempt_claim(
