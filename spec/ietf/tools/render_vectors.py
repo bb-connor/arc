@@ -552,15 +552,29 @@ CAPABILITY_OUTCOMES = {
 REQUEST_ID = "req-001"
 
 
+def full_chain_shape_holds(cap: Dict[str, Any]) -> bool:
+    """Whether a token's delegation chain, if any, ends at its subject.
+
+    The corpus outcome covers link signatures, connectivity, and timestamps.
+    Full verification ({{delegation}}) also requires the final delegatee to be
+    the token subject, so a corpus "valid" token can still be rejected.
+    """
+    chain = cap.get("delegation_chain", [])
+    return not chain or chain[-1].get("delegatee") == cap.get("subject")
+
+
 def build_appendix_a(corpus: Corpus) -> Fragment:
-    cap_id, rec_id = "valid_delegated_capability", "allow_receipt"
+    cap_id, rec_id = "valid_no_delegation_chain", "allow_receipt"
     cap_case = corpus.case("capability", cap_id)
     rec_case = corpus.case("receipt", rec_id)
     cap, rec = cap_case["capability"], rec_case["receipt"]
     _require(cap_case["expected"] == CAPABILITY_OUTCOMES["valid"], "%s is not a valid token" % cap_id)
+    # The complete request frame must carry a token that full verification
+    # accepts, not only the narrower corpus checks.
+    _require(full_chain_shape_holds(cap), "%s: the final delegatee is not the subject" % cap_id)
     _require(
-        len(cap.get("delegation_chain", [])) == 1 and len(cap["scope"]["grants"]) == 1,
-        "%s no longer has one delegation link and one grant" % cap_id,
+        not cap.get("delegation_chain") and len(cap["scope"].get("grants", [])) == 1,
+        "%s no longer has no delegation chain and one grant" % cap_id,
     )
     _require(rec_case["expected"]["decision"] == "allow", "%s is not an allow receipt" % rec_id)
     cap_signing = check_capability_signing_input(cap_case)
@@ -593,9 +607,9 @@ def build_appendix_a(corpus: Corpus) -> Fragment:
 
     f.heading("Capability Token", "example-capability")
     f.para(
-        "%s It is a token with one delegation link and one tool grant, pretty-printed here for "
-        "reading. The corpus omits the `schema` member from its tokens. Capability tokens are "
-        "defined in {{capabilities}}." % provenance("capability", cap_id)
+        "%s It is a directly issued token with no delegation chain and one tool grant, "
+        "pretty-printed here for reading. The corpus omits the `schema` member from its tokens. "
+        "Capability tokens are defined in {{capabilities}}." % provenance("capability", cap_id)
     )
     f.block(pretty(cap), "json", indent=4)
     f.para(
@@ -824,6 +838,17 @@ def build_appendix_b(corpus: Corpus) -> Fragment:
         "`capability_body_canonical_json` value is the signing input without that member."
         % SCHEMA_MEMBER
     )
+    f.para(
+        "The expected result covers the signature of the token, the signatures, key connectivity, "
+        "and timestamps of its delegation links, and its validity period. It is not the outcome of "
+        "the full verification in {{capability-verification}}, which also requires the final "
+        "delegatee to be the token subject and applies issuer trust and chain binding."
+    )
+    delegated = corpus.case("capability", "valid_delegated_capability")
+    _require(
+        not full_chain_shape_holds(delegated["capability"]),
+        "capability/v1.json case valid_delegated_capability now ends at its subject",
+    )
     expired = corpus.case("capability", "expired_capability")
     _capability_case(
         f,
@@ -831,7 +856,8 @@ def build_appendix_b(corpus: Corpus) -> Fragment:
         "valid_delegated_capability",
         "valid",
         "Its signature verifies, its delegation link verifies, and the verification time falls "
-        "within its validity period.",
+        "within its validity period. Its final delegatee is not its subject, so full verification "
+        "rejects it.",
     )
     _capability_case(
         f,

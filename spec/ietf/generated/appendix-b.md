@@ -223,10 +223,17 @@ with the member `"schema":"chio.capability.v1"` added, as in
 token itself, and its `capability_body_canonical_json` value is the
 signing input without that member.
 
+The expected result covers the signature of the token, the signatures,
+key connectivity, and timestamps of its delegation links, and its
+validity period. It is not the outcome of the full verification in
+{{capability-verification}}, which also requires the final delegatee to
+be the token subject and applies issuer trust and chain binding.
+
 The following case is `capability/v1.json` case
 `valid_delegated_capability` from the Chio binding vector corpus. Its
 signature verifies, its delegation link verifies, and the verification
-time falls within its validity period. Its signing input is:
+time falls within its validity period. Its final delegatee is not its
+subject, so full verification rejects it. Its signing input is:
 {: keepWithNext="true"}
 
 ~~~ json

@@ -240,9 +240,9 @@ Internet-Draft                Chio Protocol               September 2026
      A.3.  Receipt . . . . . . . . . . . . . . . . . . . . . . . . . 128
    Appendix B.  Test Vectors . . . . . . . . . . . . . . . . . . . . 130
      B.1.  Canonical JSON  . . . . . . . . . . . . . . . . . . . . . 130
-     B.2.  SHA-256 Digests . . . . . . . . . . . . . . . . . . . . . 132
+     B.2.  SHA-256 Digests . . . . . . . . . . . . . . . . . . . . . 131
      B.3.  Ed25519 Signatures  . . . . . . . . . . . . . . . . . . . 132
-     B.4.  Capability Token Verification . . . . . . . . . . . . . . 134
+     B.4.  Capability Token Verification . . . . . . . . . . . . . . 133
      B.5.  Receipt Verification  . . . . . . . . . . . . . . . . . . 136
    Appendix C.  Relationship to Other Work . . . . . . . . . . . . . 139
      C.1.  Agent Communication Protocols . . . . . . . . . . . . . . 139
@@ -6979,7 +6979,7 @@ Appendix A.  Examples
 
    The examples in this appendix are built from two cases of the Chio
    binding vector corpus, capability/v1.json case
-   valid_delegated_capability and receipt/v1.json case allow_receipt, so
+   valid_no_delegation_chain and receipt/v1.json case allow_receipt, so
    every key, hash, and signature in them is exact.  Lines longer than
    69 characters are folded as described in [RFC8792], and each folded
    block begins with the header line that document defines.
@@ -6987,10 +6987,10 @@ Appendix A.  Examples
 A.1.  Capability Token
 
    The following case is capability/v1.json case
-   valid_delegated_capability from the Chio binding vector corpus.  It
-   is a token with one delegation link and one tool grant, pretty-
-   printed here for reading.  The corpus omits the schema member from
-   its tokens.  Capability tokens are defined in Section 5.
+   valid_no_delegation_chain from the Chio binding vector corpus.  It is
+   a directly issued token with no delegation chain and one tool grant,
+   pretty-printed here for reading.  The corpus omits the schema member
+   from its tokens.  Capability tokens are defined in Section 5.
 
 
 
@@ -7005,21 +7005,8 @@ Internet-Draft                Chio Protocol               September 2026
    =============== NOTE: '\' line wrapping per RFC 8792 ================
 
    {
-     "delegation_chain": [
-       {
-         "capability_id": "cap-bindings-valid",
-         "delegatee": "91a28a0b74381593a4d9469579208926afc8ad82c8839b76\
-             44359b9eba9a4b3a",
-         "delegator": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d\
-             98b39fb6810c473a",
-         "signature": "a4c297402d3bef255c8a9648215d9bb9c7fcbfb0a2e4009c\
-             fc6202459c10b2e4066de4ef60d4118f612993b6ceb2197095483e94c8\
-             a2ccc658ad7ef5b865be00",
-         "timestamp": 1710000250
-       }
-     ],
      "expires_at": 1710000800,
-     "id": "cap-bindings-valid",
+     "id": "cap-bindings-direct",
      "issued_at": 1710000200,
      "issuer": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb\
          6810c473a",
@@ -7042,12 +7029,25 @@ Internet-Draft                Chio Protocol               September 2026
          }
        ]
      },
-     "signature": "a16f5a447da2a5dbd840e44c7c1a5093474e4a1b9826ae80ca85\
-         f197b18e8ad05607745ac9e0ff063db7b49ff4da637b630cf10d55c1ef1e64\
-         fb5c27d81ed505",
+     "signature": "bf98e7d482dee58f37b6f859b9eddd54191dbb1145321be7dff9\
+         aa59fbf47e7647873dd40c585956ebc098b64f7f853d7ceb83685c01410c7d\
+         ecd6a477db920c",
      "subject": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da\
          8eb6e39f2d"
    }
+
+   The signing input of the token is its canonical form without the
+   signature member and with the member "schema":"chio.capability.v1"
+   added, which sorts between issuer and scope.  The
+   capability_body_canonical_json value of the case is the same text
+   without the schema member.  The signing input is:
+
+
+
+
+
+
+
 
 
 
@@ -7058,23 +7058,10 @@ Whelan                    Expires 3 April 2027                [Page 126]
 Internet-Draft                Chio Protocol               September 2026
 
 
-   The signing input of the token is its canonical form without the
-   signature member and with the member "schema":"chio.capability.v1"
-   added, which sorts between issuer and scope.  The
-   capability_body_canonical_json value of the case is the same text
-   without the schema member.  The signing input is:
-
    =============== NOTE: '\' line wrapping per RFC 8792 ================
 
-   {"delegation_chain":[{"capability_id":"cap-bindings-valid",\
-   "delegatee":\
-   "91a28a0b74381593a4d9469579208926afc8ad82c8839b7644359b9eba9a4b3a",\
-   "delegator":\
-   "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",\
-   "signature":"a4c297402d3bef255c8a9648215d9bb9c7fcbfb0a2e4009cfc62024\
-   59c10b2e4066de4ef60d4118f612993b6ceb2197095483e94c8a2ccc658ad7ef5b86\
-   5be00","timestamp":1710000250}],"expires_at":1710000800,"id":\
-   "cap-bindings-valid","issued_at":1710000200,"issuer":\
+   {"expires_at":1710000800,"id":"cap-bindings-direct","issued_at":\
+   1710000200,"issuer":\
    "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",\
    "schema":"chio.capability.v1","scope":{"grants":[{"constraints":\
    [{"type":"path_prefix","value":"/workspace/"}],"max_invocations":3,\
@@ -7088,22 +7075,35 @@ Internet-Draft                Chio Protocol               September 2026
 A.2.  Tool Call Request Frame
 
    The following request is built from capability/v1.json case
-   valid_delegated_capability and receipt/v1.json case allow_receipt of
+   valid_no_delegation_chain and receipt/v1.json case allow_receipt of
    the Chio binding vector corpus.  Its capability_token is the token of
    Appendix A.1, and its server_id, tool, and params are the
    tool_server, tool_name, and action.parameters members of the receipt
    of Appendix A.3.  Its id is illustrative.  The request is not a case
    of the corpus, and its canonical form is:
 
+   =============== NOTE: '\' line wrapping per RFC 8792 ================
 
+   {"capability_token":{"expires_at":1710000800,"id":\
+   "cap-bindings-direct","issued_at":1710000200,"issuer":\
+   "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",\
+   "scope":{"grants":[{"constraints":[{"type":"path_prefix","value":\
+   "/workspace/"}],"max_invocations":3,"operations":["invoke",\
+   "read_result"],"server_id":"srv-files","tool_name":"file_read"}]},\
+   "signature":"bf98e7d482dee58f37b6f859b9eddd54191dbb1145321be7dff9aa5\
+   9fbf47e7647873dd40c585956ebc098b64f7f853d7ceb83685c01410c7decd6a477d\
+   b920c","subject":\
+   "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"},\
+   "id":"req-001","params":{"mode":"read","path":\
+   "/workspace/docs/roadmap.md"},"server_id":"srv-files","tool":\
+   "file_read","type":"tool_call_request"}
 
+   In the native transport (Section 10), a message is sent as a frame: a
+   four-octet length in big-endian order, followed by the canonical form
+   as the payload.  The payload here is 728 octets long, so the length
+   prefix is:
 
-
-
-
-
-
-
+   000002d8
 
 
 
@@ -7114,40 +7114,10 @@ Whelan                    Expires 3 April 2027                [Page 127]
 Internet-Draft                Chio Protocol               September 2026
 
 
-   =============== NOTE: '\' line wrapping per RFC 8792 ================
-
-   {"capability_token":{"delegation_chain":[{"capability_id":\
-   "cap-bindings-valid","delegatee":\
-   "91a28a0b74381593a4d9469579208926afc8ad82c8839b7644359b9eba9a4b3a",\
-   "delegator":\
-   "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",\
-   "signature":"a4c297402d3bef255c8a9648215d9bb9c7fcbfb0a2e4009cfc62024\
-   59c10b2e4066de4ef60d4118f612993b6ceb2197095483e94c8a2ccc658ad7ef5b86\
-   5be00","timestamp":1710000250}],"expires_at":1710000800,"id":\
-   "cap-bindings-valid","issued_at":1710000200,"issuer":\
-   "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",\
-   "scope":{"grants":[{"constraints":[{"type":"path_prefix","value":\
-   "/workspace/"}],"max_invocations":3,"operations":["invoke",\
-   "read_result"],"server_id":"srv-files","tool_name":"file_read"}]},\
-   "signature":"a16f5a447da2a5dbd840e44c7c1a5093474e4a1b9826ae80ca85f19\
-   7b18e8ad05607745ac9e0ff063db7b49ff4da637b630cf10d55c1ef1e64fb5c27d81\
-   ed505","subject":\
-   "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"},\
-   "id":"req-001","params":{"mode":"read","path":\
-   "/workspace/docs/roadmap.md"},"server_id":"srv-files","tool":\
-   "file_read","type":"tool_call_request"}
-
-   In the native transport (Section 10), a message is sent as a frame: a
-   four-octet length in big-endian order, followed by the canonical form
-   as the payload.  The payload here is 1111 octets long, so the length
-   prefix is:
-
-   00000457
-
    The first 32 octets of the payload are the ASCII text
-   {"capability_token":{"delegation.  In hex they are:
+   {"capability_token":{"expires_at.  In hex they are:
 
-   7b226361706162696c6974795f746f6b656e223a7b2264656c65676174696f6e
+   7b226361706162696c6974795f746f6b656e223a7b22657870697265735f6174
 
 A.3.  Receipt
 
@@ -7158,17 +7128,6 @@ A.3.  Receipt
    001.  The capability and receipt cases of the corpus are independent,
    so that value is not the id of the token in Appendix A.1.  Receipts
    are defined in Section 6.
-
-
-
-
-
-
-
-Whelan                    Expires 3 April 2027                [Page 128]
-
-Internet-Draft                Chio Protocol               September 2026
-
 
    =============== NOTE: '\' line wrapping per RFC 8792 ================
 
@@ -7203,6 +7162,14 @@ Internet-Draft                Chio Protocol               September 2026
      "id": "c9909f733d5fb367922293f0167d06db715393be114f212096cf2866f29\
          433ea",
      "kernel_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421\
+
+
+
+Whelan                    Expires 3 April 2027                [Page 128]
+
+Internet-Draft                Chio Protocol               September 2026
+
+
          eea691446d22c",
      "metadata": {
        "surface": "bindings-vectors",
@@ -7218,14 +7185,6 @@ Internet-Draft                Chio Protocol               September 2026
      "tool_name": "file_read",
      "tool_origin": "caller_executed",
      "tool_server": "srv-files",
-
-
-
-Whelan                    Expires 3 April 2027                [Page 129]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
      "trust_level": "mediated"
    }
 
@@ -7256,6 +7215,17 @@ Internet-Draft                Chio Protocol               September 2026
    "srv-files","trust_level":"mediated"},"id":\
    "c9909f733d5fb367922293f0167d06db715393be114f212096cf2866f29433ea"}
 
+
+
+
+
+
+
+Whelan                    Expires 3 April 2027                [Page 129]
+
+Internet-Draft                Chio Protocol               September 2026
+
+
    The signature member is an Ed25519 signature over these octets that
    verifies under the key in kernel_key.  The parameter_hash member of
    action is the SHA-256 digest of the canonical form of its parameters
@@ -7274,13 +7244,6 @@ B.1.  Canonical JSON
 
    Each case gives a JSON text and its canonical form, which Section 4
    defines.
-
-
-
-Whelan                    Expires 3 April 2027                [Page 130]
-
-Internet-Draft                Chio Protocol               September 2026
-
 
    The following case is canonical/v1.json case object_key_sorting from
    the Chio binding vector corpus.  Members are sorted by key.  The
@@ -7309,6 +7272,16 @@ Internet-Draft                Chio Protocol               September 2026
    the Chio binding vector corpus.  Members are sorted at every level of
    nesting, and the order of array elements is unchanged.  The input is:
 
+
+
+
+
+
+Whelan                    Expires 3 April 2027                [Page 130]
+
+Internet-Draft                Chio Protocol               September 2026
+
+
    =============== NOTE: '\' line wrapping per RFC 8792 ================
 
    {"tool":"read","params":{"path":"/tmp/demo","flags":["read",\
@@ -7330,13 +7303,6 @@ Internet-Draft                Chio Protocol               September 2026
    {"whole":1.0,"small":1e-7,"big":1e21,"negative_zero":-0.0}
 
    The canonical form is:
-
-
-
-Whelan                    Expires 3 April 2027                [Page 131]
-
-Internet-Draft                Chio Protocol               September 2026
-
 
    {"big":1e+21,"negative_zero":0,"small":1e-7,"whole":1}
 
@@ -7365,6 +7331,13 @@ B.2.  SHA-256 Digests
 
    5c57c7deea3998c13730797e592abe72cae55130e8da2923de6374b75b83101b
 
+
+
+Whelan                    Expires 3 April 2027                [Page 131]
+
+Internet-Draft                Chio Protocol               September 2026
+
+
    The following case is hashing/v1.json case json_canonical_form from
    the Chio binding vector corpus.  The input is a canonical JSON text:
 
@@ -7385,14 +7358,6 @@ B.3.  Ed25519 Signatures
    The input is:
 
    {"z":1,"a":2}
-
-
-
-
-Whelan                    Expires 3 April 2027                [Page 132]
-
-Internet-Draft                Chio Protocol               September 2026
-
 
    Its canonical form, which is the message, is:
 
@@ -7422,6 +7387,13 @@ Internet-Draft                Chio Protocol               September 2026
 
    {"a":2,"z":2}
 
+
+
+Whelan                    Expires 3 April 2027                [Page 132]
+
+Internet-Draft                Chio Protocol               September 2026
+
+
    The Ed25519 public key is:
 
    fd1724385aa0c75b64fb78cd602fa1d991fdebf76b13c58ed702eac835e9f618
@@ -7434,6 +7406,34 @@ Internet-Draft                Chio Protocol               September 2026
    d51ee04df5c090143a5d49e14324a2d52f628472f02719bd405d2567590e
 
    Verification is expected to fail.
+
+B.4.  Capability Token Verification
+
+   Each case gives the signing input of a token, the value of its
+   signature member, the Unix time at which the token is verified, and
+   the result that verification is expected to produce.  The signing
+   input is the canonical form of the token without its signature member
+   and with the member "schema":"chio.capability.v1" added, as in
+   Appendix A.1.  The corpus omits the schema member from the token
+   itself, and its capability_body_canonical_json value is the signing
+   input without that member.
+
+   The expected result covers the signature of the token, the
+   signatures, key connectivity, and timestamps of its delegation links,
+   and its validity period.  It is not the outcome of the full
+   verification in Section 5.8, which also requires the final delegatee
+   to be the token subject and applies issuer trust and chain binding.
+
+   The following case is capability/v1.json case
+   valid_delegated_capability from the Chio binding vector corpus.  Its
+   signature verifies, its delegation link verifies, and the
+   verification time falls within its validity period.  Its final
+   delegatee is not its subject, so full verification rejects it.  Its
+   signing input is:
+
+
+
+
 
 
 
@@ -7449,23 +7449,6 @@ Whelan                    Expires 3 April 2027                [Page 133]
 
 Internet-Draft                Chio Protocol               September 2026
 
-
-B.4.  Capability Token Verification
-
-   Each case gives the signing input of a token, the value of its
-   signature member, the Unix time at which the token is verified, and
-   the result that verification is expected to produce.  The signing
-   input is the canonical form of the token without its signature member
-   and with the member "schema":"chio.capability.v1" added, as in
-   Appendix A.1.  The corpus omits the schema member from the token
-   itself, and its capability_body_canonical_json value is the signing
-   input without that member.
-
-   The following case is capability/v1.json case
-   valid_delegated_capability from the Chio binding vector corpus.  Its
-   signature verifies, its delegation link verifies, and the
-   verification time falls within its validity period.  Its signing
-   input is:
 
    =============== NOTE: '\' line wrapping per RFC 8792 ================
 
@@ -7494,18 +7477,6 @@ B.4.  Capability Token Verification
 
    Verification at Unix time 1710000400 is expected to produce:
 
-
-
-
-
-
-
-
-Whelan                    Expires 3 April 2027                [Page 134]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
    {
      "delegation_chain_shape_valid": true,
      "signature_valid": true,
@@ -7517,6 +7488,23 @@ Internet-Draft                Chio Protocol               September 2026
    the Chio binding vector corpus.  Its signature verifies, and it
    expired at 1710000100, before the verification time.  Its signing
    input is:
+
+
+
+
+
+
+
+
+
+
+
+
+
+Whelan                    Expires 3 April 2027                [Page 134]
+
+Internet-Draft                Chio Protocol               September 2026
+
 
    =============== NOTE: '\' line wrapping per RFC 8792 ================
 
@@ -7549,6 +7537,18 @@ Internet-Draft                Chio Protocol               September 2026
    broken_delegation_chain_signature from the Chio binding vector
    corpus.  Its signature verifies, and the signature of its delegation
    link does not.  Its signing input is:
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

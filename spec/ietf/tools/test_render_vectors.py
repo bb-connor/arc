@@ -779,7 +779,7 @@ class AppendixATests(unittest.TestCase):
     def setUp(self):
         self.intro, self.sections = parse_fragment(rendered()["appendix-a.md"].text)
         self.by_anchor = {s["anchor"]: s for s in self.sections}
-        self.capability = by_id(load("capability")["cases"])["valid_delegated_capability"]
+        self.capability = by_id(load("capability")["cases"])["valid_no_delegation_chain"]
         self.receipt = by_id(load("receipt")["cases"])["allow_receipt"]
 
     def test_the_fragment_is_prose_then_three_anchored_subsections(self):
@@ -793,7 +793,7 @@ class AppendixATests(unittest.TestCase):
     def test_the_intro_names_both_source_cases(self):
         text = text_of(self.intro)
         for needle in (
-            "`capability/v1.json` case `valid_delegated_capability`",
+            "`capability/v1.json` case `valid_no_delegation_chain`",
             "`receipt/v1.json` case `allow_receipt`",
             "{{RFC8792}}",
         ):
@@ -802,7 +802,7 @@ class AppendixATests(unittest.TestCase):
     def test_capability_example_is_the_valid_case_with_its_signing_input(self):
         items = self.by_anchor["example-capability"]["items"]
         match = PROVENANCE.search(items[0][1])
-        self.assertEqual((match.group(1), match.group(2)), ("capability/v1.json", "valid_delegated_capability"))
+        self.assertEqual((match.group(1), match.group(2)), ("capability/v1.json", "valid_no_delegation_chain"))
         blocks = blocks_of(items)
         self.assertEqual([lang for lang, _ in blocks], ["json", "json"])
         self.assertIn("pretty-printed", items[0][1])
@@ -863,8 +863,18 @@ class AppendixATests(unittest.TestCase):
         self.assertIn("illustrative", text)
         self.assertIn(str(len(payload)), text)
         self.assertIn("`" + payload[:32].decode("ascii") + "`", text)
-        self.assertIn("`capability/v1.json` case `valid_delegated_capability`", text)
+        self.assertIn("`capability/v1.json` case `valid_no_delegation_chain`", text)
         self.assertIn("`receipt/v1.json` case `allow_receipt`", text)
+
+    def test_the_frame_token_passes_the_full_delegation_shape_rule(self):
+        """Full verification also requires the final delegatee to be the subject."""
+        cap = self.capability["capability"]
+        self.assertEqual(verify_capability(cap, self.capability["verify_at"]), rv.CAPABILITY_OUTCOMES["valid"])
+        self.assertTrue(rv.full_chain_shape_holds(cap))
+        self.assertNotIn("delegation_chain", cap)
+        self.assertIn("no delegation chain", text_of(self.by_anchor["example-capability"]["items"]))
+        delegated = by_id(load("capability")["cases"])["valid_delegated_capability"]["capability"]
+        self.assertFalse(rv.full_chain_shape_holds(delegated))
 
     def test_receipt_example_is_the_allow_case_with_its_signing_input(self):
         items = self.by_anchor["example-receipt"]["items"]
@@ -1072,7 +1082,10 @@ class AppendixBTests(unittest.TestCase):
         self.assertIn("delegation link", broken)
         self.assertIn("does not", broken)
         self.assertIn("delegation link", valid)
-        self.assertIn('`"schema":"chio.capability.v1"`', text_of(self.by_anchor["vectors-capability"]["items"]))
+        self.assertIn("full verification rejects it", valid)
+        intro = text_of(self.by_anchor["vectors-capability"]["items"])
+        self.assertIn('`"schema":"chio.capability.v1"`', intro)
+        self.assertIn("not the outcome of the full verification in {{capability-verification}}", intro)
 
     def test_receipt_cases(self):
         cases = by_id(load("receipt")["cases"])

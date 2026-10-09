@@ -1,6 +1,6 @@
 The examples in this appendix are built from two cases of the Chio
 binding vector corpus, `capability/v1.json` case
-`valid_delegated_capability` and `receipt/v1.json` case `allow_receipt`,
+`valid_no_delegation_chain` and `receipt/v1.json` case `allow_receipt`,
 so every key, hash, and signature in them is exact. Lines longer than 69
 characters are folded as described in {{RFC8792}}, and each folded block
 begins with the header line that document defines.
@@ -8,30 +8,17 @@ begins with the header line that document defines.
 ## Capability Token {#example-capability}
 
 The following case is `capability/v1.json` case
-`valid_delegated_capability` from the Chio binding vector corpus. It is
-a token with one delegation link and one tool grant, pretty-printed here
-for reading. The corpus omits the `schema` member from its tokens.
-Capability tokens are defined in {{capabilities}}.
+`valid_no_delegation_chain` from the Chio binding vector corpus. It is a
+directly issued token with no delegation chain and one tool grant,
+pretty-printed here for reading. The corpus omits the `schema` member
+from its tokens. Capability tokens are defined in {{capabilities}}.
 
 ~~~ json
 =============== NOTE: '\' line wrapping per RFC 8792 ================
 
 {
-  "delegation_chain": [
-    {
-      "capability_id": "cap-bindings-valid",
-      "delegatee": "91a28a0b74381593a4d9469579208926afc8ad82c8839b76\
-          44359b9eba9a4b3a",
-      "delegator": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d\
-          98b39fb6810c473a",
-      "signature": "a4c297402d3bef255c8a9648215d9bb9c7fcbfb0a2e4009c\
-          fc6202459c10b2e4066de4ef60d4118f612993b6ceb2197095483e94c8\
-          a2ccc658ad7ef5b865be00",
-      "timestamp": 1710000250
-    }
-  ],
   "expires_at": 1710000800,
-  "id": "cap-bindings-valid",
+  "id": "cap-bindings-direct",
   "issued_at": 1710000200,
   "issuer": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb\
       6810c473a",
@@ -54,9 +41,9 @@ Capability tokens are defined in {{capabilities}}.
       }
     ]
   },
-  "signature": "a16f5a447da2a5dbd840e44c7c1a5093474e4a1b9826ae80ca85\
-      f197b18e8ad05607745ac9e0ff063db7b49ff4da637b630cf10d55c1ef1e64\
-      fb5c27d81ed505",
+  "signature": "bf98e7d482dee58f37b6f859b9eddd54191dbb1145321be7dff9\
+      aa59fbf47e7647873dd40c585956ebc098b64f7f853d7ceb83685c01410c7d\
+      ecd6a477db920c",
   "subject": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da\
       8eb6e39f2d"
 }
@@ -72,15 +59,8 @@ without the `schema` member. The signing input is:
 ~~~ json
 =============== NOTE: '\' line wrapping per RFC 8792 ================
 
-{"delegation_chain":[{"capability_id":"cap-bindings-valid",\
-"delegatee":\
-"91a28a0b74381593a4d9469579208926afc8ad82c8839b7644359b9eba9a4b3a",\
-"delegator":\
-"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",\
-"signature":"a4c297402d3bef255c8a9648215d9bb9c7fcbfb0a2e4009cfc62024\
-59c10b2e4066de4ef60d4118f612993b6ceb2197095483e94c8a2ccc658ad7ef5b86\
-5be00","timestamp":1710000250}],"expires_at":1710000800,"id":\
-"cap-bindings-valid","issued_at":1710000200,"issuer":\
+{"expires_at":1710000800,"id":"cap-bindings-direct","issued_at":\
+1710000200,"issuer":\
 "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",\
 "schema":"chio.capability.v1","scope":{"grants":[{"constraints":\
 [{"type":"path_prefix","value":"/workspace/"}],"max_invocations":3,\
@@ -95,7 +75,7 @@ verifies under the key in `issuer`.
 ## Tool Call Request Frame {#example-frame}
 
 The following request is built from `capability/v1.json` case
-`valid_delegated_capability` and `receipt/v1.json` case `allow_receipt`
+`valid_no_delegation_chain` and `receipt/v1.json` case `allow_receipt`
 of the Chio binding vector corpus. Its `capability_token` is the token
 of {{example-capability}}, and its `server_id`, `tool`, and `params` are
 the `tool_server`, `tool_name`, and `action.parameters` members of the
@@ -106,22 +86,15 @@ not a case of the corpus, and its canonical form is:
 ~~~ json
 =============== NOTE: '\' line wrapping per RFC 8792 ================
 
-{"capability_token":{"delegation_chain":[{"capability_id":\
-"cap-bindings-valid","delegatee":\
-"91a28a0b74381593a4d9469579208926afc8ad82c8839b7644359b9eba9a4b3a",\
-"delegator":\
-"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",\
-"signature":"a4c297402d3bef255c8a9648215d9bb9c7fcbfb0a2e4009cfc62024\
-59c10b2e4066de4ef60d4118f612993b6ceb2197095483e94c8a2ccc658ad7ef5b86\
-5be00","timestamp":1710000250}],"expires_at":1710000800,"id":\
-"cap-bindings-valid","issued_at":1710000200,"issuer":\
+{"capability_token":{"expires_at":1710000800,"id":\
+"cap-bindings-direct","issued_at":1710000200,"issuer":\
 "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",\
 "scope":{"grants":[{"constraints":[{"type":"path_prefix","value":\
 "/workspace/"}],"max_invocations":3,"operations":["invoke",\
 "read_result"],"server_id":"srv-files","tool_name":"file_read"}]},\
-"signature":"a16f5a447da2a5dbd840e44c7c1a5093474e4a1b9826ae80ca85f19\
-7b18e8ad05607745ac9e0ff063db7b49ff4da637b630cf10d55c1ef1e64fb5c27d81\
-ed505","subject":\
+"signature":"bf98e7d482dee58f37b6f859b9eddd54191dbb1145321be7dff9aa5\
+9fbf47e7647873dd40c585956ebc098b64f7f853d7ceb83685c01410c7decd6a477d\
+b920c","subject":\
 "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"},\
 "id":"req-001","params":{"mode":"read","path":\
 "/workspace/docs/roadmap.md"},"server_id":"srv-files","tool":\
@@ -130,20 +103,20 @@ ed505","subject":\
 
 In the native transport ({{native-transport}}), a message is sent as a
 frame: a four-octet length in big-endian order, followed by the
-canonical form as the payload. The payload here is 1111 octets long, so
+canonical form as the payload. The payload here is 728 octets long, so
 the length prefix is:
 {: keepWithNext="true"}
 
 ~~~
-00000457
+000002d8
 ~~~
 
 The first 32 octets of the payload are the ASCII text
-`{"capability_token":{"delegation`. In hex they are:
+`{"capability_token":{"expires_at`. In hex they are:
 {: keepWithNext="true"}
 
 ~~~
-7b226361706162696c6974795f746f6b656e223a7b2264656c65676174696f6e
+7b226361706162696c6974795f746f6b656e223a7b22657870697265735f6174
 ~~~
 
 ## Receipt {#example-receipt}
