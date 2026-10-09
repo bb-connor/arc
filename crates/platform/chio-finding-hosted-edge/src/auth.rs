@@ -432,12 +432,14 @@ impl HostedAuthenticator {
         verify_dpop_stateless(
             proof,
             capability,
-            &expected_server,
-            &request.action,
-            &action_hash,
-            request.now_unix_secs,
-            self.config.dpop_proof_ttl_secs,
-            self.config.dpop_clock_skew_secs,
+            DpopExpectation {
+                expected_server: &expected_server,
+                expected_action: &request.action,
+                expected_action_hash: &action_hash,
+                now: request.now_unix_secs,
+                ttl: self.config.dpop_proof_ttl_secs,
+                skew: self.config.dpop_clock_skew_secs,
+            },
         )?;
         let valid_through = proof
             .body
@@ -563,17 +565,29 @@ fn request_action_hash(request: &HostedAuthRequest) -> Result<String, HostedEdge
     .map_err(|_| HostedEdgeError::InvalidRequest)
 }
 
-#[allow(clippy::too_many_arguments)]
-fn verify_dpop_stateless(
-    proof: &DpopProof,
-    capability: &CapabilityToken,
-    expected_server: &str,
-    expected_action: &str,
-    expected_action_hash: &str,
+/// Parameters of `verify_dpop_stateless`.
+struct DpopExpectation<'a> {
+    expected_server: &'a str,
+    expected_action: &'a str,
+    expected_action_hash: &'a str,
     now: u64,
     ttl: u64,
     skew: u64,
+}
+
+fn verify_dpop_stateless(
+    proof: &DpopProof,
+    capability: &CapabilityToken,
+    params: DpopExpectation<'_>,
 ) -> Result<(), HostedEdgeError> {
+    let DpopExpectation {
+        expected_server,
+        expected_action,
+        expected_action_hash,
+        now,
+        ttl,
+        skew,
+    } = params;
     if proof.body.schema != DPOP_SCHEMA
         || proof.body.agent_key != capability.subject
         || proof.body.capability_id != capability.id

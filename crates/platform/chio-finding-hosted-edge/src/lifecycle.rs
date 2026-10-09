@@ -345,7 +345,6 @@ fn validate_issue(request: &HostedApiKeyIssueRequest) -> Result<(), HostedEdgeEr
     request.secret.decoded().map(|_| ())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn validate_issue_fields(
     key_id: &str,
     principal_id: &str,
