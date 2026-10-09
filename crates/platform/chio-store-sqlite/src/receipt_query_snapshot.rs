@@ -25,7 +25,8 @@ mod service;
 mod walk;
 
 pub use service::{
-    ReceiptQuerySnapshotConfig, ReceiptQuerySnapshotState, ReceiptQuerySnapshotStatus,
+    ReceiptQuerySnapshotConfig, ReceiptQuerySnapshotRecovery, ReceiptQuerySnapshotRecoveryError,
+    ReceiptQuerySnapshotRecoveryStatus, ReceiptQuerySnapshotState, ReceiptQuerySnapshotStatus,
     ReceiptQuerySnapshots,
 };
 
