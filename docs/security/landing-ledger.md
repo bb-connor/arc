@@ -1,5 +1,24 @@
 # Security and process landing ledger
 
+## Public route composition checkpoint (October 9)
+
+The ledger now contains **1,831 requirements**. The previous 1,828 requirement
+objects remain preserved. [Three public-route findings](../reviews/2026-10-09-pr1160-public-route-findings.md)
+add the issuer trust/SSRF and authority read-write amplification P1s plus the
+bounded public-worker P2. All three must be repaired before #1160 lands.
+Issuer and public-worker repairs are composed on the isolated snapshot stage;
+full composed owning tests are running. The authority read-only repair remains
+in progress. The canonical JSON current-state view records their source
+commits, original failures, bounded owner evidence and remaining acceptance.
+
+The signed Linux snapshot capacity campaign completed at one million receipts;
+quiet and contended builds each authenticated all one million signatures and
+reported zero count mismatches. Synthetic ten-million-row projection and actual
+default-quota exhaustion remain separate measurements. Capacity evidence and
+its committed test handoff are still being reconciled. The real-SHA attestation
+proof has timed out without a verdict on both full solver attempts; it remains
+unqualified. No staged source has been pushed or merged by this checkpoint.
+
 ## Current landing repair wave (October 9)
 
 The independent whole-PR review of `fd8bfdc947` is preserved in
