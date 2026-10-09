@@ -10,12 +10,14 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use chio_core_types::{Ed25519Backend, PublicKey, SigningBackend};
+use chio_custody_store::{
+    SqliteEnterpriseMigrationOpenPolicy, SqliteEnterpriseMigrationStateStore,
+};
 use chio_security_types::ports::RecordId;
 use chio_security_types::{
     EnterpriseMigrationControl, EnterpriseMigrationKey, EnterpriseMigrationMinimumHead,
     EnterpriseMigrationScopeKind, EnterpriseMigrationStage, EnterpriseMigrationStateStore,
 };
-use chio_store_sqlite::{SqliteEnterpriseMigrationOpenPolicy, SqliteEnterpriseMigrationStateStore};
 use serde::{Deserialize, Serialize};
 
 #[cfg(unix)]

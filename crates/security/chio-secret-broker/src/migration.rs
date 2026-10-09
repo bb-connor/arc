@@ -281,12 +281,12 @@ mod tests {
     use std::path::PathBuf;
 
     use chio_core_types::Keypair;
-    use chio_security_types::{
-        EnterpriseMigrationMinimumHead, EnterpriseMigrationState, EnterpriseMigrationTransitionBody,
-    };
-    use chio_store_sqlite::{
+    use chio_custody_store::{
         sign_enterprise_migration_transition, SqliteEnterpriseMigrationOpenPolicy,
         SqliteEnterpriseMigrationStateStore,
+    };
+    use chio_security_types::{
+        EnterpriseMigrationMinimumHead, EnterpriseMigrationState, EnterpriseMigrationTransitionBody,
     };
     use chio_test_support::prelude::*;
 

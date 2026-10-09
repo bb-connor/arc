@@ -3,16 +3,16 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
 use chio_core_types::Keypair;
+use chio_custody_store::{
+    sign_enterprise_migration_transition, SqliteEnterpriseMigrationOpenPolicy,
+    SqliteEnterpriseMigrationStateStore,
+};
 use chio_secret_broker::daemon_runtime::BrokerDaemonMigrationConfig;
 use chio_secret_broker::migration::production_broker_migration_posture_digest;
 use chio_security_types::ports::{Digest32, RecordId};
 use chio_security_types::{
     EnterpriseMigrationControl, EnterpriseMigrationKey, EnterpriseMigrationScopeKind,
     EnterpriseMigrationStage, EnterpriseMigrationStateStore, EnterpriseMigrationTransitionBody,
-};
-use chio_store_sqlite::{
-    sign_enterprise_migration_transition, SqliteEnterpriseMigrationOpenPolicy,
-    SqliteEnterpriseMigrationStateStore,
 };
 use chio_test_support::prelude::*;
 

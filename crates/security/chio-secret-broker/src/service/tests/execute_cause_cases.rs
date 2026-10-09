@@ -39,8 +39,8 @@ fn f011_public_execute_retains_unavailable_cause_and_drops_prepared_material() {
                 .test_expect("opaque native credential source");
             assert!(matches!(
                 std::error::Error::source(store)
-                    .and_then(|source| source.downcast_ref::<chio_store_sqlite::BlobStoreError>()),
-                Some(chio_store_sqlite::BlobStoreError::NotFound)
+                    .and_then(|source| source.downcast_ref::<chio_custody_store::BlobStoreError>()),
+                Some(chio_custody_store::BlobStoreError::NotFound)
             ));
         };
         assert_native_source(&error);

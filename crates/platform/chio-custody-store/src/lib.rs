@@ -32,3 +32,14 @@ pub mod schema_version;
 pub mod sqlite_uri;
 pub mod store_clock;
 pub mod store_connection;
+
+pub use encrypted_blob::{
+    decrypt_blob, encrypt_blob, BlobHandle, BlobReference, BlobReferenceMutationOutcome,
+    BlobStoreError, DecryptError, EncryptError, EncryptedBlob, SqliteEncryptedBlobStore, TenantId,
+    TenantKey,
+};
+pub use enterprise_migration_state::{
+    enterprise_migration_transition_digest, sign_enterprise_migration_transition,
+    SqliteEnterpriseMigrationOpenPolicy, SqliteEnterpriseMigrationStateStore,
+    SqliteEnterpriseMigrationStateStoreError,
+};

@@ -1,5 +1,5 @@
 //! Closed credential refusal/storage categories retain native store failures.
-use chio_store_sqlite::BlobStoreError;
+use chio_custody_store::BlobStoreError;
 use std::{error::Error, fmt};
 
 /// Native credential storage error available only through explicit cause inspection.

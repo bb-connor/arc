@@ -17,7 +17,7 @@ struct RetainedPreparedDispatch {
     prepared_at_unix_seconds: u64,
     dispatch: PreparedHttpsDispatch,
     credential: SecretMaterial,
-    credential_version: chio_store_sqlite::BlobHandle,
+    credential_version: chio_custody_store::BlobHandle,
     revocation_set: CanonicalBrokerRevocationSet,
 }
 

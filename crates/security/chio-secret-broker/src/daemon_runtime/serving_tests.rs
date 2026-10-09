@@ -10,7 +10,7 @@ use std::sync::{mpsc, Mutex};
 use std::time::{Duration, Instant};
 
 use chio_core_types::Keypair;
-use chio_store_sqlite::BlobStoreError;
+use chio_custody_store::BlobStoreError;
 use chio_test_support::prelude::*;
 
 use super::*;

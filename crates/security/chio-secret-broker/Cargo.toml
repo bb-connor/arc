@@ -31,7 +31,7 @@ path = "src/bin/chio-repository-adapter.rs"
 # Compatibility selection for the production durable authority exercised by
 # the broker boundary gate. Conformance does not expose a second coordinator.
 conformance = ["kernel-admission"]
-kernel-admission = ["dep:chio-kernel", "dep:async-trait", "dep:tokio"]
+kernel-admission = ["dep:chio-kernel", "dep:chio-store-sqlite", "dep:async-trait", "dep:tokio"]
 native-mcp = ["kernel-admission", "dep:chio-mcp-adapter", "dep:chio-manifest", "dep:tracing"]
 real-linux-enforcement = ["native-mcp"]
 
@@ -44,7 +44,8 @@ chio-manifest = { workspace = true, optional = true }
 chio-mcp-adapter = { workspace = true, optional = true }
 chio-security-types = { workspace = true }
 chio-secure-ipc = { workspace = true }
-chio-store-sqlite = { workspace = true }
+chio-custody-store = { workspace = true }
+chio-store-sqlite = { workspace = true, optional = true }
 hex = { workspace = true }
 hmac = { workspace = true }
 rand_core = { workspace = true }
@@ -69,6 +70,7 @@ chio-keyring = { workspace = true }
 libc = "0.2"
 
 [dev-dependencies]
+chio-store-sqlite = { workspace = true }
 async-trait = { workspace = true }
 chio-core-types = { workspace = true, features = ["legacy-permissive-verification"] }
 chio-cage = { workspace = true }

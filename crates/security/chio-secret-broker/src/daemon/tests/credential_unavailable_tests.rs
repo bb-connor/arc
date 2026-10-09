@@ -42,7 +42,7 @@ impl Fixture {
             EncryptedBlobSecretBackend::open_with_tenant_key(
                 &secret_path,
                 "tenant-production".into(),
-                chio_store_sqlite::TenantKey::from_bytes([81; 32]),
+                chio_custody_store::TenantKey::from_bytes([81; 32]),
             )
             .test_expect("backend"),
         );
@@ -593,8 +593,8 @@ fn f011_corrupt_store_remains_fatal_with_native_cause() {
     let mut found = false;
     while let Some(cause) = source {
         if matches!(
-            cause.downcast_ref::<chio_store_sqlite::BlobStoreError>(),
-            Some(chio_store_sqlite::BlobStoreError::Sqlite(_))
+            cause.downcast_ref::<chio_custody_store::BlobStoreError>(),
+            Some(chio_custody_store::BlobStoreError::Sqlite(_))
         ) {
             found = true;
             break;

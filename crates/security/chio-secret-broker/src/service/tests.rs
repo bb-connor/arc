@@ -688,7 +688,7 @@ fn fixture_with_receipt_signer(
             Some(path) => EncryptedBlobSecretBackend::open_with_tenant_key(
                 path,
                 "tenant-a".to_string(),
-                chio_store_sqlite::TenantKey::from_bytes([7; 32]),
+                chio_custody_store::TenantKey::from_bytes([7; 32]),
             ),
             None => EncryptedBlobSecretBackend::open_in_memory_for_test("tenant-a", [7; 32]),
         }

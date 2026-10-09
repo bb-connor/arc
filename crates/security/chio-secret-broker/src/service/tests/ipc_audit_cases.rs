@@ -946,14 +946,14 @@ fn a_credential_store_fault_during_an_audit_ends_the_audit_endpoint() {
     let mut source = std::error::Error::source(&error);
     let mut native = None;
     while let Some(cause) = source {
-        if let Some(store) = cause.downcast_ref::<chio_store_sqlite::BlobStoreError>() {
+        if let Some(store) = cause.downcast_ref::<chio_custody_store::BlobStoreError>() {
             native = Some(store);
             break;
         }
         source = cause.source();
     }
     assert!(
-        matches!(native, Some(chio_store_sqlite::BlobStoreError::Sqlite(_))),
+        matches!(native, Some(chio_custody_store::BlobStoreError::Sqlite(_))),
         "native credential-store cause was discarded"
     );
 }

@@ -5076,6 +5076,7 @@ dependencies = [
  "chio-cage",
  "chio-control-plane",
  "chio-core-types",
+ "chio-custody-store",
  "chio-flow",
  "chio-kernel",
  "chio-keyring",

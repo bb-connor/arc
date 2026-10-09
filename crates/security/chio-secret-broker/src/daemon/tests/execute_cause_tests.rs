@@ -154,11 +154,11 @@ fn assert_native_store_source(error: &BrokerError, sqlite: bool) {
     let mut source = std::error::Error::source(error);
     let mut found = false;
     while let Some(cause) = source {
-        if let Some(native) = cause.downcast_ref::<chio_store_sqlite::BlobStoreError>() {
+        if let Some(native) = cause.downcast_ref::<chio_custody_store::BlobStoreError>() {
             found = if sqlite {
-                matches!(native, chio_store_sqlite::BlobStoreError::Sqlite(_))
+                matches!(native, chio_custody_store::BlobStoreError::Sqlite(_))
             } else {
-                matches!(native, chio_store_sqlite::BlobStoreError::NotFound)
+                matches!(native, chio_custody_store::BlobStoreError::NotFound)
             };
             if found {
                 break;

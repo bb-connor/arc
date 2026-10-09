@@ -2,8 +2,8 @@
 //! faults in the broker's own state or custody are fatal.
 
 use chio_core_types::canonical::UntrustedJsonError;
+use chio_custody_store::BlobStoreError;
 use chio_security_types::clock::ClockError;
-use chio_store_sqlite::BlobStoreError;
 
 use super::*;
 

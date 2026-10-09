@@ -34,8 +34,8 @@ fn assert_native_integrity_source(error: &BrokerError) {
         match cause {
             Some(source) => {
                 if matches!(
-                    source.downcast_ref::<chio_store_sqlite::BlobStoreError>(),
-                    Some(chio_store_sqlite::BlobStoreError::InvalidReference)
+                    source.downcast_ref::<chio_custody_store::BlobStoreError>(),
+                    Some(chio_custody_store::BlobStoreError::InvalidReference)
                 ) {
                     found = true;
                     break;

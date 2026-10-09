@@ -63,10 +63,10 @@ fn reprovisioning_a_disabled_version_is_a_contained_conflict() {
     existing_version_write_is_contained(CredentialMutationKind::Provision, true);
 }
 
-fn native_store_cause(error: &BrokerError) -> Option<&chio_store_sqlite::BlobStoreError> {
+fn native_store_cause(error: &BrokerError) -> Option<&chio_custody_store::BlobStoreError> {
     let mut source = std::error::Error::source(error);
     while let Some(cause) = source {
-        if let Some(store) = cause.downcast_ref::<chio_store_sqlite::BlobStoreError>() {
+        if let Some(store) = cause.downcast_ref::<chio_custody_store::BlobStoreError>() {
             return Some(store);
         }
         source = cause.source();
@@ -76,7 +76,7 @@ fn native_store_cause(error: &BrokerError) -> Option<&chio_store_sqlite::BlobSto
 
 fn assert_fatal_credential_storage(
     error: &BrokerError,
-    expected: fn(&chio_store_sqlite::BlobStoreError) -> bool,
+    expected: fn(&chio_custody_store::BlobStoreError) -> bool,
 ) {
     assert!(matches!(error, BrokerError::CredentialStorage(_)));
     assert_eq!(error.diagnostic_code(), "storage");
@@ -111,14 +111,14 @@ fn a_reference_store_fault_during_provision_remains_fatal_with_native_cause() {
         ))
         .test_expect_err("real storage fault remains fatal");
     assert_fatal_credential_storage(&error, |cause| {
-        matches!(cause, chio_store_sqlite::BlobStoreError::Sqlite(_))
+        matches!(cause, chio_custody_store::BlobStoreError::Sqlite(_))
     });
 }
 
 fn existing_version_with_broken_binding_is_fatal(
     kind: CredentialMutationKind,
     fault: &str,
-    expected: fn(&chio_store_sqlite::BlobStoreError) -> bool,
+    expected: fn(&chio_custody_store::BlobStoreError) -> bool,
 ) {
     let fixture = Fixture::new();
     let credential = Fixture::credential(1);
@@ -146,7 +146,7 @@ fn a_duplicate_provision_over_a_missing_blob_table_remains_fatal() {
     existing_version_with_broken_binding_is_fatal(
         CredentialMutationKind::Provision,
         "PRAGMA foreign_keys = OFF; DROP TABLE chio_encrypted_blobs;",
-        |cause| matches!(cause, chio_store_sqlite::BlobStoreError::Sqlite(_)),
+        |cause| matches!(cause, chio_custody_store::BlobStoreError::Sqlite(_)),
     );
 }
 
@@ -155,7 +155,7 @@ fn a_rotation_onto_a_version_over_a_missing_blob_table_remains_fatal() {
     existing_version_with_broken_binding_is_fatal(
         CredentialMutationKind::Rotate,
         "PRAGMA foreign_keys = OFF; DROP TABLE chio_encrypted_blobs;",
-        |cause| matches!(cause, chio_store_sqlite::BlobStoreError::Sqlite(_)),
+        |cause| matches!(cause, chio_custody_store::BlobStoreError::Sqlite(_)),
     );
 }
 
@@ -164,6 +164,6 @@ fn a_duplicate_provision_of_a_version_without_its_blob_row_remains_fatal() {
     existing_version_with_broken_binding_is_fatal(
         CredentialMutationKind::Provision,
         "PRAGMA foreign_keys = OFF; DELETE FROM chio_encrypted_blobs;",
-        |cause| matches!(cause, chio_store_sqlite::BlobStoreError::InvalidReference),
+        |cause| matches!(cause, chio_custody_store::BlobStoreError::InvalidReference),
     );
 }

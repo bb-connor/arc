@@ -1,5 +1,5 @@
 use chio_core_types::Keypair;
-use chio_store_sqlite::{
+use chio_custody_store::{
     BlobHandle, BlobReference, BlobReferenceMutationOutcome, SqliteEncryptedBlobStore, TenantId,
     TenantKey,
 };
@@ -411,8 +411,8 @@ fn missing_credential(_credential: &CredentialRef) -> BrokerError {
     BrokerError::AuthorizationDenied("credential version is unavailable".into())
 }
 
-fn blob_storage(error: chio_store_sqlite::BlobStoreError) -> BrokerError {
-    use chio_store_sqlite::BlobStoreError;
+fn blob_storage(error: chio_custody_store::BlobStoreError) -> BrokerError {
+    use chio_custody_store::BlobStoreError;
     match error {
         BlobStoreError::NotFound => {
             BrokerError::CredentialUnavailable(CredentialStoreError::new(BlobStoreError::NotFound))
