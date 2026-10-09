@@ -210,8 +210,8 @@ an arbitrary holder a trusted token issuer. Each delegation link is
 signed. In the authenticated attenuation profile, scope hashes and a
 subset witness bind the child scope to the issuer-resolved parent scope.
 A kernel enforcing that profile rejects a claimed parent scope that is
-not bound to the chain. Plain delegated v1 tokens do not themselves
-require these hashes or witnesses; deployments requiring authenticated
+not bound to the chain. Plain delegated v1 tokens carry the per-link
+scope hashes but no subset witness; deployments requiring authenticated
 attenuation enforce the profile in {{chain-binding}}.
 
 This document specifies the objects and exchanges that independent
@@ -546,9 +546,9 @@ Cryptographic floors are `allow_classical`, `allow_hybrid`, and
 `pq_required`. They respectively accept classical suites only, classical
 or composite suites, and composite suites only. A floor-aware verifier
 MUST reject an artifact disallowed by the configured floor. On artifacts with
-an `algorithm` envelope hint, it also rejects a present hint inconsistent
-with the signature encoding. A missing hint does not override a
-self-describing signature.
+an `algorithm` envelope hint, a verifier MUST reject a present hint
+inconsistent with the signature encoding, whether or not it applies a
+floor. A missing hint does not override a self-describing signature.
 
 ## Key and Signature Encodings {#key-encoding}
 
@@ -760,14 +760,15 @@ specified in {{hosted-admission}}.
 ## Delegation {#delegation}
 
 A delegation link requires `capability_id`, `delegator`, `delegatee`,
-`timestamp`, and `signature`. It includes `attenuations` when nonempty,
-and `scope_hash`, `aggregate_budget`, and `cumulative_approval` when
-present. The delegator signs canonical JSON of those typed fields except
-`signature`; there is no schema member or domain prefix. The signer
-has to match `delegator`.
+`timestamp`, `scope_hash` ({{chain-binding}}), and `signature`. It
+includes `attenuations` when nonempty, and `aggregate_budget` and
+`cumulative_approval` when present. The delegator signs canonical JSON
+of those typed fields except `signature`; there is no schema member or
+domain prefix. The signer has to match `delegator`.
 
-A chain verifier checks each link's signature, adjacent key connectivity,
-nondecreasing timestamps, and final delegatee equal to the token subject.
+A chain verifier checks each link's signature and `scope_hash` presence,
+adjacent key connectivity, nondecreasing timestamps, and final delegatee
+equal to the token subject.
 A configured maximum depth is also enforced. A portable verifier has no
 universal default depth limit. The hosted kernel additionally validates
 stored parent snapshots, delegator authority, validity windows, expiry
@@ -830,15 +831,21 @@ closed in this version; this document defines no caveat evaluator.
 
 ## Chain Binding {#chain-binding}
 
-A proof, nonempty `scope_attenuations`, or a budget share triggers chain
-binding. The verifier MUST require an attenuation proof and an
-issuer-resolved trust-root scope hash for such a token. For an empty
-chain, the proof's parent hash equals that root hash. For a delegated
-token, the last link's hash equals the proof's parent hash, the first
-link's hash equals the root hash, and every link carries a scope hash.
-This proof-bearing profile accepts at most one link. A plain chain alone
-does not trigger this rule; aggregate and cumulative profiles impose
-their own authenticated root-snapshot checks.
+Every delegation link MUST carry `scope_hash`, the canonical hash of the
+scope that the delegator authorized at that hop. The link signature
+covers it, binding that scope to the delegator's key. A verifier MUST
+reject a delegation chain in which any link omits `scope_hash`. This
+applies to every delegated token, including a plain chain that carries
+no attenuation proof, no `scope_attenuations`, and no budget share.
+
+A proof, nonempty `scope_attenuations`, or a budget share additionally
+binds the attenuation proof to that lineage. The verifier MUST require
+an attenuation proof and an issuer-resolved trust-root scope hash for
+such a token. For an empty chain, the proof's parent hash equals that
+root hash. For a delegated token, the last link's hash equals the
+proof's parent hash and the first link's hash equals the root hash. This
+proof-bearing profile accepts at most one link. Aggregate and cumulative
+profiles impose their own authenticated root-snapshot checks.
 
 ~~~ aasvg
 Root scope hash             Parent scope hash       Child scope hash
@@ -1143,8 +1150,11 @@ the distinct preimage and checks in {{child-receipts}}:
 2. Reconstruct `I`, recompute `H(J(I))`, and reject a different `id`.
 3. Reconstruct the signing wrapper and verify the signature using the
    embedded key and signature encoding. Reject an algorithm mismatch
-   between the key and signature. When a cryptographic floor is applied,
-   also check a present hint for consistency and enforce the floor.
+   between the key and signature. The verifier MUST reject a present
+   `algorithm` hint that does not match the signature encoding, whether
+   or not it applies a cryptographic floor; the hint is outside the
+   signed wrapper, so altering it leaves the signature valid. When a
+   cryptographic floor is applied, also enforce the floor.
 4. Check whether the kernel key belongs to the verifier's configured
    trusted set. A self-consistent record signed by an untrusted key is
    not accepted as evidence of that verifier's kernel.
@@ -4051,6 +4061,29 @@ regulated data SHOULD evaluate a guard that detects and redacts or blocks
 sensitive values before the call, and SHOULD restrict who can query
 receipts.
 
+Leaving the output out of a receipt does not hide a predictable output.
+The `content_hash` of a value result is an unsalted SHA-256 digest of
+its canonical JSON ({{content-hash}}). The per-chunk digests in stream
+metadata and a child receipt's `outcome_hash` ({{child-receipts}}) are
+computed the same way. The signing nonce ({{receipt-signing}}) is
+placed in metadata and does not enter these digests. A reader who can
+enumerate the plausible outputs of a call can hash each candidate and
+compare: a boolean, an approval verdict, a status code, or a short
+identifier is recovered this way, even when the arguments carry nothing
+sensitive. The same reader can also tell whether two receipts record
+identical outputs. A receipt therefore discloses any low-entropy output
+to everyone who can read it.
+
+Deployments that share receipts beyond the parties entitled to the
+output need to account for this. Mitigations include limiting such
+receipts to that audience, designing tools whose outputs carry enough
+entropy to resist enumeration, and a future profile that binds a salted
+or keyed commitment to the output instead of the plain digest, with the
+salt or key disclosed only to parties entitled to check the content.
+Apart from the delivery-mismatch commitment ({{content-hash}}), which
+does not bind the delivered output, this document defines no such
+commitment.
+
 Receipts are linkable. The capability identifier and the subject key
 connect every call made under one token, and a delegation chain reveals
 who delegated to whom. A party that sees many receipts can build a
@@ -4365,6 +4398,23 @@ resource and prompt matching, revocation state, sender-constraint
 verification, budget holds, and governed transaction validation. A
 producer or consumer claiming conformance states its supported profile;
 parsing an artifact does not establish enforcement of its constraints.
+
+The implementation departs from two requirements of this document. Both
+are tracked for alignment and are recorded here, not as protocol
+behavior. First, it checks `scope_hash` on delegation links only when a
+token carries an attenuation proof, nonempty `scope_attenuations`, or a
+budget share ({{chain-binding}}). For a plain delegation chain its
+compatibility path verifies link signatures, key connectivity,
+timestamps, and depth, and accepts links that omit `scope_hash`, so it
+admits tokens that a conforming verifier rejects (work item
+DELEG-SCOPE-HASH). The binding vector `valid_delegated_capability`
+({{test-vectors}}) has such a link; its corpus result does not cover
+this requirement. Second, its ordinary receipt signature check does not
+compare a present `algorithm` hint with the signature encoding; only its
+floor-aware receipt verifier does. A receipt whose unsigned hint was
+altered therefore passes the ordinary check, although
+{{receipt-verification}} requires rejecting it (work item
+RCPT-ALG-HINT).
 
 The native conformance suite is in `tests/conformance/native/`. Its
 six scenario descriptors cover capability validation, delegation
