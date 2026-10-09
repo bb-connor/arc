@@ -1317,6 +1317,17 @@ class CommandLineTests(unittest.TestCase):
             self.assertEqual(bad.returncode, 2)
             self.assertIn("MANIFEST.sha256", bad.stderr)
 
+    def test_a_corpus_without_its_manifest_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            copy = pathlib.Path(tmp) / "vectors"
+            for name in ("canonical", "hashing", "signing", "capability", "receipt"):
+                (copy / name).mkdir(parents=True)
+                (copy / name / "v1.json").write_bytes((VECTORS / name / "v1.json").read_bytes())
+            result = run_cli("--vectors", str(copy), "--out", str(pathlib.Path(tmp) / "a"))
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("MANIFEST.sha256", result.stderr)
+            self.assertFalse((pathlib.Path(tmp) / "a").exists())
+
     def test_unknown_options_are_refused(self):
         self.assertEqual(run_cli("--vectors", str(VECTORS), "--out", "x", "--width", "72").returncode, 2)
         self.assertEqual(run_cli("--out", "x").returncode, 2)

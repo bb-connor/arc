@@ -344,10 +344,14 @@ class Corpus:
         return self.root / name / "v1.json"
 
     def _check_manifest(self, raw: Dict[str, bytes]) -> None:
-        """Refuse files that differ from the frozen corpus recorded in MANIFEST.sha256."""
+        """Refuse files that differ from the frozen corpus recorded in MANIFEST.sha256.
+
+        A corpus without its manifest is refused too: the appendices claim
+        provenance from the frozen vectors, so a missing manifest must not turn
+        the digest checks off.
+        """
         manifest = self.root / "MANIFEST.sha256"
-        if not manifest.is_file():
-            return
+        _require(manifest.is_file(), "%s is missing, so the corpus is not the frozen one" % manifest)
         recorded: Dict[str, str] = {}
         for line in manifest.read_text(encoding="utf-8").splitlines():
             fields = line.split(None, 1)
