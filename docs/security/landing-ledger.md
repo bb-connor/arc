@@ -7,6 +7,40 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Current final qualification obligations (October 9)
+
+The canonical ledger contains **1,838 requirements** and the same number of
+current-state entries. [The final qualification review](../reviews/2026-10-09-pr1160-final-qualification-review.md)
+adds three required obligations while preserving every earlier requirement,
+source and current-state entry:
+
+- **V25-ARCHIVE-LATE-LINEAGE (P1):** supported archived history must keep serving
+  authenticated reads after valid later capability lineage is recorded. Claude
+  owns the isolated repair; composition and affected qualification are pending.
+- **KANI-DOMAIN-BINDING (P2):** bind mandatory proof modules and fixtures to the
+  accepted domains. The isolated guard has twelve genuine Original mutation
+  failures and 15 repaired test methods passing. Whole-batch composition and the
+  mandatory original-domain attestation proof remain pending.
+- **V25-C20-OBSERVER-CANCELLATION (P2):** the test observer must inspect committed
+  state without inheriting the production cancellation/work handler, and the
+  campaign must check the observation record after joining its walker. Root owns
+  the test-only repair and deterministic regression controls.
+
+Stage `404064bb65` includes the per-generation C20 observer. Its normal snapshot
+module passed 91 tests with five explicit ignores; seven static/fmt checks
+passed. The longer seed reported one pass but caught four observer interrupts
+and omitted a post-join error assertion. **That result is not accepted as full
+C20 qualification.** Its log and the separate evidence-parser refusal remain
+preserved. Strict lint was not reached in that attempted campaign.
+
+The full control-plane suite continues on unchanged predecessor `0fd8aa21ff`.
+The same-host 150k capacity comparison retains its contended Original run and
+requires the already-authorized single quieter Original comparison. No current
+full-suite or capacity result is claimed here. The proof diagnostic does not
+replace a terminal proof. Source remains `3b0760cfe7` and the published PR
+remains `fd8bfdc947`; exact protected checks and protected merge follow the
+completed local batch. Release acceptance remains separate.
+
 ## Current composed snapshot checkpoint (October 9)
 
 The canonical ledger contains **1,835 requirements**, each represented in
