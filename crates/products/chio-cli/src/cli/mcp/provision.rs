@@ -1813,9 +1813,7 @@ fn set_private_directory_permissions(path: &Path) -> Result<(), CliError> {
     {
         use std::os::unix::fs::PermissionsExt as _;
         chio_secure_fs::open_directory_nofollow(path)
-            .and_then(|directory| {
-                directory.set_permissions(std::fs::Permissions::from_mode(0o700))
-            })
+            .and_then(|directory| directory.set_permissions(std::fs::Permissions::from_mode(0o700)))
             .map_err(|error| {
                 CliError::cli_io_error(format!(
                     "failed to set private directory permissions on {}: {error}",
@@ -1837,10 +1835,7 @@ fn validate_private_directory(path: &Path) -> Result<(), CliError> {
         return Err(tampered("demo output is not a real directory"));
     }
     #[cfg(unix)]
-    private_files::require_private_directory_metadata(
-        &metadata,
-        chio_secure_fs::effective_uid(),
-    )?;
+    private_files::require_private_directory_metadata(&metadata, chio_secure_fs::effective_uid())?;
     Ok(())
 }
 

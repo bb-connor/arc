@@ -103,7 +103,9 @@ fn the_staging_directory_is_restricted_only_through_a_no_follow_directory_descri
         .err()
         .ok_or("a regular file must not be restricted as the staging directory")?;
     assert!(
-        refused.to_string().contains(&refusal(&victim, libc::ENOTDIR)),
+        refused
+            .to_string()
+            .contains(&refusal(&victim, libc::ENOTDIR)),
         "{refused}"
     );
     assert_eq!(mode(&victim)?, 0o644);

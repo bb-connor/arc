@@ -614,7 +614,10 @@ mod retained_selection {
             1,
         )
         .map_err(error)?;
-        assert_eq!(other.replay_key().request_id, original.replay_key().request_id);
+        assert_eq!(
+            other.replay_key().request_id,
+            original.replay_key().request_id
+        );
         assert_ne!(other.replay_key(), original.replay_key());
         let probe = || SelectorProbe {
             operations: vec![other.clone(), original.clone()],

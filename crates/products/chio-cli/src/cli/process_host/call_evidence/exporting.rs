@@ -98,7 +98,9 @@ where
         .as_ref()
         .is_some_and(|(operation, _)| operation.replay_key() != replay_key)
     {
-        return Err(error("retained operation differs from the signed replay key"));
+        return Err(error(
+            "retained operation differs from the signed replay key",
+        ));
     }
     Ok(retained)
 }
