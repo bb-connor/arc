@@ -9,10 +9,10 @@ a later requirement state or establish current candidate qualification.
 
 ## Current final qualification obligations (October 9)
 
-The canonical ledger contains **1,838 requirements** and the same number of
+The canonical ledger contains **1,839 requirements** and the same number of
 current-state entries. [The final qualification review](../reviews/2026-10-09-pr1160-final-qualification-review.md)
-adds three required obligations while preserving every earlier requirement,
-source and current-state entry:
+records four required obligations. Every earlier requirement and source is
+preserved; replaced current-state entries remain in dated observations:
 
 - **V25-ARCHIVE-LATE-LINEAGE (P1):** supported archived history must keep serving
   authenticated reads after valid later capability lineage is recorded. Claude
@@ -23,23 +23,32 @@ source and current-state entry:
   mandatory original-domain attestation proof remain pending.
 - **V25-C20-OBSERVER-CANCELLATION (P2):** the test observer must inspect committed
   state without inheriting the production cancellation/work handler, and the
-  campaign must check the observation record after joining its walker. Root owns
-  the test-only repair and deterministic regression controls.
+  campaign must check the observation record after joining its walker. Repair
+  `dc21b41788` is locally qualified and independently reviewed on the stage.
+- **RECOVERY-RPC-SHUTDOWN (P2):** a stopped test listener must also stop accepted
+  connections before transport-failure assertions. Claude owns the isolated
+  fixture repair, focused regression evidence and strict owning lint.
 
-Stage `404064bb65` includes the per-generation C20 observer. Its normal snapshot
-module passed 91 tests with five explicit ignores; seven static/fmt checks
-passed. The longer seed reported one pass but caught four observer interrupts
-and omitted a post-join error assertion. **That result is not accepted as full
-C20 qualification.** Its log and the separate evidence-parser refusal remain
-preserved. Strict lint was not reached in that attempted campaign.
+The [observer qualification record](audits/receipt-snapshot-observer-qualification-20261009.json)
+binds two genuine Original failures to 94 repaired default tests, the explicit
+long-seed pass, three final fixture controls, strict owning lint and static
+checks. The renewed intermediate-count mutant fails at generation two, and
+the source is restored. Five default ignores remain explicit. The predecessor
+long run with caught observer interrupts and the later initial strict-lint
+failure remain preserved; neither is relabeled as passing.
 
-The full control-plane suite continues on unchanged predecessor `0fd8aa21ff`.
-The same-host 150k capacity comparison retains its contended Original run and
-requires the already-authorized single quieter Original comparison. No current
-full-suite or capacity result is claimed here. The proof diagnostic does not
-replace a terminal proof. Source remains `3b0760cfe7` and the published PR
-remains `fd8bfdc947`; exact protected checks and protected merge follow the
-completed local batch. Release acceptance remains separate.
+The full control-plane suite at predecessor `0fd8aa21ff` finished with
+**1,573 passes, one failure and one ignore**. Its terminal failure remains
+failed while the RPC fixture is repaired. The same-host 150k capacity runs
+passed on contended Original, final source and quieter Original, but measured
+tail settlement rather than large unpublished checkpoint-covered staging.
+The required 100k covered-range measurement is pending. No performance gain,
+current full-suite pass or final candidate qualification is claimed.
+
+The mandatory unchanged-domain proof remains pending; diagnostic and component
+results do not replace a terminal proof. Source remains `3b0760cfe7` and the
+published PR remains `fd8bfdc947`; exact protected checks and protected merge
+follow the completed local batch. Release acceptance remains separate.
 
 ## Current composed snapshot checkpoint (October 9)
 
