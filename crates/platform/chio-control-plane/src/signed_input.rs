@@ -83,6 +83,12 @@ pub(crate) fn write_bounded_json_with_limit<T: Serialize>(
 /// the file it replaces), synced, and renamed into place. A failure removes
 /// only the temporary file this call created and leaves the prior file intact.
 fn replace_file(path: &Path, bytes: &[u8]) -> Result<(), CliError> {
+    let random = chio_core::Keypair::generate().public_key().to_hex();
+    replace_file_via(path, bytes, &random)
+}
+
+/// `nonce` names the temporary sibling; production passes a fresh random value.
+pub(crate) fn replace_file_via(path: &Path, bytes: &[u8], nonce: &str) -> Result<(), CliError> {
     use std::io::Write;
     let directory = match path.parent() {
         Some(parent) if !parent.as_os_str().is_empty() => parent,
@@ -92,10 +98,7 @@ fn replace_file(path: &Path, bytes: &[u8]) -> Result<(), CliError> {
         .file_name()
         .ok_or_else(|| CliError::cli_io_error("registry path has no file name"))?
         .to_string_lossy();
-    let temporary = directory.join(format!(
-        ".{file_name}.{}.tmp",
-        chio_core::Keypair::generate().public_key().to_hex()
-    ));
+    let temporary = directory.join(format!(".{file_name}.{nonce}.tmp"));
     let mut options = std::fs::OpenOptions::new();
     options.write(true).create_new(true);
     #[cfg(unix)]

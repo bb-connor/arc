@@ -213,49 +213,91 @@ mod custody {
         Ok(())
     }
 
+    fn temporary_for(directory: &Path, nonce: &str) -> std::path::PathBuf {
+        directory.join(format!(".offers.json.{nonce}.tmp"))
+    }
+
     #[test]
-    fn save_never_follows_or_clobbers_planted_temporary_names() -> TestResult {
+    fn exclusive_create_refuses_a_symlink_planted_at_the_attempted_temporary() -> TestResult {
         let directory = chio_test_support::private_tempdir()?;
         let path = directory.path().join("offers.json");
         let victim = directory.path().join("victim");
         fs::write(&victim, b"keep")?;
-        for planted in [
-            "offers.json.tmp",
-            "offers.json.tmp-1",
-            ".offers.json.tmp",
-            ".offers.json.0.tmp",
-        ] {
-            symlink(&victim, directory.path().join(planted))?;
-        }
-        let registry = registry_of(&template()?, 1);
-        registry.save(&path)?;
-        registry.save(&path)?;
+        let template = template()?;
+        registry_of(&template, 1).save(&path)?;
+        let before = fs::read(&path)?;
+        let planted = temporary_for(directory.path(), "fixed");
+        symlink(&victim, &planted)?;
+
+        let bytes = serde_json::to_vec(&registry_of(&template, 2))?;
+        let error = crate::signed_input::replace_file_via(&path, &bytes, "fixed")
+            .err()
+            .ok_or("a planted temporary name must be refused")?;
+        assert!(matches!(
+            error,
+            CliError::Io(ref io) if io.kind() == std::io::ErrorKind::AlreadyExists
+        ));
         assert_eq!(fs::read(&victim)?, b"keep");
-        assert_eq!(PassportIssuanceOfferRegistry::load(&path)?, registry);
-        let temporaries = fs::read_dir(directory.path())?
-            .filter_map(Result::ok)
-            .filter(|entry| entry.file_type().is_ok_and(|kind| !kind.is_symlink()))
-            .filter(|entry| entry.file_name().to_string_lossy().ends_with(".tmp"))
-            .count();
-        assert_eq!(temporaries, 0);
+        assert_eq!(fs::read_link(&planted)?, victim);
+        assert_eq!(fs::read(&path)?, before);
         Ok(())
     }
 
     #[test]
-    fn failed_save_leaves_prior_bytes_and_no_temporary() -> TestResult {
+    fn exclusive_create_refuses_a_regular_file_collision_without_clobbering_it() -> TestResult {
         let directory = chio_test_support::private_tempdir()?;
         let path = directory.path().join("offers.json");
         let template = template()?;
-        registry_of(&template, 2).save(&path)?;
+        registry_of(&template, 1).save(&path)?;
         let before = fs::read(&path)?;
-        fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o500))?;
-        let outcome = registry_of(&template, 3).save(&path);
-        fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700))?;
-        if let Err(error) = outcome {
-            assert!(matches!(error, CliError::Io(_)));
-            assert_eq!(fs::read(&path)?, before);
-            assert_eq!(fs::read_dir(directory.path())?.count(), 1);
-        }
+        let planted = temporary_for(directory.path(), "fixed");
+        fs::write(&planted, b"other writer")?;
+
+        let bytes = serde_json::to_vec(&registry_of(&template, 2))?;
+        let error = crate::signed_input::replace_file_via(&path, &bytes, "fixed")
+            .err()
+            .ok_or("a colliding temporary name must be refused")?;
+        assert!(matches!(
+            error,
+            CliError::Io(ref io) if io.kind() == std::io::ErrorKind::AlreadyExists
+        ));
+        assert_eq!(fs::read(&planted)?, b"other writer");
+        assert_eq!(fs::read(&path)?, before);
+        Ok(())
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn rename_failure_removes_only_its_own_temporary_and_reports_the_os_error() -> TestResult {
+        const EISDIR: i32 = 21;
+        let directory = chio_test_support::private_tempdir()?;
+        // A directory at the destination makes the rename fail regardless of
+        // the caller's privileges.
+        let path = directory.path().join("offers.json");
+        fs::create_dir(&path)?;
+        fs::write(path.join("occupant"), b"keep")?;
+        let bystander = temporary_for(directory.path(), "bystander");
+        fs::write(&bystander, b"other writer")?;
+
+        let error = registry_of(&template()?, 1)
+            .save(&path)
+            .err()
+            .ok_or("renaming a file over a directory must fail")?;
+        assert!(matches!(
+            error,
+            CliError::Io(ref io) if io.raw_os_error() == Some(EISDIR)
+        ));
+        assert_eq!(fs::read(path.join("occupant"))?, b"keep");
+        assert_eq!(fs::read(&bystander)?, b"other writer");
+        let mut names: Vec<_> = fs::read_dir(directory.path())?
+            .map(|entry| entry.map(|entry| entry.file_name()))
+            .collect::<Result<_, _>>()?;
+        names.sort();
+        assert_eq!(
+            names.len(),
+            2,
+            "only the destination directory and the bystander remain"
+        );
         Ok(())
     }
 }
