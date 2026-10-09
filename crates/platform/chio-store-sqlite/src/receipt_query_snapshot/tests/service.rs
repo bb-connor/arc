@@ -667,3 +667,216 @@ fn hold_shutdown_during_a_large_settlement_stops_the_walker() {
     service.shutdown();
     assert_eq!(service.status().state, ReceiptQuerySnapshotState::Stopped);
 }
+
+#[test]
+fn c13_an_in_flight_read_racing_a_resource_outcome_refuses_as_unavailable() {
+    let fixture = mixed_fixture();
+    let service = ready(&fixture, config());
+    let epoch = service.lease_for_test().unwrap();
+    service.set_unavailable_for_test("walker step exhausted its SQL work budget");
+    let error = service.recheck_lease_for_test(epoch).unwrap_err();
+    assert_eq!(
+        snapshot_error(error),
+        ReceiptQuerySnapshotError::Unavailable("walker step exhausted its SQL work budget".into())
+    );
+    service.shutdown();
+}
+
+#[test]
+fn c13_an_in_flight_read_racing_shutdown_refuses_as_unavailable() {
+    let fixture = mixed_fixture();
+    let service = ready(&fixture, config());
+    let epoch = service.lease_for_test().unwrap();
+    service.shutdown();
+    let error = service.recheck_lease_for_test(epoch).unwrap_err();
+    assert!(matches!(
+        snapshot_error(error),
+        ReceiptQuerySnapshotError::Unavailable(_)
+    ));
+}
+
+#[test]
+fn c13_an_in_flight_read_across_a_healthy_rebuild_is_not_called_tamper() {
+    let fixture = mixed_fixture();
+    let service = ready(&fixture, config());
+    let first = service.query_receipts(&admin(1)).unwrap().snapshot.unwrap();
+    let epoch = service.lease_for_test().unwrap();
+    service.set_unavailable_for_test("walker step exhausted its SQL work budget");
+    let deadline = Instant::now() + Duration::from_secs(60);
+    let rebuilt = loop {
+        if let Ok(page) = service.query_receipts(&admin(1)) {
+            break page.snapshot.unwrap();
+        }
+        assert!(
+            Instant::now() < deadline,
+            "no rebuild after a resource outcome"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    };
+    let lineage = |id: &str| id.split(':').next().unwrap().to_string();
+    assert_ne!(lineage(&first.snapshot_id), lineage(&rebuilt.snapshot_id));
+    let error = service.recheck_lease_for_test(epoch).unwrap_err();
+    assert_eq!(snapshot_error(error), ReceiptQuerySnapshotError::Stale);
+    service.shutdown();
+}
+
+#[test]
+fn c13_zero_or_overflowing_limits_are_refused_before_the_walker_starts() {
+    let fixture = mixed_fixture();
+    let invalid: Vec<(&str, ReceiptQuerySnapshotConfig)> = vec![
+        (
+            "step_rows",
+            ReceiptQuerySnapshotConfig {
+                step_rows: 0,
+                ..config()
+            },
+        ),
+        (
+            "insert_rows",
+            ReceiptQuerySnapshotConfig {
+                insert_rows: 0,
+                ..config()
+            },
+        ),
+        (
+            "checkpoint_page",
+            ReceiptQuerySnapshotConfig {
+                checkpoint_page: 0,
+                ..config()
+            },
+        ),
+        (
+            "max_concurrent_reads",
+            ReceiptQuerySnapshotConfig {
+                max_concurrent_reads: 0,
+                ..config()
+            },
+        ),
+        (
+            "quota_bytes",
+            ReceiptQuerySnapshotConfig {
+                quota_bytes: 0,
+                ..config()
+            },
+        ),
+        (
+            "step_bytes",
+            ReceiptQuerySnapshotConfig {
+                step_bytes: 0,
+                ..config()
+            },
+        ),
+        (
+            "page_bytes",
+            ReceiptQuerySnapshotConfig {
+                page_bytes: 0,
+                ..config()
+            },
+        ),
+        (
+            "max_receipt_bytes",
+            ReceiptQuerySnapshotConfig {
+                max_receipt_bytes: 0,
+                ..config()
+            },
+        ),
+        (
+            "query_sql_steps",
+            ReceiptQuerySnapshotConfig {
+                query_sql_steps: 0,
+                ..config()
+            },
+        ),
+        (
+            "fetch_sql_steps",
+            ReceiptQuerySnapshotConfig {
+                fetch_sql_steps: 0,
+                ..config()
+            },
+        ),
+        (
+            "walker_sql_steps",
+            ReceiptQuerySnapshotConfig {
+                walker_sql_steps: 0,
+                ..config()
+            },
+        ),
+        (
+            "hold_sql_steps",
+            ReceiptQuerySnapshotConfig {
+                hold_sql_steps: 0,
+                ..config()
+            },
+        ),
+        (
+            "head_wait",
+            ReceiptQuerySnapshotConfig {
+                head_wait: Duration::MAX,
+                ..config()
+            },
+        ),
+        (
+            "max_staleness",
+            ReceiptQuerySnapshotConfig {
+                max_staleness: Duration::MAX,
+                ..config()
+            },
+        ),
+        (
+            "extension_tick",
+            ReceiptQuerySnapshotConfig {
+                extension_tick: Duration::ZERO,
+                ..config()
+            },
+        ),
+        (
+            "extension_tick",
+            ReceiptQuerySnapshotConfig {
+                extension_tick: Duration::MAX,
+                ..config()
+            },
+        ),
+        (
+            "recertify_interval",
+            ReceiptQuerySnapshotConfig {
+                recertify_interval: Duration::MAX,
+                ..config()
+            },
+        ),
+        (
+            "invalid_retry_backoff",
+            ReceiptQuerySnapshotConfig {
+                invalid_retry_backoff: Duration::ZERO,
+                ..config()
+            },
+        ),
+        (
+            "invalid_retry_backoff",
+            ReceiptQuerySnapshotConfig {
+                invalid_retry_backoff: Duration::MAX,
+                ..config()
+            },
+        ),
+        (
+            "walker_busy_timeout",
+            ReceiptQuerySnapshotConfig {
+                walker_busy_timeout: Duration::MAX,
+                ..config()
+            },
+        ),
+    ];
+    for (field, config) in invalid {
+        match ReceiptQuerySnapshots::start(fixture.store.clone(), config) {
+            Ok(service) => {
+                service.shutdown();
+                panic!("a {field} outside its bounds was accepted");
+            }
+            Err(error) => match snapshot_error(error) {
+                ReceiptQuerySnapshotError::Unavailable(message) => {
+                    assert!(message.contains(field), "{field}: {message}");
+                }
+                other => panic!("{field}: {other:?}"),
+            },
+        }
+    }
+}

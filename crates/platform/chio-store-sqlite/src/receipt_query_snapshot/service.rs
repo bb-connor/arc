@@ -63,6 +63,52 @@ pub struct ReceiptQuerySnapshotConfig {
     pub hold_sql_steps: u64,
 }
 
+impl ReceiptQuerySnapshotConfig {
+    /// Refuse limits that would disable a bound or overflow a deadline. Every
+    /// count and budget must be positive; every wait has an upper bound.
+    pub fn validate(&self) -> Result<(), ReceiptStoreError> {
+        const MINIMUM_QUOTA: u64 = 1024 * 1024;
+        const MINIMUM_SQL_STEPS: u64 = 1_000;
+        const HOUR: Duration = Duration::from_secs(3_600);
+        const DAY: Duration = Duration::from_secs(86_400);
+        let checks: [(&str, bool); 20] = [
+            ("quota_bytes", self.quota_bytes >= MINIMUM_QUOTA),
+            ("max_concurrent_reads", self.max_concurrent_reads >= 1),
+            ("query_sql_steps", self.query_sql_steps >= MINIMUM_SQL_STEPS),
+            ("fetch_sql_steps", self.fetch_sql_steps >= MINIMUM_SQL_STEPS),
+            ("page_bytes", self.page_bytes >= 1),
+            ("max_receipt_bytes", self.max_receipt_bytes >= 1),
+            ("step_rows", self.step_rows >= 1),
+            ("step_bytes", self.step_bytes >= 1),
+            (
+                "walker_sql_steps",
+                self.walker_sql_steps >= MINIMUM_SQL_STEPS,
+            ),
+            ("insert_rows", self.insert_rows >= 1),
+            ("checkpoint_page", self.checkpoint_page >= 1),
+            ("hold_sql_steps", self.hold_sql_steps >= MINIMUM_SQL_STEPS),
+            ("head_wait", self.head_wait <= HOUR),
+            ("max_staleness", self.max_staleness <= DAY),
+            ("extension_tick", !self.extension_tick.is_zero()),
+            ("extension_tick", self.extension_tick <= HOUR),
+            ("recertify_interval", self.recertify_interval <= 30 * DAY),
+            (
+                "invalid_retry_backoff",
+                !self.invalid_retry_backoff.is_zero(),
+            ),
+            ("invalid_retry_backoff", self.invalid_retry_backoff <= HOUR),
+            ("walker_busy_timeout", self.walker_busy_timeout <= HOUR),
+        ];
+        match checks.iter().find(|(_, valid)| !valid) {
+            Some((field, _)) => Err(ReceiptQuerySnapshotError::Unavailable(format!(
+                "invalid receipt query snapshot configuration: {field} is outside its bounds"
+            ))
+            .into()),
+            None => Ok(()),
+        }
+    }
+}
+
 impl Default for ReceiptQuerySnapshotConfig {
     fn default() -> Self {
         Self {
@@ -420,6 +466,8 @@ struct Inner {
     readers: AtomicUsize,
     waiting: Arc<AtomicUsize>,
     epoch: AtomicU64,
+    /// Epoch of the latest transition to Invalid.
+    last_invalid_epoch: AtomicU64,
     last_recertification_ms: AtomicU64,
     #[cfg(test)]
     pause_extension: AtomicBool,
@@ -450,6 +498,7 @@ impl ReceiptQuerySnapshots {
         store: Arc<SqliteReceiptStore>,
         config: ReceiptQuerySnapshotConfig,
     ) -> Result<Self, ReceiptStoreError> {
+        config.validate()?;
         let inner = Arc::new(Inner {
             store,
             config,
@@ -461,6 +510,7 @@ impl ReceiptQuerySnapshots {
             readers: AtomicUsize::new(0),
             waiting: Arc::new(AtomicUsize::new(0)),
             epoch: AtomicU64::new(0),
+            last_invalid_epoch: AtomicU64::new(0),
             last_recertification_ms: AtomicU64::new(0),
             #[cfg(test)]
             pause_extension: AtomicBool::new(false),
@@ -624,7 +674,7 @@ impl Inner {
         let permit = ReadPermit {
             readers: &self.readers,
         };
-        if admitted >= self.config.max_concurrent_reads.max(1) {
+        if admitted >= self.config.max_concurrent_reads {
             return Err(ReceiptQuerySnapshotError::Busy.into());
         }
         Ok(permit)
@@ -643,7 +693,10 @@ impl Inner {
                 return;
             }
             if !matches!(phase, Phase::Building { .. }) {
-                self.epoch.fetch_add(1, Ordering::SeqCst);
+                let epoch = self.epoch.fetch_add(1, Ordering::SeqCst) + 1;
+                if matches!(phase, Phase::Invalid(_)) {
+                    self.last_invalid_epoch.store(epoch, Ordering::SeqCst);
+                }
             }
             *current = phase;
         }
@@ -680,18 +733,41 @@ impl Inner {
 
     /// The lease taken at `ready` holds only if no invalidation or rebuild
     /// happened since and the writer head is not poisoned.
+    /// A read keeps its result only if the phase it was admitted under is
+    /// unchanged. Otherwise it refuses with the outcome that ended that phase:
+    /// Invalid only after an authentication or writer-poison failure, and the
+    /// typed availability outcome of the current phase for anything else.
     fn recheck_lease(&self, epoch: u64) -> Result<(), ReceiptStoreError> {
         if self.store.writer_head_poisoned() {
             self.invalidate("receipt writer head is poisoned");
         }
-        if self.epoch.load(Ordering::SeqCst) != epoch {
-            let reason = match self.phase() {
-                Phase::Invalid(reason) | Phase::Unavailable(reason) => reason,
-                _ => "receipt query snapshot changed lineage during the read".to_string(),
+        if self.epoch.load(Ordering::SeqCst) == epoch {
+            return Ok(());
+        }
+        let phase = self.phase();
+        if self.last_invalid_epoch.load(Ordering::SeqCst) > epoch {
+            let reason = match phase {
+                Phase::Invalid(reason) => reason,
+                _ => "receipt query snapshot was invalidated during the read".to_string(),
             };
             return Err(ReceiptQuerySnapshotError::Invalid(reason).into());
         }
-        Ok(())
+        let error = match phase {
+            Phase::Invalid(reason) => ReceiptQuerySnapshotError::Invalid(reason),
+            Phase::Unavailable(reason) => ReceiptQuerySnapshotError::Unavailable(reason),
+            Phase::Stopped => ReceiptQuerySnapshotError::Unavailable("stopped".into()),
+            Phase::Waiting => ReceiptQuerySnapshotError::Building {
+                authenticated_entries: 0,
+                target_entries: 0,
+            },
+            Phase::Building { done, total } => ReceiptQuerySnapshotError::Building {
+                authenticated_entries: done,
+                target_entries: total,
+            },
+            // A healthy replacement lineage serves the next attempt.
+            Phase::Ready(_) => ReceiptQuerySnapshotError::Stale,
+        };
+        Err(error.into())
     }
 
     fn invalidate(&self, reason: &str) {
@@ -846,6 +922,13 @@ fn run(inner: &Arc<Inner>) {
         });
         let retry_after = match outcome {
             Ok(()) | Err(WalkError::Cancelled) => break,
+            // The phase that ended this lineage is already published.
+            Err(WalkError::Superseded) => Some(
+                inner
+                    .config
+                    .invalid_retry_backoff
+                    .min(Duration::from_secs(30)),
+            ),
             Err(error @ (WalkError::Integrity(_) | WalkError::Regressed(_))) => {
                 inner.set_phase(Phase::Invalid(error.to_string()));
                 let wait = backoff;
@@ -996,11 +1079,12 @@ fn serve(
     loop {
         ctx.check_cancel()?;
         if !is_current(inner, published) {
-            // A read invalidated this lineage; rebuild after backoff.
-            return Err(WalkError::Integrity(match inner.phase() {
-                Phase::Invalid(reason) => reason,
-                _ => "receipt query snapshot lineage was superseded".into(),
-            }));
+            // A read invalidated this lineage, or a resource outcome replaced
+            // it; either way it is rebuilt, never resumed.
+            return Err(match inner.phase() {
+                Phase::Invalid(reason) => WalkError::Integrity(reason),
+                _ => WalkError::Superseded,
+            });
         }
         if inner.store.writer_head_poisoned() {
             return Err(WalkError::Integrity(
@@ -1071,6 +1155,10 @@ impl ReceiptQuerySnapshots {
 
     pub(super) fn invalidate_for_test(&self, reason: &str) {
         self.inner.invalidate(reason);
+    }
+
+    pub(super) fn set_unavailable_for_test(&self, reason: &str) {
+        self.inner.set_phase(Phase::Unavailable(reason.to_string()));
     }
 
     pub(super) fn lease_for_test(&self) -> Result<u64, ReceiptStoreError> {

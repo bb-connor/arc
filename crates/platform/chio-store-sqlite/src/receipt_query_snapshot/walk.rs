@@ -61,6 +61,8 @@ pub(super) enum WalkError {
     Busy(String),
     #[error("walker was cancelled")]
     Cancelled,
+    #[error("receipt query snapshot lineage was superseded")]
+    Superseded,
 }
 
 impl From<SnapshotDbError> for WalkError {
