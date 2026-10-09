@@ -47,6 +47,86 @@ pub(in crate::recovery::tests) async fn native_fixture_from_empty_import_with_re
     native_fixture_from_empty_import_with_optional_retention(kind, None, Some(profile)).await
 }
 
+pub(super) async fn initialize_public_native_source(path: &std::path::Path) -> TestResult {
+    use chio_kernel::admission_operation::{
+        NativeOutputEnvelopeBoundsV1, NativeOutputRetentionProfileV1,
+    };
+    assert!(!path.join("fixture.json").exists());
+    assert!(!path.join("output-retention-profile.json").exists());
+    assert!(path.join("public-original-profile").exists());
+    std::fs::write(path.join("empty-native-import"), "selected")?;
+    let fixture = RecoveryFixture::open(path.to_path_buf(), None, false)?;
+    // The public input is retained by the real native writer. Its original
+    // deliberately has no output-retention selection, so capture must refuse
+    // after the input join and before any provider effect.
+    initialize_native_source_input(&fixture, InformationLabel::bottom(), true).await?;
+    let selected = chio_core::canonical_json_bytes(
+        &fixture
+            .authority
+            .admission_operation_store()
+            .read_semantic_installation(
+                fixture.runtime.scope(),
+                &fixture.authority.mutation_fence(),
+                now_ms()?,
+            )?,
+    )?;
+    let source = fixture
+        .kernel
+        .observe_recovery_source(fixture.runtime.scope())?;
+    drop(fixture);
+    let profile = NativeOutputRetentionProfileV1::new(NativeOutputEnvelopeBoundsV1::new(
+        1024 * 1024,
+        1024 * 1024,
+        1024 * 1024,
+        1024 * 1024,
+        1,
+    )?);
+    std::fs::write(
+        path.join("output-retention-profile.json"),
+        chio_core::canonical_json_bytes(&profile)?,
+    )?;
+    // A normal serving reopen must authenticate the retained producer history
+    // and preserve the semantic selection before the owning test continues.
+    let reopened = RecoveryFixture::open(path.to_path_buf(), None, false)?;
+    assert_lifecycle_only_import(&reopened)?;
+    let store = reopened.authority.admission_operation_store();
+    assert_eq!(
+        chio_core::canonical_json_bytes(&store.read_semantic_installation(
+            reopened.runtime.scope(),
+            &reopened.authority.mutation_fence(),
+            now_ms()?,
+        )?)?,
+        selected,
+    );
+    assert_eq!(
+        reopened
+            .kernel
+            .observe_recovery_source(reopened.runtime.scope())?
+            .snapshot(),
+        source.snapshot(),
+    );
+    assert!(store
+        .observe_knowledge_influence(
+            reopened.runtime.scope(),
+            &reopened.authority.mutation_fence(),
+            now_ms()?,
+        )?
+        .is_none());
+    assert_eq!(reopened.effects.load(Ordering::SeqCst), 0);
+    assert_eq!(external_count(path)?, 0);
+    Ok(())
+}
+
+pub(super) async fn native_public_fixture_from_empty_import(
+    kind: &str,
+) -> TestResult<RecoveryFixture> {
+    let directory = tempfile::tempdir()?;
+    std::fs::write(directory.path().join("semantic-kind"), kind)?;
+    std::fs::write(directory.path().join("public-original-profile"), "selected")?;
+    initialize_public_native_source(directory.path()).await?;
+    RecoveryFixture::open(directory.path().to_path_buf(), Some(directory), false)
+}
+
 async fn native_fixture_from_empty_import_with_optional_retention(
     kind: &str,
     payment_adapter: Option<Box<dyn chio_kernel::PaymentAdapter>>,
@@ -76,7 +156,16 @@ async fn native_fixture_from_empty_import_with_optional_retention(
         )?,
         None => RecoveryFixture::open(directory.path().to_path_buf(), Some(directory), false)?,
     };
-    assert_lifecycle_only_import(&fixture)?;
+    initialize_native_source_input(&fixture, restricted_label(), false).await?;
+    Ok(fixture)
+}
+
+async fn initialize_native_source_input(
+    fixture: &RecoveryFixture,
+    expected: InformationLabel,
+    require_unselected_retention: bool,
+) -> TestResult {
+    assert_lifecycle_only_import(fixture)?;
     let deployment = fixture
         .kernel
         .recovery_deployment(fixture.runtime.scope())?;
@@ -99,8 +188,8 @@ async fn native_fixture_from_empty_import_with_optional_retention(
     )?;
     assert!(request.declassification_grant.is_none());
     assert!(request.execution_nonce.is_none());
-    // The real Restricted input joins before the ordinary native flow policy
-    // refuses its public destination. An Input guard would deny before the join.
+    // Admission joins the actual classified input before the later refusal.
+    // An Input guard would deny before this producer transaction.
     let denied = Box::pin(fixture.process.invoke_known_only(
         "root",
         "native-input-genesis",
@@ -109,6 +198,7 @@ async fn native_fixture_from_empty_import_with_optional_retention(
     .await?;
     assert_eq!(denied.verdict, Verdict::Deny);
     assert!(denied.receipt.verify_signature()?);
+    assert!(denied.output.is_none());
     let (operation, original) = store
         .load_unambiguous_retained_tool_request(
             &AdmissionIdentifier::try_new("request_id", &request.request_id)?,
@@ -119,6 +209,9 @@ async fn native_fixture_from_empty_import_with_optional_retention(
     original.validate_request_material(&request)?;
     original.validate_native_security_authority(&deployment.native_authority)?;
     original.validate_native_security_context(&deployment.security_context)?;
+    if require_unselected_retention {
+        assert!(original.native_output_retention().is_none());
+    }
     assert_eq!(
         operation.state(),
         AdmissionOperationState::CompensatedBeforeDispatch
@@ -150,14 +243,13 @@ async fn native_fixture_from_empty_import_with_optional_retention(
         observed.stored_context_generation(),
         Some(current.context_generation)
     );
-    let expected = restricted_label();
     assert_eq!(current.principal_label, expected);
     assert_eq!(current.lineage_label, expected);
     assert_eq!(current.session_label, expected);
     assert_eq!(fixture.effects.load(Ordering::SeqCst), 0);
     assert_eq!(external_count(&fixture.path)?, 0);
-    assert_lifecycle_only_import(&fixture)?;
-    Ok(fixture)
+    assert_lifecycle_only_import(fixture)?;
+    Ok(())
 }
 
 fn retained_import_inventory(fixture: &RecoveryFixture) -> TestResult<Vec<(String, u64)>> {

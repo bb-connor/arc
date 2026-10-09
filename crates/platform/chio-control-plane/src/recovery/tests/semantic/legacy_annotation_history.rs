@@ -14,7 +14,8 @@ async fn modeled_legacy_missing_selected_annotation_refuses_the_first_public_raw
 }
 
 async fn verify_missing_annotation_delivery(require_first_refusal: bool) -> TestResult {
-    let f = native_fixture("annotated-read-weak-manifest")?;
+    let f = empty_import::native_public_fixture_from_empty_import("annotated-read-weak-manifest")
+        .await?;
     let store = f.authority.admission_operation_store();
     let legacy_capture = store.modeled_legacy_incomplete_annotation_capture_for_test()?;
     let legacy_output = store.modeled_legacy_output_join_for_test()?;

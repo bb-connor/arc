@@ -52,11 +52,15 @@ async fn known_semantic_recorded_return_child() -> TestResult {
     )?;
     trace_ordinary_recorded_child("ordinary recorded child: request persisted");
     trace_ordinary_recorded_child("ordinary recorded child: execute_step enter");
-    runtime
+    let response = runtime
         .execute_step(&f.process, "root", key, &request)
         .await?;
     trace_ordinary_recorded_child("ordinary recorded child: execute_step complete");
-    Err("semantic child did not reach the recorded-return cutpoint".into())
+    Err(format!(
+        "semantic child did not reach the recorded-return cutpoint: verdict={:?}, reason={:?}",
+        response.verdict, response.reason,
+    )
+    .into())
 }
 
 #[cfg(unix)]
@@ -78,6 +82,7 @@ async fn verify_known_recorded_return_restoration(require_stop: bool) -> TestRes
     let directory = tempfile::tempdir()?;
     std::fs::write(directory.path().join("semantic-kind"), "read-weak-manifest")?;
     std::fs::write(directory.path().join("public-original-profile"), "selected")?;
+    empty_import::initialize_public_native_source(directory.path()).await?;
     let log_path = directory
         .path()
         .join("stopped-semantic-recorded-return-child.log");
