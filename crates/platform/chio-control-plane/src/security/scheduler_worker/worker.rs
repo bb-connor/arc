@@ -358,6 +358,7 @@ impl ProductionResponseWorker {
                 };
                 let task_liveness = ResponseWorkerTaskLiveness::begin(Arc::clone(&worker));
                 let runtime = match tokio::runtime::Builder::new_current_thread()
+                    .thread_name("chio-response-worker")
                     .enable_all()
                     .build()
                 {
