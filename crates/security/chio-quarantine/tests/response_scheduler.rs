@@ -117,6 +117,7 @@ struct SchedulerState {
     next_fencing_token: u64,
     fail_health_ack_once: bool,
     claim_expiry_extension_ms: u64,
+    trusted_now_unix_ms: Option<u64>,
 }
 
 #[derive(Default)]
@@ -147,6 +148,23 @@ impl SchedulerStore {
         self.state()
             .unwrap_or_else(|error| panic!("scheduler state: {error}"))
             .claim_expiry_extension_ms = extension_ms;
+    }
+
+    fn advance_trusted_clock(&self, elapsed_ms: u64) -> PortResult<u64> {
+        let mut state = self.state()?;
+        let now = state
+            .trusted_now_unix_ms
+            .ok_or_else(PortError::unavailable)?
+            .checked_add(elapsed_ms)
+            .ok_or_else(PortError::invalid_data)?;
+        state.trusted_now_unix_ms = Some(now);
+        Ok(now)
+    }
+
+    fn trusted_now(&self) -> Option<u64> {
+        self.state()
+            .unwrap_or_else(|error| panic!("scheduler state: {error}"))
+            .trusted_now_unix_ms
     }
 
     fn retry(&self) -> Option<SchedulerRetryState> {
@@ -265,6 +283,7 @@ impl ResponseStore for SchedulerStore {
 
     fn claim_due(&self, request: &SchedulerClaimRequest) -> PortResult<Vec<ScheduledWork>> {
         let mut state = self.state()?;
+        state.trusted_now_unix_ms = Some(request.now_unix_ms);
         let Some(plan) = state.plan.as_ref() else {
             return Ok(Vec::new());
         };
@@ -359,9 +378,21 @@ impl ResponseSchedulerStore for SchedulerStore {
         Ok(renewed)
     }
 
+    fn trusted_now_unix_ms(&self) -> PortResult<u64> {
+        self.state()?
+            .trusted_now_unix_ms
+            .ok_or_else(PortError::unavailable)
+    }
+
     fn record_retry(&self, request: &SchedulerRetryRequest) -> PortResult<SchedulerRetryState> {
         self.validate_lease(&request.work)?;
         let mut state = self.state()?;
+        if state
+            .trusted_now_unix_ms
+            .is_none_or(|now| request.not_before_unix_ms <= now)
+        {
+            return Err(PortError::invalid_data());
+        }
         let current_attempts = state
             .retry
             .as_ref()
@@ -447,6 +478,27 @@ impl ScheduledResponseExecutor for UnavailableExecutor {
             .lock()
             .map_err(|_| ExecutorError::Store(PortError::unavailable()))?;
         *calls = calls.saturating_add(1);
+        Err(ExecutorError::Store(PortError::unavailable()))
+    }
+}
+
+/// An unavailable store whose every attempt spends `attempt_ms` of trusted
+/// time before failing.
+struct SlowUnavailableExecutor {
+    store: Arc<SchedulerStore>,
+    attempt_ms: u64,
+}
+
+impl ScheduledResponseExecutor for SlowUnavailableExecutor {
+    fn execute_scheduled(
+        &self,
+        _current: &ResponsePlanRecord,
+        _work: &ScheduledWork,
+        _now_unix_ms: u64,
+    ) -> Result<ResponsePlanRecord, ExecutorError> {
+        self.store
+            .advance_trusted_clock(self.attempt_ms)
+            .map_err(ExecutorError::Store)?;
         Err(ExecutorError::Store(PortError::unavailable()))
     }
 }
@@ -772,6 +824,61 @@ fn scheduler_ttl_sustained_retry_age_pages_at_threshold() {
     }
     assert_eq!(executor.calls(), 4);
     assert_eq!(health.pages(), 1);
+}
+
+#[test]
+fn scheduler_retry_after_an_attempt_outlasting_its_backoff_is_recorded_not_yet_due() {
+    let store = Arc::new(SchedulerStore::default());
+    let _planned = plan(Arc::clone(&store));
+    let executor = Arc::new(SlowUnavailableExecutor {
+        store: Arc::clone(&store),
+        attempt_ms: 25,
+    });
+    let scheduler = ResponseScheduler::new(
+        Arc::clone(&store),
+        executor,
+        Arc::new(TestHealthSink::default()),
+        policy(),
+    )
+    .unwrap_or_else(|error| panic!("scheduler: {error}"));
+
+    for (now, claim, attempts, first_failure, not_before) in [
+        (1_000, "slow-attempt-1", 1, 1_025, 1_035),
+        (1_035, "slow-attempt-2", 2, 1_025, 1_080),
+    ] {
+        let outcomes = scheduler
+            .tick(&tick(now, claim))
+            .unwrap_or_else(|error| panic!("slow attempt tick: {error}"));
+        assert!(
+            matches!(
+                outcomes.as_slice(),
+                [SchedulerWorkOutcome::RetryScheduled {
+                    attempts: actual_attempts,
+                    not_before_unix_ms,
+                    error_code,
+                    ..
+                }] if *actual_attempts == attempts
+                    && *not_before_unix_ms == not_before
+                    && error_code.as_str() == "store.unavailable"
+            ),
+            "an attempt outlasting its backoff did not schedule a retry: {outcomes:?}"
+        );
+        let retry = store
+            .retry()
+            .unwrap_or_else(|| panic!("retry after a slow attempt was not recorded"));
+        let trusted_now = store
+            .trusted_now()
+            .unwrap_or_else(|| panic!("trusted clock was not observed"));
+        assert_eq!(
+            (
+                retry.attempts,
+                retry.first_failure_at_unix_ms,
+                retry.not_before_unix_ms
+            ),
+            (attempts, first_failure, not_before)
+        );
+        assert!(retry.not_before_unix_ms > trusted_now);
+    }
 }
 
 #[test]

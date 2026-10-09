@@ -122,6 +122,11 @@ pub trait ResponseSchedulerStore: ResponseStore {
         Err(PortError::unavailable())
     }
     fn renew_lease(&self, request: &SchedulerLeaseRenewRequest) -> PortResult<ScheduledWork>;
+    /// Read the trusted clock this store validates scheduler requests against.
+    /// A store that cannot attest its trusted time refuses.
+    fn trusted_now_unix_ms(&self) -> PortResult<u64> {
+        Err(PortError::unavailable())
+    }
     fn record_retry(&self, request: &SchedulerRetryRequest) -> PortResult<SchedulerRetryState>;
     fn acknowledge_health_event(
         &self,
