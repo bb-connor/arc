@@ -51,7 +51,8 @@ Every line citation in this file must be re-verified after #1160 merges (section
    - fixed external dates (section 10).
 2. **Specs may assume their predecessors are shipped** when this ordering makes that true.
 3. **Claims follow ADR-0011 at its real scope:**
-   - every planning item that touches a trust boundary carries `boundary_class` (`prevent`, `detect_only`, `advisory_only`, `cannot_see`) and `planning_status`;
+   - every gate claim (the table at the end of section 5) carries `boundary_class` (`prevent`, `detect_only`, `advisory_only`, `cannot_see`) and `planning_status`;
+   - this document does not classify lane rungs. A lane item that touches a trust boundary gets both fields when the Gate 0 contract it builds against freezes, or when its implementation ticket is cut if no contract covers it, and always before a gate claims it;
    - anything claimed as shipped also carries its qualification status.
 4. **Program prefixes on every cross-document ID.** Letters such as M, W, S, D, P and F mean different things in different programs. Section 12 is the crosswalk. Inside this document:
    - gates are G0 to G5;
@@ -209,7 +210,7 @@ Gate 0 exists so that parallel lanes do not collide. Everything a lane builds ag
 
 ## 4. Lanes
 
-Each lane is a ladder of rungs, and each rung ends in exit evidence. Lanes run in parallel and join at the gates in section 5.
+Each lane is a ladder of rungs. Each rung (and Lane REC as a whole) states one roadmap-level **Exit**: the objective evidence that tells a dependent lane the rung is done. Finer per-item evidence lives in the swarm backlog generated from this roadmap, where every item carries testable acceptance criteria. The gates in section 5 carry the exit evidence where lanes join. Lanes run in parallel.
 
 ### Lane COOP: cooperate across organizations
 
@@ -242,6 +243,7 @@ Each lane is a ladder of rungs, and each rung ends in exit evidence. Lanes run i
   - OS key custody built on #1160's `signing_custody`: `credential:` or systemd-creds on headless hosts, Keychain or Secret Service on desktops. Plaintext seed files are labelled development-only.
   - Service packaging: systemd units, a LaunchAgent, and a container image.
   - The desktop review moments (Waybar or QML, menu bar, notifier) are optional follow-ons, not gates.
+  - **Exit:** a two-domain test passes: B issues to A's agent through the inbox and holder pickup, B's door allows an in-scope call and denies an out-of-scope one with receipts, and `evidence verify` accepts those receipts, embedded `HttpReceipt` included, against an ingested partner card.
 - **COOP-2: a production-grade pair.**
   - `chio partner add` over the CT-COOP partner card.
   - Issuer-signed lifecycle status pulled with a TTL, failing closed when stale.
@@ -250,13 +252,16 @@ Each lane is a ladder of rungs, and each rung ends in exit evidence. Lanes run i
   - Authority key history, so rotation is not an outage.
   - Safe HTTP methods deny by default for federated doors.
   - A TLS reverse-proxy recipe and a rotation runbook.
+  - **Exit:** tests show that a passport revocation at A denies at B's door without a restart, stale partner status fails closed, a federated grant presented without a DPoP proof is denied, and a key rotation mid-run keeps the door serving while older receipts still verify.
 - **COOP-3: the HOST-M3 door.**
   - Receiver-owned admission on a serving path, with treaty predicates carried by the process host's admission hook.
   - The remote co-signer over CT-CROSS. This also closes STRAT-F15's relay or mTLS lane.
+  - **Exit:** B's serving-path door denies a federated call without a treaty and admits one within it, each with a receipt; with the remote co-signer down, the work stays pending and is never re-dispatched.
 - **COOP-4: evidence a counterparty can trust without trusting the operator.**
   - C2SP checkpoint compatibility (#1174 north-star bet 6).
   - The MCP edge authorization audit (bet 8).
   - Claims stay labelled "signatures verified against pinned keys; no external witness" until witnessing exists.
+  - **Exit:** checkpoints pass published C2SP test vectors, the audit maps each MCP edge authorization control to a passing test, and every evidence output prints the label above.
 
 **After the test.**
 
@@ -293,13 +298,17 @@ Each lane is a ladder of rungs, and each rung ends in exit evidence. Lanes run i
   - then W1.5a and W1.6a;
   - then W1.5b and W1.6b, after REC;
   - then W1.7.
+  - **Exit:** the W1 plans' test cases pass for W1.1 to W1.7, including the post-REC cases in W1.5b and W1.6b, where an unknown effect is never re-dispatched.
 - **WORK-W2:**
   - W2.1, owner services including `/cosign`;
   - W2.2, co-signing plus durable bilateral delivery. This has not yet succeeded in a composed run.
   - W2.4, lost-reply recovery, after REC;
   - W2.5.
+  - **Exit:** a composed co-signed run survives a kill at every bilateral-delivery point with one tool call and no second dispatch, W2.4 recovers a lost reply, and the W2.5 package runs on separate hosts with an independent-operation record.
 - **WORK-W3:** the `chio work` CLI, and `WorkClient` wrappers for Python `chio-process` and `@chio-protocol/process`. Outside teams' agents need these.
+  - **Exit:** the CLI and both wrappers pass against the CT-WORK test vectors.
 - **PAPER-1 to PAPER-4** are now scheduled. PAPER-5 follows W4.
+  - **Exit:** the reviewed manuscript builds, every claim maps to its evidence, and the paper's independent-operation gate stays open.
 
 **After the test.**
 
@@ -331,23 +340,29 @@ This is #1174's bug-fix lane, promoted to a preview gate. It runs on post-#1160 
   - KSPEC-08 phase 1 (KDEF-D2, N22, N23): a durable, restart-safe stop with an allocated schema slot.
   - The stop is reachable from the process-host socket and the CLI.
   - Today the emergency stop is a process-local flag, its routes are unmounted, and its token comparison is not constant-time.
+  - **Exit:** one hosted run stops the kernel through a mounted route, restarts into a stopped state that still denies, and resumes; the process-host socket and the CLI reach the same stop, and the admin token is compared in constant time.
 - **KERN-2: exactly one terminal receipt per executed call.**
   - KSPEC-03 phase 1 (KDEF-D1, N2, N28, N29), together with the M20 identity-disposition delta.
   - Phase 1 and the delta land together, because KSPEC-08 rule S15 ties `retryable_after_resume` to M20.
+  - **Exit:** a property test that injects a failure at each post-effect step shows every executed call ending in exactly one terminal receipt, and every legacy non-allow receipt carries its M20 identity disposition.
 - **KERN-3: revocation and closure.**
   - KDEF-D6 and D5.
   - KSPEC-04 phases 1 and 2: subtree closure with the dispatch-commit fence, then ProcessTree closure.
   - A new spec for process exit as an authority transition. `ProcessState` has no exit state today.
+  - **Exit:** a suspension after admission denies at dispatch (KDEF-D6), a frozen lineage cannot mint delegates (KDEF-D5), closing one process subtree leaves its parent and siblings untouched, and an exited process can no longer be invoked.
 - **KERN-4: the session door.** KSPEC-05 Part A (KDEF-D3, D4, N26), because doors serve over `chio mcp serve-http`.
   - KDEF-N30 is already fixed on #1160: the GET stream subscribes before it snapshots the replay window.
   - KDEF-D3 changed shape on #1160: a lagged consumer now closes the session and reports an uncertain effect instead of hanging. Part A re-checks it against that behaviour.
+  - **Exit:** Part A's acceptance cases pass on `chio mcp serve-http`: each response is delivered exactly once, a lagged consumer never hangs, a stale cursor after a restore is refused, and subscriptions survive restarts.
 - **KERN-5: isolation evidence.** KSPEC-07 steps 1 and 2, plus `AgentHostBwrap` and `Seatbelt` backend kinds, before any HOST-M2 isolation claim.
   - First amend KSPEC-07 to add those kinds. Its closed `ConfinementBackendKind` (`LinuxCage`, `FirecrackerGuest`, `ProcessContainer`) exists only in the spec text, not in code, and #1177's PROGRAM-MAP already asks for this one amendment.
+  - **Exit:** the amended backend kinds exist in code, and a receipt renders as confined only when a verified `FullyEnforced` launch record is bound at dispatch; every other native effect renders "unconfined".
 - **KERN-6: gates.**
   - KDEF-GT1: one whole hosted CI run passes.
   - KDEF-N4: the Mechanism D gate.
   - KDEF-N1 and N15 become rebase gates, at the #1173 and #1179 merges respectively.
   - KDEF-D7, N6, D11 and D12 each get an owner.
+  - **Exit:** a hosted run URL with every required job passing is recorded, the Mechanism D and clock gates fail on violating fixtures and pass on main, and the KDEF register names an owner for each of D7, N6, D11 and D12.
 
 **Owners still to be assigned** for primitives that no spec owns:
 
@@ -388,21 +403,25 @@ Only the kernel hold ledger durably records consumption. Money is not pooled acr
   - Every other counter becomes a commitment entry or a view, following #1174's sealed-ledger proposal.
   - First slice: a family monetary cap, using #957's co-debit pattern, plus a durable sibling registry.
   - Basis-point shares already have sibling-sum enforcement at admission: `admit_capability_budget` submits `budget_share_bps` to `try_admit_child`, and an oversubscribing child is denied before dispatch. #1160's foundation also makes caller shares durable: `validation/caller_budget.rs` loads durable caller budget shares and combines them with live admissions, and `restart_preserves_the_delegated_share_of_a_live_caller_reservation` covers restart. What is missing is the consumption binding and the legacy path: a share never bounds what the child actually spends, and the legacy `InMemoryBudgetRegistry` path on main still fails closed after a restart until prior reserved holds close. Decide what a share bounds in the hold ledger, and retire the legacy in-memory path in favor of the foundation's durable sibling registry after Gate 0.
+  - **Exit:** tests show a child denied once its siblings exhaust the family monetary cap, no share or hold replenished by a restart, and the decided rule for what a share bounds enforced in the hold ledger; the legacy in-memory registry path is retired.
 - **SHARE-2: model spend through the kernel.**
   - Model calls route through the broker's provider adapter, using the worst-case-then-reconcile lifecycle.
   - Add a token quota for subscription harnesses.
   - Fix the required-agent profile, which issues a fresh counter per session. Megastart's bound-session pattern is the reference.
   - Today's "model relay" is a Python request counter inside the Hermes SDK.
+  - **Exit:** a model call reserves its worst case before dispatch and reconciles down after, a lost model reply keeps its reservation, the token quota denies at exhaustion, and two sessions of the required-agent profile draw down one counter.
 - **SHARE-3: HOST-M2 on Linux.**
   - One root grant across the harnesses outside teams run: Claude Code and Codex first, then Pi and Hermes.
   - Live cancel and revoke while the host runs.
   - Serving-path swarm admission beyond depth 1 and the `tool_calls` dimension.
   - Restart never replenishes a pool.
+  - **Exit:** on one Linux host, exhausting the root grant from one harness denies the other, revoking the root mid-run denies every child with a receipt, a swarm deeper than one level is admitted within its limits and denied beyond them, and a kill-and-restart suite across pool kinds replenishes nothing.
 - **SHARE-4: cleanup.**
   - Accept ADR-0016 (the authoritative spend contract).
   - Write ADR-0035 (web3-free distribution) at its real scope: the kernel, core, control plane and CLI. ADR-0035 is a candidate number in #1170; no such file exists yet.
   - Make `finding-market` and `web3` off by default.
   - Move the x402 and ACP clients out of the kernel (KSPEC-01 R13).
+  - **Exit:** ADR-0016 reads Accepted, ADR-0035 is merged, default builds of the kernel, core, control plane and CLI pull in no web3 or finding-market code, and the kernel crate no longer contains the x402 and ACP clients.
 
 **After the test.**
 
@@ -423,15 +442,17 @@ Only the kernel hold ledger durably records consumption. Money is not pooled acr
   - Fix `CHANGELOG.md` and the install docs, and sync the distribution mirror.
   - Mark v0.1.0 superseded and resolve crates.io (decision D10), the npm and PyPI 0.1.0 packages, and the stray tags (section 2).
   - Publish the format-stability note.
+  - **Exit:** a signed `0.2.0-alpha.N` tag whose commit has Release Qualification green; the published installer verifies and installs it on Linux x86_64 and arm64 and macOS arm64; the distribution mirror carries the tag; the GitHub release is a prerelease, not Latest.
 - **REL-2: the MCP door.**
   - Interop with MCP revision 2026-07-28 (stateless core); today the edge accepts only 2025-11-25.
   - `chio mcp serve-http` accepts presented, federated capabilities, or a bridge-daemon shim adds them.
-  - Exit: current Claude Code and Codex connect through ordinary remote MCP, with no plugin.
+  - **Exit:** current Claude Code and Codex connect through ordinary remote MCP, with no plugin.
 - **REL-3: harnesses.**
   - Claude Code and Codex are co-first, in MCP mode. Hooks count as coverage, never enforcement, because hook failure does not block either host.
   - Linux restricted launchers for the HOST-M2 harnesses. Today Pi has bubblewrap; Claude Code, Codex, Cursor and Hermes are Seatbelt-only; OpenClaw is a container.
   - Publish Pi, the bridge and the plugins with tested version ranges.
   - Fix `backbay-labs/chio-bridge#3`.
+  - **Exit:** on Linux, each HOST-M2 harness's restricted launcher leaves the kernel port unreachable, denies arbitrary egress and records its KSPEC-07 evidence; Pi, the bridge and the plugins are published with tested version ranges; `chio-bridge#3` is closed.
 - **REL-4: the operator surface.**
   - The trust-control dashboard is the one operator web client. It is read-only today and served only from a relative path.
   - It gains:
@@ -440,6 +461,7 @@ Only the kernel hold ledger durably records consumption. Money is not pooled acr
     - the issuance panel;
     - authority-tree and pool views.
   - Plus the onboarding kit and runbooks.
+  - **Exit:** an operator following only the onboarding kit on two clean hosts completes G2's six steps, and dashboard tests deny a viewer on approval routes and reject a token in the query string.
 
 ### Lane OUT: outside teams, positioning, standards
 
@@ -449,12 +471,16 @@ Only the kernel hold ledger durably records consumption. Money is not pooled acr
   - Trial terms; legal groundwork (STRAT-F13).
   - A receipt-privacy rule (STRAT-F10).
   - Teams onboard at G2 so that their infrastructure, keys and working relationship already exist by G5.
+  - **Exit:** D13 and D14 are recorded, and at least two outside teams have accepted trial terms and onboarded by G2.
 - **OUT-2: positioning cleanup** (section 9).
+  - **Exit:** every stale surface listed in section 9 is fixed on main.
 - **OUT-3: standards.**
   - The IETF -00 (decision D11).
   - WIMSE and ODIS positions.
   - Platform interoperability is technical only, and no platform is a dependency. Build OpenShell middleware only if a candidate team runs OpenShell. Track the Agent Policy Fabric for interop changes. Channels and audiences are in the private GTM plan.
+  - **Exit:** D11 is recorded and carried out, and the WIMSE and ODIS position notes are merged.
 - **OUT-4: records.** Independent-operation records and ADR-0011 claim reviews for every gate.
+  - **Exit:** each gate's claims have a recorded ADR-0011 review before they are made, and G2 and G5 each publish an independent-operation record.
 
 ## 5. Gates
 
@@ -521,14 +547,24 @@ Exit also requires:
 - At least one team repeats its run unassisted.
 - The records are published and reviewed.
 
-**Critical path:** Gate 0, then WORK-W1 and W2 together with REC, then G4, then G5.
+**Critical path.** This document makes no capacity or duration projections, so it cannot say which branch finishes last. Every prerequisite of G4 in the graph above therefore stays on the critical path until it closes:
+
+- Gate 0;
+- G2, which joins G1 (REL-1, REL-2, KERN-1, KERN-2, KERN-6 and OUT-2) with COOP-1, COOP-2, REL-4 and OUT-1;
+- G3: SHARE-1 to SHARE-3, KERN-3, KERN-5, REL-3 and WORK slice β;
+- WORK-W1, W2 and W3;
+- REC;
+- COOP-3;
+- KERN-4.
+
+G5 then waits on G4 and COOP-4.
 
 The two riskiest unproven pieces get the largest swarm allocation and the earliest prototypes:
 
 - #1179's rebase and requalification;
 - WORK-W2.2's durable bilateral delivery.
 
-G2 and G3 run in parallel with the critical path. HOST-M1 never depends on #1179.
+G2 and G3 run in parallel with the WORK, REC, COOP-3 and KERN-4 branches, but G4 waits on both, so neither is slack. HOST-M1 never depends on #1179.
 
 **Claims each gate permits.** These use ADR-0011's vocabulary. Every claim is limited to kernel-mediated calls and carries the preview label until the qualification in section 11.
 
@@ -539,7 +575,8 @@ G2 and G3 run in parallel with the critical path. HOST-M1 never depends on #1179
 | G2 | B's door admits A's agent only within B-issued, attenuated, holder-bound authority. | `prevent` | `ready_after_adr` (CT-COOP) |
 | G2 | A verifies B's receipts offline against operator-pinned partner keys, with no external witness. | `detect_only` | `ready_after_adr` (CT-COOP) |
 | G3 | One root grant's holds bound spend and invocations of kernel-mediated calls across harnesses on one host. | `prevent` | `ready_after_adr` (ADR-0016, CT-ABI) |
-| G3 | Native effects outside the kernel path. These are `prevent` only where a qualified KSPEC-07 backend confines them, and are otherwise rendered "unconfined". | `cannot_see` | `ready_after_adr` (KSPEC-07) |
+| G3 | Native effects outside the kernel path where a qualified KSPEC-07 backend confines them (a verified `FullyEnforced` launch record bound at dispatch) are denied before effect outside that confinement. | `prevent` | `ready_after_adr` (KSPEC-07) |
+| G3 | Native effects outside the kernel path with no qualified KSPEC-07 backend are out of layer and not covered; receipts render them "unconfined". | `cannot_see` | `ready_after_adr` (KSPEC-07) |
 | G4, G5 | The receiver admits a co-signed work commitment at its own door. | `prevent` | `ready_after_adr` (CT-WORK, CT-CROSS) |
 | G4, G5 | A lost reply is recovered by original identity with no second dispatch. | `prevent` | `blocked_by_adr` until CT-SETTLE is frozen (D1 and D2 decided 2026-10-09) |
 | G4, G5 | The evaluator's signed acceptance or rejection is recorded. | `detect_only` | `ready_after_adr` (CT-WORK) |
@@ -673,7 +710,8 @@ Platform and vendor audiences, channels and messaging are in the private GTM pla
   - lines 78 and 156: "pay each other";
   - the unscoped "every call" wording at lines 73, 128, 172, 177 and 259;
   - lines 44 and 251: the installer links, which #1160 already removes;
-  - the from-source `git clone` of `backbay-labs/chio` (line 254; line 260 after #1160), which clones the distribution mirror while it is stale (REL-1 syncs it).
+  - the from-source `git clone` of `backbay-labs/chio` (line 254; line 260 after #1160), which clones the distribution mirror while it is stale (REL-1 syncs it);
+  - line 242 (line 251 after #1160): the "Settlement and anchoring" row's on-chain settlement and cross-chain anchoring claim, "backed by the Chio settlement contracts", which the payments rule below forbids.
 - **`docs/reference/COMPETITIVE_LANDSCAPE.md`:** "only protocol".
 - **`AGENTS.md`:** lines 5 and 11.
 - **`docs/start-here/VISION.md`:** needs a historical banner.
