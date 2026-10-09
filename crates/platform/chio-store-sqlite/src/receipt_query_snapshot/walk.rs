@@ -695,7 +695,6 @@ pub(super) fn copy_checkpoints(
         };
         copied.push((row, archived));
     }
-    drop(reader);
     if let Some(archive) = archive.as_ref() {
         let _ = archive.execute_batch("COMMIT");
     }
@@ -978,6 +977,15 @@ pub(super) fn observe(ctx: &WalkContext<'_>) -> Result<Observation, WalkError> {
     result
 }
 
+/// Live source counts and checkpoint projection id statistics read in one
+/// transaction: `(count, max id, ids beyond the newest checkpoint)` per table.
+struct LiveCounts {
+    watermark: i64,
+    tools: u64,
+    children: u64,
+    projections: [(i64, i64, i64); 3],
+}
+
 /// Live source rows must be exactly the owned rows located above the
 /// watermark. `max_seqs` are the live source maxima pinned in the pass's
 /// starting observation: every row at or below them existed at that moment,
@@ -996,7 +1004,7 @@ pub(super) fn verify_source_bijection(
         .transaction()
         .map_err(|error| classify(sql(error), None))?;
     let guard = StepGuard::install(&live_tx, ctx.limits.sql_steps, ctx.cancel)?;
-    let counted = (|| -> Result<(i64, u64, u64, [(i64, i64, i64); 3]), ReceiptStoreError> {
+    let counted = (|| -> Result<LiveCounts, ReceiptStoreError> {
         let watermark = watermark_i64(&live_tx)?;
         let tools: i64 = live_tx.query_row(
             "SELECT COUNT(*) FROM chio_tool_receipts WHERE seq <= ?1",
@@ -1024,17 +1032,22 @@ pub(super) fn verify_source_bijection(
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )?;
         }
-        Ok((
+        Ok(LiveCounts {
             watermark,
-            u64::try_from(tools).unwrap_or(0),
-            u64::try_from(children).unwrap_or(0),
+            tools: u64::try_from(tools).unwrap_or(0),
+            children: u64::try_from(children).unwrap_or(0),
             projections,
-        ))
+        })
     })()
     .map_err(|error| guard.classify(error));
     drop(guard);
     let _ = live_tx.commit();
-    let (watermark, live_tools, live_children, projections) = counted?;
+    let LiveCounts {
+        watermark,
+        tools: live_tools,
+        children: live_children,
+        projections,
+    } = counted?;
     let (owned_tools, owned_children) = owned_counts_above(watermark)?;
     if (live_tools, live_children) != (owned_tools, owned_children) {
         return Err(WalkError::Integrity(format!(

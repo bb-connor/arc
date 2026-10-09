@@ -26,6 +26,8 @@ fn built_fixture() -> (Fixture, SnapshotDb) {
     (fixture, db)
 }
 
+type Filter = Box<dyn Fn(&mut ReceiptQuery)>;
+
 fn queries() -> Vec<ReceiptQuery> {
     let scopes = [
         ReceiptQuery::default().local_operator_admin(),
@@ -37,7 +39,7 @@ fn queries() -> Vec<ReceiptQuery> {
             ..ReceiptQuery::default().local_operator_admin()
         },
     ];
-    let mut filters: Vec<Box<dyn Fn(&mut ReceiptQuery)>> = vec![
+    let mut filters: Vec<Filter> = vec![
         Box::new(|_| {}),
         Box::new(|q| q.capability_id = Some("cap-1".into())),
         Box::new(|q| q.capability_id = Some("cap-unknown".into())),

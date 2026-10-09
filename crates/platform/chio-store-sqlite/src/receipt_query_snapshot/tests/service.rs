@@ -4,7 +4,6 @@ use std::time::{Duration, Instant};
 
 use chio_kernel::receipt_query::{ReceiptQuery, ReceiptQuerySnapshotError, ReceiptReadContext};
 use chio_kernel::ReceiptStoreError;
-use rusqlite::params;
 
 use super::super::service::{
     ReceiptQuerySnapshotConfig, ReceiptQuerySnapshotState, ReceiptQuerySnapshots,

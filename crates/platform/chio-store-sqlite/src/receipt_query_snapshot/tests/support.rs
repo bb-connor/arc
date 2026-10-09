@@ -64,15 +64,27 @@ impl Spec {
             _ => Some("tenant-b".into()),
         };
         spec.capability = format!("cap-{}", index % 5);
-        spec.tool_server = if index % 3 == 0 { "web" } else { "shell" }.into();
-        spec.tool_name = if index % 2 == 0 { "fetch" } else { "bash" }.into();
-        spec.deny = index % 7 == 0;
+        spec.tool_server = if index.is_multiple_of(3) {
+            "web"
+        } else {
+            "shell"
+        }
+        .into();
+        spec.tool_name = if index.is_multiple_of(2) {
+            "fetch"
+        } else {
+            "bash"
+        }
+        .into();
+        spec.deny = index.is_multiple_of(7);
         spec.cost = match index % 6 {
             0 => Some((index * 10, "USD")),
             1 => Some((index * 3, "EUR")),
             _ => None,
         };
-        spec.subject = (index % 5 == 0).then(|| format!("subject-{}", index % 3));
+        spec.subject = index
+            .is_multiple_of(5)
+            .then(|| format!("subject-{}", index % 3));
         spec
     }
 
