@@ -282,7 +282,6 @@ pub fn verify_bound_frost_authorization_slot(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn verify_completed_frost_authorization_slot(
     body: &FrostAuthorizationBodyV1,
     active_roster: &VerifiedActiveFrostRoster,
@@ -438,7 +437,6 @@ pub fn verify_frost_authorization_slot_bind(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn verify_frost_authorization_slot_completion(
     bound: &FrostAuthorizationSlotCheckpointV1,
     proof: &FrostAuthorizationV1,
