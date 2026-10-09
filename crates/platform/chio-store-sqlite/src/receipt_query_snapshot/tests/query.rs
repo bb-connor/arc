@@ -349,7 +349,7 @@ fn fixed_plans_never_use_a_temporary_btree() {
 pub(super) const MAINTAINED_COUNTS_SQL: &str =
     "SELECT scope, dim, value, n, min_seq, max_seq FROM snapshot_count ORDER BY 1, 2, 3";
 
-fn count_rows(db: &SnapshotDb) -> Vec<(i64, i64, i64, i64, i64, i64)> {
+pub(super) fn count_rows(db: &SnapshotDb) -> Vec<(i64, i64, i64, i64, i64, i64)> {
     let mut statement = db
         .connection()
         .unwrap()
@@ -404,7 +404,7 @@ pub(super) fn grouped_counts_sql() -> String {
     format!("{} ORDER BY 1, 2, 3", parts.join(" UNION ALL "))
 }
 
-fn grouped_rows(db: &SnapshotDb) -> Vec<(i64, i64, i64, i64, i64, i64)> {
+pub(super) fn grouped_rows(db: &SnapshotDb) -> Vec<(i64, i64, i64, i64, i64, i64)> {
     let mut statement = db
         .connection()
         .unwrap()

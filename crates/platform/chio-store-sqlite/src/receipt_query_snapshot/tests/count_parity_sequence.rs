@@ -1,15 +1,17 @@
 //! A deterministic-seed campaign over the published service. A fixed seed
 //! interleaves signed appends across tenants, tools, outcomes and costs,
 //! rotations into the archive, capability lineage refreshes, invalidations and
-//! rebuilds. At every version the campaign observes, the maintained counts
-//! equal `GROUP BY` over the snapshot's own rows, every served page, total and
-//! point read equals the per-call authenticated path, and a lineage that was
-//! dropped never serves again.
+//! rebuilds. Every state a walker hold commits to a published lineage, so
+//! every generation including each refresh, keeps its maintained counts equal
+//! to `GROUP BY` over its own rows, compared inside that hold before any reader
+//! can see it. Once settled, a version answers every page, total and point read
+//! the campaign makes as the per-call authenticated path does, and a lineage
+//! that was dropped never serves again.
 use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::panic::AssertUnwindSafe;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
@@ -23,10 +25,10 @@ use chio_kernel::receipt_query::{
 use chio_kernel::{ReceiptStoreError, StoredToolReceipt};
 
 use super::super::service::{
-    GateAction, GatePoint, ReceiptQuerySnapshotConfig, ReceiptQuerySnapshotState,
-    ReceiptQuerySnapshots,
+    GateAction, GatePoint, GenerationObserver, ReceiptQuerySnapshotConfig,
+    ReceiptQuerySnapshotState, ReceiptQuerySnapshots,
 };
-use super::query::{grouped_counts_sql, MAINTAINED_COUNTS_SQL};
+use super::query::{count_rows, grouped_counts_sql, grouped_rows, MAINTAINED_COUNTS_SQL};
 use super::support::{keypair, other_keypair, per_call, substitute, Fixture, Spec};
 use crate::receipt_store::support::{
     extract_receipt_attribution, receipt_cost_projection, receipt_decision_kind,
@@ -161,7 +163,15 @@ type Position = Cell<(usize, usize, &'static str)>;
 /// What a campaign covered, reported when it passes.
 #[derive(Debug, Default)]
 struct Tally {
-    versions: u64,
+    /// Distinct published generations whose counts were compared in their
+    /// own hold.
+    generations: u64,
+    /// Committed states compared in their own hold, staging and settlement
+    /// holds included.
+    held_states: u64,
+    /// Comparisons the campaign itself made on the served version, one
+    /// while extension may be mid-cycle and one once settled per operation.
+    sampled_count_checks: u64,
     receipts: usize,
     archived: usize,
     lineage_rows: usize,
@@ -172,6 +182,50 @@ struct Tally {
 }
 
 type Page = (Vec<u64>, u64, Option<u64>);
+
+/// What the per-hold count comparison recorded.
+#[derive(Default)]
+struct Generations {
+    /// Generations compared, per lineage.
+    seen: BTreeMap<String, BTreeSet<u64>>,
+    held_states: u64,
+    /// Lineages whose owned rows the campaign edits on purpose before a read
+    /// drops them; their counts are not compared again.
+    tampered: BTreeSet<String>,
+    /// The first state whose maintained counts differed from `GROUP BY`.
+    mismatch: Option<String>,
+}
+
+/// Compare the maintained counts of every committed state with `GROUP BY`
+/// over its rows, inside the hold that committed it.
+fn generation_observer(record: Arc<Mutex<Generations>>) -> GenerationObserver {
+    Arc::new(move |db, lineage, generation| {
+        let compared =
+            std::panic::catch_unwind(AssertUnwindSafe(|| (count_rows(db), grouped_rows(db))));
+        let Ok(mut record) = record.lock() else {
+            return;
+        };
+        record.held_states += 1;
+        record
+            .seen
+            .entry(lineage.to_string())
+            .or_default()
+            .insert(generation);
+        if record.tampered.contains(lineage) {
+            return;
+        }
+        let differs = match compared {
+            Ok((maintained, grouped)) if maintained == grouped => None,
+            Ok((maintained, grouped)) => {
+                Some(format!("maintained {maintained:?}, GROUP BY {grouped:?}"))
+            }
+            Err(_) => Some("the comparison could not read the snapshot".to_string()),
+        };
+        if let (Some(differs), None) = (differs, &record.mismatch) {
+            record.mismatch = Some(format!("{lineage}:{generation}: {differs}"));
+        }
+    })
+}
 
 /// Sets its flag when dropped, also while unwinding.
 struct StopOnDrop<'a>(&'a AtomicBool);
@@ -270,7 +324,8 @@ struct Campaign<'p> {
     serial: u64,
     served: String,
     dropped: BTreeSet<String>,
-    versions: Cell<u64>,
+    sampled: Cell<u64>,
+    generations: Arc<Mutex<Generations>>,
     gated: Cell<u64>,
     /// The per-call listing of every tool receipt, until the next append.
     listing: Option<Vec<StoredToolReceipt>>,
@@ -292,7 +347,8 @@ impl<'p> Campaign<'p> {
             serial: 0,
             served: String::new(),
             dropped: BTreeSet::new(),
-            versions: Cell::new(0),
+            sampled: Cell::new(0),
+            generations: Arc::default(),
             gated: Cell::new(0),
             listing: None,
         };
@@ -302,7 +358,9 @@ impl<'p> Campaign<'p> {
         campaign.append_child();
         campaign.rotate();
         let store = campaign.fixture.store.clone();
-        campaign.service = Some(ReceiptQuerySnapshots::start(store, config()).unwrap());
+        let observer = generation_observer(Arc::clone(&campaign.generations));
+        let service = ReceiptQuerySnapshots::start_observed_for_test(store, config(), observer);
+        campaign.service = Some(service.unwrap());
         let deadline = Instant::now() + DEADLINE;
         campaign.served = loop {
             let status = campaign.service().status();
@@ -354,8 +412,17 @@ impl<'p> Campaign<'p> {
             }
             *tally.operations.entry(op).or_default() += 1;
         }
+        self.every_generation_matched();
         self.service.take().unwrap().shutdown();
-        tally.versions += self.versions.get();
+        tally.sampled_count_checks += self.sampled.get();
+        let generations = self.generations.lock().unwrap();
+        tally.held_states += generations.held_states;
+        tally.generations += generations
+            .seen
+            .values()
+            .map(|seen| u64::try_from(seen.len()).unwrap())
+            .sum::<u64>();
+        drop(generations);
         tally.gated += self.gated.get();
         tally.receipts += self.receipts.len();
         tally.archived += self
@@ -676,6 +743,9 @@ impl<'p> Campaign<'p> {
             return false;
         };
         let epoch = self.lease();
+        let mut generations = self.generations.lock().unwrap();
+        generations.tampered.insert(self.served.clone());
+        drop(generations);
         let changed = self.service().execute_on_snapshot_for_test(
             "UPDATE snapshot_tool_receipt \
              SET tenant = (SELECT tenant FROM snapshot_tool_receipt WHERE receipt_id = ?2) \
@@ -1174,7 +1244,7 @@ impl<'p> Campaign<'p> {
                 "maintained counts differ from GROUP BY: {kept} maintained rows, {recomputed} grouped rows, {differ} differing"
             ));
         }
-        self.versions.set(self.versions.get() + 1);
+        self.sampled.set(self.sampled.get() + 1);
     }
 
     /// The settled version answers as the per-call authenticated path. The
@@ -1185,6 +1255,7 @@ impl<'p> Campaign<'p> {
     /// match. A version whose listing was not read again may also read one of
     /// them through the per-call filter path.
     fn verify(&mut self) {
+        self.every_generation_matched();
         self.counts_match_group_by();
         let anchored = self.listing.is_some();
         let listing = match self.listing.take() {
@@ -1279,6 +1350,37 @@ impl<'p> Campaign<'p> {
             self.fail(format!(
                 "the served version owns {owned} rows, {differ} differing from the {} authenticated receipts",
                 listing.len()
+            ));
+        }
+    }
+
+    /// Every state committed so far matched `GROUP BY` in its own hold, and
+    /// every generation of the served lineage up to the one served now was
+    /// compared there.
+    fn every_generation_matched(&self) {
+        let Some(watermark) = self.service().status().watermark else {
+            self.fail("no version is served");
+        };
+        let served: u64 = watermark
+            .snapshot_id
+            .rsplit(':')
+            .next()
+            .and_then(|generation| generation.parse().ok())
+            .unwrap_or_else(|| self.fail(format!("snapshot id {}", watermark.snapshot_id)));
+        let record = self.generations.lock().unwrap();
+        if let Some(mismatch) = &record.mismatch {
+            self.fail(format!(
+                "a committed state's counts differ from GROUP BY at {mismatch}"
+            ));
+        }
+        let seen = record.seen.get(&lineage_of(&watermark));
+        let missing: Vec<u64> = (1..=served)
+            .filter(|generation| !seen.is_some_and(|seen| seen.contains(generation)))
+            .collect();
+        if !missing.is_empty() {
+            self.fail(format!(
+                "generations {missing:?} of {} were published without a count comparison",
+                watermark.snapshot_id
             ));
         }
     }

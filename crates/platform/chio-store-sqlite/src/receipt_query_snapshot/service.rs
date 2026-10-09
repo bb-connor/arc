@@ -220,6 +220,23 @@ pub(super) struct Published {
     /// Most pending leaves one staging hold wrote.
     #[cfg(test)]
     max_staged_per_hold: AtomicU64,
+    /// Receives every state a hold commits to this lineage.
+    #[cfg(test)]
+    observer: Option<GenerationObserver>,
+}
+
+/// Receives the snapshot, lineage and generation of every state a walker hold
+/// commits to a published lineage, inside that hold, before any reader can see
+/// the state. Staging and settlement holds report the generation they leave
+/// unchanged.
+#[cfg(test)]
+pub(super) type GenerationObserver = Arc<dyn Fn(&SnapshotDb, &str, u64) + Send + Sync>;
+
+#[cfg(test)]
+thread_local! {
+    /// The observer the next service started on this thread installs.
+    static NEXT_OBSERVER: std::cell::RefCell<Option<GenerationObserver>> =
+        const { std::cell::RefCell::new(None) };
 }
 
 /// Where the extension's test gate stands.
@@ -363,10 +380,20 @@ impl Published {
         let value = self.hold(|owned| {
             let value = write(&mut owned.db)?;
             owned.meta.generation += 1;
+            #[cfg(test)]
+            self.observe(owned);
             Ok(value)
         })?;
         self.changed.notify_all();
         Ok(value)
+    }
+
+    /// Hand the state the current hold committed to the test observer.
+    #[cfg(test)]
+    fn observe(&self, owned: &Owned) {
+        if let Some(observer) = &self.observer {
+            observer(&owned.db, &self.lineage, owned.meta.generation);
+        }
     }
 
     /// Stop at the test gate when it is armed at `point`.
@@ -414,7 +441,10 @@ impl Published {
             {
                 return Err(fault);
             }
-            owned.db.commit(batch)
+            owned.db.commit(batch)?;
+            #[cfg(test)]
+            self.observe(owned);
+            Ok(())
         })?;
         #[cfg(test)]
         self.max_staged_per_hold.fetch_max(
@@ -444,6 +474,8 @@ impl Published {
             owned.head = Some(checkpoint);
             owned.chain = chain;
             owned.meta.generation += 1;
+            #[cfg(test)]
+            self.observe(owned);
             Ok(())
         })?;
         self.changed.notify_all();
@@ -461,7 +493,12 @@ impl Published {
         chunk: i64,
     ) -> Result<(), WalkError> {
         loop {
-            let removed = self.hold(|owned| owned.db.delete_pending_chunk(start, end, chunk))?;
+            let removed = self.hold(|owned| {
+                let removed = owned.db.delete_pending_chunk(start, end, chunk)?;
+                #[cfg(test)]
+                self.observe(owned);
+                Ok(removed)
+            })?;
             if removed == 0 {
                 return Ok(());
             }
@@ -561,6 +598,8 @@ impl OwnedSink for PublishedSink<'_> {
             owned.db.commit(batch)?;
             owned.meta.through_entry_seq = owned.meta.through_entry_seq.max(through_entry_seq);
             owned.meta.generation += 1;
+            #[cfg(test)]
+            self.published.observe(owned);
             Ok(())
         })?;
         self.published.changed.notify_all();
@@ -601,6 +640,9 @@ struct Inner {
     /// Every wait the walker chose after an integrity failure.
     #[cfg(test)]
     integrity_waits: Mutex<Vec<Duration>>,
+    /// Observer every lineage this service publishes receives.
+    #[cfg(test)]
+    generation_observer: Option<GenerationObserver>,
 }
 
 /// Owner of the authenticated receipt query snapshot of one store.
@@ -647,6 +689,8 @@ impl ReceiptQuerySnapshots {
             published_since_failure: AtomicBool::new(false),
             #[cfg(test)]
             integrity_waits: Mutex::new(Vec::new()),
+            #[cfg(test)]
+            generation_observer: NEXT_OBSERVER.with(|next| next.borrow_mut().take()),
         });
         let walker = Arc::clone(&inner);
         let handle = std::thread::Builder::new()
@@ -1314,7 +1358,13 @@ fn build_and_serve(inner: &Arc<Inner>) -> Result<(), WalkError> {
         gate: (Mutex::new(TestGate::default()), Condvar::new()),
         #[cfg(test)]
         max_staged_per_hold: AtomicU64::new(0),
+        #[cfg(test)]
+        observer: inner.generation_observer.clone(),
     });
+    #[cfg(test)]
+    if let Ok(owned) = published.owned.lock() {
+        published.observe(&owned);
+    }
     inner.set_phase(Phase::Ready(Arc::clone(&published)));
     inner.published_since_failure.store(true, Ordering::SeqCst);
     serve(inner, &extension_ctx, &ctx, &published)
@@ -1405,6 +1455,19 @@ fn duration_ms(duration: Duration) -> u64 {
 
 #[cfg(test)]
 impl ReceiptQuerySnapshots {
+    /// Start a service whose published lineages hand every committed state
+    /// to `observer` (see [`GenerationObserver`]).
+    pub(super) fn start_observed_for_test(
+        store: Arc<SqliteReceiptStore>,
+        config: ReceiptQuerySnapshotConfig,
+        observer: GenerationObserver,
+    ) -> Result<Self, ReceiptStoreError> {
+        NEXT_OBSERVER.with(|next| *next.borrow_mut() = Some(observer));
+        let started = Self::start(store, config);
+        NEXT_OBSERVER.with(|next| next.borrow_mut().take());
+        started
+    }
+
     pub(super) fn pause_extension_for_test(&self, paused: bool) {
         self.inner.pause_extension.store(paused, Ordering::SeqCst);
         self.inner.wake();
