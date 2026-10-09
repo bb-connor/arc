@@ -22,11 +22,12 @@ pub(super) fn load_scoped_flow_snapshot(
         return Err(PortError::integrity_failure());
     }
     if !epoch_exists {
-        // A context needs this exact epoch, and a principal or session row
-        // needs its epoch under some lineage.
+        // A context needs this exact epoch. A principal or session row needs
+        // its epoch under some lineage, and that epoch needs its principal row.
+        let principal_epoch = principal_epoch_exists(connection, key)?;
         if context_generation.is_some()
-            || ((principal.is_some() || session.is_some())
-                && !principal_epoch_exists(connection, key)?)
+            || ((principal.is_some() || session.is_some()) && !principal_epoch)
+            || (principal_epoch && principal.is_none())
         {
             return Err(PortError::integrity_failure());
         }

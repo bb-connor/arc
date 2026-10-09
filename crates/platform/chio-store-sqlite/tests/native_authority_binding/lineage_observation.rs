@@ -291,3 +291,96 @@ fn rows_without_their_isolation_epoch_are_still_refused() -> TestResult {
     )));
     Ok(())
 }
+
+#[test]
+fn missing_principal_label_under_an_existing_epoch_is_refused_by_the_legacy_reader() -> TestResult {
+    let directory = chio_test_support::private_tempdir()?;
+    let path = directory.path().join("security.db");
+    let store = SqliteSecurityStateStore::open(&path)?;
+    join(
+        &store,
+        &key("lineage-0", "session", "epoch")?,
+        "join-0",
+        &InformationLabel::bottom(),
+    )?;
+    rusqlite::Connection::open(&path)?.execute("DELETE FROM security_principal_flow_state", [])?;
+    // The epoch and the session survive under lineage-0; the principal row does not.
+    for session in ["session", "fresh"] {
+        assert!(
+            refused(FlowStateStore::load(
+                &store,
+                &key("lineage-1", session, "epoch")?
+            )),
+            "{session}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn missing_principal_label_edited_out_of_band_is_refused_by_the_serving_owner() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    fixture.nonce_enabled = false;
+    let mut runtime = fixture.open()?;
+    let selected = initialize(&fixture, &runtime, "missing-principal-source")?;
+    let binding = selected.admission_binding()?;
+    let store = runtime.authority.admission_operation_store();
+    let fence = runtime.authority.mutation_fence();
+    let request = fixture.request(&runtime, "missing-principal-0")?;
+    let kernel = Arc::get_mut(&mut runtime.kernel).ok_or("unique test kernel")?;
+    kernel.set_security_pre_dispatch_policy(SecurityPreDispatchPolicy::Enforce);
+    kernel.set_security_pre_dispatch_hook(Arc::new(JoinHook {
+        binding: binding.clone(),
+        first: String::new(),
+    }));
+    let first = runtime
+        .kernel
+        .refresh_native_security_context(&context(&request.agent_id, &request.capability.id)?)?;
+    let response = runtime
+        .kernel
+        .evaluate_tool_call_blocking_with_security_context(&request, &first)?;
+    assert_eq!(
+        response.reason.as_deref(),
+        Some("native security dispatch lifecycle is unsupported"),
+        "{response:?}"
+    );
+    {
+        let raw = rusqlite::Connection::open(fixture.database())?;
+        let triggers = raw
+            .prepare(
+                "SELECT name FROM sqlite_schema WHERE type = 'trigger'
+                 AND tbl_name = 'security_participant_state_principal_flow_state'
+                 AND name GLOB '*_delete'",
+            )?
+            .query_map([], |row| row.get::<_, String>(0))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        for trigger in triggers {
+            raw.execute_batch(&format!("DROP TRIGGER {trigger}"))?;
+        }
+        raw.execute(
+            "DELETE FROM security_participant_state_principal_flow_state WHERE principal_id = ?1",
+            [request.agent_id.as_str()],
+        )?;
+    }
+    let key = FlowStateKey {
+        tenant_id: TenantId::new("native-tenant")?,
+        principal_id: PrincipalId::new(request.agent_id.clone())?,
+        lineage_id: LineageId::new("second-lineage-root")?,
+        session_id: SessionId::new("native-session")?,
+        isolation_epoch_id: IsolationEpochId::new("native-epoch")?,
+    };
+    let reader: &dyn AdmissionOperationStore = &store;
+    let refused = reader
+        .observe_native_security_flow(&binding, &key, &fence, now_ms()?)
+        .err()
+        .ok_or("a missing principal label was observed as absent")?;
+    // An out-of-band edit is refused before any flow read; the in-process
+    // snapshot rule is covered by the library test of the same name.
+    assert!(
+        refused
+            .to_string()
+            .contains("authority database changed outside its serving-owner connection"),
+        "{refused}"
+    );
+    Ok(())
+}

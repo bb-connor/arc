@@ -380,6 +380,52 @@ fn identities(fixture: &Fixture) -> AnchoredTestResult<Vec<String>> {
 }
 
 #[test]
+fn missing_principal_label_under_an_existing_epoch_is_refused_by_the_native_reader(
+) -> AnchoredTestResult {
+    let _clock = clock();
+    let fixture = fixture();
+    hydrate(&fixture, &imported(&fixture, "source")?)?;
+    let label = taint("missing-principal")?;
+    let first = key("missing-principal", "root-0", "missing-session")?;
+    finish(&fixture, "missing-0", &first, &label, &label)?;
+    // The kernel's pre-evaluation refresh observes with the selected binding;
+    // it does not refold current rows.
+    let binding = initialization(&fixture)?.admission_binding()?;
+    let index = native::schema::TABLES
+        .iter()
+        .position(|table| table.native == "security_participant_state_principal_flow_state")
+        .ok_or("principal table")?;
+    {
+        let connection = fixture.store.connection()?;
+        connection.execute_batch(&format!(
+            "DROP TRIGGER security_participant_state_{index}_inactive_delete;
+             DROP TRIGGER security_participant_state_{index}_capture_delete;
+             DELETE FROM security_participant_state_principal_flow_state
+             WHERE principal_id = 'missing-principal';"
+        ))?;
+        connection.execute_batch(&native::schema::sql()?)?;
+    }
+    // The epoch and the session survive under root-0; the principal row does
+    // not. Every native read transaction refolds current rows against anchored
+    // history before any flow read, so the gap is refused there.
+    for session in ["missing-session", "fresh-session"] {
+        let next = key("missing-principal", "root-1", session)?;
+        let refused = fixture
+            .store
+            .observe_security_participant_flow(&binding, &next, &fixture.fence, now_ms())
+            .err()
+            .ok_or("a missing principal label was observed as absent")?;
+        assert!(
+            refused
+                .to_string()
+                .contains("native current rows are missing anchored history"),
+            "{refused}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn resurrected_evicted_session_row_is_refused_at_open() -> AnchoredTestResult {
     let _clock = clock();
     let fixture = fixture();
