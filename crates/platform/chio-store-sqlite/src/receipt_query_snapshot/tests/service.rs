@@ -337,6 +337,21 @@ fn c3_a_substituted_returned_receipt_fails_the_leaf_check() {
 }
 
 #[test]
+fn c3_a_substituted_uncheckpointed_receipt_fails_the_leaf_check() {
+    let fixture = mixed_fixture();
+    let service = ready(&fixture, config());
+    // Receipt 17 is in the uncheckpointed tail, where the per-call path checks
+    // only its own signature and serves the substitute.
+    substitute_varied(&fixture, 17);
+    let error = service.query_receipts(&admin(200)).unwrap_err();
+    assert!(matches!(
+        snapshot_error(error),
+        ReceiptQuerySnapshotError::Invalid(_)
+    ));
+    service.shutdown();
+}
+
+#[test]
 fn c8b_reads_are_never_served_while_the_build_cannot_complete() {
     let fixture = Fixture::new(8);
     fixture.append_varied(0..8);
