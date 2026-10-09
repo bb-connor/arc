@@ -7,8 +7,9 @@ use chio_security_types::ports::{
     RecordId, ResponsePlanKey, ResponsePlanRecord, ResponseSchedulerStore, ScheduledWork,
     SchedulerClaimRequest, SchedulerHealthAckRequest, SchedulerHealthPageRequest,
     SchedulerHealthPort, SchedulerLeaseReleaseRequest, SchedulerLeaseRenewRequest,
-    SchedulerRetryRequest, SchedulerRetryState, SchedulerWorkKey, SecurityAlert, SecurityAlertPort,
-    SecurityReceiptSink, TenantId, LINEAGE_FENCE_MAX_LEASE_MS,
+    SchedulerRelativeRetryRequest, SchedulerRetryState, SchedulerWorkKey, SecurityAlert,
+    SecurityAlertPort, SecurityReceiptSink, TenantId, LINEAGE_FENCE_MAX_LEASE_MS,
+    MAX_SCHEDULER_RETRY_BACKOFF_MS,
 };
 use chio_security_types::{
     ResponseEffectKind, ResponseEffectProgress, ResponseSnapshot, ResponseState,
@@ -103,6 +104,7 @@ impl SchedulerPolicy {
         if self.lease_duration_ms == 0
             || self.base_backoff_ms == 0
             || self.max_backoff_ms < self.base_backoff_ms
+            || self.max_backoff_ms > MAX_SCHEDULER_RETRY_BACKOFF_MS
             || self.operator_page_threshold_ms <= self.max_backoff_ms
             || self.max_claims == 0
         {
@@ -417,9 +419,11 @@ impl<
         self.release(work, false)
     }
 
-    /// Records the next retry from the store's trusted time at recording
-    /// rather than the instant processing began, so an attempt that outlasts
-    /// its backoff still records a retry that is not yet due.
+    /// Records the next retry from the store's trusted time rather than the
+    /// instant processing began, and leaves its deadline to the store, which
+    /// applies the backoff to its trusted time once it holds the write lock.
+    /// Neither an attempt that outlasts its backoff nor a wait for the lock
+    /// can record a retry that is already due.
     fn schedule_retry(
         &self,
         work: &ScheduledWork,
@@ -455,31 +459,28 @@ impl<
             }
             None => None,
         };
-        let delay = bounded_backoff(self.policy, expected_attempts);
-        let not_before_unix_ms = now_unix_ms
-            .checked_add(delay)
-            .ok_or(SchedulerError::TimeOverflow)?;
-        let request = SchedulerRetryRequest {
+        let backoff_ms = bounded_backoff(self.policy, expected_attempts);
+        let request = SchedulerRelativeRetryRequest {
             work: work.clone(),
             expected_attempts,
             error_code: error_code.clone(),
             first_failure_at_unix_ms,
             now_unix_ms,
-            not_before_unix_ms,
+            backoff_ms,
             health_event_id: health_event_id.clone(),
             transition_id: scheduler_transition_id(
-                "retry",
+                "relative_retry",
                 work,
                 &(
                     expected_attempts,
                     &error_code,
                     first_failure_at_unix_ms,
-                    not_before_unix_ms,
+                    backoff_ms,
                     &health_event_id,
                 ),
             )?,
         };
-        let retry = self.store.record_retry(&request)?;
+        let retry = self.store.record_relative_retry(&request)?;
         self.deliver_health_event(&retry, work, now_unix_ms)?;
         Ok(retry_outcome(retry))
     }

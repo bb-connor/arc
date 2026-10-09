@@ -1,4 +1,7 @@
 use super::*;
+use chio_security_types::ports::{
+    SchedulerRelativeRetryRequest, SchedulerWorkKey, MAX_SCHEDULER_RETRY_BACKOFF_MS,
+};
 
 #[test]
 fn terminal_response_work_rejects_scheduler_lease_renewal() {
@@ -530,4 +533,151 @@ fn scheduler_claim_replay_rejects_a_missing_claim_row() {
         work.fencing_token
     );
     assert_eq!(durable.5, 0);
+}
+
+#[test]
+fn relative_retry_deadline_follows_trusted_time_read_after_the_write_lock() {
+    const SAMPLED_AT: u64 = 100_000;
+    const BACKOFF_MS: u64 = 1_000;
+    const LOCK_WAIT_MS: u64 = 2_000;
+    let directory = chio_test_support::private_tempdir()
+        .unwrap_or_else(|error| panic!("temporary directory creation failed: {error}"));
+    let path = directory.path().join("relative-retry-write-lock.db");
+    let clock = Arc::new(MutableSecurityStateClock::new(SAMPLED_AT));
+    let store = Arc::new(
+        SqliteSecurityStateStore::open_with_trusted_clock(
+            &path,
+            Arc::clone(&clock) as Arc<dyn Clock>,
+        )
+        .unwrap_or_else(|error| panic!("security store open failed: {error}")),
+    );
+    let (_, relative_work) = claim_due_planned_response(
+        &store,
+        "action-relative-retry-lock",
+        "relative-retry-lock-claim",
+        "relative-retry-lock-owner",
+        SAMPLED_AT,
+    );
+    let (_, absolute_work) = claim_due_planned_response(
+        &store,
+        "action-absolute-retry-lock",
+        "absolute-retry-lock-claim",
+        "absolute-retry-lock-owner",
+        SAMPLED_AT,
+    );
+    let error_code = ErrorCode::new("response.rollback_partial")
+        .unwrap_or_else(|error| panic!("retry error code failed: {error}"));
+    // Both requests carry the trusted time sampled before waiting for the
+    // write lock.
+    let relative = SchedulerRelativeRetryRequest {
+        work: relative_work.clone(),
+        expected_attempts: 0,
+        error_code: error_code.clone(),
+        first_failure_at_unix_ms: SAMPLED_AT,
+        now_unix_ms: SAMPLED_AT,
+        backoff_ms: BACKOFF_MS,
+        health_event_id: None,
+        transition_id: record_id("relative-retry-after-lock-wait"),
+    };
+    let absolute = SchedulerRetryRequest {
+        work: absolute_work.clone(),
+        expected_attempts: 0,
+        error_code: error_code.clone(),
+        first_failure_at_unix_ms: SAMPLED_AT,
+        now_unix_ms: SAMPLED_AT,
+        not_before_unix_ms: SAMPLED_AT + BACKOFF_MS,
+        health_event_id: None,
+        transition_id: record_id("absolute-retry-after-lock-wait"),
+    };
+
+    // Another writer holds the lock while trusted time passes beyond the
+    // backoff. Neither call can acquire the lock before the release, so the
+    // store's trusted read follows the advance wherever each call waits.
+    let writer = rusqlite::Connection::open(&path)
+        .unwrap_or_else(|error| panic!("lock holder connection failed: {error}"));
+    writer
+        .execute_batch("BEGIN IMMEDIATE")
+        .unwrap_or_else(|error| panic!("write lock acquisition failed: {error}"));
+    let (relative_result, absolute_result) = thread::scope(|scope| {
+        let relative_call = scope.spawn(|| store.record_relative_retry(&relative));
+        let absolute_call = scope.spawn(|| store.record_retry(&absolute));
+        clock.set(SAMPLED_AT + LOCK_WAIT_MS);
+        writer
+            .execute_batch("COMMIT")
+            .unwrap_or_else(|error| panic!("write lock release failed: {error}"));
+        (
+            relative_call
+                .join()
+                .unwrap_or_else(|_| panic!("relative retry call panicked")),
+            absolute_call
+                .join()
+                .unwrap_or_else(|_| panic!("absolute retry call panicked")),
+        )
+    });
+
+    let recorded = relative_result
+        .unwrap_or_else(|error| panic!("relative retry after a write lock wait failed: {error}"));
+    assert_eq!(
+        (
+            recorded.attempts,
+            recorded.first_failure_at_unix_ms,
+            recorded.not_before_unix_ms
+        ),
+        (1, SAMPLED_AT, SAMPLED_AT + LOCK_WAIT_MS + BACKOFF_MS)
+    );
+    let relative_key = SchedulerWorkKey {
+        tenant_id: relative_work.tenant_id.clone(),
+        action_id: relative_work.action_id.clone(),
+    };
+    assert_eq!(
+        store
+            .load_retry(&relative_key)
+            .unwrap_or_else(|error| panic!("relative retry readback failed: {error}")),
+        Some(recorded.clone())
+    );
+    assert_eq!(
+        store
+            .record_relative_retry(&relative)
+            .unwrap_or_else(|error| panic!("relative retry replay failed: {error}")),
+        recorded
+    );
+
+    let refusal = rejected(
+        absolute_result,
+        "an absolute retry deadline that fell due during the lock wait was recorded",
+    );
+    assert_eq!(refusal.kind(), PortErrorKind::InvalidData);
+    let absolute_key = SchedulerWorkKey {
+        tenant_id: absolute_work.tenant_id.clone(),
+        action_id: absolute_work.action_id.clone(),
+    };
+    assert_eq!(
+        store
+            .load_retry(&absolute_key)
+            .unwrap_or_else(|error| panic!("absolute retry readback failed: {error}")),
+        None
+    );
+    store
+        .validate_lease(&absolute_work)
+        .unwrap_or_else(|error| panic!("refused retry changed the lease: {error}"));
+
+    for backoff_ms in [0, MAX_SCHEDULER_RETRY_BACKOFF_MS + 1] {
+        let error = rejected(
+            store.record_relative_retry(&SchedulerRelativeRetryRequest {
+                work: absolute_work.clone(),
+                expected_attempts: 0,
+                error_code: error_code.clone(),
+                first_failure_at_unix_ms: SAMPLED_AT + LOCK_WAIT_MS,
+                now_unix_ms: SAMPLED_AT + LOCK_WAIT_MS,
+                backoff_ms,
+                health_event_id: None,
+                transition_id: record_id(&format!("relative-retry-backoff-{backoff_ms}")),
+            }),
+            "an unbounded relative retry backoff was recorded",
+        );
+        assert_eq!(error.kind(), PortErrorKind::InvalidData);
+    }
+    store
+        .validate_lease(&absolute_work)
+        .unwrap_or_else(|error| panic!("refused backoffs changed the lease: {error}"));
 }

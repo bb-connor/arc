@@ -6,12 +6,13 @@ use chio_quarantine::{
 };
 use chio_security_types::ports::{
     ActionId, AlertDeliveryQuery, AlertDeliveryStatus, CanonicalBody, CreateOutcome, Digest32,
-    LeaseOwnerId, PortError, PortResult, RecordId, ResponseCasRequest, ResponseEffectCasRequest,
-    ResponseEffectKey, ResponseEffectRecord, ResponsePlanKey, ResponsePlanRecord,
-    ResponseScheduledMutationCasRequest, ResponseSchedulerStore, ResponseStore, ScheduledWork,
-    SchedulerClaimRequest, SchedulerHealthAckRequest, SchedulerHealthPageRequest,
+    ErrorCode, LeaseOwnerId, PortError, PortResult, RecordId, ResponseCasRequest,
+    ResponseEffectCasRequest, ResponseEffectKey, ResponseEffectRecord, ResponsePlanKey,
+    ResponsePlanRecord, ResponseScheduledMutationCasRequest, ResponseSchedulerStore, ResponseStore,
+    ScheduledWork, SchedulerClaimRequest, SchedulerHealthAckRequest, SchedulerHealthPageRequest,
     SchedulerHealthPort, SchedulerLeaseReleaseRequest, SchedulerLeaseRenewRequest,
-    SchedulerRetryRequest, SchedulerRetryState, SchedulerWorkKey, SessionId, TenantId,
+    SchedulerRelativeRetryRequest, SchedulerRetryRequest, SchedulerRetryState, SchedulerWorkKey,
+    SessionId, TenantId, MAX_SCHEDULER_RETRY_BACKOFF_MS,
 };
 use chio_security_types::{
     OperatorCapabilityBinding, ResponseApprovalRequirement, ResponseEffectKind, ResponseEffectSpec,
@@ -118,6 +119,7 @@ struct SchedulerState {
     fail_health_ack_once: bool,
     claim_expiry_extension_ms: u64,
     trusted_now_unix_ms: Option<u64>,
+    record_lock_wait_ms: u64,
 }
 
 #[derive(Default)]
@@ -159,6 +161,67 @@ impl SchedulerStore {
             .ok_or_else(PortError::invalid_data)?;
         state.trusted_now_unix_ms = Some(now);
         Ok(now)
+    }
+
+    /// Trusted time that passes while each retry recording waits for the
+    /// store's write lock, before the store reads its trusted clock.
+    fn set_record_lock_wait_ms(&self, wait_ms: u64) {
+        self.state()
+            .unwrap_or_else(|error| panic!("scheduler state: {error}"))
+            .record_lock_wait_ms = wait_ms;
+    }
+
+    /// Records a retry under the store contract: the trusted clock is read
+    /// once the write lock is held and the deadline must still be ahead of it.
+    fn record_retry_at(
+        &self,
+        work: &ScheduledWork,
+        expected_attempts: u32,
+        error_code: &ErrorCode,
+        first_failure_at_unix_ms: u64,
+        health_event_id: Option<&RecordId>,
+        not_before: impl FnOnce(u64) -> PortResult<u64>,
+    ) -> PortResult<SchedulerRetryState> {
+        self.validate_lease(work)?;
+        let mut state = self.state()?;
+        let trusted_now = state
+            .trusted_now_unix_ms
+            .ok_or_else(PortError::unavailable)?
+            .checked_add(state.record_lock_wait_ms)
+            .ok_or_else(PortError::invalid_data)?;
+        state.trusted_now_unix_ms = Some(trusted_now);
+        let not_before_unix_ms = not_before(trusted_now)?;
+        if not_before_unix_ms <= trusted_now {
+            return Err(PortError::invalid_data());
+        }
+        let current_attempts = state
+            .retry
+            .as_ref()
+            .map(|retry| retry.attempts)
+            .unwrap_or(0);
+        if current_attempts != expected_attempts {
+            return Err(PortError::conflict());
+        }
+        let retry = SchedulerRetryState {
+            key: SchedulerWorkKey {
+                tenant_id: work.tenant_id.clone(),
+                action_id: work.action_id.clone(),
+            },
+            attempts: expected_attempts
+                .checked_add(1)
+                .ok_or_else(PortError::integrity_failure)?,
+            last_error: error_code.clone(),
+            first_failure_at_unix_ms,
+            not_before_unix_ms,
+            health_event_id: health_event_id.cloned(),
+            health_event_delivered: state
+                .retry
+                .as_ref()
+                .is_some_and(|retry| retry.health_event_delivered),
+        };
+        state.retry = Some(retry.clone());
+        state.work = None;
+        Ok(retry)
     }
 
     fn trusted_now(&self) -> Option<u64> {
@@ -385,43 +448,35 @@ impl ResponseSchedulerStore for SchedulerStore {
     }
 
     fn record_retry(&self, request: &SchedulerRetryRequest) -> PortResult<SchedulerRetryState> {
-        self.validate_lease(&request.work)?;
-        let mut state = self.state()?;
-        if state
-            .trusted_now_unix_ms
-            .is_none_or(|now| request.not_before_unix_ms <= now)
-        {
+        self.record_retry_at(
+            &request.work,
+            request.expected_attempts,
+            &request.error_code,
+            request.first_failure_at_unix_ms,
+            request.health_event_id.as_ref(),
+            |_| Ok(request.not_before_unix_ms),
+        )
+    }
+
+    fn record_relative_retry(
+        &self,
+        request: &SchedulerRelativeRetryRequest,
+    ) -> PortResult<SchedulerRetryState> {
+        if request.backoff_ms == 0 || request.backoff_ms > MAX_SCHEDULER_RETRY_BACKOFF_MS {
             return Err(PortError::invalid_data());
         }
-        let current_attempts = state
-            .retry
-            .as_ref()
-            .map(|retry| retry.attempts)
-            .unwrap_or(0);
-        if current_attempts != request.expected_attempts {
-            return Err(PortError::conflict());
-        }
-        let retry = SchedulerRetryState {
-            key: SchedulerWorkKey {
-                tenant_id: request.work.tenant_id.clone(),
-                action_id: request.work.action_id.clone(),
+        self.record_retry_at(
+            &request.work,
+            request.expected_attempts,
+            &request.error_code,
+            request.first_failure_at_unix_ms,
+            request.health_event_id.as_ref(),
+            |trusted_now| {
+                trusted_now
+                    .checked_add(request.backoff_ms)
+                    .ok_or_else(PortError::invalid_data)
             },
-            attempts: request
-                .expected_attempts
-                .checked_add(1)
-                .ok_or_else(PortError::integrity_failure)?,
-            last_error: request.error_code.clone(),
-            first_failure_at_unix_ms: request.first_failure_at_unix_ms,
-            not_before_unix_ms: request.not_before_unix_ms,
-            health_event_id: request.health_event_id.clone(),
-            health_event_delivered: state
-                .retry
-                .as_ref()
-                .is_some_and(|retry| retry.health_event_delivered),
-        };
-        state.retry = Some(retry.clone());
-        state.work = None;
-        Ok(retry)
+        )
     }
 
     fn acknowledge_health_event(
@@ -866,6 +921,55 @@ fn scheduler_retry_after_an_attempt_outlasting_its_backoff_is_recorded_not_yet_d
         let retry = store
             .retry()
             .unwrap_or_else(|| panic!("retry after a slow attempt was not recorded"));
+        let trusted_now = store
+            .trusted_now()
+            .unwrap_or_else(|| panic!("trusted clock was not observed"));
+        assert_eq!(
+            (
+                retry.attempts,
+                retry.first_failure_at_unix_ms,
+                retry.not_before_unix_ms
+            ),
+            (attempts, first_failure, not_before)
+        );
+        assert!(retry.not_before_unix_ms > trusted_now);
+    }
+}
+
+#[test]
+fn scheduler_retry_recorded_after_a_store_write_lock_wait_is_not_yet_due() {
+    let store = Arc::new(SchedulerStore::default());
+    let _planned = plan(Arc::clone(&store));
+    store.set_record_lock_wait_ms(25);
+    let scheduler = ResponseScheduler::new(
+        Arc::clone(&store),
+        Arc::new(UnavailableExecutor::default()),
+        Arc::new(TestHealthSink::default()),
+        policy(),
+    )
+    .unwrap_or_else(|error| panic!("scheduler: {error}"));
+
+    for (now, claim, attempts, first_failure, not_before) in [
+        (1_000, "lock-wait-attempt-1", 1, 1_000, 1_035),
+        (1_035, "lock-wait-attempt-2", 2, 1_000, 1_080),
+    ] {
+        let outcomes = scheduler
+            .tick(&tick(now, claim))
+            .unwrap_or_else(|error| panic!("lock wait tick: {error}"));
+        assert!(
+            matches!(
+                outcomes.as_slice(),
+                [SchedulerWorkOutcome::RetryScheduled {
+                    attempts: actual_attempts,
+                    not_before_unix_ms,
+                    ..
+                }] if *actual_attempts == attempts && *not_before_unix_ms == not_before
+            ),
+            "a retry recorded after a write lock wait did not schedule: {outcomes:?}"
+        );
+        let retry = store
+            .retry()
+            .unwrap_or_else(|| panic!("retry after a write lock wait was not recorded"));
         let trusted_now = store
             .trusted_now()
             .unwrap_or_else(|| panic!("trusted clock was not observed"));

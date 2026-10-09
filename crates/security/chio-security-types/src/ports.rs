@@ -244,8 +244,8 @@ mod scheduler;
 pub use scheduler::{ResponseSchedulerStore, SchedulerHealthPort};
 pub use scheduler::{
     ScheduledWork, SchedulerClaimRequest, SchedulerHealthAckRequest, SchedulerHealthPageRequest,
-    SchedulerLeaseReleaseRequest, SchedulerLeaseRenewRequest, SchedulerRetryRequest,
-    SchedulerRetryState, SchedulerWorkKey,
+    SchedulerLeaseReleaseRequest, SchedulerLeaseRenewRequest, SchedulerRelativeRetryRequest,
+    SchedulerRetryRequest, SchedulerRetryState, SchedulerWorkKey, MAX_SCHEDULER_RETRY_BACKOFF_MS,
 };
 
 mod suspension;

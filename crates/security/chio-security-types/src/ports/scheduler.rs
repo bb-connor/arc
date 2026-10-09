@@ -71,6 +71,24 @@ pub struct SchedulerRetryRequest {
     pub transition_id: RecordId,
 }
 
+/// Largest backoff a relative scheduler retry may request.
+pub const MAX_SCHEDULER_RETRY_BACKOFF_MS: u64 = 86_400_000;
+
+/// A scheduler retry whose `not_before` the store fixes at its trusted time,
+/// read once the write transaction holds the lock, plus `backoff_ms`.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SchedulerRelativeRetryRequest {
+    pub work: ScheduledWork,
+    pub expected_attempts: u32,
+    pub error_code: ErrorCode,
+    pub first_failure_at_unix_ms: u64,
+    pub now_unix_ms: u64,
+    pub backoff_ms: u64,
+    pub health_event_id: Option<RecordId>,
+    pub transition_id: RecordId,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SchedulerHealthAckRequest {
@@ -128,6 +146,17 @@ pub trait ResponseSchedulerStore: ResponseStore {
         Err(PortError::unavailable())
     }
     fn record_retry(&self, request: &SchedulerRetryRequest) -> PortResult<SchedulerRetryState>;
+    /// Record a retry due `backoff_ms` after the store's trusted time, read
+    /// once the write lock is held, so no wait before recording can make the
+    /// retry already due. Backoffs of zero or above
+    /// `MAX_SCHEDULER_RETRY_BACKOFF_MS` are refused, as is a store that cannot
+    /// fix the deadline under its write lock.
+    fn record_relative_retry(
+        &self,
+        _request: &SchedulerRelativeRetryRequest,
+    ) -> PortResult<SchedulerRetryState> {
+        Err(PortError::unavailable())
+    }
     fn acknowledge_health_event(
         &self,
         request: &SchedulerHealthAckRequest,

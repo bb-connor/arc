@@ -13,6 +13,8 @@ use super::{
     Transaction, TransactionBehavior,
 };
 
+use chio_security_types::ports::{SchedulerRelativeRetryRequest, MAX_SCHEDULER_RETRY_BACKOFF_MS};
+
 pub(super) const MAX_SCHEDULER_CLAIMS: u32 = 1_024;
 pub(super) const MAX_CLOCK_SKEW_MS: u64 = 5_000;
 
@@ -463,6 +465,159 @@ impl SqliteSecurityStateStore {
     }
 }
 
+/// How a recorded retry's `not_before` is fixed.
+#[derive(Clone, Copy)]
+enum RetryDeadline {
+    /// A caller deadline, refused unless still in the future at recording.
+    At(u64),
+    /// A backoff from the trusted time read once the write lock is held.
+    After(u64),
+}
+
+struct SchedulerRetryRecord<'a> {
+    work: &'a ScheduledWork,
+    expected_attempts: u32,
+    error_code: &'a ErrorCode,
+    first_failure_at_unix_ms: u64,
+    now_unix_ms: u64,
+    health_event_id: Option<&'a RecordId>,
+    transition_id: &'a RecordId,
+    transition_kind: &'static str,
+    request_hash: [u8; 32],
+    deadline: RetryDeadline,
+}
+
+fn record_scheduler_retry(
+    store: &SqliteSecurityStateStore,
+    request: SchedulerRetryRecord<'_>,
+) -> PortResult<SchedulerRetryState> {
+    if request.first_failure_at_unix_ms > request.now_unix_ms {
+        return Err(PortError::invalid_data());
+    }
+    if let RetryDeadline::After(backoff_ms) = request.deadline {
+        if backoff_ms == 0 || backoff_ms > MAX_SCHEDULER_RETRY_BACKOFF_MS {
+            return Err(PortError::invalid_data());
+        }
+    }
+    let next_attempts = request
+        .expected_attempts
+        .checked_add(1)
+        .ok_or_else(PortError::invalid_data)?;
+    let request_hash = request.request_hash;
+    let key = SchedulerWorkKey {
+        tenant_id: request.work.tenant_id.clone(),
+        action_id: request.work.action_id.clone(),
+    };
+    let mut connection = store.connection()?;
+    let transaction = connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(sqlite_error)?;
+    let trusted_now = store.trusted_now_in_transaction(&transaction)?;
+    if transition_status(
+        &transaction,
+        request.work.tenant_id.as_str(),
+        request.transition_id.as_str(),
+        request.transition_kind,
+        &request_hash,
+    )? {
+        let stored = load_scheduler_retry(&transaction, &key)?.ok_or_else(PortError::conflict)?;
+        if stored.attempts > next_attempts {
+            return Err(PortError::conflict());
+        }
+        if stored.attempts < next_attempts
+            || stored.last_error != *request.error_code
+            || stored.first_failure_at_unix_ms != request.first_failure_at_unix_ms
+            || matches!(
+                request.deadline,
+                RetryDeadline::At(not_before) if stored.not_before_unix_ms != not_before
+            )
+            || stored.health_event_id.as_ref() != request.health_event_id
+        {
+            return Err(PortError::integrity_failure());
+        }
+        transaction.commit().map_err(sqlite_error)?;
+        return Ok(stored);
+    }
+    let not_before_unix_ms = match request.deadline {
+        RetryDeadline::At(not_before) => not_before,
+        RetryDeadline::After(backoff_ms) => trusted_now
+            .checked_add(backoff_ms)
+            .ok_or_else(PortError::invalid_data)?,
+    };
+    if request.now_unix_ms.abs_diff(trusted_now) > MAX_CLOCK_SKEW_MS
+        || not_before_unix_ms <= trusted_now
+    {
+        return Err(PortError::invalid_data());
+    }
+    validate_scheduler_work(&transaction, request.work, trusted_now)?;
+    let current = load_scheduler_retry(&transaction, &key)?;
+    let current_attempts = current.as_ref().map(|retry| retry.attempts).unwrap_or(0);
+    if current_attempts != request.expected_attempts {
+        return Err(PortError::conflict());
+    }
+    if let Some(current) = current.as_ref() {
+        if current.first_failure_at_unix_ms != request.first_failure_at_unix_ms
+            || current
+                .health_event_id
+                .as_ref()
+                .is_some_and(|event_id| Some(event_id) != request.health_event_id)
+            || current.health_event_delivered && request.health_event_id.is_none()
+        {
+            return Err(PortError::conflict());
+        }
+    } else if request.first_failure_at_unix_ms != request.now_unix_ms {
+        return Err(PortError::invalid_data());
+    }
+    let health_event_delivered = current
+        .as_ref()
+        .is_some_and(|retry| retry.health_event_delivered);
+    transaction
+        .execute(
+            r#"
+            INSERT INTO security_scheduler_retries (
+                tenant_id, action_id, attempts, last_error, first_failure_at,
+                not_before, health_event_id, health_event_delivered
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+            ON CONFLICT (tenant_id, action_id) DO UPDATE SET
+                attempts = excluded.attempts,
+                last_error = excluded.last_error,
+                first_failure_at = excluded.first_failure_at,
+                not_before = excluded.not_before,
+                health_event_id = excluded.health_event_id
+            "#,
+            params![
+                request.work.tenant_id.as_str(),
+                request.work.action_id.as_str(),
+                i64::from(next_attempts),
+                request.error_code.as_str(),
+                to_i64(request.first_failure_at_unix_ms)?,
+                to_i64(not_before_unix_ms)?,
+                request.health_event_id.map(RecordId::as_str),
+                i64::from(health_event_delivered)
+            ],
+        )
+        .map_err(sqlite_error)?;
+    delete_scheduler_lease(&transaction, request.work)?;
+    record_transition(
+        &transaction,
+        request.work.tenant_id.as_str(),
+        request.transition_id.as_str(),
+        request.transition_kind,
+        &request_hash,
+    )?;
+    let retry = SchedulerRetryState {
+        key,
+        attempts: next_attempts,
+        last_error: request.error_code.clone(),
+        first_failure_at_unix_ms: request.first_failure_at_unix_ms,
+        not_before_unix_ms,
+        health_event_id: request.health_event_id.cloned(),
+        health_event_delivered,
+    };
+    transaction.commit().map_err(sqlite_error)?;
+    Ok(retry)
+}
+
 impl ResponseSchedulerStore for SqliteSecurityStateStore {
     fn load_retry(&self, key: &SchedulerWorkKey) -> PortResult<Option<SchedulerRetryState>> {
         let connection = self.connection()?;
@@ -818,118 +973,42 @@ impl ResponseSchedulerStore for SqliteSecurityStateStore {
     }
 
     fn record_retry(&self, request: &SchedulerRetryRequest) -> PortResult<SchedulerRetryState> {
-        if request.first_failure_at_unix_ms > request.now_unix_ms {
-            return Err(PortError::invalid_data());
-        }
-        let next_attempts = request
-            .expected_attempts
-            .checked_add(1)
-            .ok_or_else(PortError::invalid_data)?;
-        let request_hash = canonical_request_hash(request)?;
-        let key = SchedulerWorkKey {
-            tenant_id: request.work.tenant_id.clone(),
-            action_id: request.work.action_id.clone(),
-        };
-        let mut connection = self.connection()?;
-        let transaction = connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(sqlite_error)?;
-        let trusted_now = self.trusted_now_in_transaction(&transaction)?;
-        if transition_status(
-            &transaction,
-            request.work.tenant_id.as_str(),
-            request.transition_id.as_str(),
-            "scheduler_retry",
-            &request_hash,
-        )? {
-            let stored =
-                load_scheduler_retry(&transaction, &key)?.ok_or_else(PortError::conflict)?;
-            if stored.attempts > next_attempts {
-                return Err(PortError::conflict());
-            }
-            if stored.attempts < next_attempts
-                || stored.last_error != request.error_code
-                || stored.first_failure_at_unix_ms != request.first_failure_at_unix_ms
-                || stored.not_before_unix_ms != request.not_before_unix_ms
-                || stored.health_event_id != request.health_event_id
-            {
-                return Err(PortError::integrity_failure());
-            }
-            transaction.commit().map_err(sqlite_error)?;
-            return Ok(stored);
-        }
-        if request.now_unix_ms.abs_diff(trusted_now) > MAX_CLOCK_SKEW_MS
-            || request.not_before_unix_ms <= trusted_now
-        {
-            return Err(PortError::invalid_data());
-        }
-        validate_scheduler_work(&transaction, &request.work, trusted_now)?;
-        let current = load_scheduler_retry(&transaction, &key)?;
-        let current_attempts = current.as_ref().map(|retry| retry.attempts).unwrap_or(0);
-        if current_attempts != request.expected_attempts {
-            return Err(PortError::conflict());
-        }
-        if let Some(current) = current.as_ref() {
-            if current.first_failure_at_unix_ms != request.first_failure_at_unix_ms
-                || current
-                    .health_event_id
-                    .as_ref()
-                    .is_some_and(|event_id| Some(event_id) != request.health_event_id.as_ref())
-                || current.health_event_delivered && request.health_event_id.is_none()
-            {
-                return Err(PortError::conflict());
-            }
-        } else if request.first_failure_at_unix_ms != request.now_unix_ms {
-            return Err(PortError::invalid_data());
-        }
-        let health_event_delivered = current
-            .as_ref()
-            .is_some_and(|retry| retry.health_event_delivered);
-        transaction
-            .execute(
-                r#"
-                INSERT INTO security_scheduler_retries (
-                    tenant_id, action_id, attempts, last_error, first_failure_at,
-                    not_before, health_event_id, health_event_delivered
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-                ON CONFLICT (tenant_id, action_id) DO UPDATE SET
-                    attempts = excluded.attempts,
-                    last_error = excluded.last_error,
-                    first_failure_at = excluded.first_failure_at,
-                    not_before = excluded.not_before,
-                    health_event_id = excluded.health_event_id
-                "#,
-                params![
-                    request.work.tenant_id.as_str(),
-                    request.work.action_id.as_str(),
-                    i64::from(next_attempts),
-                    request.error_code.as_str(),
-                    to_i64(request.first_failure_at_unix_ms)?,
-                    to_i64(request.not_before_unix_ms)?,
-                    request.health_event_id.as_ref().map(RecordId::as_str),
-                    i64::from(health_event_delivered)
-                ],
-            )
-            .map_err(sqlite_error)?;
-        delete_scheduler_lease(&transaction, &request.work)?;
-        record_transition(
-            &transaction,
-            request.work.tenant_id.as_str(),
-            request.transition_id.as_str(),
-            "scheduler_retry",
-            &request_hash,
-        )?;
-        let retry = SchedulerRetryState {
-            key,
-            attempts: next_attempts,
-            last_error: request.error_code.clone(),
-            first_failure_at_unix_ms: request.first_failure_at_unix_ms,
-            not_before_unix_ms: request.not_before_unix_ms,
-            health_event_id: request.health_event_id.clone(),
-            health_event_delivered,
-        };
-        transaction.commit().map_err(sqlite_error)?;
-        Ok(retry)
+        record_scheduler_retry(
+            self,
+            SchedulerRetryRecord {
+                work: &request.work,
+                expected_attempts: request.expected_attempts,
+                error_code: &request.error_code,
+                first_failure_at_unix_ms: request.first_failure_at_unix_ms,
+                now_unix_ms: request.now_unix_ms,
+                health_event_id: request.health_event_id.as_ref(),
+                transition_id: &request.transition_id,
+                transition_kind: "scheduler_retry",
+                request_hash: canonical_request_hash(request)?,
+                deadline: RetryDeadline::At(request.not_before_unix_ms),
+            },
+        )
+    }
+
+    fn record_relative_retry(
+        &self,
+        request: &SchedulerRelativeRetryRequest,
+    ) -> PortResult<SchedulerRetryState> {
+        record_scheduler_retry(
+            self,
+            SchedulerRetryRecord {
+                work: &request.work,
+                expected_attempts: request.expected_attempts,
+                error_code: &request.error_code,
+                first_failure_at_unix_ms: request.first_failure_at_unix_ms,
+                now_unix_ms: request.now_unix_ms,
+                health_event_id: request.health_event_id.as_ref(),
+                transition_id: &request.transition_id,
+                transition_kind: "scheduler_relative_retry",
+                request_hash: canonical_request_hash(request)?,
+                deadline: RetryDeadline::After(request.backoff_ms),
+            },
+        )
     }
 
     fn acknowledge_health_event(
