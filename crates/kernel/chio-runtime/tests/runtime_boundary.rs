@@ -160,7 +160,10 @@ fn runtime_cli_helper_parsers_return_chio_errors() {
         std::any::type_name_of_val(&admission_error),
         "chio_runtime::ChioRuntimeError"
     );
-    assert_eq!(admission_error.code(), "runtime_admission_json");
+    assert_eq!(
+        admission_error.code(),
+        "urn:chio:error:attest:signed-json-invalid-input"
+    );
 
     let orchestration_error = match chio_runtime::runtime_orchestration_profile_from_json("{") {
         Ok(_) => panic!("invalid runtime orchestration profile JSON should fail"),
@@ -170,7 +173,10 @@ fn runtime_cli_helper_parsers_return_chio_errors() {
         std::any::type_name_of_val(&orchestration_error),
         "chio_runtime::ChioRuntimeError"
     );
-    assert_eq!(orchestration_error.code(), "runtime_admission_json");
+    assert_eq!(
+        orchestration_error.code(),
+        "urn:chio:error:attest:signed-json-invalid-input"
+    );
 }
 
 #[test]
