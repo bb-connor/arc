@@ -13,10 +13,34 @@
 //!    tools it should not expose.
 
 #![forbid(unsafe_code)]
+use crate::manifest::ensure_embedded_public_key_matches;
+pub use manifest::{
+    sign_manifest, BridgeSecurityMetadata, EnvironmentVariableName, ManifestError,
+    NativeSyscallProfile, NetworkDestination, NormalizedHost, RequiredPermissions, ServerTool,
+    SignedManifest, ToolManifest, TOOL_MANIFEST_SCHEMA,
+};
 
 mod admission;
 mod input_schema;
+mod manifest;
 mod validation;
+
+use chio_core::crypto::PublicKey;
+pub use chio_core::manifest::{
+    DeclassificationPurpose, LatencyHint, PricingModel, ToolAnnotations, ToolDefinition,
+    ToolFlowDeclaration, ToolFlowValidationError, ToolPricing,
+};
+
+pub use admission::{
+    load_existing_verified_manifest_registry, AdmittedToolSecurity, AuthoritativeToolPolicy,
+    RuntimeToolTopology, VerifiedCageManifest, VerifiedManifestAdmissionError,
+    VerifiedManifestLoadError, VerifiedManifestRegistry,
+};
+pub use input_schema::{
+    trusted_server_tool_input_schema, ToolInputSchemaError, ToolInputSchemaValidator,
+    VerifiedManifestInvocationError, SERVER_TOOL_INPUT_SCHEMA_CATALOG_VERSION,
+};
+pub use validation::validate_manifest;
 
 /// Verify a signed manifest against a known public key.
 pub fn verify_manifest(
@@ -35,8 +59,3 @@ pub fn verify_manifest(
         Err(ManifestError::VerificationFailed)
     }
 }
-
-include!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/src/lib_parts/part_01.inc"
-));

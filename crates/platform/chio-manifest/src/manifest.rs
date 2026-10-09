@@ -1,20 +1,17 @@
+use crate::validation::validate_manifest;
+#[cfg(test)]
+use crate::verify_manifest;
 use chio_core::crypto::{Keypair, PublicKey, Signature};
-pub use chio_core::manifest::{
-    DeclassificationPurpose, LatencyHint, PricingModel, ToolAnnotations, ToolDefinition,
-    ToolFlowDeclaration, ToolFlowValidationError, ToolPricing,
-};
+#[cfg(test)]
+use chio_core::manifest::LatencyHint;
+#[cfg(test)]
+use chio_core::manifest::PricingModel;
+#[cfg(test)]
+use chio_core::manifest::ToolAnnotations;
+#[cfg(test)]
+use chio_core::manifest::ToolPricing;
+use chio_core::manifest::{ToolDefinition, ToolFlowDeclaration};
 use serde::{Deserialize, Serialize};
-
-pub use admission::{
-    load_existing_verified_manifest_registry, AdmittedToolSecurity, AuthoritativeToolPolicy,
-    RuntimeToolTopology, VerifiedCageManifest, VerifiedManifestAdmissionError,
-    VerifiedManifestLoadError, VerifiedManifestRegistry,
-};
-pub use input_schema::{
-    trusted_server_tool_input_schema, ToolInputSchemaError, ToolInputSchemaValidator,
-    VerifiedManifestInvocationError, SERVER_TOOL_INPUT_SCHEMA_CATALOG_VERSION,
-};
-pub use validation::validate_manifest;
 
 /// Supported Chio tool-manifest schema identifier.
 pub const TOOL_MANIFEST_SCHEMA: &str = chio_core::signed_artifact::CHIO_TOOL_MANIFEST_V2_SCHEMA;
@@ -171,14 +168,14 @@ impl ServerTool {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct BridgeSecurityMetadata {
-    flow: Option<ToolFlowDeclaration>,
-    effective_egress: bool,
+    pub(super) flow: Option<ToolFlowDeclaration>,
+    pub(super) effective_egress: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    manifest_digest: Option<String>,
+    pub(super) manifest_digest: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    server_id: Option<chio_core::ServerId>,
+    pub(super) server_id: Option<chio_core::ServerId>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    tool_name: Option<String>,
+    pub(super) tool_name: Option<String>,
 }
 
 impl BridgeSecurityMetadata {
@@ -580,7 +577,7 @@ pub fn sign_manifest(
     })
 }
 
-fn ensure_embedded_public_key_matches(
+pub(super) fn ensure_embedded_public_key_matches(
     manifest: &ToolManifest,
     signer_key: &PublicKey,
 ) -> Result<(), ManifestError> {

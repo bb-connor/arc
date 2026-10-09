@@ -498,12 +498,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         max_lines=1_425,
         max_fragments=1,
     ),
-    "crates/platform/chio-manifest/src/lib.rs": allow(
-        "2026-10-31",
-        "manifest surface assembled from include! fragments; capped until the fragments become modules",
-        max_lines=1_385,
-        max_fragments=1,
-    ),
     "crates/economy/chio-credit/src/lib.rs": allow(
         "2026-10-31",
         "credit surface assembled from include! fragments; capped until the fragments become modules",

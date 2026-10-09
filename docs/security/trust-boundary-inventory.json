@@ -221,7 +221,7 @@
     "crates/platform/chio-http-core/src/input.rs",
     "crates/platform/chio-http-core/src/plan.rs",
     "crates/platform/chio-manifest/src/admission.rs",
-    "crates/platform/chio-manifest/src/lib_parts/part_01.inc",
+    "crates/platform/chio-manifest/src/manifest.rs",
     "crates/platform/chio-risk-comptroller/src/evidence_refs.rs",
     "crates/platform/chio-store-sqlite/src/admission_operation_store.rs",
     "crates/platform/chio-store-sqlite/src/admission_operation_store/credit_exposure.rs",
@@ -2313,8 +2313,8 @@
     "crates/platform/chio-http-core/src/authority.rs::evaluate::from_value",
     "crates/platform/chio-http-core/src/plan.rs::decode_plan::from_slice",
     "crates/platform/chio-http-core/src/plan.rs::decode_plan::from_value",
-    "crates/platform/chio-manifest/src/lib_parts/part_01.inc::as_str::custom_deserialize",
-    "crates/platform/chio-manifest/src/lib_parts/part_01.inc::as_str::custom_deserialize",
+    "crates/platform/chio-manifest/src/manifest.rs::as_str::custom_deserialize",
+    "crates/platform/chio-manifest/src/manifest.rs::as_str::custom_deserialize",
     "crates/platform/chio-store-sqlite/src/channel_release_publisher_store/qualification.rs::qualify_root_publication_result::from_value",
     "crates/platform/chio-store-sqlite/src/finding_operator_bundle_store.rs::validate_canonical_bundle::from_slice",
     "crates/platform/chio-store-sqlite/src/finding_operator_bundle_store.rs::validate_canonical_json::from_slice",
@@ -4786,7 +4786,7 @@
     "crates/platform/chio-http-core/src/authority.rs::evaluate::from_value": "Presented capabilities are bounded to 64 KiB and original-token validated. Typed input causes stay local in prepared/final evaluation while receipts contain safe denial text. Issuer, signature, revocation and scope checks remain. Token time, retry expiry and receipt time share the kernel fenced clock; internal guard Value projection follows kernel-owned request construction.",
     "crates/platform/chio-http-core/src/plan.rs::decode_plan::from_slice": "Plan bytes are bounded to 1 MiB and duplicate-aware unsigned document parsing preserves ordinary argument floats. The original borrowed capability subtree independently satisfies the 64 KiB lossless native signed contract before kernel evaluation. Native local causes project a fixed HTTP 400 body; the kernel retains aggregate capability and plan authority.",
     "crates/platform/chio-http-core/src/plan.rs::decode_plan::from_value": "Plan bytes are bounded to 1 MiB and duplicate-aware unsigned document parsing preserves ordinary argument floats. The original borrowed capability subtree independently satisfies the 64 KiB lossless native signed contract before kernel evaluation. Native local causes project a fixed HTTP 400 body; the kernel retains aggregate capability and plan authority.",
-    "crates/platform/chio-manifest/src/lib_parts/part_01.inc::as_str::custom_deserialize": "Only current manifest v2 types and signature verification remain. The obsolete v1 converter, migration type, legacy schema and permission amendment APIs are removed; fixture v1 input is negative data only.",
+    "crates/platform/chio-manifest/src/manifest.rs::as_str::custom_deserialize": "Only current manifest v2 types and signature verification remain. The obsolete v1 converter, migration type, legacy schema and permission amendment APIs are removed; fixture v1 input is negative data only.",
     "crates/platform/chio-store-sqlite/src/channel_release_publisher_store/qualification.rs::qualify_root_publication_result::from_value": "Typed value conversion after its containing original-byte decoder and source verification; no new wire or database bytes enter at this conversion.",
     "crates/platform/chio-store-sqlite/src/finding_operator_bundle_store.rs::validate_canonical_bundle::from_slice": "Strict I-JSON canonical preflight rejects duplicate keys and aliases before the closed DTO read; identity, canonical equality, manifest and digest checks remain mandatory.",
     "crates/platform/chio-store-sqlite/src/finding_operator_bundle_store.rs::validate_canonical_json::from_slice": "Strict I-JSON canonical preflight rejects duplicate keys and aliases before the closed DTO read; identity, canonical equality, manifest and digest checks remain mandatory.",
@@ -6003,7 +6003,7 @@
       "decode_plan::from_slice",
       "decode_plan::from_value"
     ],
-    "crates/platform/chio-manifest/src/lib_parts/part_01.inc": [
+    "crates/platform/chio-manifest/src/manifest.rs": [
       "as_str::custom_deserialize",
       "as_str::custom_deserialize"
     ],
@@ -8523,7 +8523,7 @@
         }
       ]
     },
-    "crates/platform/chio-manifest/src/lib_parts/part_01.inc": {
+    "crates/platform/chio-manifest/src/manifest.rs": {
       "kind": "parser-internal-or-typed",
       "contract": "Only current manifest v2 types and signature verification remain. The obsolete v1 converter, migration type, legacy schema and permission amendment APIs are removed; fixture v1 input is negative data only.",
       "readers": [
@@ -15575,7 +15575,7 @@
       "contract": "Plan bytes are bounded to 1 MiB and duplicate-aware unsigned document parsing preserves ordinary argument floats. The original borrowed capability subtree independently satisfies the 64 KiB lossless native signed contract before kernel evaluation. Native local causes project a fixed HTTP 400 body; the kernel retains aggregate capability and plan authority.",
       "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
     },
-    "crates/platform/chio-manifest/src/lib_parts/part_01.inc": {
+    "crates/platform/chio-manifest/src/manifest.rs": {
       "kind": "parser-internal-or-typed",
       "contract": "Only current manifest v2 types and signature verification remain. The obsolete v1 converter, migration type, legacy schema and permission amendment APIs are removed; fixture v1 input is negative data only."
     },
