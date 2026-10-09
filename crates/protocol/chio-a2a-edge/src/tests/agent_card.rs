@@ -1,3 +1,14 @@
+use crate::config::A2aEdgeConfig;
+use crate::edge::ChioA2aEdge;
+use crate::error::A2aEdgeError;
+use crate::tests::{
+    approval_manifest, cancellation_manifest, hidden_manifest, manifest_public_key,
+    stream_manifest, test_manifest,
+};
+use chio_cross_protocol::semantic_hints::BridgeFidelity;
+use chio_test_support::prelude::*;
+use serde_json::Value;
+
 // ---- Constructor and Agent Card tests ----
 
 fn assert_invalid_agent_card_config_rejected(config: A2aEdgeConfig, expected: &str) {

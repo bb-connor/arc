@@ -1,3 +1,5 @@
+use chio_cross_protocol::error::BridgeError;
+
 // Edge error type and receipt-write error accounting helpers.
 
 /// Errors produced by the A2A edge.
@@ -35,7 +37,7 @@ fn record_receipt_write_error() {
     crate::metrics::record_receipt_write(crate::metrics::RECEIPT_WRITE_OUTCOME_ERROR);
 }
 
-fn record_receipt_write_bridge_error(error: &BridgeError) {
+pub(super) fn record_receipt_write_bridge_error(error: &BridgeError) {
     if matches!(error, BridgeError::Kernel(_)) {
         record_receipt_write_error();
     }

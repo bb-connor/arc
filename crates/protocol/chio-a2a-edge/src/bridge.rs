@@ -1,3 +1,21 @@
+use crate::conversion::ensure_chio_metadata;
+use crate::error::{record_receipt_write_bridge_error, A2aEdgeError};
+use chio_cross_protocol::capability_bridge::{CapabilityBridge, CrossProtocolCapabilityRef};
+use chio_cross_protocol::discovery::{
+    target_protocol_for_tool_with_registry, DiscoveryProtocol, TargetProtocolRegistry,
+};
+use chio_cross_protocol::error::BridgeError;
+use chio_cross_protocol::execution::{CrossProtocolExecutionRequest, OpenAiTargetExecutor};
+use chio_cross_protocol::lifecycle::{runtime_lifecycle_contract, RuntimeLifecycleSurface};
+use chio_cross_protocol::orchestrator::{CrossProtocolOrchestrator, OrchestratedToolCall};
+use chio_cross_protocol::semantic_hints::{semantic_hints_for_tool, BridgeFidelity};
+use chio_kernel::ChioKernel;
+use chio_manifest::{
+    BridgeSecurityMetadata, ToolDefinition, ToolManifest, VerifiedManifestRegistry,
+};
+use chio_mcp_edge::McpTargetExecutor;
+use serde_json::{json, Value};
+
 // Cross-protocol capability bridge, skill candidate construction, fidelity
 // evaluation, and the authoritative target registry / orchestration path.
 
@@ -7,26 +25,26 @@ static MCP_TARGET_EXECUTOR: McpTargetExecutor = McpTargetExecutor {
     peer_supports_chio_tool_streaming: false,
 };
 static OPENAI_TARGET_EXECUTOR: OpenAiTargetExecutor = OpenAiTargetExecutor;
-const MAX_DEFERRED_A2A_TASKS: usize = 1024;
-const DEFERRED_A2A_TASK_TTL_MILLIS: u64 = 5 * 60 * 1000;
+pub(super) const MAX_DEFERRED_A2A_TASKS: usize = 1024;
+pub(super) const DEFERRED_A2A_TASK_TTL_MILLIS: u64 = 5 * 60 * 1000;
 
 #[derive(Debug, Clone)]
-struct SkillBinding {
-    target_protocol: DiscoveryProtocol,
-    server_id: String,
-    tool_name: String,
-    security: BridgeSecurityMetadata,
+pub(super) struct SkillBinding {
+    pub(super) target_protocol: DiscoveryProtocol,
+    pub(super) server_id: String,
+    pub(super) tool_name: String,
+    pub(super) security: BridgeSecurityMetadata,
 }
 
 #[derive(Debug, Clone)]
-struct SkillCandidate {
-    published_id: String,
-    lookup_alias: Option<String>,
-    display_name: String,
-    description: String,
-    tags: Vec<String>,
-    fidelity: BridgeFidelity,
-    binding: Option<SkillBinding>,
+pub(super) struct SkillCandidate {
+    pub(super) published_id: String,
+    pub(super) lookup_alias: Option<String>,
+    pub(super) display_name: String,
+    pub(super) description: String,
+    pub(super) tags: Vec<String>,
+    pub(super) fidelity: BridgeFidelity,
+    pub(super) binding: Option<SkillBinding>,
 }
 
 impl CapabilityBridge for A2aCapabilityBridge {
@@ -130,7 +148,7 @@ fn evaluate_bridge_fidelity(
     }
 }
 
-fn build_skill_candidate(
+pub(super) fn build_skill_candidate(
     manifest: &ToolManifest,
     tool: &ToolDefinition,
     requires_qualification: bool,
@@ -185,7 +203,7 @@ fn build_skill_candidate(
     })
 }
 
-fn execute_orchestrated_a2a_request(
+pub(super) fn execute_orchestrated_a2a_request(
     peer: &chio_core::capability::features::CapabilityNegotiation,
     kernel: &ChioKernel,
     manifest_registry: &VerifiedManifestRegistry,

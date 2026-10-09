@@ -1,4 +1,11 @@
-use super::*;
+use crate::bridge::{DEFERRED_A2A_TASK_TTL_MILLIS, MAX_DEFERRED_A2A_TASKS};
+use crate::config::A2aEdgeConfig;
+use crate::edge::ChioA2aEdge;
+use crate::error::A2aEdgeError;
+use crate::types::{A2aKernelExecutionContext, A2aMessage, A2aPart, SendMessageRequest};
+use chio_kernel::ChioKernel;
+use serde_json::json;
+
 use crate::tests::{
     authorization_projection, capability_for_tool, test_kernel_config, test_manifest, text_message,
     unix_now,

@@ -32,38 +32,6 @@
 
 #![forbid(unsafe_code)]
 
-use chio_security_types::clock::{AuthorityDeadline, ClockError, ClockReading};
-use std::collections::BTreeMap;
-
-use chio_core::capability::{
-    governance::{GovernedApprovalToken, GovernedTransactionIntent, ThresholdApprovalProposal},
-    scope::ModelMetadata,
-    token::CapabilityToken,
-};
-use chio_core::session::OperationTerminalState;
-use chio_cross_protocol::capability_bridge::{CapabilityBridge, CrossProtocolCapabilityRef};
-use chio_cross_protocol::discovery::{
-    target_protocol_for_tool_with_registry, DiscoveryProtocol, TargetProtocolRegistry,
-};
-use chio_cross_protocol::error::BridgeError;
-use chio_cross_protocol::execution::{CrossProtocolExecutionRequest, OpenAiTargetExecutor};
-use chio_cross_protocol::lifecycle::{
-    runtime_lifecycle_contract, runtime_lifecycle_metadata, RuntimeLifecycleSurface,
-};
-use chio_cross_protocol::orchestrator::{CrossProtocolOrchestrator, OrchestratedToolCall};
-use chio_cross_protocol::semantic_hints::{semantic_hints_for_tool, BridgeFidelity};
-#[cfg(test)]
-use chio_kernel::ToolServerConnection;
-use chio_kernel::{
-    dpop, ChioKernel, SignedExecutionNonce, ToolCallOutput, Verdict as KernelVerdict,
-};
-use chio_manifest::{
-    BridgeSecurityMetadata, ToolDefinition, ToolManifest, VerifiedManifestRegistry,
-};
-use chio_mcp_edge::McpTargetExecutor;
-use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
-
 pub mod metrics;
 pub use metrics::{
     receipt_write_outcome_for_verdict, receipt_write_total, render_a2a_edge_metrics_prometheus,
@@ -74,24 +42,22 @@ pub use metrics::{
 #[cfg(feature = "otel")]
 pub mod otel;
 
-// ---------- source fragments (include! pattern) ----------
-//
-// Each fragment merges into this crate-root module scope; item paths and
-// visibility resolve as if the fragments were inlined here.
+// ---------- modules ----------
+pub use config::A2aEdgeConfig;
+pub use edge::ChioA2aEdge;
+pub use error::A2aEdgeError;
+pub use jsonrpc::MAX_A2A_REQUEST_BYTES;
+pub use types::{
+    A2aJsonRpcResponse, A2aKernelExecutionContext, A2aMessage, A2aPart, A2aSkillEntry,
+    AgentCapabilities, AgentCard, AgentInterface, SendMessageRequest, TaskResponse, TaskStatus,
+};
 
-include!("error.rs");
-include!("config.rs");
-include!("types.rs");
-include!("bridge.rs");
-include!("conversion.rs");
-include!("edge.rs");
-include!("jsonrpc.rs");
-include!("tests/all.rs");
-
+mod bridge;
+mod config;
+mod conversion;
+mod edge;
+mod error;
+mod jsonrpc;
 #[cfg(test)]
-#[path = "tests/nonce_preflight.rs"]
-mod nonce_preflight_tests;
-
-#[cfg(test)]
-#[path = "tests/boundaries.rs"]
-mod boundary_tests;
+mod tests;
+mod types;

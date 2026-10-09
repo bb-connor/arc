@@ -1,3 +1,14 @@
+use crate::error::A2aEdgeError;
+use chio_core::capability::governance::{
+    GovernedApprovalToken, GovernedTransactionIntent, ThresholdApprovalProposal,
+};
+use chio_core::capability::scope::ModelMetadata;
+use chio_core::capability::token::CapabilityToken;
+use chio_cross_protocol::semantic_hints::BridgeFidelity;
+use chio_kernel::{dpop, SignedExecutionNonce};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
 // A2A protocol wire types and the kernel execution context.
 
 /// A skill entry in the A2A Agent Card.
@@ -153,7 +164,7 @@ impl A2aJsonRpcResponse {
         }
     }
 
-    fn with_error(value: Value, error: A2aEdgeError) -> Self {
+    pub(super) fn with_error(value: Value, error: A2aEdgeError) -> Self {
         Self {
             value: Some(value),
             local_error: Some(std::sync::Arc::new(error)),
@@ -165,7 +176,7 @@ impl A2aJsonRpcResponse {
         self.local_error.as_deref()
     }
 
-    fn suppress_wire_response(mut self) -> Self {
+    pub(super) fn suppress_wire_response(mut self) -> Self {
         self.value = None;
         self
     }

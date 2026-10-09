@@ -1,11 +1,38 @@
+use crate::bridge::{
+    build_skill_candidate, execute_orchestrated_a2a_request, SkillBinding,
+    DEFERRED_A2A_TASK_TTL_MILLIS, MAX_DEFERRED_A2A_TASKS,
+};
+use crate::config::A2aEdgeConfig;
+use crate::conversion::{
+    build_a2a_source_envelope, cancelled_task_metadata, extract_arguments_from_message,
+    pending_task_metadata, task_response_from_orchestrated,
+};
+use crate::error::A2aEdgeError;
+use crate::jsonrpc::A2aJsonRpcEnvelope;
+use crate::types::{
+    A2aJsonRpcResponse, A2aKernelExecutionContext, A2aSkillEntry, AgentCapabilities, AgentCard,
+    AgentInterface, SendMessageRequest, TaskResponse, TaskStatus,
+};
+#[cfg(test)]
+use chio_core::session::OperationTerminalState;
+use chio_cross_protocol::execution::CrossProtocolExecutionRequest;
+use chio_cross_protocol::semantic_hints::BridgeFidelity;
+use chio_kernel::ChioKernel;
+#[cfg(test)]
+use chio_kernel::Verdict as KernelVerdict;
+use chio_manifest::{BridgeSecurityMetadata, ToolManifest, VerifiedManifestRegistry};
+use chio_security_types::clock::{AuthorityDeadline, ClockError, ClockReading};
+use serde_json::{json, Value};
+use std::collections::BTreeMap;
+
 // The A2A edge server, its deferred-task state, and the explicit
 // kernel-mediated dispatch.
 
 #[derive(Debug, Clone)]
-struct DeferredA2aTask {
+pub(super) struct DeferredA2aTask {
     owner_agent_id: String,
     request: CrossProtocolExecutionRequest,
-    response: TaskResponse,
+    pub(super) response: TaskResponse,
     deadline: AuthorityDeadline,
 }
 
@@ -15,17 +42,17 @@ struct DeferredA2aTask {
 pub struct ChioA2aEdge {
     config: A2aEdgeConfig,
     manifest_registry: Option<VerifiedManifestRegistry>,
-    skills: Vec<A2aSkillEntry>,
+    pub(super) skills: Vec<A2aSkillEntry>,
     skill_fidelity: BTreeMap<String, BridgeFidelity>,
     /// Maps skill ID to authoritative target binding metadata.
     skill_bindings: BTreeMap<String, SkillBinding>,
     /// Maps ambiguous unqualified tool names to the qualified published IDs.
     ambiguous_skill_ids: BTreeMap<String, Vec<String>>,
-    task_counter: u64,
-    tasks: BTreeMap<String, DeferredA2aTask>,
+    pub(super) task_counter: u64,
+    pub(super) tasks: BTreeMap<String, DeferredA2aTask>,
 }
 
-fn validate_execution_context(
+pub(super) fn validate_execution_context(
     execution: &A2aKernelExecutionContext,
     peer: &chio_core::capability::features::CapabilityNegotiation,
 ) -> Result<(), A2aEdgeError> {
@@ -279,7 +306,10 @@ impl ChioA2aEdge {
         })
     }
 
-    fn resolve_skill_binding(&self, skill_id: &str) -> Result<SkillBinding, A2aEdgeError> {
+    pub(super) fn resolve_skill_binding(
+        &self,
+        skill_id: &str,
+    ) -> Result<SkillBinding, A2aEdgeError> {
         if let Some(binding) = self.skill_bindings.get(skill_id) {
             return Ok(binding.clone());
         }
@@ -310,7 +340,7 @@ impl ChioA2aEdge {
         A2aJsonRpcResponse::with_error(Self::jsonrpc_error_payload(id, code, &message), error)
     }
 
-    fn jsonrpc_error_payload(id: Value, code: i64, message: &str) -> Value {
+    pub(super) fn jsonrpc_error_payload(id: Value, code: i64, message: &str) -> Value {
         json!({
             "jsonrpc": "2.0",
             "id": id,
@@ -398,7 +428,7 @@ impl ChioA2aEdge {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn build_execution_request(
+    pub(super) fn build_execution_request(
         binding: SkillBinding,
         skill_id: &str,
         source_request: &SendMessageRequest,
@@ -631,7 +661,7 @@ impl ChioA2aEdge {
     ///
     /// This is the receipt-bearing path for production deployments that have
     /// already authenticated the caller and resolved a capability token.
-    fn handle_jsonrpc_value(
+    pub(super) fn handle_jsonrpc_value(
         &mut self,
         message: Value,
         kernel: &ChioKernel,
@@ -755,7 +785,7 @@ impl ChioA2aEdge {
         }
     }
 
-    fn complete_task(
+    pub(super) fn complete_task(
         &mut self,
         task_id: &str,
         kernel: &ChioKernel,
@@ -891,7 +921,7 @@ impl ChioA2aEdge {
         }
     }
 
-    fn resolve_task(
+    pub(super) fn resolve_task(
         &self,
         task_id: &str,
         execution: &A2aKernelExecutionContext,

@@ -465,12 +465,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         max_lines=5_488,
         max_fragments=10,
     ),
-    "crates/protocol/chio-a2a-edge/src/lib.rs": allow(
-        "2027-01-31",
-        "A2A edge surface assembled from include! fragments; capped until the fragments become modules",
-        max_lines=5_818,
-        max_fragments=11,
-    ),
     "crates/protocol/chio-mcp-adapter/src/transport/stdio.rs": allow(
         "2026-12-31",
         "MCP stdio transport assembled from include! fragments; capped until the fragments become modules",

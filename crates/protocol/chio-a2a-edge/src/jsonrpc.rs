@@ -1,14 +1,22 @@
+use crate::edge::ChioA2aEdge;
+use crate::error::A2aEdgeError;
+use crate::types::{A2aJsonRpcResponse, A2aKernelExecutionContext, SendMessageRequest};
+use chio_kernel::ChioKernel;
+use serde_json::{json, Value};
+
 // JSON-RPC request-boundary parsing for the A2A edge.
 
 #[derive(Debug)]
-struct A2aJsonRpcEnvelope {
-    id: Option<Value>,
-    method: String,
-    params: Value,
+pub(super) struct A2aJsonRpcEnvelope {
+    pub(super) id: Option<Value>,
+    pub(super) method: String,
+    pub(super) params: Value,
 }
 
 impl ChioA2aEdge {
-    fn parse_jsonrpc_envelope(message: &Value) -> Result<A2aJsonRpcEnvelope, Option<Value>> {
+    pub(super) fn parse_jsonrpc_envelope(
+        message: &Value,
+    ) -> Result<A2aJsonRpcEnvelope, Option<Value>> {
         let id = message.get("id").cloned();
         if id
             .as_ref()
@@ -41,7 +49,7 @@ impl ChioA2aEdge {
         })
     }
 
-    fn ensure_jsonrpc_params_object_for_supported_method(
+    pub(super) fn ensure_jsonrpc_params_object_for_supported_method(
         id: &Value,
         method: &str,
         params: &Value,
@@ -58,7 +66,7 @@ impl ChioA2aEdge {
         ))
     }
 
-    fn parse_jsonrpc_send_message_params(
+    pub(super) fn parse_jsonrpc_send_message_params(
         &self,
         params: Value,
         _request_name: &str,
@@ -70,7 +78,7 @@ impl ChioA2aEdge {
         Ok((skill_id, request))
     }
 
-    fn parse_jsonrpc_task_id_params(
+    pub(super) fn parse_jsonrpc_task_id_params(
         params: &Value,
         operation: &str,
     ) -> Result<String, A2aEdgeError> {
@@ -183,9 +191,8 @@ impl ChioA2aEdge {
         kernel: &ChioKernel,
         execution: &A2aKernelExecutionContext,
     ) -> Result<A2aJsonRpcResponse, A2aEdgeError> {
-        let message =
-            chio_core::canonical::DocumentJson::from_wire(bytes, MAX_A2A_REQUEST_BYTES)?
-                .decode()?;
+        let message = chio_core::canonical::DocumentJson::from_wire(bytes, MAX_A2A_REQUEST_BYTES)?
+            .decode()?;
         Ok(self.handle_jsonrpc_value(message, kernel, execution))
     }
 }
