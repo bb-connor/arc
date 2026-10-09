@@ -1,6 +1,6 @@
 # C5: Execution observations, joins and exact apply
 
-Status: proposed contract, revision 3. Parent: [Computer proposal](PROPOSAL.md).
+Status: proposed contract, revision 4. Parent: [Computer proposal](PROPOSAL.md).
 
 ## Purpose and owner
 
@@ -71,6 +71,16 @@ a best-effort broadcast. If a graph profile lacks the necessary completion or
 close/continuation fence, this join profile is unavailable until that owner
 contract is qualified.
 
+Computer-0 therefore requires KERN-3's KSPEC-04 phases 1 to 3, including
+phase-3 graph tombstones and D1 DelegationRoot fences in W1's canonical serving
+transactions. Retain their generations in the normal migration/recovery
+inventory. A process-tree fence is not a graph-issuance fence. Sealed permits
+that predate closure remain dispatchable under their native contract and must
+stay in membership until their required disposition is established. Issuance
+closure neither cancels them nor frees their exposure. The caller's admitted
+completion policy must authorize the owner closure operations; an observation
+handle alone cannot invoke privileged teardown.
+
 This wait does not require all payments to settle or all recipients to receive
 bytes. A pending financial rail observation alone does not invalidate an exact
 accepted revision. It also does not free retained exposure. A native unknown
@@ -119,8 +129,13 @@ governed read, including names and errors. Printing it is not human approval.
    procedure/evaluator and evidence. Another task's identical bytes cannot
    substitute its acceptance.
 4. Recheck current authority, revocation, stop/closure, resource scope,
-   confidentiality and the action's required integrity. An endorsement, where
-   required, binds the exact apply action and current influence/evaluator basis.
+   confidentiality and the action's required integrity profile. Computer-0
+   uses REC's retained labels/influence, current release and exact protected
+   acceptance plus the source's qualified action policy. It does not implement
+   KSPEC-11 integrity admission. A source requiring that or another unavailable
+   endorsement profile refuses apply; successful work acceptance cannot
+   downgrade it. Later KSPEC-11 profiles bind the exact apply action and current
+   influence/evaluator basis. See the [profile crosswalk](ROADMAP-CROSSWALK.md#qualification-profiles).
 5. Publish through the resource owner's commit fence.
    - Under Computer-0 this is a compare-and-swap of the project ref against
      the expected base, on the git-native backend.
@@ -156,4 +171,4 @@ native receipts or infer total completeness from a selected success sample.
 Key-history witnesses and receipt-log witnesses have different roles. A signature
 identifies accountable evidence; it does not prove arbitrary computation correct.
 
-Acceptance: **C5-01 through C5-09** in [ACCEPTANCE.md](ACCEPTANCE.md).
+Acceptance: **C5-01 through C5-11** in [ACCEPTANCE.md](ACCEPTANCE.md).

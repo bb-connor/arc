@@ -1,6 +1,6 @@
 # C3: Portable programs and executable composition
 
-Status: proposed contract, revision 3. Parent: [Computer proposal](PROPOSAL.md).
+Status: proposed contract, revision 4. Parent: [Computer proposal](PROPOSAL.md).
 
 ## Purpose and owner
 
@@ -71,9 +71,14 @@ acceptance and recovery. They differ in whose code runs.
 
 - The acceptance procedure belongs to the work owner. Neither leaf kind can
   edit its own verifier.
-- A TaskLeaf's harness effects outside the kernel path are reported as they
-  are classed. An effect inside qualified confinement is `prevent`. An effect
-  outside it is `cannot_see` and is labelled "unconfined".
+- Classify each effect at its actual enforcement point under ADR-0011 and
+  HOST-CONTRACT. `prevent` requires a qualified decision path before that
+  effect; hooks that observe afterward are `detect_only`, and unmediated
+  activity is `cannot_see`, including inside a confined process. Confinement
+  evidence separately establishes the qualified isolation restrictions.
+  Ordinary writes allowed inside a sandbox do not acquire individual Chio
+  authorization or receipts. Missing confinement evidence means "unconfined"
+  for that isolation claim, without changing a separately mediated call's class.
 
 ## Composition semantics
 
@@ -162,7 +167,9 @@ boundary is a separate admitted operation.
   commitment, together with its HistoricalFact, CurrentPredicate and
   HeldReservation rules. Computer adds that every compiled join carries the
   exact parent-input manifest those rules evaluate.
-- **PRG-06:** KSPEC-04 closure and KSPEC-08 stop fences apply unchanged.
+- **PRG-06:** the [qualified owner profile](ROADMAP-CROSSWALK.md#qualification-profiles)
+  supplies KSPEC-04 closure and KSPEC-08 stop fences. Computer-0 requires
+  KSPEC-04 phases 1 to 3 and KSPEC-08 phases 0 and 1.
   Computer adds that dynamic descendants admitted through S1 belong to the
   closure membership that C5 counts.
 - **PRG-08:** a TaskLeaf binds only to a receiver-admitted harness profile,
@@ -171,4 +178,4 @@ boundary is a separate admitted operation.
 - **PRG-07:** compiler outputs remain untrusted checked descriptions. A forged
   plan must still be refused by the serving owners.
 
-Acceptance: **C3-01 through C3-07** in [ACCEPTANCE.md](ACCEPTANCE.md).
+Acceptance: **C3-01 through C3-11** in [ACCEPTANCE.md](ACCEPTANCE.md).

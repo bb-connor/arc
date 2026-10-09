@@ -1,9 +1,10 @@
 # Chio Computer: versioned, runnable resource environments
 
-Status: proposed design, revision 3, 2026-10-09. All new APIs and types are
+Status: proposed design, revision 4, 2026-10-09. All new APIs and types are
 proposed. Computer-0 (section 5) is the profile for the unified roadmap's
-success test. It assumes only that roadmap's G4 substrate. Later profiles
-assume the roadmap's post-success-test scope. Nothing in this document claims
+success test. Its G4 substrate includes the closure prerequisite added by
+revision 4 (section 5). Later profiles assume the roadmap's post-success-test
+scope. Nothing in this document claims
 that those programs, or the Computer API, are implemented or qualified today.
 
 **A Computer is a versioned environment where authority, resources and work
@@ -20,18 +21,17 @@ is the authority, resource, work and evidence relationships around it.
 
 Shown inside an async application, or in a REPL that supports top-level await.
 
-- `my_project` exports pinned program descriptors.
+- `my_project` exports pinned descriptors: `explore` and `challenge` are
+  TaskLeaf contracts performed by receiver-admitted harnesses; `prototype`,
+  `integrate` and `verify` are ProgramLeaf bundles. Descriptor loading follows
+  C3's code-admission rules.
 - The project already has an input, resource bindings and approved work, host
   and acceptance profiles.
 - `boot` describes a program without starting it.
 
 ```python
-from chio import Computer, USD, task
-from my_project import prototype, integrate, verify  # pinned ProgramLeaf bundles
-
-# TaskLeafs: the receiving computer's own admitted agents perform these contracts.
-explore = task("explore", contract="contracts/explore.toml")
-challenge = task("challenge", contract="contracts/challenge.toml")
+from chio import Computer, USD
+from my_project import explore, prototype, challenge, integrate, verify
 
 project = Computer.open("my-project")
 worker = Computer.connect("acme/build")
@@ -41,7 +41,7 @@ candidate = await project.fork(
     boot=explore & prototype & challenge | integrate | verify,
 )
 
-# Give another organization's computer bounded access to that branch.
+# Bound access to the branch and spending on its source-owned resources.
 grant = candidate.grant(
     to=worker,
     resources={
@@ -61,6 +61,12 @@ await run.join_tree()
 print(candidate.diff())
 await project.apply(candidate.changes)
 ```
+
+`USD(5)` bounds the source-owned resources used through this grant. The
+receiver's independently billed compute and harness/model use have their own
+limits. TaskLeaf authoring, such as `task("explore", contract=...)`, belongs in
+the project's descriptor setup; the receiver selects a compatible admitted
+harness rather than accepting a source-chosen executable for that task.
 
 The alternative below runs the same program against the candidate namespace
 that the grant binds. It is a separate example, not another call to append to
@@ -213,16 +219,21 @@ syntax is untrusted input to authoritative validation.
 ## 5. Computer-0: the success-test profile
 
 Computer-0 is the profile the unified roadmap's success test runs (roadmap
-decision D21). It needs only the roadmap's G4 substrate:
+decision D21). Its prerequisites are the amended roadmap's G4 substrate:
 
 - COOP-1 to COOP-3
 - WORK-W1 and W2
 - REC
 - SHARE-2
-- KERN-3 and KERN-5
+- KERN-1 to KERN-5, including KSPEC-04 phases 1 to 3 in KERN-3
 - HOST-M2 on Linux
 
-It adds nothing from the post-test scope.
+Revision 4 moves KSPEC-04 phase 3 into KERN-3 before G4 because C5 needs
+graph/continuation and D1 issuance fences as well as process-tree closure.
+Phase 3 lands against W1's qualified issuer and includes closure-state
+migration/recovery and retained-capacity accounting. The remaining post-test
+scope stays excluded. The [profile crosswalk](ROADMAP-CROSSWALK.md#qualification-profiles)
+separates initial owner guarantees from later mechanisms and required refusals.
 
 | Hero line | Computer-0 meaning |
 | --- | --- |
@@ -232,9 +243,9 @@ It adds nothing from the post-test scope.
 | `/workspace` read | A release-checked export of the immutable snapshot. |
 | `/workspace` write | Writes go to the receiver's own overlay, never to the source's storage. They come back only as a sealed import into the candidate ref. |
 | `/models/default` invoke | Resources are charged at their owner's door. Invocations reach the source's model route through the source's broker. The source's hold ledger enforces `USD(5)`. |
-| `delegable=True` | Delegation stays inside the receiver. The receiver's broker holds the source's grant as one hop, and its helpers reach the source's door through that broker. |
+| `delegable=True` | Delegation stays inside the receiver. Its authenticated broker holds the source grant and preserves each helper's narrower local authority and context under C4. |
 | `worker.exec(...)` | A co-signed, unpaid WORK-W2 agreement. Admission is owned by the receiver, which runs the work in its own HOST-M2 tree. |
-| `run.join_tree()` | C5 closure through the existing graph-continuation and process-closure fences. |
+| `run.join_tree()` | C5 closure through KERN-3's process fences and KSPEC-04 phase-3 graph/delegation fences, including outstanding sealed work. |
 | A lost reply | Recovered by original identity through REC, with no second dispatch. |
 | `diff()` and `apply()` | Apply is a compare-and-swap of the source's project ref against the expected base, under the resource owner's commit fence. A moved base returns a conflict. |
 | Evidence | Exported and verified offline against the receiver's pinned partner card. |
@@ -247,6 +258,8 @@ It adds nothing from the post-test scope.
 - branch backends other than git;
 - the source-owned branch service between independent organizations;
 - KSPEC-10 crossing records, which Computer adopts when they land.
+- KSPEC-09's admission-machine refactor, KSPEC-11 integrity admission and
+  KSPEC-08 phases 2 to 7. A request requiring an unavailable profile is refused.
 
 **Always excluded:** live process migration.
 
@@ -289,13 +302,16 @@ incremental delivery to the roadmap's COMP rungs and lists the adverse cases.
   independently operated computers.
 - It includes a dynamic helper, a lost reply and a source apply conflict.
 - It exercises both leaf kinds.
-- A second application must reuse the same contracts without custom signing,
-  retry, verifier or ledger code.
+- Application C (versioned data curation) is the required second application
+  and reuses the same contracts without custom signing, retry, verifier service
+  or ledger code. Application B (confined work beside private data) remains
+  optional stretch scope.
 
 ## 7. Claims under ADR-0011
 
-Each claim is limited to kernel-mediated operations. It carries the preview
-label until its COMP rung and gate pass.
+Each claim names its actual mediation or observation boundary. Confinement
+qualifies its declared isolation restrictions, not every effect inside it.
+Claims carry the preview label until their COMP rung and gate pass.
 
 | Claim | `boundary_class` | `planning_status` |
 | --- | --- | --- |
@@ -303,12 +319,26 @@ label until its COMP rung and gate pass.
 | A grant over a source-owned resource is enforced and charged by the source's hold ledger at the source's door. | `prevent` | `ready_after_adr` (CT-COOP, ADR-0016, D21) |
 | Apply publishes the exact accepted ChangeSet only while the source ref equals the expected base. | `prevent` | `ready_after_adr` (CT-WORK, D21) |
 | A ProgramLeaf runs only under receiver code admission and a qualified KSPEC-07 confinement kind. | `prevent` | `ready_after_adr` (KSPEC-07, D22) |
-| A TaskLeaf's harness effects outside the kernel path, where no qualified confinement applies. | `cannot_see` | `ready_after_adr` (KSPEC-07) |
+| Harness activity outside Chio's mediation, including allowed activity inside a confined process. | `cannot_see` | `ready_after_adr` (ADR-0011, HOST-CONTRACT) |
+| Harness hooks record activity after or outside the effect path. | `detect_only` | `ready_after_adr` (ADR-0011, HOST-CONTRACT) |
 | The evaluator's acceptance of the exact sealed revision is recorded and exported. | `detect_only` | `ready_after_adr` (CT-WORK) |
 | The source verifies the receiver's evidence offline against pinned partner keys, with no external witness. | `detect_only` | `ready_after_adr` (CT-COOP) |
 | Money that crosses organizations for Computer work. | `detect_only` | `deferred` |
 
 ## 8. Revision history
+
+**Revision 4** applies the review corrections:
+
+- moves KSPEC-04 phase 3 into KERN-3/G4 and names initial versus later security
+  and financial profiles, without weakening the join contract;
+- specifies receiver-broker authority intersection, holder binding, context,
+  per-owner fence semantics and original-operation recovery;
+- separates effect mediation from confinement claims;
+- names Application C as the required second consumer and retains Application B
+  as optional stretch scope;
+- corrects contract acceptance ranges and adds adverse cases for these paths;
+- checks canonical published evidence deterministically and fails on missing
+  published objects, with executable validator regression tests.
 
 **Revision 3** applies the owner's 2026-10-09 decisions (roadmap D21 to D23,
 and Lane COMP in the unified roadmap):
@@ -321,7 +351,7 @@ and Lane COMP in the unified roadmap):
 | `\|` parallel, `>>` sequence, parentheses required | `&` parallel, `\|` sequence, no parentheses; canonical `parallel().pipe()` |
 | First backend unnamed | Git-native: tree objects, refs, compare-and-swap apply |
 | Two remote realizations with no default | A receiver-local overlay plus sealed import between independent organizations; the branch service only within one domain |
-| Cross-org budget left to sender-funded holds | Resources are charged at their owner's door; no money crosses the boundary |
+| Designated consumption owner or bounded inter-owner suballocation | Select source-owner charging for Computer-0; no funding transfer between the organizations |
 | Restated owner invariants | Citations to owner rules; only Computer's own laws are stated |
 | Evidence and coverage in the design set | Moved to the research appendix |
 
@@ -355,8 +385,12 @@ qualification.
 [validation.json](validation.json) records reproducible documentation checks.
 With Python 3.11 or later, run
 `python3 docs/architecture/chio-computer/validate.py` from the repository root.
-It verifies the document set, the operator precedence and the source objects
-available in the local Git object database. It performs no runtime
+It verifies the document set, operator precedence and every canonical pinned
+source object. Required published objects must be fetched beforehand; missing
+objects fail validation. A verified hosted equivalent replaces an unpublished
+local head deterministically. Run validator regressions with
+`python3 -m unittest discover -s docs/architecture/chio-computer -p 'test_validate.py'`.
+These checks perform no runtime
 qualification. Folding its generic checks into a repository-wide documents gate
 is a follow-up, once the public-copy gate exists (roadmap OUT-2).
 
