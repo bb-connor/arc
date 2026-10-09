@@ -1,9 +1,8 @@
 # Optional Chio operator projection
 
 Status: optional proposed owner projection, amended 2026-10-08 UTC. See
-[STATUS-GLOSSARY](STATUS-GLOSSARY.md). `chio.operator.v1` is a reserved
-composition name, not an implemented endpoint, frozen wire ABI, mandatory
-daemon or primary application interface. Before the success test the unified
+[STATUS-GLOSSARY](STATUS-GLOSSARY.md). `chio.operator.v1` is a reserved name,
+not an endpoint, frozen ABI, mandatory daemon or primary interface. Before the success test the unified
 roadmap makes the trust-control dashboard the one operator web client (Lane
 REL-4); a separate projection controller is `planning_status: deferred`. The
 rules below bind any operator client that composes owner views, the dashboard

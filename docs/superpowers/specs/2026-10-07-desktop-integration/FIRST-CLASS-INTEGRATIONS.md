@@ -86,11 +86,10 @@ shared resources, verifiable work and recovery; unavailable features stay open.
 
 ## Delivery
 
-Shared packet 1 reconciles sources and per-host capabilities; packets 3 and 4
-deliver the plugin and launcher bindings and H01 to H08; packet 5 proves
-composition; packet 6 and the platform plans own installed delivery. Native
-gaps go to the identity, IPC, process, credential and isolation owners; Herdr
-compatibility stays with its plugin and application owner.
+Shared packets 1, 3 to 5 reconcile capabilities, deliver the bindings and H01
+to H08 and prove composition; packet 6 and the platform plans own installed
+delivery. Native gaps go to their owners; Herdr compatibility stays with its
+plugin and application.
 
 A partial release names its actual supported set; a plugin README, prior Pi
 pass or Megastart recording supplies only its own scoped evidence.

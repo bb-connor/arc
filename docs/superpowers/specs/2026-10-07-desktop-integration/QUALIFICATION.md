@@ -21,9 +21,8 @@ schema, verifier and activation gate to shared packet 2a; platform installed
 delivery cannot close until that gate exists and its activation call sites are
 exercised (Q18).
 
-`boundary_class` and `planning_status` follow ADR-0011 separately. Hook activity
-is `detect_only`, local effects outside mediation are `cannot_see`, UI guidance
-is `advisory_only`, and only a proven pre-effect gate is `prevent`.
+ADR-0011 fields are defined in STATUS-GLOSSARY; only a proven pre-effect gate
+is `prevent`.
 
 ## Profile coverage
 

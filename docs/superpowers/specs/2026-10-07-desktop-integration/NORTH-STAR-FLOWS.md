@@ -241,6 +241,11 @@ configured keys do not prove two independent organizations" (T:
 - Offline lineage deeper than one hop.
 - Remote co-signing; that is M3.
 - Budgets that span both organizations.
+- Sender-constrained use of the issued capability. Until DPoP for federated
+  grants lands at the door (roadmap decision D6, Lane COOP-2), the B-local
+  capability is a bearer token within its TTL. M1 keeps that TTL short and
+  claims no protection against a copied capability; COOP-2 qualifies missing,
+  substituted and replayed proofs.
 
 ## 4. Flow M2: One root grant, many agents
 
@@ -497,6 +502,7 @@ Each row becomes a tracked issue after this document is approved, linked from
 | Two-host federated-issue and evidence end-to-end test | Trust plane | M1 |
 | Lifecycle-status check in the portable passport verifier | `chio-kernel-core` | M1, embedded hosts |
 | Durable revocation oracle | `chio-revocation-oracle` | M1 hardening |
+| DPoP sender constraint for federated grants at the door | Trust plane and `chio api protect` | M1 hardening (COOP-2, decision D6) |
 | Production passkey approval path and S28 roster | Kernel approval, K S8 | M1 attribution, M3 |
 | Live process cancel and revoke | `chio-process` (F) | M2 |
 | Durable sibling-share registry outside process paths | `chio-kernel` | M2 |

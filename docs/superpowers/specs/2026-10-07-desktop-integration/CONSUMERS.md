@@ -54,12 +54,10 @@ gates pass; never fabricate an absent file or port locally.
 
 ## Organizational claims
 
-C06 and C07 cannot claim organizational independence from three IDs or
-processes under one administrator; a local fixture qualifies only its protocol
-branch. The organizational record names separate operators, keys, stores,
-resource owners, trust enrollment and disclosure policy, and each owner can
-refuse. Never share signing keys or databases, and never infer a global atomic
-allowance from local C04.
+C06 and C07 need separate operators, keys, stores, resource owners, trust
+enrollment and disclosure policy, each able to refuse; IDs or processes under
+one administrator qualify only the protocol branch. Local C04 never implies a
+global atomic allowance.
 
 ## Megastart and Herdr compatibility
 
