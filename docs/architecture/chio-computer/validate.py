@@ -170,7 +170,7 @@ def main():
 
     result = {
         "schema": "chio.computer.design-check.v1",
-        "design_revision": 4,
+        "design_revision": 5,
         "document_sha256": document_hashes,
         "validator_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         "validator_regression_sha256": hashlib.sha256((directory / "test_validate.py").read_bytes()).hexdigest(),

@@ -1,6 +1,6 @@
 # C4: Binding a computer to admitted work
 
-Status: proposed contract, revision 4. Parent: [Computer proposal](PROPOSAL.md).
+Status: proposed contract, revision 5. Parent: [Computer proposal](PROPOSAL.md).
 
 ## Purpose and owner
 

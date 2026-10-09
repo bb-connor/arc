@@ -1,6 +1,6 @@
 # Computer and the completed Chio roadmap
 
-Status: proposed architectural crosswalk, revision 4. Parent: [PROPOSAL.md](PROPOSAL.md).
+Status: proposed architectural crosswalk, revision 5. Parent: [PROPOSAL.md](PROPOSAL.md).
 
 ## Assumption and precedence
 
@@ -21,15 +21,16 @@ Use this order when documents disagree:
 These are pinned research views, not statements about today's merge or release
 status. Since these pins were taken, #1196 has merged into main. Its Computer
 amendment, [#1200](https://github.com/bb-connor/arc/pull/1200), adds Lane COMP
-and decisions D21 to D23. Revision 4 reconciles its closure prerequisites and
-qualification profiles. The kernel and work specifications use internal
-historical names where necessary; public Computer examples retain the approved product vocabulary.
+and decisions D21 to D23. Revision 5 separates the closure exits and assigns
+required second-application reuse to COMP-7 after G5. The kernel and work
+specifications use internal historical names where necessary; public Computer
+examples retain the approved product vocabulary.
 
 ## Pinned program heads
 
 | PR | Inspected head | Role |
 | --- | --- | --- |
-| [#1200](https://github.com/bb-connor/arc/pull/1200) | `e9b2660f61c2526fae276fdf3d7664fb7f4da2b2` | Revision-4 Computer-0 prerequisites, profiles and COMP gates |
+| [#1200](https://github.com/bb-connor/arc/pull/1200) | `cf18681269b9fb1078459275cea8dfba7858b1d8` | Revision-5 closure exits, Computer-0 profiles and COMP gates |
 | [#1196](https://github.com/bb-connor/arc/pull/1196) | `c32c460fae67c6f21386ab3cffa425cd06f0433b` | Unified contracts, lane owners, gates and superseding decisions |
 | [#1174](https://github.com/bb-connor/arc/pull/1174) | `7419d56e98e84ee57212e293e5f2658f7fef7642` | FTL lessons and all eleven kernel specifications |
 | [#1173](https://github.com/bb-connor/arc/pull/1173) | `cafdc970e4f89bddf810647e4228a605ed9f498a` | Delegation/graph code and W1-W4 work architecture |
@@ -50,7 +51,7 @@ qualified. Missing enforcement causes refusal, never silent downgrade.
 | Owner contract | Computer-0 prerequisite and guarantee | Later scope |
 | --- | --- | --- |
 | WORK-W1/W2 | Qualified allocation/graph issuer, protected exact acceptance, independent receiver offers and unpaid agreements | Funded W2.3 and W4 convergence |
-| KSPEC-04 | Phases 1 to 3 through KERN-3: process/capability closure plus graph tombstones, D1 issuance fences, closure-state recovery/migration and stranded-capacity accounting | Phase 4 |
+| KSPEC-04 | Phases 1 and 2 through KERN-3a, plus its new process-exit contract. Phase 3 through KERN-3b: graph tombstones, WORK-D1 issuance fences, closure-state recovery/migration and stranded-capacity accounting | Phase 4 |
 | KSPEC-08 | Phases 0 and 1 through KERN-1: the qualified durable stop and native identity dispositions | Phases 2 to 7; no implicit claim of their control-plane or epoch machinery |
 | KSPEC-07 | KERN-5's qualified confinement kinds and dispatch-bound launch evidence | Additional qualified backend/profile support |
 | REC | Retained labels/influence, current release, exact artifacts, original-operation recovery and qualified confined returns | Additional profile support must be separately declared |
@@ -58,13 +59,15 @@ qualified. Missing enforcement causes refusal, never silent downgrade.
 | KSPEC-11 | No KSPEC-11 integrity-admission claim. Preserve REC influence and protected acceptance; enforce the source's supported action policy. Refuse a request requiring an unavailable endorsement/integrity profile | Exact integrity-gated admission under KSPEC-11 |
 | SHARE/COOP/HOST | Source-resource holds at the source; authenticated receiver broker preserving local helper authority and context; receiver-local process ownership | Cross-organization funding, independent-key multi-hop and additional hosts |
 
-Phase 3's graph/D1 fences were previously post-test work. The #1200 correction
-moves them into KERN-3 before COMP-3/G4, after W1's qualified issuer. Preserve
-the constituent contract's canonical transactions, migration inventory,
+Phase 3's graph/WORK-D1 fences were previously post-test work. The #1200
+amendment assigns them to KERN-3b before COMP-3/G4, after WORK-W1's qualified
+issuer. KERN-3a has an independent exit for G3's capability/process closure and
+process exit; it does not wait for WORK-W1 or KERN-3b. COMP-3 consumes both exits.
+Preserve the constituent contract's canonical transactions, migration inventory,
 sealed-outstanding semantics and conformance obligations. This changes landing
 order, not fence ownership. Computer adds no closure store or mutable balance.
 
-Pinned amendment: [Computer roadmap revision 4](https://github.com/bb-connor/arc/blob/e9b2660f61c2526fae276fdf3d7664fb7f4da2b2/docs/operations/UNIFIED_ROADMAP.md).
+Pinned amendment: [Computer roadmap revision 5](https://github.com/bb-connor/arc/blob/cf18681269b9fb1078459275cea8dfba7858b1d8/docs/operations/UNIFIED_ROADMAP.md).
 
 Apply acceptance remains distinct from action authority in every profile.
 Computer-0 can accept a revision and still refuse its apply when the source
@@ -97,7 +100,7 @@ The eight frozen-contract workstreams constrain Computer as follows:
 | COOP | Independent peers/keys, local doors, co-signing and evidence delivery | Source rights and receiver consent remain independent. |
 | REL | Qualified installation and supported host/provider distributions | Publish exact profile support, not source-only demonstrations. |
 | OUT | Outside operators and claim/evidence discipline | Qualify the two-computer application with genuinely independent operation. |
-| COMP | This proposal's own lane (#1200): rungs COMP-1 to COMP-6 | Computer-0 is the success-test profile. G4's complete run is Application A, and G5's outside teams run the installed hero. |
+| COMP | This proposal's own lane (#1200): rungs COMP-1 to COMP-7 | Computer-0 is the success-test profile. G4's complete run is Application A, and G5's outside teams run the installed hero. Required Application C reuse evidence closes COMP-7 after G5; COMP-6 remains independent dogfood. |
 
 Post-success-test scope also supplies sender-funded cross-organization holds,
 multi-hop independent keys, N-organization cooperation, witnessed evidence,

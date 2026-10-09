@@ -1,6 +1,6 @@
 # C1: Versioned resource environments
 
-Status: proposed contract, revision 4. Parent: [Computer proposal](PROPOSAL.md).
+Status: proposed contract, revision 5. Parent: [Computer proposal](PROPOSAL.md).
 Assumes the qualified predecessor profile in [the crosswalk](ROADMAP-CROSSWALK.md#qualification-profiles).
 
 ## Purpose and owner

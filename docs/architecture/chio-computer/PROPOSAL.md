@@ -1,6 +1,6 @@
 # Chio Computer: versioned, runnable resource environments
 
-Status: proposed design, revision 4, 2026-10-09. All new APIs and types are
+Status: proposed design, revision 5, 2026-10-09. All new APIs and types are
 proposed. Computer-0 (section 5) is the profile for the unified roadmap's
 success test. Its G4 substrate includes the closure prerequisite added by
 revision 4 (section 5). Later profiles assume the roadmap's post-success-test
@@ -222,16 +222,17 @@ Computer-0 is the profile the unified roadmap's success test runs (roadmap
 decision D21). Its prerequisites are the amended roadmap's G4 substrate:
 
 - COOP-1 to COOP-3
-- WORK-W1 and W2
+- WORK-W1 and WORK-W2
 - REC
 - SHARE-2
-- KERN-1 to KERN-5, including KSPEC-04 phases 1 to 3 in KERN-3
+- KERN-1, KERN-2, KERN-3a, KERN-3b, KERN-4 and KERN-5
 - HOST-M2 on Linux
 
-Revision 4 moves KSPEC-04 phase 3 into KERN-3 before G4 because C5 needs
-graph/continuation and D1 issuance fences as well as process-tree closure.
-Phase 3 lands against W1's qualified issuer and includes closure-state
-migration/recovery and retained-capacity accounting. The remaining post-test
+KSPEC-04 phases 1 and 2 plus process exit qualify at KERN-3a for G3. C5 also
+needs graph/continuation and WORK-D1 issuance fences: phase 3 qualifies
+separately at KERN-3b after WORK-W1's qualified issuer, before COMP-3/G4.
+It includes closure-state migration/recovery and retained-capacity accounting.
+The remaining post-test
 scope stays excluded. The [profile crosswalk](ROADMAP-CROSSWALK.md#qualification-profiles)
 separates initial owner guarantees from later mechanisms and required refusals.
 
@@ -245,7 +246,7 @@ separates initial owner guarantees from later mechanisms and required refusals.
 | `/models/default` invoke | Resources are charged at their owner's door. Invocations reach the source's model route through the source's broker. The source's hold ledger enforces `USD(5)`. |
 | `delegable=True` | Delegation stays inside the receiver. Its authenticated broker holds the source grant and preserves each helper's narrower local authority and context under C4. |
 | `worker.exec(...)` | A co-signed, unpaid WORK-W2 agreement. Admission is owned by the receiver, which runs the work in its own HOST-M2 tree. |
-| `run.join_tree()` | C5 closure through KERN-3's process fences and KSPEC-04 phase-3 graph/delegation fences, including outstanding sealed work. |
+| `run.join_tree()` | C5 closure through KERN-3a's process fences and KERN-3b's graph/delegation fences, including outstanding sealed work. |
 | A lost reply | Recovered by original identity through REC, with no second dispatch. |
 | `diff()` and `apply()` | Apply is a compare-and-swap of the source's project ref against the expected base, under the resource owner's commit fence. A moved base returns a conflict. |
 | Evidence | Exported and verified offline against the receiver's pinned partner card. |
@@ -303,7 +304,7 @@ incremental delivery to the roadmap's COMP rungs and lists the adverse cases.
 - It includes a dynamic helper, a lost reply and a source apply conflict.
 - It exercises both leaf kinds.
 - Application C (versioned data curation) is the required second application.
-  It is COMP-5's reuse evidence and does not gate G5. It reuses the same
+  Its required reuse evidence closes I6/COMP-7 after G5. It reuses the same
   contracts without custom signing, retry, verifier service or ledger code.
   Application B (confined work beside private data) remains optional stretch
   scope.
@@ -328,6 +329,20 @@ Claims carry the preview label until their COMP rung and gate pass.
 
 ## 8. Revision history
 
+**Revision 5** reconciles completion rules after review:
+
+- splits capability/process closure and process exit into KERN-3a for G3, and
+  graph/delegation closure into KERN-3b after WORK-W1 and before COMP-3/G4;
+- keeps the installed hero at I5/COMP-5 and assigns required Application C reuse
+  evidence to I6/COMP-7 after G5, independently of COMP-6 dogfood;
+- uses qualified WORK identifiers at the imported closure boundaries;
+- covers repeated occurrences in both `a & a` and `a | a` in C3-02;
+- preserves requester/executor qualification and clarifies G5's ProgramLeaf
+  coverage across qualifying runs;
+- refreshes the pinned roadmap evidence and merge guidance. The roadmap PR's
+  native-host document checker now includes UNIFIED_ROADMAP.md, with regression
+  cases for that coverage; milestone/dependency consistency is reviewed manually.
+
 **Revision 4** applies the review corrections:
 
 - moves KSPEC-04 phase 3 into KERN-3/G4 and names initial versus later security
@@ -341,11 +356,12 @@ Claims carry the preview label until their COMP rung and gate pass.
 - checks canonical published evidence deterministically and fails on missing
   published objects, with executable validator regression tests.
 
-Follow-up corrections to revision 4 (same day):
+Follow-up corrections to revision 4 (same day; refined above in revision 5):
 
 - C3-02 uses `a & a` for the repeated parallel leaf; under D23, `a | a` is a
   sequence;
-- Application C is COMP-5's reuse evidence and does not gate G5;
+- Application C was assigned reuse evidence outside G5; revision 5 gives it
+  the explicit I6/COMP-7 exit;
 - at G5 each outside team qualifies in its roadmap role, so a requesting team
   need not execute a TaskLeaf;
 - COMP-1 and COMP-2 are unblocked now and start on the explicit start.
@@ -404,11 +420,11 @@ These checks perform no runtime
 qualification. Folding its generic checks into a repository-wide documents gate
 is a follow-up, once the public-copy gate exists (roadmap OUT-2).
 
-**Merge order.** The research evidence pins the unified roadmap amendment at
-#1200's commit `e9b2660f6`. Merge #1200 with a merge commit before this PR, so
-that commit stays reachable from main. Otherwise, re-pin that evidence view to
-main once #1200 lands; the validator fails when a pinned published object is
-missing.
+**Merge order.** The research evidence pins the exact #1200 commit recorded in
+`research/source-evidence.json` and the [crosswalk](ROADMAP-CROSSWALK.md). Merge
+#1200 with a merge commit before this PR, so that commit stays reachable from
+main. Otherwise, re-pin and revalidate that evidence view against main once
+#1200 lands; the validator fails when a pinned published object is missing.
 
 The evidence includes divergent PR heads. Implementation must:
 

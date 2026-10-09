@@ -1,6 +1,6 @@
 # C5: Execution observations, joins and exact apply
 
-Status: proposed contract, revision 4. Parent: [Computer proposal](PROPOSAL.md).
+Status: proposed contract, revision 5. Parent: [Computer proposal](PROPOSAL.md).
 
 ## Purpose and owner
 
@@ -71,10 +71,11 @@ a best-effort broadcast. If a graph profile lacks the necessary completion or
 close/continuation fence, this join profile is unavailable until that owner
 contract is qualified.
 
-Computer-0 therefore requires KERN-3's KSPEC-04 phases 1 to 3, including
-phase-3 graph tombstones and D1 DelegationRoot fences in W1's canonical serving
-transactions. Retain their generations in the normal migration/recovery
-inventory. A process-tree fence is not a graph-issuance fence. Sealed permits
+Computer-0 therefore requires KERN-3a's capability/process closure and process
+exit, plus KERN-3b's KSPEC-04 phase-3 graph tombstones and WORK-D1 DelegationRoot
+fences in WORK-W1's canonical serving transactions. Retain their generations in
+the normal migration/recovery inventory. A process-tree fence is not a
+graph-issuance fence. Sealed permits
 that predate closure remain dispatchable under their native contract and must
 stay in membership until their required disposition is established. Issuance
 closure neither cancels them nor frees their exposure. The caller's admitted

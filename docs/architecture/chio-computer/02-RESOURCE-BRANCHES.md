@@ -1,6 +1,6 @@
 # C2: Resource branching and publication
 
-Status: proposed contract, revision 4. Parent: [Computer proposal](PROPOSAL.md).
+Status: proposed contract, revision 5. Parent: [Computer proposal](PROPOSAL.md).
 
 ## Purpose and owner
 
