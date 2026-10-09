@@ -1,6 +1,6 @@
 # Design: FTL lessons program
 
-- Status: PROPOSED (program index, revision 4: adversarial review of specs 3, 5, 8, 9 and 10 on 2026-10-05; re-baselined 2026-10-04 on #1160 + #1173 + #1172 + uncommitted recovery P0-P5). Each child spec is reviewed and approved on its own.
+- Status: PROPOSED (program index, revision 5: program IDs, roadmap mapping and owner decisions on 2026-10-09; revision 4: adversarial review of specs 3, 5, 8, 9 and 10 on 2026-10-05; re-baselined 2026-10-04 on #1160 + #1173 + #1172 + uncommitted recovery P0-P5). Each child spec is reviewed and approved on its own.
 - Date: 2026-10-04
 - Scope:
   - index, cross-spec decisions and sequencing for eleven designs: seven from the FTL review, the durable stop epoch from the follow-on brainstorm, and the three keystone specs from the kernel north star;
@@ -17,7 +17,40 @@
   - `docs/research/2026-10-04-ftl-lessons-brainstorm.md`: candidates on the shipped baseline.
   - `docs/research/2026-10-04-chio-kernel-north-star.md`: historical kernel research, eleven bets that fold these specs into a small, proven, fast and agent-safe kernel. Its section 2 is a kernel technical target under the approved north star, not a north star of its own.
 
+## Program IDs and roadmap mapping
+
+The unified roadmap (`docs/operations/UNIFIED_ROADMAP.md`, PR #1196) gives every cross-document ID a program prefix (its section 12). This program's prefixes are:
+
+- **`KSPEC-NN`** names a child spec. Inside this program a spec is still written "spec N" (or S1 to S11); spec 1 is KSPEC-01, and so on.
+- **`KDEF-`** names a row of section 3: KDEF-D1 to KDEF-D12, KDEF-N1 to KDEF-N30, and KDEF-GT1, the hosted-gate qualification blocker carried in row N5. The tables keep the bare IDs. KDEF-D1 (missing receipt) is never #1173's D1 (dynamic delegation).
+- Roadmap IDs carry `UR-`: lane rungs such as UR-KERN-1, contracts such as UR-CT-SETTLE, and owner decisions UR-D1 to UR-D15.
+
+| ID | Spec | File (under `docs/superpowers/specs/`) | Roadmap placement |
+|---|---|---|---|
+| KSPEC-01 | Closed kernel ABI | `2026-10-04-closed-kernel-abi-design.md` | Phase 0 census publishes `KERNEL_ABI_VERSION` for UR-CT-ABI; the shrink follows the success test |
+| KSPEC-02 | Authority faults | `2026-10-04-authority-faults-design.md` | After the success test |
+| KSPEC-03 | Typed reservations | `2026-10-04-typed-reservations-design.md` | Phase 1 is UR-KERN-2 (KDEF-D1, N2, N28, N29), landing with KSPEC-09's M20 identity-disposition delta |
+| KSPEC-04 | Authority-space teardown | `2026-10-04-authority-space-teardown-design.md` | Phases 1 and 2 are UR-KERN-3, with KDEF-D6 and D5; phases 3 and 4 follow the success test |
+| KSPEC-05 | Unified event queue | `2026-10-04-unified-event-queue-design.md` | Part A is UR-KERN-4 (KDEF-D3, D4, N26, N30); Part B follows the success test |
+| KSPEC-06 | Opaque adapter context | `2026-10-04-opaque-adapter-context-design.md` | No KERNEL rung; KDEF-D8 stays in this program's bug-fix lane (section 6) |
+| KSPEC-07 | Isolation and confinement evidence | `2026-10-04-microkernel-isolation-backend-design.md` | Steps 1 and 2 are UR-KERN-5, with `AgentHostBwrap` and `Seatbelt` backend kinds |
+| KSPEC-08 | Durable stop epoch | `2026-10-04-durable-stop-epoch-design.md` | Phases 0 and 1 are UR-KERN-1 (AC6; KDEF-D2, N22, N23); phases 2 to 7 follow the success test |
+| KSPEC-09 | Pure admission machine | `2026-10-04-pure-admission-machine-design.md` | Keystone, after the success test (its M20 delta lands earlier, with UR-KERN-2) |
+| KSPEC-10 | Crossing primitive | `2026-10-04-crossing-primitive-design.md` | Keystone, after the success test |
+| KSPEC-11 | Integrity-gated admission | `2026-10-04-integrity-gated-admission-design.md` | Keystone, after the success test |
+
+UR-KERN-6 holds the gates: KDEF-GT1 (one whole hosted CI run passes), KDEF-N4 (the Mechanism D gate), KDEF-N1 and N15 as rebase gates at the #1173 and #1179 merges, and owners for KDEF-D7, N6, D11 and D12. Lane KERNEL runs on post-#1160 main.
+
+**Pins.** Citations stay pinned to the heads under Baseline, where they were verified. When #1160 merges, the pins move to its merge commit on main and every KDEF row is re-verified against it (roadmap section 13). Until then no KDEF row is re-pinned.
+
 ## Revision history
+
+**Revision 5, landing preparation (2026-10-09).** The roadmap lands this PR as the KSPEC program (its section 7). This revision:
+- adds the `KSPEC-NN` and `KDEF-` prefixes, the spec-to-file table and the UR-KERN-1 to UR-KERN-6 mapping ("Program IDs and roadmap mapping");
+- records owner decisions UR-D1 to UR-D7 (section 5a) and aligns KSPEC-04 section 10, KSPEC-08 S22 and S34, KSPEC-10 section 15, KSPEC-11 section 4.1 and brainstorm candidate 2 with UR-D3 and UR-D4;
+- reframes the north-star research document as historical, with its section 2 as a kernel technical target under the approved north star.
+
+The KDEF rows are unchanged; they are re-verified after #1160 merges.
 
 **Revision 4, adversarial review (2026-10-05).** Specs 9 and 10 were reviewed first, then specs 3, 5 and 8, the three that carry live defects. Each review read the spec against M:, V: and W: code and against its siblings. Every Blocker and Major was applied, and each spec records its dispositions in a `## Review disposition` table.
 - **Spec 9 (machine)**, revision 3. Latches have three scopes. A new `NonDurable` class covers `Monetary` and development `Off` modes. Post-effect step and receipt-append events let the machine own the receipt decision. Driver-drop rules (M17), trailing hint groups (M18) and twelve theorems are added.
@@ -211,7 +244,7 @@ Across three revisions, each child spec narrowed to the gap that shipped and imp
 
 ## 3. Defects and findings
 
-Items were verified on the M:/V: heads, or in W:'s working tree where marked.
+Items were verified on the M:/V: heads, or in W:'s working tree where marked. Each row's ID is its `KDEF-` ID without the prefix.
 
 ### 3.1 Live defects
 
@@ -340,6 +373,18 @@ Items were verified on the M:/V: heads, or in W:'s working tree where marked.
     - `HintPort` is infallible and best-effort.
     - Hint effects run in a trailing group only after the commit group's `Committed` acknowledgement.
     - H2 holds per commit class: a restore can undo a hinted progress-only change.
+
+## 5a. Owner decisions (2026-10-09)
+
+The owner recorded decisions UR-D1 to UR-D7 on 2026-10-09 (roadmap section 8). They bind this program as follows:
+
+| Decision | Ruling | Effect here |
+|---|---|---|
+| UR-D1, settlement composition | Adopt this program's decision 4 on #1160's paged startup sweep, frozen as UR-CT-SETTLE | Decision 4, with spec 9 M7a, M7b, M11a and R-9-05, is the settlement composition rule. Its text is unchanged |
+| UR-D2, signer rotation | Sign with the current key and bind the original identity, uniformly across finalization, release and waiver | No spec here sets a rotation rule of its own. Spec 9's finalization, release and waiver paths (M7a, M7b, M11a) take the rule from UR-CT-SETTLE, which also settles whether a finalization under a rotated signer may deliver output or only withhold it |
+| UR-D3, schema allocation | Versions are allocated in landing order under the ledger lock, with symbolic names on branches | Spec 8 (S34), spec 10 (section 15) and spec 11 (section 4.1) name no new version number. Each bump takes its number through the lock when it lands |
+| UR-D4, cross-org transport | HTTPS with mTLS or signed bodies by default; iroh stays an optional lane with self-hosted relays | Spec 4 section 10 and spec 8 S22 publish over the default transport, and iroh lane b is an option a deployment enables. The ruling also sets the direction for KDEF-N10, whose row is re-verified after #1160 merges |
+| UR-D5 to UR-D7 | An unpaid `Agreement` variant in `chio.work.v1`; DPoP for federated grants at the door; `bb-connor/arc` as the development repo with `backbay-labs/chio` as its mirror | No spec here constrains these. Spec 2's recovery actors keep direct tokens without DPoP: they are local operator tokens, not federated grants |
 
 ## 6. Sequencing
 
