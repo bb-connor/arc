@@ -937,7 +937,12 @@ jobs:
           })"
           test "$(jq -r '.ref' <<< "${merge_ref}")" = "refs/pull/${PR_NUMBER}/merge"
           test "$(jq -r '.object.type' <<< "${merge_ref}")" = commit
-          test "$(jq -r '.object.sha' <<< "${merge_ref}")" = "${MERGE_COMMIT_SHA}"
+          live_merge_sha="$(jq -r '.object.sha' <<< "${merge_ref}")"
+          [[ "${live_merge_sha}" =~ ^[0-9a-f]{40}$ ]]
+          live_merge_commit="$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/git/commits/${live_merge_sha}")"
+          test "$(jq -r '.sha' <<< "${live_merge_commit}")" = "${live_merge_sha}"
+          test "$(jq -cS '[.parents[].sha]' <<< "${live_merge_commit}")" = "[\"${BASE_SHA}\",\"${SOURCE_SHA}\"]"
+          test "$(jq -r '.tree.sha' <<< "${live_merge_commit}")" = "${MERGE_TREE_SHA}"
           test "$(jq -r '.labels | any(.name == "refresh-linux-evidence")' <<< "${live_pr}")" = "false"
           labels_json="$(jq -cS '[.labels[].name] | sort' <<< "${live_pr}")"
           test "$(printf '%s' "${labels_json}" | sha256sum | cut -d' ' -f1)" = "${LABELS_DIGEST}"
@@ -952,6 +957,11 @@ jobs:
           test "$(jq -r '.parents[0].sha' <<< "${merge_commit}")" = "${BASE_SHA}"
           test "$(jq -r '.parents[1].sha' <<< "${merge_commit}")" = "${SOURCE_SHA}"
           test "$(jq -r '.tree.sha' <<< "${merge_commit}")" = "${MERGE_TREE_SHA}"
+
+          main_ref="$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/git/ref/heads/main")"
+          test "$(jq -r '.ref' <<< "${main_ref}")" = refs/heads/main
+          test "$(jq -r '.object.type' <<< "${main_ref}")" = commit
+          test "$(jq -r '.object.sha' <<< "${main_ref}")" = "${BASE_SHA}"
 
           cursor="${SOURCE_SHA}"
           authorized=false
@@ -1287,6 +1297,8 @@ jobs:
       ci_workflow_id: ${{ steps.seal.outputs.ci_workflow_id }}
       evidence_sha: ${{ steps.seal.outputs.evidence_sha }}
       external_id: ${{ steps.seal.outputs.external_id }}
+      identity_digest: ${{ steps.seal.outputs.identity_digest }}
+      identity_json: ${{ steps.seal.outputs.identity_json }}
       merge_commit_sha: ${{ steps.seal.outputs.merge_commit_sha }}
       pr_number: ${{ steps.seal.outputs.pr_number }}
       publication_binding_digest: ${{ steps.seal.outputs.publication_binding_digest }}
@@ -1508,14 +1520,30 @@ jobs:
           EVIDENCE_SHA: ${{ steps.bind.outputs.evidence_sha }}
           GH_TOKEN: ${{ github.token }}
           HEAD_REF: ${{ steps.bind.outputs.head_ref }}
-          MERGE_COMMIT_SHA: ${{ needs.validate-capture.outputs.merge_commit_sha }}
           MERGE_TREE_SHA: ${{ needs.validate-capture.outputs.merge_tree_sha }}
           PR_NUMBER: ${{ steps.bind.outputs.pr_number }}
         run: |
           set -euo pipefail
           shopt -s inherit_errexit
           ci_run=''
-          expected_run_name="CI N=${PR_NUMBER} E=${EVIDENCE_SHA} B=${BASE_SHA} M=${MERGE_COMMIT_SHA}"
+          refuse_shared_evidence_head() {
+            local endpoint separator page response count
+            for endpoint in "pulls?state=open" "commits/${EVIDENCE_SHA}/pulls"; do
+              separator='?'
+              if [[ "${endpoint}" == *'?'* ]]; then separator='&'; fi
+              for page in $(seq 1 10); do
+                response="$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/${endpoint}${separator}per_page=100&page=${page}")" || return 1
+                count="$(jq -er 'select(type == "array" and length <= 100 and all(.[]; (.number | type == "number" and . > 0 and floor == .) and (.head.sha | type == "string" and test("^[0-9a-f]{40}$")))) | length' <<< "${response}")" || return 1
+                test "$(jq -r --arg head "${EVIDENCE_SHA}" --arg number "${PR_NUMBER}" 'any(.[]; .head.sha == $head and (.number | tostring) != $number)' <<< "${response}")" = false || return 1
+                if test "${count}" -lt 100; then break; fi
+                if test "${page}" = 10; then
+                  echo "pull request census reaches the 1,000-result listing ceiling" >&2
+                  return 1
+                fi
+              done
+            done
+          }
+          expected_run_prefix="CI N=${PR_NUMBER} E=${EVIDENCE_SHA} B=${BASE_SHA} M="
           list_matching_ci_runs() {
             # Conditional callers disable errexit throughout this helper.
             # Propagate every API, parsing, and validation failure explicitly.
@@ -1531,14 +1559,8 @@ jobs:
             total_count="$(jq -er '.total_count | select(type == "number" and . >= 0 and floor == .)' <<< "${first_response}")" || return 1
             [[ "${total_count}" =~ ^[0-9]+$ ]] || return 1
             if test "${total_count}" -ge 1000; then
-              query=''
-              first_response="$({
-                gh api \
-                  -H "Accept: application/vnd.github+json" \
-                  "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?per_page=100&page=1"
-              })" || return 1
-              total_count="$(jq -er '.total_count | select(type == "number" and . >= 0 and floor == .)' <<< "${first_response}")" || return 1
-              [[ "${total_count}" =~ ^[0-9]+$ ]] || return 1
+              echo "CI history for ${EVIDENCE_SHA} reaches the 1,000-result listing ceiling" >&2
+              return 2
             fi
             while true; do
               if test "${page}" = 1; then
@@ -1566,26 +1588,29 @@ jobs:
             test "$(jq -r '[.[].id] | unique | length' <<< "${runs}")" = "${total_count}" || return 1
             jq -cS \
               --arg evidence_sha "${EVIDENCE_SHA}" \
-              --arg expected_run_name "${expected_run_name}" \
+              --arg expected_run_prefix "${expected_run_prefix}" \
               --arg head_ref "${HEAD_REF}" \
               --arg repository "${GITHUB_REPOSITORY}" \
               --arg workflow_id "${CI_WORKFLOW_ID}" \
               '[.[] | select(
-                .name == "CI" and
                 .path == ".github/workflows/ci.yml" and
                 .event == "pull_request" and
                 (.workflow_id | tostring) == $workflow_id and
-                .display_title == $expected_run_name and
+                (.display_title | type) == "string" and
+                (.display_title | startswith($expected_run_prefix)) and
+                (.display_title | test("^CI N=[1-9][0-9]* E=[0-9a-f]{40} B=[0-9a-f]{40} M=[0-9a-f]{40}$")) and
                 .head_sha == $evidence_sha and
                 .head_branch == $head_ref and
                 .head_repository.full_name == $repository
               )] | sort_by(.id)' <<< "${runs}" || return 1
           }
           for _ in $(seq 1 480); do
-            if ! matching_runs="$(list_matching_ci_runs)"; then
+            matching_runs="$(list_matching_ci_runs)" || {
+              status=$?
+              test "${status}" != 2 || exit 1
               sleep 30
               continue
-            fi
+            }
             if test "$(jq -r 'length' <<< "${matching_runs}")" = "0"; then
               sleep 30
               continue
@@ -1616,12 +1641,16 @@ jobs:
           })"
           test "$(jq -r '.status' <<< "${ci_run}")" = "completed"
           test "$(jq -r '.conclusion' <<< "${ci_run}")" = "success"
-          test "$(jq -r '.name' <<< "${ci_run}")" = "CI"
           test "$(jq -r '.path' <<< "${ci_run}")" = ".github/workflows/ci.yml"
           test "$(jq -r '.event' <<< "${ci_run}")" = "pull_request"
           test "$(jq -r '.workflow_id' <<< "${ci_run}")" = "${CI_WORKFLOW_ID}"
-          expected_run_name="CI N=${PR_NUMBER} E=${EVIDENCE_SHA} B=${BASE_SHA} M=${MERGE_COMMIT_SHA}"
-          test "$(jq -r '.display_title' <<< "${ci_run}")" = "${expected_run_name}"
+          expected_run_prefix="CI N=${PR_NUMBER} E=${EVIDENCE_SHA} B=${BASE_SHA} M="
+          [[ "$(jq -r '.display_title' <<< "${ci_run}")" =~ ^CI\ N=${PR_NUMBER}\ E=${EVIDENCE_SHA}\ B=${BASE_SHA}\ M=([0-9a-f]{40})$ ]]
+          ci_merge_sha="${BASH_REMATCH[1]}"
+          ci_merge_commit="$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/git/commits/${ci_merge_sha}")"
+          test "$(jq -r '.sha' <<< "${ci_merge_commit}")" = "${ci_merge_sha}"
+          test "$(jq -cS '[.parents[].sha]' <<< "${ci_merge_commit}")" = "[\"${BASE_SHA}\",\"${EVIDENCE_SHA}\"]"
+          test "$(jq -r '.tree.sha' <<< "${ci_merge_commit}")" = "${MERGE_TREE_SHA}"
           test "$(jq -r '.head_sha' <<< "${ci_run}")" = "${EVIDENCE_SHA}"
           test "$(jq -r '.head_branch' <<< "${ci_run}")" = "${HEAD_REF}"
           test "$(jq -r '.head_repository.full_name' <<< "${ci_run}")" = "${GITHUB_REPOSITORY}"
@@ -1708,22 +1737,23 @@ jobs:
           })"
           test "$(jq -r '.ref' <<< "${merge_ref}")" = "refs/pull/${PR_NUMBER}/merge"
           test "$(jq -r '.object.type' <<< "${merge_ref}")" = commit
-          test "$(jq -r '.object.sha' <<< "${merge_ref}")" = "${MERGE_COMMIT_SHA}"
-          merge_commit="$({
-            gh api \
-              -H "Accept: application/vnd.github+json" \
-              -H "X-GitHub-Api-Version: 2026-03-10" \
-              "repos/${GITHUB_REPOSITORY}/git/commits/${MERGE_COMMIT_SHA}"
-          })"
-          test "$(jq -r '.parents | length' <<< "${merge_commit}")" = "2"
-          test "$(jq -r '.parents[0].sha' <<< "${merge_commit}")" = "${BASE_SHA}"
-          test "$(jq -r '.parents[1].sha' <<< "${merge_commit}")" = "${EVIDENCE_SHA}"
-          test "$(jq -r '.tree.sha' <<< "${merge_commit}")" = "${MERGE_TREE_SHA}"
+          live_merge_sha="$(jq -r '.object.sha' <<< "${merge_ref}")"
+          [[ "${live_merge_sha}" =~ ^[0-9a-f]{40}$ ]]
+          live_merge_commit="$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/git/commits/${live_merge_sha}")"
+          test "$(jq -r '.sha' <<< "${live_merge_commit}")" = "${live_merge_sha}"
+          test "$(jq -cS '[.parents[].sha]' <<< "${live_merge_commit}")" = "[\"${BASE_SHA}\",\"${EVIDENCE_SHA}\"]"
+          test "$(jq -r '.tree.sha' <<< "${live_merge_commit}")" = "${MERGE_TREE_SHA}"
+          main_ref="$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/git/ref/heads/main")"
+          test "$(jq -r '.ref' <<< "${main_ref}")" = refs/heads/main
+          test "$(jq -r '.object.type' <<< "${main_ref}")" = commit
+          test "$(jq -r '.object.sha' <<< "${main_ref}")" = "${BASE_SHA}"
+          refuse_shared_evidence_head
           {
             echo "aggregate_check_run_id=${aggregate_check_run_id}"
             echo "build_check_run_id=${build_check_run_id}"
             echo "ci_run_attempt=${ci_run_attempt}"
             echo "ci_run_id=${ci_run_id}"
+            echo "ci_merge_sha=${ci_merge_sha}"
             echo "deny_check_run_id=${deny_check_run_id}"
             echo "msrv_check_run_id=${msrv_check_run_id}"
             echo "vet_check_run_id=${vet_check_run_id}"
@@ -1740,7 +1770,7 @@ jobs:
           EVIDENCE_SHA: ${{ steps.bind.outputs.evidence_sha }}
           GH_TOKEN: ${{ github.token }}
           HEAD_REF: ${{ steps.bind.outputs.head_ref }}
-          MERGE_COMMIT_SHA: ${{ needs.validate-capture.outputs.merge_commit_sha }}
+          CI_MERGE_SHA: ${{ steps.ci.outputs.ci_merge_sha }}
           MERGE_TREE_SHA: ${{ needs.validate-capture.outputs.merge_tree_sha }}
           PR_NUMBER: ${{ steps.bind.outputs.pr_number }}
           SECURITY_DEFINITION_SHA: ${{ steps.bind.outputs.security_definition_sha }}
@@ -1752,7 +1782,7 @@ jobs:
           digest_pattern='^[0-9a-f]{64}$'
           [[ "${BASE_SHA}" =~ ${commit_pattern} ]]
           [[ "${EVIDENCE_SHA}" =~ ${commit_pattern} ]]
-          [[ "${MERGE_COMMIT_SHA}" =~ ${commit_pattern} ]]
+          [[ "${CI_MERGE_SHA}" =~ ${commit_pattern} ]]
           [[ "${MERGE_TREE_SHA}" =~ ${commit_pattern} ]]
           [[ "${SECURITY_DEFINITION_SHA}" =~ ${commit_pattern} ]]
           [[ "${CI_RUN_ID}" =~ ^[1-9][0-9]*$ ]]
@@ -1866,16 +1896,16 @@ jobs:
           test "$(jq -r '.base.ref' <<< "${binding}")" = "${BASE_REF}"
           test "$(jq -r '.base.sha' <<< "${binding}")" = "${BASE_SHA}"
           test "$(jq -r '.merge.ref' <<< "${binding}")" = "refs/pull/${PR_NUMBER}/merge"
-          test "$(jq -r '.merge.sha' <<< "${binding}")" = "${MERGE_COMMIT_SHA}"
+          test "$(jq -r '.merge.sha' <<< "${binding}")" = "${CI_MERGE_SHA}"
           test "$(jq -r '.merge.tree_sha' <<< "${binding}")" = "${MERGE_TREE_SHA}"
           test "$(jq -cS '.merge.parents' <<< "${binding}")" = "[\"${BASE_SHA}\",\"${EVIDENCE_SHA}\"]"
           test "$(jq -r '.ci.workflow_id' <<< "${binding}")" = "${CI_WORKFLOW_ID}"
           test "$(jq -r '.ci.run_id' <<< "${binding}")" = "${CI_RUN_ID}"
           test "$(jq -r '.ci.run_attempt' <<< "${binding}")" = "${CI_RUN_ATTEMPT}"
-          test "$(jq -r '.ci.run_name' <<< "${binding}")" = "CI N=${PR_NUMBER} E=${EVIDENCE_SHA} B=${BASE_SHA} M=${MERGE_COMMIT_SHA}"
+          test "$(jq -r '.ci.run_name' <<< "${binding}")" = "CI N=${PR_NUMBER} E=${EVIDENCE_SHA} B=${BASE_SHA} M=${CI_MERGE_SHA}"
           test "$(jq -r '.builder.definition_sha' <<< "${binding}")" = "${SECURITY_DEFINITION_SHA}"
           test "$(jq -r '.builder.workflow_path' <<< "${binding}")" = ".github/workflows/enterprise-hardening.yml"
-          test "$(jq -r '.caller.definition_sha' <<< "${binding}")" = "${MERGE_COMMIT_SHA}"
+          test "$(jq -r '.caller.definition_sha' <<< "${binding}")" = "${CI_MERGE_SHA}"
           test "$(jq -r '.caller.workflow_path' <<< "${binding}")" = ".github/workflows/ci.yml"
           test "$(jq -r '.caller.workflow_ref' <<< "${binding}")" = "${GITHUB_REPOSITORY}/.github/workflows/ci.yml@refs/pull/${PR_NUMBER}/merge"
           repository_id="$(jq -r '.repository.id' <<< "${binding}")"
@@ -1941,7 +1971,7 @@ jobs:
             --predicate-type "https://github.com/bb-connor/arc/attestations/ci-merge-binding/v1" \
             --signer-workflow "bb-connor/arc/.github/workflows/enterprise-hardening.yml" \
             --signer-digest "${SECURITY_DEFINITION_SHA}" \
-            --source-digest "${MERGE_COMMIT_SHA}" \
+            --source-digest "${CI_MERGE_SHA}" \
             --source-ref "refs/pull/${PR_NUMBER}/merge" \
             --deny-self-hosted-runners \
             --format json > "${verification_json}"
@@ -1963,18 +1993,18 @@ jobs:
           test "$(jq -r '.buildSignerDigest' <<< "${certificate}")" = "${SECURITY_DEFINITION_SHA}"
           test "$(jq -r '.runnerEnvironment' <<< "${certificate}")" = github-hosted
           test "$(jq -r '.sourceRepositoryURI' <<< "${certificate}")" = "https://github.com/${GITHUB_REPOSITORY}"
-          test "$(jq -r '.sourceRepositoryDigest' <<< "${certificate}")" = "${MERGE_COMMIT_SHA}"
+          test "$(jq -r '.sourceRepositoryDigest' <<< "${certificate}")" = "${CI_MERGE_SHA}"
           test "$(jq -r '.sourceRepositoryRef' <<< "${certificate}")" = "refs/pull/${PR_NUMBER}/merge"
           test "$(jq -r '.sourceRepositoryIdentifier' <<< "${certificate}")" = "${repository_id}"
           test "$(jq -r '.sourceRepositoryOwnerURI' <<< "${certificate}")" = "https://github.com/${GITHUB_REPOSITORY_OWNER}"
           test "$(jq -r '.sourceRepositoryOwnerIdentifier' <<< "${certificate}")" = "${repository_owner_id}"
           test "$(jq -r '.buildConfigURI' <<< "${certificate}")" = "${caller_uri}"
-          test "$(jq -r '.buildConfigDigest' <<< "${certificate}")" = "${MERGE_COMMIT_SHA}"
+          test "$(jq -r '.buildConfigDigest' <<< "${certificate}")" = "${CI_MERGE_SHA}"
           test "$(jq -r '.buildTrigger' <<< "${certificate}")" = pull_request
           test "$(jq -r '.runInvocationURI' <<< "${certificate}")" = "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${CI_RUN_ID}/attempts/${CI_RUN_ATTEMPT}"
           test "$(jq -r '.sourceRepositoryVisibilityAtSigning' <<< "${certificate}")" = public
           test "$(jq -r '.githubWorkflowTrigger' <<< "${certificate}")" = pull_request
-          test "$(jq -r '.githubWorkflowSHA' <<< "${certificate}")" = "${MERGE_COMMIT_SHA}"
+          test "$(jq -r '.githubWorkflowSHA' <<< "${certificate}")" = "${CI_MERGE_SHA}"
           test "$(jq -r '.githubWorkflowName' <<< "${certificate}")" = CI
           test "$(jq -r '.githubWorkflowRepository' <<< "${certificate}")" = "${GITHUB_REPOSITORY}"
           test "$(jq -r '.githubWorkflowRef' <<< "${certificate}")" = "refs/pull/${PR_NUMBER}/merge"
@@ -2008,15 +2038,16 @@ jobs:
           })"
           test "$(jq -r '.ref' <<< "${stable_merge_ref}")" = "refs/pull/${PR_NUMBER}/merge"
           test "$(jq -r '.object.type' <<< "${stable_merge_ref}")" = commit
-          test "$(jq -r '.object.sha' <<< "${stable_merge_ref}")" = "${MERGE_COMMIT_SHA}"
-          stable_merge_commit="$({
-            gh api \
-              -H "Accept: application/vnd.github+json" \
-              -H "X-GitHub-Api-Version: 2026-03-10" \
-              "repos/${GITHUB_REPOSITORY}/git/commits/${MERGE_COMMIT_SHA}"
-          })"
+          stable_merge_sha="$(jq -r '.object.sha' <<< "${stable_merge_ref}")"
+          [[ "${stable_merge_sha}" =~ ^[0-9a-f]{40}$ ]]
+          stable_merge_commit="$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/git/commits/${stable_merge_sha}")"
+          test "$(jq -r '.sha' <<< "${stable_merge_commit}")" = "${stable_merge_sha}"
           test "$(jq -cS '[.parents[].sha]' <<< "${stable_merge_commit}")" = "[\"${BASE_SHA}\",\"${EVIDENCE_SHA}\"]"
           test "$(jq -r '.tree.sha' <<< "${stable_merge_commit}")" = "${MERGE_TREE_SHA}"
+          main_ref="$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/git/ref/heads/main")"
+          test "$(jq -r '.ref' <<< "${main_ref}")" = refs/heads/main
+          test "$(jq -r '.object.type' <<< "${main_ref}")" = commit
+          test "$(jq -r '.object.sha' <<< "${main_ref}")" = "${BASE_SHA}"
           {
             echo "attestation_bundle_sha256=${attestation_bundle_sha256}"
             echo "binding_artifact_digest=${archive_sha256}"
@@ -2050,6 +2081,7 @@ jobs:
           CAPTURE_RUN_ID: ${{ needs.validate-capture.outputs.capture_run_id }}
           CAPTURE_WORKFLOW_ID: ${{ needs.validate-capture.outputs.capture_workflow_id }}
           CI_AGGREGATE_CHECK_RUN_ID: ${{ steps.ci.outputs.aggregate_check_run_id }}
+          CI_MERGE_SHA: ${{ steps.ci.outputs.ci_merge_sha }}
           CI_RUN_ATTEMPT: ${{ steps.ci.outputs.ci_run_attempt }}
           CI_RUN_ID: ${{ steps.ci.outputs.ci_run_id }}
           CI_WORKFLOW_ID: ${{ steps.bind.outputs.ci_workflow_id }}
@@ -2073,6 +2105,7 @@ jobs:
           MIGRATION_STATE_STORE_DIGEST: ${{ needs.validate-capture.outputs.migration_state_store_digest }}
           MSRV_CHECK_RUN_ID: ${{ steps.ci.outputs.msrv_check_run_id }}
           PR_NUMBER: ${{ steps.bind.outputs.pr_number }}
+          REPOSITORY_ID: ${{ github.repository_id }}
           RUNNER_ARCH: ${{ needs.validate-capture.outputs.runner_arch }}
           RUNNER_CONTRACT_DIGEST: ${{ needs.validate-capture.outputs.runner_contract_digest }}
           RUNNER_LABELS_DIGEST: ${{ needs.validate-capture.outputs.runner_labels_digest }}
@@ -2083,11 +2116,13 @@ jobs:
           VET_CHECK_RUN_ID: ${{ steps.ci.outputs.vet_check_run_id }}
         run: |
           set -euo pipefail
+          export LC_ALL=C
           for commit in \
             "${AUTHORIZED_SOURCE_SHA}" \
             "${BASE_SHA}" \
             "${CAPTURE_DEFINITION_BLOB}" \
             "${CONTROLLER_DEFINITION_BLOB}" \
+            "${CI_MERGE_SHA}" \
             "${EVIDENCE_SHA}" \
             "${MERGE_COMMIT_SHA}" \
             "${MERGE_TREE_SHA}" \
@@ -2134,6 +2169,7 @@ jobs:
             "${DENY_CHECK_RUN_ID}" \
             "${MSRV_CHECK_RUN_ID}" \
             "${PR_NUMBER}" \
+            "${REPOSITORY_ID}" \
             "${VET_CHECK_RUN_ID}"; do
             [[ "${identifier}" =~ ^[1-9][0-9]*$ ]]
           done
@@ -2147,6 +2183,24 @@ jobs:
           [[ "${RUNNER_NAME}" =~ ^GitHub\ Actions\ [1-9][0-9]*$ ]]
           test "${ARTIFACT_NAME}" = "enterprise-linux-capture-${EVIDENCE_SHA}-${CAPTURE_RUN_ID}-${CAPTURE_RUN_ATTEMPT}"
 
+          [[ "${GITHUB_REPOSITORY}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]
+          identity_json="$({
+            jq -cS -n \
+              --arg repository "${GITHUB_REPOSITORY}" \
+              --arg repository_id "${REPOSITORY_ID}" \
+              --arg pr_number "${PR_NUMBER}" \
+              --arg base_sha "${BASE_SHA}" \
+              --arg evidence_sha "${EVIDENCE_SHA}" \
+              --arg merge_tree_sha "${MERGE_TREE_SHA}" \
+              --arg authorized_source_sha "${AUTHORIZED_SOURCE_SHA}" \
+              --arg security_definition_sha "${SECURITY_DEFINITION_SHA}" \
+              '{schema: "chio.security-candidate-identity.v1", repository: $repository,
+                repository_id: $repository_id, pr_number: $pr_number, base_sha: $base_sha,
+                evidence_sha: $evidence_sha, merge_tree_sha: $merge_tree_sha,
+                authorized_source_sha: $authorized_source_sha, security_definition_sha: $security_definition_sha}'
+          })"
+          identity_digest="$(printf '%s' "${identity_json}" | sha256sum | cut -d' ' -f1)"
+
           publication_binding="$({
             jq -cS -n \
               --arg artifact_digest "${ARTIFACT_DIGEST}" \
@@ -2158,7 +2212,7 @@ jobs:
               --arg base_ref "${BASE_REF}" \
               --arg base_repository "${BASE_REPOSITORY}" \
               --arg base_sha "${BASE_SHA}" \
-              --arg binding_artifact_digest "${BINDING_ARTIFACT_DIGEST}" \
+              --arg binding_artifact_digest "sha256:${BINDING_ARTIFACT_DIGEST}" \
               --arg binding_artifact_id "${BINDING_ARTIFACT_ID}" \
               --arg binding_sha256 "${BINDING_SHA256}" \
               --arg broker_boundary_digest "${BROKER_BOUNDARY_DIGEST}" \
@@ -2172,6 +2226,7 @@ jobs:
               --arg capture_run_id "${CAPTURE_RUN_ID}" \
               --arg capture_workflow_id "${CAPTURE_WORKFLOW_ID}" \
               --arg ci_aggregate_check_run_id "${CI_AGGREGATE_CHECK_RUN_ID}" \
+              --arg ci_merge_sha "${CI_MERGE_SHA}" \
               --arg ci_run_attempt "${CI_RUN_ATTEMPT}" \
               --arg ci_run_id "${CI_RUN_ID}" \
               --arg ci_workflow_id "${CI_WORKFLOW_ID}" \
@@ -2186,6 +2241,8 @@ jobs:
               --arg controller_workflow_id "${CONTROLLER_WORKFLOW_ID}" \
               --arg deny_check_run_id "${DENY_CHECK_RUN_ID}" \
               --arg evidence_sha "${EVIDENCE_SHA}" \
+              --arg identity_digest "${identity_digest}" \
+              --argjson identity "${identity_json}" \
               --arg inventory_digest "${INVENTORY_DIGEST}" \
               --arg key_log_transparency_digest "${KEY_LOG_TRANSPARENCY_DIGEST}" \
               --arg labels_digest "${LABELS_DIGEST}" \
@@ -2263,9 +2320,11 @@ jobs:
                   migration_state_store: $migration_state_store_digest,
                   runner_contract: $runner_contract_digest
                 },
+                identity: $identity,
+                identity_digest: $identity_digest,
                 inventory_digest: $inventory_digest,
                 labels_digest: $labels_digest,
-                merge_commit_sha: $merge_commit_sha,
+                merge_observations: {capture: $merge_commit_sha, ci: $ci_merge_sha},
                 merge_tree_sha: $merge_tree_sha,
                 pr_number: $pr_number,
                 repository: $repository,
@@ -2275,12 +2334,12 @@ jobs:
                   name: $runner_name,
                   os: $runner_os
                 },
-                schema: "chio.security-check-publication.v1",
+                schema: "chio.security-check-publication.v2",
                 security_definition_sha: $security_definition_sha
               }'
           })"
           publication_binding_digest="$(printf '%s' "${publication_binding}" | sha256sum | cut -d' ' -f1)"
-          external_id="arc:${PR_NUMBER}:${EVIDENCE_SHA}:${MERGE_COMMIT_SHA}:${AUTHORIZED_SOURCE_SHA}"
+          external_id="chio:v3:${PR_NUMBER}:${EVIDENCE_SHA}:${identity_digest}"
           {
             echo "authorized_source_sha=${AUTHORIZED_SOURCE_SHA}"
             echo "ci_aggregate_check_run_id=${CI_AGGREGATE_CHECK_RUN_ID}"
@@ -2289,6 +2348,8 @@ jobs:
             echo "ci_workflow_id=${CI_WORKFLOW_ID}"
             echo "evidence_sha=${EVIDENCE_SHA}"
             echo "external_id=${external_id}"
+            echo "identity_digest=${identity_digest}"
+            echo "identity_json=${identity_json}"
             echo "merge_commit_sha=${MERGE_COMMIT_SHA}"
             echo "pr_number=${PR_NUMBER}"
             echo "publication_binding_digest=${publication_binding_digest}"
@@ -2301,12 +2362,11 @@ jobs:
     needs: [authorize-security-check-publication, sign-validated-capture]
     environment: security-check-publisher
     concurrency:
-      group: security-check-authority-${{ needs.authorize-security-check-publication.outputs.merge_commit_sha }}
+      group: security-check-authority-${{ needs.authorize-security-check-publication.outputs.evidence_sha }}
       cancel-in-progress: false
       queue: max
     permissions:
       actions: read
-      checks: write
       contents: read
       pull-requests: read
     runs-on: ubuntu-24.04
@@ -2325,12 +2385,15 @@ jobs:
           FINALIZER_RUN_ATTEMPT: ${{ github.run_attempt }}
           FINALIZER_RUN_ID: ${{ github.run_id }}
           GH_TOKEN: ${{ github.token }}
+          IDENTITY_DIGEST: ${{ needs.authorize-security-check-publication.outputs.identity_digest }}
+          IDENTITY_JSON: ${{ needs.authorize-security-check-publication.outputs.identity_json }}
           MERGE_COMMIT_SHA: ${{ needs.authorize-security-check-publication.outputs.merge_commit_sha }}
           PR_NUMBER: ${{ needs.authorize-security-check-publication.outputs.pr_number }}
           PUBLICATION_BINDING_DIGEST: ${{ needs.authorize-security-check-publication.outputs.publication_binding_digest }}
           PUBLICATION_BINDING_JSON: ${{ needs.authorize-security-check-publication.outputs.publication_binding_json }}
           PUBLISHER_REF: ${{ github.ref }}
           PUBLISHER_SHA: ${{ github.sha }}
+          REPOSITORY_ID: ${{ github.repository_id }}
           SECURITY_APP_ID: ${{ vars.CHIO_SECURITY_APP_ID }}
           SECURITY_APP_INSTALLATION_ID: ${{ vars.CHIO_SECURITY_APP_INSTALLATION_ID }}
           SECURITY_APP_PRIVATE_KEY_PEM: ${{ secrets.CHIO_SECURITY_APP_PRIVATE_KEY_PEM }}
@@ -2339,6 +2402,7 @@ jobs:
           LIVE_SECURITY_DEFINITION_SHA: ${{ vars.CHIO_ENTERPRISE_SECURITY_DEFINITION_SHA }}
         run: |
           set -euo pipefail
+          export LC_ALL=C
           shopt -s inherit_errexit
           umask 077
           [[ "${SECURITY_APP_ID}" =~ ^[1-9][0-9]*$ ]]
@@ -2359,6 +2423,7 @@ jobs:
           [[ "${CI_RUN_ATTEMPT}" =~ ^[1-9][0-9]*$ ]]
           [[ "${CI_RUN_ID}" =~ ^[1-9][0-9]*$ ]]
           [[ "${CI_WORKFLOW_ID}" =~ ^[1-9][0-9]*$ ]]
+          [[ "${REPOSITORY_ID}" =~ ^[1-9][0-9]*$ ]]
           test "${PUBLISHER_REF}" = "refs/heads/main"
           test "${LIVE_SECURITY_DEFINITION_SHA}" = "${SECURITY_DEFINITION_SHA}"
           authorized_publisher_blob_sha="$({
@@ -2379,16 +2444,21 @@ jobs:
           test "${running_publisher_blob_sha}" = "${authorized_publisher_blob_sha}"
           test "${COMMITTED_EVIDENCE_SHA}" = "${EVIDENCE_SHA}"
           test "${LIVE_AUTHORIZED_SOURCE_SHA}" = "${AUTHORIZED_SOURCE_SHA}"
-          test "${EXTERNAL_ID}" = "arc:${PR_NUMBER}:${EVIDENCE_SHA}:${MERGE_COMMIT_SHA}:${AUTHORIZED_SOURCE_SHA}"
+          [[ "${IDENTITY_DIGEST}" =~ ^[0-9a-f]{64}$ ]]
+          [[ "${EXTERNAL_ID}" =~ ^chio:v3:${PR_NUMBER}:${EVIDENCE_SHA}:([0-9a-f]{64})$ ]]
+          test "${BASH_REMATCH[1]}" = "${IDENTITY_DIGEST}"
+          test "$(jq -cS . <<< "${IDENTITY_JSON}")" = "${IDENTITY_JSON}"
+          test "$(printf '%s' "${IDENTITY_JSON}" | sha256sum | cut -d' ' -f1)" = "${IDENTITY_DIGEST}"
+          test "$(jq -r 'keys == ["authorized_source_sha", "base_sha", "evidence_sha", "merge_tree_sha", "pr_number", "repository", "repository_id", "schema", "security_definition_sha"] and all(.[]; type == "string" and test("^[ -~]+$")) and .schema == "chio.security-candidate-identity.v1"' <<< "${IDENTITY_JSON}")" = true
           publication_details_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${FINALIZER_RUN_ID}/attempts/${FINALIZER_RUN_ATTEMPT}"
           canonical_binding="$(jq -cS . <<< "${PUBLICATION_BINDING_JSON}")"
           test "${canonical_binding}" = "${PUBLICATION_BINDING_JSON}"
           test "$(printf '%s' "${canonical_binding}" | sha256sum | cut -d' ' -f1)" = "${PUBLICATION_BINDING_DIGEST}"
-          test "$(jq -r '.schema' <<< "${canonical_binding}")" = "chio.security-check-publication.v1"
+          test "$(jq -r '.schema' <<< "${canonical_binding}")" = "chio.security-check-publication.v2"
           test "$(jq -r '.repository' <<< "${canonical_binding}")" = "${GITHUB_REPOSITORY}"
           test "$(jq -r '.pr_number' <<< "${canonical_binding}")" = "${PR_NUMBER}"
           test "$(jq -r '.evidence_sha' <<< "${canonical_binding}")" = "${EVIDENCE_SHA}"
-          test "$(jq -r '.merge_commit_sha' <<< "${canonical_binding}")" = "${MERGE_COMMIT_SHA}"
+          test "$(jq -r '.merge_observations.capture' <<< "${canonical_binding}")" = "${MERGE_COMMIT_SHA}"
           test "$(jq -r '.authorized_source_sha' <<< "${canonical_binding}")" = "${AUTHORIZED_SOURCE_SHA}"
           test "$(jq -r '.security_definition_sha' <<< "${canonical_binding}")" = "${SECURITY_DEFINITION_SHA}"
           test "$(jq -r '.ci.workflow_id' <<< "${canonical_binding}")" = "${CI_WORKFLOW_ID}"
@@ -2396,8 +2466,26 @@ jobs:
           test "$(jq -r '.ci.run_attempt' <<< "${canonical_binding}")" = "${CI_RUN_ATTEMPT}"
           test "$(jq -r '.ci.aggregate_check_run_id' <<< "${canonical_binding}")" = "${CI_AGGREGATE_CHECK_RUN_ID}"
           [[ "$(jq -r '.labels_digest' <<< "${canonical_binding}")" =~ ^[0-9a-f]{64}$ ]]
-          [[ "$(jq -r '.merge_commit_sha' <<< "${canonical_binding}")" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$(jq -r '.merge_observations.ci' <<< "${canonical_binding}")" =~ ^[0-9a-f]{40}$ ]]
           [[ "$(jq -r '.merge_tree_sha' <<< "${canonical_binding}")" =~ ^[0-9a-f]{40}$ ]]
+
+          test "$(jq -r --argjson identity "${IDENTITY_JSON}" --arg digest "${IDENTITY_DIGEST}" --arg repository_id "${REPOSITORY_ID}" '
+            .identity == $identity and .identity_digest == $digest and
+            .identity.repository == .repository and .identity.repository_id == $repository_id and
+            .identity.pr_number == .pr_number and .identity.base_sha == .base.sha and
+            .identity.evidence_sha == .evidence_sha and .identity.merge_tree_sha == .merge_tree_sha and
+            .identity.authorized_source_sha == .authorized_source_sha and
+            .identity.security_definition_sha == .security_definition_sha and
+            (.merge_observations | keys) == ["capture", "ci"] and
+            (.ci.required_check_run_ids | keys) == ["build", "deny", "msrv", "vet"] and
+            all(.ci.required_check_run_ids[]; type == "string" and test("^[1-9][0-9]*$")) and
+            all(.ci | .run_id, .run_attempt, .workflow_id, .aggregate_check_run_id; type == "string" and test("^[1-9][0-9]*$")) and
+            (.identity.base_sha | test("^[0-9a-f]{40}$")) and
+            (.identity.merge_tree_sha | test("^[0-9a-f]{40}$")) and
+            (.ci.merge_binding.artifact_id | type == "string" and test("^[1-9][0-9]*$")) and
+            (.ci.merge_binding.artifact_digest | type == "string" and test("^sha256:[0-9a-f]{64}$")) and
+            (.ci.merge_binding.binding_sha256 | type == "string" and test("^[0-9a-f]{64}$"))
+            ' <<< "${canonical_binding}")" = true
 
           private_key="${RUNNER_TEMP}/chio-security-authority.pem"
           trap 'unset SECURITY_APP_PRIVATE_KEY_PEM installation_token token_response jwt jwt_header jwt_claims jwt_unsigned jwt_signature; rm -f -- "${private_key}"' EXIT
@@ -2530,7 +2618,6 @@ jobs:
             test "$(jq -r '.labels | any(.name == "refresh-linux-evidence")' <<< "${live_pr}")" = "false"
             labels_json="$(jq -cS '[.labels[].name] | sort' <<< "${live_pr}")"
             test "$(printf '%s' "${labels_json}" | sha256sum | cut -d' ' -f1)" = "$(jq -r '.labels_digest' <<< "${canonical_binding}")"
-            merge_commit_sha="$(jq -r '.merge_commit_sha' <<< "${canonical_binding}")"
             merge_ref="$({
               curl \
                 --proto '=https' \
@@ -2545,7 +2632,8 @@ jobs:
             })"
             test "$(jq -r '.ref' <<< "${merge_ref}")" = "refs/pull/${PR_NUMBER}/merge"
             test "$(jq -r '.object.type' <<< "${merge_ref}")" = commit
-            test "$(jq -r '.object.sha' <<< "${merge_ref}")" = "${merge_commit_sha}"
+            live_merge_sha="$(jq -r '.object.sha' <<< "${merge_ref}")"
+            [[ "${live_merge_sha}" =~ ^[0-9a-f]{40}$ ]]
             merge_commit="$({
               curl \
                 --proto '=https' \
@@ -2556,61 +2644,43 @@ jobs:
                 -H "Accept: application/vnd.github+json" \
                 -H "Authorization: Bearer ${GH_TOKEN}" \
                 -H "X-GitHub-Api-Version: 2026-03-10" \
-                "https://api.github.com/repos/${GITHUB_REPOSITORY}/git/commits/${merge_commit_sha}"
+                "https://api.github.com/repos/${GITHUB_REPOSITORY}/git/commits/${live_merge_sha}"
             })"
+            test "$(jq -r '.sha' <<< "${merge_commit}")" = "${live_merge_sha}"
             test "$(jq -r '.parents | length' <<< "${merge_commit}")" = "2"
             test "$(jq -r '.parents[0].sha' <<< "${merge_commit}")" = "$(jq -r '.base.sha' <<< "${canonical_binding}")"
             test "$(jq -r '.parents[1].sha' <<< "${merge_commit}")" = "${EVIDENCE_SHA}"
             test "$(jq -r '.tree.sha' <<< "${merge_commit}")" = "$(jq -r '.merge_tree_sha' <<< "${canonical_binding}")"
+            main_ref="$(curl --proto '=https' --tlsv1.2 --fail --silent --show-error -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "https://api.github.com/repos/${GITHUB_REPOSITORY}/git/ref/heads/main")"
+            test "$(jq -r '.ref' <<< "${main_ref}")" = refs/heads/main
+            test "$(jq -r '.object.type' <<< "${main_ref}")" = commit
+            test "$(jq -r '.object.sha' <<< "${main_ref}")" = "$(jq -r '.base.sha' <<< "${canonical_binding}")"
+            refuse_shared_evidence_head
           }
 
-          list_actions_mirror_checks() {
-            mirror_name="$1"
-            encoded_name="$(jq -rn --arg value "${mirror_name}" '$value | @uri')"
-            page=1
-            total_count=''
-            collected_checks='[]'
-            while true; do
-              page_response="$({
-                curl \
-                  --proto '=https' \
-                  --tlsv1.2 \
-                  --fail \
-                  --silent \
-                  --show-error \
-                  -H "Accept: application/vnd.github+json" \
-                  -H "Authorization: Bearer ${GH_TOKEN}" \
-                  -H "X-GitHub-Api-Version: 2026-03-10" \
-                  "https://api.github.com/repos/${GITHUB_REPOSITORY}/commits/${MERGE_COMMIT_SHA}/check-runs?app_id=15368&check_name=${encoded_name}&filter=all&per_page=100&page=${page}"
-              })"
-              page_total="$(jq -r '.total_count' <<< "${page_response}")"
-              [[ "${page_total}" =~ ^[0-9]+$ ]]
-              if test -z "${total_count}"; then
-                total_count="${page_total}"
-              else
-                test "${page_total}" = "${total_count}"
-              fi
-              page_checks="$(jq -cS '.check_runs' <<< "${page_response}")"
-              test "$(jq -r 'type' <<< "${page_checks}")" = "array"
-              collected_checks="$({
-                jq -cS -n \
-                  --argjson collected "${collected_checks}" \
-                  --argjson page "${page_checks}" \
-                  '$collected + $page'
-              })"
-              collected_count="$(jq -r 'length' <<< "${collected_checks}")"
-              test "${collected_count}" -le "${total_count}"
-              if test "${collected_count}" = "${total_count}"; then
-                break
-              fi
-              test "$(jq -r 'length' <<< "${page_checks}")" = "100"
-              page="$((page + 1))"
+
+          refuse_shared_evidence_head() {
+            local endpoint separator page response count
+            for endpoint in "pulls?state=open" "commits/${EVIDENCE_SHA}/pulls"; do
+              separator='?'
+              if [[ "${endpoint}" == *'?'* ]]; then separator='&'; fi
+              for page in $(seq 1 10); do
+                response="$(curl --proto '=https' --tlsv1.2 --fail --silent --show-error -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GH_TOKEN}" -H "X-GitHub-Api-Version: 2026-03-10" "https://api.github.com/repos/${GITHUB_REPOSITORY}/${endpoint}${separator}per_page=100&page=${page}")" || return 1
+                count="$(jq -er 'select(type == "array" and length <= 100 and all(.[]; (.number | type == "number" and . > 0 and floor == .) and (.head.sha | type == "string" and test("^[0-9a-f]{40}$")))) | length' <<< "${response}")" || return 1
+                test "$(jq -r --arg head "${EVIDENCE_SHA}" --arg number "${PR_NUMBER}" 'any(.[]; .head.sha == $head and (.number | tostring) != $number)' <<< "${response}")" = false || return 1
+                if test "${count}" -lt 100; then break; fi
+                if test "${page}" = 10; then
+                  echo "pull request census reaches the 1,000-result listing ceiling" >&2
+                  return 1
+                fi
+              done
             done
-            test "$(jq -r '[.[].id] | unique | length' <<< "${collected_checks}")" = "${total_count}"
-            jq -cS -n \
-              --argjson check_runs "${collected_checks}" \
-              --argjson total_count "${total_count}" \
-              '{check_runs: $check_runs, total_count: $total_count}'
+          }
+
+          revalidate_denial_scope() {
+            local evidence_commit
+            evidence_commit="$(curl --proto '=https' --tlsv1.2 --fail --silent --show-error -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GH_TOKEN}" -H "X-GitHub-Api-Version: 2026-03-10" "https://api.github.com/repos/${GITHUB_REPOSITORY}/git/commits/${EVIDENCE_SHA}")"
+            test "$(jq -r '.sha' <<< "${evidence_commit}")" = "${EVIDENCE_SHA}"
           }
 
           list_namespace_checks() {
@@ -2632,7 +2702,7 @@ jobs:
                   -H "Accept: application/vnd.github+json" \
                   -H "Authorization: Bearer ${token}" \
                   -H "X-GitHub-Api-Version: 2026-03-10" \
-                  "https://api.github.com/repos/${GITHUB_REPOSITORY}/commits/${MERGE_COMMIT_SHA}/check-runs?app_id=${app_id}&check_name=${encoded_name}&filter=all&per_page=100&page=${page}"
+                  "https://api.github.com/repos/${GITHUB_REPOSITORY}/commits/${EVIDENCE_SHA}/check-runs?app_id=${app_id}&check_name=${encoded_name}&filter=all&per_page=100&page=${page}"
               })"
               page_total="$(jq -r '.total_count' <<< "${page_response}")"
               [[ "${page_total}" =~ ^[0-9]+$ ]]
@@ -2665,7 +2735,7 @@ jobs:
             namespace="$(list_namespace_checks "${token}" "${app_id}" "${check_name}")"
             namespace_count="$(jq -r '.total_count' <<< "${namespace}")"
             test "$(jq -r '.check_runs | length' <<< "${namespace}")" = "${namespace_count}"
-            test "$(jq -r --arg app_id "${app_id}" --arg app_slug "${app_slug}" --arg head_sha "${MERGE_COMMIT_SHA}" --arg name "${check_name}" 'all(.check_runs[]; .name == $name and .head_sha == $head_sha and (.app.id | tostring) == $app_id and .app.slug == $app_slug)' <<< "${namespace}")" = "true"
+            test "$(jq -r --arg app_id "${app_id}" --arg app_slug "${app_slug}" --arg head_sha "${EVIDENCE_SHA}" --arg name "${check_name}" 'all(.check_runs[]; .name == $name and .head_sha == $head_sha and (.app.id | tostring) == $app_id and .app.slug == $app_slug)' <<< "${namespace}")" = "true"
             summary="Authority ${required_external_id} is permanently revoked for ci-regression."
             if test "${namespace_count}" = "0"; then
               if test "${bad_ci_create_missing}" = false; then
@@ -2675,8 +2745,7 @@ jobs:
                 jq -cS -n \
                   --arg authorized_source_sha "${AUTHORIZED_SOURCE_SHA}" \
                   --arg evidence_sha "${EVIDENCE_SHA}" \
-                  --arg merge_commit_sha "${MERGE_COMMIT_SHA}" \
-                  --arg pr_number "${PR_NUMBER}" \
+                  --argjson identity "${IDENTITY_JSON}" \
                   --arg security_definition_sha "${SECURITY_DEFINITION_SHA}" \
                   --argjson bad_ci_runs "${bad_ci_runs}" \
                   '{
@@ -2686,31 +2755,28 @@ jobs:
                       run_id: .id,
                       workflow_id: .workflow_id
                     }],
-                    identity: {
-                      authorized_source_sha: $authorized_source_sha,
-                      evidence_sha: $evidence_sha,
-                      merge_commit_sha: $merge_commit_sha,
-                      pr_number: $pr_number
-                    },
+                    authorized_source_sha: $authorized_source_sha,
+                    evidence_sha: $evidence_sha,
+                    identity: $identity,
                     reason: "ci-regression",
-                    schema: "chio.security-check-revocation.v1",
+                    schema: "chio.security-check-revocation.v2",
                     security_definition_sha: $security_definition_sha
                   }'
               })"
-              failure_payload="$(jq -cS -n --arg completed_at "$(date --utc +%Y-%m-%dT%H:%M:%SZ)" --arg external_id "${required_external_id}" --arg head_sha "${MERGE_COMMIT_SHA}" --arg name "${check_name}" --arg summary "${summary}" --arg text "${tombstone_text}" '{completed_at: $completed_at, conclusion: "failure", external_id: $external_id, head_sha: $head_sha, name: $name, output: {summary: $summary, text: $text, title: "Chio security authority revoked"}, status: "completed"}')"
-              revalidate_live_publication_head
+              failure_payload="$(jq -cS -n --arg completed_at "$(date --utc +%Y-%m-%dT%H:%M:%SZ)" --arg external_id "${required_external_id}" --arg head_sha "${EVIDENCE_SHA}" --arg name "${check_name}" --arg summary "${summary}" --arg text "${tombstone_text}" '{completed_at: $completed_at, conclusion: "failure", external_id: $external_id, head_sha: $head_sha, name: $name, output: {summary: $summary, text: $text, title: "Chio security authority revoked"}, status: "completed"}')"
+              revalidate_denial_scope
               failed_check="$(curl --proto '=https' --tlsv1.2 --fail --silent --show-error --request POST -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" -H "X-GitHub-Api-Version: 2026-03-10" --data-binary "${failure_payload}" "https://api.github.com/repos/${GITHUB_REPOSITORY}/check-runs")"
-              revalidate_live_publication_head
+              revalidate_denial_scope
               [[ "$(jq -r '.id' <<< "${failed_check}")" =~ ^[1-9][0-9]*$ ]]
               test "$(jq -r '.name' <<< "${failed_check}")" = "${check_name}"
-              test "$(jq -r '.head_sha' <<< "${failed_check}")" = "${MERGE_COMMIT_SHA}"
+              test "$(jq -r '.head_sha' <<< "${failed_check}")" = "${EVIDENCE_SHA}"
               test "$(jq -r '.external_id' <<< "${failed_check}")" = "${required_external_id}"
               test "$(jq -r '.status' <<< "${failed_check}")" = "completed"
               test "$(jq -r '.conclusion' <<< "${failed_check}")" = "failure"
               test "$(jq -r '.app.id' <<< "${failed_check}")" = "${app_id}"
               test "$(jq -r '.app.slug' <<< "${failed_check}")" = "${app_slug}"
             else
-              canonical_check_id="$(jq -r --arg external_id "${required_external_id}" '[.check_runs[] | select(.external_id == $external_id)] | sort_by(.id) | .[0].id // empty' <<< "${namespace}")"
+              canonical_check_id="$(jq -r '.check_runs | sort_by(.id) | .[0].id // empty' <<< "${namespace}")"
               [[ "${canonical_check_id}" =~ ^[1-9][0-9]*$ ]]
               preserved_metadata="$(jq -cS --arg canonical_check_id "${canonical_check_id}" '[.check_runs[] | select((.id | tostring) == $canonical_check_id) | {external_id: .external_id, id: .id, text: (.output.text // "")}]' <<< "${namespace}")"
               test "$(jq -r 'length' <<< "${preserved_metadata}")" = 1
@@ -2732,7 +2798,7 @@ jobs:
                 failed_check="$(curl --proto '=https' --tlsv1.2 --fail --silent --show-error --request PATCH -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" -H "X-GitHub-Api-Version: 2026-03-10" --data-binary "${failure_payload}" "https://api.github.com/repos/${GITHUB_REPOSITORY}/check-runs/${existing_check_id}")"
                 test "$(jq -r '.id' <<< "${failed_check}")" = "${existing_check_id}"
                 test "$(jq -r '.name' <<< "${failed_check}")" = "${target_name}"
-                test "$(jq -r '.head_sha' <<< "${failed_check}")" = "${MERGE_COMMIT_SHA}"
+                test "$(jq -r '.head_sha' <<< "${failed_check}")" = "${EVIDENCE_SHA}"
                 test "$(jq -r '.external_id' <<< "${failed_check}")" = "$(jq -r '.external_id // ""' <<< "${existing_check}")"
                 test "$(jq -r '.output.text // ""' <<< "${failed_check}")" = "${current_text}"
                 test "$(jq -r '.status' <<< "${failed_check}")" = "completed"
@@ -2742,7 +2808,7 @@ jobs:
             verified_failure="$(list_namespace_checks "${token}" "${app_id}" "${check_name}")"
             test "$(jq -r '.total_count' <<< "${verified_failure}")" = "1"
             test "$(jq -r '.check_runs | length' <<< "${verified_failure}")" = "1"
-            test "$(jq -r --arg app_id "${app_id}" --arg app_slug "${app_slug}" --arg external_id "${required_external_id}" --arg head_sha "${MERGE_COMMIT_SHA}" --arg name "${check_name}" 'all(.check_runs[]; .name == $name and .head_sha == $head_sha and .external_id == $external_id and .status == "completed" and .conclusion == "failure" and (.app.id | tostring) == $app_id and .app.slug == $app_slug)' <<< "${verified_failure}")" = "true"
+            test "$(jq -r --arg app_id "${app_id}" --arg app_slug "${app_slug}" --arg external_id "${required_external_id}" --arg head_sha "${EVIDENCE_SHA}" --arg name "${check_name}" --argjson created "$(test "${namespace_count}" = 0 && echo true || echo false)" 'all(.check_runs[]; .name == $name and .head_sha == $head_sha and (if $created then .external_id == $external_id else true end) and .status == "completed" and .conclusion == "failure" and (.app.id | tostring) == $app_id and .app.slug == $app_slug)' <<< "${verified_failure}")" = "true"
             if test "${namespace_count}" -gt 0; then
               verified_metadata="$(jq -cS '[.check_runs[] | {external_id: .external_id, id: .id, text: (.output.text // "")}] | sort_by(.id)' <<< "${verified_failure}")"
               test "${verified_metadata}" = "${preserved_metadata}"
@@ -2751,13 +2817,16 @@ jobs:
 
           reconcile_bad_ci() {
             bad_ci_observed=false
-            expected_ci_run_name="CI N=${PR_NUMBER} E=${EVIDENCE_SHA} B=$(jq -r '.base.sha' <<< "${canonical_binding}") M=${MERGE_COMMIT_SHA}"
 
-            list_matching_ci_runs() {
+            list_ci_inventory() {
               # Conditional callers disable errexit throughout this helper.
               # Propagate every API, parsing, and validation failure explicitly.
+              local endpoint="$1"
               local page=1
               local query="event=pull_request&head_sha=${EVIDENCE_SHA}&"
+              if test "${endpoint}" = actions/runs; then
+                query+="exclude_pull_requests=true&"
+              fi
               local ci_runs='[]'
               local first_response total_count page_response page_total page_runs collected_count
               first_response="$({
@@ -2770,26 +2839,13 @@ jobs:
                   -H "Accept: application/vnd.github+json" \
                   -H "Authorization: Bearer ${GH_TOKEN}" \
                   -H "X-GitHub-Api-Version: 2026-03-10" \
-                  "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?${query}per_page=100&page=1"
+                  "https://api.github.com/repos/${GITHUB_REPOSITORY}/${endpoint}?${query}per_page=100&page=1"
               })" || return 1
               total_count="$(jq -er '.total_count | select(type == "number" and . >= 0 and floor == .)' <<< "${first_response}")" || return 1
               [[ "${total_count}" =~ ^[0-9]+$ ]] || return 1
               if test "${total_count}" -ge 1000; then
-                query=''
-                first_response="$({
-                  curl \
-                    --proto '=https' \
-                    --tlsv1.2 \
-                    --fail \
-                    --silent \
-                    --show-error \
-                    -H "Accept: application/vnd.github+json" \
-                    -H "Authorization: Bearer ${GH_TOKEN}" \
-                    -H "X-GitHub-Api-Version: 2026-03-10" \
-                    "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?per_page=100&page=1"
-                })" || return 1
-                total_count="$(jq -er '.total_count | select(type == "number" and . >= 0 and floor == .)' <<< "${first_response}")" || return 1
-                [[ "${total_count}" =~ ^[0-9]+$ ]] || return 1
+                echo "CI history for ${EVIDENCE_SHA} reaches the 1,000-result listing ceiling and cannot be proven complete" >&2
+                return 1
               fi
               while true; do
                 if test "${page}" = 1; then
@@ -2805,7 +2861,7 @@ jobs:
                       -H "Accept: application/vnd.github+json" \
                       -H "Authorization: Bearer ${GH_TOKEN}" \
                       -H "X-GitHub-Api-Version: 2026-03-10" \
-                      "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?${query}per_page=100&page=${page}"
+                      "https://api.github.com/repos/${GITHUB_REPOSITORY}/${endpoint}?${query}per_page=100&page=${page}"
                   })" || return 1
                 fi
                 page_total="$(jq -er '.total_count | select(type == "number" and . >= 0 and floor == .)' <<< "${page_response}")" || return 1
@@ -2822,20 +2878,61 @@ jobs:
                 page="$((page + 1))"
               done
               test "$(jq -r '[.[].id] | unique | length' <<< "${ci_runs}")" = "${total_count}" || return 1
+              printf '%s\n' "${ci_runs}"
+            }
+
+            list_matching_ci_runs() {
+              local workflow_runs repository_runs workflow_ids repository_ids ci_runs
+              workflow_runs="$(list_ci_inventory actions/workflows/ci.yml/runs)" || return 1
+              repository_runs="$(list_ci_inventory actions/runs)" || return 1
+              workflow_ids="$(jq -cS '[.[].id] | sort' <<< "${workflow_runs}")" || return 1
+              repository_ids="$(jq -cS '[.[] | select(.path == ".github/workflows/ci.yml") | .id] | sort' <<< "${repository_runs}")" || return 1
+              test "$(jq -r -n --argjson workflow "${workflow_ids}" --argjson repository "${repository_ids}" '$workflow - $repository | length')" = 0 || return 1
+              # Other known workflow paths are outside CI history. Missing
+              # paths remain visible and make the scan incomplete.
+              ci_runs="$(jq -cS '[.[] | select(.path == ".github/workflows/ci.yml" or (.path | type) != "string")]' <<< "${repository_runs}")" || return 1
+              # A run is outside this history only when it is a trusted CI
+              # run of this repository for E whose head repository has both
+              # a distinct ID and a distinct well-formed name.
+              # Every other listed run, whatever its title, belongs to the
+              # history; one without a proven identity makes the history
+              # incomplete rather than disappearing from it.
               jq -cS \
                 --arg evidence_sha "${EVIDENCE_SHA}" \
-                --arg expected_run_name "${expected_ci_run_name}" \
                 --arg repository "${GITHUB_REPOSITORY}" \
-                --arg workflow_id "${CI_WORKFLOW_ID}" \
-                '[.[] | select(
-                  .name == "CI" and
+                --arg repository_id "${REPOSITORY_ID}" \
+                '[.[] | select((
                   .path == ".github/workflows/ci.yml" and
                   .event == "pull_request" and
-                  (.workflow_id | tostring) == $workflow_id and
-                  .display_title == $expected_run_name and
+                  (.workflow_id | type == "number" and . > 0 and floor == .) and
                   .head_sha == $evidence_sha and
-                  .head_repository.full_name == $repository
-                )] | sort_by(.id)' <<< "${ci_runs}" || return 1
+                  (.repository | type) == "object" and
+                  .repository.full_name == $repository and
+                  (.repository.id | tostring) == $repository_id and
+                  (.head_repository | type) == "object" and
+                  (.head_repository.id | type) == "number" and
+                  .head_repository.id > 0 and
+                  (.head_repository.id | floor) == .head_repository.id and
+                  (.head_repository.id | tostring) != $repository_id and
+                  (.head_repository.full_name | type) == "string" and
+                  (.head_repository.full_name | test("^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$")) and
+                  (.head_repository.full_name | ascii_downcase) != ($repository | ascii_downcase)
+                ) | not)] | sort_by(.id)' <<< "${ci_runs}" || return 1
+            }
+
+            authoritative_ci_identity() {
+              test "$(jq -r \
+                --arg evidence_sha "${EVIDENCE_SHA}" \
+                --arg repository "${GITHUB_REPOSITORY}" \
+                --arg repository_id "${REPOSITORY_ID}" \
+                '.path == ".github/workflows/ci.yml" and
+                  .event == "pull_request" and
+                  (.workflow_id | type == "number" and . > 0 and floor == .) and
+                  .head_sha == $evidence_sha and
+                  .repository.full_name == $repository and
+                  (.repository.id | tostring) == $repository_id and
+                  .head_repository.full_name == $repository and
+                  (.head_repository.id | tostring) == $repository_id' <<< "$1")" = true
             }
 
             get_current_ci_run() {
@@ -2870,14 +2967,16 @@ jobs:
             require_matching_ci_identity() {
               local candidate_run="$1"
               local required_run_id="$2"
-              test "$(jq -r '.id' <<< "${candidate_run}")" = "${required_run_id}"
-              test "$(jq -r '.workflow_id' <<< "${candidate_run}")" = "${CI_WORKFLOW_ID}"
-              test "$(jq -r '.name' <<< "${candidate_run}")" = CI
-              test "$(jq -r '.path' <<< "${candidate_run}")" = .github/workflows/ci.yml
-              test "$(jq -r '.event' <<< "${candidate_run}")" = pull_request
-              test "$(jq -r '.display_title' <<< "${candidate_run}")" = "${expected_ci_run_name}"
-              test "$(jq -r '.head_sha' <<< "${candidate_run}")" = "${EVIDENCE_SHA}"
-              test "$(jq -r '.head_repository.full_name' <<< "${candidate_run}")" = "${GITHUB_REPOSITORY}"
+              local required_workflow_id="$3"
+              test "$(jq -r '.id' <<< "${candidate_run}")" = "${required_run_id}" || return 1
+              test "$(jq -r '.workflow_id' <<< "${candidate_run}")" = "${required_workflow_id}" || return 1
+              test "$(jq -r '.path' <<< "${candidate_run}")" = .github/workflows/ci.yml || return 1
+              test "$(jq -r '.event' <<< "${candidate_run}")" = pull_request || return 1
+              test "$(jq -r '.head_sha' <<< "${candidate_run}")" = "${EVIDENCE_SHA}" || return 1
+              test "$(jq -r '.repository.full_name' <<< "${candidate_run}")" = "${GITHUB_REPOSITORY}" || return 1
+              test "$(jq -r '.repository.id' <<< "${candidate_run}")" = "${REPOSITORY_ID}" || return 1
+              test "$(jq -r '.head_repository.full_name' <<< "${candidate_run}")" = "${GITHUB_REPOSITORY}" || return 1
+              test "$(jq -r '.head_repository.id' <<< "${candidate_run}")" = "${REPOSITORY_ID}" || return 1
             }
 
             scan_stable=false
@@ -2896,16 +2995,37 @@ jobs:
               while IFS= read -r listed_ci_run; do
                 run_id="$(jq -r '.id' <<< "${listed_ci_run}")"
                 [[ "${run_id}" =~ ^[1-9][0-9]*$ ]]
-                current_ci_run="$(get_current_ci_run "${run_id}")"
-                require_matching_ci_identity "${current_ci_run}" "${run_id}"
+                if ! authoritative_ci_identity "${listed_ci_run}"; then
+                  scan_incomplete=true
+                  continue
+                fi
+                listed_workflow_id="$(jq -r '.workflow_id' <<< "${listed_ci_run}")"
+                if ! current_ci_run="$(get_current_ci_run "${run_id}")" ||
+                   ! require_matching_ci_identity "${current_ci_run}" "${run_id}" "${listed_workflow_id}"; then
+                  scan_incomplete=true
+                  continue
+                fi
                 max_attempt="$(jq -r '.run_attempt' <<< "${current_ci_run}")"
-                [[ "${max_attempt}" =~ ^[1-9][0-9]*$ ]]
+                if [[ ! "${max_attempt}" =~ ^[1-9][0-9]*$ ]]; then
+                  scan_incomplete=true
+                  continue
+                fi
+                attempt_limit="${max_attempt}"
+                # Preserve authenticated negatives within the finite window,
+                # but an over-limit history can never authorize publication.
+                if test "${#max_attempt}" -gt 3 || test "${max_attempt}" -gt 100; then
+                  scan_incomplete=true
+                  attempt_limit=100
+                fi
                 current_max_fingerprint="$(jq -cS '{conclusion: (.conclusion // ""), run_attempt: .run_attempt, status: .status}' <<< "${current_ci_run}")"
                 exact_max_fingerprint=''
-                for ((run_attempt = 1; run_attempt <= max_attempt; run_attempt++)); do
-                  exact_attempt="$(get_exact_ci_attempt "${run_id}" "${run_attempt}")"
-                  require_matching_ci_identity "${exact_attempt}" "${run_id}"
-                  test "$(jq -r '.run_attempt' <<< "${exact_attempt}")" = "${run_attempt}"
+                for ((run_attempt = 1; run_attempt <= attempt_limit; run_attempt++)); do
+                  if ! exact_attempt="$(get_exact_ci_attempt "${run_id}" "${run_attempt}")" ||
+                     ! require_matching_ci_identity "${exact_attempt}" "${run_id}" "${listed_workflow_id}" ||
+                     ! test "$(jq -r '.run_attempt' <<< "${exact_attempt}")" = "${run_attempt}"; then
+                    scan_incomplete=true
+                    continue
+                  fi
                   attempt_status="$(jq -r '.status' <<< "${exact_attempt}")"
                   if test "${run_attempt}" = "${max_attempt}"; then
                     exact_max_fingerprint="$(jq -cS '{conclusion: (.conclusion // ""), run_attempt: .run_attempt, status: .status}' <<< "${exact_attempt}")"
@@ -2920,22 +3040,27 @@ jobs:
                     scanned_bad_ci_runs="$(jq -cS -n --argjson collected "${scanned_bad_ci_runs}" --argjson candidate "${bad_attempt}" '$collected + [$candidate]')"
                   fi
                 done
-                stable_ci_run="$(get_current_ci_run "${run_id}")"
-                require_matching_ci_identity "${stable_ci_run}" "${run_id}"
+                if ! stable_ci_run="$(get_current_ci_run "${run_id}")" ||
+                   ! require_matching_ci_identity "${stable_ci_run}" "${run_id}" "${listed_workflow_id}"; then
+                  scan_incomplete=true
+                  continue
+                fi
                 stable_max_attempt="$(jq -r '.run_attempt' <<< "${stable_ci_run}")"
-                [[ "${stable_max_attempt}" =~ ^[1-9][0-9]*$ ]]
+                if [[ ! "${stable_max_attempt}" =~ ^[1-9][0-9]*$ ]]; then
+                  scan_incomplete=true
+                  continue
+                fi
                 stable_max_fingerprint="$(jq -cS '{conclusion: (.conclusion // ""), run_attempt: .run_attempt, status: .status}' <<< "${stable_ci_run}")"
                 if test "${stable_max_attempt}" != "${max_attempt}"; then
-                  test "${stable_max_attempt}" -gt "${max_attempt}"
                   round_stable=false
-                  break
+                  continue
                 fi
                 if test "${current_max_fingerprint}" != "${exact_max_fingerprint}" ||
                    test "${stable_max_fingerprint}" != "${exact_max_fingerprint}"; then
                   round_stable=false
-                  break
+                  continue
                 fi
-                snapshot_entry="$(jq -cS -n --argjson fingerprint "${exact_max_fingerprint}" --arg run_id "${run_id}" '{fingerprint: $fingerprint, run_id: ($run_id | tonumber)}')"
+                snapshot_entry="$(jq -cS -n --argjson fingerprint "${exact_max_fingerprint}" --arg run_id "${run_id}" --arg workflow_id "${listed_workflow_id}" '{fingerprint: $fingerprint, run_id: ($run_id | tonumber), workflow_id: $workflow_id}')"
                 scan_snapshot="$(jq -cS -n --argjson collected "${scan_snapshot}" --argjson candidate "${snapshot_entry}" '$collected + [$candidate]')"
               done < <(jq -c '.[]' <<< "${matching_ci_runs}")
               if test "$(jq -r 'length' <<< "${scanned_bad_ci_runs}")" -gt 0; then
@@ -2961,9 +3086,13 @@ jobs:
               fi
               while IFS= read -r snapshot_entry; do
                 run_id="$(jq -r '.run_id' <<< "${snapshot_entry}")"
+                expected_workflow_id="$(jq -r '.workflow_id' <<< "${snapshot_entry}")"
                 expected_fingerprint="$(jq -cS '.fingerprint' <<< "${snapshot_entry}")"
-                revalidated_ci_run="$(get_current_ci_run "${run_id}")"
-                require_matching_ci_identity "${revalidated_ci_run}" "${run_id}"
+                if ! revalidated_ci_run="$(get_current_ci_run "${run_id}")" ||
+                   ! require_matching_ci_identity "${revalidated_ci_run}" "${run_id}" "${expected_workflow_id}"; then
+                  round_stable=false
+                  break
+                fi
                 revalidated_fingerprint="$(jq -cS '{conclusion: (.conclusion // ""), run_attempt: .run_attempt, status: .status}' <<< "${revalidated_ci_run}")"
                 if test "${revalidated_fingerprint}" != "${expected_fingerprint}"; then
                   round_stable=false
@@ -2984,173 +3113,236 @@ jobs:
               return 0
             fi
             bad_ci_create_missing=false
-            if live_bad_ci_pr="$(curl --proto '=https' --tlsv1.2 --fail --silent --show-error -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GH_TOKEN}" -H "X-GitHub-Api-Version: 2026-03-10" "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" 2>/dev/null)" &&
-               test "$(jq -r '.state' <<< "${live_bad_ci_pr}")" = open &&
-               test "$(jq -r '.head.repo.full_name' <<< "${live_bad_ci_pr}")" = "${GITHUB_REPOSITORY}" &&
-               test "$(jq -r '.head.sha' <<< "${live_bad_ci_pr}")" = "${EVIDENCE_SHA}" &&
-               test "$(jq -r '.base.repo.full_name' <<< "${live_bad_ci_pr}")" = "$(jq -r '.base.repository' <<< "${canonical_binding}")" &&
-               test "$(jq -r '.base.ref' <<< "${live_bad_ci_pr}")" = "$(jq -r '.base.ref' <<< "${canonical_binding}")" &&
-               test "$(jq -r '.base.sha' <<< "${live_bad_ci_pr}")" = "$(jq -r '.base.sha' <<< "${canonical_binding}")"; then
-              if live_bad_ci_merge_ref="$(curl --proto '=https' --tlsv1.2 --fail --silent --show-error -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GH_TOKEN}" -H "X-GitHub-Api-Version: 2026-03-10" "https://api.github.com/repos/${GITHUB_REPOSITORY}/git/ref/pull/${PR_NUMBER}/merge" 2>/dev/null)" &&
-                 test "$(jq -r '.ref' <<< "${live_bad_ci_merge_ref}")" = "refs/pull/${PR_NUMBER}/merge" &&
-                 test "$(jq -r '.object.type' <<< "${live_bad_ci_merge_ref}")" = commit &&
-                 test "$(jq -r '.object.sha' <<< "${live_bad_ci_merge_ref}")" = "${MERGE_COMMIT_SHA}"; then
-                bad_ci_create_missing=true
+            if test "${COMMITTED_EVIDENCE_SHA}" = "${EVIDENCE_SHA}"; then
+              bad_ci_create_missing=true
+              if live_bad_ci_pr="$(curl --max-time 15 --proto '=https' --tlsv1.2 --fail --silent --show-error -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GH_TOKEN}" -H "X-GitHub-Api-Version: 2026-03-10" "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" 2>/dev/null)" &&
+                 test "$(jq -r '.merged' <<< "${live_bad_ci_pr}" 2>/dev/null)" = true &&
+                 test "$(jq -r '.head.sha' <<< "${live_bad_ci_pr}" 2>/dev/null)" = "${EVIDENCE_SHA}"; then
+                bad_ci_create_missing=false
               fi
             fi
-            normalize_bad_ci_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / Build, lint, test" "${EXTERNAL_ID}:actions:build"
-            normalize_bad_ci_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / MSRV build and test" "${EXTERNAL_ID}:actions:msrv"
-            normalize_bad_ci_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / cargo-vet (locked supply-chain audit)" "${EXTERNAL_ID}:actions:vet"
-            normalize_bad_ci_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / cargo-deny (supply-chain bans/advisories/licenses)" "${EXTERNAL_ID}:actions:deny"
-            normalize_bad_ci_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${EXTERNAL_ID}"
+            normalize_bad_ci_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "chio:v3:deny:${EVIDENCE_SHA}"
             echo "Bad current CI completion permanently tombstoned ${EXTERNAL_ID}." >> "${GITHUB_STEP_SUMMARY}"
             bad_ci_observed=true
             return 0
           }
 
+          reconcile_bad_authorizing_finalizer() {
+            bad_authorizing_finalizer_observed=false
+            retry_namespace="$(list_namespace_checks "${installation_token}" "${SECURITY_APP_ID}" "Security contract")"
+            test "$(jq -r '.total_count' <<< "${retry_namespace}")" -le 1
+            if test "$(jq -r '.total_count' <<< "${retry_namespace}")" = 0; then
+              return 0
+            fi
+            retry_authority="$(jq -cS '.check_runs[0]' <<< "${retry_namespace}")"
+            test "$(jq -r --arg app_id "${SECURITY_APP_ID}" --arg head "${EVIDENCE_SHA}" --arg external_id "${EXTERNAL_ID}" '.name == "Security contract" and .head_sha == $head and .external_id == $external_id and (.app.id | tostring) == $app_id and .app.slug == "chio-security-authority" and .status == "completed" and .conclusion == "success"' <<< "${retry_authority}")" = true
+            retry_metadata="$(jq -cS '.output.text | fromjson' <<< "${retry_authority}")"
+            retry_identity="${IDENTITY_JSON}"
+            retry_source_ci="$(jq -cS -n --arg run_id "${CI_RUN_ID}" --arg run_attempt "${CI_RUN_ATTEMPT}" --arg workflow_id "${CI_WORKFLOW_ID}" '{run_id: $run_id, run_attempt: $run_attempt, workflow_id: $workflow_id}')"
+            test "$(jq -r --argjson identity "${retry_identity}" --argjson source_ci "${retry_source_ci}" --arg digest "${IDENTITY_DIGEST}" --argjson observations "$(jq -cS '.merge_observations' <<< "${canonical_binding}")" 'keys == ["aggregate_check_run_id", "ci_merge_binding", "identity", "identity_digest", "merge_observations", "publication_binding_digest", "required_check_run_ids", "schema", "source_ci"] and .schema == "chio.security-check-authority.v3" and .identity == $identity and .identity_digest == $digest and .merge_observations == $observations and .source_ci == $source_ci and (.publication_binding_digest | test("^[0-9a-f]{64}$"))' <<< "${retry_metadata}")" = true
+            retry_details="$(jq -r '.details_url' <<< "${retry_authority}")"
+            if [[ "${retry_details}" =~ ^https://github\.com/${GITHUB_REPOSITORY}/actions/runs/([1-9][0-9]*)/attempts/1$ ]]; then
+              authorizing_finalizer_id="${BASH_REMATCH[1]}"
+            else
+              exit 1
+            fi
+            # Existing App authority and immutable attempt 1 bind this run.
+            # No listing or same-title sibling can mint withdrawal authority.
+            retry_api() {
+              curl --proto '=https' --tlsv1.2 --fail --silent --show-error -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GH_TOKEN}" -H "X-GitHub-Api-Version: 2026-03-10" "https://api.github.com/repos/${GITHUB_REPOSITORY}/$1"
+            }
+            original_finalizer="$(retry_api "actions/runs/${authorizing_finalizer_id}/attempts/1")"
+            retry_workflow_id="$(jq -r '.workflow_id' <<< "${original_finalizer}")"
+            [[ "${retry_workflow_id}" =~ ^[1-9][0-9]*$ ]]
+            original_finalizer_sha="$(jq -r '.head_sha' <<< "${original_finalizer}")"
+            original_finalizer_title="$(jq -r '.display_title' <<< "${original_finalizer}")"
+            [[ "${original_finalizer_sha}" =~ ^[0-9a-f]{40}$ ]]
+            [[ "${original_finalizer_title}" =~ ^Enterprise\ evidence\ finalizer\ N=${PR_NUMBER}\ E=${EVIDENCE_SHA}\ M=${MERGE_COMMIT_SHA}\ S=${AUTHORIZED_SOURCE_SHA}\ K=[0-9a-f]{64}$ ]]
+            require_authorizing_attempt() {
+              test "$(jq -r --arg run_id "${authorizing_finalizer_id}" --arg workflow_id "${retry_workflow_id}" --arg attempt "$2" --arg head "${original_finalizer_sha}" --arg title "${original_finalizer_title}" --arg repository "${GITHUB_REPOSITORY}" '(.id | tostring) == $run_id and (.workflow_id | tostring) == $workflow_id and (.run_attempt | tostring) == $attempt and .path == ".github/workflows/enterprise-evidence-finalizer.yml" and .event == "workflow_dispatch" and .head_sha == $head and .head_branch == "main" and .display_title == $title and .actor.login == "github-actions[bot]" and .repository.full_name == $repository and .head_repository.full_name == $repository' <<< "$1")" = true
+            }
+            require_authorizing_attempt "${original_finalizer}" 1
+            test "$(jq -r '.triggering_actor.login' <<< "${original_finalizer}")" = 'github-actions[bot]'
+            retry_authorized_blob="$(retry_api "contents/.github/workflows/enterprise-evidence-finalizer.yml?ref=${SECURITY_DEFINITION_SHA}" | jq -r '.sha')"
+            retry_original_blob="$(retry_api "contents/.github/workflows/enterprise-evidence-finalizer.yml?ref=${original_finalizer_sha}" | jq -r '.sha')"
+            [[ "${retry_authorized_blob}" =~ ^[0-9a-f]{40}$ ]]
+            test "${retry_original_blob}" = "${retry_authorized_blob}"
+            original_finalizer_jobs="$(retry_api "actions/runs/${authorizing_finalizer_id}/attempts/1/jobs?filter=all&per_page=100")"
+            test "$(jq -r --arg run_id "${authorizing_finalizer_id}" --arg head "${original_finalizer_sha}" '.total_count == 4 and (.jobs | length) == 4 and ([.jobs[].name] | sort) == (["validate unsigned enterprise Linux capture", "sign committed enterprise Linux migration evidence", "authorize dedicated Security contract publication", "reconcile exact merge authority contexts"] | sort) and all(.jobs[]; (.run_id | tostring) == $run_id and .head_sha == $head)' <<< "${original_finalizer_jobs}")" = true
+            if test "${authorizing_finalizer_id}" = "${FINALIZER_RUN_ID}" &&
+               test "${FINALIZER_RUN_ATTEMPT}" = 1 &&
+               test "$(jq -r '.status' <<< "${original_finalizer}")" = in_progress; then
+              # The current publisher must finish before its enclosing first
+              # attempt can be completed. All three protected predecessors
+              # must already be successful and no rerun may have started.
+              test "$(jq -r 'all(.jobs[]; if .name == "reconcile exact merge authority contexts" then .status == "in_progress" and .conclusion == null else .status == "completed" and .conclusion == "success" end)' <<< "${original_finalizer_jobs}")" = true
+              retry_own_current="$(retry_api "actions/runs/${authorizing_finalizer_id}")"
+              require_authorizing_attempt "${retry_own_current}" 1
+              test "$(jq -r '.status == "in_progress" and .conclusion == null' <<< "${retry_own_current}")" = true
+              return 0
+            fi
+            test "$(jq -r '.status' <<< "${original_finalizer}")" = completed
+            test "$(jq -r '.conclusion' <<< "${original_finalizer}")" = success
+            test "$(jq -r 'all(.jobs[]; .status == "completed" and .conclusion == "success")' <<< "${original_finalizer_jobs}")" = true
+            retry_current="$(retry_api "actions/runs/${authorizing_finalizer_id}")"
+            retry_maximum="$(jq -r '.run_attempt' <<< "${retry_current}")"
+            [[ "${retry_maximum}" =~ ^[1-9][0-9]*$ ]]
+            test "${retry_maximum}" -le 100
+            require_authorizing_attempt "${retry_current}" "${retry_maximum}"
+            retry_fingerprint="$(jq -cS '{run_attempt, status, conclusion}' <<< "${retry_current}")"
+            retry_complete=true
+            retry_own_in_progress=false
+            for ((retry_attempt = 1; retry_attempt <= retry_maximum; retry_attempt++)); do
+              retry_exact="$(retry_api "actions/runs/${authorizing_finalizer_id}/attempts/${retry_attempt}")"
+              require_authorizing_attempt "${retry_exact}" "${retry_attempt}"
+              if test "$(jq -r '.status' <<< "${retry_exact}")" != completed; then
+                if test "${authorizing_finalizer_id}" = "${FINALIZER_RUN_ID}" &&
+                   test "${retry_attempt}" = "${FINALIZER_RUN_ATTEMPT}" &&
+                   test "${retry_attempt}" = "${retry_maximum}" &&
+                   test "${retry_attempt}" -gt 1 &&
+                   test "$(jq -r '.status == "in_progress" and .conclusion == null' <<< "${retry_exact}")" = true; then
+                  retry_own_in_progress=true
+                else
+                  retry_complete=false
+                fi
+              elif test "$(jq -r '.conclusion // ""' <<< "${retry_exact}")" != success; then
+                bad_authorizing_finalizer_observed=true
+              fi
+            done
+            if test "${bad_authorizing_finalizer_observed}" = false; then
+              retry_stable="$(retry_api "actions/runs/${authorizing_finalizer_id}")"
+              require_authorizing_attempt "${retry_stable}" "${retry_maximum}"
+              test "$(jq -cS '{run_attempt, status, conclusion}' <<< "${retry_stable}")" = "${retry_fingerprint}"
+              if test "${retry_own_in_progress}" = true; then
+                retry_own_jobs="$(retry_api "actions/runs/${authorizing_finalizer_id}/attempts/${FINALIZER_RUN_ATTEMPT}/jobs?filter=all&per_page=100")"
+                test "$(jq -r --arg run_id "${authorizing_finalizer_id}" --arg head "${original_finalizer_sha}" --arg title "${original_finalizer_title}" '.total_count == 4 and (.jobs | length) == 4 and ([.jobs[].name] | sort) == (["validate unsigned enterprise Linux capture", "sign committed enterprise Linux migration evidence", "authorize dedicated Security contract publication", "reconcile exact merge authority contexts"] | sort) and all(.jobs[]; (.run_id | tostring) == $run_id and .head_sha == $head and .workflow_name == $title and (if .name == "reconcile exact merge authority contexts" then .status == "in_progress" and .conclusion == null else .status == "completed" and .conclusion == "success" end))' <<< "${retry_own_jobs}")" = true
+              fi
+              test "${retry_complete}" = true
+              return 0
+            fi
+            fail_existing_retry_namespace() {
+              local retry_token="$1" retry_app="$2" retry_slug="$3" retry_name="$4" retry_external="$5"
+              local retry_checks retry_check retry_id retry_text retry_payload retry_failed
+              retry_checks="$(list_namespace_checks "${retry_token}" "${retry_app}" "${retry_name}")"
+              test "$(jq -r '.total_count' <<< "${retry_checks}")" = 1
+              retry_check="$(jq -cS '.check_runs[0]' <<< "${retry_checks}")"
+              test "$(jq -r --arg app "${retry_app}" --arg slug "${retry_slug}" --arg name "${retry_name}" --arg external "${retry_external}" --arg head "${EVIDENCE_SHA}" '.name == $name and .external_id == $external and .head_sha == $head and (.app.id | tostring) == $app and .app.slug == $slug' <<< "${retry_check}")" = true
+              retry_id="$(jq -r '.id' <<< "${retry_check}")"
+              [[ "${retry_id}" =~ ^[1-9][0-9]*$ ]]
+              retry_text="$(jq -r '.output.text' <<< "${retry_check}")"
+              retry_payload="$(jq -cS -n --arg name "${retry_name}" --arg external "${retry_external}" --arg text "${retry_text}" --arg completed "$(date --utc +%Y-%m-%dT%H:%M:%SZ)" '{name: $name, external_id: $external, status: "completed", conclusion: "failure", completed_at: $completed, output: {title: "Chio security authority revoked", summary: "Authenticated authorizing finalizer retry failed; authority remains revoked.", text: $text}}')"
+              revalidate_denial_scope
+              retry_failed="$(curl --proto '=https' --tlsv1.2 --fail --silent --show-error --request PATCH -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${retry_token}" -H "Content-Type: application/json" -H "X-GitHub-Api-Version: 2026-03-10" --data-binary "${retry_payload}" "https://api.github.com/repos/${GITHUB_REPOSITORY}/check-runs/${retry_id}")"
+              revalidate_denial_scope
+              test "$(jq -r --arg id "${retry_id}" --arg app "${retry_app}" --arg slug "${retry_slug}" --arg name "${retry_name}" --arg external "${retry_external}" --arg head "${EVIDENCE_SHA}" --arg text "${retry_text}" '(.id | tostring) == $id and .name == $name and .external_id == $external and .head_sha == $head and (.app.id | tostring) == $app and .app.slug == $slug and .status == "completed" and .conclusion == "failure" and .output.text == $text' <<< "${retry_failed}")" = true
+            }
+            fail_existing_retry_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${EXTERNAL_ID}"
+          }
+
+          revalidate_source_ci_checks() {
+            local exact_ci suite_id jobs='[]' page=1 page_response page_jobs page_count total_count='' page_total
+            local required_name required_key expected_check_id matches required_job check_id check_run check_url check_url_prefix
+            exact_ci="$({
+              curl --proto '=https' --tlsv1.2 --fail --silent --show-error \
+                -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GH_TOKEN}" \
+                -H "X-GitHub-Api-Version: 2026-03-10" \
+                "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${CI_RUN_ID}/attempts/${CI_RUN_ATTEMPT}"
+            })"
+            test "$(jq -r --arg run_id "${CI_RUN_ID}" --arg attempt "${CI_RUN_ATTEMPT}" \
+              --arg workflow_id "${CI_WORKFLOW_ID}" --arg head "${EVIDENCE_SHA}" \
+              --arg repository "${GITHUB_REPOSITORY}" --arg owner "${GITHUB_REPOSITORY_OWNER}" \
+              --arg repository_id "${REPOSITORY_ID}" \
+              --arg title "CI N=${PR_NUMBER} E=${EVIDENCE_SHA} B=$(jq -r '.base.sha' <<< "${canonical_binding}") M=$(jq -r '.merge_observations.ci' <<< "${canonical_binding}")" '
+                (.id | tostring) == $run_id and (.run_attempt | tostring) == $attempt and
+                (.workflow_id | tostring) == $workflow_id and .path == ".github/workflows/ci.yml" and
+                .event == "pull_request" and .head_sha == $head and .display_title == $title and
+                .status == "completed" and .conclusion == "success" and
+                .repository.full_name == $repository and .head_repository.full_name == $repository and
+                (.repository.id | tostring) == $repository_id and
+                (.head_repository.id | tostring) == $repository_id and
+                .actor.login == $owner and .triggering_actor.login == $owner
+              ' <<< "${exact_ci}")" = true
+            suite_id="$(jq -r '.check_suite_id' <<< "${exact_ci}")"
+            [[ "${suite_id}" =~ ^[1-9][0-9]*$ ]]
+            while true; do
+              test "${page}" -le 10
+              page_response="$({
+                curl --proto '=https' --tlsv1.2 --fail --silent --show-error \
+                  -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GH_TOKEN}" \
+                  -H "X-GitHub-Api-Version: 2026-03-10" \
+                  "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${CI_RUN_ID}/attempts/${CI_RUN_ATTEMPT}/jobs?filter=all&per_page=100&page=${page}"
+              })"
+              page_total="$(jq -er '.total_count | select(type == "number" and . >= 0 and floor == .)' <<< "${page_response}")"
+              [[ "${page_total}" =~ ^(0|[1-9][0-9]*)$ ]]
+              if test "${page_total}" -ge 1000; then
+                echo "source CI job inventory reaches the 1,000-result listing ceiling" >&2
+                return 1
+              fi
+              if test -z "${total_count}"; then total_count="${page_total}"; else test "${page_total}" = "${total_count}"; fi
+              page_jobs="$(jq -ceS '.jobs | select(type == "array" and length <= 100)' <<< "${page_response}")"
+              page_count="$(jq -r 'length' <<< "${page_jobs}")"
+              jobs="$(jq -cS -n --argjson prior "${jobs}" --argjson page "${page_jobs}" '$prior + $page')"
+              test "$(jq -r 'length' <<< "${jobs}")" -le "${total_count}"
+              if test "${page_count}" -lt 100; then break; fi
+              page="$((page + 1))"
+            done
+            test "$(jq -r 'length' <<< "${jobs}")" = "${total_count}"
+            test "$(jq -r '[.[].id] | unique | length' <<< "${jobs}")" = "${total_count}"
+            for required_key in build msrv vet deny aggregate; do
+              case "${required_key}" in
+                build) required_name='Build, lint, test' ;;
+                msrv) required_name='MSRV build and test' ;;
+                vet) required_name='cargo-vet (locked supply-chain audit)' ;;
+                deny) required_name='cargo-deny (supply-chain bans/advisories/licenses)' ;;
+                aggregate) required_name='Security contract' ;;
+              esac
+              if test "${required_key}" = aggregate; then
+                expected_check_id="$(jq -r '.ci.aggregate_check_run_id' <<< "${canonical_binding}")"
+              else
+                expected_check_id="$(jq -r --arg key "${required_key}" '.ci.required_check_run_ids[$key]' <<< "${canonical_binding}")"
+              fi
+              [[ "${expected_check_id}" =~ ^[1-9][0-9]*$ ]]
+              matches="$(jq -cS --arg name "${required_name}" '[.[] | select(.name == $name)]' <<< "${jobs}")"
+              test "$(jq -r 'length' <<< "${matches}")" = 1
+              required_job="$(jq -cS '.[0]' <<< "${matches}")"
+              test "$(jq -r --arg name "${required_name}" --arg head "${EVIDENCE_SHA}" --arg run "${CI_RUN_ID}" '
+                .name == $name and .head_sha == $head and (.run_id | tostring) == $run and
+                .status == "completed" and .conclusion == "success"
+              ' <<< "${required_job}")" = true
+              check_url="$(jq -r '.check_run_url' <<< "${required_job}")"
+              check_url_prefix="https://api.github.com/repos/${GITHUB_REPOSITORY}/check-runs/"
+              check_id="${check_url#"${check_url_prefix}"}"
+              [[ "${check_id}" =~ ^[1-9][0-9]*$ ]]
+              test "${check_url}" = "${check_url_prefix}${check_id}"
+              test "${check_id}" = "${expected_check_id}"
+              test "$(jq -r '.id' <<< "${required_job}")" = "${check_id}"
+              check_run="$({
+                curl --proto '=https' --tlsv1.2 --fail --silent --show-error \
+                  -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GH_TOKEN}" \
+                  -H "X-GitHub-Api-Version: 2026-03-10" \
+                  "https://api.github.com/repos/${GITHUB_REPOSITORY}/check-runs/${expected_check_id}"
+              })"
+              test "$(jq -r --arg id "${expected_check_id}" --arg name "${required_name}" \
+                --arg head "${EVIDENCE_SHA}" --arg suite "${suite_id}" '
+                  (.id | tostring) == $id and .name == $name and .head_sha == $head and
+                  .status == "completed" and .conclusion == "success" and
+                  (.app.id | tostring) == "15368" and .app.slug == "github-actions" and
+                  (.check_suite.id | tostring) == $suite and .check_suite.head_sha == $head
+                ' <<< "${check_run}")" = true
+            done
+          }
+
           require_publishable_ci() {
             reconcile_bad_ci
             test "${bad_ci_observed}" = false
+            reconcile_bad_authorizing_finalizer
+            test "${bad_authorizing_finalizer_observed}" = false
+            revalidate_source_ci_checks
           }
 
           publish_success_authority() {
           require_publishable_ci
           revalidate_live_publication_head
-          mirror_rows="$({
-            jq -r '
-              [
-                ["Security mirror / Build, lint, test", "build", "Build, lint, test", .ci.required_check_run_ids.build],
-                ["Security mirror / MSRV build and test", "msrv", "MSRV build and test", .ci.required_check_run_ids.msrv],
-                ["Security mirror / cargo-vet (locked supply-chain audit)", "vet", "cargo-vet (locked supply-chain audit)", .ci.required_check_run_ids.vet],
-                ["Security mirror / cargo-deny (supply-chain bans/advisories/licenses)", "deny", "cargo-deny (supply-chain bans/advisories/licenses)", .ci.required_check_run_ids.deny]
-              ][] | @tsv
-            ' <<< "${canonical_binding}"
-          })"
-          while IFS=$'\t' read -r mirror_name mirror_key source_check_name source_check_run_id; do
-            test -n "${mirror_name}"
-            test -n "${source_check_name}"
-            [[ "${mirror_key}" =~ ^(build|msrv|vet|deny)$ ]]
-            [[ "${source_check_run_id}" =~ ^[1-9][0-9]*$ ]]
-            mirror_external_id="${EXTERNAL_ID}:actions:${mirror_key}"
-            mirror_summary="Trusted mirror of authenticated ${source_check_name} for ${EXTERNAL_ID}."
-            mirror_text="$({
-              jq -cS -n \
-                --arg authorized_source_sha "${AUTHORIZED_SOURCE_SHA}" \
-                --arg evidence_sha "${EVIDENCE_SHA}" \
-                --arg merge_commit_sha "${MERGE_COMMIT_SHA}" \
-                --arg pr_number "${PR_NUMBER}" \
-                --arg source_check_name "${source_check_name}" \
-                --arg source_check_run_id "${source_check_run_id}" \
-                --arg source_ci_run_attempt "${CI_RUN_ATTEMPT}" \
-                --arg source_ci_run_id "${CI_RUN_ID}" \
-                --arg source_ci_workflow_id "${CI_WORKFLOW_ID}" \
-                '{
-                  identity: {
-                    authorized_source_sha: $authorized_source_sha,
-                    evidence_sha: $evidence_sha,
-                    merge_commit_sha: $merge_commit_sha,
-                    pr_number: $pr_number
-                  },
-                  schema: "chio.security-check-authority.v2",
-                  source_check: {
-                    check_run_id: $source_check_run_id,
-                    name: $source_check_name
-                  },
-                  source_ci: {
-                    run_attempt: $source_ci_run_attempt,
-                    run_id: $source_ci_run_id,
-                    workflow_id: $source_ci_workflow_id
-                  }
-                }'
-            })"
-            mirror_namespace="$(list_actions_mirror_checks "${mirror_name}")"
-            test "$(jq -r '.check_runs | length' <<< "${mirror_namespace}")" = "$(jq -r '.total_count' <<< "${mirror_namespace}")"
-            test "$({
-              jq -r \
-                --arg head_sha "${MERGE_COMMIT_SHA}" \
-                --arg name "${mirror_name}" \
-                'all(.check_runs[];
-                  .name == $name and
-                  .head_sha == $head_sha and
-                  .app.id == 15368 and
-                  .app.slug == "github-actions"
-                )' <<< "${mirror_namespace}"
-            })" = "true"
-            mirror_matches="$(jq -cS '.check_runs | sort_by(.id)' <<< "${mirror_namespace}")"
-            mirror_match_count="$(jq -r 'length' <<< "${mirror_matches}")"
-            test "${mirror_match_count}" -le 1
-            mirror_created=false
-            if test "${mirror_match_count}" = "1"; then
-              mirror_check="$(jq -cS '.[0]' <<< "${mirror_matches}")"
-              test "$(jq -r '.external_id' <<< "${mirror_check}")" = "${mirror_external_id}"
-              test "$(jq -r '.status' <<< "${mirror_check}")" = "completed"
-              test "$(jq -r '.conclusion' <<< "${mirror_check}")" = "success"
-              test "$(jq -r '.output.title' <<< "${mirror_check}")" = "Chio trusted Actions mirror"
-              test "$(jq -r '.output.summary' <<< "${mirror_check}")" = "${mirror_summary}"
-              existing_mirror_text="$(jq -cS '.output.text | fromjson' <<< "${mirror_check}")"
-              test "${existing_mirror_text}" = "${mirror_text}"
-            else
-              mirror_payload="$({
-                jq -cS -n \
-                  --arg details_url "${publication_details_url}" \
-                  --arg external_id "${mirror_external_id}" \
-                  --arg head_sha "${MERGE_COMMIT_SHA}" \
-                  --arg name "${mirror_name}" \
-                  --arg summary "${mirror_summary}" \
-                  --arg text "${mirror_text}" \
-                  '{
-                    conclusion: "success",
-                    details_url: $details_url,
-                    external_id: $external_id,
-                    head_sha: $head_sha,
-                    name: $name,
-                    output: {
-                      summary: $summary,
-                      text: $text,
-                      title: "Chio trusted Actions mirror"
-                    },
-                    status: "completed"
-                }'
-              })"
-              require_publishable_ci
-              revalidate_live_publication_head
-              mirror_check="$({
-                curl \
-                  --proto '=https' \
-                  --tlsv1.2 \
-                  --fail \
-                  --silent \
-                  --show-error \
-                  --request POST \
-                  -H "Accept: application/vnd.github+json" \
-                  -H "Authorization: Bearer ${GH_TOKEN}" \
-                  -H "Content-Type: application/json" \
-                  -H "X-GitHub-Api-Version: 2026-03-10" \
-                  --data-binary "${mirror_payload}" \
-                "https://api.github.com/repos/${GITHUB_REPOSITORY}/check-runs"
-              })"
-              revalidate_live_publication_head
-              mirror_created=true
-            fi
-            require_publishable_ci
-            [[ "$(jq -r '.id' <<< "${mirror_check}")" =~ ^[1-9][0-9]*$ ]]
-            test "$(jq -r '.name' <<< "${mirror_check}")" = "${mirror_name}"
-            test "$(jq -r '.head_sha' <<< "${mirror_check}")" = "${MERGE_COMMIT_SHA}"
-            test "$(jq -r '.status' <<< "${mirror_check}")" = "completed"
-            test "$(jq -r '.conclusion' <<< "${mirror_check}")" = "success"
-            test "$(jq -r '.external_id' <<< "${mirror_check}")" = "${mirror_external_id}"
-            [[ "$(jq -r '.details_url' <<< "${mirror_check}")" =~ ^https://github\.com/${GITHUB_REPOSITORY}/actions/runs/[1-9][0-9]*/attempts/[1-9][0-9]*$ ]]
-            if test "${mirror_created}" = true; then
-              test "$(jq -r '.details_url' <<< "${mirror_check}")" = "${publication_details_url}"
-            fi
-            test "$(jq -r '.app.id' <<< "${mirror_check}")" = "15368"
-            test "$(jq -r '.app.slug' <<< "${mirror_check}")" = "github-actions"
-            observed_mirror_text="$(jq -cS '.output.text | fromjson' <<< "${mirror_check}")"
-            test "${observed_mirror_text}" = "${mirror_text}"
-            require_publishable_ci
-          done <<< "${mirror_rows}"
-          revalidate_live_publication_head
-
           list_authority_checks() {
             page=1
             total_count=''
@@ -3166,7 +3358,7 @@ jobs:
                   -H "Accept: application/vnd.github+json" \
                   -H "Authorization: Bearer ${installation_token}" \
                   -H "X-GitHub-Api-Version: 2026-03-10" \
-                  "https://api.github.com/repos/${GITHUB_REPOSITORY}/commits/${MERGE_COMMIT_SHA}/check-runs?app_id=${SECURITY_APP_ID}&check_name=Security%20contract&filter=all&per_page=100&page=${page}"
+                  "https://api.github.com/repos/${GITHUB_REPOSITORY}/commits/${EVIDENCE_SHA}/check-runs?app_id=${SECURITY_APP_ID}&check_name=Security%20contract&filter=all&per_page=100&page=${page}"
               })"
               page_total="$(jq -r '.total_count' <<< "${page_response}")"
               [[ "${page_total}" =~ ^[0-9]+$ ]]
@@ -3202,7 +3394,7 @@ jobs:
           test "$({
             jq -r \
               --arg app_id "${SECURITY_APP_ID}" \
-              --arg head_sha "${MERGE_COMMIT_SHA}" \
+              --arg head_sha "${EVIDENCE_SHA}" \
               'all(.check_runs[];
                 .name == "Security contract" and
                 .head_sha == $head_sha and
@@ -3220,37 +3412,20 @@ jobs:
           fi
 
           summary="Dedicated chio-security-authority approval for ${EXTERNAL_ID}."
-          authority_text="$({
-            jq -cS -n \
-              --arg authorized_source_sha "${AUTHORIZED_SOURCE_SHA}" \
-              --arg evidence_sha "${EVIDENCE_SHA}" \
-              --arg merge_commit_sha "${MERGE_COMMIT_SHA}" \
-              --arg pr_number "${PR_NUMBER}" \
-              --arg publication_binding_digest "${PUBLICATION_BINDING_DIGEST}" \
-              --arg source_ci_run_attempt "${CI_RUN_ATTEMPT}" \
-              --arg source_ci_run_id "${CI_RUN_ID}" \
-              --arg source_ci_workflow_id "${CI_WORKFLOW_ID}" \
-              '{
-                identity: {
-                  authorized_source_sha: $authorized_source_sha,
-                  evidence_sha: $evidence_sha,
-                  merge_commit_sha: $merge_commit_sha,
-                  pr_number: $pr_number
-                },
-                publication_binding_digest: $publication_binding_digest,
-                schema: "chio.security-check-authority.v2",
-                source_ci: {
-                  run_attempt: $source_ci_run_attempt,
-                  run_id: $source_ci_run_id,
-                  workflow_id: $source_ci_workflow_id
-                }
-              }'
-          })"
+          authority_text="$(jq -cS --arg publication_digest "${PUBLICATION_BINDING_DIGEST}" '{
+            schema: "chio.security-check-authority.v3", identity, identity_digest,
+            merge_observations, publication_binding_digest: $publication_digest,
+            source_ci: (.ci | {run_attempt, run_id, workflow_id}),
+            required_check_run_ids: .ci.required_check_run_ids,
+            aggregate_check_run_id: .ci.aggregate_check_run_id,
+            ci_merge_binding: (.ci.merge_binding | {artifact_id,
+              artifact_digest: (.artifact_digest | sub("^sha256:"; "")), binding_sha256})
+          }' <<< "${canonical_binding}")"
           check_payload="$({
             jq -cS -n \
               --arg details_url "${publication_details_url}" \
               --arg external_id "${EXTERNAL_ID}" \
-              --arg head_sha "${MERGE_COMMIT_SHA}" \
+              --arg head_sha "${EVIDENCE_SHA}" \
               --arg summary "${summary}" \
               --arg text "${authority_text}" \
               '{
@@ -3274,6 +3449,7 @@ jobs:
           else
             require_publishable_ci
             revalidate_live_publication_head
+            test "${FINALIZER_RUN_ATTEMPT}" = 1
             check_run="$({
               curl \
                 --proto '=https' \
@@ -3296,7 +3472,7 @@ jobs:
           check_run_id="$(jq -r '.id' <<< "${check_run}")"
           [[ "${check_run_id}" =~ ^[1-9][0-9]*$ ]]
           test "$(jq -r '.name' <<< "${check_run}")" = "Security contract"
-          test "$(jq -r '.head_sha' <<< "${check_run}")" = "${MERGE_COMMIT_SHA}"
+          test "$(jq -r '.head_sha' <<< "${check_run}")" = "${EVIDENCE_SHA}"
           test "$(jq -r '.status' <<< "${check_run}")" = "completed"
           test "$(jq -r '.conclusion' <<< "${check_run}")" = "success"
           test "$(jq -r '.external_id' <<< "${check_run}")" = "${EXTERNAL_ID}"
@@ -3323,7 +3499,7 @@ jobs:
               "https://api.github.com/repos/${GITHUB_REPOSITORY}/check-runs/${check_run_id}"
           })"
           test "$(jq -r '.name' <<< "${verified_check}")" = "Security contract"
-          test "$(jq -r '.head_sha' <<< "${verified_check}")" = "${MERGE_COMMIT_SHA}"
+          test "$(jq -r '.head_sha' <<< "${verified_check}")" = "${EVIDENCE_SHA}"
           test "$(jq -r '.status' <<< "${verified_check}")" = "completed"
           test "$(jq -r '.conclusion' <<< "${verified_check}")" = "success"
           test "$(jq -r '.external_id' <<< "${verified_check}")" = "${EXTERNAL_ID}"
@@ -3333,45 +3509,11 @@ jobs:
           verified_authority_text="$(jq -cS '.output.text | fromjson' <<< "${verified_check}")"
           test "${verified_authority_text}" = "${authority_text}"
           require_publishable_ci
-          while IFS=$'\t' read -r mirror_name mirror_key source_check_name source_check_run_id; do
-            verified_mirror_namespace="$(list_actions_mirror_checks "${mirror_name}")"
-            test "$(jq -r '.total_count' <<< "${verified_mirror_namespace}")" = "1"
-            expected_mirror_text="$(
-              jq -cS -n \
-                --arg authorized_source_sha "${AUTHORIZED_SOURCE_SHA}" \
-                --arg evidence_sha "${EVIDENCE_SHA}" \
-                --arg merge_commit_sha "${MERGE_COMMIT_SHA}" \
-                --arg pr_number "${PR_NUMBER}" \
-                --arg source_check_name "${source_check_name}" \
-                --arg source_check_run_id "${source_check_run_id}" \
-                --arg source_ci_run_attempt "${CI_RUN_ATTEMPT}" \
-                --arg source_ci_run_id "${CI_RUN_ID}" \
-                --arg source_ci_workflow_id "${CI_WORKFLOW_ID}" \
-                '{identity: {authorized_source_sha: $authorized_source_sha, evidence_sha: $evidence_sha, merge_commit_sha: $merge_commit_sha, pr_number: $pr_number}, schema: "chio.security-check-authority.v2", source_check: {check_run_id: $source_check_run_id, name: $source_check_name}, source_ci: {run_attempt: $source_ci_run_attempt, run_id: $source_ci_run_id, workflow_id: $source_ci_workflow_id}}'
-            )"
-            test "$({
-              jq -r \
-                --arg external_id "${EXTERNAL_ID}:actions:${mirror_key}" \
-                --arg head_sha "${MERGE_COMMIT_SHA}" \
-                --arg name "${mirror_name}" \
-                --arg expected_text "${expected_mirror_text}" \
-                'all(.check_runs[];
-                  .name == $name and
-                  .head_sha == $head_sha and
-                  .external_id == $external_id and
-                  .status == "completed" and
-                  .conclusion == "success" and
-                  .app.id == 15368 and
-                  .app.slug == "github-actions" and
-                  ((.output.text | fromjson) == ($expected_text | fromjson))
-                )' <<< "${verified_mirror_namespace}"
-            })" = "true"
-          done <<< "${mirror_rows}"
           require_publishable_ci
           revalidate_live_publication_head
           unset installation_token
           trap - EXIT
-          echo "Five exact merge-authority contexts published for ${MERGE_COMMIT_SHA}; Security contract check run ${check_run_id}." >> "${GITHUB_STEP_SUMMARY}"
+          echo "Dedicated Security contract published for ${EVIDENCE_SHA}; check run ${check_run_id}." >> "${GITHUB_STEP_SUMMARY}"
           }
 
           reconcile_bad_ci

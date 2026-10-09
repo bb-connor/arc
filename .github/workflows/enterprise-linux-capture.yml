@@ -528,7 +528,12 @@ jobs:
           })"
           test "$(jq -r '.ref' <<< "${merge_ref}")" = "refs/pull/${INPUT_PR_NUMBER}/merge"
           test "$(jq -r '.object.type' <<< "${merge_ref}")" = commit
-          test "$(jq -r '.object.sha' <<< "${merge_ref}")" = "${INPUT_MERGE_COMMIT_SHA}"
+          live_merge_sha="$(jq -r '.object.sha' <<< "${merge_ref}")"
+          [[ "${live_merge_sha}" =~ ^[0-9a-f]{40}$ ]]
+          live_merge_commit="$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/git/commits/${live_merge_sha}")"
+          test "$(jq -r '.sha' <<< "${live_merge_commit}")" = "${live_merge_sha}"
+          test "$(jq -cS '[.parents[].sha]' <<< "${live_merge_commit}")" = "[\"${INPUT_BASE_SHA}\",\"${INPUT_SOURCE_SHA}\"]"
+          test "$(jq -r '.tree.sha' <<< "${live_merge_commit}")" = "${INPUT_MERGE_TREE_SHA}"
           labels_json="$(jq -cS '[.labels[].name] | sort' <<< "${live_pr}")"
           labels_digest="$(printf '%s' "${labels_json}" | sha256sum | cut -d' ' -f1)"
           test "${labels_digest}" = "${INPUT_LABELS_DIGEST}"
@@ -636,13 +641,10 @@ jobs:
           })"
           test "$(jq -r '.ref' <<< "${stable_merge_ref}")" = "refs/pull/${INPUT_PR_NUMBER}/merge"
           test "$(jq -r '.object.type' <<< "${stable_merge_ref}")" = commit
-          test "$(jq -r '.object.sha' <<< "${stable_merge_ref}")" = "${INPUT_MERGE_COMMIT_SHA}"
-          stable_merge_commit="$({
-            gh api \
-              -H "Accept: application/vnd.github+json" \
-              -H "X-GitHub-Api-Version: 2026-03-10" \
-              "repos/${GITHUB_REPOSITORY}/git/commits/${INPUT_MERGE_COMMIT_SHA}"
-          })"
+          stable_merge_sha="$(jq -r '.object.sha' <<< "${stable_merge_ref}")"
+          [[ "${stable_merge_sha}" =~ ^[0-9a-f]{40}$ ]]
+          stable_merge_commit="$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/git/commits/${stable_merge_sha}")"
+          test "$(jq -r '.sha' <<< "${stable_merge_commit}")" = "${stable_merge_sha}"
           test "$(jq -cS '[.parents[].sha]' <<< "${stable_merge_commit}")" = "[\"${INPUT_BASE_SHA}\",\"${INPUT_SOURCE_SHA}\"]"
           test "$(jq -r '.tree.sha' <<< "${stable_merge_commit}")" = "${INPUT_MERGE_TREE_SHA}"
 
@@ -674,13 +676,18 @@ jobs:
           } >> "${GITHUB_OUTPUT}"
 
   refresh-linux-evidence:
-    name: refresh isolated complete mutation evidence
+    name: refresh isolated mutation evidence (shard ${{ matrix.shard }})
     needs: [authorize-capture]
     if: needs.authorize-capture.outputs.mode == 'refresh'
     permissions:
       contents: read
     runs-on: ubuntu-24.04
     timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      max-parallel: 7
+      matrix:
+        shard: ["0", "1", "2", "3", "4", "5", "6"]
     steps:
       - name: Checkout exact candidate source without credentials
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
@@ -719,6 +726,9 @@ jobs:
           644 deploy/docker/Dockerfile.security-evidence-runner
           644 deploy/docker/security-evidence-apk.lock
           644 deploy/docker/security-evidence-seccomp.json
+          644 deploy/docker/security-evidence-seccomp-upstream.json
+          644 deploy/docker/security-evidence-seccomp-provenance.json
+          644 deploy/docker/security-evidence-seccomp-upstream.LICENSE
           755 crates/security/chio-cage/scripts/check-linux-enforcement.sh
           644 scripts/check-cage-all-target-inventory.py
           755 scripts/check-cage-enforcement.sh
@@ -748,22 +758,176 @@ jobs:
           test "$(/usr/bin/docker image inspect --format '{{.Os}}/{{.Architecture}}' "${tag}")" = "linux/amd64"
           echo "image=${image_id}" >> "${GITHUB_OUTPUT}"
 
-      - name: Refresh all evidence inside trusted execution boundary
+      - name: Refresh shard inside trusted execution boundary
         env:
           AUTHORIZED_SOURCE_SHA: ${{ needs.authorize-capture.outputs.authorized_source_sha }}
           EVIDENCE_SOURCE_SHA: ${{ needs.authorize-capture.outputs.source_sha }}
           SECURITY_EXECUTION_IMAGE: ${{ steps.security-image.outputs.image }}
+          EVIDENCE_SHARD: ${{ matrix.shard }}
         run: |
+          set -euo pipefail
+          [[ "${EVIDENCE_SHARD}" =~ ^[0-6]$ ]]
           /usr/bin/python3 \
             authorized-security/scripts/run-security-execution-container.py \
             --authorized-source-sha "${AUTHORIZED_SOURCE_SHA}" \
             --candidate candidate \
             --expected-sha "${EVIDENCE_SOURCE_SHA}" \
             --image "${SECURITY_EXECUTION_IMAGE}" \
-            --operation refresh-all-evidence \
+            --operation "refresh-evidence-shard-${EVIDENCE_SHARD}" \
             --output-dir "${RUNNER_TEMP}/linux-evidence-artifact" \
             --state-dir "${RUNNER_TEMP}/security-execution-state" \
             --timeout-seconds 21000
+
+      - name: Upload unsigned evidence shard
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: linux-adversarial-shard-${{ matrix.shard }}-${{ needs.authorize-capture.outputs.source_sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/linux-evidence-artifact/all-evidence-inventory.json
+            ${{ runner.temp }}/linux-evidence-artifact/all-evidence.patch
+            ${{ runner.temp }}/linux-evidence-artifact/all-evidence.patch.sha256
+            ${{ runner.temp }}/linux-evidence-artifact/source-sha.txt
+          if-no-files-found: error
+          retention-days: 7
+
+  aggregate-refreshed-evidence:
+    name: validate complete isolated mutation evidence
+    needs: [authorize-capture, refresh-linux-evidence]
+    if: needs.authorize-capture.outputs.mode == 'refresh'
+    permissions:
+      actions: read
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact candidate source without credentials
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          repository: ${{ needs.authorize-capture.outputs.source_repository }}
+          ref: ${{ needs.authorize-capture.outputs.source_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: candidate
+
+      - name: Checkout exact authorized security tooling without credentials
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          repository: ${{ needs.authorize-capture.outputs.source_repository }}
+          ref: ${{ needs.authorize-capture.outputs.authorized_source_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          path: authorized-security
+
+      - name: Validate exact aggregation inputs
+        env:
+          AUTHORIZED_SOURCE_SHA: ${{ needs.authorize-capture.outputs.authorized_source_sha }}
+          EVIDENCE_SOURCE_SHA: ${{ needs.authorize-capture.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          [[ "${AUTHORIZED_SOURCE_SHA}" =~ ^[0-9a-f]{40}$ ]]
+          [[ "${EVIDENCE_SOURCE_SHA}" =~ ^[0-9a-f]{40}$ ]]
+          test "$(/usr/bin/git -C candidate rev-parse HEAD)" = "${EVIDENCE_SOURCE_SHA}"
+          test "$(/usr/bin/git -C authorized-security rev-parse HEAD)" = "${AUTHORIZED_SOURCE_SHA}"
+          test "$(uname -s):$(uname -m)" = "Linux:x86_64"
+          test -f authorized-security/scripts/aggregate-security-evidence-shards.py
+          test ! -L authorized-security/scripts/aggregate-security-evidence-shards.py
+          while read -r mode path; do
+            test -f "authorized-security/${path}"
+            test ! -L "authorized-security/${path}"
+            test "$(stat --format='%a' "authorized-security/${path}")" = "${mode}"
+          done <<'TRUSTED_EXECUTION_FILES'
+          644 deploy/docker/Dockerfile.security-evidence-runner
+          644 deploy/docker/security-evidence-apk.lock
+          644 deploy/docker/security-evidence-seccomp.json
+          644 deploy/docker/security-evidence-seccomp-upstream.json
+          644 deploy/docker/security-evidence-seccomp-provenance.json
+          644 deploy/docker/security-evidence-seccomp-upstream.LICENSE
+          755 crates/security/chio-cage/scripts/check-linux-enforcement.sh
+          644 scripts/check-cage-all-target-inventory.py
+          755 scripts/check-cage-enforcement.sh
+          755 scripts/check-exact-cargo-test-inventory.py
+          755 scripts/check-keyring-transparency.sh
+          755 scripts/check-linux-enforcement-stack.py
+          755 scripts/check-secret-broker-boundary.sh
+          755 scripts/check-security-adversarial-evidence.py
+          755 scripts/run-security-execution-container.py
+          755 scripts/security-execution-command-client.py
+          755 scripts/security-execution-container-entrypoint.py
+          755 scripts/tests/run-security-execution-container.test.py
+          TRUSTED_EXECUTION_FILES
+
+      - name: Build digest-addressed trusted security execution image
+        id: security-image
+        run: |
+          set -euo pipefail
+          tag="chio-security-execution:${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          /usr/bin/docker build \
+            --platform linux/amd64 \
+            --file authorized-security/deploy/docker/Dockerfile.security-evidence-runner \
+            --tag "${tag}" \
+            authorized-security
+          image_id="$(/usr/bin/docker image inspect --format '{{.Id}}' "${tag}")"
+          [[ "${image_id}" =~ ^sha256:[0-9a-f]{64}$ ]]
+          test "$(/usr/bin/docker image inspect --format '{{.Os}}/{{.Architecture}}' "${tag}")" = "linux/amd64"
+          echo "image=${image_id}" >> "${GITHUB_OUTPUT}"
+
+      - name: Download exact evidence shard 0
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: linux-adversarial-shard-0-${{ needs.authorize-capture.outputs.source_sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/evidence-shards/shard-0
+
+      - name: Download exact evidence shard 1
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: linux-adversarial-shard-1-${{ needs.authorize-capture.outputs.source_sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/evidence-shards/shard-1
+
+      - name: Download exact evidence shard 2
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: linux-adversarial-shard-2-${{ needs.authorize-capture.outputs.source_sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/evidence-shards/shard-2
+
+      - name: Download exact evidence shard 3
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: linux-adversarial-shard-3-${{ needs.authorize-capture.outputs.source_sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/evidence-shards/shard-3
+
+      - name: Download exact evidence shard 4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: linux-adversarial-shard-4-${{ needs.authorize-capture.outputs.source_sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/evidence-shards/shard-4
+
+      - name: Download exact evidence shard 5
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: linux-adversarial-shard-5-${{ needs.authorize-capture.outputs.source_sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/evidence-shards/shard-5
+
+      - name: Download exact evidence shard 6
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: linux-adversarial-shard-6-${{ needs.authorize-capture.outputs.source_sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/evidence-shards/shard-6
+
+      - name: Compose exact shards and require isolated complete validation
+        env:
+          AUTHORIZED_SOURCE_SHA: ${{ needs.authorize-capture.outputs.authorized_source_sha }}
+          EVIDENCE_SOURCE_SHA: ${{ needs.authorize-capture.outputs.source_sha }}
+          SECURITY_EXECUTION_IMAGE: ${{ steps.security-image.outputs.image }}
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 -I \
+            authorized-security/scripts/aggregate-security-evidence-shards.py \
+            --authorized-source-sha "${AUTHORIZED_SOURCE_SHA}" \
+            --candidate candidate \
+            --expected-sha "${EVIDENCE_SOURCE_SHA}" \
+            --image "${SECURITY_EXECUTION_IMAGE}" \
+            --shards "${RUNNER_TEMP}/evidence-shards" \
+            --output-dir "${RUNNER_TEMP}/linux-evidence-artifact"
 
       - name: Upload unsigned evidence patch
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -845,6 +1009,9 @@ jobs:
           644 deploy/docker/Dockerfile.security-evidence-runner
           644 deploy/docker/security-evidence-apk.lock
           644 deploy/docker/security-evidence-seccomp.json
+          644 deploy/docker/security-evidence-seccomp-upstream.json
+          644 deploy/docker/security-evidence-seccomp-provenance.json
+          644 deploy/docker/security-evidence-seccomp-upstream.LICENSE
           755 crates/security/chio-cage/scripts/check-linux-enforcement.sh
           644 scripts/check-cage-all-target-inventory.py
           755 scripts/check-cage-enforcement.sh
@@ -1117,6 +1284,8 @@ jobs:
               -H "Accept: application/vnd.github+json" \
               "repos/${GITHUB_REPOSITORY}/actions/workflows/enterprise-evidence-finalizer.yml"
           })"
+          finalizer_workflow_id="$(jq -r '.id' <<< "${finalizer_workflow}")"
+          [[ "${finalizer_workflow_id}" =~ ^[1-9][0-9]*$ ]]
           test "$(jq -r '.path' <<< "${finalizer_workflow}")" = ".github/workflows/enterprise-evidence-finalizer.yml"
           test "$(jq -r '.state' <<< "${finalizer_workflow}")" = "active"
 
@@ -1171,9 +1340,10 @@ jobs:
                 --arg head_branch "${default_branch}" \
                 --arg head_sha "${default_commit_sha}" \
                 --arg started_at "${dispatch_started_at}" \
+                --arg workflow_id "${finalizer_workflow_id}" \
                 '[.[] | select(
-                  .name == "Enterprise evidence finalizer" and
                   .path == ".github/workflows/enterprise-evidence-finalizer.yml" and
+                  (.workflow_id | tostring) == $workflow_id and
                   .event == "workflow_dispatch" and
                   .display_title == $display_title and
                   .head_branch == $head_branch and
@@ -1217,8 +1387,8 @@ jobs:
               -H "Accept: application/vnd.github+json" \
               "repos/${GITHUB_REPOSITORY}/actions/runs/${dispatched_run_id}"
           })"
-          test "$(jq -r '.name' <<< "${dispatched_run}")" = "Enterprise evidence finalizer"
           test "$(jq -r '.path' <<< "${dispatched_run}")" = ".github/workflows/enterprise-evidence-finalizer.yml"
+          test "$(jq -r '.workflow_id' <<< "${dispatched_run}")" = "${finalizer_workflow_id}"
           test "$(jq -r '.event' <<< "${dispatched_run}")" = "workflow_dispatch"
           test "$(jq -r '.display_title' <<< "${dispatched_run}")" = "${display_title}"
           test "$(jq -r '.head_branch' <<< "${dispatched_run}")" = "${default_branch}"

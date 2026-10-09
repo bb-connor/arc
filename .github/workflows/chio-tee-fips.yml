@@ -27,8 +27,8 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: chio-tee-fips-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: chio-tee-fips-${{ github.workflow }}-${{ github.run_id }}-${{ github.run_attempt }}
+  cancel-in-progress: false
 
 permissions:
   contents: read

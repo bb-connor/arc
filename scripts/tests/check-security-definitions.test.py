@@ -29,6 +29,16 @@ EVIDENCE = "2" * 40
 MERGE = "3" * 40
 TREE = "4" * 40
 OTHER = "5" * 40
+SOURCE = "6" * 40
+DEFINITION = "7" * 40
+IDENTITY = {
+    "schema": "chio.security-candidate-identity.v1", "repository": "bb-connor/arc",
+    "repository_id": "42", "pr_number": "1160", "base_sha": BASE,
+    "evidence_sha": EVIDENCE, "merge_tree_sha": TREE,
+    "authorized_source_sha": SOURCE, "security_definition_sha": DEFINITION,
+}
+IDENTITY_DIGEST = "f77b9e789001c0e0c5c11f9a12e3551289dd4b58f58570f1312a5816181276c3"
+EXTERNAL_ID = f"chio:v3:1160:{EVIDENCE}:{IDENTITY_DIGEST}"
 
 
 def workflow_step(workflow: str, job: str, name: str) -> str:
@@ -67,9 +77,10 @@ def labels_digest(labels: list[str]) -> str:
 
 PUBLICATION_API = r"""
 curl() {
-  local url="${@: -1}" method=GET
+  local url="${@: -1}" method=GET request=''
   while test "$#" -gt 0; do
     if test "$1" = '--request'; then method="$2"; fi
+    if test "$1" = '--data-binary'; then request="$2"; fi
     shift
   done
   case "${method} ${url}" in
@@ -81,9 +92,16 @@ curl() {
       fi ;;
     'GET https://api.github.com/repos/bb-connor/arc/git/ref/pull/1160/merge')
       printf '%s\n' "${MOCK_REF}" ;;
-    "GET https://api.github.com/repos/bb-connor/arc/git/commits/${MERGE_COMMIT_SHA}")
+    "GET https://api.github.com/repos/bb-connor/arc/git/commits/${MOCK_LIVE_MERGE_SHA}")
       printf '%s\n' "${MOCK_COMMIT}" ;;
+    'GET https://api.github.com/repos/bb-connor/arc/git/ref/heads/main')
+      printf '%s\n' "${MOCK_MAIN_REF}" ;;
+    'GET https://api.github.com/repos/bb-connor/arc/pulls?state=open&per_page=100&page=1')
+      printf '%s\n' "${MOCK_OPEN_PRS}" ;;
+    "GET https://api.github.com/repos/bb-connor/arc/commits/${EVIDENCE_SHA}/pulls?per_page=100&page=1")
+      printf '%s\n' "${MOCK_ASSOCIATED_PRS}" ;;
     'POST https://api.github.com/repos/bb-connor/arc/check-runs')
+      test "$(jq -cS '{name,head_sha,external_id,status,conclusion,text:(.output.text|fromjson)}' <<< "$request")" = "$(jq -cS . <<< "$EXPECTED_AUTHORITY")" || return 22
       printf 'posted\n' > check-posted
       printf '{"id":99}\n' ;;
     *) printf 'unexpected fixture API request\n' >&2; return 22 ;;
@@ -126,13 +144,26 @@ curl() {
 
 CI_CATALOG_API = r"""
 catalog_request() {
-  local url="${@: -1}" count=0 reply
+  local url="${@: -1}" count=0 reply counter pages
   case "$url" in
-    */actions/workflows/ci.yml/runs\?*)
-      if test -f catalog-calls; then read -r count < catalog-calls; fi
-      printf '%s\n' "$((count + 1))" > catalog-calls
-      reply="$(jq -c --argjson index "$count" '.[$index] // .[-1]' <<< "$MOCK_PAGES")"
-      jq -r '.body | if type == "string" then . else tojson end' <<< "$reply"
+    */actions/workflows/ci.yml/runs\?*|*/actions/runs\?*)
+      counter=workflow
+      pages="$MOCK_PAGES"
+      if [[ "$url" == */actions/runs\?* ]]; then
+        counter=repository
+        pages="${MOCK_REPOSITORY_PAGES:-$MOCK_PAGES}"
+      fi
+      if test -f "${counter}-catalog-calls"; then read -r count < "${counter}-catalog-calls"; fi
+      printf '%s\n' "$((count + 1))" > "${counter}-catalog-calls"
+      touch "catalog-${counter}-$((count + 1))"
+      reply="$(jq -c --argjson index "$count" '.[$index] // .[-1]' <<< "$pages")"
+      if jq -e 'has("generated_total")' <<< "$reply" > /dev/null; then
+        jq -cn --argjson total "$(jq -r '.generated_total' <<< "$reply")" \
+          --argjson page "${url##*page=}" --argjson run "$MOCK_RUN" \
+          '{total_count:$total,workflow_runs:[range(($page-1)*100;([$page*100,$total]|min)) | $run + {id:(.+1)}]}'
+      else
+        jq -r '.body | if type == "string" then . else tojson end' <<< "$reply"
+      fi
       return "$(jq -r '.exit_code // 0' <<< "$reply")" ;;
     */actions/runs/1)
       printf '%s\n' "$MOCK_RUN" ;;
@@ -142,11 +173,24 @@ catalog_request() {
       else
         printf '%s\n' "$MOCK_RUN"
       fi ;;
+    */pulls/1160) printf '%s\n' "${MOCK_PR}" ;;
     *) printf 'unexpected fixture CI API request\n' >&2; return 22 ;;
   esac
 }
 curl() { catalog_request "$@"; }
 gh() { catalog_request "$@"; }
+"""
+
+HISTORICAL_ROUTE_API = r"""
+gh() {
+  local path="${@: -1}"
+  case "$path" in
+    "repos/bb-connor/arc/actions/runs/${EVENT_RUN_ID}/attempts/${EVENT_RUN_ATTEMPT}") printf '%s\n' "$MOCK_ATTEMPT" ;;
+    "repos/bb-connor/arc/actions/workflows/${EVENT_WORKFLOW_ID}") printf '%s\n' "$MOCK_WORKFLOW" ;;
+    repos/bb-connor/arc/actions/workflows/ci.yml|repos/bb-connor/arc/actions/workflows/enterprise-evidence-finalizer.yml) printf '%s\n' "$MOCK_REGISTERED" ;;
+    *) printf 'unexpected historical route API request\n' >&2; return 22 ;;
+  esac
+}
 """
 
 
@@ -157,13 +201,20 @@ class DefinitionTests(unittest.TestCase):
             FINALIZER, "publish-security-contract", "Reconcile exact five-context merge authority"
         )
         cls.revalidate = shell_function(cls.publisher, "revalidate_live_publication_head")
+        cls.shared_evidence = shell_function(cls.publisher, "refuse_shared_evidence_head")
+        cls.publication_binding = shell_region(cls.publisher, '[[ "${IDENTITY_DIGEST}"', "private_key=")
+        cls.authority_payload = shell_region(
+            cls.publisher, 'summary="Dedicated chio-security-authority approval',
+            "revalidate_live_publication_head\nauthority_created=false\n",
+        )
         cls.reconcile = shell_function(cls.publisher, "reconcile_bad_ci")
         reconcile_body = textwrap.dedent("\n".join(cls.reconcile.splitlines()[1:-1]))
         wait_body = workflow_step(
             FINALIZER, "authorize-security-check-publication", "Authenticate exact successful current CI run"
         )
         cls.catalog_helpers = {
-            "publisher": shell_function(reconcile_body, "list_matching_ci_runs"),
+            "publisher": shell_function(reconcile_body, "list_ci_inventory") + "\n"
+            + shell_function(reconcile_body, "list_matching_ci_runs"),
             "wait-for-ci": shell_function(wait_body, "list_matching_ci_runs"),
         }
         cls.wait_for_ci = shell_region(wait_body, "for _ in $(seq 1 480); do\n", "ci_run_id=")
@@ -191,13 +242,68 @@ class DefinitionTests(unittest.TestCase):
             files = {path.name for path in Path(raw).iterdir()}
         return result.returncode, result.stderr, files
 
+    def run_historical_route(self, state: str, workflow_path: str, mutation: str = '', registry_change: str = '') -> tuple[int, str, set[str]]:
+        route = workflow_step(REVOKER, "bind-revocation", "Resolve exact completed workflow identity")
+        record = {"id": 101, "path": workflow_path, "state": state}
+        registered = record.copy()
+        attempt = {"id": 201, "workflow_id": 101, "run_attempt": 2, "path": workflow_path,
+                   "status": "completed", "conclusion": "failure", "event": "pull_request" if workflow_path.endswith('/ci.yml') else "workflow_dispatch",
+                   "repository": {"full_name": "bb-connor/arc", "id": 42}, "head_repository": {"full_name": "bb-connor/arc", "id": 42}, "head_sha": EVIDENCE}
+        if mutation == 'event_id': attempt['workflow_id'] = 999
+        elif mutation == 'event_path': attempt['path'] = '.github/workflows/untrusted.yml'
+        elif mutation == 'run_id': attempt['id'] = 999
+        elif mutation == 'repository': attempt['repository']['id'] = 999
+        elif mutation == 'run_attempt': attempt['run_attempt'] = 1
+        elif mutation == 'run_head': attempt['head_sha'] = 'not-a-commit'
+        elif mutation == 'event_type': attempt['event'] = 'push'
+        if registry_change == 'renamed': record['path'] = registered['path'] = '.github/workflows/renamed.yml'
+        elif registry_change == 'deleted': record = registered = {}
+        elif registry_change == 'recreated': registered['id'] = 999
+        program = HISTORICAL_ROUTE_API + route + '\ntest "$(cat "${GITHUB_OUTPUT}")" = "workflow_path=${EXPECTED_PATH}"\n'
+        return self.run_shell(program, {"GITHUB_REPOSITORY": "bb-connor/arc", "EVENT_WORKFLOW_ID": "101",
+                                       "EVENT_RUN_ID": "201", "EVENT_RUN_ATTEMPT": "2", "EVENT_CONCLUSION": "failure",
+                                       "REPOSITORY_ID": "42",
+                                       "MOCK_ATTEMPT": json.dumps(attempt),
+                                       "MOCK_WORKFLOW": json.dumps(record), "MOCK_REGISTERED": json.dumps(registered),
+                                       "EXPECTED_PATH": workflow_path})
+
+    def test_historical_failure_route_accepts_disabled_workflow_identity(self) -> None:
+        for path in ('.github/workflows/ci.yml', '.github/workflows/enterprise-evidence-finalizer.yml'):
+            for state in ('active', 'disabled_manually', 'disabled_inactivity', 'disabled_fork'):
+                with self.subTest(path=path, state=state):
+                    code, error, _ = self.run_historical_route(state, path)
+                    self.assertEqual(code, 0, error)
+
+    def test_disabled_historical_route_still_rejects_identity_substitution(self) -> None:
+        for mutation in ('event_id', 'event_path', 'run_id', 'repository', 'run_attempt', 'run_head', 'event_type'):
+            with self.subTest(mutation=mutation):
+                code, _, _ = self.run_historical_route('disabled_manually', '.github/workflows/ci.yml', mutation)
+                self.assertNotEqual(code, 0)
+
+    def test_historical_route_accepts_renamed_deleted_recreated_registration(self) -> None:
+        for path in ('.github/workflows/ci.yml', '.github/workflows/enterprise-evidence-finalizer.yml'):
+            for change in ('renamed', 'deleted', 'recreated'):
+                with self.subTest(path=path, change=change):
+                    code, error, _ = self.run_historical_route('active', path, registry_change=change)
+                    self.assertEqual(code, 0, error)
+
     def publication_fixture(self, labels: list[str] | None = None) -> dict:
         names = labels or []
         return {
             "binding": {
+                "schema": "chio.security-check-publication.v2",
+                "repository": "bb-connor/arc", "pr_number": "1160", "evidence_sha": EVIDENCE,
+                "authorized_source_sha": SOURCE, "security_definition_sha": DEFINITION,
+                "identity": copy.deepcopy(IDENTITY), "identity_digest": IDENTITY_DIGEST,
                 "base": {"repository": "bb-connor/arc", "ref": "main", "sha": BASE},
-                "merge_commit_sha": MERGE, "merge_tree_sha": TREE,
+                "merge_observations": {"capture": MERGE, "ci": MERGE}, "merge_tree_sha": TREE,
                 "labels_digest": labels_digest(names),
+                "ci": {
+                    "workflow_id": "77", "run_id": "1", "run_attempt": "1",
+                    "aggregate_check_run_id": "505",
+                    "required_check_run_ids": {"build": "501", "msrv": "502", "vet": "503", "deny": "504"},
+                    "merge_binding": {"artifact_id": "900", "artifact_digest": "sha256:" + "8" * 64, "binding_sha256": "9" * 64},
+                },
             },
             "pr": {
                 "state": "open", "labels": [{"name": name} for name in names],
@@ -205,35 +311,64 @@ class DefinitionTests(unittest.TestCase):
                 "base": {"repo": {"full_name": "bb-connor/arc"}, "ref": "main", "sha": BASE},
             },
             "ref": {"ref": "refs/pull/1160/merge", "object": {"type": "commit", "sha": MERGE}},
-            "commit": {"parents": [{"sha": BASE}, {"sha": EVIDENCE}], "tree": {"sha": TREE}},
+            "commit": {"sha": MERGE, "parents": [{"sha": BASE}, {"sha": EVIDENCE}], "tree": {"sha": TREE}},
+            "main_ref": {"ref": "refs/heads/main", "object": {"type": "commit", "sha": BASE}},
+            "open_prs": [{"number": 1160, "head": {"sha": EVIDENCE}}],
+            "associated_prs": [{"number": 1160, "head": {"sha": EVIDENCE}}],
         }
 
     def run_publication(self, fixture: dict, *, after: dict | None = None, write: bool = False) -> tuple[int, str, set[str]]:
+        binding_json = json.dumps(fixture["binding"], sort_keys=True, separators=(",", ":"))
+        binding_digest = hashlib.sha256(binding_json.encode()).hexdigest()
         env = {
             "GITHUB_REPOSITORY": "bb-connor/arc", "GH_TOKEN": "fixture-no-credential",
             "PR_NUMBER": "1160", "EVIDENCE_SHA": EVIDENCE, "MERGE_COMMIT_SHA": MERGE,
-            "canonical_binding": json.dumps(fixture["binding"]),
+            "PUBLICATION_BINDING_JSON": binding_json, "PUBLICATION_BINDING_DIGEST": binding_digest,
+            "IDENTITY_JSON": json.dumps(IDENTITY, sort_keys=True, separators=(",", ":")),
+            "IDENTITY_DIGEST": IDENTITY_DIGEST, "EXTERNAL_ID": EXTERNAL_ID, "REPOSITORY_ID": "42",
+            "AUTHORIZED_SOURCE_SHA": SOURCE, "SECURITY_DEFINITION_SHA": DEFINITION,
+            "CI_WORKFLOW_ID": "77", "CI_RUN_ID": "1", "CI_RUN_ATTEMPT": "1", "CI_AGGREGATE_CHECK_RUN_ID": "505",
+            "FINALIZER_RUN_ID": "900", "FINALIZER_RUN_ATTEMPT": "1",
             "MOCK_PR": json.dumps(fixture["pr"]), "MOCK_AFTER_PR": json.dumps(after or fixture["pr"]),
             "MOCK_REF": json.dumps(fixture["ref"]), "MOCK_COMMIT": json.dumps(fixture["commit"]),
+            "MOCK_LIVE_MERGE_SHA": fixture["ref"]["object"]["sha"],
+            "MOCK_MAIN_REF": json.dumps(fixture["main_ref"]),
+            "MOCK_OPEN_PRS": json.dumps(fixture["open_prs"]), "MOCK_ASSOCIATED_PRS": json.dumps(fixture["associated_prs"]),
+            "EXPECTED_AUTHORITY": json.dumps({
+                "name": "Security contract", "head_sha": EVIDENCE, "external_id": EXTERNAL_ID,
+                "status": "completed", "conclusion": "success",
+                "text": {
+                    "schema": "chio.security-check-authority.v3", "identity": IDENTITY,
+                    "identity_digest": IDENTITY_DIGEST, "publication_binding_digest": binding_digest,
+                    "merge_observations": {"capture": MERGE, "ci": MERGE},
+                    "source_ci": {"workflow_id": "77", "run_id": "1", "run_attempt": "1"},
+                    "aggregate_check_run_id": "505",
+                    "required_check_run_ids": {"build": "501", "msrv": "502", "vet": "503", "deny": "504"},
+                    "ci_merge_binding": {"artifact_id": "900", "artifact_digest": "8" * 64, "binding_sha256": "9" * 64},
+                },
+            }),
         }
-        program = PUBLICATION_API + self.revalidate + "\n"
+        program = PUBLICATION_API + self.publication_binding + self.shared_evidence + "\n" + self.revalidate + "\n"
         if write:
             region = shell_region(
                 self.publisher,
                 "revalidate_live_publication_head\nauthority_created=false\n",
                 "check_run_id=",
             )
-            env.update({"existing_authority_match_count": "0", "installation_token": "fixture-token", "check_payload": "{}"})
-            program += "require_publishable_ci() { return 0; }\n" + region
+            env.update({"existing_authority_match_count": "0", "installation_token": "fixture-token"})
+            program += self.authority_payload + "require_publishable_ci() { return 0; }\n" + region
         else:
             program += "revalidate_live_publication_head\n"
         return self.run_shell(program, env)
 
-    def test_publisher_accepts_unchanged_merge_and_sorted_labels(self) -> None:
-        fixture = self.publication_fixture(["zeta", "alpha"])
-        fixture["pr"]["labels"].reverse()
-        code, error, _ = self.run_publication(fixture)
-        self.assertEqual(code, 0, error)
+    def test_publisher_accepts_same_identity_merge_regeneration_and_sorted_labels(self) -> None:
+        for live_merge in (MERGE, OTHER):
+            with self.subTest(live_merge=live_merge):
+                fixture = self.publication_fixture(["zeta", "alpha"])
+                fixture["pr"]["labels"].reverse()
+                fixture["ref"]["object"]["sha"] = fixture["commit"]["sha"] = live_merge
+                code, error, _ = self.run_publication(fixture, write=True)
+                self.assertEqual(code, 0, error)
 
     def test_publisher_rejects_late_refresh_label(self) -> None:
         fixture = self.publication_fixture()
@@ -248,7 +383,7 @@ class DefinitionTests(unittest.TestCase):
     def test_publisher_rejects_refresh_mode_even_if_digest_matches(self) -> None:
         self.assertNotEqual(self.run_publication(self.publication_fixture(["refresh-linux-evidence"]))[0], 0)
 
-    def test_publisher_rejects_head_base_and_merge_drift(self) -> None:
+    def test_publisher_rejects_head_base_tree_and_identity_drift(self) -> None:
         changes = (
             (("pr", "state"), "closed"),
             (("pr", "head", "sha"), OTHER),
@@ -259,9 +394,18 @@ class DefinitionTests(unittest.TestCase):
             (("ref", "ref"), "refs/pull/2/merge"),
             (("ref", "object", "sha"), OTHER),
             (("ref", "object", "type"), "tag"),
+            (("commit", "sha"), OTHER),
             (("commit", "parents"), [{"sha": EVIDENCE}, {"sha": BASE}]),
             (("commit", "parents"), [{"sha": BASE}, {"sha": EVIDENCE}, {"sha": OTHER}]),
             (("commit", "tree", "sha"), OTHER),
+            (("main_ref", "object", "sha"), OTHER),
+            (("binding", "identity", "pr_number"), "2"),
+            (("binding", "identity_digest"), "0" * 64),
+            (("binding", "schema"), "chio.security-check-publication.v1"),
+            (("binding", "ci", "required_check_run_ids", "build"), "invalid"),
+            (("binding", "ci", "aggregate_check_run_id"), "0"),
+            (("open_prs",), [{"number": 2, "head": {"sha": EVIDENCE}}]),
+            (("associated_prs",), [{"number": 2, "head": {"sha": EVIDENCE}}]),
         )
         for keys, value in changes:
             with self.subTest(keys=keys):
@@ -398,7 +542,8 @@ class DefinitionTests(unittest.TestCase):
             "event": "pull_request", "workflow_id": 77,
             "display_title": f"CI N=1160 E={EVIDENCE} B={BASE} M={MERGE}",
             "head_sha": EVIDENCE, "head_branch": "foundation",
-            "head_repository": {"full_name": "bb-connor/arc"},
+            "repository": {"full_name": "bb-connor/arc", "id": 42},
+            "head_repository": {"full_name": "bb-connor/arc", "id": 42},
             "run_attempt": 1, "status": "completed", "conclusion": "success",
         }
 
@@ -407,19 +552,24 @@ class DefinitionTests(unittest.TestCase):
         return {
             "GH_TOKEN": "fixture-no-credential", "GITHUB_REPOSITORY": "bb-connor/arc",
             "EVIDENCE_SHA": EVIDENCE, "BASE_SHA": BASE, "MERGE_COMMIT_SHA": MERGE,
-            "PR_NUMBER": "1160", "CI_WORKFLOW_ID": "77", "CI_RUN_ID": "1", "HEAD_REF": "foundation",
+            "PR_NUMBER": "1160", "CI_WORKFLOW_ID": "77", "CI_RUN_ID": "1", "HEAD_REF": "foundation", "REPOSITORY_ID": "42",
             "expected_run_name": name, "expected_ci_run_name": name,
-            "canonical_binding": json.dumps({"base": {"sha": BASE}}),
+            "expected_run_prefix": f"CI N=1160 E={EVIDENCE} B={BASE} M=",
+            "canonical_binding": json.dumps({"base": {"sha": BASE}, "merge_observations": {"capture": MERGE, "ci": MERGE}}),
             "MOCK_PAGES": json.dumps(pages), "MOCK_RUN": json.dumps(run or self.ci_run_fixture()),
+            "MOCK_PR": json.dumps({"merged": False, "head": {"sha": EVIDENCE}}),
         }
 
-    def run_catalog(self, helper: str, pages: list[dict], *, conditional: bool = True) -> tuple[int, str, set[str]]:
+    def run_catalog(self, helper: str, pages: list[dict], *, conditional: bool = True, repository_pages: list[dict] | None = None) -> tuple[int, str, set[str]]:
         call = 'matching_ci_runs="$(list_matching_ci_runs)"\n'
         if conditional:
             call = 'if ! matching_ci_runs="$(list_matching_ci_runs)"; then exit 1; fi\n'
+        env = self.catalog_environment(pages)
+        if repository_pages is not None:
+            env["MOCK_REPOSITORY_PAGES"] = json.dumps(repository_pages)
         return self.run_shell(
             CI_CATALOG_API + self.catalog_helpers[helper] + "\n" + call + "printf accepted > accepted\n",
-            self.catalog_environment(pages),
+            env,
         )
 
     def malformed_catalogs(self) -> dict[str, list[dict]]:
@@ -448,7 +598,7 @@ class DefinitionTests(unittest.TestCase):
             "non-array catalog": [{"body": {"total_count": 1, "workflow_runs": good}}],
             "malformed JSON": [{"body": "{"}],
             "API failure with body": [{"body": {"total_count": 1, "workflow_runs": [good]}, "exit_code": 22}],
-            "fallback API failure with body": [
+            "ceiling cannot be followed by a fallback API reply": [
                 {"body": {"total_count": 1000}},
                 {"body": {"total_count": 1, "workflow_runs": [good]}, "exit_code": 22},
             ],
@@ -465,6 +615,12 @@ class DefinitionTests(unittest.TestCase):
                     code, _, files = self.run_catalog(helper, pages)
                     self.assertNotEqual(code, 0, "conditional helper accepted an invalid CI catalog")
                     self.assertNotIn("accepted", files)
+        good = [{"body": {"total_count": 1, "workflow_runs": [self.ci_run_fixture()]}}]
+        for pages in ([{"body": {"total_count": 0, "workflow_runs": []}}], *self.malformed_catalogs().values()):
+            with self.subTest(repository_inventory=pages):
+                code, _, files = self.run_catalog("publisher", good, repository_pages=pages)
+                self.assertNotEqual(code, 0, "publisher accepted an incomplete repository-wide CI history")
+                self.assertNotIn("accepted", files)
 
     def test_ci_catalog_duplicate_rejection_is_not_errexit_dependent(self) -> None:
         pages = self.malformed_catalogs()["duplicate unrelated run IDs"]
@@ -472,7 +628,7 @@ class DefinitionTests(unittest.TestCase):
             with self.subTest(helper=helper):
                 self.assertNotEqual(self.run_catalog(helper, pages, conditional=False)[0], 0)
 
-    def test_ci_catalog_accepts_valid_and_fallback_pages(self) -> None:
+    def test_ci_catalog_accepts_complete_pages_and_refuses_listing_ceiling(self) -> None:
         good = self.ci_run_fixture()
         page = {"body": {"total_count": 1, "workflow_runs": [good]}}
         full_page = [self.ci_run_fixture(index) for index in range(1, 101)]
@@ -484,13 +640,19 @@ class DefinitionTests(unittest.TestCase):
             for label, pages in (
                 ("one page", [page]),
                 ("two pages", two_pages),
-                ("filtered catalog limit fallback", [{"body": {"total_count": 1000}}, page]),
                 ("empty catalog", [{"body": {"total_count": 0, "workflow_runs": []}}]),
             ):
                 with self.subTest(helper=helper, label=label):
                     code, error, files = self.run_catalog(helper, pages)
                     self.assertEqual(code, 0, error)
                     self.assertIn("accepted", files)
+            for count in (1000, 1001):
+                with self.subTest(helper=helper, total_count=count):
+                    code, _, files = self.run_catalog(helper, [{"generated_total": count}])
+                    self.assertNotEqual(code, 0, "the listing ceiling must not trigger an accepting fallback")
+                    self.assertNotIn("accepted", files)
+                    self.assertNotIn("catalog-workflow-2", files)
+                    self.assertNotIn("catalog-repository-1", files)
 
     def test_publisher_does_not_accept_ambiguous_ci_catalog(self) -> None:
         good = self.ci_run_fixture()
@@ -501,6 +663,7 @@ class DefinitionTests(unittest.TestCase):
             ("duplicate unrelated IDs", duplicate, False),
             ("duplicate stability scan", (valid + duplicate) * 3, False),
             ("retry after rejected catalog", duplicate + valid, True),
+            ("listing ceiling", [{"generated_total": 1000}], False),
         ):
             with self.subTest(label=label):
                 code, error, files = self.run_shell(
@@ -519,6 +682,7 @@ class DefinitionTests(unittest.TestCase):
             ("valid", valid, True),
             ("duplicate", duplicate, False),
             ("retry after rejected catalog", duplicate + valid, True),
+            ("listing ceiling cannot be retried", [{"generated_total": 1000}, *valid], False),
         ):
             with self.subTest(label=label):
                 code, error, files = self.run_shell(
@@ -529,29 +693,41 @@ class DefinitionTests(unittest.TestCase):
                 self.assertEqual(code == 0, accepted, error)
                 self.assertEqual("accepted" in files, accepted)
 
-    def test_bad_ci_still_requests_all_five_revocations(self) -> None:
+    def test_bad_ci_requests_only_dedicated_evidence_head_revocation(self) -> None:
         for conclusion in ("failure", "cancelled", "timed_out", "older failed attempt"):
             with self.subTest(conclusion=conclusion):
                 run = dict(self.ci_run_fixture(), conclusion=conclusion)
                 if conclusion == "older failed attempt":
                     run.update(conclusion="success", run_attempt=2)
                 env = self.catalog_environment([{"body": {"total_count": 1, "workflow_runs": [run]}}], run)
-                env.update({"installation_token": "fixture-token", "SECURITY_APP_ID": "77", "EXTERNAL_ID": "fixture-binding"})
+                env.update({"installation_token": "fixture-token", "SECURITY_APP_ID": "42", "EXTERNAL_ID": EXTERNAL_ID, "COMMITTED_EVIDENCE_SHA": OTHER})
                 if conclusion == "older failed attempt":
                     env["MOCK_ATTEMPTS"] = json.dumps({
                         "1": dict(self.ci_run_fixture(), conclusion="failure"), "2": run,
                     })
                 # Check reconciliation requests; real check writes remain a hosted boundary.
-                normalizer = 'normalize_bad_ci_namespace() { printf "%s\\n" "$4" >> normalized; }\n'
-                code, error, files = self.run_shell(
-                    CI_CATALOG_API + self.reconcile + "\n" + normalizer
-                    + 'reconcile_bad_ci\ntest "$bad_ci_observed" = true\n'
-                    + 'test "$(sort -u normalized | wc -l)" = 5\n'
-                    + 'test "$bad_ci_create_missing" = false\nprintf revoked > revoked\n',
-                    env,
+                normalizer = 'normalize_bad_ci_namespace() { jq -cn --args \'$ARGS.positional\' "$@" >> normalized; }\n'
+                env["EXPECTED_NORMALIZATION"] = json.dumps(
+                    ["fixture-token", "42", "chio-security-authority", "Security contract", f"chio:v3:deny:{EVIDENCE}"],
+                    separators=(",", ":"),
                 )
-                self.assertEqual(code, 0, error)
-                self.assertIn("revoked", files)
+                for committed, merged, create_missing in ((OTHER, False, "false"), (EVIDENCE, False, "true"), (EVIDENCE, True, "false")):
+                    with self.subTest(committed=committed, merged=merged):
+                        env.update({
+                            "COMMITTED_EVIDENCE_SHA": committed,
+                            "MOCK_PR": json.dumps({"merged": merged, "head": {"sha": EVIDENCE}}),
+                            "EXPECTED_CREATE_MISSING": create_missing,
+                        })
+                        code, error, files = self.run_shell(
+                            CI_CATALOG_API + self.reconcile + "\n" + normalizer
+                            + 'reconcile_bad_ci\ntest "$bad_ci_observed" = true\n'
+                            + 'test "$(wc -l < normalized)" = 1\n'
+                            + 'test "$(cat normalized)" = "${EXPECTED_NORMALIZATION}"\n'
+                            + 'test "$bad_ci_create_missing" = "${EXPECTED_CREATE_MISSING}"\nprintf revoked > revoked\n',
+                            env,
+                        )
+                        self.assertEqual(code, 0, error)
+                        self.assertIn("revoked", files)
 
 
 if __name__ == "__main__":
