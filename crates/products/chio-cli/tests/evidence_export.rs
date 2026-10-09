@@ -831,8 +831,10 @@ fn evidence_export_supports_remote_trust_control_with_federation_policy() {
         return;
     }
 
-    let dir = unique_path("evidence-export-remote", "");
-    std::fs::create_dir_all(&dir).expect("create temp dir");
+    // The trust service refuses an authority database whose directory is not
+    // private to its owner, whatever the test runner's umask.
+    let temp = chio_test_support::private_tempdir().expect("create private temp dir");
+    let dir = temp.path().to_path_buf();
     let receipt_db_path = dir.join("receipts.sqlite3");
     let revocation_db_path = dir.join("revocations.sqlite3");
     let authority_db_path = dir.join("authority.sqlite3");
