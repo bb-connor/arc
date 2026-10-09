@@ -1,6 +1,6 @@
 # C3: Portable programs and executable composition
 
-Status: proposed contract, revision 4. Parent: [Computer proposal](PROPOSAL.md).
+Status: proposed contract, revision 5. Parent: [Computer proposal](PROPOSAL.md).
 
 ## Purpose and owner
 
