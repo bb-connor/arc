@@ -75,6 +75,12 @@ impl CertificationRegistry {
     /// Loads the registry at `path` under its writer lock, applies `change`,
     /// and persists the result, keeping room for every entry to be revoked,
     /// before the lock is released. This is the registry's only writer.
+    ///
+    /// `change` receives the registry freshly loaded under the lock and must
+    /// change it in place. Replacing it with a different or earlier value
+    /// would persist that value and defeat the single-writer guarantee, so
+    /// callers are trusted to only mutate the loaded registry, as the
+    /// trust-control handlers and CLI commands do.
     pub(crate) fn update<R>(
         path: &Path,
         change: impl FnOnce(&mut Self) -> Result<R, CliError>,
