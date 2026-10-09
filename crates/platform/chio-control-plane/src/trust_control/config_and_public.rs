@@ -11,13 +11,11 @@ pub(crate) use generic_listing::{
     build_public_generic_listing_report, build_signed_generic_namespace,
     public_generic_registry_publisher,
 };
+use public_authority_read::resolve_public_authority_signing_key;
 pub(crate) use public_authority_read::{
     public_authority_status, public_authority_verification_status,
     public_passport_credential_issuer, public_replicated_authority_verification_status,
-    resolve_public_oid4vp_verifier_trusted_public_keys,
-};
-use public_authority_read::{
-    resolve_public_authority_signing_key, resolve_public_registry_signing_key,
+    resolve_public_oid4vp_verifier_trusted_public_keys, resolve_public_registry_signing_key,
 };
 
 #[derive(Debug, Serialize, Deserialize)]
