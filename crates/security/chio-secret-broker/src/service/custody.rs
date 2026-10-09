@@ -21,7 +21,6 @@ struct RetainedPreparedDispatch {
     revocation_set: CanonicalBrokerRevocationSet,
 }
 
-#[cfg_attr(not(test), expect(dead_code))]
 pub(super) mod dispatch_claim;
 mod execution;
 mod registration;

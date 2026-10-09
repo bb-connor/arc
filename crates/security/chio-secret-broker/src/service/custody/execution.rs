@@ -1,14 +1,21 @@
 use super::super::{
     broker_request_digest, capability_digest, credential_reference_hash, derive_attempt_ids,
-    derive_attempt_ids_for_operation, execution_failure_after_capture_release,
-    prepared_dispatch_id, receipt_digest, response_digest, sign_execution_receipt,
-    validate_identifier, validate_revocation_snapshot, verify_execution_receipt, AttemptState,
-    AttemptTransitionEvidence, BrokerDispatchKnowledge, BrokerError, BrokerExecuteFailure,
-    BrokerExecuteOutcome, BrokerExecuteRequest, BrokerExecuteResponse, BrokerExecutionEvidence,
-    BrokerExecutionOutcome, BrokerFailureOutcome, BrokerFailureStage, BrokerReceiptBody,
-    BrokerRevocationRequest, BrokerService, CaptureExecutionHoldRequest, ExecutionFailure,
-    ExecutionHoldState, ExecutionResult, FailureOrigin, FailureProjection, HttpsDispatchFailure,
-    Result, TrustedExecutionContext, BROKER_EVIDENCE_SCHEMA, BROKER_RECEIPT_SCHEMA,
+    derive_attempt_ids_for_operation, prepared_dispatch_id, receipt_digest, response_digest,
+    sign_execution_receipt, validate_identifier, validate_revocation_snapshot,
+    verify_execution_receipt, AttemptState, AttemptTransitionEvidence, BrokerDispatchKnowledge,
+    BrokerError, BrokerExecuteFailure, BrokerExecuteOutcome, BrokerExecuteRequest,
+    BrokerExecuteResponse, BrokerExecutionEvidence, BrokerExecutionOutcome, BrokerFailureOutcome,
+    BrokerFailureStage, BrokerReceiptBody, BrokerRevocationRequest, BrokerService,
+    CaptureExecutionHoldRequest, ExecutionFailure, ExecutionHoldState, ExecutionResult,
+    FailureOrigin, FailureProjection, HttpsDispatchFailure, Result, TrustedExecutionContext,
+    BROKER_EVIDENCE_SCHEMA, BROKER_RECEIPT_SCHEMA,
+};
+use super::dispatch_claim::ClaimedCapture;
+
+const RESPONSE_FAILED: FailureProjection = FailureProjection {
+    stage: BrokerFailureStage::Response,
+    outcome: BrokerFailureOutcome::Failed,
+    dispatch_knowledge: BrokerDispatchKnowledge::Committed,
 };
 
 enum ProjectedExecuteOutcome {
@@ -426,17 +433,13 @@ impl BrokerService {
             }
         }
         self.require_migrations_enforced(request)?;
-        let dispatch_claim_id = self.next_dispatch_claim_id()?;
-        if !self.attempts.claim_captured_attempt(
+        let claimed = ClaimedCapture::claim(
+            self.attempts.as_ref(),
             &ids.attempt_id,
-            &dispatch_claim_id,
+            self.next_dispatch_claim_id()?,
+            capture_evidence.clone(),
             now_unix_seconds,
-        )? {
-            return Err(BrokerError::Conflict(
-                "captured broker attempt is already owned by another execution path".to_string(),
-            )
-            .into());
-        }
+        )?;
 
         let second_revocation = (|| {
             let observed = self.authority_observation_time(now_unix_seconds)?;
@@ -457,84 +460,37 @@ impl BrokerService {
             )
         })();
         if let Err(error) = second_revocation {
-            let released = self.attempts.release_captured_attempt_claim(
-                &ids.attempt_id,
-                &dispatch_claim_id,
-                now_unix_seconds,
-            );
-            return Err(execution_failure_after_capture_release(error, released));
+            return Err(claimed.refuse(error));
         }
 
         if let Err(error) = self.require_migrations_enforced(request) {
-            let released = self.attempts.release_captured_attempt_claim(
-                &ids.attempt_id,
-                &dispatch_claim_id,
-                now_unix_seconds,
-            );
-            return Err(execution_failure_after_capture_release(error, released));
+            return Err(claimed.refuse(error));
         }
         let boundary_commit = match self.budget.capture_execution_hold(&capture_request) {
             Ok(ExecutionHoldState::Captured(commit)) => commit,
             Ok(_) | Err(_) => {
-                let released = self.attempts.release_captured_attempt_claim(
-                    &ids.attempt_id,
-                    &dispatch_claim_id,
-                    now_unix_seconds,
-                );
-                return Err(execution_failure_after_capture_release(
-                    BrokerError::AuthorityUnavailable(
-                        "kernel dispatch commitment is unavailable at the network boundary"
-                            .to_string(),
-                    ),
-                    released,
-                ));
+                return Err(claimed.refuse(BrokerError::AuthorityUnavailable(
+                    "kernel dispatch commitment is unavailable at the network boundary".to_string(),
+                )));
             }
         };
         if boundary_commit != commit {
-            let released = self.attempts.release_captured_attempt_claim(
-                &ids.attempt_id,
-                &dispatch_claim_id,
-                now_unix_seconds,
-            );
-            return Err(execution_failure_after_capture_release(
-                BrokerError::Invariant(
-                    "kernel capture evidence changed before network dispatch".to_string(),
-                ),
-                released,
-            ));
+            return Err(claimed.refuse(BrokerError::Invariant(
+                "kernel capture evidence changed before network dispatch".to_string(),
+            )));
         }
         if let Err(error) = self.require_migrations_enforced(request) {
-            let released = self.attempts.release_captured_attempt_claim(
-                &ids.attempt_id,
-                &dispatch_claim_id,
-                now_unix_seconds,
-            );
-            return Err(execution_failure_after_capture_release(error, released));
+            return Err(claimed.refuse(error));
         }
         let retained = match self.retained_prepared_dispatches() {
             Ok(mut retained) => retained.remove(&ids.operation_id),
-            Err(error) => {
-                let released = self.attempts.release_captured_attempt_claim(
-                    &ids.attempt_id,
-                    &dispatch_claim_id,
-                    now_unix_seconds,
-                );
-                return Err(execution_failure_after_capture_release(error, released));
-            }
+            Err(error) => return Err(claimed.refuse(error)),
         };
         let Some(retained) = retained else {
-            let released = self.attempts.release_captured_attempt_claim(
-                &ids.attempt_id,
-                &dispatch_claim_id,
-                now_unix_seconds,
-            );
-            return Err(execution_failure_after_capture_release(
-                BrokerError::AuthorityUnavailable(
-                    "retained prepared broker operation disappeared at the network boundary"
-                        .to_string(),
-                ),
-                released,
-            ));
+            return Err(claimed.refuse(BrokerError::AuthorityUnavailable(
+                "retained prepared broker operation disappeared at the network boundary"
+                    .to_string(),
+            )));
         };
         if retained.operation_id != ids.operation_id
             || retained.attempt_id != ids.attempt_id
@@ -542,28 +498,14 @@ impl BrokerService {
             || retained.request_canonical_digest != registration.request_canonical_digest
             || retained.revocation_set != revocation_set
         {
-            let released = self.attempts.release_captured_attempt_claim(
-                &ids.attempt_id,
-                &dispatch_claim_id,
-                now_unix_seconds,
-            );
-            return Err(execution_failure_after_capture_release(
-                BrokerError::Invariant(
-                    "retained prepared broker operation changed before dispatch".to_string(),
-                ),
-                released,
-            ));
+            return Err(claimed.refuse(BrokerError::Invariant(
+                "retained prepared broker operation changed before dispatch".to_string(),
+            )));
         }
         if let Err(error) = self.require_migrations_enforced(request) {
-            let released = self.attempts.release_captured_attempt_claim(
-                &ids.attempt_id,
-                &dispatch_claim_id,
-                now_unix_seconds,
-            );
-            return Err(execution_failure_after_capture_release(error, released));
+            return Err(claimed.refuse(error));
         }
-        let mut commit_started = false;
-        let dispatch_commit = (|| {
+        let committed = claimed.commit(|commit_point| {
             // Capture can block on remote authority. Its historical witness
             // cannot authorize dispatch after expiry or parent revocation.
             let authority_now = terminal_clock()?.max(now_unix_seconds);
@@ -585,34 +527,10 @@ impl BrokerService {
                     let dispatch_now = terminal_clock()?.max(authority_now);
                     self.validate_request_core(request, dispatch_now)?;
                     self.require_migrations_enforced(request)?;
-                    commit_started = true;
-                    self.attempts.commit_captured_attempt_dispatch(
-                        &ids.attempt_id,
-                        &dispatch_claim_id,
-                        &capture_evidence,
-                        dispatch_now,
-                    )
+                    commit_point.commit(dispatch_now)
                 },
             )
-        })();
-        if let Err(error) = dispatch_commit {
-            if !commit_started {
-                let released = self.attempts.release_captured_attempt_claim(
-                    &ids.attempt_id,
-                    &dispatch_claim_id,
-                    now_unix_seconds,
-                );
-                return Err(execution_failure_after_capture_release(error, released));
-            }
-            let _ = self.attempts.transition(
-                &ids.attempt_id,
-                AttemptState::Captured,
-                AttemptState::UnknownOutcome,
-                &capture_evidence,
-                now_unix_seconds,
-            );
-            return Err(error.into());
-        }
+        })?;
 
         let (status, headers, body) = match self.https.dispatch_evidenced(
             retained.dispatch,
@@ -656,106 +574,87 @@ impl BrokerService {
             }
         };
         drop(retained.credential);
-        let terminal_unix_seconds = terminal_clock()
-            .map(|terminal| terminal.max(now_unix_seconds))
-            .map_err(|error| {
-                ExecutionFailure::at(
-                    error,
-                    FailureProjection {
-                        stage: BrokerFailureStage::Response,
-                        outcome: BrokerFailureOutcome::Failed,
-                        dispatch_knowledge: BrokerDispatchKnowledge::Committed,
-                    },
-                )
-            })?;
-        let (response, response_body_sha256, expected_receipt_reference) =
-            (|| -> Result<(BrokerExecuteResponse, String, String)> {
-                let response_body_sha256 = response_digest(&body);
-                let evidence = BrokerExecutionEvidence {
-                    schema: BROKER_EVIDENCE_SCHEMA.to_string(),
-                    attempt_id: ids.attempt_id.clone(),
-                    invocation_id: request.invocation_id.clone(),
-                    hold_id: ids.hold_id.clone(),
-                    request_digest,
-                    capability_digest,
-                    revocation_set_digest: commit.checked_revocation_set_digest,
-                    budget_commit_index: commit.budget_commit_index,
-                    revocation_commit_index: commit.revocation_commit_index,
-                    authority_commit_index: commit.authority_commit_index,
-                    leader_epoch: commit.leader_epoch,
-                    upstream_status: status,
-                    response_body_sha256: response_body_sha256.clone(),
-                    response_headers_sha256: crate::generic_https::response_header_digest(
-                        &headers,
+        let terminal_unix_seconds = match terminal_clock() {
+            Ok(terminal) => terminal.max(now_unix_seconds),
+            Err(error) => return Err(committed.fail_committed(error, RESPONSE_FAILED)),
+        };
+        let built = (|| -> Result<(BrokerExecuteResponse, String, String)> {
+            let response_body_sha256 = response_digest(&body);
+            let evidence = BrokerExecutionEvidence {
+                schema: BROKER_EVIDENCE_SCHEMA.to_string(),
+                attempt_id: ids.attempt_id.clone(),
+                invocation_id: request.invocation_id.clone(),
+                hold_id: ids.hold_id.clone(),
+                request_digest,
+                capability_digest,
+                revocation_set_digest: commit.checked_revocation_set_digest,
+                budget_commit_index: commit.budget_commit_index,
+                revocation_commit_index: commit.revocation_commit_index,
+                authority_commit_index: commit.authority_commit_index,
+                leader_epoch: commit.leader_epoch,
+                upstream_status: status,
+                response_body_sha256: response_body_sha256.clone(),
+                response_headers_sha256: crate::generic_https::response_header_digest(&headers)?,
+            };
+            let receipt_id = format!("broker-receipt-{}", ids.attempt_id);
+            let receipt = sign_execution_receipt(
+                BrokerReceiptBody {
+                    schema: BROKER_RECEIPT_SCHEMA.to_string(),
+                    receipt_id,
+                    issued_at_unix_seconds: terminal_unix_seconds,
+                    evidence: evidence.clone(),
+                    operation_id: ids.operation_id.clone(),
+                    authorize_event_id: ids.authorize_event_id.clone(),
+                    capture_event_id: ids.capture_event_id.clone(),
+                    parent_capability_id: request.capability.body.parent_capability_id.clone(),
+                    broker_capability_id: request.capability.body.capability_id.clone(),
+                    subject: request.capability.body.subject.clone(),
+                    credential_reference_hash: credential_reference_hash(
+                        &request.capability.body.credential,
                     )?,
-                };
-                let receipt_id = format!("broker-receipt-{}", ids.attempt_id);
-                let receipt = sign_execution_receipt(
-                    BrokerReceiptBody {
-                        schema: BROKER_RECEIPT_SCHEMA.to_string(),
-                        receipt_id,
-                        issued_at_unix_seconds: terminal_unix_seconds,
-                        evidence: evidence.clone(),
-                        operation_id: ids.operation_id.clone(),
-                        authorize_event_id: ids.authorize_event_id.clone(),
-                        capture_event_id: ids.capture_event_id.clone(),
-                        parent_capability_id: request.capability.body.parent_capability_id.clone(),
-                        broker_capability_id: request.capability.body.capability_id.clone(),
-                        subject: request.capability.body.subject.clone(),
-                        credential_reference_hash: credential_reference_hash(
-                            &request.capability.body.credential,
-                        )?,
-                        credential_version: request.capability.body.credential.version,
-                        normalized_destination: request.request.destination.clone(),
-                        request_body_sha256: request.proof.body.body_sha256.clone(),
-                        caller_headers_sha256: request.proof.body.caller_headers_sha256.clone(),
-                        caller_options_sha256: request.proof.body.caller_options_sha256.clone(),
-                        quotas: trusted.quotas.clone(),
-                        broker_quota_key_id: request.capability.body.broker_quota_key_id.clone(),
-                        provider_adapter_id: request.capability.body.provider_adapter_id.clone(),
-                        provider_adapter_version: request.capability.body.provider_adapter_version,
-                        request_body_bytes: u64::try_from(request.request.body.len()).map_err(
-                            |_| {
-                                BrokerError::Invariant(
-                                    "request body length does not fit u64".to_string(),
-                                )
-                            },
-                        )?,
-                        response_body_bytes: u64::try_from(body.len()).map_err(|_| {
+                    credential_version: request.capability.body.credential.version,
+                    normalized_destination: request.request.destination.clone(),
+                    request_body_sha256: request.proof.body.body_sha256.clone(),
+                    caller_headers_sha256: request.proof.body.caller_headers_sha256.clone(),
+                    caller_options_sha256: request.proof.body.caller_options_sha256.clone(),
+                    quotas: trusted.quotas.clone(),
+                    broker_quota_key_id: request.capability.body.broker_quota_key_id.clone(),
+                    provider_adapter_id: request.capability.body.provider_adapter_id.clone(),
+                    provider_adapter_version: request.capability.body.provider_adapter_version,
+                    request_body_bytes: u64::try_from(request.request.body.len()).map_err(
+                        |_| {
                             BrokerError::Invariant(
-                                "response body length does not fit u64".to_string(),
+                                "request body length does not fit u64".to_string(),
                             )
-                        })?,
-                        source_receipt_ids: trusted.source_receipt_ids.clone(),
-                        outcome: BrokerExecutionOutcome::Completed,
-                    },
-                    self.receipt_signer.as_ref(),
-                )?;
-                let expected_receipt_reference =
-                    format!("broker-receipt-sha256-{}", receipt_digest(&receipt)?);
-                Ok((
-                    BrokerExecuteResponse {
-                        status,
-                        headers,
-                        body,
-                        evidence,
-                        receipt_reference: expected_receipt_reference.clone(),
-                        receipt,
-                    },
-                    response_body_sha256,
-                    expected_receipt_reference,
-                ))
-            })()
-            .map_err(|error| {
-                ExecutionFailure::at(
-                    error,
-                    FailureProjection {
-                        stage: BrokerFailureStage::Response,
-                        outcome: BrokerFailureOutcome::Failed,
-                        dispatch_knowledge: BrokerDispatchKnowledge::Committed,
-                    },
-                )
-            })?;
+                        },
+                    )?,
+                    response_body_bytes: u64::try_from(body.len()).map_err(|_| {
+                        BrokerError::Invariant("response body length does not fit u64".to_string())
+                    })?,
+                    source_receipt_ids: trusted.source_receipt_ids.clone(),
+                    outcome: BrokerExecutionOutcome::Completed,
+                },
+                self.receipt_signer.as_ref(),
+            )?;
+            let expected_receipt_reference =
+                format!("broker-receipt-sha256-{}", receipt_digest(&receipt)?);
+            Ok((
+                BrokerExecuteResponse {
+                    status,
+                    headers,
+                    body,
+                    evidence,
+                    receipt_reference: expected_receipt_reference.clone(),
+                    receipt,
+                },
+                response_body_sha256,
+                expected_receipt_reference,
+            ))
+        })();
+        let (response, response_body_sha256, expected_receipt_reference) = match built {
+            Ok(built) => built,
+            Err(error) => return Err(committed.fail_committed(error, RESPONSE_FAILED)),
+        };
         let receipt_reference = match self.receipt_sink.persist_completed(&response) {
             Ok(reference) => reference,
             Err(error) => {
@@ -812,17 +711,7 @@ impl BrokerService {
                 },
             ));
         }
-        let completion = AttemptTransitionEvidence {
-            response_digest: Some(response_body_sha256),
-            ..capture_evidence
-        };
-        self.attempts.transition(
-            &ids.attempt_id,
-            AttemptState::DispatchCommitted,
-            AttemptState::Completed,
-            &completion,
-            terminal_unix_seconds,
-        )?;
+        committed.complete(response_body_sha256, terminal_unix_seconds)?;
         Ok(response)
     }
 

@@ -1090,3 +1090,52 @@ fn a_panicking_compensation_stays_inside_drop_even_while_unwinding() {
         "a failed unknown mark leaves the commit for exact replay"
     );
 }
+
+#[test]
+fn an_unwinding_execution_settles_the_claim_by_its_commit_stage() {
+    for (name, unwinding_read, state, dispatches) in [
+        (
+            "unwind before dispatch authorization",
+            1,
+            AttemptState::Captured,
+            0,
+        ),
+        (
+            "unwind inside dispatch authorization before the commit",
+            2,
+            AttemptState::Captured,
+            0,
+        ),
+        (
+            "unwind after the dispatch",
+            3,
+            AttemptState::UnknownOutcome,
+            1,
+        ),
+    ] {
+        let fixture = fixture(1, false, false);
+        let (request, trusted, ids, evidence) = captured_execution(&fixture, 370 + unwinding_read);
+        let clock_reads = std::cell::Cell::new(0_usize);
+        let terminal_clock = || {
+            clock_reads.set(clock_reads.get() + 1);
+            if clock_reads.get() == unwinding_read {
+                panic!("request worker unwound");
+            }
+            Ok(TERMINAL)
+        };
+
+        expect_unwind(
+            || {
+                drop(
+                    fixture
+                        .service
+                        .execute_inner(&request, &trusted, NOW, &terminal_clock),
+                )
+            },
+            "request worker unwound",
+        );
+
+        assert_settled(name, &fixture, &ids, &evidence, state, NOW);
+        assert_eq!(dispatch_count(&fixture), dispatches, "{name}");
+    }
+}
