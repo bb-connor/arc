@@ -159,27 +159,42 @@ fn signed_receipt(
 ) -> Built<ChioReceipt> {
     signed_receipt_for_server(
         kernel,
+        ServerReceiptSpec {
+            timestamp,
+            tool_server: "finding-server",
+            tool_name,
+            action,
+            decision,
+            content_hash,
+            metadata,
+        },
+    )
+}
+
+/// Parameters of `signed_receipt_for_server`.
+struct ServerReceiptSpec<'a> {
+    timestamp: u64,
+    tool_server: &'a str,
+    tool_name: &'a str,
+    action: ToolCallAction,
+    decision: Decision,
+    content_hash: &'a str,
+    metadata: Option<serde_json::Value>,
+}
+
+fn signed_receipt_for_server(
+    kernel: &Keypair,
+    params: ServerReceiptSpec<'_>,
+) -> Built<ChioReceipt> {
+    let ServerReceiptSpec {
         timestamp,
-        "finding-server",
+        tool_server,
         tool_name,
         action,
         decision,
         content_hash,
         metadata,
-    )
-}
-
-#[allow(clippy::too_many_arguments)]
-fn signed_receipt_for_server(
-    kernel: &Keypair,
-    timestamp: u64,
-    tool_server: &str,
-    tool_name: &str,
-    action: ToolCallAction,
-    decision: Decision,
-    content_hash: &str,
-    metadata: Option<serde_json::Value>,
-) -> Built<ChioReceipt> {
+    } = params;
     let body = ChioReceiptBody {
         id: String::new(),
         timestamp,
@@ -1895,19 +1910,21 @@ pub fn replay_case(world: &World, shape: &ReplayShape) -> Built<ReplayCase> {
         }
         let receipt = signed_receipt_for_server(
             &kernel,
-            1_746_000_000 + index as u64,
-            shape
-                .receipt_tool_server
-                .as_deref()
-                .unwrap_or(&world.recipe.runner_server),
-            shape
-                .receipt_tool_name
-                .as_deref()
-                .unwrap_or(&world.recipe.runner_tool),
-            action,
-            shape.decision.clone(),
-            &content_hash,
-            None,
+            ServerReceiptSpec {
+                timestamp: 1_746_000_000 + index as u64,
+                tool_server: shape
+                    .receipt_tool_server
+                    .as_deref()
+                    .unwrap_or(&world.recipe.runner_server),
+                tool_name: shape
+                    .receipt_tool_name
+                    .as_deref()
+                    .unwrap_or(&world.recipe.runner_tool),
+                action,
+                decision: shape.decision.clone(),
+                content_hash: &content_hash,
+                metadata: None,
+            },
         )?;
         leaves.push(canonical_json_bytes(&receipt)?);
         receipts.push(receipt);
