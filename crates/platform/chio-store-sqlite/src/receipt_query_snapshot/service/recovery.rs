@@ -2,9 +2,10 @@
 //! service can raise it or request a retry; public queries never allocate an
 //! increased quota or shorten a backoff.
 //!
-//! A retry request is answered by the walker's next rebuild attempt. It ends a
-//! resource backoff in progress, never shortens an integrity backoff, and is
-//! satisfied without a rebuild by a projection that publishes or is serving.
+//! A retry request is answered by the walker's next rebuild attempt. Without a
+//! quota increase it ends only a resource backoff; an explicit quota increase
+//! can wake either backoff. A projection that publishes or is already serving
+//! satisfies the request without another rebuild.
 //! Every rebuild authenticates what it publishes; a retry changes when the
 //! walker tries, never what it accepts.
 use super::*;
@@ -16,7 +17,8 @@ pub enum ReceiptQuerySnapshotRecovery {
     /// rebuild is scheduled.
     Serving,
     /// The walker's next rebuild attempt answers retry request `epoch`. A
-    /// resource backoff in progress ends now; an integrity backoff runs out.
+    /// resource backoff in progress ends now. An integrity backoff runs out
+    /// unless the operator also raises the quota.
     Scheduled { epoch: u64 },
 }
 

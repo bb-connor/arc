@@ -9,6 +9,32 @@ schedule. Every answer names the snapshot version it came from. See
 [Authenticated Query Snapshots](#authenticated-query-snapshots) for the as-of
 semantics, freshness rules, typed errors and limits.
 
+## Operator recovery
+
+`POST /v1/receipts/query/snapshot/recovery` requires the service `Bearer` token.
+Authentication runs before the body is read; tenant read tokens cannot invoke it.
+Send strict JSON of at most 256 bytes with `Content-Type: application/json`:
+
+```json
+{"quotaBytes": 4294967296}
+```
+
+Use `{}` to retry with the existing quota. A quota must be at least 1 MiB and
+cannot decrease the current runtime budget. The request acts on the addressed
+node, without forwarding to the cluster leader.
+
+A `202` response reports `recovery: "scheduled"`, `retryEpoch`, `quotaBytes`, and
+`quotaPersisted: false`. It acknowledges scheduling; receipt reads can still
+return unavailable while recovery runs. A healthy projection returns `200` with
+`recovery: "serving"` and is not rebuilt. A retry alone ends resource backoff;
+an explicit quota increase can also wake integrity backoff, but every rebuilt
+snapshot must pass the same integrity checks.
+
+Runtime increases do not survive restart. Change
+`--receipt-query-snapshot-quota-bytes` in the deployment to retain the new budget.
+Decreases return `409`, a quota below 1 MiB returns `400`, and a stopped service
+returns `503`. An unconfigured service returns `409`.
+
 ## HTTP Endpoint
 
 ```

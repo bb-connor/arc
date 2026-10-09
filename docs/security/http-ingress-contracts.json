@@ -1,7 +1,7 @@
 {
   "version": 1,
   "scope": "Framework request extraction, transport response decoding, non-JSON formats, and resolved shared-reader call sites. This supplements the direct serde census and never changes its raw-input baseline.",
-  "control_reader_sha256": "7b4c304fe30b5ba31b74164a6c3ca3d8e6efa44ff8e4a45ed077030b57f8d3e2",
+  "control_reader_sha256": "0b6400aff59ab1e097c1216a02ee103734b2197fc6054c124fe0d6cfccedcd7c",
   "requests": [
     {
       "source": "crates/platform/chio-control-plane/src/trust_control/authority_handlers.rs",
@@ -1488,6 +1488,20 @@
       "authentication": "Existing OAuth session, authorization-code, PKCE and client validation",
       "semantics": "OAuth URL-encoded authorization approval or token exchange uses the typed form schema and OAuth state, redirect, code and client validation.",
       "remaining_risk": "Form decoding has its own duplicate/encoding semantics. This census records the boundary but does not qualify URL-encoded ambiguity or OAuth protocol behavior."
+    },
+    {
+      "authentication": "Before body reads, json_ingress::authenticate calls validate_service_auth (the default Service arm). The handler repeats validate_service_auth after typed extraction before any quota or retry change. Tenant read tokens and missing, forged or non-Bearer credentials receive 401 without the body being polled.",
+      "disposition": "bounded-signed-json",
+      "format": "json",
+      "max_bytes": 256,
+      "method": "POST",
+      "owner": "handle_receipt_query_snapshot_recovery",
+      "reader": "signed",
+      "request_type": "ReceiptQuerySnapshotRecoveryRequest",
+      "route": "RECEIPT_QUERY_SNAPSHOT_RECOVERY_PATH",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "semantics": "A node-local service-token request optionally raises the runtime snapshot quota without lowering it and schedules recovery. It is never forwarded. A quota increase is lost on restart and can wake either backoff; a retry without an increase wakes only resource backoff. Every rebuilt snapshot still authenticates its contents.",
+      "source": "crates/platform/chio-control-plane/src/trust_control/receipt_snapshot_admin.rs"
     }
   ],
   "other_input_files": {
@@ -1641,7 +1655,7 @@
   "router_compositions": {
     "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs": {
       "owner": "build_router",
-      "sha256": "faec7fbcc704e1294c6a9b89cca4d3feb78331df6bea73090f4dacb1f80fbfc6"
+      "sha256": "4305e938c6857af540d2340447302592955362d1219d5a4829adc99d11839b5d"
     },
     "crates/platform/chio-control-plane/src/trust_control/frost/coordinator.rs": {
       "owner": "frost_coordinator_router",

@@ -6,10 +6,11 @@
 //! contract bounds it to 256 bytes and authenticates before reading it. The
 //! request is never forwarded to a leader: each node owns its projection.
 //!
-//! Quotas never grow on their own and a decrease is refused. A retry ends a
-//! resource backoff, never an integrity backoff, and a serving projection is
-//! not rebuilt. Every rebuild authenticates what it publishes. The response
-//! acknowledges what was scheduled, not that a rebuild succeeded.
+//! Quotas never grow on their own and a decrease is refused. With no quota
+//! increase a retry ends only a resource backoff; an explicit increase can wake
+//! either backoff. A serving projection is not rebuilt. Every rebuild
+//! authenticates what it publishes. The response acknowledges what was
+//! scheduled, not that a rebuild succeeded.
 //!
 //! A raised quota is runtime-only: it is lost on restart, which applies the
 //! configured `--receipt-query-snapshot-quota-bytes` again. Change that setting

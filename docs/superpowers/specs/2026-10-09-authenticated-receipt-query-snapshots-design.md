@@ -245,11 +245,18 @@ process's custody. If `/tmp` is a `tmpfs`, the file occupies system memory.
   whole pages and capped at SQLite's maximum page count; `status()` reports the
   applied value. How many receipts fit is an estimate that depends on value
   lengths (10).
-  Embedded service owners may call `ReceiptQuerySnapshots::increase_quota_bytes`
-  to request a larger budget without restarting. The walker applies the increase
-  to the owned database or its next rebuild, and the request wakes resource
-  backoff. Decreases are refused. This owner API is not exposed to receipt-read
-  callers; CLI deployments continue to set their explicit startup budget.
+  Embedded service owners may call `ReceiptQuerySnapshots::request_recovery`
+  with an optional larger quota. The deployed node exposes the same operation at
+  `POST /v1/receipts/query/snapshot/recovery`, using service-token authentication
+  before its strict 256-byte JSON body is read. Tenant read tokens are refused.
+  `{}` requests a retry; `{"quotaBytes": N}` also raises the runtime quota.
+  Decreases are refused, and a healthy projection is not rebuilt. The response
+  reports `scheduled` with a retry epoch (202) or `serving` (200), not completed
+  recovery. Requests act only on the addressed node and are never forwarded.
+  An unchanged-quota retry wakes only resource backoff; an explicit increase
+  can wake either backoff. Every rebuild retains all authentication checks.
+  Runtime increases are lost on restart unless the deployment's
+  `--receipt-query-snapshot-quota-bytes` setting is changed too.
 - **What the quota is not.** It bounds snapshot database pages only (the file
   on Linux, process memory elsewhere). It is not a limit on process RSS (10).
 - **SQLite heap outside the page quota.** The page quota does not cap other
@@ -705,10 +712,10 @@ brackets.
     after `min(invalid_retry_backoff, 30 s)`.
   - `capacity` and `row_cap` retry after exponential backoff, starting at
     `min(invalid_retry_backoff, 30 s)` and capped at one hour. Successful
-    publication resets the backoff. An explicit owner call to
-    `increase_quota_bytes` wakes the walker; quotas never grow automatically.
-    The CLI option sets the startup quota. There is no HTTP quota mutation
-    endpoint.
+    publication resets the backoff. An explicit owner recovery request wakes
+    the walker, including a retry with unchanged quota. The node-local HTTP
+    operator route described above exposes this operation to the service token.
+    Quotas never grow automatically; the CLI option sets the startup quota.
 - **`Stopped` (`stopped`).** Entered after cancellation. Reads get 503
   `unavailable`.
 
