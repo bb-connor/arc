@@ -31,7 +31,7 @@ use chio_test_support::prelude::*;
 
 static NEXT_TREE: AtomicU64 = AtomicU64::new(1);
 
-#[path = "support/broker_status.inc"]
+#[path = "support/broker_status.rs"]
 mod broker_status;
 
 fn cage_init_helper() -> PathBuf {
