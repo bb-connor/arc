@@ -1,3 +1,4 @@
+use super::handler::normalize_agent_message;
 use super::*;
 use chio_kernel::ToolCallRequest as KernelToolCallRequest;
 mod failure_receipts;

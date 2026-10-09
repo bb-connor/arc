@@ -27,22 +27,36 @@ mod verify;
 // references (and the `cmd_replay`/`load_trusted_kernel_pubkey` symbols
 // re-exported from `main.rs`) resolve at this module scope. The submodules
 // carry no colliding public item names, so the globs are unambiguous.
-pub(crate) use self::bless::*;
-pub(crate) use self::bless::fixture_layout::*;
-pub(crate) use self::bless::strip::*;
-pub(crate) use self::diff::*;
-pub(crate) use self::execute::*;
-pub(crate) use self::merkle::*;
-pub(crate) use self::ndjson::*;
-pub(crate) use self::policy_ref::*;
-pub(crate) use self::reader::*;
-pub(crate) use self::receipt_partition::*;
-pub(crate) use self::report::*;
-pub(crate) use self::schema_gate::*;
-pub(crate) use self::traffic::*;
-pub(crate) use self::validate::*;
-pub(crate) use self::verdict::*;
-pub(crate) use self::verify::*;
+pub(crate) use self::bless::cmd_replay_bless;
+pub(crate) use self::bless::fixture_layout::{
+    map_replay_fixture_error, validate_replay_bless_into_path,
+};
+pub(crate) use self::bless::strip::require_replay_bless_capability;
+pub(crate) use self::diff::{
+    build_traffic_diff_report, render_traffic_diff_human, render_traffic_diff_json,
+    TrafficReplayDiffReport,
+};
+pub(crate) use self::execute::{
+    run_traffic_replay, ExecuteError, TrafficFrameOutcome, TrafficReplayReport,
+};
+pub(crate) use self::merkle::MerkleAccumulator;
+pub(crate) use self::ndjson::open_ndjson;
+pub(crate) use self::policy_ref::{PolicyRef, PolicyRefError};
+pub(crate) use self::reader::{ReadError, ReceiptLogReader};
+pub(crate) use self::receipt_partition::{PartitionError, ReplayPartition, StorePartition};
+pub(crate) use self::report::{Divergence, DivergenceKind, ReplayReport, exit_code_for, render_json};
+pub(crate) use self::schema_gate::{
+    check_receipt_redaction, check_receipt_schema, ReceiptGateError,
+    SUPPORTED_RECEIPT_REDACTION_PASS_ID, SUPPORTED_RECEIPT_SCHEMA,
+};
+pub(crate) use self::traffic::cmd_replay_traffic;
+pub(crate) use self::traffic::finish_replay_failure;
+pub(crate) use self::validate::{
+    load_tenant_pubkey, load_trusted_kernel_pubkey, validate_frame, EXIT_BAD_TENANT_SIG,
+    EXIT_REDACTION_MISMATCH, EXIT_SCHEMA_MISMATCH,
+};
+pub(crate) use self::verdict::{EXIT_VERDICT_DRIFT, VerdictError, rederive_verdict};
+pub(crate) use self::verify::{EXIT_BAD_SIGNATURE, verify_receipt};
 
 /// Dispatch entry-point for `chio replay`.
 pub(crate) fn cmd_replay(args: &ReplayArgs) -> Result<(), CliError> {

@@ -77,6 +77,8 @@ pub(crate) fn cmd_replay_bless(args: &ReplayArgs, log: &Path) -> Result<(), CliE
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod replay_bless_tests {
     use super::*;
+    use super::strip::{REPLAY_BLESS_CAPABILITY, REPLAY_BLESS_CAPABILITY_ENV};
+    use crate::cli::replay::validate::signing_payload;
     use base64::Engine;
     use chio_tee_frame::{Frame, FrameInputs, Otel, Provenance, Upstream, UpstreamSystem, Verdict};
     use chio_tool_call_fabric::{Principal, ProvenanceStamp, ProviderId, ToolInvocation};

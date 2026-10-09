@@ -90,7 +90,6 @@ use chio_mcp_adapter::server::AdaptedMcpServer;
 
 use crate::policy::load_policy;
 
-#[allow(unused_imports)]
 pub(crate) use cli::types::{
     ApiCommands, ArenaCommands, AuthorityDeploymentCommands, AuthorityStoreCommands, CertCommands,
     CertifyCommands, CertifyRegistryCommands, CheckMode, ChioAttestCommands, ChioBuyerCommands,
@@ -116,11 +115,7 @@ pub(crate) use cli::types::{
     FindingChallengeClassArg, FindingCommands, FindingOperatorCommands, FindingPackageCommands,
 };
 pub(crate) use cli::security_preflight::{cmd_security_preflight, PreflightArgs, PreflightStores};
-#[allow(unused_imports)]
-pub(crate) use cli::doctor::{
-    cmd_doctor, render_doctor_human, render_doctor_json, render_titled_human, write_doctor_report,
-    DoctorArgs,
-};
+pub(crate) use cli::doctor::{cmd_doctor, render_doctor_json, render_titled_human, DoctorArgs};
 pub(crate) use cli::security_supervise::{cmd_security_supervise, SuperviseArgs};
 #[cfg(test)]
 pub(crate) use cli::dispatch::{cmd_chio_attest_runtime_quote_verify, write_cli_error};
@@ -152,25 +147,14 @@ fn main() {
         }
     }
 }
-#[allow(unused_imports)]
 pub(crate) use cli::runtime::{
-    cli_normalized_url_authority, cmd_api_protect, cmd_check, cmd_mcp_serve, cmd_mcp_serve_http,
-    cmd_run, cmd_start, cmd_trust_revoke, cmd_trust_serve, cmd_trust_status,
-    is_cli_ipv6_unicast_link_local, is_cli_ipv6_unique_local, load_roster_policy,
-    optional_secret_with_env_fallback, parse_tenant_read_tokens,
-    parse_trusted_capability_issuers_from_env, remote_mcp_auth_egress_contract,
-    require_receipt_db_path, require_revocation_db_path, verdict_label, CHIO_START_NO_UPSTREAM_URL,
-    CHIO_START_SIDECAR_OPENAPI_SPEC,
+    cmd_api_protect, cmd_check, cmd_mcp_serve, cmd_mcp_serve_http, cmd_run, cmd_start,
+    cmd_trust_revoke, cmd_trust_serve, cmd_trust_status, load_roster_policy,
 };
-#[cfg(test)]
-#[allow(unused_imports)]
-pub(crate) use cli::trust::select_receipt_for_explain;
-#[allow(unused_imports)]
 pub(crate) use cli::trust::{
-    bilateral_field, build_underwriting_policy_input_query, cmd_receipt_audit,
-    cmd_receipt_checkpoint_create, cmd_receipt_checkpoint_status, cmd_receipt_checkpoint_verify,
-    cmd_receipt_explain, cmd_receipt_flush, cmd_receipt_health, cmd_receipt_list,
-    cmd_receipt_retention_repair, cmd_trust_credit_backtest_export,
+    cmd_receipt_audit, cmd_receipt_checkpoint_create, cmd_receipt_checkpoint_status,
+    cmd_receipt_checkpoint_verify, cmd_receipt_explain, cmd_receipt_flush, cmd_receipt_health,
+    cmd_receipt_list, cmd_receipt_retention_repair, cmd_trust_credit_backtest_export,
     cmd_trust_credit_loss_lifecycle_evaluate, cmd_trust_credit_loss_lifecycle_issue,
     cmd_trust_credit_loss_lifecycle_list, cmd_trust_liability_auto_bind_issue,
     cmd_trust_liability_bound_coverage_issue, cmd_trust_liability_claim_adjudication_issue,
@@ -189,62 +173,21 @@ pub(crate) use cli::trust::{
     cmd_trust_underwriting_appeal_resolve, cmd_trust_underwriting_decision_evaluate,
     cmd_trust_underwriting_decision_issue, cmd_trust_underwriting_decision_list,
     cmd_trust_underwriting_decision_simulate, cmd_trust_underwriting_input_export,
-    decision_details, explain_decision_label, explain_dsse_envelope, explain_dual_signed_receipt,
-    explain_receipt_value, finish_receipt_for_explain, inspect_bilateral_envelope_trace,
-    is_bilateral_artifacts_value, json_path_str, load_credit_bonded_execution_control_policy,
-    load_existing_kernel_checkpoint_keypair, load_json_or_yaml,
-    load_liability_auto_bind_issue_request, load_liability_bound_coverage_issue_request,
-    load_liability_claim_adjudication_issue_request, load_liability_claim_dispute_issue_request,
-    load_liability_claim_issue_request, load_liability_claim_payout_instruction_issue_request,
-    load_liability_claim_payout_receipt_issue_request, load_liability_claim_response_issue_request,
-    load_liability_claim_settlement_instruction_issue_request,
-    load_liability_claim_settlement_receipt_issue_request, load_liability_placement_issue_request,
-    load_liability_pricing_authority_issue_request, load_liability_provider_report,
-    load_liability_quote_request_issue_request, load_liability_quote_response_issue_request,
-    load_receipt_for_explain, load_runtime_attestation_evidence,
-    load_runtime_attestation_import_policy, load_signed_runtime_attestation_appraisal_result,
-    load_underwriting_decision_policy, local_receipt_read_context, local_receipt_store,
-    optional_u64, parse_credit_bond_disposition, parse_credit_bond_lifecycle_state,
-    parse_credit_facility_disposition, parse_credit_facility_lifecycle_state,
-    parse_credit_loss_lifecycle_event_kind, parse_governed_autonomy_tier,
-    parse_liability_coverage_class, parse_liability_provider_lifecycle_state,
-    parse_runtime_assurance_tier, parse_underwriting_appeal_resolution,
-    parse_underwriting_appeal_status, parse_underwriting_decision_outcome,
-    parse_underwriting_lifecycle_state, print_bilateral_human, print_receipt_operator_json,
-    push_receipt_explain_matches, push_writer_counters_human, receipt_checkpoint_report_error,
-    receipt_health_report_error, receipt_operator_json_value, receipt_value_matches_id,
-    render_bilateral_explain, render_receipt_checkpoint_create_human,
-    render_receipt_checkpoint_status_human, render_receipt_flush_human,
-    render_receipt_health_human, repair_hint, trusted_kernel_keys_from_authority,
+    load_credit_bonded_execution_control_policy, load_json_or_yaml, parse_credit_bond_disposition,
+    parse_credit_bond_lifecycle_state, parse_credit_facility_disposition,
+    parse_credit_facility_lifecycle_state, parse_credit_loss_lifecycle_event_kind,
+    parse_governed_autonomy_tier, parse_runtime_assurance_tier, trusted_kernel_keys_from_authority,
     BudgetQueryBackend, CreditBacktestExportArgs, CreditLossLifecycleListArgs,
     LiabilityClaimsListArgs, LiabilityMarketListArgs, ProviderRiskPackageExportArgs, QueryBackend,
-    ReceiptExplainArgs, ReceiptListArgs, ReceiptOperatorJsonEnvelope, SignedQueryBackend,
-    UnderwritingAppealResolveArgs, UnderwritingDecisionIssueArgs, UnderwritingDecisionListArgs,
-    UnderwritingDecisionSimulateArgs, UnderwritingPolicyInputArgs, CHIO_CLI_RECEIPT_AUDIT_SCHEMA,
-    CHIO_CLI_RECEIPT_CHECKPOINT_CREATE_SCHEMA, CHIO_CLI_RECEIPT_CHECKPOINT_STATUS_SCHEMA,
-    CHIO_CLI_RECEIPT_CHECKPOINT_VERIFY_SCHEMA, CHIO_CLI_RECEIPT_FLUSH_SCHEMA,
-    CHIO_CLI_RECEIPT_HEALTH_SCHEMA,
+    ReceiptExplainArgs, ReceiptListArgs, SignedQueryBackend, UnderwritingAppealResolveArgs,
+    UnderwritingDecisionIssueArgs, UnderwritingDecisionListArgs, UnderwritingDecisionSimulateArgs,
+    UnderwritingPolicyInputArgs,
 };
-#[allow(unused_imports)]
 pub(crate) use cli::session::{
-    control_request_id, handle_agent_message, normalize_agent_message, print_summary,
-    select_capability_for_request, tool_response_messages, SessionStats,
+    handle_agent_message, print_summary, select_capability_for_request, SessionStats,
 };
-#[cfg(test)]
-#[allow(unused_imports)]
-pub(crate) use cli::session::{StubSqlResultToolServer, StubStreamingToolServer, StubToolServer};
-#[allow(unused_imports)]
-pub(crate) use cli::conformance::{
-    cmd_conformance_fetch_peers, cmd_conformance_run, download_and_verify, extract_archive,
-    parse_peer_selection, parse_report_format, resolve_peers_lock_path,
-    validate_extracted_peer_binary, write_human_report, write_json_report,
-    FETCH_PEERS_HTTP_TIMEOUT_SECS,
-};
-#[allow(unused_imports)]
-pub(crate) use cli::mcp::{
-    cmd_mcp_governed_sim, cmd_mcp_wrap, cmd_mcp_wrap_e2e_fixture, cmd_mcp_wrap_run,
-    load_tools_fixture, GovernedSimArgs, McpWrapArgs,
-};
+pub(crate) use cli::conformance::{cmd_conformance_fetch_peers, cmd_conformance_run};
+pub(crate) use cli::mcp::{cmd_mcp_governed_sim, cmd_mcp_wrap, GovernedSimArgs, McpWrapArgs};
 pub(crate) use cli::replay::{cmd_replay, load_trusted_kernel_pubkey};
 
 pub(crate) use cli::{input, process_host, process_response_verify, receipt_verify};
@@ -262,7 +205,50 @@ use cli::chio::types::{
     ChioRuntimePeerWeightsCommands, ChioRuntimePheromoneCommands, ChioRuntimePolicyCommands,
     ChioTreatyCommands, ChioTrustBundleCommands,
 };
-use cli::chio::dispatch::*;
+use cli::chio::dispatch::{
+    cmd_chio_attest_buyer_explain, cmd_chio_attest_buyer_package, cmd_chio_attest_buyer_verify,
+    cmd_chio_attest_buyer_verify_packet, cmd_chio_attest_buyer_verify_proof,
+    cmd_chio_federation_authority_checkpoint, cmd_chio_federation_authority_issue,
+    cmd_chio_federation_authority_trust_bundle_assemble, cmd_chio_federation_treaty_admit,
+    cmd_chio_federation_treaty_intersect, cmd_chio_federation_treaty_verify_packet,
+    cmd_chio_pheromone_query, cmd_chio_pheromone_receive,
+    cmd_chio_pheromone_relay_alert_assurance_archive_package_create,
+    cmd_chio_pheromone_relay_alert_assurance_archive_package_extract,
+    cmd_chio_pheromone_relay_alert_assurance_archive_package_verify,
+    cmd_chio_pheromone_relay_alert_assurance_archive_plan,
+    cmd_chio_pheromone_relay_alert_assurance_archive_restore_drill_review,
+    cmd_chio_pheromone_relay_alert_assurance_closeout_review,
+    cmd_chio_pheromone_relay_alert_assurance_export,
+    cmd_chio_pheromone_relay_alert_assurance_package,
+    cmd_chio_pheromone_relay_alert_assurance_physical_drill_review,
+    cmd_chio_pheromone_relay_alert_assurance_recovery_drill,
+    cmd_chio_pheromone_relay_alert_assurance_replay,
+    cmd_chio_pheromone_relay_alert_assurance_retention_external_review,
+    cmd_chio_pheromone_relay_alert_assurance_retention_handoff_review,
+    cmd_chio_pheromone_relay_alert_assurance_retention_plan,
+    cmd_chio_pheromone_relay_alert_assurance_verify,
+    cmd_chio_pheromone_relay_alert_delivery_acknowledge,
+    cmd_chio_pheromone_relay_alert_delivery_drift,
+    cmd_chio_pheromone_relay_alert_delivery_drift_window,
+    cmd_chio_pheromone_relay_alert_delivery_import, cmd_chio_pheromone_relay_alert_evaluate,
+    cmd_chio_pheromone_relay_alert_handoff, cmd_chio_pheromone_relay_alert_normalize,
+    cmd_chio_pheromone_relay_alert_review, cmd_chio_pheromone_relay_catchup,
+    cmd_chio_pheromone_relay_directory_inspect, cmd_chio_pheromone_relay_directory_promote,
+    cmd_chio_pheromone_relay_directory_reject, cmd_chio_pheromone_relay_enqueue,
+    cmd_chio_pheromone_relay_lint, cmd_chio_pheromone_relay_metrics,
+    cmd_chio_pheromone_relay_observe, cmd_chio_pheromone_relay_serve,
+    cmd_chio_pheromone_relay_status, cmd_chio_pheromone_relay_supervisor_lint,
+    cmd_chio_pheromone_relay_tick, cmd_chio_pheromone_relay_trend, cmd_chio_runtime_admit,
+    cmd_chio_runtime_ops_evidence_health, cmd_chio_runtime_ops_provider_health,
+    cmd_chio_runtime_ops_recovery_drill, cmd_chio_runtime_ops_retention_plan,
+    cmd_chio_runtime_ops_status, cmd_chio_runtime_ops_tick, cmd_chio_runtime_orchestrate_drift,
+    cmd_chio_runtime_orchestrate_lint, cmd_chio_runtime_orchestrate_plan,
+    cmd_chio_runtime_orchestrate_resume, cmd_chio_runtime_orchestrate_run,
+    cmd_chio_runtime_orchestrate_status, cmd_chio_runtime_peer_weights_hash,
+    cmd_chio_runtime_pheromone_evaluate, cmd_chio_runtime_run_loopback,
+    cmd_chio_runtime_sign_peer_weights, cmd_chio_runtime_sign_pheromone_query_report,
+    cmd_chio_runtime_sign_policy, cmd_chio_runtime_sign_trust_input, unix_now_ms,
+};
 pub(crate) use cli::arena::{cmd_arena_evolve, cmd_arena_replay, cmd_arena_run};
 
 #[cfg(test)]

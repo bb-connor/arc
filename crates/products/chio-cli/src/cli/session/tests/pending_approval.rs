@@ -1,5 +1,6 @@
 //! Pending approval delivery through the real stdio handler and durable admission.
 
+use super::super::handler::normalize_agent_message;
 use super::*;
 use chio_core::capability::governance::{
     GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,

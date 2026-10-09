@@ -188,11 +188,11 @@ fn operator_policy_accepts_producer_numbers_in_json_and_yaml(
     let document = serde_json::to_string(&policy)?.replace("0.5", "0.50");
     let json = dir.path().join("policy.json");
     std::fs::write(&json, document)?;
-    let actual = crate::load_underwriting_decision_policy(&json)?;
+    let actual = crate::cli::trust::load_underwriting_decision_policy(&json)?;
     assert_eq!(actual, policy);
     let yaml = dir.path().join("policy.yaml");
     std::fs::write(&yaml, serde_yml::to_string(&policy)?)?;
-    assert_eq!(crate::load_underwriting_decision_policy(&yaml)?, policy);
+    assert_eq!(crate::cli::trust::load_underwriting_decision_policy(&yaml)?, policy);
     Ok(())
 }
 
@@ -212,13 +212,13 @@ fn unsigned_runtime_attestation_evidence_accepts_operator_numbers(
         // The separate signed-appraisal route still rejects the original
         // numeric spelling, before attempting any typed appraisal projection.
         assert!(matches!(
-            crate::load_signed_runtime_attestation_appraisal_result(&json),
+            crate::cli::trust::load_signed_runtime_attestation_appraisal_result(&json),
             Err(crate::CliError::SignedJson(
                 UntrustedJsonError::SignedInput(_)
             ))
         ));
-        let from_json = crate::load_runtime_attestation_evidence(&json)?;
-        let from_yaml = crate::load_runtime_attestation_evidence(&yaml)?;
+        let from_json = crate::cli::trust::load_runtime_attestation_evidence(&json)?;
+        let from_yaml = crate::cli::trust::load_runtime_attestation_evidence(&yaml)?;
         assert_eq!(from_json, from_yaml);
         std::fs::write(
             &json,
@@ -227,7 +227,7 @@ fn unsigned_runtime_attestation_evidence_accepts_operator_numbers(
                 "\"measurement\":1,\"measurement\":2",
             ),
         )?;
-        assert!(crate::load_runtime_attestation_evidence(&json).is_err());
+        assert!(crate::cli::trust::load_runtime_attestation_evidence(&json).is_err());
     }
     Ok(())
 }

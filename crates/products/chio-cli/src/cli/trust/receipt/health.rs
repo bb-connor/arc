@@ -265,6 +265,7 @@ fn receipt_audit_with_schema(
 
 #[cfg(test)]
 mod receipt_operator_tests {
+    use super::super::format::receipt_operator_json_value;
     use super::*;
     use chio_kernel::ReceiptStore;
 

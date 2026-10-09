@@ -12,8 +12,7 @@ mod tests;
 
 pub(crate) use capability::select_capability_for_request;
 pub(crate) use errors::control_request_id;
-#[allow(unused_imports)]
-pub(crate) use handler::{handle_agent_message, normalize_agent_message};
+pub(crate) use handler::handle_agent_message;
 pub(crate) use response::tool_response_messages;
 pub(crate) use stats::{print_summary, SessionStats};
 #[cfg(test)]

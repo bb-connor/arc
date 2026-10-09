@@ -242,6 +242,7 @@ pub(crate) fn finish_replay_failure(_code: i32, message: String) -> Result<(), C
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod replay_traffic_tests {
+    use crate::cli::replay::validate::signing_payload;
     use super::*;
     use ed25519_dalek::{Signer, SigningKey};
 

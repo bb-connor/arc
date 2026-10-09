@@ -1,21 +1,46 @@
 use super::*;
 
 mod runtime;
-pub(crate) use self::runtime::*;
+pub(crate) use self::runtime::{
+    ApiCommands, ArenaCommands, ChioAttestCommands, ChioBuyerCommands, ChioFederationCommands,
+    ChioRuntimeQuoteCommands, ChioSupplyChainCommands, ConformanceCommands, GuardBlocklistCommands,
+    GuardCommands, GuardMarketCommands, LineageCommands, McpCommands, ReceiptRetentionArgs,
+    SettleCommands,
+};
 mod trust;
-pub(crate) use self::trust::*;
+pub(crate) use self::trust::{
+    TrustAuthorizationContextCommands, TrustBehavioralFeedCommands, TrustCapitalAllocationCommands,
+    TrustCapitalBookCommands, TrustCapitalInstructionCommands, TrustCommands,
+    TrustCreditBacktestCommands, TrustCreditBondCommands, TrustCreditFacilityCommands,
+    TrustCreditLossLifecycleCommands, TrustCreditScorecardCommands, TrustEvidenceShareCommands,
+    TrustExposureLedgerCommands, TrustFederationPolicyCommands, TrustLiabilityMarketCommands,
+    TrustLiabilityProviderCommands, TrustProviderCommands, TrustProviderRiskPackageCommands,
+    TrustRuntimeAttestationAppraisalCommands, TrustTraceSpec, TrustUnderwritingAppealCommands,
+    TrustUnderwritingDecisionCommands, TrustUnderwritingInputCommands,
+};
 mod receipt;
-pub(crate) use self::receipt::*;
+pub(crate) use self::receipt::{
+    CertifyCommands, CertifyRegistryCommands, EvidenceCommands, EvidenceFederationPolicyCommands,
+    ReceiptCheckpointCommands, ReceiptCommands, ReceiptRetentionCommands,
+};
 mod passport;
-pub(crate) use self::passport::*;
+pub(crate) use self::passport::{
+    PassportChallengeCommands, PassportCommands, PassportIssuanceCommands, PassportOid4vpCommands,
+    PassportPolicyCommands, PassportStatusCommands,
+};
 mod proof;
-pub(crate) use self::proof::*;
+pub(crate) use self::proof::{
+    CommerceCommands, ProofCollectKind, ProofCommands, ProofDoctorScenario,
+    ProofExportRedactProfile, ProofFixtureCommands, ProofVerifyRequirement,
+};
 mod workflow;
-pub(crate) use self::workflow::*;
+pub(crate) use self::workflow::WorkflowCommands;
 mod replay;
-pub(crate) use self::replay::*;
+pub(crate) use self::replay::{ReplayArgs, ReplaySubcommand, TrafficArgs};
 mod finding;
-pub(crate) use self::finding::*;
+pub(crate) use self::finding::{
+    FindingChallengeClassArg, FindingCommands, FindingOperatorCommands, FindingPackageCommands,
+};
 
 /// Chio -- Chio.
 ///

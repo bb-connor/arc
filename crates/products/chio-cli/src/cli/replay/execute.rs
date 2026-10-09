@@ -485,6 +485,7 @@ fn map_kernel_verdict_to_frame(verdict: chio_kernel::Verdict) -> chio_tee_frame:
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod replay_execute_tests {
+    use crate::cli::replay::validate::signing_payload;
     use super::*;
     use base64::Engine;
     use ed25519_dalek::{Signer, SigningKey};
