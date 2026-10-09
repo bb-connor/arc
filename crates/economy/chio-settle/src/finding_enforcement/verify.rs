@@ -638,7 +638,6 @@ fn verify_finding_enforcement_inner(
 
 /// Authenticate the observer policy and current lifecycle reading behind a
 /// snapshot before it can grant fresh dispatch authority.
-#[allow(clippy::too_many_arguments)]
 fn verify_settlement_observer_lifecycle(
     snapshot: &FindingFinalizedBondSnapshot,
     settlement_observer: &PublicKey,

@@ -918,18 +918,19 @@ fn channel_transition_replay_round_trips_all_transition_kinds() -> Result<(), Ch
         &terminal_projection,
         fixture.advance.batch().issued_at,
     )?;
-    let terminal_descriptor = ChannelTransitionReplayDescriptorV1::for_terminal(
-        &reservation_context,
-        &open_artifacts,
-        &authorities,
-        &fixture.ready_view,
-        fixture.advance.current(),
-        &fixture.signed_receipt,
-        fixture.obligation.as_ref(),
-        &fixture.signed_next,
-        &outcome,
-        &terminal_batch,
-    )?;
+    let terminal_descriptor =
+        ChannelTransitionReplayDescriptorV1::for_terminal(TerminalReplayInputs {
+            context: &reservation_context,
+            open_artifacts: &open_artifacts,
+            authority_pins: &authorities,
+            reservation_view: &fixture.ready_view,
+            current: fixture.advance.current(),
+            signed_receipt: &fixture.signed_receipt,
+            obligation: fixture.obligation.as_ref(),
+            signed_next_state: &fixture.signed_next,
+            terminal_outcome: &outcome,
+            expected_batch: &terminal_batch,
+        })?;
 
     let replay_keys = [
         reservation_descriptor.key().to_owned(),
@@ -1092,18 +1093,18 @@ fn channel_terminal_replay_allows_completion_after_reservation_expiry() -> Resul
     };
     let context =
         ChannelReservationReplayContextV1::from_verified(&fixture.prepared, &fixture.reservation)?;
-    let descriptor = ChannelTransitionReplayDescriptorV1::for_terminal(
-        &context,
-        &open_artifacts,
-        &authorities,
-        &fixture.ready_view,
-        &post_expiry,
-        &fixture.signed_receipt,
-        fixture.obligation.as_ref(),
-        &fixture.signed_next,
-        &outcome,
-        &batch,
-    )?;
+    let descriptor = ChannelTransitionReplayDescriptorV1::for_terminal(TerminalReplayInputs {
+        context: &context,
+        open_artifacts: &open_artifacts,
+        authority_pins: &authorities,
+        reservation_view: &fixture.ready_view,
+        current: &post_expiry,
+        signed_receipt: &fixture.signed_receipt,
+        obligation: fixture.obligation.as_ref(),
+        signed_next_state: &fixture.signed_next,
+        terminal_outcome: &outcome,
+        expected_batch: &batch,
+    })?;
     assert_eq!(descriptor.not_after_unix_ms(), None);
     let verifier = ChannelTransitionReplayVerifierV1::from_canonical_bytes(
         &descriptor.canonical_bytes()?,

@@ -328,6 +328,20 @@ pub struct ChannelTransitionReplayDescriptorV1 {
     descriptor_digest: String,
 }
 
+/// Parameters of `for_terminal`.
+pub struct TerminalReplayInputs<'a> {
+    pub context: &'a ChannelReservationReplayContextV1,
+    pub open_artifacts: &'a ChannelTransitionReplayOpenArtifactsV1,
+    pub authority_pins: &'a ChannelTransitionReplayAuthorityPinsV1,
+    pub reservation_view: &'a VerifiedEconomicStateView,
+    pub current: &'a VerifiedEconomicStateView,
+    pub signed_receipt: &'a ChioReceipt,
+    pub obligation: Option<&'a ObligationAtomV1>,
+    pub signed_next_state: &'a SignedChannelStateV1,
+    pub terminal_outcome: &'a VerifiedChannelTerminalOutcomeCommitmentV1,
+    pub expected_batch: &'a EconomicStateBatchV1,
+}
+
 impl ChannelTransitionReplayDescriptorV1 {
     pub fn for_reservation(
         context: &ChannelReservationReplayContextV1,
@@ -383,19 +397,19 @@ impl ChannelTransitionReplayDescriptorV1 {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn for_terminal(
-        context: &ChannelReservationReplayContextV1,
-        open_artifacts: &ChannelTransitionReplayOpenArtifactsV1,
-        authority_pins: &ChannelTransitionReplayAuthorityPinsV1,
-        reservation_view: &VerifiedEconomicStateView,
-        current: &VerifiedEconomicStateView,
-        signed_receipt: &ChioReceipt,
-        obligation: Option<&ObligationAtomV1>,
-        signed_next_state: &SignedChannelStateV1,
-        terminal_outcome: &VerifiedChannelTerminalOutcomeCommitmentV1,
-        expected_batch: &EconomicStateBatchV1,
-    ) -> Result<Self, ChannelError> {
+    pub fn for_terminal(params: TerminalReplayInputs<'_>) -> Result<Self, ChannelError> {
+        let TerminalReplayInputs {
+            context,
+            open_artifacts,
+            authority_pins,
+            reservation_view,
+            current,
+            signed_receipt,
+            obligation,
+            signed_next_state,
+            terminal_outcome,
+            expected_batch,
+        } = params;
         Self::new(
             context,
             open_artifacts,
