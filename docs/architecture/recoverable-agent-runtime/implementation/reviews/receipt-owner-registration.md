@@ -38,15 +38,57 @@ open; that gate was not rerun for this Kernel-only installation. The sealed
 (SHA-256 `107d84b72843acb04eaead2b7e2e6d11d2299b7f6c591accd78b2a4cd4afbe1f`)
 pins all five actual gate records/logs and confirms the nine reviewed postimages.
 
-The separate receipt actor foundation remains **CHANGES_REQUIRED / NOT FULLY
-ACCEPTED** under `receipt-capture-quality/base-acceptance-gate.md`. Its predecessor
-quality report preserves two P3s: **P3-B1**, a stored-original comparator test that
-stops at request schema validation, and **P3-B2**, accepted queued-lane inflight
-accounting lost before actor dispatch. Both need additive repair, independent
-review and owning execution. Neither is a maintained Kernel regression. The
-closed `configured_owner` consumer and isolated strict receipt-only check also
-remain installation prerequisites; a dummy use, lint suppression or unreviewed
-Native lifecycle import does not satisfy that boundary.
+The predecessor `receipt-capture-quality/base-acceptance-gate.md` remains intact.
+Its two repair obligations, **P3-B1** and **P3-B2**, are now **closed in the exact
+four-file candidate scope** by additive SPEC_PASS and QUALITY_PASS reviews plus
+27 genuine owning passes. Their original findings and candidate-only status are
+preserved. Neither is a maintained Kernel regression.
+
+P3-B1 now keeps the requested canonical original unchanged, modifies only actual
+stored raw JSON, proves the typed signed identity, requires the exact comparator
+conflict without row mutation, and restores successful readback by restoring the
+original bytes. P3-B2 gives each Native command one accounting token through
+queueing, dispatch and return. Actual terminal-supervisor, saturation, batch
+deferral, channel-loss and refusal/unwind controls verify exactly-once retirement.
+
+The packet is `receipt-owner-foundation/p3-accounting-successor/`:
+
+| Preserved or successor evidence | Result |
+| --- | --- |
+| `stored-original-comparator-first` | 1 passed before the accounting repair |
+| `queued-lane-red` | Genuine predecessor failure: inflight 2 instead of 0 |
+| `receipt-owner-green-first` | E0583 module-path compile failure; zero tests |
+| `receipt-owner-green-second` | 27 passed, 0 failed, 0 ignored |
+
+The corrected source manifest is
+`module-path-successor/source-manifest.json`, SHA-256
+`2b48d43205b2c3b654f67038cfcb23e09ba71b4268af2eedd045ad727bb31e37`.
+The register pins both reviews, the quality seal, exact postimages and all four
+execution records/logs. The first failed selection remains preserved; its
+successor corrects the accounting module path. All four repaired files match
+the 18-file composed checkpoint used for the successful run. The disjoint Capture
+files provide source identity context only and gain no acceptance from these
+receipt results.
+
+The subsequent broader `receipt-store-module` run **failed**: 390 passed, 17
+failed, two ignored, exit 101. All 17 failures occur during
+`rollback_anchor_tempdir` setup because its unconditional `/dev/shm` root is
+absent on the macOS host, before the associated qualified anchor behavior. The
+two pre-existing ignored cases are the batch-bound scale proof and million-receipt
+recovery campaign. The later 18-file source manifest preserves all four reviewed
+receipt hashes. These failures leave the broader gate pending a valid environment;
+they neither erase the bounded 27-case closure nor establish Store acceptance.
+
+The Store repair remains uninstalled. A genuine `configured_owner` consumer,
+closed receipt-only installation selection and isolated strict Store checks
+remain prerequisites. The prior base installation gate is not promoted to full
+installation acceptance by closing these two candidate repair obligations.
+
+The separate initial Capture source/selection stage has twelve owning passes
+(10 selection cases, one typed-preimage case and one observation-budget case)
+and SPEC_PASS. Its quality review is pending. Earlier failed checkpoints remain
+preserved; this stage provides no productive Capture, financing or retirement
+acceptance.
 
 The read-only `kernel-installed-pin-continuity.json` audit verifies 29 distinct
 Kernel postimages across both installations and finds no intersections with the
@@ -58,4 +100,4 @@ Kernel passes do not renew any historical closure.
 Productive Capture, complete completion funding, retained debt, interruption and
 reopen, historical settlement and retirement still require their own acceptance.
 The runtime remains unqualified. All original canonical and historical closure
-counts remain unchanged; the two P3 additions increase the register total.
+counts remain unchanged; this P3 corrective successor changes no register counts.

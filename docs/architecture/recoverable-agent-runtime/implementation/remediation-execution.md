@@ -79,8 +79,16 @@ passed the borrowed-backend control, 1,472 library tests, 25 doctests, strict
 library Clippy and format. The 1,473-test composed-candidate run includes the
 excluded atomic-ledger callback case. No Store, Process, Capture overlay or
 production host activation was imported. The prior all-targets lint gap remains.
-The uninstalled receipt base still requires both P3 repairs and owning acceptance,
-a closed `configured_owner` consumer and an isolated strict check. Complete
+The two receipt P3 repairs now have independent spec/quality approval and 27
+owning passes on the corrected four-file candidate. Their original findings,
+queued-death red and initial E0583 compile failure remain preserved. The repair
+is uninstalled; a genuine `configured_owner` consumer, closed Store installation
+selection and isolated strict checks remain pending. The broader receipt module
+gate failed: 390 passed, 17 rollback-anchor setup failures due to absent `/dev/shm`,
+two existing scale cases ignored. Associated qualified behavior remains untested.
+The separate initial Capture source/selection stage passed twelve owning controls
+and spec review; quality review is pending and earlier failed checkpoints remain
+preserved. These results provide no final Capture acceptance. Complete
 funding, retained debt, interruption/reopen, historical settlement and retirement
 remain explicit acceptance gates.
 

@@ -118,13 +118,14 @@ exact local evidence hashes and accounting time are in `candidate_review_evidenc
   Only the nine-path Kernel subset is installed at `032d77338`: one borrowed
   control, 1,472 library tests, 25 doctests, strict library Clippy and format passed.
 - `candidate:receipt-stored-original-comparison-control` preserves reviewer
-  label `P3-B1`: the added-field request control stops at schema validation before
-  stored raw JSON comparison. It needs a genuine committed-row substitution and
-  restoration control with the exact comparator refusal.
+  label `P3-B1`: the original added-field request control stopped at schema
+  validation before stored raw JSON comparison. Its approved successor proves
+  genuine committed-row substitution, the exact comparator refusal without row
+  mutation, and successful readback after restoring the original bytes.
 - `candidate:receipt-queued-lane-inflight-ownership` preserves reviewer label
-  `P3-B2`: an accepted lane dropped while queued can strand its inflight count.
-  It needs exactly-once queued/dispatched/returned ownership and a terminating
-  actor control that preserves other accepted requests' accounting.
+  `P3-B2`: the predecessor terminal-supervisor control left inflight at 2 instead
+  of 0. Its approved successor gives each command one accounting token across
+  queued, dispatched and returned states, with actual actor failure controls.
 
 All eight records use register keys with null assigned finding IDs. The
 [Kernel foundation successor](reviews/kernel-foundation.md) also records 1,469
@@ -147,10 +148,17 @@ retained-reservation test.
 The [receipt registration successor](reviews/receipt-owner-registration.md)
 separates its 1,473-test composed-candidate run from the 1,472-test maintained
 Kernel subset. The excluded atomic-ledger callback is the exact one-test delta.
-The two Store P3s remain open candidate findings with no repair acceptance here.
-The receipt base installation is **CHANGES_REQUIRED / NOT FULLY ACCEPTED** until
-both are satisfied and its closed `configured_owner` consumer and isolated strict
-check are established. No Store/Process implementation, production host activation
+The two Store P3s are **closed in the reviewed four-file candidate scope** after
+SPEC_PASS, QUALITY_PASS and 27 owning cases passed with no failures or ignored
+cases. Their original findings and candidate-only classifications remain intact.
+The first repaired build failed E0583 before tests; that failure and the genuine
+queued-lane red remain preserved. The Store repair is uninstalled: its genuine
+`configured_owner` consumer, closed installation selection and isolated strict
+checks remain pending. A broader receipt module run failed with 390 passed,
+17 setup failures from absent `/dev/shm`, and two existing scale cases ignored.
+The associated qualified anchor behavior was not exercised; this leaves the
+broader gate open without erasing the 27-case P3 closure.
+No Store/Process implementation, production host activation
 or Capture overlay is imported by the Kernel registration installation. Complete
 funding, retained debt, interruption/reopen, historical settlement and retirement
 retain their own obligations.
@@ -283,7 +291,7 @@ The installed Kernel successor adds its sealed selection, applied snapshot,
 maintained verification and two exact comparison records. All eight maintained
 gate records and logs match the verification hashes, including the retained lint
 failure. Its installation changes no finding classification or qualification.
-The latest receipt registration update preserves 385 of the 386 prior rows
+The preceding receipt registration update preserves 385 of the 386 prior rows
 exactly. The P2 row changes only `current_reason` and adds `current_successor`,
 which retains the prior reason verbatim; all its historical fields remain exact.
 Two distinct P3 candidate rows produce 388 total records, eight candidate
@@ -291,6 +299,15 @@ follow-ups, 39 candidate-only statuses and sixteen null IDs. Nineteen additive
 evidence pins, five maintained gate records/logs and the exact candidate versus
 maintained test-name difference were verified. Every canonical row, historical
 closure, original inventory and prior source pin remains unchanged.
+The receipt P3 successor preserves 386 of 388 rows exactly, changing only the two
+P3 current reasons and adding successors that retain both prior reasons verbatim.
+All counts and historical classifications stay unchanged. Twenty-eight additive
+evidence pins were verified, including the four exact reviewed postimages within
+the 18-file composed checkpoint and all four predecessor/corrected execution
+records and logs. The broader
+receipt failure and its source manifest are separately pinned. The twelve
+initial Capture source/selection passes and SPEC_PASS remain separate with quality
+review pending; they establish no final Capture acceptance.
 The installation-specific SDK continuity audit supplements the historical pin
 audit; it does not rerun unrelated flags. Confidence is high for this accounting;
 current integrated behavior remains unqualified.
