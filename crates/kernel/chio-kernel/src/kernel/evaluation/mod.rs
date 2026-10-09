@@ -16,11 +16,6 @@ mod delivery_preparation;
 mod dispatch_commit_failure;
 mod evaluation_entry;
 pub(crate) mod evaluation_helpers;
-#[expect(
-    dead_code,
-    reason = "pre-dispatch custody captures non-durable invocations now"
-)]
-mod invocation_capture;
 #[cfg(feature = "admission-test-support")]
 mod native_capture_checkpoint;
 mod nested_flow_evaluation;
