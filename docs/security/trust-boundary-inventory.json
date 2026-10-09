@@ -2865,17 +2865,6 @@
       "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
     },
     {
-      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/write.rs",
-      "owner": "mutate_security_participant_egress",
-      "sha256": "2b55d16ef5930a4e6c9fbc6d894e7868a2db4b851691fa516441440b8c6fa42d",
-      "tables": [
-        "security_participant_state_egress_fences"
-      ],
-      "sql": "SELECT EXISTS(SELECT 1 FROM security_participant_state_egress_fences WHERE security_authority_id = ?1 AND ((tenant_id = ?2 AND request_id = ?3) OR fence_id = ?4))",
-      "principal": "kernel-admission",
-      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
-    },
-    {
       "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history.rs",
       "owner": "load",
       "sha256": "3616a18da83b9264111488912746a61533a3536fb65f7196a983e79d73de0c19",
@@ -19014,6 +19003,8 @@
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint.rs": [
       "checkpoint_history::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs::observed_time",
       "checkpoint_history::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint.rs::latest",
+      "checkpoint_history::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/compaction.rs::compact",
+      "checkpoint_history::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/compaction.rs::plan",
       "checkpoint_history::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/rows.rs::copy",
       "checkpoint_history::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/rows.rs::visit",
       "checkpoint_history::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/records.rs::load",
@@ -22185,6 +22176,11 @@
       "load_result::shared-reader::crates/platform/chio-control-plane/src/security/adapters/effect_port/dispatch.rs::validate_durable_plan_binding",
       "validate_durable_plan_binding::shared-reader::crates/core/chio-response-model/src/state.rs::decode_response_record"
     ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/compaction.rs": [
+      "compact::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::compact_native_rows",
+      "plan::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::encode_retained_security_values",
+      "plan::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::retained_security_columns"
+    ],
     "crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs": [
       "check_apply::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::verified_marker",
       "completed_capability_remove::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::load_command",
@@ -22221,6 +22217,20 @@
       "load::shared-reader::crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs::load_finality_command",
       "load::shared-reader::crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs::load_session_throttle_command",
       "load::shared-reader::crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs::validate_stored_session_throttle_command"
+    ],
+    "crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs": [
+      "cell::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::retained_security_columns",
+      "compact_native_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::text",
+      "compact_native_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::text",
+      "compact_native_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::validate_dead",
+      "compact_native_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::decode_retained_security_row",
+      "record::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::encode_retained_security_values",
+      "record::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::retained_security_columns",
+      "text::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::cell",
+      "validate_dead::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::cell",
+      "validate_dead::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::cell",
+      "validate_dead::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::cell",
+      "validate_dead::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::text"
     ]
   },
   "retired_direct_readers": {

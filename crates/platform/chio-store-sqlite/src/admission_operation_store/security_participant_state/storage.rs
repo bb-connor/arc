@@ -257,9 +257,65 @@ pub(super) fn verify_rows(
     Ok(())
 }
 
+/// Store-wide budget for authenticated current native rows.
+const MAX_CURRENT_ROWS: u64 = 65_536;
+
+#[cfg(test)]
+thread_local! {
+    static TEST_CURRENT_ROWS: std::cell::Cell<u64> = const { std::cell::Cell::new(MAX_CURRENT_ROWS) };
+}
+
+/// Lower, never raise, the current-row budget for one test thread.
+#[cfg(test)]
+pub(in crate::admission_operation_store) fn with_test_current_rows<T>(
+    rows: u64,
+    run: impl FnOnce() -> T,
+) -> T {
+    assert!((1..=MAX_CURRENT_ROWS).contains(&rows));
+    struct Reset(u64);
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            TEST_CURRENT_ROWS.set(self.0);
+        }
+    }
+    let _reset = Reset(TEST_CURRENT_ROWS.replace(rows));
+    run()
+}
+
+fn current_rows_budget() -> u64 {
+    #[cfg(test)]
+    return TEST_CURRENT_ROWS.get();
+    #[cfg(not(test))]
+    MAX_CURRENT_ROWS
+}
+
+/// Largest current-row delta one captured native event can introduce.
+const EVENT_ROWS: u64 = 4_096;
+
+/// Whether one more native event could exceed the store-wide row budget.
+pub(super) fn within_event_of_budget(
+    connection: &Connection,
+) -> Result<bool, AdmissionOperationStoreError> {
+    let mut total = 0_u64;
+    for table in schema::TABLES {
+        let count: i64 = connection
+            .query_row(
+                &format!("SELECT COUNT(*) FROM {}", table.native),
+                [],
+                |row| row.get(0),
+            )
+            .map_err(sqlite_error)?;
+        total = total
+            .checked_add(u64::try_from(count).map_err(invalid)?)
+            .ok_or_else(|| invalid("native row count overflow"))?;
+    }
+    Ok(total.saturating_add(EVENT_ROWS) > current_rows_budget())
+}
+
 pub(super) fn verify_no_orphans(
     connection: &Connection,
 ) -> Result<(), AdmissionOperationStoreError> {
+    let budget = current_rows_budget();
     let mut total = 0_u64;
     for table in schema::TABLES {
         let (count, orphan): (i64, bool) = connection.query_row(&format!("SELECT COUNT(*), COALESCE(MAX(NOT EXISTS(
@@ -269,7 +325,7 @@ pub(super) fn verify_no_orphans(
         total = total
             .checked_add(u64::try_from(count).map_err(invalid)?)
             .ok_or_else(|| invalid("native row count overflow"))?;
-        if orphan || total > 65_536 {
+        if orphan || total > budget {
             return Err(invalid("orphan or excessive native state"));
         }
     }

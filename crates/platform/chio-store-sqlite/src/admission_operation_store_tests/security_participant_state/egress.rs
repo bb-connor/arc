@@ -22,6 +22,8 @@ mod lifecycle;
 mod migration;
 #[path = "egress/portable.rs"]
 mod portable;
+#[path = "egress/retention.rs"]
+mod retention;
 
 struct Pending {
     operation: AdmissionOperationV1,

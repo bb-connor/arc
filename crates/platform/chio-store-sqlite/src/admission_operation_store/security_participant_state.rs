@@ -13,13 +13,19 @@ pub(crate) use output::NativeOutputJoinAuthority;
 mod history;
 #[cfg(feature = "admission-test-support")]
 mod image_visit_test_support;
+pub(crate) use checkpoint::NativeCompactionAuthority;
 pub(crate) use egress::NativeEgressAuthority;
 pub use egress::SecurityParticipantEgressHistory;
 #[cfg(test)]
 pub(in crate::admission_operation_store) use history::ordered::with_test_bounds as with_test_journal_bounds;
+#[cfg(test)]
+pub(in crate::admission_operation_store) use occupancy::{fence_occupied, transition_occupied};
+#[cfg(test)]
+pub(in crate::admission_operation_store) use storage::with_test_current_rows;
 mod integrity;
 mod mutations;
 mod observation;
+mod occupancy;
 pub(crate) use mutations::NativeFlowJoinAuthority;
 mod readback;
 mod records;

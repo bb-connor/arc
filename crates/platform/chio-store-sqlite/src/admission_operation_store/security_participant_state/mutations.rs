@@ -155,19 +155,12 @@ impl SqliteAdmissionOperationStore {
         // Existing context-only journals remain historical data. They cannot
         // acquire a first native mutation without an original authority binding.
         original.validate_native_security_authority(&actual.admission_binding()?)?;
-        let occupied: bool = tx
-            .query_row(
-                "SELECT EXISTS(SELECT 1 FROM security_participant_state_transitions
-             WHERE security_authority_id = ?1 AND tenant_id = ?2 AND transition_id = ?3)",
-                params![
-                    actual.authority.as_str(),
-                    command.key().tenant_id.as_str(),
-                    command.transition_id().as_str()
-                ],
-                |row| row.get(0),
-            )
-            .map_err(sqlite_error)?;
-        if occupied {
+        if occupancy::transition_occupied(
+            &tx,
+            actual.authority.as_str(),
+            command.key().tenant_id.as_str(),
+            command.transition_id().as_str(),
+        )? {
             return Err(invalid(
                 "native transition belongs to another operation or imported history",
             ));

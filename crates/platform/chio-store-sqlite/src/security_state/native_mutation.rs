@@ -19,8 +19,10 @@ use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
+mod compaction;
 mod row_policy;
 mod sql_scope;
+pub(crate) use compaction::compact_native_rows;
 
 const FUNCTION: &str = "chio_native_security_change";
 const AUTHORIZE: &str = "chio_native_security_authorize";

@@ -2,9 +2,11 @@
 use super::*;
 
 mod cadence;
+mod compaction;
 mod record;
 mod rows;
 mod schema;
+pub(crate) use compaction::NativeCompactionAuthority;
 pub(super) use record::{FamilyHead, Record};
 pub(in crate::admission_operation_store) use schema::{require_absent, sql, verify_catalog};
 
@@ -133,11 +135,14 @@ impl SqliteAdmissionOperationStore {
     /// capacity exhaustion, or after a denied append has rolled back, then retry
     /// the same operation. It retains all old events and claims, keeps the same
     /// initialization and labels, and creates no invocation or dispatch permit.
+    /// Finished transition and egress-fence rows leave the current state; their
+    /// identities stay in the immutable journals.
     ///
     /// Use the initialized authority selected by the trusted host and the
     /// current serving fence. Caller time is only checked for skew; the owner
-    /// clock supplies checkpoint time. Repeating without new events returns
-    /// the prior anchored digest. Commit/anchor uncertainty requires reopen.
+    /// clock supplies checkpoint time. Repeating without new events or newly
+    /// dead rows returns the prior anchored digest. Commit/anchor uncertainty
+    /// requires reopen.
     pub fn checkpoint_security_participant_history(
         &self,
         initialized: &SecurityParticipantStateInitialization,
@@ -187,21 +192,37 @@ impl SqliteAdmissionOperationStore {
         }
         let heads = heads(&tx, &actual)?;
         let previous = latest(&tx, actual.authority.as_str())?;
-        if let Some(previous) = &previous {
-            if previous.heads == heads {
-                return if automatic {
-                    Ok(None)
-                } else {
+        let unchanged = previous
+            .as_ref()
+            .is_some_and(|previous| previous.heads == heads);
+        let (events, bytes) = history::ordered::segment_totals(&tx, actual.authority.as_str())?;
+        history::ordered::validate_history_bounds(&tx, actual.authority.as_str())?;
+        let due = cadence::due(events)?;
+        // A pending fence can expire without any new event. Explicit
+        // maintenance, and automatic maintenance within one event of the
+        // current-row budget, therefore always look for dead rows.
+        let sweep = !automatic || super::storage::within_event_of_budget(&tx)?;
+        // Current rows were authenticated above in this transaction. Only rows
+        // that no later native command can read leave the sealed snapshot.
+        let dead = if due || sweep {
+            compaction::plan(&tx, actual.authority.as_str(), observed_at)?
+        } else {
+            Vec::new()
+        };
+        let seal = if automatic {
+            due || !dead.is_empty()
+        } else {
+            !unchanged || !dead.is_empty()
+        };
+        if !seal {
+            return match (&previous, automatic) {
+                (Some(previous), false) => {
                     AdmissionDigest::try_new("native_checkpoint", previous.digest()?)
                         .map(Some)
                         .map_err(Into::into)
-                };
-            }
-        }
-        let (events, bytes) = history::ordered::segment_totals(&tx, actual.authority.as_str())?;
-        history::ordered::validate_history_bounds(&tx, actual.authority.as_str())?;
-        if automatic && !cadence::due(events)? {
-            return Ok(None);
+                }
+                _ => Ok(None),
+            };
         }
         let sequence = previous.as_ref().map_or(Ok(1), |record| {
             record
@@ -213,6 +234,7 @@ impl SqliteAdmissionOperationStore {
             "SELECT head_sequence,head_chain_digest FROM authority_global_commit_meta WHERE singleton = 1",
             [], |row| Ok((row.get(0)?,row.get(1)?)),
         ).map_err(sqlite_error)?;
+        let tx = compaction::compact(tx, actual.authority.as_str(), observed_at, dead)?;
         let (tables, current_rows, current_bytes) =
             rows::copy(&tx, actual.authority.as_str(), sequence)?;
         super::cutpoint(70)?;

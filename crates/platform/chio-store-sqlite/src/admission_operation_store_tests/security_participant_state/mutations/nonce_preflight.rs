@@ -382,3 +382,80 @@ fn preflight_cutpoints_preserve_only_committed_monotone_history_on_reopen() -> T
     }
     Ok(())
 }
+
+#[test]
+fn compacted_preflight_transition_stays_refused_to_another_join_family() -> TestResult {
+    let _fixture_clock = chio_test_support::clock::scope_unix_secs(now_ms().div_ceil(1_000));
+    let fixture = fixture();
+    let initialized = hydrate(&fixture, &imported(&fixture, "source")?)?;
+    let (context, _) = request("compacted-preflight")?;
+    let (operation, lease, input) = prepare(&fixture, &context)?;
+    let binding = initialized.admission_binding()?;
+    let recorded = fixture.store.join_native_security_nonce_preflight(
+        &operation,
+        &lease,
+        &binding,
+        &context,
+        &input,
+        now_ms(),
+    )?;
+    fixture.store.checkpoint_security_participant_history(
+        &initialized,
+        &fixture.fence,
+        now_ms(),
+    )?;
+    let current = |fixture: &Fixture| -> TestResult<bool> {
+        Ok(fixture.store.connection()?.query_row(
+            "SELECT EXISTS(SELECT 1 FROM security_participant_state_transitions
+             WHERE tenant_id = ?1 AND transition_id = ?2)",
+            params![
+                input.key().tenant_id.as_str(),
+                input.transition_id().as_str()
+            ],
+            |row| row.get(0),
+        )?)
+    };
+    assert!(
+        !current(&fixture)?,
+        "finished preflight transition stayed current"
+    );
+    assert_eq!(
+        fixture.store.join_native_security_nonce_preflight(
+            &operation,
+            &lease,
+            &binding,
+            &context,
+            &input,
+            now_ms(),
+        )?,
+        recorded
+    );
+    // A flow join of another operation cannot claim the preflight identifier.
+    let (_, mut join) = request("unused")?;
+    join.transition_id = input.transition_id().clone();
+    let context = SecurityInvocationContext::v1(
+        context
+            .as_v1()
+            .clone()
+            .with_flow_state_generation(recorded.join.snapshot.context_generation),
+    );
+    let (other, other_lease) = setup(&fixture, "compacted-preflight-reuse", &context)?;
+    let before = global_count(&*fixture.store.connection()?)?;
+    let refused = fixture.store.join_security_participant_flow(
+        &other,
+        &other_lease,
+        &initialized,
+        &context,
+        &join,
+        now_ms(),
+    );
+    assert!(
+        refused.as_ref().is_err_and(|error| error
+            .to_string()
+            .contains("native transition belongs to another operation or imported history")),
+        "a compacted preflight identifier was claimed by a flow join"
+    );
+    assert_eq!(global_count(&*fixture.store.connection()?)?, before);
+    assert!(!current(&fixture)?);
+    Ok(())
+}

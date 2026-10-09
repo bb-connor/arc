@@ -162,10 +162,13 @@ impl SqliteAdmissionOperationStore {
         }
         let acquisition_digest = match &command {
             NativeEgressCommand::Acquire(_) => {
-                let occupied: bool = tx.query_row("SELECT EXISTS(SELECT 1 FROM security_participant_state_egress_fences
-                    WHERE security_authority_id = ?1 AND ((tenant_id = ?2 AND request_id = ?3) OR fence_id = ?4))",
-                    params![actual.authority.as_str(),fence.key.tenant_id.as_str(),fence.request_id.as_str(),fence.fence_id.as_str()], |row| row.get(0)).map_err(sqlite_error)?;
-                if occupied {
+                if super::super::occupancy::fence_occupied(
+                    &tx,
+                    actual.authority.as_str(),
+                    fence.key.tenant_id.as_str(),
+                    fence.request_id.as_str(),
+                    fence.fence_id.as_str(),
+                )? {
                     return Err(invalid(
                         "native egress fence belongs to imported or another operation's history",
                     ));

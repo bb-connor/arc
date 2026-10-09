@@ -109,6 +109,11 @@ fn image_counter_measures_actual_current_copy_and_sealed_row_visits() -> Anchore
         &fixture.fence,
         now_ms(),
     )?;
+    // The finished join's transition identity stays in its journal and leaves
+    // the snapshot. The copy visits exactly the remaining current rows.
+    let unsealed = expected;
+    let expected = current_rows(&fixture, &initialized)?;
+    assert_eq!(expected, unsealed - 1);
     assert_eq!(images.counts("copy"), vec![expected]);
     let sealed_rows: i64 = fixture.store.connection()?.query_row(
         "SELECT COUNT(*) FROM security_participant_checkpoint_rows WHERE security_authority_id = ?1",

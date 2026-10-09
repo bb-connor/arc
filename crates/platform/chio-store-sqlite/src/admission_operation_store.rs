@@ -112,8 +112,8 @@ pub(crate) use security_participant_state::nonce_preflight::projection_reference
 pub(crate) use security_participant_state::output::projection_reference as security_participant_output_projection_reference;
 pub(crate) use security_participant_state::projection_reference as security_participant_state_projection_reference;
 pub(crate) use security_participant_state::{
-    NativeEgressAuthority, NativeFlowJoinAuthority, NativeNoncePreflightJoinAuthority,
-    NativeOutputJoinAuthority,
+    NativeCompactionAuthority, NativeEgressAuthority, NativeFlowJoinAuthority,
+    NativeNoncePreflightJoinAuthority, NativeOutputJoinAuthority,
 };
 pub use security_participant_state::{
     SecurityParticipantEgressHistory, SecurityParticipantFlowJoinHistory,

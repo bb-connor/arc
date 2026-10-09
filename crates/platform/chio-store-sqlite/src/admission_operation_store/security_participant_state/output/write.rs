@@ -65,19 +65,12 @@ impl SqliteAdmissionOperationStore {
         if generation != Some(intent.observed_generation()) {
             return Err(invalid("native output flow observation is stale or absent"));
         }
-        let occupied: bool = tx
-            .query_row(
-                "SELECT EXISTS(SELECT 1 FROM security_participant_state_transitions
-            WHERE security_authority_id = ?1 AND tenant_id = ?2 AND transition_id = ?3)",
-                params![
-                    actual.authority.as_str(),
-                    intent.key().tenant_id.as_str(),
-                    intent.transition_id().as_str()
-                ],
-                |row| row.get(0),
-            )
-            .map_err(sqlite_error)?;
-        if occupied {
+        if super::super::occupancy::transition_occupied(
+            &tx,
+            actual.authority.as_str(),
+            intent.key().tenant_id.as_str(),
+            intent.transition_id().as_str(),
+        )? {
             return Err(invalid("native output transition belongs to other history"));
         }
         let output_head = head(&tx, actual.authority.as_str())?;

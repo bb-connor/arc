@@ -105,7 +105,7 @@ pub(crate) use flow_state::{
 };
 pub(crate) use native_egress::{NativeEgressCommand, NativeEgressResult};
 pub(crate) use native_mutation::{
-    deny_native_mutations, is_native_flow_join_table, join_native_flow,
+    compact_native_rows, deny_native_mutations, is_native_flow_join_table, join_native_flow,
     join_native_nonce_preflight, join_native_output, mutate_native_egress, NativeRowChange,
 };
 #[cfg(all(test, unix))]
