@@ -505,21 +505,34 @@ fn point_reads_are_scoped_and_negatives_require_the_head() {
 fn c12_a_poisoned_writer_head_invalidates_reads_and_is_never_revived() {
     let fixture = mixed_fixture();
     let service = ready(&fixture, config());
-    assert!(service.query_receipts(&admin(10)).is_ok());
-    // A checkpoint row diverges out of band; the writer's own reseed fails
-    // closed and poisons its verified head.
+    let published = service
+        .query_receipts(&admin(10))
+        .unwrap()
+        .snapshot
+        .unwrap();
+    // A read admitted before the poison holds a lease on the published version.
+    let in_flight = service.lease_for_test().unwrap();
+    // The real writer-poison path: a persisted checkpoint diverges out of band,
+    // and the writer's own reseed fails closed and poisons its verified head.
+    let original = "\"batch_end_seq\":4";
+    let diverged = "\"batch_end_seq\":3";
     fixture
         .tamper()
         .execute(
-            "UPDATE kernel_checkpoints SET statement_json = replace(statement_json, '\"batch_end_seq\":4', '\"batch_end_seq\":3') WHERE checkpoint_seq = 1",
-            [],
+            "UPDATE kernel_checkpoints SET statement_json = replace(statement_json, ?1, ?2) WHERE checkpoint_seq = 1",
+            [original, diverged],
         )
         .unwrap();
     assert!(fixture.store.reseed_verified_head().is_err());
     assert!(fixture.store.writer_serving_closed());
-    let error = service.query_receipts(&admin(10)).unwrap_err();
+    let admitted = service.query_receipts(&admin(10)).unwrap_err();
     assert!(matches!(
-        snapshot_error(error),
+        snapshot_error(admitted),
+        ReceiptQuerySnapshotError::Invalid(_)
+    ));
+    let leased = service.recheck_lease_for_test(in_flight).unwrap_err();
+    assert!(matches!(
+        snapshot_error(leased),
         ReceiptQuerySnapshotError::Invalid(_)
     ));
     wait_for(&service, "invalid", |state| {
@@ -530,6 +543,35 @@ fn c12_a_poisoned_writer_head_invalidates_reads_and_is_never_revived() {
     while Instant::now() < deadline {
         assert!(service.query_receipts(&admin(10)).is_err());
     }
+    // Repair the checkpoint and reseed: the service builds a new lineage and
+    // never serves the poisoned one again.
+    fixture
+        .tamper()
+        .execute(
+            "UPDATE kernel_checkpoints SET statement_json = replace(statement_json, ?1, ?2) WHERE checkpoint_seq = 1",
+            [diverged, original],
+        )
+        .unwrap();
+    fixture.store.reseed_verified_head().unwrap();
+    assert!(!fixture.store.writer_serving_closed());
+    let deadline = Instant::now() + Duration::from_secs(60);
+    let rebuilt = loop {
+        if let Ok(page) = service.query_receipts(&admin(10)) {
+            break page.snapshot.unwrap();
+        }
+        assert!(Instant::now() < deadline, "no rebuild after the reseed");
+        std::thread::sleep(Duration::from_millis(10));
+    };
+    let lineage = |id: &str| id.split(':').next().unwrap().to_string();
+    assert_ne!(
+        lineage(&published.snapshot_id),
+        lineage(&rebuilt.snapshot_id)
+    );
+    let stale = service.recheck_lease_for_test(in_flight).unwrap_err();
+    assert!(matches!(
+        snapshot_error(stale),
+        ReceiptQuerySnapshotError::Invalid(_)
+    ));
     service.shutdown();
 }
 
