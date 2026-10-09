@@ -1,0 +1,36 @@
+{
+  "schema": "chio.computer.design-check.v1",
+  "design_revision": 5,
+  "document_sha256": {
+    "01-ENVIRONMENTS.md": "b607c4984acc45628540efb500db043367de2b75d714e4b00fd7e9ba10b7a25a",
+    "02-RESOURCE-BRANCHES.md": "b7b9853df14f3960975ff6b0b00362f7882b58c7454945349dd91c1d236ea6c1",
+    "03-PROGRAMS.md": "942d5cc2316b89bb1bd80f16ae2f5747dedccd13624620dccdd16f18839b9989",
+    "04-EXECUTION-BINDINGS.md": "5b78a4de072f3af14c375143e4916fb4e702bef7f3c5196319ff26b132541b2c",
+    "05-EXECUTION-AND-APPLY.md": "43708fe15995910b56ee0b3d0a8f761ae8ddda749aa1c930a64cde6255d63f22",
+    "ACCEPTANCE.md": "3be9ae76135b43128b78bdb803bffbca7f1e7bd9f77f32446296e5d267ceb9a4",
+    "PROPOSAL.md": "fabfe62dbda1e1d05cb0845dc49e619e77fa9d5657129bba51d40d6677e49f27",
+    "ROADMAP-CROSSWALK.md": "34ec06f48b8afcf2c42bb1bc80b28e65511c98ff2eaecae92e3ed2374d4fd426",
+    "research/CODEBASE-COVERAGE.md": "f0741cc64994914ff21ce171e4be4e4a241b0e0598565fbfff66dcc96994d07e"
+  },
+  "validator_sha256": "c202d64db2fff2673fa170085471be558c6022488acd59e6cae7f002315b7c4c",
+  "validator_regression_sha256": "e92cce5ca41241189cde12e5ea089981beebff8e703121b226565644cede6c1f",
+  "source_evidence_sha256": "41dc967870f9774530f529a396d9e3183fcef72efe74ee13264248e09e2d534a",
+  "python_examples_syntax_checked": 2,
+  "operator_precedence_checked": true,
+  "local_links_checked": 35,
+  "pinned_source_links_checked": 194,
+  "source_records": 276,
+  "source_objects_hash_and_line_count_checked": 276,
+  "source_selection": "canonical-published-equivalent-or-required-pins",
+  "distinct_crate_manifests": 158,
+  "crate_groups": 12,
+  "proposed_acceptance_cases": 52,
+  "acceptance_cases_by_profile": {
+    "Computer-0": 48,
+    "Both": 2,
+    "Later funded": 2
+  },
+  "runtime_tests_run": false,
+  "api_implemented": false,
+  "errors": []
+}
