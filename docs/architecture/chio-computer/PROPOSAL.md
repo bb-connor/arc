@@ -302,10 +302,11 @@ incremental delivery to the roadmap's COMP rungs and lists the adverse cases.
   independently operated computers.
 - It includes a dynamic helper, a lost reply and a source apply conflict.
 - It exercises both leaf kinds.
-- Application C (versioned data curation) is the required second application
-  and reuses the same contracts without custom signing, retry, verifier service
-  or ledger code. Application B (confined work beside private data) remains
-  optional stretch scope.
+- Application C (versioned data curation) is the required second application.
+  It is COMP-5's reuse evidence and does not gate G5. It reuses the same
+  contracts without custom signing, retry, verifier service or ledger code.
+  Application B (confined work beside private data) remains optional stretch
+  scope.
 
 ## 7. Claims under ADR-0011
 
@@ -339,6 +340,15 @@ Claims carry the preview label until their COMP rung and gate pass.
 - corrects contract acceptance ranges and adds adverse cases for these paths;
 - checks canonical published evidence deterministically and fails on missing
   published objects, with executable validator regression tests.
+
+Follow-up corrections to revision 4 (same day):
+
+- C3-02 uses `a & a` for the repeated parallel leaf; under D23, `a | a` is a
+  sequence;
+- Application C is COMP-5's reuse evidence and does not gate G5;
+- at G5 each outside team qualifies in its roadmap role, so a requesting team
+  need not execute a TaskLeaf;
+- COMP-1 and COMP-2 are unblocked now and start on the explicit start.
 
 **Revision 3** applies the owner's 2026-10-09 decisions (roadmap D21 to D23,
 and Lane COMP in the unified roadmap):
@@ -393,6 +403,12 @@ local head deterministically. Run validator regressions with
 These checks perform no runtime
 qualification. Folding its generic checks into a repository-wide documents gate
 is a follow-up, once the public-copy gate exists (roadmap OUT-2).
+
+**Merge order.** The research evidence pins the unified roadmap amendment at
+#1200's commit `e9b2660f6`. Merge #1200 with a merge commit before this PR, so
+that commit stays reachable from main. Otherwise, re-pin that evidence view to
+main once #1200 lands; the validator fails when a pinned published object is
+missing.
 
 The evidence includes divergent PR heads. Implementation must:
 
