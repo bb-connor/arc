@@ -790,7 +790,6 @@ fn validate_network_mutation(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn network_get(
     http: &NetworkHttpClient,
     profile: &FindingHostedProfile,
@@ -810,7 +809,6 @@ async fn network_get(
     bounded_response(&response)
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn network_get_status(
     http: &NetworkHttpClient,
     profile: &FindingHostedProfile,
@@ -829,7 +827,6 @@ async fn network_get_status(
     Ok(status)
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn network_request(
     http: &NetworkHttpClient,
     profile: &FindingHostedProfile,
