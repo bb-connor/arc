@@ -457,9 +457,13 @@ fixed when the pass starts. Extension keeps running alongside it.
 
 ### 6.1 Request flow
 
-1. Take one of the service's non-queued read permits
-   (`max_concurrent_reads`, default 4). Without one, the request returns 503
-   `busy`.
+1. **Two-layer admission.** Both layers are non-queued; without a permit, the
+   request returns 503 `busy`.
+   - The control plane takes an HTTP permit before `spawn_blocking`, and moves
+     it into the closure so a cancelled request holds it until the work stops.
+   - The core service then takes one of its own read permits
+     (`max_concurrent_reads`, default 4). This bounds every consumer,
+     including the ones that do not come through HTTP.
 2. The control plane calls the service on the blocking pool.
 3. Validate exactly as today: outcome, currency rules and `effective_read_scope`
    (`chio-kernel/src/receipt_query.rs:200-250`).
@@ -624,8 +628,10 @@ detected at the recertification cadence rather than on the next page (Q1).
     Both are V25-PRE's to implement.
   - This design adds `TrustServiceState.receipt_query_snapshots:
     Option<Arc<ReceiptQuerySnapshots>>`. It starts the service once after the
-    store exists and stops it before the store is dropped. Read admission
-    lives in the service. The exact hunks are agreed with the V25-PRE lane before Task 6.
+    store exists and stops it before the store is dropped.
+  - Read admission has two layers (6.1): an outer, non-queued HTTP permit
+    taken before `spawn_blocking`, and the core service's own non-queued read
+    permit. The exact hunks are agreed with the V25-PRE lane before Task 6.
 - **Start, asynchronously.**
   - `ReceiptQuerySnapshots::start` returns at once in
     `Building(waiting_for_writer_seed)`.
