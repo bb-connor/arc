@@ -364,6 +364,14 @@ opt-level = 3
 [profile.test.package.sha2]
 opt-level = 3
 
+# Bundled SQLite dominates concurrent store tests at dev/test optimization zero.
+# Optimize this dependency while retaining debug assertions and overflow checks.
+[profile.dev.package.libsqlite3-sys]
+opt-level = 3
+
+[profile.test.package.libsqlite3-sys]
+opt-level = 3
+
 [workspace.dependencies]
 secrecy = { version = "=0.10.3", features = ["serde"] }
 async-trait = "0.1"
