@@ -41,7 +41,9 @@ def test_host_projects_every_native_state(native, category):
         session = RecoveryHostSession("http://localhost:1", "private-capability",
                                       {"selected": b"{}"}, transport=httpx.MockTransport(serve))
         outcome = await session.execute("selected")
-        assert outcome.as_dict() == {"category": category, "command_id": "command", "workflow_id": "workflow"}
+        assert outcome.as_dict() == {"category": category, "command_id": "command", "workflow_id": "workflow",
+                                    "effect": native["effect"]["kind"], "control": native["control"],
+                                    "release": native["release"]["kind"]}
         assert len(calls) == session.attempts == 1
     asyncio.run(run())
 
@@ -62,7 +64,7 @@ def test_fixed_native_errors_keep_semantics(http_status, code, category):
             await client.execute("private-capability", b"{}")
         await client.aclose()
         session = RecoveryHostSession("http://localhost:1", "private-capability", {"selected": b"{}"}, transport=transport)
-        assert (await session.execute("selected")).as_dict() == {"category": category}
+        assert (await session.execute("selected")).as_dict() == {"category": category, "error_code": "recovery." + code}
     asyncio.run(run())
 
 

@@ -28,7 +28,7 @@ def test_reserved_framework_context_never_changes_the_native_actor_or_selected_b
         "task_fingerprint": {"uuid": "synthetic-task"}}}
     supplied = json.dumps(arguments) if as_string else arguments
     result = structured.invoke(supplied)
-    assert json.loads(result) == {"category": "refused"}
+    assert json.loads(result) == {"category": "refused", "error_code": "recovery.refused_or_unavailable"}
     assert session.attempts == len(wires) == 1
     assert wires[0]["capability"] == "owned-native-capability"
     assert wires[0]["command"] == '{"command_id":"owned-command"}'
@@ -50,7 +50,7 @@ def test_reserved_framework_context_is_never_inspected():
             raise AssertionError("framework context was traversed")
     tool, session, wires = tool_and_wires()
     result = tool.to_structured_tool().invoke({"choice": "resume", "security_context": OpaqueContext()})
-    assert json.loads(result) == {"category": "refused"}
+    assert json.loads(result) == {"category": "refused", "error_code": "recovery.refused_or_unavailable"}
     assert session.attempts == len(wires) == 1
 
 

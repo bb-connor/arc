@@ -47,7 +47,9 @@ async def test_cleanup_uses_the_remaining_action_deadline_without_losing_effects
     session = RecoveryHostSession("http://localhost:1", "synthetic-capability",
         {"resume": b"{}"}, transport=transport, timeout_seconds=1)
     outcome = await asyncio.wait_for(session.execute("resume"), timeout=1.4)
-    assert outcome.as_dict() == {"category": category, "command_id": "command", "workflow_id": "workflow"}
+    assert outcome.as_dict() == {"category": category, "command_id": "command", "workflow_id": "workflow",
+                                "effect": status["effect"]["kind"], "control": status["control"],
+                                "release": status["release"]["kind"]}
     assert transport.calls == session.attempts == 1
     # The action returns when its deadline ends; observe task cancellation
     # separately so the observation cannot extend the selected action wait.
@@ -81,7 +83,9 @@ async def test_delayed_cleanup_cancellation_cannot_renew_the_action_budget():
     started = time.monotonic()
     outcome = await asyncio.wait_for(session.execute("resume"), timeout=2)
     assert time.monotonic() - started < 1.3
-    assert outcome.as_dict() == {"category": "complete", "command_id": "command", "workflow_id": "workflow"}
+    assert outcome.as_dict() == {"category": "complete", "command_id": "command", "workflow_id": "workflow",
+                                "effect": status["effect"]["kind"], "control": status["control"],
+                                "release": status["release"]["kind"]}
     assert session.attempts == 1
     # Observe eventual cleanup separately from the action's selected wait.
     await asyncio.wait_for(transport.completed.wait(), timeout=1)
