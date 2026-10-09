@@ -39,6 +39,8 @@ RETIRED = (
 CASE_ID = re.compile(r"\b(Q(?:0[1-9]|[1-9][0-9])|C(?:0[1-9]|1[0-9])|H0[1-8][ab]?)\b")
 CASE_ROW = re.compile(r"^\|\s*(Q\d\d|C\d\d|H0[1-8][ab]?)\s*\|", re.M)
 LINK = re.compile(r"\]\(([^)\s]+)\)")
+REF_DEF = re.compile(r"^ {0,3}\[([^\]]+)\]:\s*<?([^\s>]+)>?", re.M)
+REF_USE = re.compile(r"\[[^\]]*\]\[([^\]]*)\]")
 HEADING = re.compile(r"^ {0,3}#{1,6}\s+(.+?)\s*#*\s*$", re.M)
 SETEXT = re.compile(r"^ {0,3}(\S[^\n]*?)\s*\n {0,3}(?:=+|-+)\s*$", re.M)
 FENCE = re.compile(r"^([ \t]*)(```|~~~)[^\n]*\n.*?^[ \t]*\2[^\n]*$", re.M | re.S)
@@ -190,7 +192,12 @@ def missing_inputs(layout: Layout, rule: str, public: bool) -> list[str]:
 def check_links(layout: Layout) -> list[str]:
     out = missing_inputs(layout, "links", public=False)
     for path in layout.program:
-        for target in LINK.findall(prose(read(path))):
+        text = prose(read(path))
+        definitions = {label.strip().lower(): target for label, target in REF_DEF.findall(text)}
+        for label in REF_USE.findall(text):
+            if label and label.strip().lower() not in definitions:
+                out.append(f"links: {layout.rel(path)}: undefined reference [{label}]")
+        for target in LINK.findall(text) + list(definitions.values()):
             if re.match(r"^[a-z][a-z0-9+.-]*:", target, re.I):
                 continue
             file_part, _, anchor = target.partition("#")
@@ -224,9 +231,11 @@ def check_retired(layout: Layout) -> list[str]:
             continue
         text = visible_text(path, read(path))
         for phrase in RETIRED:
-            # "verify-only protocol" is not an "only protocol" claim.
-            if re.search(r"(?<![\w-])" + re.escape(phrase.lower()) + r"s?\b", text):
-                out.append(f"retired-phrases: {layout.rel(path)}: contains '{phrase}'")
+            # "verify-only protocol" is not an "only protocol" claim. The
+            # count lets a baseline catch an added occurrence in a known file.
+            hits = len(re.findall(r"(?<![\w-])" + re.escape(phrase.lower()) + r"s?\b", text))
+            if hits:
+                out.append(f"retired-phrases: {layout.rel(path)}: contains '{phrase}' (count {hits})")
     return out
 
 

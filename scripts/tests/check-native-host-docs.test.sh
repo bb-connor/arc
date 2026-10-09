@@ -13,12 +13,14 @@ REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 CHECKER="$REPO_ROOT/scripts/check-native-host-docs.py"
 
 # Public-copy violations on main before the positioning items land.
+# Each entry carries its occurrence count, so an added occurrence of a known
+# phrase in a known file is a new violation.
 PUBLIC_COPY_BASELINE=(
-  "retired-phrases: README.md: contains 'The kernel your agents answer to'"
-  "retired-phrases: README.md: contains 'Agents that pay each other'"
-  "retired-phrases: docs/assets/subhead-mobile.svg: contains 'Agents that pay each other'"
-  "retired-phrases: docs/assets/subhead.svg: contains 'Agents that pay each other'"
-  "retired-phrases: docs/reference/COMPETITIVE_LANDSCAPE.md: contains 'only protocol'"
+  "retired-phrases: README.md: contains 'The kernel your agents answer to' (count 1)"
+  "retired-phrases: README.md: contains 'Agents that pay each other' (count 1)"
+  "retired-phrases: docs/assets/subhead-mobile.svg: contains 'Agents that pay each other' (count 2)"
+  "retired-phrases: docs/assets/subhead.svg: contains 'Agents that pay each other' (count 2)"
+  "retired-phrases: docs/reference/COMPETITIVE_LANDSCAPE.md: contains 'only protocol' (count 1)"
 )
 
 work="$(mktemp -d -t chio-native-host-docs-XXXXXX)"
@@ -115,26 +117,31 @@ expect "clean fixture passes every rule" 0 "-" --
 # A retired phrase in Markdown is found even when wrapped across lines.
 new_fixture markdown-retired
 printf '\n<strong>The kernel your agents\nanswer to.</strong>\n' >>"$fixture/README.md"
-expect "retired phrase in Markdown" 1 "retired-phrases: README.md: contains 'The kernel your agents answer to'" -- --rule retired-phrases
+expect "retired phrase in Markdown" 1 "retired-phrases: README.md: contains 'The kernel your agents answer to' (count 1)" -- --rule retired-phrases
 
 # A retired phrase in an SVG alt attribute is found.
 new_fixture svg-alt-retired
 printf '<svg xmlns="http://www.w3.org/2000/svg"><image href="hero.png" alt="Agents that pay each other"/></svg>\n' \
   >"$fixture/docs/assets/subhead-mobile.svg"
-expect "retired phrase in SVG alt" 1 "retired-phrases: docs/assets/subhead-mobile.svg: contains 'Agents that pay each other'" -- --rule retired-phrases
+expect "retired phrase in SVG alt" 1 "retired-phrases: docs/assets/subhead-mobile.svg: contains 'Agents that pay each other' (count 1)" -- --rule retired-phrases
 
 # A retired phrase split across SVG text spans is found.
 new_fixture svg-tspan-retired
 printf '<svg xmlns="http://www.w3.org/2000/svg"><text><tspan>Agents that pay</tspan><tspan dx="4">each other</tspan></text></svg>\n' \
   >"$fixture/docs/assets/subhead.svg"
-expect "retired phrase split across SVG spans" 1 "retired-phrases: docs/assets/subhead.svg: contains 'Agents that pay each other'" -- --rule retired-phrases
+expect "retired phrase split across SVG spans" 1 "retired-phrases: docs/assets/subhead.svg: contains 'Agents that pay each other' (count 1)" -- --rule retired-phrases
+
+# Every occurrence counts.
+new_fixture repeated-retired
+printf '\nThe kernel your agents answer to.\n\nThe kernel your agents answer to.\n' >>"$fixture/README.md"
+expect "repeated retired phrase is counted" 1 "retired-phrases: README.md: contains 'The kernel your agents answer to' (count 2)" -- --rule retired-phrases
 
 # Inline Markdown cannot hide a retired phrase.
 new_fixture markdown-markup
 printf 'Agents that **pay** each other.\n' >"$fixture/docs/start-here/EMPHASIS.md"
 printf '[The kernel your agents](https://example.com) answer to.\n' >"$fixture/docs/start-here/LINK.md"
-expect "retired phrase with emphasis" 1 "retired-phrases: docs/start-here/EMPHASIS.md: contains 'Agents that pay each other'" -- --rule retired-phrases
-expect "retired phrase across a link span" 1 "retired-phrases: docs/start-here/LINK.md: contains 'The kernel your agents answer to'" -- --rule retired-phrases
+expect "retired phrase with emphasis" 1 "retired-phrases: docs/start-here/EMPHASIS.md: contains 'Agents that pay each other' (count 1)" -- --rule retired-phrases
+expect "retired phrase across a link span" 1 "retired-phrases: docs/start-here/LINK.md: contains 'The kernel your agents answer to' (count 1)" -- --rule retired-phrases
 
 # A missing explicitly named input is reported for its scope.
 new_fixture missing-inputs
@@ -145,14 +152,14 @@ expect "missing named public document" 1 "retired-phrases: docs/adr/README.md: r
 # A plural retired claim is still a retired claim.
 new_fixture plural-retired
 printf 'Chio is one of the only protocols that does this.\n' >>"$fixture/docs/reference/COMPETITIVE_LANDSCAPE.md"
-expect "plural only protocols" 1 "retired-phrases: docs/reference/COMPETITIVE_LANDSCAPE.md: contains 'only protocol'" -- --rule retired-phrases
+expect "plural only protocols" 1 "retired-phrases: docs/reference/COMPETITIVE_LANDSCAPE.md: contains 'only protocol' (count 1)" -- --rule retired-phrases
 
 # --scope program ignores the public copy; --scope public ignores the program set.
 new_fixture scopes
 printf '\nThe kernel your agents answer to.\n' >>"$fixture/README.md"
 printf '\nAgents that pay each other.\n' >>"$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/README.md"
-expect "--scope program skips public copy" 1 "retired-phrases: docs/superpowers/specs/2026-10-07-desktop-integration/README.md: contains 'Agents that pay each other'" -- --scope program --rule retired-phrases
-expect "--scope public skips the program set" 1 "retired-phrases: README.md: contains 'The kernel your agents answer to'" -- --scope public --rule retired-phrases
+expect "--scope program skips public copy" 1 "retired-phrases: docs/superpowers/specs/2026-10-07-desktop-integration/README.md: contains 'Agents that pay each other' (count 1)" -- --scope program --rule retired-phrases
+expect "--scope public skips the program set" 1 "retired-phrases: README.md: contains 'The kernel your agents answer to' (count 1)" -- --scope public --rule retired-phrases
 new_fixture scope-public-only
 printf '\nThe kernel your agents answer to.\n' >>"$fixture/README.md"
 expect "--scope program ignores a public-copy violation" 0 "-" -- --scope program
@@ -163,7 +170,7 @@ expect "--scope public ignores a program violation" 0 "-" -- --scope public
 # The ADR index is public copy.
 new_fixture adr-index
 printf '# ADRs\n\nThe kernel your agents answer to.\n' >"$fixture/docs/adr/README.md"
-expect "retired phrase in the ADR index" 1 "retired-phrases: docs/adr/README.md: contains 'The kernel your agents answer to'" -- --scope public --rule retired-phrases
+expect "retired phrase in the ADR index" 1 "retired-phrases: docs/adr/README.md: contains 'The kernel your agents answer to' (count 1)" -- --scope public --rule retired-phrases
 
 # "verify-only protocol" is a projection name, not an "only protocol" claim.
 new_fixture verify-only
@@ -180,7 +187,7 @@ expect "allowlisted historical file is exempt" 0 "-" -- --rule retired-phrases
 new_fixture not-allowlisted
 printf '# Review\n\nThe old README said "only protocol".\n' \
   >"$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/reviews/2026-10-08-notes.md"
-expect "non-allowlisted program file is checked" 1 "retired-phrases: docs/superpowers/specs/2026-10-07-desktop-integration/reviews/2026-10-08-notes.md: contains 'only protocol'" -- --rule retired-phrases
+expect "non-allowlisted program file is checked" 1 "retired-phrases: docs/superpowers/specs/2026-10-07-desktop-integration/reviews/2026-10-08-notes.md: contains 'only protocol' (count 1)" -- --rule retired-phrases
 
 # An em dash is reported with its line, also as an HTML entity.
 new_fixture em-dash
@@ -209,6 +216,13 @@ new_fixture indented-fence
 printf '\n- Step:\n\n  ```markdown\n  [example](MISSING.md)\n  ```\n' \
   >>"$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/README.md"
 expect "links in an indented fence are ignored" 0 "-" -- --rule links
+
+# Reference-style links are checked: a missing target and an undefined label.
+new_fixture reference-links
+printf '\nSee [flows][north-star] and [cases][cases-ref].\n\n[north-star]: MISSING.md\n' \
+  >>"$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/README.md"
+expect "reference link with a missing target" 1 "links: docs/superpowers/specs/2026-10-07-desktop-integration/README.md: missing target MISSING.md" -- --rule links
+expect "undefined reference label" 1 "links: docs/superpowers/specs/2026-10-07-desktop-integration/README.md: undefined reference [cases-ref]" -- --rule links
 
 # Links inside code are not checked.
 new_fixture code-link
