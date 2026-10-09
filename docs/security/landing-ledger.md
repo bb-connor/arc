@@ -1,36 +1,48 @@
 # Security and process landing ledger
 
-## Current qualification checkpoint (October 9, 00:34 UTC)
+## Current qualification checkpoint (October 9, 03:01 UTC)
 
-PR #1160 remains open and unmerged at `fd8bfdc947`. The local integration
-branch at `04f3527afe` has three unpublished commits: Python lint/layout
-repairs (`eb656fb745`), a comment-only stub-scanner repair (`70f288c057`),
-and moving the stub checks before expensive build gates (`04f3527afe`).
-The previous hosted Build check failed; its MSRV workspace lane is still
-running. Cargo Vet and Cargo Deny passed on that previous head. These
-results do not qualify the unpublished batch.
+PR #1160 remains open and unmerged at `fd8bfdc947`. Its hosted checks are
+terminal: 117 succeeded, eight failed and 16 were skipped. Required Cargo
+Vet and Cargo Deny passed; Build and MSRV failed. The local integration
+branch at `5f70f6ed2e` contains 14 unpublished repair and evidence commits.
+These source repairs do not qualify that unpublished batch.
 
-The isolated Kani repair now checks unwinding and an exact reachable
-completion witness instead of accepting a truncated success path. Eight
-affected harnesses have passed within their recorded source/profile
-boundaries. Renewed receipt hash controls with the safe encoder passed,
-including the accepting case in 486.46 seconds with a 6.58 GiB peak.
-The original symbolic weights and attestation proofs remain open;
-timed-out and cancelled attempts are not proof evidence. No cryptographic
-assumption, input-domain reduction, assertion removal or baseline waiver
-has supplied acceptance.
+| Current repair | Integrated commits | Verification and remaining acceptance |
+| --- | --- | --- |
+| Python lint, Cohere comment and early stub scan | `eb656fb745`, `70f288c057`, `04f3527afe` | Focused Ruff, formatting, diagnostic and stub controls passed. Hosted renewal remains pending. |
+| Preserve signed outcomes and cleanup after four kernel faults | `5ead9f7d59`, `805c1e38b4`, `7c10a35384`, `d5c1cd4545` | Four regressions failed on original foundation source; 161 focused controls and strict owner Clippy passed in private targets. |
+| Refuse compensation when both trusted clocks fail | `5f70f6ed2e` | Test-only negative control passed with 19 surrounding cases. Refusal preserves the exact operation; recovery succeeds when trusted time returns. |
+| Release a broker dispatch claim after poisoned custody | `a38bc525fd` | Original failed at the missing failure projection; all 246 broker library tests and strict owner Clippy passed in a private target. |
+| Record retries after slow work and sample settled teardown state | `95542c8cfd`, `5b687080f2`, `96d3910237` | Original load reproductions include the hosted RollingBack failure. Repaired controls passed 144 load repetitions, owner suites and strict Clippy. The remaining transaction-lock race and exhausted-rollback journal growth require separate repairs now. |
+| Refresh reviewed formal source links | `9bedacd23f` | Four abstraction anchors changed; all 252 match using a freshly compiled source-specific generator. Matching hashes establish bookkeeping, not model refinement. |
 
-The changed Rust owners passed 925 tests with one existing ignored doctest.
-Wire compatibility and all 8,192 attestation seed/root cases passed as
-ordinary tests. A subsequent checked-index correction passed those wire
-controls and strict all-target Clippy for all four owning crates. These
-ordinary tests do not replace the outstanding symbolic proofs. The broader
-workspace runtime campaign encountered a load-only teardown regression
-and was cancelled after 3,403.33 seconds; its remaining tests were not run.
-Claude owns `CI-TEARDOWN-FAULTBOUND` and is triaging eight additional cleanup
-candidates against the foundation source. Confirmed foundation blockers
-require repair before landing; defects confined to later trains stay with
-those trains. The merge and pre-release boundaries below remain unchanged.
+Independent review of the eight production/test repair commits found no
+introduced P0, P1 or P2 defects. The remaining scheduler issues are assigned
+for repair. A fresh private-target integration campaign is running with
+the typed encoder composition. Older shared-target Claude lane counts
+outside each lane's edits are superseded; their later private-target
+Original and repaired results are the relevant evidence.
+
+The isolated Kani repair checks unwinding and an exact reachable completion
+witness. Eight affected harnesses have passed within their recorded
+source/profile boundaries. The typed ASCII encoder separately proved every
+output digit for an arbitrary 32-byte input in 53.34 seconds, using 1.29 GiB.
+The complete original weights proof then timed out after 1,802.01 seconds
+in the solver, using 6.09 GiB. Attestation is running independently; receipt
+proofs will be renewed on this final encoder. Neither the encoder proof nor
+ordinary tests supply the missing whole-harness acceptance. No cryptographic
+assumption, input reduction, assertion removal or baseline waiver has
+supplied acceptance.
+
+Typed-encoder owner tests passed 925 cases with one existing ignored
+doctest; strict Clippy, native and WASM no-default checks, and locked Cargo
+Vet passed. Wire compatibility and all 8,192 attestation seed/root cases
+passed as ordinary tests. The earlier broad workspace campaign failed the
+teardown regression and was cancelled after 3,403.33 seconds; its remaining
+tests were not run. The final combined source still needs generated coverage,
+focused integration completion, exact hosted qualification and current
+review dispositions. The merge and pre-release boundaries below are unchanged.
 
 ## Current CI closeout wave (October 8)
 
