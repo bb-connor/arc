@@ -544,3 +544,74 @@ fn a_snapshot_storage_io_error_on_a_read_refuses_as_unavailable() {
         ReceiptStoreError::QuerySnapshot(ReceiptQuerySnapshotError::Invalid(_))
     ));
 }
+
+fn sqlite_failure(code: std::os::raw::c_int) -> rusqlite::Error {
+    rusqlite::Error::SqliteFailure(rusqlite::ffi::Error::new(code), None)
+}
+
+#[test]
+fn nested_sqlite_resource_failures_are_unavailable_and_other_classes_keep_theirs() {
+    use super::super::query::snapshot_error;
+    use super::super::walk::WalkError;
+    let walker = |error| WalkError::from(SnapshotDbError::Store(error));
+    for code in [
+        rusqlite::ffi::SQLITE_IOERR_READ,
+        rusqlite::ffi::SQLITE_CANTOPEN,
+        rusqlite::ffi::SQLITE_NOMEM,
+        rusqlite::ffi::SQLITE_READONLY,
+        rusqlite::ffi::SQLITE_PERM,
+    ] {
+        let outcome = walker(ReceiptStoreError::Sqlite(sqlite_failure(code)));
+        assert!(
+            matches!(outcome, WalkError::Unavailable(_)),
+            "nested SQLite code {code} in the walker became {outcome:?}"
+        );
+        let read = snapshot_error(SnapshotDbError::Store(ReceiptStoreError::Sqlite(
+            sqlite_failure(code),
+        )));
+        assert!(
+            matches!(
+                read,
+                ReceiptStoreError::QuerySnapshot(ReceiptQuerySnapshotError::Unavailable(_))
+            ),
+            "nested SQLite code {code} on a read became {read:?}"
+        );
+    }
+    // Interruption, contention, work budgets and integrity keep their class.
+    assert!(matches!(
+        walker(ReceiptStoreError::Sqlite(sqlite_failure(
+            rusqlite::ffi::SQLITE_INTERRUPT
+        ))),
+        WalkError::Busy(_)
+    ));
+    assert!(matches!(
+        walker(ReceiptStoreError::Sqlite(sqlite_failure(
+            rusqlite::ffi::SQLITE_BUSY
+        ))),
+        WalkError::Busy(_)
+    ));
+    assert!(matches!(
+        walker(ReceiptQuerySnapshotError::WorkBudgetExhausted("walker".into()).into()),
+        WalkError::WalkerBudget
+    ));
+    assert!(matches!(
+        walker(ReceiptStoreError::Sqlite(sqlite_failure(
+            rusqlite::ffi::SQLITE_CORRUPT
+        ))),
+        WalkError::Integrity(_)
+    ));
+    assert!(matches!(
+        snapshot_error(SnapshotDbError::Store(ReceiptStoreError::Sqlite(
+            sqlite_failure(rusqlite::ffi::SQLITE_INTERRUPT)
+        ))),
+        ReceiptStoreError::Sqlite(_)
+    ));
+    // Ordinary capacity is a capacity outcome, never an integrity one.
+    assert!(matches!(
+        WalkError::from(SnapshotDbError::Capacity {
+            quota_bytes: 1,
+            used_bytes: 1
+        }),
+        WalkError::Capacity { .. }
+    ));
+}

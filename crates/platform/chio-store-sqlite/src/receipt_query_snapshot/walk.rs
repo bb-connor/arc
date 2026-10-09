@@ -80,14 +80,7 @@ impl From<SnapshotDbError> for WalkError {
             },
             SnapshotDbError::Duplicate(message) => Self::Integrity(message),
             SnapshotDbError::Store(error) => classify(error, None),
-            SnapshotDbError::Sqlite(error) => {
-                let reason = format!("receipt query snapshot storage failed: {error}");
-                if super::query::storage_unavailable(&error) {
-                    Self::Unavailable(reason)
-                } else {
-                    Self::Integrity(reason)
-                }
-            }
+            SnapshotDbError::Sqlite(error) => classify(ReceiptStoreError::Sqlite(error), None),
         }
     }
 }
@@ -215,9 +208,40 @@ impl Drop for StepGuard<'_> {
     }
 }
 
-/// Map a store error to its walker outcome. Interruption means cancellation
-/// or budget exhaustion; busy and pool errors are contention. A typed snapshot
-/// outcome keeps its class: only `Invalid` is an integrity failure.
+/// SQLite failures of storage or its environment: I/O, opening, memory,
+/// permissions and space. They say nothing about the stored rows.
+fn sqlite_resource_failure(error: &rusqlite::Error) -> bool {
+    matches!(
+        error.sqlite_error_code(),
+        Some(
+            ErrorCode::SystemIoFailure
+                | ErrorCode::CannotOpen
+                | ErrorCode::OutOfMemory
+                | ErrorCode::ReadOnly
+                | ErrorCode::PermissionDenied
+                | ErrorCode::DiskFull
+                | ErrorCode::NoLargeFileSupport
+                | ErrorCode::FileLockingProtocolFailed
+        )
+    )
+}
+
+/// The availability reason of a store error that wraps a SQLite resource
+/// failure, shared by the walker and the read path. Interruption, contention
+/// and every other error are left to their own class.
+pub(super) fn resource_unavailable(error: &ReceiptStoreError) -> Option<String> {
+    match error {
+        ReceiptStoreError::Sqlite(sqlite) if sqlite_resource_failure(sqlite) => {
+            Some(format!("receipt query snapshot storage failed: {sqlite}"))
+        }
+        _ => None,
+    }
+}
+
+/// Map a store error to its walker outcome, in order of precedence. A typed
+/// snapshot outcome keeps its class: only `Invalid` is an integrity failure.
+/// Interruption means cancellation or budget exhaustion; busy and pool errors
+/// are contention; a SQLite resource failure is unavailability.
 fn classify(error: ReceiptStoreError, guard: Option<&StepGuard<'_>>) -> WalkError {
     if let ReceiptStoreError::QuerySnapshot(snapshot) = &error {
         return match snapshot {
@@ -247,6 +271,9 @@ fn classify(error: ReceiptStoreError, guard: Option<&StepGuard<'_>>) -> WalkErro
             }
             _ => {}
         }
+    }
+    if let Some(reason) = resource_unavailable(&error) {
+        return WalkError::Unavailable(reason);
     }
     match error {
         ReceiptStoreError::Pool(_)

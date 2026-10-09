@@ -11,6 +11,7 @@ use super::db::{
     DIM_CURRENCY, DIM_DECISION, DIM_SUBJECT, DIM_TENANT, DIM_TOOL, DIM_TOOL_NAME, DIM_TOOL_SERVER,
     SCOPE_ALL,
 };
+use super::walk::resource_unavailable;
 use crate::receipt_store::support::SqlWorkBudget;
 
 const SECONDS_PER_HOUR: i64 = 3_600;
@@ -61,36 +62,34 @@ fn column(dim: i64) -> &'static str {
 
 pub(super) fn snapshot_error(error: SnapshotDbError) -> ReceiptStoreError {
     match error {
-        SnapshotDbError::Store(error) => error,
-        // Storage I/O and resource failures say nothing about the snapshot's
-        // contents; a read refuses as unavailable and may be retried.
-        SnapshotDbError::Sqlite(error) if storage_unavailable(&error) => {
-            ReceiptQuerySnapshotError::Unavailable(format!(
-                "receipt query snapshot storage failed: {error}"
-            ))
-            .into()
-        }
-        SnapshotDbError::Sqlite(error) => ReceiptStoreError::Sqlite(error),
+        SnapshotDbError::Store(error) => read_outcome(error),
+        SnapshotDbError::Sqlite(error) => read_outcome(ReceiptStoreError::Sqlite(error)),
         other => ReceiptStoreError::Conflict(other.to_string()),
     }
 }
 
-/// Whether a snapshot storage error is an I/O or resource failure rather
-/// than a statement about the stored rows.
-pub(super) fn storage_unavailable(error: &rusqlite::Error) -> bool {
-    matches!(
-        error.sqlite_error_code(),
-        Some(
-            ErrorCode::SystemIoFailure
-                | ErrorCode::CannotOpen
-                | ErrorCode::OutOfMemory
-                | ErrorCode::ReadOnly
-                | ErrorCode::PermissionDenied
-                | ErrorCode::DiskFull
-                | ErrorCode::DatabaseBusy
-                | ErrorCode::DatabaseLocked
-        )
-    )
+/// The outcome a read reports for a store error. A SQLite resource failure,
+/// however it was wrapped, and lock contention both refuse as unavailable,
+/// so the read may be retried; every other error, interruption included, is
+/// returned unchanged.
+pub(super) fn read_outcome(error: ReceiptStoreError) -> ReceiptStoreError {
+    if let Some(reason) = resource_unavailable(&error) {
+        return ReceiptQuerySnapshotError::Unavailable(reason).into();
+    }
+    match error {
+        ReceiptStoreError::Sqlite(sqlite)
+            if matches!(
+                sqlite.sqlite_error_code(),
+                Some(ErrorCode::DatabaseBusy | ErrorCode::DatabaseLocked)
+            ) =>
+        {
+            ReceiptQuerySnapshotError::Unavailable(format!(
+                "receipt query storage is busy: {sqlite}"
+            ))
+            .into()
+        }
+        other => other,
+    }
 }
 
 /// Select one page and its exact total from one snapshot version.

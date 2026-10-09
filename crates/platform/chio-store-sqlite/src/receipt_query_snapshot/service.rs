@@ -17,7 +17,7 @@ use super::db::{SnapshotBatch, SnapshotDb, SnapshotDbError};
 use super::extend::extend_cycle;
 use super::fetch::{fetch, FetchError, FetchLimits, FetchedPage};
 use super::pass::{build_snapshot, retry_busy, Pass, PassMode, PassProgress, Target};
-use super::query::{locate, select, SelectedRow, Selection};
+use super::query::{locate, read_outcome, select, SelectedRow, Selection};
 use super::walk::{observe, Observation, OwnedSink, WalkContext, WalkError, WalkLimits};
 use crate::receipt_store::SqliteReceiptStore;
 
@@ -575,6 +575,10 @@ impl ReceiptQuerySnapshots {
         &self,
         query: &ReceiptQuery,
     ) -> Result<ReceiptQueryResult, ReceiptStoreError> {
+        self.serve_page(query).map_err(read_outcome)
+    }
+
+    fn serve_page(&self, query: &ReceiptQuery) -> Result<ReceiptQueryResult, ReceiptStoreError> {
         let _permit = self.inner.admit()?;
         let (published, epoch) = self.inner.ready()?;
         self.inner.await_head(&published, false)?;
@@ -607,6 +611,15 @@ impl ReceiptQuerySnapshots {
     /// Load one receipt by id. A negative answer covers every commit that
     /// completed before the request, or the read refuses as stale.
     pub fn load_receipt(
+        &self,
+        receipt_id: &str,
+        read_context: &ReceiptReadContext,
+    ) -> Result<(Option<ChioReceipt>, ReceiptSnapshotWatermark), ReceiptStoreError> {
+        self.serve_point(receipt_id, read_context)
+            .map_err(read_outcome)
+    }
+
+    fn serve_point(
         &self,
         receipt_id: &str,
         read_context: &ReceiptReadContext,

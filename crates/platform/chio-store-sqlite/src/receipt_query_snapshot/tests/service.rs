@@ -814,6 +814,70 @@ fn a_snapshot_storage_io_error_in_a_walker_hold_is_unavailable_never_invalid() {
 }
 
 #[test]
+fn a_nested_sqlite_open_failure_in_a_walker_hold_is_unavailable_never_invalid() {
+    let cannot_open = rusqlite::Error::SqliteFailure(
+        rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_CANTOPEN),
+        Some("unable to open database file".into()),
+    );
+    let (state, lease, rebuilt) = walker_storage_failure(SnapshotDbError::Store(
+        ReceiptStoreError::Sqlite(cannot_open),
+    ));
+    assert!(
+        matches!(&state, ReceiptQuerySnapshotState::Unavailable { .. }),
+        "a nested SQLite open failure published {state:?}"
+    );
+    assert!(
+        matches!(&lease, ReceiptQuerySnapshotError::Unavailable(_)),
+        "an in-flight read across a nested open failure refused as {lease:?}"
+    );
+    assert!(rebuilt, "the walker did not rebuild after an open failure");
+}
+
+#[test]
+fn a_nested_sqlite_io_failure_on_a_read_is_unavailable_and_keeps_the_lineage() {
+    let fixture = mixed_fixture();
+    let service = ready(&fixture, config());
+    service.pause_extension_for_test(true);
+    let first = service.query_receipts(&admin(1)).unwrap().snapshot.unwrap();
+    let epoch = service.lease_for_test().unwrap();
+    let io = || {
+        ReceiptStoreError::Sqlite(rusqlite::Error::SqliteFailure(
+            rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_IOERR_READ),
+            Some("disk I/O error".into()),
+        ))
+    };
+    service.fail_next_read_for_test(io());
+    let page = service.query_receipts(&admin(1));
+    assert!(
+        matches!(
+            &page,
+            Err(ReceiptStoreError::QuerySnapshot(
+                ReceiptQuerySnapshotError::Unavailable(_)
+            ))
+        ),
+        "a nested I/O failure on a page read surfaced as {:?}",
+        page.map(|page| page.snapshot)
+    );
+    service.fail_next_read_for_test(io());
+    let point = service.load_receipt("rcpt-missing", &ReceiptReadContext::admin_service());
+    assert!(
+        matches!(
+            &point,
+            Err(ReceiptStoreError::QuerySnapshot(
+                ReceiptQuerySnapshotError::Unavailable(_)
+            ))
+        ),
+        "a nested I/O failure on a point read surfaced as {:?}",
+        point.map(|(_, watermark)| watermark)
+    );
+    assert_eq!(service.status().state, ReceiptQuerySnapshotState::Ready);
+    service.recheck_lease_for_test(epoch).unwrap();
+    let served = service.query_receipts(&admin(1)).unwrap().snapshot.unwrap();
+    assert_eq!(served.snapshot_id, first.snapshot_id);
+    service.shutdown();
+}
+
+#[test]
 fn a_custody_mismatch_in_a_walker_hold_stays_invalid() {
     let (state, lease, _) = walker_storage_failure(SnapshotDbError::Store(
         ReceiptQuerySnapshotError::Invalid("snapshot backing file custody mismatch".into()).into(),
