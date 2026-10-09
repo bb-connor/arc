@@ -83,6 +83,12 @@ jobs:
       - name: Install Python workflow validators
         run: python -m pip install --disable-pip-version-check PyYAML==6.0.2 jsonschema==4.26.0 referencing==0.37.0
 
+      - name: Patch hygiene
+        run: python3 scripts/check-patch-hygiene.py
+
+      - name: Patch hygiene regressions
+        run: python3 scripts/tests/check-patch-hygiene.test.py
+
       - name: Trusted security definition regressions
         run: |
           python3 -m pip install --disable-pip-version-check 'PyYAML==6.0.3'
@@ -465,9 +471,6 @@ jobs:
           CARGO_BUILD_JOBS: "1"
           RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
         run: cargo test -p chio-wasm-guards --test py_guard_integration -- --nocapture
-
-      - name: Patch hygiene
-        run: git diff --check
 
       - name: Tokio console smoke
         env:

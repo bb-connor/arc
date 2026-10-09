@@ -1147,6 +1147,8 @@ cargo test -p chio-cli --bin chio finding
 cargo test -p chio-finding -p chio-finding-verifier
 """.strip()
 EXPECTED_CI_EVIDENCE_STEPS = (
+    ("Patch hygiene", "python3 scripts/check-patch-hygiene.py"),
+    ("Patch hygiene regressions", "python3 scripts/tests/check-patch-hygiene.test.py"),
     (
         "Trusted security definition regressions",
         "python3 -m pip install --disable-pip-version-check 'PyYAML==6.0.3'\n"
@@ -1171,7 +1173,6 @@ EXPECTED_CI_EVIDENCE_STEPS = (
         "Wasm guards Python SDK round-trip tests",
         "cargo test -p chio-wasm-guards --test py_guard_integration -- --nocapture",
     ),
-    ("Patch hygiene", "git diff --check"),
 )
 EXPECTED_COMMON_CI_STEP_ENV = {
     "CARGO_BUILD_JOBS": "1",
@@ -8648,7 +8649,8 @@ def validate(root: Path) -> None:
         "cargo test --workspace --exclude chio-wasm-guards",
         "cargo clippy --workspace --lib --bins --examples -- -D warnings",
         "bash scripts/check-mapping.sh",
-        "git diff --check",
+        "python3 scripts/check-patch-hygiene.py",
+        "python3 scripts/tests/check-patch-hygiene.test.py",
     ):
         if command not in check_lines:
             raise ContractError(f"required CI omits exact command: {command}")
