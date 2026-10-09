@@ -416,13 +416,89 @@ Supported query parameters:
 requires `costCurrency` as exactly three uppercase ASCII letters. When both
 bounds are present, `minCost` must not exceed `maxCost`.
 
+`limit` is clamped to 1 through 200 and defaults to 50. `cursor` is
+forward-only: a page returns receipts with `seq` greater than `cursor`, in
+ascending `seq` order.
+
 Response body:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `totalCount` | integer | Total matched receipts |
-| `nextCursor` | integer or null | Cursor for the next page |
+| `snapshot` | object, optional | Authenticated snapshot version that answered the request |
+| `totalCount` | integer | Receipts matching the filters in that version |
+| `nextCursor` | integer or null | Cursor for the next page; `null` when no page follows |
 | `receipts` | array | Receipt rows serialized as JSON values |
+
+`snapshot` object:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `id` | string | Opaque version identifier, informational only |
+| `throughEntrySeq` | unsigned 64-bit integer | Every claim-log entry at or below this sequence is included, and none above it |
+| `checkpointSeq` | unsigned 64-bit integer or null | Newest verified receipt checkpoint in this version; `null` before the first checkpoint. Entries above its range are authenticated by signature only |
+| `observedAt` | integer, Unix milliseconds | Observation time of the newest receipt log head this version fully covers (the as-of time) |
+| `recertifiedAt` | integer, Unix milliseconds | Completion time of the last full authentication of the whole history |
+
+The same `snapshot` object appears on `GET /v1/agents/{subject_key}/receipts`
+(same body as above) and on `GET /v1/receipts/tools`, including its
+`receiptId` point read.
+
+Snapshot rules:
+
+- A server that answers receipt reads from an authenticated query snapshot
+  **MUST** include `snapshot` on every successful response of those three
+  routes. Clients **MUST** treat an absent `snapshot` as unknown provenance.
+- `snapshot.id` **MUST NOT** be accepted as a request parameter and is never a
+  cursor. There is no version-pinned pagination; each page is answered by the
+  version current at that request.
+- `receipts` and `totalCount` **MUST** come from the same version.
+  `totalCount` is exact for that version and **MAY** change between pages.
+- Every returned receipt **MUST** be re-read, signature-verified and bound to
+  the leaf the snapshot authenticated, in the request that returns it. A
+  mismatch **MUST** fail the request with `receipt_query_snapshot_invalid`.
+- Answers have as-of semantics. The whole history is authenticated when the
+  snapshot is built and again by recertification passes that start every hour.
+  A change to a stored receipt that no response returns is detected within one
+  recertification interval plus one pass duration; no answer reflects it in
+  the meantime.
+- A page **MAY** hold fewer than `limit` receipts while `nextCursor` is
+  non-null; it stops before the receipt that would exceed 16 MiB of stored
+  receipt JSON and always carries at least one receipt. Clients **MUST**
+  continue until `nextCursor` is `null`.
+- A page waits up to 2 seconds for the snapshot to reach the receipt log head
+  read at request start, and is otherwise served only from a version that
+  covered an observed head within the last 30 seconds. A point read that finds
+  no receipt **MUST** reach that head; it has no staleness allowance.
+
+Snapshot errors use the body `{"error": string, "code": string}`. Every other
+error keeps the body `{"error": string}`. `Retry-After` is an integer number
+of seconds.
+
+| `code` | HTTP status | `Retry-After` | Client action |
+| --- | --- | --- | --- |
+| `receipt_query_snapshot_building` | 503 | 5 | retry |
+| `receipt_query_snapshot_stale` | 503 | 2 | retry |
+| `receipt_query_busy` | 503 | 1 | retry |
+| `receipt_query_snapshot_unavailable` | 503 | absent | do not retry; resource outcome |
+| `receipt_query_snapshot_invalid` | 500 | absent | do not retry; integrity failure |
+| `receipt_query_work_budget_exhausted` | 422 | absent | do not retry; narrow the query |
+
+Clients **MAY** retry only the three retryable codes, after `Retry-After`, and
+**MUST NOT** automatically retry any other snapshot code or a `503` without
+one of them.
+
+Admission has two non-queued layers, and either refusing returns
+`receipt_query_busy`:
+
+1. the trust-control HTTP read lane, whose permit is taken before the work
+   enters the blocking thread pool and is held until that work stops, even if
+   the request is cancelled;
+2. the snapshot service's own read permit, which bounds every consumer of the
+   snapshot, including non-HTTP callers.
+
+`POST /v1/evidence/export` does not use the snapshot. It runs under its own
+single non-queued permit, which covers the whole export through response
+finalization, and refuses a concurrent export with `receipt_query_busy`.
 
 ### 4.4 Revocation
 
