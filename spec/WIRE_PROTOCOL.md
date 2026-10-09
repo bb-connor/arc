@@ -457,14 +457,18 @@ Snapshot rules:
   the leaf the snapshot authenticated, in the request that returns it. A
   mismatch **MUST** fail the request with `receipt_query_snapshot_invalid`.
 - Answers have as-of semantics. The whole history is authenticated when the
-  snapshot is built and again by recertification passes that start every hour.
-  A change to a stored receipt that no response returns is detected within one
-  recertification interval plus one pass duration; no answer reflects it in
+  snapshot is built and again by recertification passes, scheduled no sooner
+  than one recertification interval (1 hour by default) after the previous
+  pass started; an active pass or contention can delay them further. A change
+  to a stored receipt that no response returns is detected only by a later
+  pass, so the delay is at least on the order of the interval, can grow under
+  load, and has no fixed wall-clock bound. No answer reflects the change in
   the meantime.
 - A page **MAY** hold fewer than `limit` receipts while `nextCursor` is
   non-null; it stops before the receipt that would exceed 16 MiB of stored
-  receipt JSON and always carries at least one receipt. Clients **MUST**
-  continue until `nextCursor` is `null`.
+  receipt JSON. A page always carries at least one receipt, so a single
+  receipt larger than 16 MiB, up to the 128 MiB per-receipt limit, is returned
+  alone. Clients **MUST** continue until `nextCursor` is `null`.
 - A page waits up to 2 seconds for the snapshot to reach the receipt log head
   read at request start, and is otherwise served only from a version that
   covered an observed head within the last 30 seconds. A point read that finds

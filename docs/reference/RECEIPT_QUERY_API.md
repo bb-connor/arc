@@ -107,8 +107,9 @@ passed. Continued pagination does not return it, but `totalCount` counts it.
 
 A page can hold fewer than `limit` receipts while `nextCursor` is non-null. A
 page stops before the receipt that would take it above 16 MiB of stored
-receipt JSON, and always carries at least one receipt. No receipt is ever
-truncated. Clients must continue until `nextCursor` is `null`, and must not
+receipt JSON, but it always carries at least one receipt: a single receipt
+larger than 16 MiB, up to the 128 MiB per-receipt limit, is returned alone on
+its own page. No receipt is ever truncated. Clients must continue until `nextCursor` is `null`, and must not
 treat a page shorter than `limit` as the last page.
 
 A page that holds exactly `limit` receipts always carries a `nextCursor`, even
@@ -260,17 +261,21 @@ version. Within one response:
 
 Receipts a response does not return are not re-read on each request. The whole
 history is authenticated when the snapshot is built and again by each
-recertification pass. A pass starts every hour and re-authenticates every
-claim-log entry up to the head it targets, comparing the result with the
-snapshot; any difference invalidates the snapshot. A change to a stored
-receipt that no response returns is therefore detected within one
-recertification interval plus one pass duration, about 1 hour plus the pass
-duration with the default schedule. Until then no answer reflects the change,
-because answers come from the authenticated projection, but the change is not
-reported either. This is as-of semantics, not immediate detection of tampering
-anywhere in the database. `recertifiedAt` on each response gives the
-completion time of the last full pass, and `lastRecertificationMs` on
-[`/health`](#health) gives its duration.
+recertification pass. A pass re-authenticates every claim-log entry up to the
+head it targets and compares the result with the snapshot; any difference
+invalidates the snapshot. Passes are scheduled no sooner than one
+recertification interval (1 hour) after the previous pass started. A pass
+still running, a snapshot that has not yet covered a head to target, or
+contention on the receipt store can start the next pass later, and a pass
+itself takes time that grows with the history and the load. A change to a
+stored receipt that no response returns is therefore detected only by a later
+pass: the delay is at least on the order of the interval and can grow under
+load, with no fixed wall-clock bound. Until then no answer reflects the
+change, because answers come from the authenticated projection, but the
+change is not reported either. This is as-of semantics, not immediate
+detection of tampering anywhere in the database. `recertifiedAt` on each
+response gives the completion time of the last full pass, and
+`lastRecertificationMs` on [`/health`](#health) gives its duration.
 
 ### Freshness
 
@@ -456,8 +461,9 @@ database's share of process memory. It is not a limit on total process memory
 - SQLite's page cache and statement memory;
 - the snapshot builder's per-step copy buffer, up to 16 MiB, or one receipt of
   up to 128 MiB when a single receipt is larger;
-- the receipts each admitted read assembles, up to 16 MiB of stored receipt
-  JSON per page;
+- the receipts each admitted read assembles: up to 16 MiB of stored receipt
+  JSON per page, or one receipt of up to 128 MiB when a single receipt is
+  larger;
 - everything else in the trust-control process.
 
 Every other limit is fixed in this release:
@@ -469,12 +475,12 @@ Every other limit is fixed in this release:
 | Evidence export lane | 1 permit, non-queued | `503` `receipt_query_busy` |
 | Selection and count work | 10,000,000 SQLite VM steps per request | `422` `receipt_query_work_budget_exhausted` |
 | Payload fetch work | 1,000,000 SQLite VM steps per fetch, and per head read | `503` `receipt_query_snapshot_unavailable` |
-| Page size | `limit` receipts (1 through 200) and at most 16 MiB of stored receipt JSON, always at least one receipt | Short page with a non-null `nextCursor` |
+| Page size | `limit` receipts (1 through 200) and 16 MiB of stored receipt JSON, except that a page always carries at least one receipt, so one receipt larger than 16 MiB (up to the 128 MiB per-receipt limit) is returned alone | Short page with a non-null `nextCursor` |
 | Receipt size | 128 MiB per stored receipt | While building, extending or recertifying: `unavailable`. On a read: `invalid`, because the receipt the snapshot authenticated was within the limit. |
 | Head wait | 2 seconds | Falls through to the 30-second staleness allowance (pages) or `stale` (point reads that find nothing) |
 | Staleness allowance | 30 seconds | `503` `receipt_query_snapshot_stale` |
 | Extension interval | 250 milliseconds between extension cycles when no read is waiting | None |
-| Recertification interval | 1 hour between the starts of full passes | None |
+| Recertification interval | At least 1 hour between the starts of full passes; an active pass or contention can delay the next start | None |
 | Rebuild backoff after an integrity failure | 5 minutes, doubling up to 1 hour | None |
 
 ## Receipt Analytics Endpoint

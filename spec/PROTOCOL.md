@@ -2994,25 +2994,27 @@ Federation and certification administration includes:
 The health contract is additive JSON and currently includes authority, store,
 receipt query snapshot, federation, and cluster summaries rather than a single
 opaque boolean.
-
-Receipt reads on `/v1/receipts/query`, `/v1/agents/{subject_key}/receipts`
-and `/v1/receipts/tools` are answered from an authenticated query snapshot: a
-process-owned projection of the receipt log that is authenticated in full when
-built, extended by authenticating only appended entries, and recertified on a
-schedule (hourly by default). Each successful response carries a `snapshot`
-object naming the version it came from; its rows and `totalCount` come from
-that version, and every returned receipt is re-verified against the leaf the
-snapshot authenticated. Answers have as-of semantics: a change to a stored
-receipt that no response returns is detected within one recertification
-interval plus one pass duration. Reads that cannot be answered carry a typed
-`code` (building, stale, busy, unavailable, invalid, work budget exhausted),
-and admission is two-layer and non-queued. The wire shape, freshness rules and
-error table are normative in `spec/WIRE_PROTOCOL.md` section 4.3.
 `/v1/reports/operator` now also carries settlement backlog visibility and
 explicit multi-dimensional budget profiles. Budget utilization rows expose
 named `dimensions.invocations` and `dimensions.money` usage blocks, while
 settlement backlog rows pair signed `financial.settlement_status` with mutable
 sidecar reconciliation state keyed by `receipt_id`.
+
+Receipt reads on `/v1/receipts/query`, `/v1/agents/{subject_key}/receipts`
+and `/v1/receipts/tools` are answered from an authenticated query snapshot: a
+process-owned projection of the receipt log that is authenticated in full when
+built, extended by authenticating only appended entries, and recertified by
+passes scheduled no sooner than one interval apart (1 hour by default). Each
+successful response carries a `snapshot` object naming the version it came
+from; its rows and `totalCount` come from that version, and every returned
+receipt is re-verified against the leaf the snapshot authenticated. Answers
+have as-of semantics: a change to a stored receipt that no response returns is
+detected only by a later recertification pass, so the delay is at least on the
+order of the interval and can grow under load. Reads that cannot be answered
+carry a typed `code` (building, stale, busy, unavailable, invalid, work budget
+exhausted), and admission is two-layer and non-queued. The wire shape,
+freshness rules and error table are normative in `spec/WIRE_PROTOCOL.md`
+section 4.3.
 
 Cluster snapshots that carry immutable pre-upgrade budget usage anchors MUST
 also carry `chio.budget-snapshot-anchor-provenance.v1`. The provenance binds the
