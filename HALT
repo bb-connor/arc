@@ -1,6 +1,6 @@
 ---
-scopes: ["all", "agent:codex-builder-integrator", "agent:codex-builder-worker1", "agent:codex-builder-worker2"]
+scopes: ["all", "agent:codex-builder-integrator", "agent:codex-builder-worker1", "agent:codex-builder-worker2", "agent:claude-builder-worker1"]
 reason: "pilot prep: idle until #1160 merges and integration/beta-next exists"
 by: "connor"
-at: "2026-10-09T15:30:04Z"
+at: "2026-10-09T15:30:06Z"
 ---
