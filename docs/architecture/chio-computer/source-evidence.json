@@ -1,7 +1,7 @@
 {
   "schema": "chio.computer.design-source-snapshot.v1",
   "captured_at": "2026-10-09T16:20:47.304163+00:00",
-  "scope": "Source inspection only; no runtime qualification performed",
+  "scope": "Proposed architecture on completed-roadmap substrate; selected source and manifest inventory, no runtime qualification.",
   "views": {
     "main": {
       "head": "f5a9d2ab238448b8a85b04e9d426c507a2e09929",
@@ -257,8 +257,1806 @@
       ],
       "hosted_source_commit": "e245965435a1b912c9ae57bab81c81ba6f5391ea",
       "hosted_source_commit_matches_recorded_files": true
+    },
+    "pr_1196": {
+      "head": "c32c460fae67c6f21386ab3cffa425cd06f0433b",
+      "hosted_source_commit": "c32c460fae67c6f21386ab3cffa425cd06f0433b",
+      "purpose": "Revision 2 pinned architecture/source corpus and manifest inventory; recording does not imply full line-by-line review.",
+      "sources": [
+        {
+          "path": "docs/operations/UNIFIED_ROADMAP.md",
+          "sha256": "6986b935fd2e0948d12979d035a3ed484906ed04759ec3c0f986897f10f1210f",
+          "lines": 809,
+          "inspection": "architecture_contract"
+        }
+      ]
+    },
+    "pr_1174": {
+      "head": "7419d56e98e84ee57212e293e5f2658f7fef7642",
+      "hosted_source_commit": "7419d56e98e84ee57212e293e5f2658f7fef7642",
+      "purpose": "Revision 2 pinned architecture/source corpus and manifest inventory; recording does not imply full line-by-line review.",
+      "sources": [
+        {
+          "path": "docs/research/2026-10-04-chio-kernel-north-star.md",
+          "sha256": "7a2aa084c22622de1dd653a0d1ccc64a8ad320825441cab360f04bbc8be19988",
+          "lines": 412,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-04-authority-faults-design.md",
+          "sha256": "264fdfd92627377cb662fb72d9896930f6485269d1beef8e5de0f9d8d08f684d",
+          "lines": 775,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-04-authority-space-teardown-design.md",
+          "sha256": "da69b15fa526b82fa22da625732bef2c041072731b261957a5bbab469deddccc",
+          "lines": 744,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-04-closed-kernel-abi-design.md",
+          "sha256": "7d290a231b4f16e0b30a426bc65f9cf57ab4aca6717c0111a63f05db386a5c21",
+          "lines": 526,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-04-crossing-primitive-design.md",
+          "sha256": "16568d567f6bbbc82e8a3fc9cece7271523cb261faa9f34863f53d4eded0a5cf",
+          "lines": 998,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-04-durable-stop-epoch-design.md",
+          "sha256": "ec721e5d8f722384b3f4f9c626e8c6431ba49933ecbb320d7b48e61adcb41040",
+          "lines": 1355,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-04-ftl-lessons-program-design.md",
+          "sha256": "ed66d49736fec49a4aedc9f3404f5fdede8f91dce184bd332bb03ad104e189fc",
+          "lines": 516,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-04-integrity-gated-admission-design.md",
+          "sha256": "17d5cf5c821396c2facac9666456621ca073d472c96b8dc1004b8c6e1d320caf",
+          "lines": 1042,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-04-microkernel-isolation-backend-design.md",
+          "sha256": "5baff75d4697ade67827ae98ec2c5774669a31b967c4d1cf06eb0c1db4324b98",
+          "lines": 670,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-04-opaque-adapter-context-design.md",
+          "sha256": "7575b8670c7cde8fe46b172688b058a3486e0d608c1c126963e31b65fdb380a7",
+          "lines": 800,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-04-pure-admission-machine-design.md",
+          "sha256": "697521c51d259ab0d3755179759a525a896554eaf98620ccd2e353df27ec7631",
+          "lines": 1260,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-04-typed-reservations-design.md",
+          "sha256": "52890b6ae8991b9ce454ff4d31039dabb1870d19ca06e1cbe7a69321037d9081",
+          "lines": 1008,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-04-unified-event-queue-design.md",
+          "sha256": "6c6c8d05fccf56abc3e071f8e67bbb97d92223b47571204b9ae718a5a6f484f8",
+          "lines": 1166,
+          "inspection": "architecture_contract"
+        }
+      ]
+    },
+    "pr_1173": {
+      "head": "cafdc970e4f89bddf810647e4228a605ed9f498a",
+      "hosted_source_commit": "cafdc970e4f89bddf810647e4228a605ed9f498a",
+      "purpose": "Revision 2 pinned architecture/source corpus and manifest inventory; recording does not imply full line-by-line review.",
+      "sources": [
+        {
+          "path": "crates/core/chio-adversarial-suite/Cargo.toml",
+          "sha256": "bb244eaafbaa2b9c153206868e10912bd1df9324904a8736d772a3e70d4aa48f",
+          "lines": 22,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-adversarial-suite",
+          "crate_group": "core"
+        },
+        {
+          "path": "crates/core/chio-arena/Cargo.toml",
+          "sha256": "5327d890bf69a5be91604fc83f7258df4b4d8719791da430df81999441c6d228",
+          "lines": 32,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-arena",
+          "crate_group": "core"
+        },
+        {
+          "path": "crates/core/chio-bounded/Cargo.toml",
+          "sha256": "6c335300563f006133f1f571f0562be460c8784e160373cafa100e63146e77c9",
+          "lines": 31,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-bounded",
+          "crate_group": "core"
+        },
+        {
+          "path": "crates/core/chio-core-types/Cargo.toml",
+          "sha256": "6d6d5d6903421ae1d021475a90dc5da1acaa6560c7946fe3ba5706383cb8d279",
+          "lines": 106,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-core-types",
+          "crate_group": "core"
+        },
+        {
+          "path": "crates/core/chio-core/Cargo.toml",
+          "sha256": "af6e28c896b26c4713d54037526ea62f63382627c44e85886abe5be52176a7f3",
+          "lines": 53,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-core",
+          "crate_group": "core"
+        },
+        {
+          "path": "crates/core/chio-errors/Cargo.toml",
+          "sha256": "a316064c5970fcb2b7ae4e2f2d222c8599df363b3cb3aec8059e5316eb9b18b5",
+          "lines": 19,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-errors",
+          "crate_group": "core"
+        },
+        {
+          "path": "crates/core/chio-response-model/Cargo.toml",
+          "sha256": "a17843794c8be60e4cad57c67efc49e91338fb2ce02809c67398e7a65eade282",
+          "lines": 20,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-response-model",
+          "crate_group": "core"
+        },
+        {
+          "path": "crates/core/chio-supervisor/Cargo.toml",
+          "sha256": "9b2cad74d9bfb74ef29587f32f680c0c9140161c7001db9166c4537215b76efc",
+          "lines": 40,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-supervisor",
+          "crate_group": "core"
+        },
+        {
+          "path": "crates/economy/chio-anchor/Cargo.toml",
+          "sha256": "8eee8104259ef2e2db9912fa715900fb27081dff03b8dbe4c6b37639b2b9e66a",
+          "lines": 94,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-anchor",
+          "crate_group": "economy"
+        },
+        {
+          "path": "crates/economy/chio-appraisal/Cargo.toml",
+          "sha256": "9d745f7653f55f4f83f229744516ef05319f178f1ecf9de5bfa7d315c4529483",
+          "lines": 26,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-appraisal",
+          "crate_group": "economy"
+        },
+        {
+          "path": "crates/economy/chio-autonomy/Cargo.toml",
+          "sha256": "19abc77298de08e87f73825261f19d533dab6be7fadf778db1309aae38bf081c",
+          "lines": 24,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-autonomy",
+          "crate_group": "economy"
+        },
+        {
+          "path": "crates/economy/chio-credit/Cargo.toml",
+          "sha256": "4165eff98c3921f4d0fb8bdc9e20e240764edabd1f62217e4d803e829b46764d",
+          "lines": 46,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-credit",
+          "crate_group": "economy"
+        },
+        {
+          "path": "crates/economy/chio-fincred/Cargo.toml",
+          "sha256": "a14b5e17c706d7d745472ca3367d25c94a406ba22ff686bf1779a80f77328f55",
+          "lines": 23,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-fincred",
+          "crate_group": "economy"
+        },
+        {
+          "path": "crates/economy/chio-finding/Cargo.toml",
+          "sha256": "73f638667d6d2287bb2176661d3d6a7b70624d47acada9fe2ed28994a644c2aa",
+          "lines": 28,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-finding",
+          "crate_group": "economy"
+        },
+        {
+          "path": "crates/economy/chio-fiscal/Cargo.toml",
+          "sha256": "ca2e86d9a71558f999f7e3e0e98db3f0fcc20c53478a3433e96d74ccd0dd326f",
+          "lines": 27,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-fiscal",
+          "crate_group": "economy"
+        },
+        {
+          "path": "crates/economy/chio-link/Cargo.toml",
+          "sha256": "a0212ac7286fafb1a52af85805d8896e21991294b1f7870e2bff409b8e0070c3",
+          "lines": 49,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-link",
+          "crate_group": "economy"
+        },
+        {
+          "path": "crates/economy/chio-listing/Cargo.toml",
+          "sha256": "a4ece8c78a838ccfc03b77038ca57dc92e6320cac8d92ac617edb8ec6bfcc054",
+          "lines": 25,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-listing",
+          "crate_group": "economy"
+        },
+        {
+          "path": "crates/economy/chio-market/Cargo.toml",
+          "sha256": "93477f1f2af5eb9536622625e5b3425d4484ae33c3421015ecb2ebb82dfabcdb",
+          "lines": 29,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-market",
+          "crate_group": "economy"
+        },
+        {
+          "path": "crates/economy/chio-metering/Cargo.toml",
+          "sha256": "f41ecbf7708172da20c71e0d954561b9dfcdb8f536d5aec8ea0faa81c2f71d7a",
+          "lines": 26,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-metering",
+          "crate_group": "economy"
+        },
+        {
+          "path": "crates/economy/chio-open-market/Cargo.toml",
+          "sha256": "c1f1e42b6b0c6f536c13f7e33f9216327d2c5ad1ec1c23bf05959e8643f0272e",
+          "lines": 48,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-open-market",
+          "crate_group": "economy"
+        },
+        {
+          "path": "crates/economy/chio-settle/Cargo.toml",
+          "sha256": "a97d75cf72d053f457f902593860f6496a97865a6dd2869e01f54e1e5d61b16a",
+          "lines": 70,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-settle",
+          "crate_group": "economy"
+        },
+        {
+          "path": "crates/economy/chio-underwriting/Cargo.toml",
+          "sha256": "7f996d55bd0676cdb0cb07c03c4636964f2780c925afd355cf32fa4244dd9148",
+          "lines": 23,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-underwriting",
+          "crate_group": "economy"
+        },
+        {
+          "path": "crates/economy/chio-web3-bindings/Cargo.toml",
+          "sha256": "6ab301652b2ab88ddf14be9e91a68cf843237a1395a3941bf462f9dfd9d3fbea",
+          "lines": 29,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-web3-bindings",
+          "crate_group": "economy"
+        },
+        {
+          "path": "crates/economy/chio-web3/Cargo.toml",
+          "sha256": "cb546ad3fbc11b5cc0fb2ab3e4205a356459945956e606ad84e496c198e283bb",
+          "lines": 38,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-web3",
+          "crate_group": "economy"
+        },
+        {
+          "path": "crates/guards/chio-data-guards/Cargo.toml",
+          "sha256": "bda9ae1d4878e7700ecbc15a6947b338a3f37d8a4090fed83405d9ad006f6827",
+          "lines": 29,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-data-guards",
+          "crate_group": "guards"
+        },
+        {
+          "path": "crates/guards/chio-external-guards/Cargo.toml",
+          "sha256": "dae14bed5c8a45b77363634bb609932c3369263efc9472119c046a881d118726",
+          "lines": 36,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-external-guards",
+          "crate_group": "guards"
+        },
+        {
+          "path": "crates/guards/chio-guard-registry/Cargo.toml",
+          "sha256": "42dd6b7195931dfb2cba5ba46406f64490cfac2fdf53ecfd6ece2e520512eb40",
+          "lines": 52,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-guard-registry",
+          "crate_group": "guards"
+        },
+        {
+          "path": "crates/guards/chio-guards/Cargo.toml",
+          "sha256": "0a4f3a8e21643fb04876fccee4c597a3436965f66ea2754acba6188e57aa1450",
+          "lines": 43,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-guards",
+          "crate_group": "guards"
+        },
+        {
+          "path": "crates/guards/chio-policy/Cargo.toml",
+          "sha256": "4f123b05456b952c4759ea6ee4cc85f50bd29acffda855af58f3b7585fe3237c",
+          "lines": 39,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-policy",
+          "crate_group": "guards"
+        },
+        {
+          "path": "crates/guards/chio-wasm-guards/Cargo.toml",
+          "sha256": "f1a51973de2696d0af4e4353701870e8ed6fc4698921da2b7985a9dfb3fcee7c",
+          "lines": 103,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-wasm-guards",
+          "crate_group": "guards"
+        },
+        {
+          "path": "crates/kernel/chio-kernel-browser/Cargo.toml",
+          "sha256": "467f17a05388d28be937c8df7f0a5b164b1db6f2cd05de98c044d978d410312b",
+          "lines": 68,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-kernel-browser",
+          "crate_group": "kernel"
+        },
+        {
+          "path": "crates/kernel/chio-kernel-core/Cargo.toml",
+          "sha256": "fdeaa38098e4b758e12a57b446b6ac356e221890a5d7b9bcc9bd114a85b6c015",
+          "lines": 104,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-kernel-core",
+          "crate_group": "kernel"
+        },
+        {
+          "path": "crates/kernel/chio-kernel-mobile/Cargo.toml",
+          "sha256": "0b6086ff5db6bac11b5d9c03da532053661519fffb4868efa90c85aa287664c7",
+          "lines": 64,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-kernel-mobile",
+          "crate_group": "kernel"
+        },
+        {
+          "path": "crates/kernel/chio-kernel/Cargo.toml",
+          "sha256": "5ef4ef130fef19055e240c166a1902c1faedeeabf5ab9855131f6eb70f5d1d1d",
+          "lines": 252,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-kernel",
+          "crate_group": "kernel"
+        },
+        {
+          "path": "crates/kernel/chio-process/Cargo.toml",
+          "sha256": "6b4962e5bd272071af55afde10f33fcbfe86593173ea2a5d2d4aa3f3fea242d7",
+          "lines": 49,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-process",
+          "crate_group": "kernel"
+        },
+        {
+          "path": "crates/kernel/chio-runtime-core/Cargo.toml",
+          "sha256": "9e9140c780909eb08bf9b60cbfcf8799d99ca580b359aa72dd300f55b29a6962",
+          "lines": 45,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-runtime-core",
+          "crate_group": "kernel"
+        },
+        {
+          "path": "crates/kernel/chio-runtime-core/src/store/sqlite/swarm_authority_bundles.rs",
+          "sha256": "2c581bf561f968079e0f72f5cb82fbe997375866845690a92bfaaa31868bfde6",
+          "lines": 194,
+          "inspection": "owner_source"
+        },
+        {
+          "path": "crates/kernel/chio-runtime-harness/Cargo.toml",
+          "sha256": "4118e482bd038baf293332c9f0e36ee97cf8df3f364903d68c2dbd6d14f77719",
+          "lines": 31,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-runtime-harness",
+          "crate_group": "kernel"
+        },
+        {
+          "path": "crates/kernel/chio-runtime-proof-parity/Cargo.toml",
+          "sha256": "39cbadb7533629e9e58cb9382ca701b1c127ac2aff99010d98da4c391b0150c0",
+          "lines": 21,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-runtime-proof-parity",
+          "crate_group": "kernel"
+        },
+        {
+          "path": "crates/kernel/chio-runtime/ARCHITECTURE.md",
+          "sha256": "5622a086165aa6c453aeb488d194180f34b3c3849cad36db1499656af4635e07",
+          "lines": 114,
+          "inspection": "owner_source"
+        },
+        {
+          "path": "crates/kernel/chio-runtime/Cargo.toml",
+          "sha256": "5a054cbbacbd7bf24bd760c838af31b4bdf937c056cbd3d22f4f68dc52483291",
+          "lines": 27,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-runtime",
+          "crate_group": "kernel"
+        },
+        {
+          "path": "crates/kernel/chio-swarm-authority/ARCHITECTURE.md",
+          "sha256": "a7bd84803b8bfefec3aa0ebd23a0a987fe876985106b7b5af7bed585e5382bfe",
+          "lines": 106,
+          "inspection": "owner_source"
+        },
+        {
+          "path": "crates/kernel/chio-swarm-authority/Cargo.toml",
+          "sha256": "b707a48e165b13892f602ac0bf80e58896ef2899106585db0d2ff512d58a52a6",
+          "lines": 27,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-swarm-authority",
+          "crate_group": "kernel"
+        },
+        {
+          "path": "crates/observability/chio-lineage/Cargo.toml",
+          "sha256": "e641bafec17a0c5eb15de35871c91ee5eac508a35c350342cd0c881e16288392",
+          "lines": 22,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-lineage",
+          "crate_group": "observability"
+        },
+        {
+          "path": "crates/observability/chio-log-redact/Cargo.toml",
+          "sha256": "3489e738e11d2667961899316ae94918d2d6f6a343053f7e9a1574ce160e47c3",
+          "lines": 25,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-log-redact",
+          "crate_group": "observability"
+        },
+        {
+          "path": "crates/observability/chio-metrics-spec/Cargo.toml",
+          "sha256": "ed6dcb531bbcbd073ecd3c99e2eefea15f219f0e55acab2f801fc3761dedc81e",
+          "lines": 18,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-metrics-spec",
+          "crate_group": "observability"
+        },
+        {
+          "path": "crates/observability/chio-otel-receipt-exporter/Cargo.toml",
+          "sha256": "7d678ae511be35d0341c36a7dab06a6b6b16bf73e5d01d6fa6e054f52252ca8f",
+          "lines": 35,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-otel-receipt-exporter",
+          "crate_group": "observability"
+        },
+        {
+          "path": "crates/observability/chio-siem/Cargo.toml",
+          "sha256": "896cb137349e41d7f563d9b6fef3dbd4853364574072fceaed95173e1fc3d3f2",
+          "lines": 37,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-siem",
+          "crate_group": "observability"
+        },
+        {
+          "path": "crates/platform/chio-agent-web-interop/Cargo.toml",
+          "sha256": "47a4b89154e10cb0a75fe5a32da5e4d902c62f7e80f74f420d833728389df37c",
+          "lines": 31,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-agent-web-interop",
+          "crate_group": "platform"
+        },
+        {
+          "path": "crates/platform/chio-commerce-order/Cargo.toml",
+          "sha256": "4619152dd39c2b2f00c6d3468d73a3aecad8e85b1f47bf867b342dc2fa5e8a85",
+          "lines": 28,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-commerce-order",
+          "crate_group": "platform"
+        },
+        {
+          "path": "crates/platform/chio-config/Cargo.toml",
+          "sha256": "e448356c78066e38601276a9c0589cb2f3b974d8e745eac81219e38ebd47f07c",
+          "lines": 31,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-config",
+          "crate_group": "platform"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/Cargo.toml",
+          "sha256": "7ac8fd60279464015ed04107f9e7aacec43ed1599d631e9a6218d0c2b6b05cc3",
+          "lines": 133,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-control-plane",
+          "crate_group": "platform"
+        },
+        {
+          "path": "crates/platform/chio-enterprise-export/Cargo.toml",
+          "sha256": "3d3ff92e1221a7dc857e9b24425a4705aa0d9de4da7c856159455c1fc3b8d68b",
+          "lines": 27,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-enterprise-export",
+          "crate_group": "platform"
+        },
+        {
+          "path": "crates/platform/chio-finding-hosted-edge/Cargo.toml",
+          "sha256": "57ac0a2ae784daeea90318fde6c9c714dc980c327917abe90c8d84bab9b31e5b",
+          "lines": 50,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-finding-hosted-edge",
+          "crate_group": "platform"
+        },
+        {
+          "path": "crates/platform/chio-finding-market-migrations/Cargo.toml",
+          "sha256": "226a6e20ad03a22e997f24436e4c79cc14c86979312af1dae21c8b1079d843b6",
+          "lines": 17,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-finding-market-migrations",
+          "crate_group": "platform"
+        },
+        {
+          "path": "crates/platform/chio-finding-market-port/Cargo.toml",
+          "sha256": "c490391bb88c2388fd5bfc2401a53843274df7145fe9e7cbf12cbaf920f928f7",
+          "lines": 19,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-finding-market-port",
+          "crate_group": "platform"
+        },
+        {
+          "path": "crates/platform/chio-finding-market-store-postgres/Cargo.toml",
+          "sha256": "c34a0cb3137cd2cf71f35fff705ff77fde5a41318356c555e379ab88e32fe97a",
+          "lines": 49,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-finding-market-store-postgres",
+          "crate_group": "platform"
+        },
+        {
+          "path": "crates/platform/chio-finding-worker/Cargo.toml",
+          "sha256": "10c49a8c826d3ffcfbd723798499ac72a6e733c9bd3feaedd528180e769226d0",
+          "lines": 30,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-finding-worker",
+          "crate_group": "platform"
+        },
+        {
+          "path": "crates/platform/chio-http-core/Cargo.toml",
+          "sha256": "6293a19846e6f3b2091eedc39af053f71291c2ec18536c83c12a3bbfd6ef6fde",
+          "lines": 46,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-http-core",
+          "crate_group": "platform"
+        },
+        {
+          "path": "crates/platform/chio-http-session/Cargo.toml",
+          "sha256": "00b6ad5eb0b73b093c7859842d446d7f2a900f6eb93c8107f4650da65931b096",
+          "lines": 30,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-http-session",
+          "crate_group": "platform"
+        },
+        {
+          "path": "crates/platform/chio-manifest/Cargo.toml",
+          "sha256": "899cdab950331cd5415197b606d6fde9a66fc70acdb89a59cda98f14e3d0dd2b",
+          "lines": 30,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-manifest",
+          "crate_group": "platform"
+        },
+        {
+          "path": "crates/platform/chio-risk-comptroller/Cargo.toml",
+          "sha256": "6d2e68f98a824786d3de19867688a2029466300b118a93d4beb0121dd6ef1355",
+          "lines": 28,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-risk-comptroller",
+          "crate_group": "platform"
+        },
+        {
+          "path": "crates/platform/chio-sqlite-file-identity/Cargo.toml",
+          "sha256": "58e3be0f793268dffa40f250e80d81a49978b750fd74d2debfecf27de1667e0d",
+          "lines": 19,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-sqlite-file-identity",
+          "crate_group": "platform"
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/Cargo.toml",
+          "sha256": "c9e0cbe63778b8022778ac8bc43a00e4294b0510875e36d46ddaf7df58970c15",
+          "lines": 108,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-store-sqlite",
+          "crate_group": "platform"
+        },
+        {
+          "path": "crates/platform/chio-transaction-passport/Cargo.toml",
+          "sha256": "bdd23088796d7d02497fe9053b5a5d538c677e0e11710c5c445c1e8c2d4c3f64",
+          "lines": 29,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-transaction-passport",
+          "crate_group": "platform"
+        },
+        {
+          "path": "crates/platform/chio-trust-market-context/Cargo.toml",
+          "sha256": "08261237c4dbff6cd9a33c84ccfbcc44fcf3f6cffca4e2ae8e248d92a30400d7",
+          "lines": 27,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-trust-market-context",
+          "crate_group": "platform"
+        },
+        {
+          "path": "crates/platform/chio-workflow-preflight/Cargo.toml",
+          "sha256": "bac38d3b8a18d7d1ff97e752b828437edf128ac2768239ab38a7d62ecf63cf25",
+          "lines": 23,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-workflow-preflight",
+          "crate_group": "platform"
+        },
+        {
+          "path": "crates/platform/chio-workflow/Cargo.toml",
+          "sha256": "a0e56be0934d3f12cd99923d6ac07228a98e355f53d15c568919a429028b2860",
+          "lines": 28,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-workflow",
+          "crate_group": "platform"
+        },
+        {
+          "path": "crates/platform/chio-workflow/src/delegation/store.rs",
+          "sha256": "59d789c09f90678e19e935e4a628b207caf21495591e0a4773f84055737bd050",
+          "lines": 393,
+          "inspection": "owner_source"
+        },
+        {
+          "path": "crates/platform/chio-workflow/src/delegation/types.rs",
+          "sha256": "71526dcda6247c35ac6b2a27e6f1822ca897a6ed954a50045a083a0fedecdf16",
+          "lines": 403,
+          "inspection": "owner_source"
+        },
+        {
+          "path": "crates/products/chio-api-protect/Cargo.toml",
+          "sha256": "36ffc499ec7b2c570662a1a179a23bf5e11f4748879ad3d18daabaf5dceab803",
+          "lines": 53,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-api-protect",
+          "crate_group": "products"
+        },
+        {
+          "path": "crates/products/chio-cli/Cargo.toml",
+          "sha256": "60fec0a799f31282f403f4ef8b6bbece31e470f8d0f3005849e85b24dfa57d96",
+          "lines": 165,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-cli",
+          "crate_group": "products"
+        },
+        {
+          "path": "crates/products/chio-finding-market-canary/Cargo.toml",
+          "sha256": "e0815c28444d95da63e0203d589242020ce2b275bf2265f98d0860ffe5f4e087",
+          "lines": 34,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-finding-market-canary",
+          "crate_group": "products"
+        },
+        {
+          "path": "crates/products/chio-finding-market-migrator/Cargo.toml",
+          "sha256": "4afb6cb3a1a855ac0119e13cb64d9683d744c6c089ad751abc50469a5218483e",
+          "lines": 21,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-finding-market-migrator",
+          "crate_group": "products"
+        },
+        {
+          "path": "crates/products/chio-finding-market-server/Cargo.toml",
+          "sha256": "1d7c38184fb32e414fc80012449cb9b3476a9a648b0077f9a985d1d378329762",
+          "lines": 32,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-finding-market-server",
+          "crate_group": "products"
+        },
+        {
+          "path": "crates/products/chio-finding-worker/Cargo.toml",
+          "sha256": "04a16745a7f54b225aa400ab579e4f07b8df4029b3f19d3ebd2255fd815f9e1e",
+          "lines": 30,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-finding-worker-daemon",
+          "crate_group": "products"
+        },
+        {
+          "path": "crates/products/chio-mercury-core/Cargo.toml",
+          "sha256": "b113e8f44991c441ed1d60c7565ba7a85b31c4a3a3b027ca4f7bdae920f718eb",
+          "lines": 28,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-mercury-core",
+          "crate_group": "products"
+        },
+        {
+          "path": "crates/products/chio-mercury/Cargo.toml",
+          "sha256": "6006b8ca94690e95d9014047acc4100c4fe53aad3daaf8a352d6e34de3c04c18",
+          "lines": 35,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-mercury",
+          "crate_group": "products"
+        },
+        {
+          "path": "crates/products/chio-proof-room/Cargo.toml",
+          "sha256": "0c498b0fa564f01ff5c26330a60d6317ff852dc106e5210243df3556b45713e2",
+          "lines": 54,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-proof-room",
+          "crate_group": "products"
+        },
+        {
+          "path": "crates/products/chio-wall-core/Cargo.toml",
+          "sha256": "86c4cfbd556926d227a37c1f9f92c8b689f70b53aaffeab8521e78df4d85e293",
+          "lines": 20,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-wall-core",
+          "crate_group": "products"
+        },
+        {
+          "path": "crates/products/chio-wall/Cargo.toml",
+          "sha256": "0f031785ec9fd7eebc3a02c98a6cbd7a40c283e656546d41826ff4fc251d21b3",
+          "lines": 38,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-wall",
+          "crate_group": "products"
+        },
+        {
+          "path": "crates/protocol/chio-a2a-adapter/Cargo.toml",
+          "sha256": "87ce59e1a5dcd7c505d2016bd1eaadc65c75d4ecc11e4de4b6f846a3a8b15b5f",
+          "lines": 45,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-a2a-adapter",
+          "crate_group": "protocol"
+        },
+        {
+          "path": "crates/protocol/chio-a2a-edge/Cargo.toml",
+          "sha256": "1a82f86f709603a9531b50b31f81778865cbd4b098cfc21dccd6f9e73c90bae7",
+          "lines": 35,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-a2a-edge",
+          "crate_group": "protocol"
+        },
+        {
+          "path": "crates/protocol/chio-acp-edge/Cargo.toml",
+          "sha256": "ada7f41377f9ddde80492aa050471d21e6cefad9c2983f4a264cf38977230905",
+          "lines": 42,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-acp-edge",
+          "crate_group": "protocol"
+        },
+        {
+          "path": "crates/protocol/chio-acp-proxy/Cargo.toml",
+          "sha256": "5c3ded0c9ce4294ae1281e962b4fb2d42c4d621aac9e041a593c16e5711eaf6f",
+          "lines": 32,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-acp-proxy",
+          "crate_group": "protocol"
+        },
+        {
+          "path": "crates/protocol/chio-ag-ui-proxy/Cargo.toml",
+          "sha256": "84b87a38e8ee19322b3087f64fae0f0acb066439c29cda17b67803a1458528f3",
+          "lines": 26,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-ag-ui-proxy",
+          "crate_group": "protocol"
+        },
+        {
+          "path": "crates/protocol/chio-anthropic-tools-adapter/Cargo.toml",
+          "sha256": "2ffecd88ab9e47d9052064d4c3042f152f5f633e5f5b4fa63a595d50dd260661",
+          "lines": 43,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-anthropic-tools-adapter",
+          "crate_group": "protocol"
+        },
+        {
+          "path": "crates/protocol/chio-bedrock-converse-adapter/Cargo.toml",
+          "sha256": "888e4414d01d0d5cf1265220239201b344366f35279ef45087f42822200f8fe4",
+          "lines": 64,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-bedrock-converse-adapter",
+          "crate_group": "protocol"
+        },
+        {
+          "path": "crates/protocol/chio-cohere-tools-adapter/Cargo.toml",
+          "sha256": "b3f8e704e08b2384fcbf7f2303802efff27b28de9b3a38cef836d124cc9798ee",
+          "lines": 39,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-cohere-tools-adapter",
+          "crate_group": "protocol"
+        },
+        {
+          "path": "crates/protocol/chio-cross-protocol/Cargo.toml",
+          "sha256": "8974e09f02363425b76e47e0cd2c3f9478a147ed29b7182c461108c5d04eea9f",
+          "lines": 28,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-cross-protocol",
+          "crate_group": "protocol"
+        },
+        {
+          "path": "crates/protocol/chio-edge-metrics/Cargo.toml",
+          "sha256": "7aa485d713e5be13c81e604f432f4b94e587344c102047e9df16135fcc26052a",
+          "lines": 19,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-edge-metrics",
+          "crate_group": "protocol"
+        },
+        {
+          "path": "crates/protocol/chio-egress-contract/Cargo.toml",
+          "sha256": "9c09a8a1664818ae97d43548779f1239c9abce915ce9379415b576ebc7d9c2c3",
+          "lines": 36,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-egress-contract",
+          "crate_group": "protocol"
+        },
+        {
+          "path": "crates/protocol/chio-envoy-ext-authz/Cargo.toml",
+          "sha256": "0d0c1906e7e29d3ecccae8540501cb7c074790bb21e06fea065379029149d193",
+          "lines": 35,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-envoy-ext-authz",
+          "crate_group": "protocol"
+        },
+        {
+          "path": "crates/protocol/chio-gemini-tools-adapter/Cargo.toml",
+          "sha256": "44dba71c299715b5ef4f51416e4dd24550d879a6e4ed24870cc96c58dcb12939",
+          "lines": 38,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-gemini-tools-adapter",
+          "crate_group": "protocol"
+        },
+        {
+          "path": "crates/protocol/chio-groq-tools-adapter/Cargo.toml",
+          "sha256": "07376d6b162345cb64117f8c89cd2a15cf8dcb1bfaa811a35dc1fd3af55ea12a",
+          "lines": 39,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-groq-tools-adapter",
+          "crate_group": "protocol"
+        },
+        {
+          "path": "crates/protocol/chio-hosted-mcp/Cargo.toml",
+          "sha256": "52838960a879e9e202d2c17b7a8e545e6b77d71505b68d9f33f82b667cfe1bff",
+          "lines": 23,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-hosted-mcp",
+          "crate_group": "protocol"
+        },
+        {
+          "path": "crates/protocol/chio-http-serve/Cargo.toml",
+          "sha256": "6eae4a4829824f6a43525609cfb3ee4dfcf87c1042cb196ec8756471caa004e6",
+          "lines": 30,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-http-serve",
+          "crate_group": "protocol"
+        },
+        {
+          "path": "crates/protocol/chio-mcp-adapter/Cargo.toml",
+          "sha256": "cde50b78d62c63e8c81b9e9476433e8acc4a403880926aba5809023f035be7df",
+          "lines": 48,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-mcp-adapter",
+          "crate_group": "protocol"
+        },
+        {
+          "path": "crates/protocol/chio-mcp-edge/Cargo.toml",
+          "sha256": "538df2b222295cf5ee8cf8e70a9aefcffc9b9ca7ddf32dada61d18e1e46ed287",
+          "lines": 48,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-mcp-edge",
+          "crate_group": "protocol"
+        },
+        {
+          "path": "crates/protocol/chio-mcp-remote/Cargo.toml",
+          "sha256": "cfe736d142ea269a3a531c74cb92bb34909ff190a8c3aa9aa65bf52f7d18760e",
+          "lines": 60,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-mcp-remote",
+          "crate_group": "protocol"
+        },
+        {
+          "path": "crates/protocol/chio-mistral-tools-adapter/Cargo.toml",
+          "sha256": "db672a5e1c71bfdf12e41ae3e33cfcc5eb081ed78283a6d73c2d1edf868be00d",
+          "lines": 40,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-mistral-tools-adapter",
+          "crate_group": "protocol"
+        },
+        {
+          "path": "crates/protocol/chio-ollama-tools-adapter/Cargo.toml",
+          "sha256": "6a49cc760ee520bbca44f434737bb170084b4473117807bb64060d1f30e54859",
+          "lines": 36,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-ollama-tools-adapter",
+          "crate_group": "protocol"
+        },
+        {
+          "path": "crates/protocol/chio-openai-adapter/Cargo.toml",
+          "sha256": "5fc9fbc15cebed11e8afc4766837fd05e4c739ae36ccb9d8496df782a1f0319f",
+          "lines": 52,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-openai-adapter",
+          "crate_group": "protocol"
+        },
+        {
+          "path": "crates/protocol/chio-openapi-mcp-bridge/Cargo.toml",
+          "sha256": "7da95ffa873b063781e1b2f67bfd6f7e81549dda4ac7b4adcb6dac3cbfc54c6f",
+          "lines": 39,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-openapi-mcp-bridge",
+          "crate_group": "protocol"
+        },
+        {
+          "path": "crates/protocol/chio-openapi/Cargo.toml",
+          "sha256": "f8395e7029f978308b8948aad006d42e5e5515a676d34c836782d89c12c9712d",
+          "lines": 23,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-openapi",
+          "crate_group": "protocol"
+        },
+        {
+          "path": "crates/protocol/chio-provider-adapter-core/Cargo.toml",
+          "sha256": "4938b4843d0fa8233bb4cf05c82c7a96a0e053f5e6eb85cc831ee557aaa69279",
+          "lines": 30,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-provider-adapter-core",
+          "crate_group": "protocol"
+        },
+        {
+          "path": "crates/protocol/chio-provider-conformance/Cargo.toml",
+          "sha256": "9846e786c84e5a8aa82ec31f595720d06610fbae1dc9cbccd115c4aafe2f3c9b",
+          "lines": 49,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-provider-conformance",
+          "crate_group": "protocol"
+        },
+        {
+          "path": "crates/protocol/chio-tool-call-fabric/Cargo.toml",
+          "sha256": "96ffe42d3295c4d5bbfddd819c10c3165846c1d3aa1ce69df58c1b6a9181126c",
+          "lines": 33,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-tool-call-fabric",
+          "crate_group": "protocol"
+        },
+        {
+          "path": "crates/protocol/chio-tower/Cargo.toml",
+          "sha256": "c3e578c3e231bdd7e1e71126378cdfb20c65ddc54c6058ab918f5c8c2fa3d0eb",
+          "lines": 47,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-tower",
+          "crate_group": "protocol"
+        },
+        {
+          "path": "crates/sdk/chio-binding-helpers/Cargo.toml",
+          "sha256": "5da0991df87def45ede0d89072d7ce231bac6ac558d7fd655a01b82992ca813a",
+          "lines": 25,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-binding-helpers",
+          "crate_group": "sdk"
+        },
+        {
+          "path": "crates/sdk/chio-bindings-ffi/Cargo.toml",
+          "sha256": "fed9295a3af7c6561e1404197a0290ffa53f743bf0a13b1038758b7274363552",
+          "lines": 21,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-bindings-ffi",
+          "crate_group": "sdk"
+        },
+        {
+          "path": "crates/sdk/chio-cpp-kernel-ffi/Cargo.toml",
+          "sha256": "0a00c70ea0124c6925316975f07c84d5f0f8b5fb075d2af81d3698ed12eb89df",
+          "lines": 23,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-cpp-kernel-ffi",
+          "crate_group": "sdk"
+        },
+        {
+          "path": "crates/sdk/chio-eval-receipt/Cargo.toml",
+          "sha256": "bfd8e1217f6d52c52e2fb14341802664ce0b9d22a3b2ba5ce55a06c7f13dde83",
+          "lines": 25,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-eval-receipt",
+          "crate_group": "sdk"
+        },
+        {
+          "path": "crates/sdk/chio-guard-sdk-macros/Cargo.toml",
+          "sha256": "10d6e9d01f3137b2cd0241d1ebe7eac8700bee8bbd9508f0c3a5ff99ddbf3ddf",
+          "lines": 20,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-guard-sdk-macros",
+          "crate_group": "sdk"
+        },
+        {
+          "path": "crates/sdk/chio-guard-sdk/Cargo.toml",
+          "sha256": "87251c785157b52d99ec1987eae5c5e06c6c16c5c5e92cf3cdf7d8a97d8773d7",
+          "lines": 19,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-guard-sdk",
+          "crate_group": "sdk"
+        },
+        {
+          "path": "crates/security/chio-active-response-authority/Cargo.toml",
+          "sha256": "0a67b0ed6c850122535f31dc418133a9e5ba90af61b70de476e6b049c0fbcdf8",
+          "lines": 41,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-active-response-authority",
+          "crate_group": "security"
+        },
+        {
+          "path": "crates/security/chio-cage-init/Cargo.toml",
+          "sha256": "d7f9a0cae1791ac40a600cf6ed870c6fc7d39aed7e024d81ceaa080ae47e06aa",
+          "lines": 26,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-cage-init",
+          "crate_group": "security"
+        },
+        {
+          "path": "crates/security/chio-cage-plan/Cargo.toml",
+          "sha256": "48f05610bd653b5ba01e42725660a6e03d63a3905ef34075dd8538b47e08127e",
+          "lines": 20,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-cage-plan",
+          "crate_group": "security"
+        },
+        {
+          "path": "crates/security/chio-cage/Cargo.toml",
+          "sha256": "17c240556e47ae8e12a58d98e89cc4954dd1addf6fde337ad4d446cb7d31acc8",
+          "lines": 36,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-cage",
+          "crate_group": "security"
+        },
+        {
+          "path": "crates/security/chio-decoy/Cargo.toml",
+          "sha256": "f2ba442e94752c7a8b28480cc612e09b310b940adbbb90c4173b7e2eafad541f",
+          "lines": 35,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-decoy",
+          "crate_group": "security"
+        },
+        {
+          "path": "crates/security/chio-flow/Cargo.toml",
+          "sha256": "6ea3655a7a99a16472891d887bd0b8c2e5a28c55f40ac2a19712a2723f5ea440",
+          "lines": 34,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-flow",
+          "crate_group": "security"
+        },
+        {
+          "path": "crates/security/chio-keyring/Cargo.toml",
+          "sha256": "e266a57f6e23dba8ac7ef1329e6d8ff47d02ca4c8ae271840f21cfefd7b0ff6b",
+          "lines": 30,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-keyring",
+          "crate_group": "security"
+        },
+        {
+          "path": "crates/security/chio-quarantine/Cargo.toml",
+          "sha256": "3663af4ed2f424c4b93cd6438e0572f42d811bead856c40885fc061af258e2d0",
+          "lines": 33,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-quarantine",
+          "crate_group": "security"
+        },
+        {
+          "path": "crates/security/chio-secret-broker/Cargo.toml",
+          "sha256": "303fd39f48d530f041a195bfc7234d2782afd6b93098b4d0ea9837f7cac90f2d",
+          "lines": 85,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-secret-broker",
+          "crate_group": "security"
+        },
+        {
+          "path": "crates/security/chio-secure-ipc/Cargo.toml",
+          "sha256": "a157d1fdaa06d9f313d5fffa4027f26e08cbfcb6bab044aa2465f25724e53bb8",
+          "lines": 22,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-secure-ipc",
+          "crate_group": "security"
+        },
+        {
+          "path": "crates/security/chio-security-kernel/Cargo.toml",
+          "sha256": "e36f7d3e49f32383b5976d9295764a138462f6aefbdc8d2809aba96ccc0b94ec",
+          "lines": 33,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-security-kernel",
+          "crate_group": "security"
+        },
+        {
+          "path": "crates/security/chio-security-types/Cargo.toml",
+          "sha256": "38f1a68749754157bf164db3825de55e996445c61fa3f3a7ea6adba4fc47572e",
+          "lines": 35,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-security-types",
+          "crate_group": "security"
+        },
+        {
+          "path": "crates/tooling/chio-conformance/Cargo.toml",
+          "sha256": "e0650fcfc991515844bfd491fb30978a354f21907e1b16a3683d78f424065983",
+          "lines": 245,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-conformance",
+          "crate_group": "tooling"
+        },
+        {
+          "path": "crates/tooling/chio-lsp/Cargo.toml",
+          "sha256": "43f29b884e37f57146aa19d61110e17262d2cf17743748e0ff48fabe2f610123",
+          "lines": 36,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-lsp",
+          "crate_group": "tooling"
+        },
+        {
+          "path": "crates/tooling/chio-profile-probe/Cargo.toml",
+          "sha256": "7f9c77e48443153eeb370f013ad1cf70472ec673d00f909e00fd4ce6d5da0dfe",
+          "lines": 16,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-profile-probe",
+          "crate_group": "tooling"
+        },
+        {
+          "path": "crates/tooling/chio-reference-tools/Cargo.toml",
+          "sha256": "346c69c0e6ba00ba3a0ef1bbe34430e58e976c877a854210f63e6a4efd27d038",
+          "lines": 34,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-reference-tools",
+          "crate_group": "tooling"
+        },
+        {
+          "path": "crates/tooling/chio-release-evidence/Cargo.toml",
+          "sha256": "997cf3de7a785fb3dc9fd99e12d0e18f26a15c997d9124bf222cbb1d2b555030",
+          "lines": 26,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-release-evidence",
+          "crate_group": "tooling"
+        },
+        {
+          "path": "crates/tooling/chio-spec-codegen/Cargo.toml",
+          "sha256": "2e8f58fc2ed47ce3e4a76d104def95a2b7a054d0ff7ad899fed377fb9478fd6a",
+          "lines": 32,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-spec-codegen",
+          "crate_group": "tooling"
+        },
+        {
+          "path": "crates/tooling/chio-spec-validate/Cargo.toml",
+          "sha256": "056dddb099f00e3cdaa8d334464ccb8ce541ce40fbfa0ecd27fe6a7113a89021",
+          "lines": 24,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-spec-validate",
+          "crate_group": "tooling"
+        },
+        {
+          "path": "crates/tooling/chio-test-support/Cargo.toml",
+          "sha256": "b0bd0e32fa74d8b8d4a9856a749eb8424ae280b5a8d252151f89e0ebe046d5ad",
+          "lines": 19,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-test-support",
+          "crate_group": "tooling"
+        },
+        {
+          "path": "crates/tooling/chio-trace-validate/Cargo.toml",
+          "sha256": "30992e2cf3ed220f4ad656ae6ea495cba02216cb9d86b219332d49c160d87940",
+          "lines": 32,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-trace-validate",
+          "crate_group": "tooling"
+        },
+        {
+          "path": "crates/trust/chio-attest-buyer-core/Cargo.toml",
+          "sha256": "0ff82b35475514cc25424deb434d5370a855c673542aaf272dc8a1c148fabdca",
+          "lines": 32,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-attest-buyer-core",
+          "crate_group": "trust"
+        },
+        {
+          "path": "crates/trust/chio-attest-buyer/Cargo.toml",
+          "sha256": "a2887e4f2bcc422879417808209a7427bb4422e5c223572872901a1c75ab23b9",
+          "lines": 23,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-attest-buyer",
+          "crate_group": "trust"
+        },
+        {
+          "path": "crates/trust/chio-attest-loopback/Cargo.toml",
+          "sha256": "d5d400622be120540599e042fb7d7c84212c89a7369d9036e438a4c2d469b118",
+          "lines": 29,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-attest-loopback",
+          "crate_group": "trust"
+        },
+        {
+          "path": "crates/trust/chio-attest-verify/Cargo.toml",
+          "sha256": "08bc01287c99977307f8ffae28441ffc86fc366894f5242dd7a1d9bb72850694",
+          "lines": 92,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-attest-verify",
+          "crate_group": "trust"
+        },
+        {
+          "path": "crates/trust/chio-credentials/Cargo.toml",
+          "sha256": "584ad81dcd3e642653f632c74e9233ed5faa6f4011486dc3121c5391812e20ab",
+          "lines": 66,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-credentials",
+          "crate_group": "trust"
+        },
+        {
+          "path": "crates/trust/chio-custody-hw/Cargo.toml",
+          "sha256": "d9bd900f5aa884860b80d68ca5cce31f31a5d2fb1237edfd3648430a0706ba4d",
+          "lines": 95,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-custody-hw",
+          "crate_group": "trust"
+        },
+        {
+          "path": "crates/trust/chio-did/Cargo.toml",
+          "sha256": "427774b8cec5b1403d6186a25323fc6cfa5048a5ab27f3c4a2b14f2d4d04b419",
+          "lines": 36,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-did",
+          "crate_group": "trust"
+        },
+        {
+          "path": "crates/trust/chio-disclosure-lineage/Cargo.toml",
+          "sha256": "519f581b665c99235e913926c6823463c9e5efbcc25a901ccf6670f4c27d4ff1",
+          "lines": 21,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-disclosure-lineage",
+          "crate_group": "trust"
+        },
+        {
+          "path": "crates/trust/chio-federation-authority/Cargo.toml",
+          "sha256": "a337f0f00c653d57b6e9fd5ecf9c62cc205b90a6525aa0232430b2c8ea5eff9f",
+          "lines": 35,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-federation-authority",
+          "crate_group": "trust"
+        },
+        {
+          "path": "crates/trust/chio-federation-transport-iroh/Cargo.toml",
+          "sha256": "86b536fb6a2826300a2f054a973d1e6c5bff417b73b6bd3479b916a1f9571b2f",
+          "lines": 107,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-federation-transport-iroh",
+          "crate_group": "trust"
+        },
+        {
+          "path": "crates/trust/chio-federation/Cargo.toml",
+          "sha256": "13ef1d068df0e3ae8def899dd9bf67019b3ed769f1ae881afb668e917363c6d9",
+          "lines": 85,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-federation",
+          "crate_group": "trust"
+        },
+        {
+          "path": "crates/trust/chio-finding-challenge/Cargo.toml",
+          "sha256": "88d4008cb082234a668982b4ed1fa5ef6a89025918b1874ede721da9666baf59",
+          "lines": 25,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-finding-challenge",
+          "crate_group": "trust"
+        },
+        {
+          "path": "crates/trust/chio-finding-verifier/Cargo.toml",
+          "sha256": "058c207c35bfad4581f8e99e2a2e5751dece94d24f3d85bc7c067c60f1cb1794",
+          "lines": 29,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-finding-verifier",
+          "crate_group": "trust"
+        },
+        {
+          "path": "crates/trust/chio-governance/Cargo.toml",
+          "sha256": "3000174be8565fb7200d5c3dff2988c64cdd75b6c5defb54126c909a123a3828",
+          "lines": 25,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-governance",
+          "crate_group": "trust"
+        },
+        {
+          "path": "crates/trust/chio-pheromone-relay/Cargo.toml",
+          "sha256": "f1c6c8d188f021871b247c4c2f15c5d48e3a95ce6bd9a5323fb48f452e072e84",
+          "lines": 37,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-pheromone-relay",
+          "crate_group": "trust"
+        },
+        {
+          "path": "crates/trust/chio-pheromone-runtime/Cargo.toml",
+          "sha256": "935763a5d25fa4745abd03faf49c51534f8bd38d905cdb27c91bed219cc4ab23",
+          "lines": 29,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-pheromone-runtime",
+          "crate_group": "trust"
+        },
+        {
+          "path": "crates/trust/chio-pheromone/Cargo.toml",
+          "sha256": "2849398ab9fb833c71dbd8d05169ee4ef1daedab54860b1fa50b449b9c9cde4c",
+          "lines": 25,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-pheromone",
+          "crate_group": "trust"
+        },
+        {
+          "path": "crates/trust/chio-replay-corpus/Cargo.toml",
+          "sha256": "1acf5b0f554f9befd3699fec4615ed74f6302242c2b095b5bbf8dd1718123074",
+          "lines": 29,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-replay-corpus",
+          "crate_group": "trust"
+        },
+        {
+          "path": "crates/trust/chio-reputation/Cargo.toml",
+          "sha256": "24e1122b660d0d817d7be3a975b42c1084aadfb0282eda9ddaac8eefb6db9848",
+          "lines": 25,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-reputation",
+          "crate_group": "trust"
+        },
+        {
+          "path": "crates/trust/chio-revocation-oracle/Cargo.toml",
+          "sha256": "258deeed5b45c56227f5829d0880657cf6d2292c29093e8c7f2148f1f003d03f",
+          "lines": 61,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-revocation-oracle",
+          "crate_group": "trust"
+        },
+        {
+          "path": "crates/trust/chio-selective-disclosure/Cargo.toml",
+          "sha256": "14361964f1c566d8d12bda13c4f334983de095a5b6dd0f55cf8a8b8c4b180b38",
+          "lines": 38,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-selective-disclosure",
+          "crate_group": "trust"
+        },
+        {
+          "path": "crates/trust/chio-signing-remote/Cargo.toml",
+          "sha256": "0e7bbc1aa83239e275112c75131e684d50d542d36371b38472460c266676310b",
+          "lines": 24,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-signing-remote",
+          "crate_group": "trust"
+        },
+        {
+          "path": "crates/trust/chio-tee-frame/Cargo.toml",
+          "sha256": "d318b073779f47e0cf63d122b954c552cf0c121651e9f27673929003a5ba222f",
+          "lines": 26,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-tee-frame",
+          "crate_group": "trust"
+        },
+        {
+          "path": "crates/trust/chio-tee/Cargo.toml",
+          "sha256": "f0c8ebbf4dff994a2df1744300e639ca6441d642744ef263e88d6d4b3bc31fe1",
+          "lines": 52,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-tee",
+          "crate_group": "trust"
+        },
+        {
+          "path": "crates/trust/chio-weights/Cargo.toml",
+          "sha256": "6ecc71daf5195c18a0c177c8bbdb86f89fcdd9919c0346d144a2a3d69d5af473",
+          "lines": 57,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-weights",
+          "crate_group": "trust"
+        },
+        {
+          "path": "docs/research/work-abstraction/README.md",
+          "sha256": "8da6cd18ca4eebe48582864d7a19c14b08d7d5dce571217e736e6dfedd404c70",
+          "lines": 59,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/superpowers/plans/2026-10-03-work-beta-convergence.md",
+          "sha256": "4d61ead4eb437bf0ad5e0cb6449e70ec9dab2b8c0926aa8a856fc220005fdd67",
+          "lines": 84,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/superpowers/plans/2026-10-03-work-developer-surface.md",
+          "sha256": "1b84c98a3cdce6332889d0f399f1103d2c22faaf1b3f57bc2c0cba366fb694db",
+          "lines": 148,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/superpowers/plans/2026-10-03-work-owner-services.md",
+          "sha256": "988a60a210b09cc0f18a49780c4a35058b5049c302ad745681df6e9afa3bc8fc",
+          "lines": 156,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/superpowers/plans/2026-10-03-work-runtime.md",
+          "sha256": "2b4ad1ccde8e3678172b5f5e3db56e0c66de91541836cc5ae31f7451dc273b63",
+          "lines": 232,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-03-agentic-work-kernel-design.md",
+          "sha256": "b0de296289a927a86650fc862b44ec2e0afee286aafb397d6f494801de28f427",
+          "lines": 193,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-03-work-developer-surface-design.md",
+          "sha256": "d20577e1c40ec1dc23c078be05bb1821fbd39394b0d6d54bd5c448f4abac1457",
+          "lines": 81,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-03-work-owner-services-design.md",
+          "sha256": "89c297de8afd6a2e690b3f8806e2076454b78a31c3e044a10c1ca0ffffd09ba7",
+          "lines": 89,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-03-work-runtime-design.md",
+          "sha256": "a29835efff9cdb68ad9dd17536732fbe6de11e6c22f260e5d69f6c0afc07b4e0",
+          "lines": 161,
+          "inspection": "architecture_contract"
+        }
+      ]
+    },
+    "pr_1170": {
+      "head": "666274baef7a503a6bf4791816483cbc6eb1b4ed",
+      "hosted_source_commit": "666274baef7a503a6bf4791816483cbc6eb1b4ed",
+      "purpose": "Revision 2 pinned architecture/source corpus and manifest inventory; recording does not imply full line-by-line review.",
+      "sources": [
+        {
+          "path": "docs/research/nvidia/04-integration-design.md",
+          "sha256": "1984bf102c6d91d064495d19548362936dd78fcfa85a9c388ea3b902463aad53",
+          "lines": 681,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/research/nvidia/06-strategy-and-roadmap.md",
+          "sha256": "7163b93deabd72ef8380a14cf69920f32e218e1157fbfb2f8e9af8eb5b66a826",
+          "lines": 857,
+          "inspection": "architecture_contract"
+        }
+      ]
+    },
+    "pr_1160": {
+      "head": "fd8bfdc947bbaf070b39457a9190f032a018e55a",
+      "hosted_source_commit": "fd8bfdc947bbaf070b39457a9190f032a018e55a",
+      "purpose": "Revision 2 pinned architecture/source corpus and manifest inventory; recording does not imply full line-by-line review.",
+      "sources": [
+        {
+          "path": "crates/core/chio-supervisor/src/lib.rs",
+          "sha256": "5e99892432d756368adcdbb1bc8c62e27890b5fd01f78c0d7b5b048879c35b04",
+          "lines": 54,
+          "inspection": "owner_source"
+        },
+        {
+          "path": "crates/security/chio-active-response-authority/src/lib.rs",
+          "sha256": "9999d6764a510c6ce94fb70a64ca9d70b8a8124d4d79b01fa89ef1e116b96926",
+          "lines": 60,
+          "inspection": "owner_source"
+        },
+        {
+          "path": "crates/security/chio-cage/src/lib.rs",
+          "sha256": "c90b1b2faa6abf36f8a04545a28d51b1bede7af9cb2d749fe0c998597cbd3d79",
+          "lines": 1903,
+          "inspection": "owner_source"
+        },
+        {
+          "path": "crates/security/chio-flow/src/lib.rs",
+          "sha256": "c2a0718cd3ddfad9e20bd68855b7600d5b4bf5b98d77360fd232253bc3f54324",
+          "lines": 44,
+          "inspection": "owner_source"
+        },
+        {
+          "path": "crates/security/chio-keyring/src/lib.rs",
+          "sha256": "c51a30fc1e13573977a71d5680c1027759b9711c47a5f1a1902712c57cd62765",
+          "lines": 938,
+          "inspection": "owner_source"
+        },
+        {
+          "path": "crates/security/chio-secret-broker/src/lib.rs",
+          "sha256": "ddc84a649f94db912617187b11b1faf97e3ecbdd7d9795660873771dbc54f7ec",
+          "lines": 217,
+          "inspection": "owner_source"
+        },
+        {
+          "path": "crates/security/chio-secure-ipc/src/lib.rs",
+          "sha256": "45a3e241ec3582f695b8f12c5524db15db387a1f181810915a4668abaec778ac",
+          "lines": 550,
+          "inspection": "owner_source"
+        },
+        {
+          "path": "crates/security/chio-security-kernel/src/lib.rs",
+          "sha256": "4180d17c9c759d22157645e9339ad0cd86c1d1b0c43de205f531c54bb2332a81",
+          "lines": 59,
+          "inspection": "owner_source"
+        },
+        {
+          "path": "docs/adr/ADR-0016-authoritative-spend-contract.md",
+          "sha256": "a482e117c87f210daa03009f9e629c6c4eebedf7f2ccbbb8b7515945796fb029",
+          "lines": 63,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/architecture/CHIO_RUNTIME_BOUNDARIES.md",
+          "sha256": "3f12b9081f5c4fa5b9e4f46b65668904cfdfc5ab4598b03a6879c6079f6eddae",
+          "lines": 84,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/architecture/reliability/README.md",
+          "sha256": "14360e36ba8113e8a2cfa2d6d7ddf45e4c81338aa061904f2ca6063099fb3ff6",
+          "lines": 332,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/architecture/transparency/README.md",
+          "sha256": "991e993f1d273dd5d45ed06b73367458a2fe84ec5c6d0e0535b3908692b5defe",
+          "lines": 349,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/formal/ROADMAP.md",
+          "sha256": "ec8eabb2dc6f60803245ac7988be18f3ac5c77738af9c6f53b894a34ee39ebe5",
+          "lines": 238,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/security/active-defense-rollout.md",
+          "sha256": "39e9aa56918f6c53d4b94467b65208d033b03fb9ca64a3f5fafd80fb9c892000",
+          "lines": 291,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/security/authority-sqlite-custody.md",
+          "sha256": "e26f373ea9362b6b73d413121d15ce1249adc759932c79ac7bdf46fb51450b13",
+          "lines": 88,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/security/broker-prepared-connections.md",
+          "sha256": "5db4634314a1ef914b3891d5763abbf239913c6c8fe1910035b4b9eba255bfd4",
+          "lines": 240,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/security/launch-execution-plan.md",
+          "sha256": "41444902dccb0cc371cc31558d1cc4d8231b11048884fc5c8498ae3047a06ecc",
+          "lines": 689,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/security/launch-plan.md",
+          "sha256": "a4293e18e99ce70109336a259b1262415622d991cd27978a5e40bdc2e9e879ae",
+          "lines": 9088,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/security/process-security-integration.md",
+          "sha256": "f716725bf090c9d10e92b8cb7b2caa9f7dd0c3d9962ddcc5622573881417aa88",
+          "lines": 471,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/superpowers/plans/2026-07-09-enterprise-hardening.md",
+          "sha256": "e42325b63cf3e9be95cc6e13b29a3df60cba462709997d5d9ea5902fdcef6cee",
+          "lines": 769,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/superpowers/plans/2026-07-09-protocol-primitives.md",
+          "sha256": "e215cedd5daf35cba629d150a312110c981dc075dddfa2038b1531b096c06f94",
+          "lines": 1186,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/superpowers/plans/2026-07-09-security-active-defense.md",
+          "sha256": "46fcbf42613d77534e14e057f8d84e5fc5d307160e79fec9bb1f1c00f10633c4",
+          "lines": 972,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/superpowers/plans/2026-07-10-agent-economy-roadmap.md",
+          "sha256": "25b8d93f05daa3671516ab929f4547b1ff9c27d8bb36240239e7b440bb270f71",
+          "lines": 442,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-07-07-chio-next-directions/ROADMAP.md",
+          "sha256": "af1069acbc0b00f0ab115a8c5e28039cf50be715e1bd7b78f1bdea4c6f775721",
+          "lines": 78,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-09-26-unrepresentable-defects-design.md",
+          "sha256": "b45cd2ec0041c120f06d4c98252e250cf957b06028483ba9806724b78da2640b",
+          "lines": 528,
+          "inspection": "architecture_contract"
+        }
+      ]
+    },
+    "pr_1172": {
+      "head": "de84fc306efbb4c8dd6de748d0ad2a8d695fd30e",
+      "hosted_source_commit": "de84fc306efbb4c8dd6de748d0ad2a8d695fd30e",
+      "purpose": "Revision 2 pinned architecture/source corpus and manifest inventory; recording does not imply full line-by-line review.",
+      "sources": [
+        {
+          "path": "docs/architecture/recoverable-agent-runtime/01-security-model.md",
+          "sha256": "1fffc88f236d7c869c68c968df68b6e7ee58c8e3a3f09fc61a1dc45f317e5160",
+          "lines": 72,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/architecture/recoverable-agent-runtime/02-rust-design.md",
+          "sha256": "c64494196045229cc5fd8a6cd6c2cc3fc3ff12fc846c8653b3cb38b38d9bc8f0",
+          "lines": 146,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/architecture/recoverable-agent-runtime/03-recovery-protocol.md",
+          "sha256": "c9abf0ffbb12d376e71472ad434d5489b4346aebcfefcb0059f7db5663f17678",
+          "lines": 214,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/architecture/recoverable-agent-runtime/04-counterfactuals.md",
+          "sha256": "1ff752ad13aabd4655e21db63a47f95b732fa15335c47dad7924651ff8d141b7",
+          "lines": 56,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/architecture/recoverable-agent-runtime/05-semantic-contracts.md",
+          "sha256": "8d98f869225d67be41fcd3e5d953110f02a6ab045fc56bd2c77e289d4eedd4a8",
+          "lines": 91,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/architecture/recoverable-agent-runtime/06-artifacts-memory.md",
+          "sha256": "6547879a4893866d06335a561c4109713eb9ee71218ec301c21af68a4593cc2c",
+          "lines": 82,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/architecture/recoverable-agent-runtime/07-confined-returns.md",
+          "sha256": "e2e61718f141ced2fe36d5743a1893af9a36bafb7c64d4d81464dbbf41bbd29e",
+          "lines": 67,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/architecture/recoverable-agent-runtime/08-protocol-operations.md",
+          "sha256": "33e107ad6c2df9febd23f50a5c28931d7e8a35fb90dceed53e20a4dbe15656ce",
+          "lines": 114,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/architecture/recoverable-agent-runtime/09-conformance.md",
+          "sha256": "72cee862c55eff78c3123f8ceae0b5a0c463b6752fa50c3c97f3414562816a23",
+          "lines": 84,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/architecture/recoverable-agent-runtime/10-delivery-decisions.md",
+          "sha256": "9e89cb757d5a1b14a6c9842c27bc9529434ff1b718fe32c0ac7055fc11bb9b1c",
+          "lines": 86,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/architecture/recoverable-agent-runtime/11-contract-catalog.md",
+          "sha256": "fab53560b298ae852dfb5cbdd2d5833aaa966d1031387af784791ae1eb371cc0",
+          "lines": 130,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/architecture/recoverable-agent-runtime/README.md",
+          "sha256": "2b9e9fd7fd3550ff9426258781fa5f9e0dbc6f4b8f124d91561fb875dee2c3fa",
+          "lines": 100,
+          "inspection": "architecture_contract"
+        }
+      ]
+    },
+    "pr_1179": {
+      "head": "0e03db2d7395c544701ac02015046613b1115e56",
+      "hosted_source_commit": "0e03db2d7395c544701ac02015046613b1115e56",
+      "purpose": "Revision 2 pinned architecture/source corpus and manifest inventory; recording does not imply full line-by-line review.",
+      "sources": [
+        {
+          "path": "crates/kernel/chio-kernel/src/kernel/mod.rs",
+          "sha256": "c007aed0a935aad9aec558937a88a85a06cea3ed0f248c2a3db5e846aaa182d2",
+          "lines": 1888,
+          "inspection": "owner_source"
+        },
+        {
+          "path": "crates/kernel/chio-kernel/src/knowledge.rs",
+          "sha256": "a811971734f03f28eaca732c5db5b5952745f474633f68401e1a4ef3534ef4db",
+          "lines": 301,
+          "inspection": "owner_source"
+        },
+        {
+          "path": "crates/kernel/chio-kernel/src/recovery/ports.rs",
+          "sha256": "2213d26560f128042a3b880c35ebf6a3fd2bae6c9905702037e76243b1fd3fdb",
+          "lines": 389,
+          "inspection": "owner_source"
+        },
+        {
+          "path": "crates/kernel/chio-process/src/lib.rs",
+          "sha256": "192c8e2f8e634b4c5e544dcfd870cfcbe8abb6802f279a278a64af3afecb2554",
+          "lines": 722,
+          "inspection": "owner_source"
+        },
+        {
+          "path": "crates/security/chio-recovery/Cargo.toml",
+          "sha256": "3e96738a38ae4c56f262ba7a522493057ccfb86c1c6a7e446979911ccd3fe842",
+          "lines": 25,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-recovery",
+          "crate_group": "security"
+        },
+        {
+          "path": "crates/security/chio-semantic-contracts/Cargo.toml",
+          "sha256": "6ffff8d55b2bd53a40d4a0815d5f91e6861a3728dafadff851c221cbc8078de3",
+          "lines": 26,
+          "inspection": "manifest_inventory",
+          "crate_name": "chio-semantic-contracts",
+          "crate_group": "security"
+        }
+      ]
+    },
+    "pr_1177": {
+      "head": "01666b33b439d9e488ad7de6295a01eed25292c4",
+      "hosted_source_commit": "01666b33b439d9e488ad7de6295a01eed25292c4",
+      "purpose": "Revision 2 pinned architecture/source corpus and manifest inventory; recording does not imply full line-by-line review.",
+      "sources": [
+        {
+          "path": "docs/adr/ADR-0038-native-host-program.md",
+          "sha256": "b7ef918f423ea6b324cd426fbf3ec51da2d7423798284a83d25d22a710891e64",
+          "lines": 200,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/architecture/PROGRAM-MAP.md",
+          "sha256": "d3851aa2ad0160be3f0e1dd671e3dfb9898875e148112b9dca41bced225c1f3a",
+          "lines": 143,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-07-desktop-integration/HOST-CONTRACT.md",
+          "sha256": "6aa023d9c0e0d403c3abb9129e738e6c981e8d3255834c91c96fcf219b4bf45e",
+          "lines": 133,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-07-desktop-integration/NORTH-STAR-FLOWS.md",
+          "sha256": "04964a5355ae84ecf33b2127a36b45a2b7293145c4d5797fe78015fd0cfca354",
+          "lines": 538,
+          "inspection": "architecture_contract"
+        }
+      ]
+    },
+    "pr_1171": {
+      "head": "1a6f7bfccb1030c620eb7a2f9e3a06620196076b",
+      "hosted_source_commit": "1a6f7bfccb1030c620eb7a2f9e3a06620196076b",
+      "purpose": "Revision 2 pinned architecture/source corpus and manifest inventory; recording does not imply full line-by-line review.",
+      "sources": []
+    },
+    "pr_1197": {
+      "head": "3ab02761b9859be81e858ce3d6ef14da309f764c",
+      "hosted_source_commit": "3ab02761b9859be81e858ce3d6ef14da309f764c",
+      "purpose": "Revision 2 pinned architecture/source corpus and manifest inventory; recording does not imply full line-by-line review.",
+      "sources": [
+        {
+          "path": "docs/superpowers/plans/2026-10-08-swarm-v2.md",
+          "sha256": "49d325f60151ba17382bc08d6b5251ecd98130ca331918208308f6ab3bb0bee7",
+          "lines": 1887,
+          "inspection": "architecture_contract"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-06-agent-swarm-design.md",
+          "sha256": "6539933c49eacd9f64723d072f25126aecea251e66940d255cfa337240db677a",
+          "lines": 633,
+          "inspection": "architecture_contract"
+        }
+      ]
     }
   },
   "repository": "https://github.com/bb-connor/arc.git",
-  "publication_note": "The main inspection head contains unpublished review tooling. All recorded main source files also match its hosted parent. Candidate snapshots are source evidence, not qualification claims."
+  "publication_note": "Original three inspection views retain their historical commits, including the local main view whose files match its hosted parent. Revision 2 views pin the roadmap and owner sources plus the 158-crate manifest inventory. Branch union is not a merged/default build or qualification claim.",
+  "revision": 2,
+  "revision_2_research_date": "2026-10-09",
+  "baseline_assumption": "Unified roadmap and constituent programs complete at their declared qualified scope, including post-success-test programs; current completion is not asserted."
 }
