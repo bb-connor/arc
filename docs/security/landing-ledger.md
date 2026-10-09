@@ -15,9 +15,13 @@ Eight prior current states are archived in `final_review_reconciliation_20261009
 before their acceptance is reconciled with the owner proof amendment and terminal
 capacity/C20 evidence. Historical wording below does not supersede current states.
 
-FINAL-F01 through FINAL-F11 record the independent candidate review. Native session
-retention, revocation capacity, tenant export, snapshot recovery, public health and
-cluster forwarding/freshness remain open until their repairs and tests are composed.
+FINAL-F01 through FINAL-F11 record the independent candidate review. Snapshot
+recovery and public health are committed at `d9e3359e3a`, with public forwarding
+isolation at `bd9bd6a201`. Their [component audit](audits/receipt-recovery-health-qualification-20261009.json)
+records Original failures, 138 passing snapshot/backing tests (seven explicit
+ignores), 26 passing HTTP health/forwarding tests and strict owning lint. Native
+session retention, revocation capacity, tenant export and cluster authority
+freshness still require completed repair integration and composition.
 The [repair plan](../superpowers/plans/2026-10-09-final-review-repairs.md) names owners
 and acceptance. V13-V15 are accounted for as consolidated duplicates of V10-V12.
 The [document audit](audits/final-review-document-reconciliation-20261009.json)
