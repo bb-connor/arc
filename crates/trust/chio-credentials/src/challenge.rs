@@ -1,3 +1,25 @@
+use crate::artifact::{
+    ChioCredentialEvidence, CredentialError, CredentialProof, EnterpriseIdentityProvenance,
+    ReputationCredential, ReputationCredentialSubject, UnsignedReputationCredential,
+};
+use crate::passport::{
+    AgentPassport, PassportLifecycleResolution, PassportPolicyEvaluation, PassportVerification,
+    PassportVerifierPolicy, PassportVerifierPolicyReference,
+};
+use crate::policy::evaluate_credential_against_policy;
+use crate::{
+    is_supported_passport_presentation_challenge_schema, is_supported_passport_schema,
+    CHIO_CREDENTIAL_CONTEXT_V1, PASSPORT_PRESENTATION_CHALLENGE_SCHEMA, PASSPORT_SCHEMA,
+    PROOF_PURPOSE, PROOF_TYPE, REPUTATION_ATTESTATION_TYPE, VC_CONTEXT_V1, VC_TYPE,
+};
+use chio_core::{canonical_json_bytes, sha256_hex, Keypair, Signature};
+use chio_did::DidChio;
+use chio_reputation::LocalReputationScorecard;
+use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
+use std::str::FromStr;
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PassportPresentationOptions {
@@ -93,13 +115,13 @@ pub struct PassportPresentationVerification {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct UnsignedPassportPresentationResponse {
-    schema: String,
-    challenge: PassportPresentationChallenge,
-    passport: AgentPassport,
+pub(super) struct UnsignedPassportPresentationResponse {
+    pub(super) schema: String,
+    pub(super) challenge: PassportPresentationChallenge,
+    pub(super) passport: AgentPassport,
 }
 
-fn rfc3339_from_unix(timestamp: u64) -> Result<String, CredentialError> {
+pub(super) fn rfc3339_from_unix(timestamp: u64) -> Result<String, CredentialError> {
     let timestamp =
         i64::try_from(timestamp).map_err(|_| CredentialError::InvalidUnixTimestamp(timestamp))?;
     let datetime = Utc
@@ -109,7 +131,7 @@ fn rfc3339_from_unix(timestamp: u64) -> Result<String, CredentialError> {
     Ok(datetime.to_rfc3339_opts(SecondsFormat::Secs, true))
 }
 
-fn unix_from_rfc3339(value: &str) -> Result<u64, CredentialError> {
+pub(super) fn unix_from_rfc3339(value: &str) -> Result<u64, CredentialError> {
     let datetime = DateTime::parse_from_rfc3339(value)
         .map_err(|error| CredentialError::InvalidTimestamp(error.to_string()))?;
     u64::try_from(datetime.timestamp())
@@ -362,7 +384,7 @@ pub fn present_agent_passport(
     build_agent_passport(&passport.subject, credentials)
 }
 
-fn aggregate_enterprise_identity_provenance(
+pub(super) fn aggregate_enterprise_identity_provenance(
     credentials: &[ReputationCredential],
 ) -> Result<Vec<EnterpriseIdentityProvenance>, CredentialError> {
     let mut unique = Vec::<(Vec<u8>, EnterpriseIdentityProvenance)>::new();

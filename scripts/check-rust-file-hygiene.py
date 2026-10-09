@@ -453,12 +453,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         max_lines=5_454,
         max_fragments=10,
     ),
-    "crates/trust/chio-credentials/src/lib.rs": allow(
-        "2027-01-31",
-        "credentials surface assembled from include! fragments; capped until the fragments become modules",
-        max_lines=8_223,
-        max_fragments=14,
-    ),
     "crates/platform/chio-control-plane/src/trust_control/finding_challenge_coordinator.rs": allow(
         "2027-01-31",
         "finding challenge coordinator assembled from include! fragments; capped until the fragments become modules",

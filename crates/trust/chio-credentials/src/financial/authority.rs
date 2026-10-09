@@ -1,24 +1,37 @@
-use super::*;
+use crate::artifact::CredentialError;
+use crate::cross_issuer::CrossIssuerPortfolioEntryKind;
+use crate::financial::validation::validate_digest;
+use chio_core::{canonical_json_bytes, sha256_hex};
+use chio_fincred::FinancialCredentialFamilyV1;
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 
-pub const FINANCIAL_CROSS_ISSUER_TRUST_PACK_SCHEMA_V1: &str = "chio.financial.cross-issuer-trust-pack.v1";
+pub const FINANCIAL_CROSS_ISSUER_TRUST_PACK_SCHEMA_V1: &str =
+    "chio.financial.cross-issuer-trust-pack.v1";
 pub const FINANCIAL_ENTRY_ACTIVATION_DECISION_SCHEMA_V1: &str =
     "chio.financial.cross-issuer-entry-activation-decision.v1";
-pub const FINANCIAL_CROSS_ISSUER_MIGRATION_SCHEMA_V1: &str = "chio.financial.cross-issuer-migration.v1";
+pub const FINANCIAL_CROSS_ISSUER_MIGRATION_SCHEMA_V1: &str =
+    "chio.financial.cross-issuer-migration.v1";
 pub const FINANCIAL_LEGACY_CREDENTIAL_ISSUANCE_ANCHOR_SCHEMA_V1: &str =
     "chio.financial.legacy-credential-issuance-anchor.v1";
-pub const FINANCIAL_ISSUER_LIFECYCLE_CHECKPOINT_SCHEMA_V1: &str = "chio.financial.cross-issuer.lifecycle-checkpoint.v1";
-pub const FINANCIAL_CROSS_ISSUER_LIFECYCLE_RESULT_SCHEMA_V1: &str = "chio.financial.cross-issuer.lifecycle-result.v1";
+pub const FINANCIAL_ISSUER_LIFECYCLE_CHECKPOINT_SCHEMA_V1: &str =
+    "chio.financial.cross-issuer.lifecycle-checkpoint.v1";
+pub const FINANCIAL_CROSS_ISSUER_LIFECYCLE_RESULT_SCHEMA_V1: &str =
+    "chio.financial.cross-issuer.lifecycle-result.v1";
 pub const FINANCIAL_ISSUER_LIFECYCLE_GENERATION_PIN_SCHEMA_V1: &str =
     "chio.financial.cross-issuer.lifecycle-generation-pin.v1";
 pub const FINANCIAL_LIFECYCLE_CHECKPOINT_PIN_SCHEMA_V1: &str =
     "chio.financial.cross-issuer.lifecycle-checkpoint-pin.v1";
 
 const FINANCIAL_POLICY_DIGEST_DOMAIN: &[u8] = b"chio.fincred.verifier-policy-digest.v1\0";
-const ENTRY_ACTIVATION_DIGEST_DOMAIN: &[u8] = b"chio.financial.cross-issuer.entry-activation-digest.v1\0";
-const CROSS_ISSUER_MIGRATION_DIGEST_DOMAIN: &[u8] = b"chio.financial.cross-issuer.migration-digest.v1\0";
+const ENTRY_ACTIVATION_DIGEST_DOMAIN: &[u8] =
+    b"chio.financial.cross-issuer.entry-activation-digest.v1\0";
+const CROSS_ISSUER_MIGRATION_DIGEST_DOMAIN: &[u8] =
+    b"chio.financial.cross-issuer.migration-digest.v1\0";
 const LEGACY_ISSUANCE_ANCHOR_DIGEST_DOMAIN: &[u8] =
     b"chio.financial.legacy-credential.issuance-anchor-digest.v1\0";
-const LIFECYCLE_RESULT_DIGEST_DOMAIN: &[u8] = b"chio.financial.cross-issuer.lifecycle-result-digest.v1\0";
+const LIFECYCLE_RESULT_DIGEST_DOMAIN: &[u8] =
+    b"chio.financial.cross-issuer.lifecycle-result-digest.v1\0";
 const LIFECYCLE_CHECKPOINT_DIGEST_DOMAIN: &[u8] =
     b"chio.financial.cross-issuer.lifecycle-checkpoint-digest.v1\0";
 const LIFECYCLE_GENERATION_PIN_DIGEST_DOMAIN: &[u8] =
@@ -342,19 +355,14 @@ fn availability_error(
     authority_error(format!("{component} {reason}"))
 }
 
-#[path = "authority/evaluation.rs"]
 mod evaluation;
-#[path = "authority/lifecycle.rs"]
 mod lifecycle;
-#[path = "authority/policy.rs"]
 mod policy;
-#[path = "authority/trust.rs"]
-mod trust;
+pub(crate) mod trust;
 pub use evaluation::*;
 pub use lifecycle::*;
 pub use policy::*;
 pub use trust::*;
 
 #[cfg(test)]
-#[path = "authority/tests.rs"]
-mod tests;
+pub(crate) mod tests;

@@ -1,4 +1,16 @@
-use super::*;
+use crate::artifact::CredentialError;
+use crate::cross_issuer::CrossIssuerPortfolioEntryKind;
+use crate::financial::authority::trust::artifacts::SignedLegacyCredentialIssuanceAnchorV2;
+use crate::financial::authority::trust::{
+    active_key, insert_unique, normalize_strings, validate_epoch,
+};
+use crate::financial::authority::{authority_error, TrustedKeyStatusV2};
+use crate::financial::validation::{validate_digest, validate_text};
+use chio_core::PublicKey;
+use chio_did::DidChio;
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, BTreeSet};
+use std::str::FromStr;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -318,7 +330,7 @@ impl CrossIssuerTrustRegistryV2 {
         Ok(&matches[0].public_key)
     }
 
-    pub(in crate::financial_authority) fn issuer_key(
+    pub(in crate::financial::authority) fn issuer_key(
         &self,
         issuer: &str,
         verification_method: &str,
@@ -331,7 +343,7 @@ impl CrossIssuerTrustRegistryV2 {
         )
     }
 
-    pub(in crate::financial_authority) fn manifest_issuer_key(
+    pub(in crate::financial::authority) fn manifest_issuer_key(
         &self,
         issuer: &str,
         signer_key: &PublicKey,
@@ -382,7 +394,7 @@ impl CrossIssuerTrustRegistryV2 {
         )
     }
 
-    pub(in crate::financial_authority) fn resolver_key(
+    pub(in crate::financial::authority) fn resolver_key(
         &self,
         resolver_identity: &str,
         signer_key_id: &str,
@@ -398,7 +410,7 @@ impl CrossIssuerTrustRegistryV2 {
         )
     }
 
-    pub(in crate::financial_authority) fn generation_anchor_key(
+    pub(in crate::financial::authority) fn generation_anchor_key(
         &self,
         anchor_id: &str,
         epoch: u64,
@@ -410,7 +422,7 @@ impl CrossIssuerTrustRegistryV2 {
         )
     }
 
-    pub(in crate::financial_authority) fn high_water_key(
+    pub(in crate::financial::authority) fn high_water_key(
         &self,
         store_id: &str,
         epoch: u64,
@@ -422,7 +434,7 @@ impl CrossIssuerTrustRegistryV2 {
         )
     }
 
-    pub(in crate::financial_authority) fn activation_metadata(
+    pub(in crate::financial::authority) fn activation_metadata(
         &self,
         issuer: &str,
     ) -> Result<&IssuerActivationMetadataV2, CredentialError> {

@@ -1,6 +1,23 @@
 //! OID4VP artifacts signed by weak Ed25519 keys are refused.
-
-use super::*;
+use crate::artifact::CredentialError;
+use crate::challenge::{build_agent_passport, issue_reputation_credential};
+use crate::oid4vp::{
+    filter_portable_disclosures, verify_oid4vp_direct_post_response,
+    verify_signed_oid4vp_request_object, Oid4vpDcqlQuery, Oid4vpDescriptorMap,
+    Oid4vpDirectPostResponseClaims, Oid4vpPresentationSubmission, Oid4vpRequestObject,
+    Oid4vpRequestedCredential, OID4VP_CLIENT_ID_SCHEME_REDIRECT_URI, OID4VP_REQUEST_OBJECT_TYP,
+    OID4VP_RESPONSE_MODE_DIRECT_POST_JWT, OID4VP_RESPONSE_OBJECT_TYP,
+    OID4VP_RESPONSE_TYPE_VP_TOKEN,
+};
+use crate::portable_sd_jwt::{
+    issue_chio_passport_sd_jwt_vc, PortableEd25519Jwk, CHIO_PASSPORT_SD_JWT_VC_FORMAT,
+    CHIO_PASSPORT_SD_JWT_VC_TYPE,
+};
+use crate::tests::{did_from_public_key, sample_evidence, sample_scorecard, TestResultExt};
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::Engine;
+use chio_core::Keypair;
+use serde_json::{json, Value};
 
 /// The Ed25519 identity point. With the signature `(R = identity, s = 0)`
 /// it satisfies the cofactorless verification equation for every message.

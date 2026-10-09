@@ -1,9 +1,11 @@
-use super::*;
+use crate::artifact::CredentialError;
+use crate::financial::authority::{authority_error, TrustedKeyStatusV2};
+use crate::financial::validation::{validate_digest, validate_text};
+use crate::financial::I_JSON_MAX_SAFE_INTEGER;
+use std::collections::{BTreeMap, BTreeSet};
 
-#[path = "trust/artifacts.rs"]
-mod artifacts;
-#[path = "trust/registry.rs"]
-mod registry;
+pub(super) mod artifacts;
+pub(crate) mod registry;
 pub use artifacts::*;
 pub use registry::*;
 
@@ -53,7 +55,7 @@ impl_trust_status!(
     LegacyIssuanceAnchorAuthorityTrustKeyV2,
 );
 
-pub(in crate::financial_authority) fn validate_epoch(
+pub(in crate::financial::authority) fn validate_epoch(
     field: &str,
     epoch: u64,
 ) -> Result<(), CredentialError> {

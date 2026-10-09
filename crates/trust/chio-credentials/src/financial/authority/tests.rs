@@ -1,11 +1,53 @@
-use super::*;
+use crate::artifact::CredentialError;
+use crate::cross_issuer::CrossIssuerPortfolioEntryKind;
+use crate::financial::authority::evaluation::{
+    reject_legacy_cross_issuer_v1_activation, verify_entry_activation_decision_v2,
+};
+use crate::financial::authority::lifecycle::{
+    resolve_cross_issuer_lifecycle_v2, sign_issuer_lifecycle_generation_pin_v2,
+    sign_lifecycle_checkpoint_pin_v2, sign_single_passport_lifecycle_snapshot_v2,
+    CrossIssuerLifecycleGenerationAnchor, CrossIssuerLifecycleHighWaterStore,
+    CrossIssuerLifecycleResolver, CrossIssuerLifecycleStatusV2, LifecycleCheckpointPinCandidateV2,
+    SignedCrossIssuerLifecycleResultV2, SignedIssuerLifecycleCheckpointV2,
+    SignedIssuerLifecycleGenerationPinV2, SignedLifecycleCheckpointPinV2,
+    SinglePassportLifecycleSnapshotInputV2, VerifiedCrossIssuerLifecycleV2,
+};
+use crate::financial::authority::policy::{
+    create_financial_verifier_policy_v1, FinancialVerifierPolicyActivationV1,
+    FinancialVerifierPolicyInputV1, FinancialVerifierPolicyRegistry,
+};
+use crate::financial::authority::trust::artifacts::{
+    sign_cross_issuer_migration_v2, sign_cross_issuer_trust_pack_v2,
+    sign_entry_activation_decision_v2, verify_signed_cross_issuer_trust_pack_v2,
+};
+use crate::financial::authority::trust::registry::{
+    CrossIssuerTrustRegistryConfigV2, CrossIssuerTrustRegistryV2, IssuerActivationMetadataV2,
+    IssuerTrustKeyV2, LifecycleGenerationAnchorTrustKeyV2, LifecycleHighWaterTrustKeyV2,
+    LifecycleResolverTrustKeyV2, MigrationAttesterTrustKeyV2, VerifierTrustKeyV2,
+};
+use crate::financial::authority::{
+    signed_envelope_digest, CrossIssuerMigrationInputV2, CrossIssuerTrustPackInputV2,
+    CrossIssuerTrustPackPolicyV2, EntryActivationCredentialBindingV2,
+    EntryActivationDecisionInputV2, EntryActivationDispositionV2,
+    FinancialAuthorityAvailabilityError, SignedCrossIssuerTrustPackV2,
+    SignedEntryActivationDecisionV2, TrustedKeyStatusV2, VerifiedFinancialCredentialBindingV2,
+    VerifiedFinancialCredentialSet,
+};
+use chio_core::Keypair;
+use chio_did::DidChio;
+use chio_fincred::{
+    FinancialCredentialFamilyV1, FinancialVerifierPolicyV1, FinancialVerifierThresholdsV1,
+};
+use std::collections::{BTreeMap, BTreeSet};
+use std::str::FromStr;
+
 use std::cell::RefCell;
 
 const NOW: u64 = 1_710_000_100;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
-fn did(keypair: &Keypair) -> TestResult<String> {
+pub(crate) fn did(keypair: &Keypair) -> TestResult<String> {
     Ok(DidChio::from_public_key(keypair.public_key())?.to_string())
 }
 
@@ -13,7 +55,7 @@ fn digest(byte: u8) -> String {
     format!("{byte:02x}").repeat(32)
 }
 
-fn decision(
+pub(crate) fn decision(
     signer: &Keypair,
     verifier_id: &str,
     signer_key_epoch: u64,

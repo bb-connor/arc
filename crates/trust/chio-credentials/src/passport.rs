@@ -1,3 +1,13 @@
+use crate::artifact::{CredentialError, EnterpriseIdentityProvenance, ReputationCredential};
+use crate::challenge::unix_from_rfc3339;
+use crate::policy::validate_unit_interval;
+use crate::trust_tier::TrustTier;
+use chio_core::{PublicKey, Signature};
+use chio_did::DidChio;
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
+use std::str::FromStr;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AgentPassport {
@@ -385,7 +395,10 @@ fn validate_passport_lifecycle_state_fields(
             }
         }
         PassportLifecycleState::NotFound => {
-            if has_published_at || superseded_by.is_some() || revoked_at.is_some() || revoked_reason.is_some()
+            if has_published_at
+                || superseded_by.is_some()
+                || revoked_at.is_some()
+                || revoked_reason.is_some()
             {
                 return Err(CredentialError::InvalidPassportLifecycle(format!(
                     "not-found passport lifecycle entry `{passport_id}` cannot include published, supersession, or revocation fields"

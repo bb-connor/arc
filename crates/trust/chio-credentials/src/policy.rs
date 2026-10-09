@@ -1,4 +1,12 @@
-fn challenge_presentation_options(
+use crate::artifact::{CredentialError, ReputationCredential};
+use crate::challenge::{PassportPresentationChallenge, PassportPresentationOptions};
+use crate::is_supported_passport_verifier_policy_schema;
+use crate::passport::{
+    CredentialPolicyEvaluation, PassportVerifierPolicy, SignedPassportVerifierPolicyBody,
+};
+use chio_reputation::MetricValue;
+
+pub(super) fn challenge_presentation_options(
     challenge: &PassportPresentationChallenge,
 ) -> PassportPresentationOptions {
     PassportPresentationOptions {
@@ -7,7 +15,10 @@ fn challenge_presentation_options(
     }
 }
 
-fn validate_unit_interval(field: &'static str, value: Option<f64>) -> Result<(), CredentialError> {
+pub(super) fn validate_unit_interval(
+    field: &'static str,
+    value: Option<f64>,
+) -> Result<(), CredentialError> {
     if let Some(value) = value {
         if !(0.0..=1.0).contains(&value) {
             return Err(CredentialError::InvalidVerifierThreshold { field, value });
@@ -16,7 +27,7 @@ fn validate_unit_interval(field: &'static str, value: Option<f64>) -> Result<(),
     Ok(())
 }
 
-fn verify_signed_passport_verifier_policy_body(
+pub(super) fn verify_signed_passport_verifier_policy_body(
     body: &SignedPassportVerifierPolicyBody,
 ) -> Result<(), CredentialError> {
     if !is_supported_passport_verifier_policy_schema(&body.schema) {
@@ -35,7 +46,7 @@ fn verify_signed_passport_verifier_policy_body(
     Ok(())
 }
 
-fn evaluate_credential_against_policy(
+pub(super) fn evaluate_credential_against_policy(
     index: usize,
     credential: &ReputationCredential,
     now: u64,

@@ -1,3 +1,13 @@
+use crate::{
+    PASSPORT_PRESENTATION_CHALLENGE_SCHEMA, PASSPORT_PRESENTATION_RESPONSE_SCHEMA, PASSPORT_SCHEMA,
+    PASSPORT_VERIFIER_POLICY_SCHEMA, PRESENTATION_PROOF_PURPOSE, PROOF_PURPOSE, PROOF_TYPE,
+};
+use chio_core::session::{EnterpriseFederationMethod, EnterpriseIdentityContext};
+use chio_did::DidError;
+use chio_reputation::LocalReputationScorecard;
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+
 #[derive(Debug, thiserror::Error)]
 pub enum CredentialError {
     #[error(transparent)]
@@ -312,7 +322,7 @@ impl EnterpriseIdentityProvenance {
         }
     }
 
-    fn validate(&self) -> Result<(), CredentialError> {
+    pub(super) fn validate(&self) -> Result<(), CredentialError> {
         require_enterprise_identity_provenance_field(&self.provider_id, "providerId")?;
         require_enterprise_identity_provenance_field(&self.provider_kind, "providerKind")?;
         require_enterprise_identity_provenance_field(&self.principal, "principal")?;
@@ -321,7 +331,7 @@ impl EnterpriseIdentityProvenance {
     }
 }
 
-fn require_enterprise_identity_provenance_field(
+pub(super) fn require_enterprise_identity_provenance_field(
     value: &str,
     field: &'static str,
 ) -> Result<(), CredentialError> {

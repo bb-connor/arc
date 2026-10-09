@@ -1,8 +1,36 @@
-use super::*;
+use crate::artifact::{CredentialError, EnterpriseIdentityProvenance};
+use crate::challenge::{
+    aggregate_enterprise_identity_provenance, rfc3339_from_unix, unix_from_rfc3339,
+    verify_agent_passport, verify_reputation_credential, PresentationProof,
+};
+use crate::financial::passport_v2::digest::{
+    passport_manifest_leaf_v2, passport_presentation_challenge_digest_v2,
+    recompute_presentation_digest, recompute_source_passport_id,
+};
+use crate::financial::validation::{
+    invalid_financial, invalid_financial_error, validate_digest, validate_text, validate_time,
+};
+use crate::financial::{
+    inspect_financial_credential_signature, AgentPassportV2, PassportCredentialMembershipProofV2,
+    PassportCredentialSelectorV2, PassportCredentialV2, PassportPresentationChallengeIdentityV2,
+    PassportPresentationChallengeUseError, PassportPresentationChallengeUseStore,
+    PassportPresentationChallengeV2, PassportPresentationResponseV2, PassportSourceManifestV2,
+    PassportValidityWindowV2, PresentedAgentPassportV2, SignedPassportPresentationChallengeV2,
+    SignedPassportSourceManifestV2, UnsignedPassportPresentationResponseV2,
+    FINANCIAL_AGENT_PASSPORT_SCHEMA_V1, FINANCIAL_AGENT_PASSPORT_SOURCE_MANIFEST_SCHEMA_V1,
+    FINANCIAL_PASSPORT_PRESENTATION_CHALLENGE_SCHEMA_V1,
+    FINANCIAL_PASSPORT_PRESENTATION_RESPONSE_SCHEMA_V1, I_JSON_MAX_SAFE_INTEGER,
+    MAX_FINANCIAL_SOURCE_ARTIFACTS, PRESENTED_FINANCIAL_AGENT_PASSPORT_SCHEMA_V1,
+};
+use crate::passport::AgentPassport;
+use crate::trust_tier::TrustTier;
+use crate::{PASSPORT_SCHEMA, PRESENTATION_PROOF_PURPOSE, PROOF_TYPE};
+use chio_core::{canonical_json_bytes, Keypair, Signature};
+use chio_did::DidChio;
+use std::collections::BTreeSet;
+use std::str::FromStr;
 
-#[path = "passport_v2/digest.rs"]
 mod digest;
-use digest::*;
 
 pub fn issue_passport_source_manifest_v2(
     issuer_keypair: &Keypair,

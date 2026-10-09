@@ -1,3 +1,13 @@
+use crate::artifact::{AttestationWindow, CredentialError};
+use chio_core::{canonical_json_bytes, sha256_hex};
+use chio_reputation::{
+    BoundaryPressureMetrics, DelegationHygieneMetrics, HistoryDepthMetrics,
+    IncidentCorrelationMetrics, LeastPrivilegeMetrics, LocalReputationScorecard, MetricValue,
+    ReliabilityMetrics, ResourceStewardshipMetrics, SpecializationMetrics,
+};
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, BTreeSet};
+
 use chio_core::receipt::lineage::SignedExportEnvelope;
 
 fn validate_non_empty(value: &str, field: &str) -> Result<(), String> {
@@ -611,7 +621,10 @@ pub fn evaluate_portable_reputation(
             });
             continue;
         }
-        if !request.weighting_profile.allowed_issuer_operator_ids.is_empty()
+        if !request
+            .weighting_profile
+            .allowed_issuer_operator_ids
+            .is_empty()
             && !request
                 .weighting_profile
                 .allowed_issuer_operator_ids
@@ -630,7 +643,9 @@ pub fn evaluate_portable_reputation(
             rejected_summary_count += 1;
             findings.push(PortableReputationFinding {
                 code: PortableReputationFindingCode::ProbationaryRejected,
-                message: "portable reputation summary is probationary under the local weighting profile".to_string(),
+                message:
+                    "portable reputation summary is probationary under the local weighting profile"
+                        .to_string(),
                 issuer_operator_id: issuer,
                 reference_id: reference,
             });
@@ -732,7 +747,10 @@ pub fn evaluate_portable_reputation(
             });
             continue;
         }
-        if !request.weighting_profile.allowed_issuer_operator_ids.is_empty()
+        if !request
+            .weighting_profile
+            .allowed_issuer_operator_ids
+            .is_empty()
             && !request
                 .weighting_profile
                 .allowed_issuer_operator_ids
@@ -741,7 +759,9 @@ pub fn evaluate_portable_reputation(
             rejected_negative_event_count += 1;
             findings.push(PortableReputationFinding {
                 code: PortableReputationFindingCode::IssuerNotAllowed,
-                message: "portable negative event issuer is not allowed by the local weighting profile".to_string(),
+                message:
+                    "portable negative event issuer is not allowed by the local weighting profile"
+                        .to_string(),
                 issuer_operator_id: issuer,
                 reference_id: reference,
             });
@@ -753,9 +773,8 @@ pub fn evaluate_portable_reputation(
             .get(&event.body.issuer_operator_id)
             .copied()
             .unwrap_or(1.0);
-        negative_event_penalty += event.body.severity
-            * request.weighting_profile.negative_event_weight
-            * issuer_weight;
+        negative_event_penalty +=
+            event.body.severity * request.weighting_profile.negative_event_weight * issuer_weight;
         accepted_negative_event_count += 1;
         if request
             .weighting_profile
@@ -961,7 +980,9 @@ mod portable_reputation_tests {
         );
         assert_close(evaluation.negative_event_penalty, 0.15);
         assert_close(
-            evaluation.effective_score.expect("expected effective score"),
+            evaluation
+                .effective_score
+                .expect("expected effective score"),
             0.65,
         );
         assert!(!evaluation.blocked);
@@ -1021,9 +1042,10 @@ mod portable_reputation_tests {
         assert_eq!(evaluation.accepted_summary_count, 0);
         assert_eq!(evaluation.rejected_summary_count, 2);
         assert_eq!(evaluation.effective_score, None);
-        assert!(evaluation.findings.iter().all(|finding| {
-            finding.code == PortableReputationFindingCode::IssuerNotAllowed
-        }));
+        assert!(evaluation
+            .findings
+            .iter()
+            .all(|finding| { finding.code == PortableReputationFindingCode::IssuerNotAllowed }));
     }
 
     #[test]

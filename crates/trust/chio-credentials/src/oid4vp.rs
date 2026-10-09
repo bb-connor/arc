@@ -1,3 +1,20 @@
+use crate::artifact::CredentialError;
+use crate::jwt_decode::decode_compact_jwt_without_signature;
+use crate::oid4vci::{
+    normalize_credential_issuer, validate_endpoint_prefix, Oid4vciChioPassportStatusReference,
+};
+use crate::portable_sd_jwt::{
+    parse_sd_jwt_disclosure, verify_chio_passport_sd_jwt_vc, ChioPassportSdJwtVcUnverified,
+    PortableEd25519Jwk, CHIO_PASSPORT_SD_JWT_VC_FORMAT, CHIO_PASSPORT_SD_JWT_VC_TYPE,
+};
+use base64::Engine as _;
+use chio_core::session::ChioIdentityAssertion;
+use chio_core::{sha256_hex, ChioPortableClaimCatalog, Keypair, PublicKey, Signature};
+use chio_did::DidChio;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::collections::BTreeSet;
+
 pub const OID4VP_RESPONSE_TYPE_VP_TOKEN: &str = "vp_token";
 pub const OID4VP_RESPONSE_MODE_DIRECT_POST_JWT: &str = "direct_post.jwt";
 pub const OID4VP_CLIENT_ID_SCHEME_REDIRECT_URI: &str = "redirect_uri";
@@ -1036,7 +1053,7 @@ fn is_supported_chio_sd_jwt_claim(claim: &str) -> bool {
     ChioPortableClaimCatalog::default().supports_selective_disclosure(claim)
 }
 
-fn filter_portable_disclosures(
+pub(super) fn filter_portable_disclosures(
     compact: &str,
     requested_claims: &[String],
 ) -> Result<String, CredentialError> {
@@ -1062,7 +1079,7 @@ fn filter_portable_disclosures(
     }
 }
 
-fn sign_jwt_value(
+pub(super) fn sign_jwt_value(
     typ: &str,
     payload: &Value,
     signing_key: &Keypair,

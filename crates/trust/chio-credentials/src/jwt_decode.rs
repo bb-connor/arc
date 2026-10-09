@@ -86,8 +86,8 @@ mod tests {
 
     #[test]
     fn compact_jwt_bounds_segments_before_base64_allocation() {
-        let key = crate::Keypair::from_seed(&[37; 32]);
-        let compact = crate::sign_jwt_value("JWT", &serde_json::json!({"sub": "a"}), &key)
+        let key = chio_core::Keypair::from_seed(&[37; 32]);
+        let compact = crate::oid4vp::sign_jwt_value("JWT", &serde_json::json!({"sub": "a"}), &key)
             .expect("sign valid JWT");
         let decode = |value: &str| {
             decode_compact_jwt_without_signature(

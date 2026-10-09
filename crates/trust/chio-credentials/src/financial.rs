@@ -1,3 +1,22 @@
+use crate::artifact::{
+    CredentialError, CredentialProof, EnterpriseIdentityProvenance, ReputationCredential,
+};
+use crate::challenge::{rfc3339_from_unix, unix_from_rfc3339, PresentationProof};
+use crate::passport::AgentPassport;
+use crate::trust_tier::TrustTier;
+use crate::{
+    CHIO_CREDENTIAL_CONTEXT_V1, PASSPORT_SCHEMA, PROOF_PURPOSE, PROOF_TYPE, VC_CONTEXT_V1, VC_TYPE,
+};
+use chio_core::{canonical_json_bytes, sha256_hex, Keypair, Signature};
+use chio_did::DidChio;
+use chio_fincred::{
+    FinancialCredentialEvidenceV1, FinancialCredentialFamilyV1, FinancialCredentialSubjectV1,
+    MAX_I_JSON_SAFE_INTEGER,
+};
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
+use std::str::FromStr;
+
 pub const FINANCIAL_AGENT_PASSPORT_SCHEMA_V1: &str = "chio.financial-agent-passport.v1";
 pub const FINANCIAL_AGENT_PASSPORT_SOURCE_MANIFEST_SCHEMA_V1: &str =
     "chio.financial-agent-passport.source-manifest.v1";
@@ -582,11 +601,10 @@ impl PassportPresentationChallengeUseStore for OfflinePassportPresentationChalle
     }
 }
 
-#[path = "financial/passport_v2.rs"]
-mod financial_passport_v2;
+mod passport_v2;
 
-use financial_passport_v2::validate_agent_passport_v2_contract;
-pub use financial_passport_v2::{
+use passport_v2::validate_agent_passport_v2_contract;
+pub use passport_v2::{
     build_agent_passport_v2, build_presented_agent_passport_v2,
     create_passport_presentation_challenge_v2, inspect_agent_passport_v2,
     inspect_passport_presentation_challenge_v2, inspect_passport_presentation_response_v2,
@@ -594,9 +612,8 @@ pub use financial_passport_v2::{
     issue_passport_source_manifest_v2, respond_to_passport_presentation_challenge_v2,
 };
 
-#[path = "financial/authority.rs"]
-mod financial_authority;
-pub use financial_authority::*;
+pub(super) mod authority;
+pub use authority::*;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum VersionedAgentPassport {
@@ -722,14 +739,12 @@ pub fn try_downgrade_v2_passport(
     })
 }
 
-#[path = "financial/validation.rs"]
-mod financial_validation;
+mod validation;
 
-use financial_validation::{
+use validation::{
     invalid_financial, invalid_financial_error, validate_digest, validate_evidence_classes,
     validate_financial_evidence, validate_financial_subject, validate_text, validate_time,
 };
 
 #[cfg(test)]
-#[path = "financial/tests.rs"]
-mod financial_tests;
+mod tests;

@@ -1,3 +1,24 @@
+use crate::artifact::CredentialError;
+use crate::challenge::{
+    passport_artifact_id, rfc3339_from_unix, unix_from_rfc3339, verify_agent_passport,
+};
+use crate::passport::{AgentPassport, PassportStatusDistribution};
+use crate::portable_jwt_vc::{
+    jwt_vc_json_claim_catalog, jwt_vc_json_identity_binding, verify_chio_passport_jwt_vc_json,
+    CHIO_PASSPORT_JWT_VC_JSON_CREDENTIAL_CONFIGURATION_ID, CHIO_PASSPORT_JWT_VC_JSON_FORMAT,
+    CHIO_PASSPORT_JWT_VC_JSON_TYPE_METADATA_PATH,
+};
+use crate::portable_sd_jwt::{
+    verify_chio_passport_sd_jwt_vc, Oid4vciIssuedCredential, PortableEd25519Jwk,
+    CHIO_PASSPORT_SD_JWT_VC_CREDENTIAL_CONFIGURATION_ID, CHIO_PASSPORT_SD_JWT_VC_FORMAT,
+    CHIO_PASSPORT_SD_JWT_VC_TYPE_METADATA_PATH, OID4VCI_JWKS_PATH,
+};
+use chio_core::{ChioPortableClaimCatalog, ChioPortableIdentityBinding, PublicKey};
+use chio_did::DidChio;
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+use std::str::FromStr;
+
 pub const OID4VCI_PRE_AUTHORIZED_GRANT_TYPE: &str =
     "urn:ietf:params:oauth:grant-type:pre-authorized_code";
 pub const CHIO_PASSPORT_OID4VCI_CREDENTIAL_CONFIGURATION_ID: &str = "chio_agent_passport";
@@ -192,8 +213,7 @@ pub struct Oid4vciCredentialIssuerMetadata {
     pub token_endpoint: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub jwks_uri: Option<String>,
-    pub credential_configurations_supported:
-        BTreeMap<String, Oid4vciCredentialConfiguration>,
+    pub credential_configurations_supported: BTreeMap<String, Oid4vciCredentialConfiguration>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chio_profile: Option<Oid4vciChioIssuerProfile>,
 }
@@ -337,7 +357,8 @@ impl Oid4vciCredentialOffer {
         normalize_credential_issuer(&self.credential_issuer)?;
         if self.credential_configuration_ids.is_empty() {
             return Err(CredentialError::InvalidOid4vciCredentialOffer(
-                "credential offer must include at least one credential_configuration_id".to_string(),
+                "credential offer must include at least one credential_configuration_id"
+                    .to_string(),
             ));
         }
         let mut deduped = self.credential_configuration_ids.clone();
@@ -479,8 +500,7 @@ impl Oid4vciCredentialRequest {
         DidChio::from_str(&self.subject)?;
         if self.credential_configuration_id.is_none() && self.format.is_none() {
             return Err(CredentialError::InvalidOid4vciCredentialRequest(
-                "credential request must include credential_configuration_id or format"
-                    .to_string(),
+                "credential request must include credential_configuration_id or format".to_string(),
             ));
         }
         if let Some(credential_configuration_id) = self.credential_configuration_id.as_ref() {
@@ -571,8 +591,7 @@ impl Oid4vciChioPassportStatusReference {
         }
         if self.distribution.is_empty() {
             return Err(CredentialError::InvalidOid4vciCredentialResponse(
-                "Chio passport status reference must include a non-empty distribution"
-                    .to_string(),
+                "Chio passport status reference must include a non-empty distribution".to_string(),
             ));
         }
         self.distribution
@@ -602,7 +621,10 @@ struct PortableCompactCredentialArgs<'a> {
 }
 
 impl Oid4vciCredentialResponse {
-    pub fn new(format: impl Into<String>, credential: AgentPassport) -> Result<Self, CredentialError> {
+    pub fn new(
+        format: impl Into<String>,
+        credential: AgentPassport,
+    ) -> Result<Self, CredentialError> {
         Self::new_with_status_reference(format, credential, None)
     }
 
@@ -664,7 +686,9 @@ impl Oid4vciCredentialResponse {
         })
     }
 
-    fn new_portable_compact(args: PortableCompactCredentialArgs<'_>) -> Result<Self, CredentialError> {
+    fn new_portable_compact(
+        args: PortableCompactCredentialArgs<'_>,
+    ) -> Result<Self, CredentialError> {
         let PortableCompactCredentialArgs {
             format,
             compact,
@@ -936,7 +960,7 @@ pub fn build_oid4vci_passport_offer(
     Ok(offer)
 }
 
-fn normalize_credential_issuer(value: &str) -> Result<String, CredentialError> {
+pub(super) fn normalize_credential_issuer(value: &str) -> Result<String, CredentialError> {
     let normalized = value.trim().trim_end_matches('/');
     if normalized.is_empty() {
         return Err(CredentialError::InvalidOid4vciIssuerMetadata(
@@ -946,7 +970,7 @@ fn normalize_credential_issuer(value: &str) -> Result<String, CredentialError> {
     Ok(normalized.to_string())
 }
 
-fn validate_endpoint_prefix(
+pub(super) fn validate_endpoint_prefix(
     credential_issuer: &str,
     field: &str,
     endpoint: &str,

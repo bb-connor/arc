@@ -1,6 +1,34 @@
+use crate::artifact::CredentialError;
+use crate::challenge::unix_from_rfc3339;
+use crate::financial::authority::lifecycle::{
+    resolve_cross_issuer_lifecycle_v2, CrossIssuerLifecycleGenerationAnchor,
+    CrossIssuerLifecycleHighWaterStore, CrossIssuerLifecycleResolver,
+};
+use crate::financial::authority::policy::VerifiedFinancialVerifierPolicy;
+use crate::financial::authority::trust::artifacts::{
+    verify_cross_issuer_migration_v2, verify_signed_cross_issuer_trust_pack_v2,
+    LegacyCredentialIssuanceAnchorResolver,
+};
+use crate::financial::authority::trust::registry::CrossIssuerTrustRegistryV2;
+use crate::financial::authority::{
+    authority_digest, authority_error, signed_envelope_digest, EntryActivationCredentialBindingV2,
+    EntryActivationDispositionV2, SignedCrossIssuerMigrationV2, SignedCrossIssuerTrustPackV2,
+    SignedEntryActivationDecisionV2, VerifiedFinancialCredentialBindingV2,
+    VerifiedFinancialCredentialSet,
+};
+use crate::financial::validation::{validate_digest, validate_financial_evidence, validate_time};
+use crate::financial::{
+    FinancialCredentialEnvelope, PassportCredentialV2, PresentedAgentPassportV2,
+};
+use chio_core::{canonical_json_bytes, sha256_hex, Signature};
+use chio_fincred::{
+    FinancialCredentialSubjectV1, FinancialSourceDisclosureV1, FinancialVerifierPolicyV1,
+};
+use chio_security_types::clock::Clock;
+use std::collections::BTreeSet;
+
 use super::trust::verify_legacy_credential_authority;
-use super::*;
-use crate::financial_passport_v2::validate_presented_agent_passport_v2_authority_contract;
+use crate::financial::passport_v2::validate_presented_agent_passport_v2_authority_contract;
 
 const FINANCIAL_CREDENTIAL_BODY_DIGEST_DOMAIN: &[u8] = b"chio.fincred.verified-body-digest.v1\0";
 

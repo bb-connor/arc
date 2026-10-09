@@ -1,3 +1,16 @@
+use crate::artifact::{CredentialError, EnterpriseIdentityProvenance};
+use crate::challenge::{unix_from_rfc3339, verify_agent_passport};
+use crate::jwt_decode::decode_compact_jwt_without_signature;
+use crate::oid4vci::{normalize_credential_issuer, Oid4vciChioPassportStatusReference};
+use crate::passport::AgentPassport;
+use chio_core::{
+    canonical_json_bytes, ChioPortableClaimCatalog, ChioPortableIdentityBinding, Keypair, PublicKey,
+};
+use chio_did::DidChio;
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
+use std::str::FromStr;
+
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
 use rand_core::{OsRng, RngCore};
@@ -610,12 +623,14 @@ fn disclosure_entry(key: &str, value: Value) -> SdJwtDisclosureEntry {
     SdJwtDisclosureEntry { encoded, digest }
 }
 
-fn sd_jwt_disclosure_digest(disclosure: &str) -> String {
+pub(super) fn sd_jwt_disclosure_digest(disclosure: &str) -> String {
     URL_SAFE_NO_PAD.encode(sha2::Sha256::digest(disclosure.as_bytes()))
 }
 
-fn parse_sd_jwt_disclosure(disclosure: &str) -> Result<(String, String, Value), CredentialError> {
-    if disclosure.len() > jwt_decode::MAX_ENCODED_JSON_BYTES {
+pub(super) fn parse_sd_jwt_disclosure(
+    disclosure: &str,
+) -> Result<(String, String, Value), CredentialError> {
+    if disclosure.len() > crate::jwt_decode::MAX_ENCODED_JSON_BYTES {
         return Err(CredentialError::InvalidOid4vciCredentialResponse(
             "portable credential disclosure exceeds size limit".to_string(),
         ));
@@ -627,14 +642,16 @@ fn parse_sd_jwt_disclosure(disclosure: &str) -> Result<(String, String, Value), 
                 "portable credential disclosure is not valid base64url: {error}"
             ))
         })?;
-    let array: Vec<Value> =
-        chio_core::canonical::UntrustedJsonText::from_wire(&bytes, jwt_decode::MAX_JSON_BYTES)
-            .and_then(|input| input.decode_signed())
-            .map_err(|error| {
-                CredentialError::InvalidOid4vciCredentialResponse(format!(
-                    "portable credential disclosure is not valid JSON: {error}"
-                ))
-            })?;
+    let array: Vec<Value> = chio_core::canonical::UntrustedJsonText::from_wire(
+        &bytes,
+        crate::jwt_decode::MAX_JSON_BYTES,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(|error| {
+        CredentialError::InvalidOid4vciCredentialResponse(format!(
+            "portable credential disclosure is not valid JSON: {error}"
+        ))
+    })?;
     if array.len() != 3 {
         return Err(CredentialError::InvalidOid4vciCredentialResponse(
             "portable credential disclosures must be [salt, key, value] arrays".to_string(),
@@ -650,7 +667,6 @@ fn parse_sd_jwt_disclosure(disclosure: &str) -> Result<(String, String, Value), 
     Ok((salt, key, array[2].clone()))
 }
 
-
 #[cfg(test)]
 mod key_algorithm_tests {
     use super::*;
@@ -660,10 +676,15 @@ mod key_algorithm_tests {
         let key = PublicKey::from_hex(
             "p256:046b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c2964fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5",
         )?;
-        assert!(matches!(PortableEd25519Jwk::from_public_key(&key),
-            Err(CredentialError::Core(chio_core::Error::InvalidPublicKey(_)))));
+        assert!(matches!(
+            PortableEd25519Jwk::from_public_key(&key),
+            Err(CredentialError::Core(chio_core::Error::InvalidPublicKey(_)))
+        ));
         let ed25519 = Keypair::from_seed(&[7; 32]).public_key();
-        assert_eq!(PortableEd25519Jwk::from_public_key(&ed25519)?.to_public_key()?, ed25519);
+        assert_eq!(
+            PortableEd25519Jwk::from_public_key(&ed25519)?.to_public_key()?,
+            ed25519
+        );
         Ok(())
     }
 }

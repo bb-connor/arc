@@ -1,3 +1,20 @@
+use crate::artifact::CredentialError;
+use crate::challenge::{
+    evaluate_agent_passport, present_agent_passport, rfc3339_from_unix, unix_from_rfc3339,
+    verify_agent_passport, verify_passport_presentation_challenge, PassportPresentationChallenge,
+    PassportPresentationResponse, PassportPresentationVerification, PresentationProof,
+    UnsignedPassportPresentationResponse,
+};
+use crate::passport::{AgentPassport, PassportVerifierPolicy};
+use crate::policy::challenge_presentation_options;
+use crate::{
+    is_supported_passport_presentation_response_schema, PASSPORT_PRESENTATION_RESPONSE_SCHEMA,
+    PRESENTATION_PROOF_PURPOSE, PROOF_TYPE,
+};
+use chio_core::{canonical_json_bytes, Keypair, Signature};
+use chio_did::DidChio;
+use std::str::FromStr;
+
 pub fn respond_to_passport_presentation_challenge(
     holder_keypair: &Keypair,
     passport: &AgentPassport,

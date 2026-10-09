@@ -1,3 +1,11 @@
+use crate::artifact::CredentialError;
+use crate::passport::{
+    PassportVerifierPolicy, SignedPassportVerifierPolicy, SignedPassportVerifierPolicyBody,
+};
+use crate::policy::verify_signed_passport_verifier_policy_body;
+use crate::PASSPORT_VERIFIER_POLICY_SCHEMA;
+use chio_core::Keypair;
+
 pub fn create_signed_passport_verifier_policy(
     signer_keypair: &Keypair,
     policy_id: impl Into<String>,
@@ -48,4 +56,3 @@ pub fn ensure_signed_passport_verifier_policy_active(
     }
     Ok(())
 }
-

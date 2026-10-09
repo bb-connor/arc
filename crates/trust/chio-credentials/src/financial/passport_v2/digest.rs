@@ -1,4 +1,15 @@
-use super::*;
+use crate::artifact::{CredentialError, EnterpriseIdentityProvenance};
+use crate::financial::{
+    PassportCredentialFamilyV2, PassportCredentialManifestLeafV2,
+    PassportCredentialMembershipProofV2, PassportCredentialSelectorV2, PassportCredentialV2,
+    PassportPresentationChallengeV2, PassportSourceManifestV2, SignedPassportSourceManifestV2,
+    PASSPORT_CREDENTIAL_REF_DOMAIN, PASSPORT_PRESENTATION_CHALLENGE_DIGEST_DOMAIN,
+    PASSPORT_PRESENTATION_DIGEST_DOMAIN, PASSPORT_SOURCE_MANIFEST_ID_DOMAIN,
+};
+use crate::trust_tier::TrustTier;
+use chio_core::{canonical_json_bytes, sha256_hex};
+use chio_fincred::FinancialCredentialFamilyV1;
+use serde::Serialize;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]

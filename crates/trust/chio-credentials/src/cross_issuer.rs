@@ -1,3 +1,16 @@
+use crate::artifact::CredentialError;
+use crate::challenge::verify_agent_passport;
+use crate::financial::authority::trust::registry::CrossIssuerTrustRegistryV2;
+use crate::passport::{AgentPassport, PassportLifecycleResolution, PassportLifecycleState};
+use crate::{
+    CROSS_ISSUER_MIGRATION_SCHEMA, CROSS_ISSUER_PORTFOLIO_SCHEMA, CROSS_ISSUER_TRUST_PACK_SCHEMA,
+};
+use chio_core::{canonical_json_bytes, Keypair, PublicKey, Signature};
+use chio_did::DidChio;
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, BTreeSet};
+use std::str::FromStr;
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "kebab-case")]
 pub enum CrossIssuerPortfolioEntryKind {

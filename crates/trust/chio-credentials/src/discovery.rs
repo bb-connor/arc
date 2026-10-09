@@ -1,3 +1,10 @@
+use crate::artifact::CredentialError;
+use crate::oid4vci::{normalize_credential_issuer, validate_endpoint_prefix};
+use crate::passport::PassportStatusDistribution;
+use chio_core::{Keypair, PublicKey, Signature};
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
+
 pub const CHIO_PUBLIC_ISSUER_DISCOVERY_SCHEMA: &str = "chio.public-issuer-discovery.v1";
 pub const CHIO_PUBLIC_VERIFIER_DISCOVERY_SCHEMA: &str = "chio.public-verifier-discovery.v1";
 pub const CHIO_PUBLIC_DISCOVERY_TRANSPARENCY_SCHEMA: &str = "chio.public-discovery-transparency.v1";

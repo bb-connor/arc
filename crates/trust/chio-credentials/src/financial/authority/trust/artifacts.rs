@@ -1,4 +1,26 @@
-use super::*;
+use crate::artifact::{CredentialError, ReputationCredential};
+use crate::cross_issuer::CrossIssuerPortfolioEntryKind;
+use crate::financial::authority::trust::registry::CrossIssuerTrustRegistryV2;
+use crate::financial::authority::trust::{
+    normalize_digests, normalize_optional_digests, normalize_strings, validate_epoch,
+    validate_string_set,
+};
+use crate::financial::authority::{
+    authority_digest, authority_error, CrossIssuerMigrationInputV2, CrossIssuerMigrationV2,
+    CrossIssuerTrustPackInputV2, CrossIssuerTrustPackV2, EntryActivationCredentialBindingV2,
+    EntryActivationDecisionInputV2, EntryActivationDecisionV2, EntryActivationDispositionV2,
+    FinancialAuthorityAvailabilityError, SignedCrossIssuerMigrationV2,
+    SignedCrossIssuerTrustPackV2, SignedEntryActivationDecisionV2,
+    CROSS_ISSUER_MIGRATION_DIGEST_DOMAIN, ENTRY_ACTIVATION_DIGEST_DOMAIN,
+    FINANCIAL_CROSS_ISSUER_MIGRATION_SCHEMA_V1, FINANCIAL_CROSS_ISSUER_TRUST_PACK_SCHEMA_V1,
+    FINANCIAL_ENTRY_ACTIVATION_DECISION_SCHEMA_V1,
+    FINANCIAL_LEGACY_CREDENTIAL_ISSUANCE_ANCHOR_SCHEMA_V1, LEGACY_ISSUANCE_ANCHOR_DIGEST_DOMAIN,
+};
+use crate::financial::validation::{validate_digest, validate_text};
+use chio_core::{canonical_json_bytes, sha256_hex, Keypair, Signature};
+use chio_did::DidChio;
+use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LegacyCredentialIssuanceAnchorInputV2 {
@@ -265,7 +287,7 @@ pub fn sign_legacy_credential_issuance_anchor_v2(
     Ok(SignedLegacyCredentialIssuanceAnchorV2::sign(body, signer)?)
 }
 
-pub(in crate::financial_authority) fn verify_legacy_credential_authority(
+pub(in crate::financial::authority) fn verify_legacy_credential_authority(
     credential: &ReputationCredential,
     trust: &CrossIssuerTrustRegistryV2,
     anchors: &dyn LegacyCredentialIssuanceAnchorResolver,

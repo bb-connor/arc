@@ -1,4 +1,13 @@
-use super::*;
+use crate::challenge::{build_agent_passport, issue_reputation_credential, passport_artifact_id};
+use crate::oid4vci::Oid4vciCredentialResponse;
+use crate::portable_sd_jwt::{
+    issue_chio_passport_sd_jwt_vc, parse_sd_jwt_disclosure, verify_chio_passport_sd_jwt_vc,
+    CHIO_PASSPORT_SD_JWT_VC_FORMAT,
+};
+use crate::tests::{did_from_public_key, sample_evidence, sample_scorecard, TestResultExt};
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::Engine as _;
+use chio_core::Keypair;
 
 #[test]
 fn portable_sd_jwt_passport_projection_roundtrip_verifies() {
@@ -49,7 +58,7 @@ fn portable_sd_jwt_passport_projection_roundtrip_verifies() {
             .expect_err("valid signature cannot bypass the header contract");
         assert!(error.to_string().contains(expected), "{error}");
     }
-    let oversized = "!".repeat(jwt_decode::MAX_ENCODED_JSON_BYTES + 1);
+    let oversized = "!".repeat(crate::jwt_decode::MAX_ENCODED_JSON_BYTES + 1);
     assert!(parse_sd_jwt_disclosure(&oversized)
         .expect_err("bound before decoding")
         .to_string()

@@ -1,3 +1,20 @@
+use crate::artifact::CredentialError;
+use crate::challenge::unix_from_rfc3339;
+use crate::jwt_decode::decode_compact_jwt_without_signature;
+use crate::oid4vci::{normalize_credential_issuer, Oid4vciChioPassportStatusReference};
+use crate::oid4vp::sign_jwt_value;
+use crate::passport::AgentPassport;
+use crate::portable_sd_jwt::{
+    build_chio_passport_portable_projection, ChioPassportPortableProjection, PortableEd25519Jwk,
+    OID4VCI_JWKS_PATH,
+};
+use crate::{CHIO_CREDENTIAL_CONTEXT_V1, VC_CONTEXT_V1, VC_TYPE};
+use chio_core::{ChioPortableClaimCatalog, ChioPortableIdentityBinding, Keypair, PublicKey};
+use chio_did::DidChio;
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Map, Value};
+use std::str::FromStr;
+
 pub const CHIO_PASSPORT_JWT_VC_JSON_CREDENTIAL_CONFIGURATION_ID: &str =
     "chio_agent_passport_jwt_vc_json";
 pub const CHIO_PASSPORT_JWT_VC_JSON_FORMAT: &str = "jwt_vc_json";
@@ -54,7 +71,10 @@ pub fn build_chio_passport_jwt_vc_json_type_metadata(
     let portable_claim_catalog = jwt_vc_json_claim_catalog();
     let portable_identity_binding = jwt_vc_json_identity_binding();
     Ok(ChioPassportJwtVcJsonTypeMetadata {
-        types: vec![VC_TYPE.to_string(), CHIO_PASSPORT_JWT_VC_JSON_TYPE.to_string()],
+        types: vec![
+            VC_TYPE.to_string(),
+            CHIO_PASSPORT_JWT_VC_JSON_TYPE.to_string(),
+        ],
         format: CHIO_PASSPORT_JWT_VC_JSON_FORMAT.to_string(),
         subject_binding: portable_identity_binding.subject_binding.clone(),
         issuer_identity: portable_identity_binding.issuer_identity.clone(),
@@ -222,7 +242,9 @@ pub fn verify_chio_passport_jwt_vc_json(
                 "portable jwt vc vc.@context must be an array".to_string(),
             )
         })?;
-    if !contexts.iter().any(|value| value.as_str() == Some(VC_CONTEXT_V1))
+    if !contexts
+        .iter()
+        .any(|value| value.as_str() == Some(VC_CONTEXT_V1))
         || !contexts
             .iter()
             .any(|value| value.as_str() == Some(CHIO_CREDENTIAL_CONTEXT_V1))
@@ -286,13 +308,16 @@ pub fn verify_chio_passport_jwt_vc_json(
         .and_then(Value::as_u64)
         .ok_or_else(|| {
             CredentialError::InvalidOid4vciCredentialResponse(
-                "portable jwt vc must include vc.credentialSubject.chioCredentialCount"
-                    .to_string(),
+                "portable jwt vc must include vc.credentialSubject.chioCredentialCount".to_string(),
             )
         })?;
     json_array_claim(subject, "chioIssuerDids", "portable jwt vc")?;
     json_array_claim(subject, "chioMerkleRoots", "portable jwt vc")?;
-    json_array_claim(subject, "chioEnterpriseIdentityProvenance", "portable jwt vc")?;
+    json_array_claim(
+        subject,
+        "chioEnterpriseIdentityProvenance",
+        "portable jwt vc",
+    )?;
     let passport_status = subject
         .get("chioPassportStatus")
         .cloned()
@@ -320,35 +345,46 @@ fn jwt_vc_json_value(
     passport_status: Option<Oid4vciChioPassportStatusReference>,
 ) -> Result<Value, CredentialError> {
     let mut credential_subject = Map::new();
-    credential_subject.insert("id".to_string(), Value::String(projection.subject_did.clone()));
+    credential_subject.insert(
+        "id".to_string(),
+        Value::String(projection.subject_did.clone()),
+    );
     credential_subject.insert(
         "chioPassportId".to_string(),
         Value::String(projection.passport_id.clone()),
     );
     credential_subject.insert(
         "chioCredentialCount".to_string(),
-        Value::Number(u64::try_from(projection.credential_count).unwrap_or(u64::MAX).into()),
+        Value::Number(
+            u64::try_from(projection.credential_count)
+                .unwrap_or(u64::MAX)
+                .into(),
+        ),
     );
     credential_subject.insert(
         "chioIssuerDids".to_string(),
-        serde_json::to_value(&projection.issuer_dids)
-            .map_err(|error| CredentialError::InvalidOid4vciCredentialResponse(error.to_string()))?,
+        serde_json::to_value(&projection.issuer_dids).map_err(|error| {
+            CredentialError::InvalidOid4vciCredentialResponse(error.to_string())
+        })?,
     );
     credential_subject.insert(
         "chioMerkleRoots".to_string(),
-        serde_json::to_value(&projection.merkle_roots)
-            .map_err(|error| CredentialError::InvalidOid4vciCredentialResponse(error.to_string()))?,
+        serde_json::to_value(&projection.merkle_roots).map_err(|error| {
+            CredentialError::InvalidOid4vciCredentialResponse(error.to_string())
+        })?,
     );
     credential_subject.insert(
         "chioEnterpriseIdentityProvenance".to_string(),
-        serde_json::to_value(&projection.enterprise_identity_provenance)
-            .map_err(|error| CredentialError::InvalidOid4vciCredentialResponse(error.to_string()))?,
+        serde_json::to_value(&projection.enterprise_identity_provenance).map_err(|error| {
+            CredentialError::InvalidOid4vciCredentialResponse(error.to_string())
+        })?,
     );
     if let Some(passport_status) = passport_status {
         credential_subject.insert(
             "chioPassportStatus".to_string(),
-            serde_json::to_value(passport_status)
-                .map_err(|error| CredentialError::InvalidOid4vciCredentialResponse(error.to_string()))?,
+            serde_json::to_value(passport_status).map_err(|error| {
+                CredentialError::InvalidOid4vciCredentialResponse(error.to_string())
+            })?,
         );
     }
     Ok(json!({
@@ -358,7 +394,7 @@ fn jwt_vc_json_value(
     }))
 }
 
-fn jwt_vc_json_claim_catalog() -> ChioPortableClaimCatalog {
+pub(super) fn jwt_vc_json_claim_catalog() -> ChioPortableClaimCatalog {
     let default_catalog = ChioPortableClaimCatalog::default();
     ChioPortableClaimCatalog {
         always_disclosed_claims: vec![
@@ -381,7 +417,7 @@ fn jwt_vc_json_claim_catalog() -> ChioPortableClaimCatalog {
     }
 }
 
-fn jwt_vc_json_identity_binding() -> ChioPortableIdentityBinding {
+pub(super) fn jwt_vc_json_identity_binding() -> ChioPortableIdentityBinding {
     ChioPortableIdentityBinding {
         portable_subject_claim: "sub".to_string(),
         subject_confirmation_claim: "cnf.jwk".to_string(),

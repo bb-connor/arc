@@ -1,4 +1,21 @@
-use super::*;
+use crate::artifact::{CredentialError, CredentialProof};
+use crate::challenge::rfc3339_from_unix;
+use crate::financial::{
+    decode_financial_credential, inspect_financial_credential_signature,
+    FinancialCredentialEnvelope,
+};
+use crate::{CHIO_CREDENTIAL_CONTEXT_V1, PROOF_PURPOSE, PROOF_TYPE, VC_CONTEXT_V1, VC_TYPE};
+use chio_core::{canonical_json_bytes, Keypair};
+use chio_did::DidChio;
+use chio_fincred::{
+    FinancialCredentialEvidenceV1, FinancialCredentialFamilyV1, FinancialCredentialSubjectV1,
+    FinancialCredentialWindowV1, FinancialSourceCommittedLeafProofV1,
+    FinancialSourceCommittedLeafV1, FinancialSourceCompletenessAttestationBodyV1,
+    FinancialSourceCompletenessBoundaryV1, FinancialSourceDisclosureV1,
+    FinancialSourceMerkleProofV1, PremiumHistoryCredentialSubjectV1,
+    SettlementReliabilityCredentialSubjectV1, SignedFinancialSourceCompletenessAttestationV1,
+    FINANCIAL_SOURCE_COMPLETENESS_ATTESTATION_SCHEMA_V1,
+};
 
 use chio_core::{
     capability::{governance::ProvenanceEvidenceClass, scope::MonetaryAmount},
@@ -271,10 +288,13 @@ fn credential_decode_and_inspection_reject_member_at_exact_window_end() -> TestR
     ));
     let bytes = serde_json::to_vec(&credential)?;
     let decoded = decode_financial_credential(&bytes);
-    assert!(matches!(
-        &decoded,
-        Err(CredentialError::InvalidFinancialCredential(reason))
-            if reason.contains("committed leaves contain a gap")
-    ), "unexpected decode result: {decoded:?}");
+    assert!(
+        matches!(
+            &decoded,
+            Err(CredentialError::InvalidFinancialCredential(reason))
+                if reason.contains("committed leaves contain a gap")
+        ),
+        "unexpected decode result: {decoded:?}"
+    );
     Ok(())
 }

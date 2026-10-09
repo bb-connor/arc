@@ -1,4 +1,16 @@
-use super::*;
+use crate::artifact::CredentialError;
+use crate::financial::authority::{
+    authority_digest, authority_error, FINANCIAL_POLICY_DIGEST_DOMAIN,
+};
+use crate::financial::validation::{validate_digest, validate_text, validate_time};
+use chio_did::DidChio;
+use chio_fincred::{
+    FinancialCredentialFamilyV1, FinancialVerifierPolicyV1, FinancialVerifierThresholdsV1,
+    FINANCIAL_VERIFIER_POLICY_SCHEMA_V1,
+};
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, BTreeSet};
+use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FinancialVerifierPolicyInputV1 {

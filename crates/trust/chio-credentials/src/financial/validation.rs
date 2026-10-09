@@ -1,4 +1,22 @@
-use super::*;
+use crate::artifact::CredentialError;
+use crate::financial::{
+    FinancialCredentialEnvelope, I_JSON_MAX_SAFE_INTEGER, MAX_FINANCIAL_BOUNDARY_PROOFS,
+    MAX_FINANCIAL_IDENTIFIER_BYTES, MAX_FINANCIAL_POSITIONS, MAX_FINANCIAL_SOURCE_ARTIFACTS,
+    MAX_FINANCIAL_SOURCE_ARTIFACT_BYTES, MAX_FINANCIAL_SOURCE_BUNDLE_BYTES,
+};
+use chio_core::{canonical_json_bytes, sha256_hex};
+use chio_did::DidChio;
+use chio_fincred::FINANCIAL_SOURCE_MEMBER_SCHEMA_V1;
+use chio_fincred::{
+    ExposureHistoryPositionV1, FinancialCredentialEvidenceV1, FinancialCredentialFamilyV1,
+    FinancialCredentialSubjectV1, FinancialCredentialWindowV1, FinancialSourceCommittedLeafProofV1,
+    FinancialSourceCompletenessBoundaryV1, FinancialSourceDisclosureV1, FinancialSourceQueryKeyV1,
+    SignedFinancialSourceMemberV1, FINANCIAL_SOURCE_ARTIFACT_DIGEST_DOMAIN,
+    FINANCIAL_SOURCE_COMPLETENESS_ATTESTATION_SCHEMA_V1, FINANCIAL_SOURCE_DISCLOSURE_DIGEST_DOMAIN,
+};
+use serde::Serialize;
+use std::collections::BTreeSet;
+use std::str::FromStr;
 
 pub(super) fn validate_evidence_classes(
     credential: &FinancialCredentialEnvelope,
