@@ -258,6 +258,68 @@ fn pre_dispatch_cleanup_runs_when_its_deny_timestamp_clock_sample_fails() -> Tes
     Ok(())
 }
 
+struct ClockOutageRuntimeDenial(Arc<FailOnceClock>);
+
+impl RuntimeAdmissionHook for ClockOutageRuntimeDenial {
+    fn name(&self) -> &str {
+        "clock-outage-runtime-denial"
+    }
+
+    fn evaluate(
+        &self,
+        _: &RuntimeAdmissionContext<'_>,
+    ) -> Result<RuntimeAdmissionDecision, KernelError> {
+        self.0.unavailable.store(true, Ordering::SeqCst);
+        Ok(RuntimeAdmissionDecision::deny(
+            "runtime admission refused the call",
+            None,
+        ))
+    }
+}
+
+#[test]
+fn pre_dispatch_compensation_runs_when_its_kernel_clock_sample_fails() -> TestResult {
+    for nested in [false, true] {
+        let (mut kernel, request, store, invocations) =
+            durable_admission_fixture("review-compensation-clock");
+        let clock = Arc::new(FailOnceClock {
+            inner: chio_test_support::clock::clock(),
+            unavailable: std::sync::atomic::AtomicBool::new(false),
+        });
+        kernel.clock = clock.clone();
+        kernel.set_runtime_admission_hook(Arc::new(ClockOutageRuntimeDenial(clock)));
+        let result = if nested {
+            let session = kernel.open_session(request.agent_id.clone(), Vec::new())?;
+            kernel.activate_session(&session)?;
+            let parent =
+                make_operation_context(&session, "review-compensation-parent", &request.agent_id);
+            kernel.begin_session_request(&parent, OperationKind::ToolCall, true)?;
+            kernel.evaluate_tool_call_with_nested_flow_client(
+                &parent,
+                &request,
+                &mut NoopNestedFlowClient,
+                None,
+            )
+        } else {
+            kernel.evaluate_tool_call_blocking(&request)
+        };
+        assert_eq!(invocations.load(Ordering::SeqCst), 0);
+        assert_eq!(
+            store.operation().state(),
+            AdmissionOperationState::CompensatedBeforeDispatch,
+            "{result:?}"
+        );
+        let denied = result?;
+        assert_eq!(denied.verdict, Verdict::Deny);
+        assert_eq!(
+            denied.reason.as_deref(),
+            Some("runtime admission refused the call")
+        );
+        assert!(denied.receipt.verify_signature()?);
+    }
+    Ok(())
+}
+
 fn prepared_active_response(
     kernel: &ChioKernel,
     authority: &str,
