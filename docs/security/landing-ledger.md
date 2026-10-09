@@ -37,7 +37,7 @@ change, and final candidate checks. No feature additions are admitted.
 | V17 P2 | Claude | `3fe03f89b8`: lazily decode classification payload once per verification | Original 256 parses versus 1; composed flow 47 tests, strict all-target Clippy and trust-boundary gate pass | Final hosted candidate and independent delta review | #1160 |
 | V22 P2 | Claude | `dfb58ee550`, `a902313b4c`: discover sets through live contributions; retain generation and replay state | Original historical-set and orphan controls fail; composed suspension 11 tests and strict all-target Clippy pass | Final hosted candidate and independent delta review | #1160 |
 | V24 P2, P1 follow-up | Claude | `6f35827a64`, `20dc901d6d`, `7c0b275486` bind destination continuity and the in-place exception to the provisioned lock identity | Original rollback, zeroed-slot and retirement-byte replay failures retained; final composed 171 controls pass with one existing ignored helper, strict CP/store Clippy passes | Final hosted candidate and independent delta review; whole lock-root restoration remains outside the guarantee | #1160 |
-| V25 P2 | Claude and Root | User-selected authenticated snapshots; [core design](../superpowers/specs/2026-10-09-authenticated-receipt-query-snapshots-design.md) accepted and [execution plan](../superpowers/plans/2026-10-09-authenticated-receipt-query-snapshots.md) integrated at `5fdd7f8d07` | Original linear work reproduced; SDK integrated and qualified locally; persistent lifetime and snapshot core in progress | Complete implementation and filter/count/freshness controls, Linux custody, large-history capacity, owning and composed qualification | #1160 |
+| V25 P2 | Claude and Root | User-selected authenticated snapshots; [core design](../superpowers/specs/2026-10-09-authenticated-receipt-query-snapshots-design.md) accepted and [execution plan](../superpowers/plans/2026-10-09-authenticated-receipt-query-snapshots.md) integrated at `5fdd7f8d07` | Original linear work reproduced; SDK integrated; snapshot core, Linux custody, HTTP wiring and narrow repairs composed on isolated stage `4fe1f22f16`; [local checkpoint](audits/receipt-snapshot-local-checkpoint-20261009.json) records bounded tests and memory capacity | Signed Linux capacity, final public-handler repairs and delta renewal, Source promotion, independent candidate review and hosted qualification | #1160 |
 
 | V26 P2 | Claude | `0dbfa910d1`: validate every media type accepted by the JSON extractor and refuse non-JSON contract requests before body consumption | Original duplicate-key and lossy-number controls fail; composed 24 ingress tests and strict all-target control-plane Clippy pass | Final candidate checks and independent delta review | #1160 |
 
@@ -53,8 +53,22 @@ The snapshot SDK component is integrated at `7381a4bd4d` and `69dc420874`:
 Python lint pass on the composition. Retry metadata remains compatible with
 legacy responses; only the three transient snapshot HTTP 503 codes retry.
 Python blocking reads retain transport timeout semantics; the monotonic
-budget controls retry admission and delays. Server wiring, Linux custody,
-capacity and final candidate qualification remain open.
+budget controls retry admission and delays. Server wiring and Linux custody are composed on isolated stage `4fe1f22f16`.
+The [source-bound local checkpoint](audits/receipt-snapshot-local-checkpoint-20261009.json)
+records 266 store, 192 MCP, seven kernel, 93 control-plane and eight CLI cluster
+tests passing on their stated snapshots, plus strict all-target lint for six
+affected crates. The two later paused-finalization controls have producer
+RED/GREEN evidence and await the final narrow composition renewal.
+
+The synthetic ten-million-row projection passed with zero count mismatches,
+using 5,288,763,392 bytes under a larger test quota. A separate default-quota
+control committed 4,639,744 rows within 2 GiB, then refused another batch with
+a typed capacity error and no partial rows or dimensions. Broad filters still
+have the documented work budget. These results establish synthetic projection
+and quota behavior; the one-million-receipt signed Linux campaign is running.
+The stage is not promoted to Source or hosted qualification. The assigned
+issuer-trust/SSRF and public-worker repairs, final delta verification, signed
+capacity and exact candidate qualification remain open.
 
 The refreshed published state is still `fd8bfdc947`: 117 successful, eight
 failed and 16 skipped hosted checks. No local repair has been promoted to
@@ -87,6 +101,13 @@ verdict is claimed. Earlier weights, encoder and receipt proof results
 predate this shared-filler change and need applicable renewal. All
 original symbolic inputs and full unwinding assertions remain. Cancelled diagnostic runs and
 original noncollision timeouts remain separate failed or incomplete evidence.
+The later checked-fallback run also timed out after 1,807.336 seconds,
+including cleanup, under its 1,800-second cap (peak 14,504,180 KiB). It produced
+no assertion or exact-completion-cover verdict. Source, prepared model,
+properties and the final external-solver formula are retained under
+`/tmp/pr1160-kani-concrete-20261009/attest-checked-fallback/`. Alternate solver
+diagnostics reuse that unchanged formula; they do not qualify the mandatory
+proof or authorize a reduced symbolic domain.
 Generated coverage, explicit crypto-scope controls and the security CI
 contract mutation suite passed on their recorded staged snapshots; later
 composition still needs its applicable renewals. The frozen composition at
