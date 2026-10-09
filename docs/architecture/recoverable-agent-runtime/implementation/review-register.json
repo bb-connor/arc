@@ -58,14 +58,14 @@
     "qualified": 0,
     "current_status": {
       "candidate_only": 31,
-      "needs_revalidation": 48,
+      "needs_revalidation": 47,
       "open": 231,
       "prerequisite_only": 1,
-      "recorded_scoped_closed": 69
+      "recorded_scoped_closed": 70
     },
     "needs_revalidation_by_category": {
       "additional": 10,
-      "canonical": 38
+      "canonical": 37
     },
     "severity_by_category": {
       "canonical": {
@@ -719,8 +719,15 @@
           "docs/architecture/recoverable-agent-runtime/README.md"
         ]
       },
-      "current_status": "needs_revalidation",
-      "current_reason": "Recorded closure is preserved; a cited source or document pin differs. Review continuity and relevant controls on the integrated candidate. A hash difference is not a demonstrated regression."
+      "current_status": "recorded_scoped_closed",
+      "current_reason": "Independent source continuity review confirms README drift adds navigation only; the original explanation evidence obligation remains satisfied within its source-only scope. No new runtime qualification.",
+      "current_review": {
+        "path": "docs/architecture/recoverable-agent-runtime/implementation/reviews/explanation-evidence-continuity.md",
+        "sha256": "d8bea1c7674e4bc5d3d6af7667ca508e4931d15069043b852670869865fdb8f2",
+        "scope": "Original source-only evidence and anchor obligation",
+        "reviewed_head": "ccf7d1ca174431ab4ce8638b50806c7e44c8a2c9",
+        "qualified": false
+      }
     },
     {
       "key": "A-planner-08",
@@ -8692,5 +8699,13 @@
       "current_reason": "Exact archived fd374/f67 provenance is now verified, and originalHybrid205 hook is genuinely absent. A distinct existing070252 predecessor has compatible source, but producer lifecycle/capture/current consumers remain separate pending gates. No production or native failure is inferred from the absent hook."
     }
   ],
-  "inventory_confidence": "high: exact ID, row-count and recorded-disposition joins; current behavior is not requalified"
+  "inventory_confidence": "high: exact ID, row-count and recorded-disposition joins; current behavior is not requalified",
+  "current_updates": [
+    {
+      "finding": "A-planner-07",
+      "at_utc": "2026-10-09T14:21:52.537022+00:00",
+      "review": "docs/architecture/recoverable-agent-runtime/implementation/reviews/explanation-evidence-continuity.md",
+      "scope": "source-only continuity"
+    }
+  ]
 }
