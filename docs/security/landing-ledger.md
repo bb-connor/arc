@@ -7,6 +7,32 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Bounded capacity amendment and operator review (October 9)
+
+**SEC-1160-COLDSTATE remains OPEN P1 and blocks the G5 outside-team preview.**
+The [owner decision](audits/bounded-capacity-owner-amendment-20261009.json)
+allows foundation landing with the required bounded F01 repairs. The current-row
+cap remains 65,536. About 32K lineage roots is only a topology-dependent estimate;
+other identity classes and declassification history count too. No lineage,
+principal, epoch or declassification authority may be dropped. Exact measured
+thresholds and the refusal error still need the final bounded-source handoff.
+No unbounded-capacity or preview readiness claim follows from this decision.
+
+The ledger now contains **1,875 requirements** and matching states, preserving
+all 1,864 earlier requirements and sources. The [independent review dispositions](audits/root-repair-review-dispositions-20261009.json)
+retain all ten findings. **FINAL-F04-OPERATOR remains required:** deployed
+operators need an authenticated, local-node recovery entry point with deterministic
+wake and cancellation controls. Library-level quota recovery alone does not
+complete this production acceptance.
+
+F02's content-defined reserve and no-regression legacy fallback are accepted for
+pre-release landing with a documented limitation: an older dev/test file already
+at its cap can still refuse a growing revocation and leave its record unchanged.
+Atomic persistence (FINAL-F13) remains required. The [forwarding audit](audits/public-forwarding-qualification-20261009.json)
+now pins the genuine Original failures and existing producer/composed evidence.
+Final repaired source, independent candidate review, hosted qualification and
+protected merge remain pending.
+
 ## Remaining capacity acceptance (October 9)
 
 The ledger now contains **1,864 requirements** with matching current states.
