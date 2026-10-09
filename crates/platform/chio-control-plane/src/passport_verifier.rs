@@ -307,18 +307,32 @@ impl PassportStatusRegistry {
             distribution,
             valid_until: verification.valid_until.clone(),
         };
-        // Load refuses an invalid record, so one is never admitted.
+        // Load refuses an invalid record, so neither the new record nor a
+        // record it supersedes is changed unless load would accept the result.
         verify_passport_lifecycle_record(&record)?;
-
-        for existing in self.passports.values_mut() {
+        let mut superseded = Vec::new();
+        for existing in self.passports.values() {
             if existing.subject == verification.subject
                 && existing.issuers == verification.issuers
                 && existing.status == PassportLifecycleState::Active
             {
-                existing.status = PassportLifecycleState::Superseded;
-                existing.superseded_by = Some(verification.passport_id.clone());
-                existing.updated_at = published_at;
+                if published_at < existing.published_at {
+                    return Err(CliError::policy_error(format!(
+                        "passport `{}` published at {published_at} cannot supersede passport `{}`, published later at {}",
+                        verification.passport_id, existing.passport_id, existing.published_at
+                    )));
+                }
+                let mut replaced = existing.clone();
+                replaced.status = PassportLifecycleState::Superseded;
+                replaced.superseded_by = Some(verification.passport_id.clone());
+                replaced.updated_at = published_at;
+                verify_passport_lifecycle_record(&replaced)?;
+                superseded.push(replaced);
             }
+        }
+        for replaced in superseded {
+            self.passports
+                .insert(replaced.passport_id.clone(), replaced);
         }
         self.passports
             .insert(verification.passport_id, record.clone());

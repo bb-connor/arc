@@ -454,3 +454,113 @@ fn revocations_never_raise_the_reserved_registry_size() -> TestResult {
     }
     Ok(())
 }
+
+/// Publishes `successor` at `published_at` over a registry whose only record,
+/// for the same subject and issuer, was published later, then saves and
+/// reopens. The publish is refused, and both the registry and its file are
+/// unchanged and reload.
+fn assert_replacement_predating_its_predecessor_is_refused(
+    path: &Path,
+    registry: &mut PassportStatusRegistry,
+    predecessor: &PassportLifecycleRecord,
+    published: Result<PassportLifecycleRecord, CliError>,
+    before: &[u8],
+) -> TestResult {
+    let after_publish = serde_json::to_vec(&*registry)?;
+    registry.save(path)?;
+    let reopened = PassportStatusRegistry::load(path)
+        .map_err(|error| format!("reopen after an earlier-timestamped replacement: {error}"))?;
+    let error = published
+        .err()
+        .ok_or("a replacement published before its predecessor must be refused")?;
+    assert!(matches!(error, CliError::Chio(_)));
+    assert!(
+        error.to_string().contains(&format!(
+            "cannot supersede passport `{}`, published later at {}",
+            predecessor.passport_id, predecessor.published_at
+        )),
+        "{error}"
+    );
+    assert_eq!(after_publish, before);
+    assert_eq!(
+        reopened.get(&predecessor.passport_id),
+        Some(predecessor),
+        "the predecessor keeps its state"
+    );
+    assert_eq!(reopened.passports.len(), 1);
+    assert_reloads_exactly(registry, path)
+}
+
+#[test]
+fn replacement_with_an_earlier_publication_time_is_refused_and_the_registry_reloads() -> TestResult
+{
+    let directory = chio_test_support::private_tempdir()?;
+    let path = directory.path().join("passport-statuses.json");
+    let mut registry = PassportStatusRegistry::default();
+    let predecessor = registry.publish(
+        &passport_issued_at(FRESH_SUBJECT_SEED, ISSUED_AT)?,
+        PUBLISHED_AT + 100,
+        distribution(0),
+    )?;
+    registry.save(&path)?;
+    let before = serde_json::to_vec(&registry)?;
+    let successor = passport_issued_at(FRESH_SUBJECT_SEED, ISSUED_AT + 1)?;
+    let published = registry.publish(&successor, PUBLISHED_AT + 50, distribution(0));
+    assert_replacement_predating_its_predecessor_is_refused(
+        &path,
+        &mut registry,
+        &predecessor,
+        published,
+        &before,
+    )?;
+
+    // A replacement published at the predecessor's own time still supersedes it.
+    let replacement = registry.publish(&successor, PUBLISHED_AT + 100, distribution(0))?;
+    registry.save(&path)?;
+    let reopened = PassportStatusRegistry::load(&path)?;
+    let superseded = reopened
+        .get(&predecessor.passport_id)
+        .ok_or("predecessor kept")?;
+    assert_eq!(superseded.status, PassportLifecycleState::Superseded);
+    assert_eq!(
+        superseded.superseded_by.as_deref(),
+        Some(replacement.passport_id.as_str())
+    );
+    assert_reloads_exactly(&registry, &path)
+}
+
+#[test]
+fn replacement_read_from_a_regressed_clock_is_refused_and_the_registry_reloads() -> TestResult {
+    use chio_security_types::clock::Clock;
+    let clock = chio_test_support::clock::clock();
+    let now =
+        |clock: &std::sync::Arc<dyn Clock>| -> Fallible<u64> { Ok(clock.unix_millis()?.as_secs()) };
+    let directory = chio_test_support::private_tempdir()?;
+    let path = directory.path().join("passport-statuses.json");
+    let mut registry = PassportStatusRegistry::default();
+    let predecessor = {
+        let _at = chio_test_support::clock::scope_unix_secs(PUBLISHED_AT + 100);
+        registry.publish(
+            &passport_issued_at(FRESH_SUBJECT_SEED, ISSUED_AT)?,
+            now(&clock)?,
+            distribution(0),
+        )?
+    };
+    registry.save(&path)?;
+    let before = serde_json::to_vec(&registry)?;
+    let published = {
+        let _at = chio_test_support::clock::scope_unix_secs(PUBLISHED_AT + 50);
+        registry.publish(
+            &passport_issued_at(FRESH_SUBJECT_SEED, ISSUED_AT + 1)?,
+            now(&clock)?,
+            distribution(0),
+        )
+    };
+    assert_replacement_predating_its_predecessor_is_refused(
+        &path,
+        &mut registry,
+        &predecessor,
+        published,
+        &before,
+    )
+}
