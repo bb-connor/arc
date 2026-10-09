@@ -102,6 +102,18 @@ commit. The Process read-source failure and Kani compiler failure remain open.
 No full owning-suite, funded Native, current historical-authority or P5/P6
 qualification follows from these scoped results.
 
+The maintained callback implementation also handles SQLite's zero-argument
+null pointer without constructing an invalid Rust slice. Its exact reviewed
+helper and three callback conversions preserve every other production byte.
+Six new argument controls and all 216 owning library tests passed on macOS,
+with zero failures or ignored cases, followed by strict library Clippy. The
+separate uninstalled authorizer composition passed the actual STAT4 trigger
+and all 231 owning library tests on macOS. These are scoped local results;
+GNU/Linux acceptance of these changed callback bytes and whole-runtime
+qualification remain pending. Exact sources and logs are retained under
+`target/recovery-pr/current-review-followup/maintained-empty-callback-repair-20261009T0612/`
+and `target/recovery-pr/current-review-followup/local-callback-empty-boundary-20261009T0600/`.
+
 ### Formal result accounting
 
 The public Kani gate now requires exactly one matching harness and exactly one

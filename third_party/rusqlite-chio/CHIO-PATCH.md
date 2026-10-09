@@ -1,4 +1,4 @@
-# Rusqlite callback ownership repair
+# Rusqlite callback ownership and argument safety
 
 This unpublished path package retains rusqlite 0.39.0 and its MIT license.
 The workspace selects it through `[patch.crates-io]`.
@@ -26,3 +26,19 @@ original code failed the nine conversion cleanup cases; the repair passed all
 Those runs used the same real library sources and bundled SQLite 3.51.3 with
 an isolated control manifest. Complete package, platform and workspace
 qualification remain separate from these scoped ownership results.
+
+Scalar, aggregate-step and window-inverse callbacks now borrow a valid empty
+slice when SQLite supplies zero arguments. SQLite may supply a null argument
+pointer during STAT4 expression evaluation; Rust requires a non-null pointer
+even for an empty `from_raw_parts` slice. Positive argument counts retain the
+original pointer array and borrowing contract.
+
+The added argument controls exercise the null/zero boundary, nonempty pointer
+slots, variable arity, normal scalar evaluation, aggregate empty input and
+moving-window step/inverse/value/final evaluation. The maintained-library
+composition passed all 216 library tests on macOS with bundled SQLite, functions,
+hooks and window support, with no failures or ignored tests, and passed strict
+library Clippy. The larger uninstalled authorizer composition also passed its
+actual STAT4 preparation control and all 231 library tests on macOS. Those
+observations do not qualify the changed library on GNU/Linux or qualify the
+whole recovery runtime.

@@ -70,6 +70,31 @@ use crate::types::{FromSql, FromSqlError, ToSql, ToSqlOutput, ValueRef};
 use crate::util::free_boxed_value;
 use crate::{str_to_cstring, Connection, Error, InnerConnection, Name, Result};
 
+/// Borrow SQLite's argument-pointer array for one synchronous callback.
+///
+/// # Safety
+///
+/// `argc` must be SQLite's nonnegative actual argument count, not the registration
+/// arity (which may be -1). If positive, `argv` must be non-null, aligned and point
+/// to `argc` initialized pointer slots in one allocation, readable and unmodified
+/// for `'a`, with total size at most `isize::MAX`. When borrowing SQLite's array,
+/// callers must keep `'a` within that callback. SQLite's valueFromFunction and
+/// VDBE dispatch satisfy this contract.
+/// For zero arguments, `argv` is unused and may be null.
+unsafe fn callback_args<'a>(
+    argc: c_int,
+    argv: *mut *mut sqlite3_value,
+) -> &'a [*mut sqlite3_value] {
+    if argc == 0 {
+        // STAT4 valueFromFunction passes NULL for a zero-argument expression.
+        // Even an empty from_raw_parts slice would require a non-null pointer.
+        &[]
+    } else {
+        // SAFETY: SQLite supplies a positive count and a live argument array.
+        unsafe { slice::from_raw_parts(argv, argc as usize) }
+    }
+}
+
 unsafe fn report_error(ctx: *mut sqlite3_context, err: &Error) {
     if let Error::SqliteFailure(ref err, ref s) = *err {
         ffi::sqlite3_result_error_code(ctx, err.extended_code);
@@ -590,7 +615,7 @@ impl InnerConnection {
             F: Fn(&Context<'_>) -> Result<T>,
             T: SqlFnOutput,
         {
-            let args = slice::from_raw_parts(argv, argc as usize);
+            let args = callback_args(argc, argv);
             let r = catch_unwind(|| {
                 let boxed_f: *const F = ffi::sqlite3_user_data(ctx).cast::<F>();
                 assert!(!boxed_f.is_null(), "Internal error - null function pointer");
@@ -736,7 +761,7 @@ unsafe extern "C" fn call_boxed_step<A, D, T>(
         );
         let mut ctx = Context {
             ctx,
-            args: slice::from_raw_parts(argv, argc as usize),
+            args: callback_args(argc, argv),
         };
 
         #[expect(clippy::unnecessary_cast)]
@@ -782,7 +807,7 @@ unsafe extern "C" fn call_boxed_inverse<A, W, T>(
         );
         let mut ctx = Context {
             ctx,
-            args: slice::from_raw_parts(argv, argc as usize),
+            args: callback_args(argc, argv),
         };
         (*boxed_aggr).inverse(&mut ctx, &mut **pac)
     });
@@ -1272,3 +1297,6 @@ mod test {
 
 #[cfg(test)]
 mod registration_ownership;
+
+#[cfg(test)]
+mod empty_arguments_tests;
