@@ -4,10 +4,10 @@
 //! exact admission boundary: one more byte of any admitted record would be
 //! refused. Revocations of admitted records must still persist from there.
 
+use super::test_fixtures::passport_issued_at;
 use super::*;
-use crate::signed_input::{MAX_SIGNED_FILE_BYTES, REVOCATION_REASON_LIMIT_BYTES as REASON_LIMIT};
-use chio_credentials::{
-    build_agent_passport, issue_reputation_credential, AttestationWindow, ChioCredentialEvidence,
+use crate::signed_input::{
+    RevocationReserve, MAX_SIGNED_FILE_BYTES, REVOCATION_REASON_LIMIT_BYTES as REASON_LIMIT,
 };
 use std::sync::OnceLock;
 
@@ -16,42 +16,10 @@ type Fallible<T> = Result<T, Box<dyn std::error::Error>>;
 
 const ISSUED_AT: u64 = 1_710_000_000;
 pub(crate) const PUBLISHED_AT: u64 = ISSUED_AT + 60;
-const ISSUER_SEED: u8 = 71;
 const BULK_SUBJECT_SEED: u8 = 72;
 const TOP_OFF_SUBJECT_SEED: u8 = 73;
 const FRESH_SUBJECT_SEED: u8 = 74;
 const CACHE_TTL_SECS: u64 = 300;
-
-pub(crate) fn passport_issued_at(subject_seed: u8, issued_at: u64) -> Fallible<AgentPassport> {
-    let subject = Keypair::from_seed(&[subject_seed; 32]);
-    let scorecard = chio_reputation::compute_local_scorecard(
-        &subject.public_key().to_hex(),
-        issued_at,
-        &chio_reputation::LocalReputationCorpus::default(),
-        &chio_reputation::ReputationConfig::default(),
-    );
-    let credential = issue_reputation_credential(
-        &Keypair::from_seed(&[ISSUER_SEED; 32]),
-        scorecard,
-        ChioCredentialEvidence {
-            query: AttestationWindow {
-                since: None,
-                until: issued_at,
-            },
-            receipt_count: 0,
-            receipt_ids: Vec::new(),
-            checkpoint_roots: Vec::new(),
-            receipt_log_urls: Vec::new(),
-            lineage_records: 0,
-            uncheckpointed_receipts: 0,
-            runtime_attestation: None,
-        },
-        issued_at,
-        issued_at + 7_200,
-    )?;
-    let subject_did = credential.unsigned.credential_subject.id.clone();
-    Ok(build_agent_passport(&subject_did, vec![credential])?)
-}
 
 pub(crate) fn passport(subject_seed: u8) -> Fallible<AgentPassport> {
     passport_issued_at(subject_seed, ISSUED_AT)

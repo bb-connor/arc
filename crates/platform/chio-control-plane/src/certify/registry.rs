@@ -23,8 +23,16 @@ use super::verify::{
 };
 
 #[cfg(test)]
+#[path = "registry/fixtures.rs"]
+mod test_fixtures;
+
+#[cfg(test)]
 #[path = "registry/revocation_capacity.rs"]
 pub(crate) mod revocation_capacity;
+
+#[cfg(test)]
+#[path = "registry/older_registry_files.rs"]
+mod older_registry_files;
 
 impl Default for CertificationRegistry {
     fn default() -> Self {
@@ -63,19 +71,7 @@ impl CertificationRegistry {
     /// be revoked, so a revocation of any admitted entry always persists.
     pub(crate) fn save(&self, path: &Path) -> Result<(), CliError> {
         ensure_parent_dir(path)?;
-        crate::signed_input::write_bounded_json_reserving(path, self, self.revocation_reserve()?)
-    }
-
-    /// Bytes the entries may still grow by through revocation: the sum of each
-    /// entry's growth to its largest revoked form.
-    fn revocation_reserve(&self) -> Result<usize, CliError> {
-        let mut reserved = 0usize;
-        for entry in self.artifacts.values() {
-            let largest = largest_revoked_entry(entry)?;
-            reserved =
-                reserved.saturating_add(crate::signed_input::revocation_headroom(entry, &largest)?);
-        }
-        Ok(reserved)
+        crate::signed_input::write_reserving_registry(path, self)
     }
 
     pub(crate) fn get(&self, artifact_id: &str) -> Option<&CertificationRegistryEntry> {
@@ -408,6 +404,18 @@ impl CertificationRegistry {
             events,
             errors: Vec::new(),
         })
+    }
+}
+
+impl crate::signed_input::RevocationReserve for CertificationRegistry {
+    fn revocation_reserve(&self) -> Result<usize, CliError> {
+        let mut reserved = 0usize;
+        for entry in self.artifacts.values() {
+            let largest = largest_revoked_entry(entry)?;
+            reserved =
+                reserved.saturating_add(crate::signed_input::revocation_headroom(entry, &largest)?);
+        }
+        Ok(reserved)
     }
 }
 

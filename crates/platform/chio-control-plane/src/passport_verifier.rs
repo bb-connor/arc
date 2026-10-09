@@ -31,8 +31,16 @@ mod signed_readback_tests;
 mod bounded_persistence_tests;
 
 #[cfg(test)]
+#[path = "passport_verifier/tests/fixtures.rs"]
+mod test_fixtures;
+
+#[cfg(test)]
 #[path = "passport_verifier/tests/revocation_capacity.rs"]
 pub(crate) mod revocation_capacity_tests;
+
+#[cfg(test)]
+#[path = "passport_verifier/tests/older_registry_files.rs"]
+mod older_registry_files_tests;
 
 const VERIFIER_POLICY_REGISTRY_VERSION: &str = "chio.passport-verifier-policies.v1";
 const PASSPORT_STATUS_REGISTRY_VERSION: &str = "chio.passport-status-registry.v1";
@@ -265,19 +273,7 @@ impl PassportStatusRegistry {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
-        crate::signed_input::write_bounded_json_reserving(path, self, self.revocation_reserve()?)
-    }
-
-    /// Bytes the records may still grow by through revocation: the sum of each
-    /// record's growth to its largest revoked form.
-    fn revocation_reserve(&self) -> Result<usize, CliError> {
-        let mut reserved = 0usize;
-        for record in self.passports.values() {
-            let largest = largest_revoked_lifecycle_record(record)?;
-            reserved = reserved
-                .saturating_add(crate::signed_input::revocation_headroom(record, &largest)?);
-        }
-        Ok(reserved)
+        crate::signed_input::write_reserving_registry(path, self)
     }
 
     pub fn get(&self, passport_id: &str) -> Option<&PassportLifecycleRecord> {
@@ -472,6 +468,18 @@ impl PassportStatusRegistry {
             passport_id: resolution.passport_id,
             distribution: resolution.distribution,
         })
+    }
+}
+
+impl crate::signed_input::RevocationReserve for PassportStatusRegistry {
+    fn revocation_reserve(&self) -> Result<usize, CliError> {
+        let mut reserved = 0usize;
+        for record in self.passports.values() {
+            let largest = largest_revoked_lifecycle_record(record)?;
+            reserved = reserved
+                .saturating_add(crate::signed_input::revocation_headroom(record, &largest)?);
+        }
+        Ok(reserved)
     }
 }
 

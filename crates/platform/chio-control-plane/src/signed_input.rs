@@ -120,26 +120,67 @@ pub(crate) fn revocation_headroom<T: Serialize>(
     Ok(encoded_len(largest)?.saturating_sub(encoded_len(record)?))
 }
 
-/// Writes `value` as compact JSON, keeping `reserved` bytes of the read cap
-/// free for revocations of the records it holds. A revocation never grows a
-/// record past its reserved headroom, so a registry admitted here stays
-/// writable for every revocation of its records. The destination is
-/// untouched when the write is refused.
-pub(crate) fn write_bounded_json_reserving<T: Serialize>(
+/// A registry whose records keep room in its file for their own revocation.
+///
+/// Its reserved size is its compact encoding plus [`Self::revocation_reserve`].
+/// Revoking a record never raises the reserved size.
+pub(crate) trait RevocationReserve: Serialize + DeserializeOwned {
+    /// Bytes the records may still grow by through revocation: the sum of
+    /// each record's growth to its largest revoked form.
+    fn revocation_reserve(&self) -> Result<usize, CliError>;
+}
+
+/// Writes `registry` as compact JSON.
+///
+/// A write whose reserved size fits the read cap is admitted. From such a
+/// file every sequence of revocations of its records persists, because a
+/// revocation never raises the reserved size.
+///
+/// A file whose reserved size is already over the cap, because it was written
+/// without the reserve, admits only writes that fit the read cap and do not
+/// raise the reserved size of the file they replace: revocations persist
+/// whenever the rewritten file fits, and nothing that adds records does.
+///
+/// The destination is untouched when the write is refused.
+pub(crate) fn write_reserving_registry<T: RevocationReserve>(
     path: &Path,
-    value: &T,
-    reserved: usize,
+    registry: &T,
 ) -> Result<(), CliError> {
-    let encoded = match MAX_SIGNED_FILE_BYTES.checked_sub(reserved) {
-        Some(limit) => encode_within(value, limit)?,
-        None => None,
-    };
-    match encoded {
-        Some(bytes) => replace_file(path, &bytes),
-        None => Err(CliError::policy_constraint_error(format!(
-            "registry file would exceed the {MAX_SIGNED_FILE_BYTES} byte limit once {reserved} bytes are kept for revoking its records; the existing file was left unchanged"
-        ))),
+    let reserved = registry.revocation_reserve()?;
+    if let Some(limit) = MAX_SIGNED_FILE_BYTES.checked_sub(reserved) {
+        if let Some(bytes) = encode_within(registry, limit)? {
+            return replace_file(path, &bytes);
+        }
     }
+    let replaced = reserved_size_on_disk::<T>(path)?;
+    if let Some(bytes) = encode_within(registry, MAX_SIGNED_FILE_BYTES)? {
+        let reserved_size = bytes.len().saturating_add(reserved);
+        if replaced.is_some_and(|replaced| reserved_size <= replaced) {
+            return replace_file(path, &bytes);
+        }
+    }
+    if replaced.is_some_and(|replaced| replaced > MAX_SIGNED_FILE_BYTES) {
+        return Err(CliError::policy_constraint_error(format!(
+            "registry file is over its revocation reserve: it was written without room to revoke every record within the {MAX_SIGNED_FILE_BYTES} byte limit, so it admits only a write that fits that limit without raising the reserve; this write does not, and the existing file was left unchanged"
+        )));
+    }
+    Err(CliError::policy_constraint_error(format!(
+        "registry file would exceed the {MAX_SIGNED_FILE_BYTES} byte limit once {reserved} bytes are kept for revoking its records; the existing file was left unchanged"
+    )))
+}
+
+/// Reserved size of the registry stored at `path`, or `None` when there is no
+/// file there.
+fn reserved_size_on_disk<T: RevocationReserve>(path: &Path) -> Result<Option<usize>, CliError> {
+    let bytes = match read_bounded(path) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(CliError::Io(error)),
+    };
+    let replaced: T = decode(&bytes)?;
+    Ok(Some(
+        encoded_len(&replaced)?.saturating_add(replaced.revocation_reserve()?),
+    ))
 }
 
 /// Counts serializer output without retaining it.
