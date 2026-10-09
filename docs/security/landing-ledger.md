@@ -9,6 +9,14 @@ and one separately tracked pre-existing issue. Ten are required for this
 foundation landing. The report names the remaining 18 follow-up items;
 they remain open and must not be reported as repaired by this wave.
 
+[The machine-readable review index](audits/landing-review-wave-20261009.json)
+adds all 28 findings and the separately tracked pre-existing SSE issue. The
+canonical JSON ledger now has **1,828 requirements**. Every prior 1,799
+requirement object, source record and current-state entry remains unchanged;
+the new rows record repairs, bounded evidence and remaining acceptance
+separately. The 18 later review findings and the SSE issue remain open in the
+security follow-up track.
+
 All ten repairs start from local source `a457a89c75`. Root remains the sole
 integration writer. Claude owns eight isolated Rust repair lanes; Root owns
 the two workflow boundaries. Every row requires a regression that fails on
@@ -17,7 +25,7 @@ change, and final candidate checks. No feature additions are admitted.
 
 | Requirement | Owner | Source repair | Verification evidence | Remaining acceptance | Landing |
 | --- | --- | --- | --- | --- | --- |
-| V01 P1 | Claude | `4976aeb460` isolates revocation replication from authority-sync failure and requires a startup pin | Original 9 failures; composed 9 isolation and 6 authority replication tests plus strict CP/store Clippy pass | Preserve the prior authority refusal while the next authority RPC is stalled; then renew focused and final candidate checks | #1160 |
+| V01 P1 | Claude | `4976aeb460`, `1cbe0c9e6d` isolate revocation replication, require a startup pin and preserve authority refusals until recovery | Original isolation and stalled-retry failures retained; final composed 10 isolation tests and strict CP/store Clippy pass | Final candidate checks and independent delta review | #1160 |
 | V02 P1 | Claude | Compact authenticated dead native transition/fence current rows at automatic checkpoints; retain immutable replay journals | Design accepted; regression pending | Sustained traffic, live cap, replay, retry, crash rollback and reopen controls | #1160 |
 | V03 P2 | Root | `e5a4b9e44b`, `2e02021ab2`: qualify exact source before canonical signatures and bind verification to expected SHA | Original failures retained; composed 13 real-cosign and 17 source-gate tests, CI contract and current actionlint pass | Hosted signing, final candidate and independent delta review | #1160 |
 | V04 P2 | Root | `625f7ae17f`: check committed event ranges early in CI | Original 11 failures; repaired 13 real-Git tests, 11 independent controls; full composed CI mutation suite passes | Final hosted candidate | #1160 |
@@ -25,8 +33,8 @@ change, and final candidate checks. No feature additions are admitted.
 | V08 P2 | Claude | `b17fee4ee7`, `088d81d84d`: monotonic resilience reads do not sample fenced wall time | Original 3 failures; composed guards 386 tests and strict all-target Clippy pass; regressions prime and reject backward wall time | Final hosted candidate and independent delta review | #1160 |
 | V17 P2 | Claude | `3fe03f89b8`: lazily decode classification payload once per verification | Original 256 parses versus 1; composed flow 47 tests, strict all-target Clippy and trust-boundary gate pass | Final hosted candidate and independent delta review | #1160 |
 | V22 P2 | Claude | `dfb58ee550`, `a902313b4c`: discover sets through live contributions; retain generation and replay state | Original historical-set and orphan controls fail; composed suspension 11 tests and strict all-target Clippy pass | Final hosted candidate and independent delta review | #1160 |
-| V24 P2, P1 follow-up | Claude | `6f35827a64` rejects ordinary retained-export rollback; independent review found a zeroed newer anchor slot can expose the old seed and permit reimport | Composed serving-owner 103 tests and strict Clippy pass; full-library timeout stays incomplete | Repair served-destination identity check and test genuine pre-commit retry, zeroed/corrupted slots and byte preservation; then composed and hosted checks | #1160 |
-| V25 P2 | Claude | User requires authenticated query snapshots before landing; persistent control-plane store lifetime is the first prerequisite | Original work-bound failure reproduced; per-request open/page work grows with both archive and live history | Reviewed snapshot spec and implementation, immutable authenticated projection, explicit watermarks/freshness, complete accepted filters/counts, bounded build/query work and large-history lifecycle controls | #1160 |
+| V24 P2, P1 follow-up | Claude | `6f35827a64`, `20dc901d6d`, `7c0b275486` bind destination continuity and the in-place exception to the provisioned lock identity | Original rollback, zeroed-slot and retirement-byte replay failures retained; final composed 171 controls pass with one existing ignored helper, strict CP/store Clippy passes | Final hosted candidate and independent delta review; whole lock-root restoration remains outside the guarantee | #1160 |
+| V25 P2 | Claude and Root | User-selected authenticated snapshots; [core design](../superpowers/specs/2026-10-09-authenticated-receipt-query-snapshots-design.md) accepted and [execution plan](../superpowers/plans/2026-10-09-authenticated-receipt-query-snapshots.md) integrated at `5fdd7f8d07` | Original linear work reproduced; persistent lifetime, snapshot core and separate SDK implementation in progress | Complete implementation and filter/count/freshness controls, Linux custody, large-history capacity, owning and composed qualification | #1160 |
 
 The user explicitly selected authenticated receipt query snapshots on October
 9. Strict whole-history request budgets that permanently disable healthy
@@ -53,8 +61,12 @@ RED/GREEN validation: both P256 attestation entry points preserve their output
 bytes while reducing the measured allocations from one to zero. The shared
 filler keeps the owned renderer and all three real SHA evaluations. Its new
 loop-role selector has 30 passing controls after the old selector failed eight.
-Owning runtime qualification and the renewed strict proof remain open; earlier
-weights, encoder and receipt proof results predate this shared-filler change. All
+The four-owner runtime suite passed 929 tests, with one existing ignored
+doctest. An initial strict Clippy failure in the allocation-test fixture was
+repaired with a named struct; the allocation tests and strict four-owner
+Clippy then passed. The renewed strict attestation proof started at 06:17 UTC
+and remains in progress. Earlier weights, encoder and receipt proof results
+predate this shared-filler change and need applicable renewal. All
 original symbolic inputs and full unwinding assertions remain. Cancelled diagnostic runs and
 original noncollision timeouts remain separate failed or incomplete evidence.
 Generated coverage, explicit crypto-scope controls and the security CI
@@ -66,10 +78,9 @@ campaign in 916.22 seconds; it does not establish the pending attestation proof.
 The prior combined runtime evidence has been renewed for the later retry,
 budget and dual-clock boundaries. Exact commands, source hashes, failures
 and successful resumptions remain under
-`/tmp/pr1160-integrated-check-20261009/attempt3` through `attempt10`. Attempt8
-qualifies the initial V24 composition only; its newly discovered rollback
-follow-up still needs repair and verification. Attempt9 qualifies the initial
-V01 change, with its error-lifetime follow-up still open. Attempt10 qualifies
+`/tmp/pr1160-integrated-check-20261009/attempt3` through `attempt11`. Attempt8
+and attempt9 qualify the initial V24 and V01 changes; attempt11 renews both
+with their final rollback and error-lifetime repairs. Attempt10 qualifies
 the three-commit V06 composition. Each records its bounded source composition;
 none is a full final-candidate or hosted qualification.
 These focused results do not replace the four required protected hosted
