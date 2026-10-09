@@ -7,6 +7,8 @@ import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
+import shutil
+from check_fonts import FONTS, check as check_fonts
 from idnits_gate import validate
 from normalize_xml import normalize
 
@@ -90,6 +92,39 @@ class AasvgWrapper(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn("<style>", result.stdout)
         self.assertIn('stroke="black"', result.stdout)
+
+
+class FontManifest(unittest.TestCase):
+    """The PDF fonts and licenses are the hash-pinned files in sources.json."""
+
+    def copy(self, tmp):
+        directory = Path(tmp) / "fonts"
+        shutil.copytree(FONTS, directory)
+        return directory
+
+    def test_the_committed_fonts_match_their_manifest(self):
+        self.assertEqual(check_fonts(), 8)
+
+    def test_a_changed_missing_or_unlisted_file_is_rejected(self):
+        def change_license(d):
+            path = d / "notoserif-OFL.txt"
+            path.write_bytes(path.read_bytes().replace(b"Copyright", b"Copyleft", 1))
+
+        def swap_font(d):
+            (d / "RobotoMono[wght].ttf").write_bytes((d / "RobotoMono-Italic[wght].ttf").read_bytes())
+
+        cases = {
+            "changed license text": change_license,
+            "substituted font": swap_font,
+            "missing font": lambda d: (d / "NotoSansSymbols2-Regular.ttf").unlink(),
+            "unlisted font": lambda d: shutil.copy(d / "RobotoMono[wght].ttf", d / "Extra.ttf"),
+        }
+        for name, change in cases.items():
+            with self.subTest(name), tempfile.TemporaryDirectory() as tmp:
+                directory = self.copy(tmp)
+                change(directory)
+                with self.assertRaises(ValueError):
+                    check_fonts(directory)
 
 
 class XmlNormalization(unittest.TestCase):

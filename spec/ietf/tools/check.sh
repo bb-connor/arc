@@ -18,6 +18,7 @@ out=draft-whelan-chio-protocol-00
 python3 tools/render_vectors.py --vectors ../../tests/bindings/vectors --out generated --check
 python3 tools/test_render_vectors.py
 python3 tools/test_build_gates.py
+python3 tools/check_fonts.py
 make --no-print-directory OUTDIR="$tmp" all >"$tmp/build.log" 2>&1 || {
   cat "$tmp/build.log" >&2
   exit 1
