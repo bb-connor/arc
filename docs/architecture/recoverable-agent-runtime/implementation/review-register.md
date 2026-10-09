@@ -32,15 +32,19 @@ The current status counts are:
 | Status | Records | Meaning |
 | --- | ---: | --- |
 | `open` | 231 | No complete independent disposition is recorded. |
-| `needs_revalidation` | 48 | Historical closure remains, but cited source or document pins differ. |
-| `recorded_scoped_closed` | 69 | The recorded scoped disposition is retained, with the limits stated per record. |
+| `needs_revalidation` | 47 | Historical closure remains, but cited source or document pins differ without an accepted current continuity review. |
+| `recorded_scoped_closed` | 70 | The recorded scoped disposition is retained, with the limits stated per record. |
 | `candidate_only` | 31 | The defective candidate was uninstalled when found; corrected successors may have separate evidence. |
 | `prerequisite_only` | 1 | Provenance work, not a proved implementation defect. |
 
-The 48 revalidation flags are part of the 117 historical scoped closures. They
+The 47 remaining revalidation flags are part of the 117 historical scoped closures. They
 are not added to the 231 historically unclosed findings. No finding is declared
 regressed merely because its bytes changed, and no matching pin constitutes a
-new behavioral test.
+new behavioral test. The initial audit flagged 48 closures. An independent
+[explanation evidence continuity review](reviews/explanation-evidence-continuity.md)
+subsequently confirmed that the README change for `A-planner-07` adds navigation
+only and preserves its original source-only obligation. Its historical pin
+difference remains recorded, alongside the current review and its scope.
 
 ## Source-pin audit
 
