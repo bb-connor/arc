@@ -476,12 +476,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         max_lines=2_159,
         max_fragments=2,
     ),
-    "crates/security/chio-quarantine/src/executor.rs": allow(
-        "2026-11-30",
-        "quarantine executor assembled from include! fragments; capped until the fragments become modules",
-        max_lines=2_168,
-        max_fragments=1,
-    ),
     "crates/platform/chio-agent-web-interop/tests/agent_web_interop/core_tests.rs": allow(
         "2026-11-30",
         "agent-web interop core suite assembled from include! fragments; capped until the fragments become modules",
@@ -491,11 +485,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/tooling/chio-conformance/tests/active_defense.rs": allow(
         "2026-10-31",
         "active-defense conformance suite assembled from include! fragments; capped until the fragments become modules",
-        max_fragments=1,
-    ),
-    "crates/security/chio-quarantine/tests/state_machine.rs": allow(
-        "2026-10-31",
-        "quarantine state machine suite assembled from include! fragments; capped until the fragments become modules",
         max_fragments=1,
     ),
     "crates/protocol/chio-cross-protocol/src/tests.rs": allow(

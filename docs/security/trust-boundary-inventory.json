@@ -527,7 +527,7 @@
     "crates/security/chio-keyring/src/lib.rs",
     "crates/security/chio-keyring/src/service.rs",
     "crates/security/chio-quarantine/src/correlation.rs",
-    "crates/security/chio-quarantine/src/executor_parts/effect_journal_methods.inc",
+    "crates/security/chio-quarantine/src/executor/effect_journal_methods.rs",
     "crates/security/chio-quarantine/src/rules.rs",
     "crates/security/chio-secret-broker/src/audit.rs",
     "crates/security/chio-secret-broker/src/authority_ipc.rs",
@@ -2439,7 +2439,7 @@
     "crates/security/chio-quarantine/src/correlation.rs::load_partition_state::from_slice",
     "crates/security/chio-quarantine/src/correlation.rs::parse_verified_event::from_slice",
     "crates/security/chio-quarantine/src/correlation.rs::validate_stored_body::from_slice",
-    "crates/security/chio-quarantine/src/executor_parts/effect_journal_methods.inc::decode_journal::from_slice",
+    "crates/security/chio-quarantine/src/executor/effect_journal_methods.rs::decode_journal::from_slice",
     "crates/security/chio-secret-broker/src/ipc_client.rs::decode_canonical_response_with_limit::from_value",
     "crates/security/chio-secret-broker/src/ipc_client.rs::read_vector::from_slice",
     "crates/security/chio-secret-broker/src/prepared_mcp.rs::serve_prepared_broker_mcp::from_value",
@@ -4898,7 +4898,7 @@
     "crates/security/chio-quarantine/src/correlation.rs::load_partition_state::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
     "crates/security/chio-quarantine/src/correlation.rs::parse_verified_event::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
     "crates/security/chio-quarantine/src/correlation.rs::validate_stored_body::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
-    "crates/security/chio-quarantine/src/executor_parts/effect_journal_methods.inc::decode_journal::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
+    "crates/security/chio-quarantine/src/executor/effect_journal_methods.rs::decode_journal::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
     "crates/security/chio-secret-broker/src/ipc_client.rs::decode_canonical_response_with_limit::from_value": "Typed projection after the constrained input parser; no fresh raw bytes.",
     "crates/security/chio-secret-broker/src/ipc_client.rs::read_vector::from_slice": "This-process canonical serialization replay; no external raw bytes.",
     "crates/security/chio-secret-broker/src/prepared_mcp.rs::serve_prepared_broker_mcp::from_value": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
@@ -6409,7 +6409,7 @@
       "parse_verified_event::from_slice",
       "validate_stored_body::from_slice"
     ],
-    "crates/security/chio-quarantine/src/executor_parts/effect_journal_methods.inc": [
+    "crates/security/chio-quarantine/src/executor/effect_journal_methods.rs": [
       "decode_journal::from_slice"
     ],
     "crates/security/chio-quarantine/src/fuzz.rs": [
@@ -10527,7 +10527,7 @@
         }
       ]
     },
-    "crates/security/chio-quarantine/src/executor_parts/effect_journal_methods.inc": {
+    "crates/security/chio-quarantine/src/executor/effect_journal_methods.rs": {
       "kind": "parser-internal-or-typed",
       "contract": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
       "readers": [
@@ -16235,7 +16235,7 @@
       "kind": "parser-internal-or-typed",
       "contract": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue."
     },
-    "crates/security/chio-quarantine/src/executor_parts/effect_journal_methods.inc": {
+    "crates/security/chio-quarantine/src/executor/effect_journal_methods.rs": {
       "kind": "parser-internal-or-typed",
       "contract": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue."
     },

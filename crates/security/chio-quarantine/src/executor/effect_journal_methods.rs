@@ -1,3 +1,28 @@
+use crate::executor::error::ExecutorError;
+use crate::executor::{
+    domain_hash, domain_record_id, effect_command_id, effect_transition_id, encode_effect_record,
+    mutation_for_journal_phase, receipt_cursor_transition_id, record_id, validate_receipt_cursor,
+    EffectJournal, EffectJournalPhase, EffectResultLookup, ResponseExecutor, ALERT_EVENT_ID_DOMAIN,
+    ALERT_HASH_DOMAIN, ALERT_IDEMPOTENCY_KEY_DOMAIN, EFFECT_JOURNAL_SCHEMA_VERSION,
+};
+use crate::native_receipts::{
+    latest_response_receipt, receipt_append_request, response_receipt_for_mutation,
+};
+use crate::state_machine::{
+    decode_response_record, CanonicalFailure, EffectMutation, EffectMutationRequest,
+    EffectReceiptContext, ResponseStateMachine,
+};
+use chio_core_types::{canonical_json_bytes, sha256};
+use chio_security_types::ports::{
+    AlertDeliveryQuery, Digest32, EffectExecutionStatus, EffectOperation, EffectPort,
+    EffectResultQuery, OpaqueReceiptRef, PortError, ResponseEffectCasRequest, ResponseEffectKey,
+    ResponseEffectRecord, ResponsePlanKey, ResponsePlanRecord, ResponseReceiptCursor,
+    ResponseReceiptCursorCasRequest, ResponseSchedulerStore, ScheduledWork, SecurityAlert,
+    SecurityAlertPort, SecurityReceiptSink,
+};
+use chio_security_types::{PlannedResponseEffect, ResponsePlan, ResponseSnapshot};
+use std::sync::Arc;
+
 impl<
         S: ResponseSchedulerStore + ?Sized,
         E: EffectPort + ?Sized,
@@ -5,7 +30,7 @@ impl<
         A: SecurityAlertPort + ?Sized,
     > ResponseExecutor<S, E, R, A>
 {
-    fn ensure_apply_intent(
+    pub(super) fn ensure_apply_intent(
         &self,
         plan: &ResponsePlan,
         effect: &PlannedResponseEffect,
@@ -59,7 +84,7 @@ impl<
         }
     }
 
-    fn load_effect_record(
+    pub(super) fn load_effect_record(
         &self,
         plan: &ResponsePlan,
         effect: &PlannedResponseEffect,
@@ -73,7 +98,7 @@ impl<
             .ok_or(ExecutorError::InvalidEffectJournal)
     }
 
-    fn decode_journal(
+    pub(super) fn decode_journal(
         &self,
         plan: &ResponsePlan,
         effect: &PlannedResponseEffect,
@@ -107,7 +132,7 @@ impl<
         Ok(journal)
     }
 
-    fn update_effect_record(
+    pub(super) fn update_effect_record(
         &self,
         plan_record: &ResponsePlanRecord,
         current: &ResponseEffectRecord,
@@ -136,7 +161,7 @@ impl<
             .map_err(ExecutorError::Store)
     }
 
-    fn rebind_pending_effect_command(
+    pub(super) fn rebind_pending_effect_command(
         &self,
         plan_record: &ResponsePlanRecord,
         current: &ResponseEffectRecord,
@@ -157,7 +182,7 @@ impl<
         self.update_effect_record(plan_record, current, journal, work)
     }
 
-    fn record_effect_mutation(
+    pub(super) fn record_effect_mutation(
         &self,
         current: &ResponsePlanRecord,
         work: &ScheduledWork,
@@ -265,7 +290,7 @@ impl<
         Ok(cursor.current_evidence_id)
     }
 
-    fn append_receipt(
+    pub(super) fn append_receipt(
         &self,
         plan_record: &ResponsePlanRecord,
         _effect_record: Option<&ResponseEffectRecord>,
@@ -274,7 +299,10 @@ impl<
         self.reconcile_snapshot_receipts(&snapshot)
     }
 
-    fn reconcile_receipts(&self, plan_record: &ResponsePlanRecord) -> Result<(), ExecutorError> {
+    pub(super) fn reconcile_receipts(
+        &self,
+        plan_record: &ResponsePlanRecord,
+    ) -> Result<(), ExecutorError> {
         let snapshot = decode_response_record(plan_record)?;
         self.reconcile_snapshot_receipts(&snapshot)
     }
@@ -367,7 +395,7 @@ impl<
         }
     }
 
-    fn page_rollback_failure(
+    pub(super) fn page_rollback_failure(
         &self,
         snapshot: &ResponseSnapshot,
         record: &ResponsePlanRecord,
@@ -415,7 +443,7 @@ impl<
         Ok(())
     }
 
-    fn load_effect_execution_status(
+    pub(super) fn load_effect_execution_status(
         &self,
         plan: &ResponsePlan,
         effect: &PlannedResponseEffect,
@@ -452,7 +480,7 @@ impl<
             .map_err(ExecutorError::EffectQuery)
     }
 
-    fn validate_work(
+    pub(super) fn validate_work(
         &self,
         snapshot: &ResponseSnapshot,
         work: &ScheduledWork,
@@ -467,7 +495,7 @@ impl<
         Ok(())
     }
 
-    fn state_machine(&self) -> ResponseStateMachine<S> {
+    pub(super) fn state_machine(&self) -> ResponseStateMachine<S> {
         ResponseStateMachine::new(Arc::clone(&self.store))
     }
 }

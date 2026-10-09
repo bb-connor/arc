@@ -16,9 +16,8 @@ use chio_security_types::ports::{
     OpaqueReceiptRef, RecordIdSet, ResponsePlanRecord, SessionId, TenantId,
 };
 use chio_security_types::{
-    OperatorCapabilityBinding, ResponseApprovalRequirement, ResponseEffectKind,
-    ResponseEffectProgress, ResponseEffectSpec, ResponsePlanAuthorizationBody, ResponsePlanInput,
-    ResponseState, ResponseTarget,
+    OperatorCapabilityBinding, ResponseApprovalRequirement, ResponseEffectKind, ResponseEffectSpec,
+    ResponsePlanAuthorizationBody, ResponsePlanInput, ResponseState, ResponseTarget,
 };
 use proptest::prelude::*;
 use response_support::{record, TestResponseStore};
@@ -1279,7 +1278,8 @@ fn canonical_body_with_recomputed_hash_cannot_forge_a_transition_id() {
     assert!(decode_response_record(&forged).is_err());
 }
 
-include!("state_machine_parts/apply_failure_edges.inc");
+#[path = "state_machine/apply_failure_edges.rs"]
+mod apply_failure_edges;
 
 #[test]
 fn partial_apply_timeout_full_rollback_and_rollback_failure_remain_truthful() {

@@ -13,21 +13,19 @@ use crate::native_receipts::{
     latest_response_receipt, receipt_append_request, response_receipt_for_mutation,
 };
 use crate::state_machine::{
-    decode_response_record, EffectMutation, EffectMutationRequest, EffectReceiptContext,
-    ResponseStateMachine, ResponseTransitionRequest, StateMachineError,
+    decode_response_record, EffectMutation, ResponseTransitionRequest, StateMachineError,
 };
 use chio_core_types::{canonical_json_bytes, sha256};
 use chio_security_types::ports::{
-    ActionId, AlertDeliveryQuery, CanonicalBody, Digest32, EffectExecutionStatus, EffectId,
-    EffectOperation, EffectPort, EffectRequest, EffectResult, EffectResultQuery, ErrorCode,
-    LineageFenceMaintenanceOutcome, LineageFenceMaintenanceRequest, OpaqueReceiptRef, PortError,
-    ReceiptAppendRequest, RecordId, ResponseDispatchAuthorization, ResponseEffectCasRequest,
-    ResponseEffectKey, ResponseEffectRecord, ResponsePlanKey, ResponsePlanRecord,
-    ResponseReceiptCursor, ResponseReceiptCursorCasRequest, ResponseSchedulerStore, ScheduledWork,
-    SecurityAlert, SecurityAlertPort, SecurityReceiptSink, TenantId,
+    ActionId, CanonicalBody, Digest32, EffectExecutionStatus, EffectId, EffectOperation,
+    EffectPort, EffectRequest, EffectResult, ErrorCode, LineageFenceMaintenanceOutcome,
+    LineageFenceMaintenanceRequest, OpaqueReceiptRef, PortError, ReceiptAppendRequest, RecordId,
+    ResponseDispatchAuthorization, ResponseEffectKey, ResponseEffectRecord, ResponsePlanRecord,
+    ResponseReceiptCursor, ResponseSchedulerStore, ScheduledWork, SecurityAlertPort,
+    SecurityReceiptSink, TenantId,
 };
 use chio_security_types::{
-    PlannedResponseEffect, ResponseApprovalRequirement, ResponseEffectKind, ResponseEffectProgress,
+    ResponseApprovalRequirement, ResponseEffectKind, ResponseEffectProgress,
     ResponseMutationRecord, ResponsePlan, ResponseSnapshot, ResponseState,
     ResponseTerminalFailureEvidence,
 };
@@ -1374,7 +1372,7 @@ impl<
     }
 }
 
-include!("executor_parts/effect_journal_methods.inc");
+mod effect_journal_methods;
 
 struct EffectResultLookup<'a> {
     operation: EffectOperation,
