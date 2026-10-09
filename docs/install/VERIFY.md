@@ -29,8 +29,10 @@ For example, the native tag `v0.1.1-rc.1` requires this literal certificate SAN:
 https://github.com/bb-connor/arc/.github/workflows/release-binaries.yml@refs/tags/v0.1.1-rc.1
 ```
 
-A certificate for another tag, branch, owner, repository or workflow fails even
-if its signature is otherwise valid. Selecting a fleet tag does not authorize a
+A certificate for another tag, source commit, branch, owner, repository or
+workflow fails even if its signature is otherwise valid. Consumers must pin the
+full source commit independently of the downloaded artifact and certificate.
+Selecting a fleet tag does not authorize a
 package-specific tag, or the reverse. Registry trusted publisher settings are
 separate operator configuration; they do not replace this consumer policy.
 
@@ -42,25 +44,35 @@ boundary; do not fetch it from the artifact's untrusted download location.
 
 [`scripts/verify-release-identity.py`](../../scripts/verify-release-identity.py)
 validates tag syntax, chooses the workflow from the artifact family and invokes
-`cosign verify-blob` with `--certificate-identity` and
-`--certificate-oidc-issuer`. Identity is compared literally. The script has no
-repository override and leaves public Fulcio chain, SCT and Rekor checks enabled.
+`cosign verify-blob` with `--certificate-identity`,
+`--certificate-oidc-issuer` and `--certificate-github-workflow-sha`. Cosign compares
+the supplied source SHA with the signed GitHub workflow SHA certificate extension
+(`1.3.6.1.4.1.57264.1.3`). Identity and source commit are compared literally. The
+script has no repository override and leaves public Fulcio chain, SCT and Rekor
+checks enabled.
 See the [pinned cosign command reference](https://github.com/sigstore/cosign/blob/v2.4.1/doc/cosign_verify-blob.md)
 and [Sigstore verification guidance](https://docs.sigstore.dev/cosign/verifying/verify/).
 
 Set `CHIO_CHECKOUT` to the trusted checkout, `CHANNEL` to `binaries`, `pypi` or
-`npm`, `TAG` to the exact tag, and `ARTIFACT` to the downloaded file. Place its
+`npm`, `TAG` to the exact tag, `SOURCE_SHA` to the full lowercase 40-character
+source commit from independently trusted release qualification, and `ARTIFACT`
+to the downloaded file. Obtain the expected SHA from the accepted source record
+or a reviewed, trusted checkout. A mutable tag lookup, artifact metadata or the
+certificate being verified cannot supply this expectation: a tag can be moved
+after an earlier run signs different source bytes. Place its
 nonempty `.sig` and `.pem` siblings in the same directory, then run:
 
 <!-- release-verification-command -->
 ```bash
 python3 "${CHIO_CHECKOUT}/scripts/verify-release-identity.py" verify \
-  --channel "$CHANNEL" --tag "$TAG" --artifact "$ARTIFACT"
+  --channel "$CHANNEL" --tag "$TAG" --source-sha "$SOURCE_SHA" --artifact "$ARTIFACT"
 ```
 
 A nonzero exit denies use of the artifact. Missing, empty or corrupt signing
-material, a mismatched issuer or signer identity, and changed artifact bytes must
-fail. Do not add flags that skip certificate or transparency verification.
+material, a mismatched issuer, signer identity or source commit, a missing source
+certificate extension, and changed artifact bytes must fail. The source SHA is
+required; the verifier never infers it from the certificate. Do not add flags
+that skip certificate or transparency verification.
 
 To inspect the literal identity before verification:
 
@@ -73,7 +85,8 @@ python3 scripts/verify-release-identity.py identity \
 
 The versions below illustrate naming; they do not assert these signed releases
 exist. For unpublished drafts, downloading also requires maintainer access.
-Select the actual intended release tag before fetching.
+Select the actual intended release tag and independently accepted source commit
+before fetching. Each example requires `SOURCE_SHA` to be set to that commit.
 
 ### Native archive
 
@@ -81,12 +94,13 @@ Select the actual intended release tag before fetching.
 CHIO_CHECKOUT="$PWD"
 CHANNEL=binaries
 TAG=v0.1.1-rc.1
+: "${SOURCE_SHA:?Set the independently accepted full source commit}"
 ARTIFACT=chio-0.1.1-rc.1-x86_64-unknown-linux-gnu.tar.gz
 
 gh release download "$TAG" --repo bb-connor/arc \
   --pattern "$ARTIFACT" --pattern "${ARTIFACT}.sig" --pattern "${ARTIFACT}.pem"
 python3 "${CHIO_CHECKOUT}/scripts/verify-release-identity.py" verify \
-  --channel "$CHANNEL" --tag "$TAG" --artifact "$ARTIFACT"
+  --channel "$CHANNEL" --tag "$TAG" --source-sha "$SOURCE_SHA" --artifact "$ARTIFACT"
 ```
 
 Verify each target separately. A signed checksum index uses the same `binaries`
@@ -98,13 +112,14 @@ channel and exact tag. Checksums alone provide no signer authentication.
 CHIO_CHECKOUT="$PWD"
 CHANNEL=pypi
 TAG=py/chio-crewai-v0.2.0
+: "${SOURCE_SHA:?Set the independently accepted full source commit}"
 ARTIFACT=chio_crewai-0.2.0-py3-none-any.whl
 
 pip download --no-deps --dest . 'chio-crewai==0.2.0'
 gh release download "$TAG" --repo bb-connor/arc \
   --pattern "${ARTIFACT}.sig" --pattern "${ARTIFACT}.pem"
 python3 "${CHIO_CHECKOUT}/scripts/verify-release-identity.py" verify \
-  --channel "$CHANNEL" --tag "$TAG" --artifact "$ARTIFACT"
+  --channel "$CHANNEL" --tag "$TAG" --source-sha "$SOURCE_SHA" --artifact "$ARTIFACT"
 ```
 
 Use the actual wheel filename. An sdist uses its `.tar.gz` filename and sidecars.
@@ -116,12 +131,13 @@ For a fleet release, set `TAG=py/v0.2.0` explicitly instead.
 CHIO_CHECKOUT="$PWD"
 CHANNEL=npm
 TAG=ts/express-v0.2.0
+: "${SOURCE_SHA:?Set the independently accepted full source commit}"
 ARTIFACT=chio-protocol-express-0.2.0.tgz
 
 gh release download "$TAG" --repo bb-connor/arc \
   --pattern "$ARTIFACT" --pattern "${ARTIFACT}.sig" --pattern "${ARTIFACT}.pem"
 python3 "${CHIO_CHECKOUT}/scripts/verify-release-identity.py" verify \
-  --channel "$CHANNEL" --tag "$TAG" --artifact "$ARTIFACT"
+  --channel "$CHANNEL" --tag "$TAG" --source-sha "$SOURCE_SHA" --artifact "$ARTIFACT"
 ```
 
 Use the actual `npm pack` filename. For a fleet release, set `TAG=ts/v0.2.0`
@@ -138,18 +154,29 @@ python3 scripts/tests/release-identity.test.py
 
 This test executes the marked command above through real cosign v2.4.1. It
 creates local EC signatures and CA-issued certificates carrying the expected SAN
-and OIDC issuer extension. The isolated test adapter supplies that local CA and
-disables SCT/Rekor checks because the fixtures have no public log entries. Those
+and OIDC issuer and source SHA extensions. The isolated test adapter supplies
+that local CA and disables SCT/Rekor checks because the fixtures have no public
+log entries. Those
 options exist only in the test adapter; the production verifier exposes no bypass.
 The test covers all three artifact families, wrong owner/repository/workflow/tag,
-a branch identity, wrong OIDC issuer, missing/empty/corrupt sidecars and altered
-bytes. CI runs it in [`release-identity-check.yml`](../../.github/workflows/release-identity-check.yml).
+a branch identity, wrong OIDC issuer, wrong/missing source SHA, invalid or omitted
+expected SHA, missing/empty/corrupt sidecars and altered bytes. It executes every
+active verification example in the installation docs against a wrong-source
+certificate. CI runs it in [`release-identity-check.yml`](../../.github/workflows/release-identity-check.yml).
 
 **This proves local command behavior, not hosted keyless identity.** Hosted
 acceptance still requires an actual artifact signed by the exact tagged workflow,
 with production Fulcio, SCT and Rekor validation enabled. Account ownership,
 registry trusted publisher registration, protected environments, signed release
 publication and release acceptance remain operator gates.
+
+All three artifact build jobs run exact-source qualification before building or
+signing canonical artifacts. The native checksum signer repeats that gate before
+rendering the index. The gate requires the clean immutable event checkout, the
+matching tag and successful required main workflows for that same commit. SDK
+dispatch dry runs remain unsigned. Publication jobs repeat qualification before
+uploading release bytes; signature verification alone does not establish operator
+publication approval.
 
 ## Rust callers and other artifact types
 

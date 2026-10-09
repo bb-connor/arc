@@ -60,6 +60,7 @@ The published image must satisfy this contract:
 set -euo pipefail
 VERSION=0.1.1-rc.1
 TAG="v${VERSION}"
+: "${SOURCE_SHA:?Set the independently accepted full source commit}"
 TARGET=$(uname -m | sed 's/x86_64/x86_64/; s/arm64/aarch64/; s/aarch64/aarch64/')
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 case "$OS" in
@@ -77,14 +78,16 @@ curl -fsSL "${BASE}/${ARCHIVE}.sig" -o "${ARCHIVE}.sig"
 curl -fsSL "${BASE}/${ARCHIVE}.pem" -o "${ARCHIVE}.pem"
 # Run from a trusted reviewed source checkout with cosign v2.4.1 installed.
 python3 scripts/verify-release-identity.py verify \
-  --channel binaries --tag "$TAG" --artifact "$ARCHIVE"
+  --channel binaries --tag "$TAG" --source-sha "$SOURCE_SHA" --artifact "$ARCHIVE"
 shasum -a 256 -c "${ARCHIVE}.sha256"
 tar xf "${ARCHIVE}"
 sudo install -m 0755 "chio-${VERSION}-${TRIPLE}/chio" /usr/local/bin/chio
 chio --version
 ```
 
-The illustrative tag above does not establish publication. Missing signatures
+The expected source SHA must come from independent accepted release qualification
+or a reviewed, trusted checkout, as described in [VERIFY.md](VERIFY.md). The
+illustrative tag above does not establish publication. Missing signatures
 must stop installation. Homebrew formula and OCI verification have separate
 contracts; see [homebrew.md](homebrew.md) and
 [PUBLISHING.md](PUBLISHING.md#sidecar-image-signing).

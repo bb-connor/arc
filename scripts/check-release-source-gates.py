@@ -1,25 +1,29 @@
 #!/usr/bin/env python3
-"""Require completed, exact-source main checks before publishing a release."""
+"""Require completed, exact-source main checks before signing or publishing a release."""
+
 from __future__ import annotations
 
 import argparse
 import json
 import os
-from pathlib import Path
 import re
 import subprocess
 import sys
-import tomllib
+from pathlib import Path
 from urllib.parse import urlencode
 
+import tomllib
 
 REQUIRED = {
-    "ci.yml": ("push", {
-        "Build, lint, test",
-        "MSRV build and test",
-        "cargo-vet (locked supply-chain audit)",
-        "cargo-deny (supply-chain bans/advisories/licenses)",
-    }),
+    "ci.yml": (
+        "push",
+        {
+            "Build, lint, test",
+            "MSRV build and test",
+            "cargo-vet (locked supply-chain audit)",
+            "cargo-deny (supply-chain bans/advisories/licenses)",
+        },
+    ),
     "release-qualification.yml": (None, {"Release qualification"}),
     "cve-monitor.yml": (None, {"cargo-audit and osv-scanner"}),
     "cargo-vet.yml": (None, {"cargo-vet (locked supply-chain audit)"}),
@@ -32,7 +36,7 @@ def github(path: str) -> dict:
     )
     value = json.loads(result.stdout)
     if not isinstance(value, dict):
-        raise ValueError("GitHub returned a non-object response")
+        raise TypeError("GitHub returned a non-object response")
     return value
 
 
@@ -55,13 +59,19 @@ def require_gates(repository: str, head: str, read=github) -> list[dict]:
         # Refuse a truncated history rather than silently choosing an older run.
         if response["total_count"] != len(runs):
             raise ValueError(f"incomplete run history for {filename}")
-        eligible = [r for r in runs if (
-            r.get("head_sha") == head and r.get("head_branch") == "main"
-            and r.get("head_repository", {}).get("full_name") == repository
-            and r.get("workflow_id") == workflow_id
-            and r.get("path") == expected_path
-            and r.get("event") in ({event} if event else {"push", "workflow_dispatch", "schedule"})
-        )]
+        eligible = [
+            r
+            for r in runs
+            if (
+                r.get("head_sha") == head
+                and r.get("head_branch") == "main"
+                and r.get("head_repository", {}).get("full_name") == repository
+                and r.get("workflow_id") == workflow_id
+                and r.get("path") == expected_path
+                and r.get("event")
+                in ({event} if event else {"push", "workflow_dispatch", "schedule"})
+            )
+        ]
         if not eligible:
             raise ValueError(f"no exact-source main run for {filename}")
         run = max(eligible, key=lambda r: (r["run_number"], r["id"]))
@@ -79,23 +89,36 @@ def require_gates(repository: str, head: str, read=github) -> list[dict]:
         for name in names:
             matching = [job for job in jobs if job.get("name") == name]
             if len(matching) != 1 or any(
-                job.get("run_id") != run["id"] or job.get("run_attempt") != attempt
+                job.get("run_id") != run["id"]
+                or job.get("run_attempt") != attempt
                 or job.get("head_sha") != head
-                or job.get("status") != "completed" or job.get("conclusion") != "success"
+                or job.get("status") != "completed"
+                or job.get("conclusion") != "success"
                 for job in matching
             ):
                 raise ValueError(f"required job did not succeed: {name}")
-        evidence.append({"workflow": filename, "run": run["id"], "attempt": attempt,
-                         "head": head, "jobs": sorted(names)})
+        evidence.append(
+            {
+                "workflow": filename,
+                "run": run["id"],
+                "attempt": attempt,
+                "head": head,
+                "jobs": sorted(names),
+            }
+        )
     return evidence
 
 
 def release_version(root: Path, tag: str, sdk: str | None, package: str | None) -> str:
     if sdk is None:
-        manifest = tomllib.loads((root / "crates/products/chio-cli/Cargo.toml").read_text())
+        manifest = tomllib.loads(
+            (root / "crates/products/chio-cli/Cargo.toml").read_text()
+        )
         version = manifest["package"]["version"]
         if isinstance(version, dict) and version == {"workspace": True}:
-            version = tomllib.loads((root / "Cargo.toml").read_text())["workspace"]["package"]["version"]
+            version = tomllib.loads((root / "Cargo.toml").read_text())["workspace"][
+                "package"
+            ]["version"]
         expected = {f"v{version}"}
     else:
         if sdk not in {"npm", "pypi"} or not package:
@@ -110,7 +133,9 @@ def release_version(root: Path, tag: str, sdk: str | None, package: str | None) 
             version = json.loads((path / "package.json").read_text())["version"]
             prefix = "ts"
         else:
-            version = tomllib.loads((path / "pyproject.toml").read_text())["project"]["version"]
+            version = tomllib.loads((path / "pyproject.toml").read_text())["project"][
+                "version"
+            ]
             prefix = "py"
         expected = {f"{prefix}/v{version}", f"{prefix}/{path.name}-v{version}"}
     if not isinstance(version, str) or tag not in expected:
@@ -125,12 +150,24 @@ def main(sdk: str | None = None, package: str | None = None) -> None:
     if os.environ.get("GITHUB_REF_TYPE") != "tag":
         raise ValueError("publication requires a tag event")
     version = release_version(root, tag, sdk, package)
-    actual = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
+    actual = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=root, text=True
+    ).strip()
     if actual != head:
         raise ValueError("checkout does not match the release source")
+    tag_head = subprocess.check_output(
+        ["git", "rev-parse", "--verify", f"refs/tags/{tag}^{{commit}}"],
+        cwd=root,
+        text=True,
+        stderr=subprocess.PIPE,
+    ).strip()
+    if tag_head != head:
+        raise ValueError("release tag does not match the workflow source")
     subprocess.run(["git", "diff", "--quiet", "HEAD", "--"], cwd=root, check=True)
     evidence = require_gates(os.environ["GITHUB_REPOSITORY"], head)
-    print(json.dumps({"source": head, "version": version, "checks": evidence}, indent=2))
+    print(
+        json.dumps({"source": head, "version": version, "checks": evidence}, indent=2)
+    )
 
 
 if __name__ == "__main__":
@@ -140,7 +177,13 @@ if __name__ == "__main__":
         parser.add_argument("--package")
         arguments = parser.parse_args()
         main(arguments.sdk, arguments.package)
-    except (KeyError, ValueError, TypeError, OSError, subprocess.SubprocessError) as error:
+    except (
+        KeyError,
+        ValueError,
+        TypeError,
+        OSError,
+        subprocess.SubprocessError,
+    ) as error:
         # Do not echo gh stderr or environment values into release logs.
         print(f"release source gate refused: {type(error).__name__}", file=sys.stderr)
         sys.exit(1)

@@ -544,6 +544,8 @@ sidecars are unchanged.
    lets `cosign sign-blob --yes` exchange a GitHub-issued OIDC token
    for a short-lived Fulcio signing certificate. No long-lived
    signing key is held in repo secrets.
+   Before building or signing, it requires successful exact-source main checks
+   from a clean checkout of the immutable event commit and its matching tag.
 3. After the per-target archive is staged into `dist/`, the workflow
    runs `cosign sign-blob --yes --output-signature <archive>.sig
    --output-certificate <archive>.pem <archive>` and asserts both
@@ -560,22 +562,29 @@ sidecars are unchanged.
 The `release-binaries.yml` workflow signs only tag-bound builds. Pushes run on
 `refs/tags/v...`; dispatch rebuilds must run from the matching tag. The signing
 steps check the canonical repository, workflow ref and exact tag before signing.
+All native, npm and PyPI canonical signing jobs first require exact-source main
+qualification. The native checksum signer repeats that gate before rendering.
 
 Use the executable [native archive recipe in VERIFY.md](VERIFY.md#native-archive).
 For example:
 
 ```bash
 TAG=v0.1.1-rc.1
+: "${SOURCE_SHA:?Set the independently accepted full source commit}"
 ARCHIVE=chio-0.1.1-rc.1-x86_64-unknown-linux-gnu.tar.gz
 gh release download "$TAG" --repo bb-connor/arc \
   --pattern "$ARCHIVE" --pattern "${ARCHIVE}.sig" --pattern "${ARCHIVE}.pem"
 python3 scripts/verify-release-identity.py verify \
-  --channel binaries --tag "$TAG" --artifact "$ARCHIVE"
+  --channel binaries --tag "$TAG" --source-sha "$SOURCE_SHA" --artifact "$ARCHIVE"
 ```
 
-This illustrative tag is not a claim of a hosted signed release. Verify every
-platform archive separately and run source/provenance/runtime acceptance gates
-before promotion. A signed checksum index uses the same channel and exact tag.
+This illustrative tag is not a claim of a hosted signed release. The expected
+source SHA must come from independent accepted release qualification or a
+reviewed, trusted checkout. The verifier compares that SHA with the signed
+certificate extension; a mutable tag lookup cannot establish the expected SHA.
+Verify every platform archive separately and run source/provenance/runtime
+acceptance gates before promotion. A signed checksum index uses the same channel
+and exact tag.
 
 ### Programmatic verification from chio code
 
