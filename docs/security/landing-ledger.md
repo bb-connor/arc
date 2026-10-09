@@ -1,5 +1,43 @@
 # Security and process landing ledger
 
+## Current qualification checkpoint (October 9, 03:34 UTC)
+
+Published #1160 remains `fd8bfdc947`: 117 hosted checks succeeded, eight failed
+and 16 were skipped. The local source at `75e3ef10fe` includes the exhausted
+rollback budget repair (`d683d10d62`), the atomic relative retry operation
+(`85e01f1fbf`) and retained generated-deadline binding (`75e3ef10fe`). The
+write-lock race and deadline replay-integrity regressions failed before repair
+and passed in their owning lane. Combined-source focused renewal is pending.
+
+A fresh private-target campaign on `96d3910237` plus the typed encoder passed
+2,106 tests: kernel 1,650, broker 246, scheduler/security types 205 and teardown
+five. Strict all-target Clippy passed for ten affected crates. This campaign
+predates the budget, atomic retry and dual-clock negative-control followups;
+it does not qualify those later deltas or the hosted candidate.
+
+The user explicitly approved the cryptographic acceptance contract on October
+9. Digest noncollision is the existing audited `ASSUME-SHA256` assumption.
+The mandatory weights and attestation harnesses keep real portable SHA-256,
+original symbolic input domains, strict unwinding assertions and exact reachable
+completion covers. They check determinism, encoding, padding and context-wrapper
+binding. Their original noncollision harnesses are retained as **unproved**,
+opt-in research obligations outside mandatory enrollment. No successful
+noncollision proof is claimed: the original strict weights and attestation
+runs timed out at 1,802.01 and 1,803.95 seconds respectively.
+
+The contract, retained source hashes and failed strict outcomes are recorded
+in `formal/rust-verification/crypto-proof-scope.toml`; the public scope is
+[Concrete hash checks and cryptographic assumptions](../formal/CRYPTO_PROOF_SCOPE.md).
+Mutation controls reject removal of the assumption, promotion or alteration of
+unproved research, and direct or indirect research-feature enrollment. The
+all-byte encoder proof, runtime tamper controls and 8,192 attestation seed/root
+cases remain required evidence. On the final typed encoder, the receipt hash
+mismatch proof renewed successfully in 226.68 seconds; matching receipt and
+newly scoped concrete crypto proofs remain pending. Independent final review,
+local composition, current thread dispositions and protected hosted checks
+still precede landing. Native/trusted and release gates remain separate below.
+
+
 ## Current qualification checkpoint (October 9, 03:01 UTC)
 
 PR #1160 remains open and unmerged at `fd8bfdc947`. Its hosted checks are
