@@ -1,6 +1,13 @@
 # Recoverable agent runtime: architecture specification
 
-Status: proposed architecture, revision 3, October 2, 2026. This package specifies implementation work. It does not announce implemented APIs, public availability, or completed security qualification. Normative MUST/MUST NOT requirements are acceptance obligations. Rust API names, schema names and test names introduced here are proposed unless marked existing.
+Status: implementation present; current source unqualified. The historical design
+basis is proposed architecture, revision 3, October 2, 2026. This package records
+the architecture and acceptance obligations for the existing implementation.
+Original API, schema and test names identify that historical design and its
+evidence; the [current source correspondence](implementation/current-reproduction.md)
+maps retained names to maintained source. Normative MUST/MUST NOT requirements
+remain acceptance obligations. Implementation presence does not establish public
+availability or completed security qualification.
 
 ## Decision
 
@@ -49,10 +56,12 @@ establish current-source qualification or absence of open review findings.
 | [P6 plan](implementation/p6/P6-PRODUCT-PLAN.md), [review](implementation/p6/REVIEW.md), [verification](implementation/p6/verification.json), [supported matrix](implementation/p6/supported-matrix.json) | Archived local, Linux and finite live qualification at runtime binding `b1bcd48c` and qualification binding `3a13a9bc`. |
 
 Full bindings, archive hashes, review scopes, retained failures and unknown
-outcomes are stated in [execution status](implementation/STATUS.md). At the
-cumulative review snapshot, 113 of 735 P6-qualified sources differed after naming
-cleanup; subsequent repairs add further drift. The retained package auditors
-refuse the current working tree. Fresh repair review, owning regressions and
+outcomes are stated in [execution status](implementation/STATUS.md). At source
+commit `c5f53a96dbfc836bfc42805c2fee2d393dd78821`, 581 of the 735 historical P6
+source paths do not match: 547 have different bytes and 34 are absent at their
+original paths. The [reproducible drift snapshot](implementation/STATUS.md#source-drift-at-the-recorded-commit)
+records the unchanged paths, explicit rename declarations and current anchor map.
+The retained package auditors refuse the current working tree. Fresh repair review, owning regressions and
 source/profile-bound requalification are required before a qualified candidate
 can enter release integration. Linux, live providers, formal tools, hosted CI
 and production acceptance remain separate evidence dimensions. The roadmap ends
