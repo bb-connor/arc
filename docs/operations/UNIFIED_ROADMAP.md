@@ -32,7 +32,7 @@ This roadmap works backwards from one result: outside teams running Chio under t
 | #1173 | `cafdc970e` |
 | #1174 | `8dffff3da` |
 | #1177 | `620c703d8` |
-| #1179 | `491bd01b5` |
+| #1179 | `491bd01b5` (research); head moved to `f217de1fb` later on 2026-10-08, and the #1179 schema and conflict figures below were re-checked there on 2026-10-09 |
 | #1172 | `de84fc306` |
 | #1170 | `666274bae` |
 | #1171 | `ad9df87a5` |
@@ -100,9 +100,9 @@ A run qualifies only if all of the following hold.
 
 | Program | PRs | State | What blocks it |
 | --- | --- | --- | --- |
-| Security and process foundation | #1160 | Mergeable and blocked. Four required checks (build/lint/test, MSRV, cargo-vet, cargo-deny) were pending on the latest push. It merges into main without conflicts. | Review-thread dispositions; coordination items including `MINISW-NATIVE-DENY`. It must land as a **merge commit**. |
-| Recovery | #1172 (architecture and lab), #1179 (runtime, draft) | #1172 merges onto #1160 with 0 conflicts. #1179 is not qualified, and its P1s are open (including `NATIVE-FUNDING-AVAILABILITY-01` and the command-pool P1). | #1179 has 279 conflicts with #1160 and 264 with #1173. It sits on #1160's old startup sweep. It needs schema versions v39 to v45. |
-| Verifiable work | #1173 (contains #1161, #1159; supersedes #1158; carries #1162's code) | Dynamic delegation, swarm evolution, the A2A v1 edge, execution evidence and unknown-payment release are qualified locally on one host. **WORK-W1 to W4 have no code.** | 112 conflicts with #1160; schema collisions |
+| Security and process foundation | #1160 | Mergeable and blocked. On head `fd8bfdc94`, two of the four required checks failed (build/lint/test and MSRV); cargo-vet and cargo-deny passed. KDEF-GT1 (one whole hosted CI run passes) is therefore not met. It merges into main without conflicts. | The failing required checks; review-thread dispositions. It must land as a **merge commit**. |
+| Recovery | #1172 (architecture and lab), #1179 (runtime, draft) | #1172 merges onto #1160 with 0 conflicts. #1179 is not qualified, and its P1s are open (including `NATIVE-FUNDING-AVAILABILITY-01` and the command-pool P1). | At head `f217de1fb`, #1179 has 280 conflicted paths with #1160 (273 content, 5 modify/delete, 2 add/add; 159 of them generated SDK files) and 265 with #1173. It sits on #1160's old startup sweep. It declares admission schema v35 to v40 on a v34 base and checks for v41 in code, while #1160 already uses v35 and v36; it takes its slots through the ledger lock (G0.2). |
+| Verifiable work | #1173 (contains #1161, #1159; supersedes #1158; carries #1162's code) | Dynamic delegation, swarm evolution, the A2A v1 edge, execution evidence and unknown-payment release are qualified locally on one host. **WORK-W1 to W4 have no code.** | 113 conflicted paths with #1160; schema collisions |
 | Kernel program | #1174 (docs) | Proposed, revision 4: eleven specs plus a defect register (KDEF-D1 to D12, N1 to N30) | Its baseline: #1160, #1172, #1173, #1179 |
 | Strategy | #1170 (docs) | Every founder decision STRAT-F1 to F17 is open. | F-1 publication split; ADR-0023 and ADR-0028 scoping |
 | Native host program | #1177 (docs; #1178 folded in) | ADR-0038 is accepted for planning. NORTH-STAR-FLOWS (HOST-M1 to M3) was approved 2026-10-08. The restructure and M1 plans are written but not executed. | Server-first re-cut (section 4) |
@@ -114,21 +114,22 @@ A run qualifies only if all of the following hold.
 - **Public installer:** resolves to v0.1.0, built 2026-04-22 from source more than 4,000 commits behind main. GitHub still marks v0.1.0 as Latest.
 - **Docs contradict that release:** `CHANGELOG.md` and `docs/install/README.md` say nothing has been released.
 - **crates.io:** carries `chio-*` 0.1.2 from 2026-08-01, built from the public mirror rather than main.
+- **npm and PyPI:** `@chio-protocol/*` 0.1.0 (including `sdk`, `node-http`, `express`, `fastify`) and PyPI `chio-sdk` 0.1.0 were published on 2026-04-22. The PyPI name `chio` belongs to an unrelated project.
+- **Stray tags:** `v3.20.0-trj4`, `v3.18.1-trj3.1` and `v0.0.0-m03-probe` sit beside `v0.1.0` on the development repo.
 - **Plugins and bridge:** the harness plugins and `chio-bridge` are unpublished.
 
 **Merged since the previous draft:** #1194 (lane-test CI). Already on main: #1025 (cognition market design) and #966 (four-direction roadmap, including the governed x402 rail).
 
 ## 3. Gate 0: foundation and frozen contracts
 
-Gate 0 exists so that parallel lanes do not collide. Everything a lane builds against is fixed here first, as a versioned 0.x preview contract with schemas and test vectors under `spec/`.
+Gate 0 exists so that parallel lanes do not collide. Everything a lane builds against is fixed here first, as a versioned 0.x preview contract with schemas and test vectors under `spec/`. Today `spec/schemas/VERSION` reads 1.0.0 and the `spec/PROTOCOL.md` header reads "Version 1.0", so CT-WIRE records the preview version explicitly and U3 fixes the PROTOCOL header.
 
 ### G0.1 Land #1160
 
 - Merge as a **merge commit**. The landing ledger binds evidence to exact source identity, and squash or rebase would break that binding.
-- Before merging:
-  - pass the required checks;
-  - record dispositions for every review thread;
-  - close the coordination items, including `MINISW-NATIVE-DENY`.
+- Before merging (the merge requirements in #1160's `foundation-landing-boundary-20261008.json`):
+  - pass the four required checks on the exact candidate;
+  - record dispositions for every review thread.
 - After merging:
   - record `main_ancestry_verified`;
   - close #1136, whose patch #1160 contains.
@@ -137,7 +138,7 @@ Gate 0 exists so that parallel lanes do not collide. Everything a lane builds ag
 
 - the 35-campaign trusted capture;
 - per-PR security App enforcement;
-- native mini-swe and cold-platform acceptance.
+- native mini-swe and cold-platform acceptance. This includes what remains of `MINISW-NATIVE-DENY`: its diagnostic and bounded-journal source repair is integrated, and its open acceptance is the enforcing native trajectory, which #1160's merge bar leaves to this obligation.
 
 ### G0.2 Integration rules
 
@@ -145,6 +146,12 @@ Gate 0 exists so that parallel lanes do not collide. Everything a lane builds ag
   - Admission-store versions are assigned in landing order, at merge time, under a lock recorded in the #1160 landing ledger.
   - Branches use symbolic version names until they rebase.
   - A static reservation (for example "#1179 takes v39 and up") would force every earlier lander to renumber, so it is not used.
+  - The lock covers every shared slot, not only admission versions:
+    - every store's schema version, the tool-outcome store included;
+    - the `authority_global_commits` projection-kind order;
+    - `KernelOp` ids (KSPEC-01 plans 27 for #1173's execution-evidence export and 28 and 29 for #1179's recovery ops);
+    - trigger names;
+    - module paths (#1160 and #1179 both add `chio-store-sqlite/src/admission_operation_store/recovery.rs`, an add/add conflict).
 - **Collisions to fix before any rebase:**
   - **Duplicate trigger, fails open.** `admission_operation_recovery_no_delete` is defined by #1160 on its deferrals table and by #1179 on its records table, both with `CREATE TRIGGER IF NOT EXISTS`. After a merge, the second delete guard is silently skipped.
   - **Global-commit kind list.** The `authority_global_commits` projection-kind CHECK list is appended separately in #1160, #1173 and #1179.
@@ -159,8 +166,8 @@ Gate 0 exists so that parallel lanes do not collide. Everything a lane builds ag
 
 | Contract | Freezes |
 | --- | --- |
-| **CT-ABI** | Process ABI v4. `chio.process.v1` schemas in `spec/schemas` (39 identifiers are unspecified today). `KERNEL_ABI_VERSION`, published from the KSPEC-01 phase 0 census. Operation IDs are never reused. |
-| **CT-WORK** | `chio.work.v1` and the WORK-W1 facade (`WorkClient`, `WorkHandleV1`, `WorkViewV1`). These are mapped to #1179's real port names (`RecoveryProcessReservationPort`, `RecoveryProcessOriginPort`, `RecoveryAuthorityPort`), not the doc-only names. Includes an **unpaid** `Agreement` variant (D5, decided 2026-10-09). |
+| **CT-ABI** | Process ABI v4. `chio.process.v1` schemas in `spec/schemas`: on post-#1160 main, 39 distinct `chio.process*` identifiers in Rust source have no schema there. The worker protocol has seven ops, including `prepare_invocation`, which `WORKER_PROTOCOL.md` omits and KSPEC-01 (which counts six) misses. `KERNEL_ABI_VERSION`, published from the KSPEC-01 phase 0 census. Operation IDs are never reused. |
+| **CT-WORK** | `chio.work.v1` and the WORK-W1 facade (`WorkClient`, `WorkHandleV1`, `WorkViewV1`). These are mapped to #1179's real port names (`RecoveryProcessReservationPort`, `RecoveryProcessOriginPort`, `RecoveryAuthorityPort`), not the doc-only names. Includes an **unpaid** `Agreement` variant (D5, decided 2026-10-09). The schema path needs a choice: #1173's experimental funded-work envelopes already occupy `spec/schemas/chio-work/v1`, and SDK codegen reads only `spec/schemas/chio-wire/v1`, so CT-WORK names its directory and adds it to codegen. |
 | **CT-SETTLE** | The settlement composition rule (#1174 decision 4, spec 9 rules M7a, M7b, M11a, R-9-05), implemented on #1160's paged startup sweep (D1, decided 2026-10-09). Details below the table. |
 | **CT-COOP** | The **partner card**: org DID, trust-control URL, authority key history, receipt-signer keys, status resolve URL. Issuer-signed passport lifecycle status. DPoP possession for federated grants at the door (D6, decided 2026-10-09). The evidence trust-anchor format. |
 | **CT-CTRL** | OpenAPI for trust-control and the `chio api protect` sidecar. Per-route principals in place of one shared service token. The KSPEC-08 stop routes. |
@@ -217,24 +224,28 @@ Each lane is a ladder of rungs, and each rung ends in exit evidence. Lanes run i
 - A's passport revocation never reaches B. Federated issue reads B's own local status.
 - At proxied routes a federated capability is a bearer token, because holder possession is not checked.
 - The door ignores revocations made after it started.
-- `evidence verify` pins no trust anchor.
-- Door receipts (`http_receipts`) are missing from the evidence export.
+- `evidence verify` gains `--trusted-kernel-pubkey` and `--trusted-anchor-file` with #1160, but it cannot anchor to a partner's published keys.
+- Door receipts are signed `HttpReceipt`s projected into `ChioReceipt`s in the door's own receipt store, with the original carried in metadata (`chio_http_receipt_v1`). The evidence verifier never checks that embedded `HttpReceipt`.
 - The issuance inbox design has no way to return the issued capability to the holder.
+- As written in #1177's NORTH-STAR-FLOWS, the HOST-M1 flow fails on #1160 in two places:
+  - B rejects an A-signed delegation ceiling: federated issue requires the policy signer to be a key B's own capability authority trusts (the IETF draft's Delegated Issuance step 7 states the same rule);
+  - challenge submit and federated issue each consume the same challenge.
 
 **Rungs.**
 
 - **COOP-1: HOST-M1, re-cut server-first.**
   - The issuance inbox, with a holder pickup route authenticated by the subject key.
   - B's authority owns the delegation ceiling.
-  - Door receipts are exportable.
-  - `evidence verify --trust-anchor <partner card>`.
+  - The challenge is consumed once across challenge submit and federated issue.
+  - Door receipts are exportable, and the verifier checks the embedded `HttpReceipt`.
+  - `evidence verify` anchored to a partner card, extending #1160's `--trusted-anchor-file`.
   - OS key custody built on #1160's `signing_custody`: `credential:` or systemd-creds on headless hosts, Keychain or Secret Service on desktops. Plaintext seed files are labelled development-only.
   - Service packaging: systemd units, a LaunchAgent, and a container image.
   - The desktop review moments (Waybar or QML, menu bar, notifier) are optional follow-ons, not gates.
 - **COOP-2: a production-grade pair.**
   - `chio partner add` over the CT-COOP partner card.
   - Issuer-signed lifecycle status pulled with a TTL, failing closed when stale.
-  - A live revocation feed at the door, and a durable revocation oracle (today only `InMemoryRevocationOracle` exists).
+  - A live revocation feed at the door, and a durable revocation oracle. Today the sparse-Merkle `RevocationOracle` has only `InMemoryRevocationOracle`; `chio-custody-hw`'s `SqliteCredentialRevocationOracle` already persists credential revocations over it and is the nearest base.
   - DPoP for federated grants.
   - Authority key history, so rotation is not an outage.
   - Safe HTTP methods deny by default for federated doors.
@@ -260,17 +271,17 @@ Each lane is a ladder of rungs, and each rung ends in exit evidence. Lanes run i
 
 | Slice | Contents | Lands |
 | --- | --- | --- |
-| α | Execution evidence and checked output. Carries most of the 25 core conflicts. Drops #1173's own sweep edit in favour of #1160's classifier. | Right after Gate 0 |
+| α | Execution evidence and checked output: the tool-outcome store and terminal-path hunks. The core conflicts with #1160 are spread across α, δ (funded work and payment) and ζ (security) by path, so α does not carry most of them. Drops #1173's own sweep edit in favour of #1160's classifier. | Right after Gate 0 |
 | β | D1 dynamic delegation, S1 swarm evolution, A2A v1 edge | Right after Gate 0 (1 conflict) |
 | γ | Federation, bilateral DSSE, iroh lanes, treaty runtime-core | After α and β; needed for the remote co-signer |
-| c | WORK specs and plans, with the corrections below | With γ |
+| c | WORK specs and plans, including `docs/research/work-abstraction/`, with the corrections below | Before WORK-W1.0, which builds on these plans and writes its inventory into that directory |
 | d | Paper and research documents, plus research code | Separate docs PR |
 | δ | Unknown-payment release, capture waiver, journal overlay, funded work | After CT-SETTLE; off the success-test path |
 | ε, ζ | Confined PostgreSQL and broker; security and CI | Re-derived from #1160 or dropped |
 
 **Corrections to the WORK plans.**
 
-- **Split W1.5 and W1.6** into halves that need no recovery (a) and halves that do (b).
+- **Split W1.5 and W1.6** into halves that need no recovery (a) and halves that do (b). W1.0's inventory also decides whether W1.3 and W1.4 need the same split: W1.4's original-ID issuance readback may depend on #1179's recovery ports.
 - **Add the missing route:** W2.1's route list lacks `/cosign`.
 - **W2.5** (operator package and external handoff) is required for outside teams.
 
@@ -305,7 +316,7 @@ Each lane is a ladder of rungs, and each rung ends in exit evidence. Lanes run i
   - Fix KDEF-N15 (wall-clock time in authority evidence) during the rebase.
   - Fix every open P1.
   - Take schema slots through the ledger lock.
-  - Regenerate the SDKs rather than merging 161 generated files by hand.
+  - Regenerate the SDKs rather than merging 159 conflicted generated files by hand (158 Python, 1 TypeScript, at head `f217de1fb`).
 - **Order of landing.**
   - First a REC-P0 + REC-P1 slice: contracts and exact durable recovery.
   - Then REC-P2 to REC-P6, each re-qualified.
@@ -327,8 +338,11 @@ This is #1174's bug-fix lane, promoted to a preview gate. It runs on post-#1160 
   - KDEF-D6 and D5.
   - KSPEC-04 phases 1 and 2: subtree closure with the dispatch-commit fence, then ProcessTree closure.
   - A new spec for process exit as an authority transition. `ProcessState` has no exit state today.
-- **KERN-4: the session door.** KSPEC-05 Part A (KDEF-D3, D4, N26, N30), because doors serve over `chio mcp serve-http`.
+- **KERN-4: the session door.** KSPEC-05 Part A (KDEF-D3, D4, N26), because doors serve over `chio mcp serve-http`.
+  - KDEF-N30 is already fixed on #1160: the GET stream subscribes before it snapshots the replay window.
+  - KDEF-D3 changed shape on #1160: a lagged consumer now closes the session and reports an uncertain effect instead of hanging. Part A re-checks it against that behaviour.
 - **KERN-5: isolation evidence.** KSPEC-07 steps 1 and 2, plus `AgentHostBwrap` and `Seatbelt` backend kinds, before any HOST-M2 isolation claim.
+  - First amend KSPEC-07 to add those kinds. Its closed `ConfinementBackendKind` (`LinuxCage`, `FirecrackerGuest`, `ProcessContainer`) exists only in the spec text, not in code, and #1177's PROGRAM-MAP already asks for this one amendment.
 - **KERN-6: gates.**
   - KDEF-GT1: one whole hosted CI run passes.
   - KDEF-N4: the Mechanism D gate.
@@ -386,7 +400,7 @@ Only the kernel hold ledger durably records consumption. Money is not pooled acr
   - Restart never replenishes a pool.
 - **SHARE-4: cleanup.**
   - Accept ADR-0016 (the authoritative spend contract).
-  - Write ADR-0035 (web3-free distribution) at its real scope: the kernel, core, control plane and CLI.
+  - Write ADR-0035 (web3-free distribution) at its real scope: the kernel, core, control plane and CLI. ADR-0035 is a candidate number in #1170; no such file exists yet.
   - Make `finding-market` and `web3` off by default.
   - Move the x402 and ACP clients out of the kernel (KSPEC-01 R13).
 
@@ -401,11 +415,13 @@ Only the kernel hold ledger durably records consumption. Money is not pooled acr
 - **REL-1: the preview train.**
   - SEC-M9 packaging and SEC-M10 publishing.
   - #1160's post-merge obligations, or the CT-REL preview exception.
-  - The AWS-LC fork audit.
+  - Close out the AWS-LC fork audit. The source audit and its independent review are already on main (`docs/security/audits/aws-lc-rs-1.18.1-fork.md`, `aws-lc-rs-1.18.1-independent-review.md`). The audit states that it is not an approval to publish a release.
+  - Turn the Release Qualification workflow green. `docs/release/RISK_REGISTER.md` requires hosted CI and Release Qualification success before tagging, and Release Qualification has failed on every recent push to main.
+  - Retarget `release-tagged.yml`, which checks out `project/roadmap-04-25-2026`, a branch section 7 archives.
   - Signed binaries for Linux x86_64 and arm64 and macOS arm64.
   - A container image with the dashboard embedded. Today the dashboard is in no release artifact.
   - Fix `CHANGELOG.md` and the install docs, and sync the distribution mirror.
-  - Mark v0.1.0 superseded and resolve crates.io (decision D10).
+  - Mark v0.1.0 superseded and resolve crates.io (decision D10), the npm and PyPI 0.1.0 packages, and the stray tags (section 2).
   - Publish the format-stability note.
 - **REL-2: the MCP door.**
   - Interop with MCP revision 2026-07-28 (stateless core); today the edge accepts only 2025-11-25.
@@ -534,11 +550,11 @@ None of these depend on #1160.
 | U1 | **STRAT-F1:** decide which #1170 documents stay public. |
 | U2 | **Void STRAT-F17** and remove Clawdstrike-as-peer framing from #1170 and #1177. Rewrite `research/clawdstrike.md` in #1177 as a prior-art note: Tetragon and Hubble observation on Linux, Endpoint Security and Network Extension on macOS. |
 | U3 | **Positioning PR** (section 9). It covers every stale surface on main. |
-| U4 | **KDEF-N23:** constant-time comparison of the admin token (`crates/kernel/chio-kernel/src/kernel/emergency.rs`), plus the AC6 stop-scope document. |
+| U4 | **KDEF-N23:** constant-time comparison of the admin token (`crates/platform/chio-http-core/src/emergency.rs`, the `token == self.expected_admin_token` match arm), plus the AC6 stop-scope document. |
 | U5 | **x402 fails open.** `X402AuthorizeResponse.settled` defaults to `true` when the field is absent (`crates/kernel/chio-kernel/src/payment.rs`, `default_true`). Default to not settled, failing closed. |
 | U6 | **`backbay-labs/chio-bridge#3`:** `approval-decide` does not check the recorded decision or the approval ID. The scope is that utility; the gateway resume path honours the signed decision. |
 | U7 | **Recruiting:** a named owner, trial terms and legal groundwork. |
-| U8 | **IETF -00:** decide whether to submit by the cutoff (section 10). If it is submitted, fix or flag the single-key multi-hop rule in draft step 7 first. |
+| U8 | **IETF -00:** decide whether to submit by the cutoff (section 10). If it is submitted, fix or flag the single-key multi-hop rule first: step 7 of the draft's Delegated Issuance section (the delegation policy's signer must be a key the issuing authority itself trusts), read with the one-link limit in its Chain Binding section. |
 | U9 | **CT-CROSS:** decided on 2026-10-09 (D4). Draft the contract early, because the free iroh relays end (section 10). |
 | U10 | **Stale artifacts:** add deprecation notices to the stale installer and registry artifacts now, and replace them at G1. |
 
@@ -548,9 +564,13 @@ None of these depend on #1160.
 
 - 136 requirements on #957 to #959;
 - 27 on #956;
+- 15 on #1159;
 - 12 on #1164;
+- 5 on #1171;
 - 2 on #1046;
+- 2 on #1172;
 - 1 on #1073;
+- 1 on #1158;
 - the FV-D3 dependency on #959's netting code;
 - #1029's singular-approval ADR decision.
 
@@ -559,7 +579,7 @@ None of these depend on #1160.
 | #1160 | Land at Gate 0 as a merge commit. |
 | #1196 | This document. |
 | #1172 | Land after #1160 (Lane REC). |
-| #1173 | Split by path into slices α, β, γ, c, d and δ; re-derive or drop ε and ζ. Close when the slices land. |
+| #1173 | Split by path into slices α, β, γ, c, d and δ; re-derive or drop ε and ζ. Close when the slices land. Before closing, tag the paper's pinned source commits (`71e5cbc3b`, `7755d3762`, `611660eb2`), which main does not contain and only unmerged branches reach; otherwise `paper-artifact-check` loses them when those branches go. |
 | #1179 | Stays a draft until it is re-scoped and rebased (Lane REC). |
 | #1174 | Merge this PR as the KSPEC program (owner decision 2026-10-09: it lands by merging the PR, not by importing its documents elsewhere). Fix its north-star research document on the PR branch first; it still carries a superseded north star and the retired tagline. |
 | #1177 | Merge this PR after the restructure and the server-first HOST-M1 re-cut (owner decision 2026-10-09: it lands by merging the PR, not by importing its documents elsewhere). Mark NORTH-STAR-FLOWS approved. Apply the ADR-0038 amendment. Rewrite the Clawdstrike material as prior art (U2). Move macOS HOST-M2 after the test. HOST-M1 code no longer waits on the docs restructure. |
@@ -577,7 +597,7 @@ None of these depend on #1160.
 | #1043 | Owner review: archive or close. |
 | #1029 | Close as superseded by #1160, after checking its three economy items against main (settlement-observer idempotency key, credit election, MustPrepay). Its ADR-0018 collides with main's ADR-0018 and must be renumbered if any of it survives. |
 | #956 to #959 | Salvage, then close. From #956: the unforgeable `VerifiedApproval`, settlement terms inside the signed intent, single use keyed on request and intent, and raw builders made `pub(crate)`. From #957: the co-debit pattern. From #958: the escrow `accept()` invariants. From #959: the conformance tests `x402_payment_does_not_authorize_tool_call` and `eas_verax_display_only_projection`. Drop #957's Chio Pass kernel gating and #959's closed-enum wire break. |
-| Unmerged branches | Archive `research/genesis-program` (its ADR-0018 also collides), `project/roadmap-04-25-2026`, `docs/native-application-adoption` and `research/funded-work-baseline`. |
+| Unmerged branches | Archive `research/genesis-program` (its ADR-0018 also collides), `project/roadmap-04-25-2026`, `docs/native-application-adoption` and `research/funded-work-baseline`. Retarget `release-tagged.yml` off `project/roadmap-04-25-2026` first (REL-1). |
 | `backbay-labs/chio` | Megastart (#9, #10, #25) and the agentic OS suite (#4, #5) become HOST-M2 showcases after the test. Megastart's allowance is already a kernel-held aggregate-family quota. What remains is moving it to the host's shared admission owner and adding spend. The chio-world app (#228) needs an explicit decision. |
 
 ## 8. Owner decision register
@@ -614,6 +634,8 @@ None of these depend on #1160.
 - accept ADR-0016;
 - ADR-0035 at full scope.
 
+ADR-0023, ADR-0028, ADR-0035 and ADR-0036 are candidate numbers inside #1170's strategy documents; none of those files exists yet. ADR-0038 arrives with #1177. On main the ADRs run to ADR-0022, and main's ADR-0018 (Radicle carrier) is the number that #1029 and `research/genesis-program` collide with.
+
 ## 9. Positioning
 
 **Lead with the cross-org clause in every audience.**
@@ -635,18 +657,19 @@ None of these depend on #1160.
 
 **Stale surfaces on main to fix (U3):**
 
-- **README.md:**
+- **README.md** (line numbers are against main `002b4d14e`; #1160 shifts them, so U3 matches on the text):
   - line 16: "The kernel your agents answer to";
   - line 22 and `docs/assets/subhead.svg` / `subhead-mobile.svg`: "Agents that pay each other" and the unscoped "every call";
   - lines 78 and 156: "pay each other";
   - the unscoped "every call" wording at lines 73, 128, 172, 177 and 259;
-  - lines 44 and 251: the installer links.
+  - lines 44 and 251: the installer links, which #1160 already removes;
+  - the from-source `git clone` of `backbay-labs/chio` (line 254; line 260 after #1160), which clones the distribution mirror while it is stale (REL-1 syncs it).
 - **`docs/reference/COMPETITIVE_LANDSCAPE.md`:** "only protocol".
 - **`AGENTS.md`:** lines 5 and 11.
 - **`docs/start-here/VISION.md`:** needs a historical banner.
 - **`CHANGELOG.md` and `docs/install/README.md`:** they contradict the v0.1.0 release.
 - **The `spec/PROTOCOL.md` header.**
-- **The ADR indexes:** they stop at ADR-0020 and ADR-0021.
+- **The ADR indexes:** `docs/README.md` stops at ADR-0020 and `docs/adr/README.md` at ADR-0021, while ADR-0022 exists.
 
 **How to describe payments.** Rails plug in as optional modules. Holds and caps are `prevent` for kernel-mediated calls. Rail settlement outcomes are `detect_only`. Make no on-chain or escrow claims.
 
@@ -718,9 +741,12 @@ Dates are calendar dates only; a bare "Q2" is never used.
 
 ## 13. Re-grounding after #1160 merges
 
-- **Re-verify every KDEF row against post-merge main.** `chio-kernel/src` changed in 162 files since #1174's pin. KDEF-D1's site changed shape, and KDEF-D6 moved.
+- **Re-verify every KDEF row against post-merge main.** `chio-kernel/src` changed in 162 files since #1174's pin. KDEF-D1's site changed shape. KDEF-D6 only drifted lines (`kernel/mod.rs:882` to `:901`). KDEF-N30 is fixed and KDEF-D3 changed shape (KERN-4).
 - **#1177:** its PROGRAM-MAP foundation pin becomes main. "In F" becomes "main (experimental; broker Linux-only)". `chio-ipc` mailboxes become `crates/kernel/chio-process/src/mailboxes`.
-- **#1174:** its pin becomes main, and the acceptance statistics are recomputed from the ledger.
+- **#1174:** its pin becomes main, and the acceptance statistics are recomputed from the ledger. KSPEC-08 section 2 is already stale on three facts:
+  - the admission schema version is 36 on #1160, not 34;
+  - #1160 already reserves the `chio_runtime` receipt-metadata key;
+  - #1160's startup sweep already defers per item instead of aborting.
 - **The M1 plan** is re-cut per COOP-1:
   - extend `signing_custody` instead of rewriting loaders;
   - handle the fallible `unix_timestamp_now()`;
