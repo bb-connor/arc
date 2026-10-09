@@ -178,18 +178,31 @@ fn setup() -> Setup {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+/// Parameters of `run_invocation_with`.
+struct InvocationVerifiers<'a> {
+    receipt_store: &'a dyn ReceiptStore,
+    lease_registry: &'a dyn chio_federation::bilateral_verifier::CapabilityLeaseRegistry,
+    governance_store: &'a dyn GovernanceReceiptStore,
+    revocation_oracle: &'a dyn RevocationOracle,
+    peer_pin_set: &'a PeerPinSet,
+    pinned_now_ms: u64,
+    action_classes: BTreeMap<String, ActionClassKind>,
+}
+
 fn run_invocation_with(
     setup: &Setup,
     extensions: BilateralPredicateExtensions,
-    receipt_store: &dyn ReceiptStore,
-    lease_registry: &dyn chio_federation::bilateral_verifier::CapabilityLeaseRegistry,
-    governance_store: &dyn GovernanceReceiptStore,
-    revocation_oracle: &dyn RevocationOracle,
-    peer_pin_set: &PeerPinSet,
-    pinned_now_ms: u64,
-    mut action_classes: BTreeMap<String, ActionClassKind>,
+    params: InvocationVerifiers<'_>,
 ) -> Result<chio_federation::bilateral::BilateralInvocationOutcome, BilateralInvocationError> {
+    let InvocationVerifiers {
+        receipt_store,
+        lease_registry,
+        governance_store,
+        revocation_oracle,
+        peer_pin_set,
+        pinned_now_ms,
+        mut action_classes,
+    } = params;
     let request = LocalBilateralInvocationFixtureRequest {
         origin_kernel_id: ORG_A,
         origin_keypair: &setup.kp_a,
@@ -234,13 +247,15 @@ fn run_default(
     run_invocation_with(
         setup,
         happy_extensions(),
-        &setup.receipt_store,
-        &setup.lease_registry,
-        &setup.governance_store,
-        &setup.revocation_oracle,
-        &setup.peer_pin_set,
-        now_ms(),
-        BTreeMap::new(),
+        InvocationVerifiers {
+            receipt_store: &setup.receipt_store,
+            lease_registry: &setup.lease_registry,
+            governance_store: &setup.governance_store,
+            revocation_oracle: &setup.revocation_oracle,
+            peer_pin_set: &setup.peer_pin_set,
+            pinned_now_ms: now_ms(),
+            action_classes: BTreeMap::new(),
+        },
     )
 }
 
@@ -332,13 +347,15 @@ fn step_7_missing_receipt_in_store_fails_with_subject_digest_mismatch() {
     let err = run_invocation_with(
         &setup,
         happy_extensions(),
-        &empty_store,
-        &setup.lease_registry,
-        &setup.governance_store,
-        &setup.revocation_oracle,
-        &setup.peer_pin_set,
-        now_ms(),
-        BTreeMap::new(),
+        InvocationVerifiers {
+            receipt_store: &empty_store,
+            lease_registry: &setup.lease_registry,
+            governance_store: &setup.governance_store,
+            revocation_oracle: &setup.revocation_oracle,
+            peer_pin_set: &setup.peer_pin_set,
+            pinned_now_ms: now_ms(),
+            action_classes: BTreeMap::new(),
+        },
     )
     .unwrap_err();
     assert_verifier_code(err, "subject.digest_mismatch");
@@ -570,13 +587,15 @@ fn step_14_expired_lease_at_pinned_epoch_fails() {
     let err = run_invocation_with(
         &setup,
         happy_extensions(),
-        &setup.receipt_store,
-        &setup.lease_registry,
-        &setup.governance_store,
-        &setup.revocation_oracle,
-        &setup.peer_pin_set,
-        expired_now_ms,
-        BTreeMap::new(),
+        InvocationVerifiers {
+            receipt_store: &setup.receipt_store,
+            lease_registry: &setup.lease_registry,
+            governance_store: &setup.governance_store,
+            revocation_oracle: &setup.revocation_oracle,
+            peer_pin_set: &setup.peer_pin_set,
+            pinned_now_ms: expired_now_ms,
+            action_classes: BTreeMap::new(),
+        },
     )
     .unwrap_err();
     assert_verifier_code(err, "capability.lease_expired_or_unknown");
@@ -589,13 +608,15 @@ fn step_14_lease_not_in_registry_fails() {
     let err = run_invocation_with(
         &setup,
         happy_extensions(),
-        &setup.receipt_store,
-        &empty_registry,
-        &setup.governance_store,
-        &setup.revocation_oracle,
-        &setup.peer_pin_set,
-        now_ms(),
-        BTreeMap::new(),
+        InvocationVerifiers {
+            receipt_store: &setup.receipt_store,
+            lease_registry: &empty_registry,
+            governance_store: &setup.governance_store,
+            revocation_oracle: &setup.revocation_oracle,
+            peer_pin_set: &setup.peer_pin_set,
+            pinned_now_ms: now_ms(),
+            action_classes: BTreeMap::new(),
+        },
     )
     .unwrap_err();
     assert_verifier_code(err, "capability.lease_expired_or_unknown");
@@ -609,13 +630,15 @@ fn step_14_missing_lease_ref_in_predicate_fails() {
     let err = run_invocation_with(
         &setup,
         ext,
-        &setup.receipt_store,
-        &setup.lease_registry,
-        &setup.governance_store,
-        &setup.revocation_oracle,
-        &setup.peer_pin_set,
-        now_ms(),
-        BTreeMap::new(),
+        InvocationVerifiers {
+            receipt_store: &setup.receipt_store,
+            lease_registry: &setup.lease_registry,
+            governance_store: &setup.governance_store,
+            revocation_oracle: &setup.revocation_oracle,
+            peer_pin_set: &setup.peer_pin_set,
+            pinned_now_ms: now_ms(),
+            action_classes: BTreeMap::new(),
+        },
     )
     .unwrap_err();
     assert_verifier_code(err, "capability.lease_expired_or_unknown");
@@ -636,13 +659,15 @@ fn step_13_verdict_disagreement_fails() {
     let err = run_invocation_with(
         &setup,
         ext,
-        &setup.receipt_store,
-        &setup.lease_registry,
-        &setup.governance_store,
-        &setup.revocation_oracle,
-        &setup.peer_pin_set,
-        now_ms(),
-        BTreeMap::new(),
+        InvocationVerifiers {
+            receipt_store: &setup.receipt_store,
+            lease_registry: &setup.lease_registry,
+            governance_store: &setup.governance_store,
+            revocation_oracle: &setup.revocation_oracle,
+            peer_pin_set: &setup.peer_pin_set,
+            pinned_now_ms: now_ms(),
+            action_classes: BTreeMap::new(),
+        },
     )
     .unwrap_err();
     assert_verifier_code(err, "policy.verdict_disagreement");
@@ -659,13 +684,15 @@ fn step_8_unpinned_peer_fails() {
     let err = run_invocation_with(
         &setup,
         happy_extensions(),
-        &setup.receipt_store,
-        &setup.lease_registry,
-        &setup.governance_store,
-        &setup.revocation_oracle,
-        &empty_pin_set,
-        now_ms(),
-        BTreeMap::new(),
+        InvocationVerifiers {
+            receipt_store: &setup.receipt_store,
+            lease_registry: &setup.lease_registry,
+            governance_store: &setup.governance_store,
+            revocation_oracle: &setup.revocation_oracle,
+            peer_pin_set: &empty_pin_set,
+            pinned_now_ms: now_ms(),
+            action_classes: BTreeMap::new(),
+        },
     )
     .unwrap_err();
     assert_verifier_code(err, "peer.unpinned_or_keyid_mismatch");
@@ -689,13 +716,15 @@ fn step_8_mismatched_fingerprint_fails() {
     let err = run_invocation_with(
         &setup,
         happy_extensions(),
-        &setup.receipt_store,
-        &setup.lease_registry,
-        &setup.governance_store,
-        &setup.revocation_oracle,
-        &peer_pin_set,
-        now_ms(),
-        BTreeMap::new(),
+        InvocationVerifiers {
+            receipt_store: &setup.receipt_store,
+            lease_registry: &setup.lease_registry,
+            governance_store: &setup.governance_store,
+            revocation_oracle: &setup.revocation_oracle,
+            peer_pin_set: &peer_pin_set,
+            pinned_now_ms: now_ms(),
+            action_classes: BTreeMap::new(),
+        },
     )
     .unwrap_err();
     assert_verifier_code(err, "peer.unpinned_or_keyid_mismatch");
@@ -713,13 +742,15 @@ fn step_9_revoked_passport_fails() {
     let err = run_invocation_with(
         &setup,
         happy_extensions(),
-        &setup.receipt_store,
-        &setup.lease_registry,
-        &setup.governance_store,
-        &oracle,
-        &setup.peer_pin_set,
-        now_ms(),
-        BTreeMap::new(),
+        InvocationVerifiers {
+            receipt_store: &setup.receipt_store,
+            lease_registry: &setup.lease_registry,
+            governance_store: &setup.governance_store,
+            revocation_oracle: &oracle,
+            peer_pin_set: &setup.peer_pin_set,
+            pinned_now_ms: now_ms(),
+            action_classes: BTreeMap::new(),
+        },
     )
     .unwrap_err();
     assert_verifier_code(err, "peer.revoked_at_epoch");
@@ -737,13 +768,15 @@ fn step_15_receipt_backed_class_without_governance_ref_fails() {
     let err = run_invocation_with(
         &setup,
         happy_extensions(),
-        &setup.receipt_store,
-        &setup.lease_registry,
-        &setup.governance_store,
-        &setup.revocation_oracle,
-        &setup.peer_pin_set,
-        now_ms(),
-        classes,
+        InvocationVerifiers {
+            receipt_store: &setup.receipt_store,
+            lease_registry: &setup.lease_registry,
+            governance_store: &setup.governance_store,
+            revocation_oracle: &setup.revocation_oracle,
+            peer_pin_set: &setup.peer_pin_set,
+            pinned_now_ms: now_ms(),
+            action_classes: classes,
+        },
     )
     .unwrap_err();
     assert_verifier_code(err, "governance.receipt_required_missing");
@@ -780,13 +813,15 @@ fn step_15_receipt_backed_class_with_resolvable_governance_ref_passes() {
     let outcome = run_invocation_with(
         &setup,
         ext,
-        &setup.receipt_store,
-        &setup.lease_registry,
-        &governance_store,
-        &setup.revocation_oracle,
-        &setup.peer_pin_set,
-        now_ms(),
-        classes,
+        InvocationVerifiers {
+            receipt_store: &setup.receipt_store,
+            lease_registry: &setup.lease_registry,
+            governance_store: &governance_store,
+            revocation_oracle: &setup.revocation_oracle,
+            peer_pin_set: &setup.peer_pin_set,
+            pinned_now_ms: now_ms(),
+            action_classes: classes,
+        },
     )
     .unwrap_or_else(|e| panic!("receipt-backed happy path failed: {e:?}"));
     assert!(outcome.verified.resolved_governance_receipt.is_some());
@@ -805,13 +840,15 @@ fn step_16_totally_ordered_without_anchor_fails() {
     let err = run_invocation_with(
         &setup,
         ext,
-        &setup.receipt_store,
-        &setup.lease_registry,
-        &setup.governance_store,
-        &setup.revocation_oracle,
-        &setup.peer_pin_set,
-        now_ms(),
-        BTreeMap::new(),
+        InvocationVerifiers {
+            receipt_store: &setup.receipt_store,
+            lease_registry: &setup.lease_registry,
+            governance_store: &setup.governance_store,
+            revocation_oracle: &setup.revocation_oracle,
+            peer_pin_set: &setup.peer_pin_set,
+            pinned_now_ms: now_ms(),
+            action_classes: BTreeMap::new(),
+        },
     )
     .unwrap_err();
     assert_cosigning_error_contains(
@@ -829,13 +866,15 @@ fn step_16_quorum_required_without_anchor_fails() {
     let err = run_invocation_with(
         &setup,
         ext,
-        &setup.receipt_store,
-        &setup.lease_registry,
-        &setup.governance_store,
-        &setup.revocation_oracle,
-        &setup.peer_pin_set,
-        now_ms(),
-        BTreeMap::new(),
+        InvocationVerifiers {
+            receipt_store: &setup.receipt_store,
+            lease_registry: &setup.lease_registry,
+            governance_store: &setup.governance_store,
+            revocation_oracle: &setup.revocation_oracle,
+            peer_pin_set: &setup.peer_pin_set,
+            pinned_now_ms: now_ms(),
+            action_classes: BTreeMap::new(),
+        },
     )
     .unwrap_err();
     assert_cosigning_error_contains(
@@ -853,13 +892,15 @@ fn step_16_quorum_required_with_bare_anchor_still_fails_without_quorum_proof() {
     let err = run_invocation_with(
         &setup,
         ext,
-        &setup.receipt_store,
-        &setup.lease_registry,
-        &setup.governance_store,
-        &setup.revocation_oracle,
-        &setup.peer_pin_set,
-        now_ms(),
-        BTreeMap::new(),
+        InvocationVerifiers {
+            receipt_store: &setup.receipt_store,
+            lease_registry: &setup.lease_registry,
+            governance_store: &setup.governance_store,
+            revocation_oracle: &setup.revocation_oracle,
+            peer_pin_set: &setup.peer_pin_set,
+            pinned_now_ms: now_ms(),
+            action_classes: BTreeMap::new(),
+        },
     )
     .unwrap_err();
     assert_cosigning_error_contains(
@@ -909,13 +950,15 @@ fn step_16_totally_ordered_with_bare_anchor_still_fails_without_reconciliation()
     let err = run_invocation_with(
         &setup,
         ext,
-        &setup.receipt_store,
-        &setup.lease_registry,
-        &setup.governance_store,
-        &setup.revocation_oracle,
-        &setup.peer_pin_set,
-        now_ms(),
-        BTreeMap::new(),
+        InvocationVerifiers {
+            receipt_store: &setup.receipt_store,
+            lease_registry: &setup.lease_registry,
+            governance_store: &setup.governance_store,
+            revocation_oracle: &setup.revocation_oracle,
+            peer_pin_set: &setup.peer_pin_set,
+            pinned_now_ms: now_ms(),
+            action_classes: BTreeMap::new(),
+        },
     )
     .unwrap_err();
     assert_cosigning_error_contains(
