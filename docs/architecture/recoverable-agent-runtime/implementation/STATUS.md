@@ -1,6 +1,6 @@
 # Recovery runtime execution status
 
-Remediation of the current implementation is in progress. The
+The recoverable agent runtime implementation is present and remediation is in progress. The
 working tree is **not qualified**. Focused local passes and scoped independent
 reviews apply to their exact recorded subjects. Later source changes need their
 owning validation and review. Complete current resource-reserve, historical
@@ -49,6 +49,70 @@ cleanup. Subsequent repairs add further drift; 113 is a historical count, not a
 current inventory. The retained P5 and P6 read-only package auditors refuse the
 working tree. P6 refuses at `qualification.live_runtime_sources`. Updating
 metadata to reuse old runs would not qualify the changed implementation.
+
+## Source drift at the recorded commit
+
+At source commit `c5f53a96dbfc836bfc42805c2fee2d393dd78821`, 581 of the 735
+original paths in the retained [P6 verification inventory](p6/verification.json)
+do not match. This compares Git commit objects with the historical
+`chio.recovery-p6-verification.v1` record created at
+`2026-10-05T16:05:08.880789+00:00`, with runtime source binding `b1bcd48c` and
+qualification source binding `3a13a9bc`. The inventory file SHA-256 is
+`a9d5b2517f194f10105d9d1889161948987fe9f14add9f6f7218378b49cb6e1b`.
+
+| Original inventory path at that commit | Count |
+|---|---:|
+| Present with identical bytes | 154 |
+| Present with changed bytes | 547 |
+| Absent at its original path | 34 |
+| Total original paths | 735 |
+
+All 34 absent original paths have existing successors explicitly declared in
+`target/source-naming-review/renames.json` (SHA-256
+`072ae142ca4a921511399633e45352d960c2e0aac814f7e277640470d1158e7c`).
+Four successor files retain the historical bytes; 30 have different bytes.
+These are declared path correspondences, not inferred semantic equivalence.
+The 34 missing original paths remain counted separately above.
+
+Reproduce the original-path counts from the checkout root. This reads the named
+commit's inventory and source objects, independent of working-tree edits:
+
+```sh
+python3 -I -B - <<'PY'
+import hashlib
+import json
+import subprocess
+
+revision = "c5f53a96dbfc836bfc42805c2fee2d393dd78821"
+inventory_path = "docs/architecture/recoverable-agent-runtime/implementation/p6/verification.json"
+def git(*args):
+    return subprocess.check_output(["git", *args])
+inventory_bytes = git("show", f"{revision}:{inventory_path}")
+inventory = json.loads(inventory_bytes)
+paths = set(git("ls-tree", "-r", "--name-only", revision).decode().splitlines())
+counts = {"unchanged": 0, "changed_at_original_path": 0, "missing_original_path": 0}
+for entry in inventory["joined_sources"]:
+    path = entry["path"]
+    if path not in paths:
+        counts["missing_original_path"] += 1
+    else:
+        actual = hashlib.sha256(git("show", f"{revision}:{path}")).hexdigest()
+        counts["unchanged" if actual == entry["sha256"] else "changed_at_original_path"] += 1
+print(json.dumps({"revision": revision,
+                  "inventory_sha256": hashlib.sha256(inventory_bytes).hexdigest(),
+                  "original_paths": len(inventory["joined_sources"]), **counts}, indent=2))
+PY
+```
+
+The additive [path drift record](../../../../target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/evidence-documentation-continuity/measured/source-drift.json)
+lists every original path and declared successor. The [current anchor overlay](../../../../target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/evidence-documentation-continuity/measured/current-anchor-overlay.json)
+resolves all 243 retained P1/P4/P6 coverage references on this commit, with
+current source hashes and declaration or literal locations. Its [source manifest](../../../../target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/evidence-documentation-continuity/measured/current-source-manifest.json)
+binds the inspected Git objects. The [measurement command](../../../../target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/evidence-documentation-continuity/measurement-command.json)
+records the local reader, arguments and output hash. These are source and
+documentation observations. They preserve the original coverage records, seals,
+execution results and behavior-review uncertainties; they do not qualify the
+current source or turn missing historical paths into passing package checks.
 
 Current guided setup uses the [source-bound operator procedure](protected-setup-operations.md), including its original-denial prerequisite, quiet source window, retained legacy disposition and logical call accounting. Historical phase contracts and acceptance records keep their original source scope.
 
