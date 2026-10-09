@@ -136,7 +136,7 @@ pub(crate) async fn handle_public_certification_transparency(
 pub(crate) async fn handle_public_generic_namespace(
     State(state): State<TrustServiceState>,
 ) -> Response {
-    match build_signed_generic_namespace(&state.config) {
+    match build_signed_generic_namespace(&state.config, &state.finding_challenge_clock) {
         Ok(namespace) => Json(namespace).into_response(),
         Err(error) => public_discovery_error_response(&error),
     }
@@ -146,8 +146,12 @@ pub(crate) async fn handle_public_generic_listings(
     State(state): State<TrustServiceState>,
     Query(query): Query<GenericListingQuery>,
 ) -> Response {
-    match build_public_generic_listing_report(&state.config, state.receipt_store.as_deref(), &query)
-    {
+    match build_public_generic_listing_report(
+        &state.config,
+        state.receipt_store.as_deref(),
+        &query,
+        &state.finding_challenge_clock,
+    ) {
         Ok(report) => Json(report).into_response(),
         Err(error) => public_discovery_error_response(&error),
     }

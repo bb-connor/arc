@@ -12,7 +12,7 @@ use super::*;
 pub(crate) async fn handle_passport_issuer_metadata(
     State(state): State<TrustServiceState>,
 ) -> Response {
-    match configured_passport_credential_issuer(&state.config) {
+    match public_passport_credential_issuer(&state.config, &state.finding_challenge_clock) {
         Ok(metadata) => Json(metadata).into_response(),
         Err(error) => plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     }
@@ -21,7 +21,7 @@ pub(crate) async fn handle_passport_issuer_metadata(
 pub(crate) async fn handle_public_passport_issuer_discovery(
     State(state): State<TrustServiceState>,
 ) -> Response {
-    match build_public_issuer_discovery(&state.config) {
+    match build_public_issuer_discovery(&state.config, &state.finding_challenge_clock) {
         Ok(document) => Json(document).into_response(),
         Err(error) => public_discovery_error_response(&error),
     }
@@ -30,7 +30,7 @@ pub(crate) async fn handle_public_passport_issuer_discovery(
 pub(crate) async fn handle_public_passport_verifier_discovery(
     State(state): State<TrustServiceState>,
 ) -> Response {
-    match build_public_verifier_discovery(&state.config) {
+    match build_public_verifier_discovery(&state.config, &state.finding_challenge_clock) {
         Ok(document) => Json(document).into_response(),
         Err(error) => public_discovery_error_response(&error),
     }
@@ -39,7 +39,7 @@ pub(crate) async fn handle_public_passport_verifier_discovery(
 pub(crate) async fn handle_public_passport_discovery_transparency(
     State(state): State<TrustServiceState>,
 ) -> Response {
-    match build_public_discovery_transparency(&state.config) {
+    match build_public_discovery_transparency(&state.config, &state.finding_challenge_clock) {
         Ok(document) => Json(document).into_response(),
         Err(error) => public_discovery_error_response(&error),
     }
@@ -48,7 +48,7 @@ pub(crate) async fn handle_public_passport_discovery_transparency(
 pub(crate) async fn handle_oid4vp_verifier_metadata(
     State(state): State<TrustServiceState>,
 ) -> Response {
-    match build_oid4vp_verifier_metadata(&state.config) {
+    match build_oid4vp_verifier_metadata(&state.config, &state.finding_challenge_clock) {
         Ok(metadata) => Json(metadata).into_response(),
         Err(error) => plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     }
@@ -57,7 +57,7 @@ pub(crate) async fn handle_oid4vp_verifier_metadata(
 pub(crate) async fn handle_passport_issuer_jwks(
     State(state): State<TrustServiceState>,
 ) -> Response {
-    match build_oid4vp_verifier_jwks(&state.config) {
+    match build_oid4vp_verifier_jwks(&state.config, &state.finding_challenge_clock) {
         Ok(jwks) => Json(jwks).into_response(),
         Err(error) => {
             let message = error.to_string();
@@ -192,10 +192,11 @@ pub(crate) async fn handle_redeem_passport_issuance_token(
         Ok(values) => values,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    let metadata = match configured_passport_credential_issuer(&state.config) {
-        Ok(metadata) => metadata,
-        Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
-    };
+    let metadata =
+        match public_passport_credential_issuer(&state.config, &state.finding_challenge_clock) {
+            Ok(metadata) => metadata,
+            Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
+        };
     let response = match registry.redeem_pre_authorized_code(&metadata, &payload, clock_now, 300) {
         Ok(response) => response,
         Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
@@ -985,7 +986,10 @@ pub(crate) async fn handle_public_get_oid4vp_request(
         }
         Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
     };
-    let trusted_public_keys = match resolve_oid4vp_verifier_trusted_public_keys(&state.config) {
+    let trusted_public_keys = match resolve_public_oid4vp_verifier_trusted_public_keys(
+        &state.config,
+        &state.finding_challenge_clock,
+    ) {
         Ok(keys) => keys,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };

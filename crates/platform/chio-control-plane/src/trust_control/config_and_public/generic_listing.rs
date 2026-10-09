@@ -73,11 +73,9 @@ fn configured_generic_namespace_ownership(
 
 pub(crate) fn build_signed_generic_namespace(
     config: &TrustServiceConfig,
+    clock: &Arc<dyn Clock>,
 ) -> Result<SignedGenericNamespace, CliError> {
-    let signer_keypair = load_behavioral_feed_signing_keypair(
-        config.authority_seed_path.as_deref(),
-        config.authority_db_path.as_deref(),
-    )?;
+    let signer_keypair = resolve_public_registry_signing_key(config, clock)?;
     let registered_at = now_unix_secs()?;
     let ownership =
         configured_generic_namespace_ownership(config, signer_keypair.public_key(), registered_at)?;
@@ -343,11 +341,9 @@ pub(crate) fn build_public_generic_listing_report(
     config: &TrustServiceConfig,
     receipt_store: Option<&SqliteReceiptStore>,
     query: &GenericListingQuery,
+    clock: &Arc<dyn Clock>,
 ) -> Result<GenericListingReport, CliError> {
-    let signer_keypair = load_behavioral_feed_signing_keypair(
-        config.authority_seed_path.as_deref(),
-        config.authority_db_path.as_deref(),
-    )?;
+    let signer_keypair = resolve_public_registry_signing_key(config, clock)?;
     let generated_at = now_unix_secs()?;
     let namespace =
         configured_generic_namespace_ownership(config, signer_keypair.public_key(), generated_at)?;
@@ -374,12 +370,12 @@ pub(crate) fn build_public_generic_listing_report(
     }
 
     listings.push(build_signed_generic_listing_from_public_issuer(
-        &build_public_issuer_discovery(config)?,
+        &build_public_issuer_discovery(config, clock)?,
         &namespace,
         &signer_keypair,
     )?);
     listings.push(build_signed_generic_listing_from_public_verifier(
-        &build_public_verifier_discovery(config)?,
+        &build_public_verifier_discovery(config, clock)?,
         &namespace,
         &signer_keypair,
     )?);

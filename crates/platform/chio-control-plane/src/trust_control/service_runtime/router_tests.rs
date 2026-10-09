@@ -5,6 +5,10 @@ mod compacted_replay_tests;
 #[path = "router_tests/recovery_rpc_tests.rs"]
 mod recovery_rpc_tests;
 
+#[cfg(target_os = "linux")]
+#[path = "router_tests/public_authority_reads.rs"]
+mod public_authority_reads;
+
 use super::super::super::*;
 use super::super::budget::build_remote_budget_store;
 use super::handle_trust_control_metrics;

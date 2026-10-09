@@ -44,7 +44,14 @@ fn trust_authority_health_snapshot(state: &TrustServiceState) -> Value {
     } else {
         None
     };
-    match load_authority_status_for_state(state) {
+    // Health is unauthenticated: database status is inspected without provisioning
+    // or writing it. Keyring and seed status keep the owner's read-only path.
+    let status = if state.authority_keyring.is_none() && config.authority_db_path.is_some() {
+        public_authority_status(config, &state.finding_challenge_clock).map_err(|_| ())
+    } else {
+        load_authority_status_for_state(state).map_err(|_| ())
+    };
+    match status {
         Ok(status) => json!({
             "configured": status.configured,
             "available": true,
@@ -55,7 +62,7 @@ fn trust_authority_health_snapshot(state: &TrustServiceState) -> Value {
             "appliesToFutureSessionsOnly": status.applies_to_future_sessions_only,
             "trustedKeyCount": status.trusted_public_keys.len(),
         }),
-        Err(_) => json!({
+        Err(()) => json!({
             "configured": backend_hint.is_some(),
             "available": false,
             "backend": backend_hint,
