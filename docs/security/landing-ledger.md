@@ -7,6 +7,27 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Final review repair ledger (October 9)
+
+The authoritative ledger now contains **1,862 requirements** and matching current
+states. All 1,841 previous requirement objects and source records are preserved.
+Eight prior current states are archived in `final_review_reconciliation_20261009`
+before their acceptance is reconciled with the owner proof amendment and terminal
+capacity/C20 evidence. Historical wording below does not supersede current states.
+
+FINAL-F01 through FINAL-F11 record the independent candidate review. Native session
+retention, revocation capacity, tenant export, snapshot recovery, public health and
+cluster forwarding/freshness remain open until their repairs and tests are composed.
+The [repair plan](../superpowers/plans/2026-10-09-final-review-repairs.md) names owners
+and acceptance. V13-V15 are accounted for as consolidated duplicates of V10-V12.
+The [document audit](audits/final-review-document-reconciliation-20261009.json)
+preserves old/new hashes for public copies whose internal host aliases were removed.
+
+The CLI fixtures now have composed 16/16 tests and strict owning lint. Report
+residual disclosure, input binding and the contract-sync fixture also pass their
+local suites. This does not qualify the new runtime repair batch, hosted checks,
+merge, or release. KANI-PROOF-QUAL remains explicitly OPEN/UNPROVED.
+
 ## Required CI fixture checkpoint (October 9)
 
 The canonical ledger contains **1,841 requirements** and current-state entries.
