@@ -300,6 +300,17 @@ printf '| Q11 | HOST-M1 | Eleven. | W | Observer | specified | |\n| Q12 | HOST-M
   >>"$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/CASES.md"
 printf '\nSee Q11-Q13 and Q11 to Q13.\n' >>"$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/README.md"
 expect "complete range passes" 0 "-" -- --rule case-ids
+# A suffixed range expands its letters within one case and is malformed across cases.
+new_fixture case-range-suffix
+printf '| Q11 | HOST-M1 | Eleven. | W | Observer | specified | |\n| Q11a | HOST-M1 | Eleven a. | W | Observer | specified | |\n| Q11c | HOST-M1 | Eleven c. | W | Observer | specified | |\n| Q13 | HOST-M1 | Thirteen. | W | Observer | specified | |\n' \
+  >>"$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/CASES.md"
+printf '\nSee Q11a-Q11c.\n' >>"$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/README.md"
+expect "suffixed range with a missing member" 1 "case-ids: docs/superpowers/specs/2026-10-07-desktop-integration/README.md: references Q11b, not defined in CASES.md" -- --rule case-ids
+new_fixture case-range-suffix-cross
+printf '| Q11 | HOST-M1 | Eleven. | W | Observer | specified | |\n| Q11a | HOST-M1 | Eleven a. | W | Observer | specified | |\n| Q13 | HOST-M1 | Thirteen. | W | Observer | specified | |\n' \
+  >>"$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/CASES.md"
+printf '\nSee Q11a-Q13.\n' >>"$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/README.md"
+expect "suffixed range across cases is malformed" 1 "case-ids: docs/superpowers/specs/2026-10-07-desktop-integration/README.md: malformed range Q11a-Q13" -- --rule case-ids
 new_fixture case-range-malformed
 printf '| Q11 | HOST-M1 | Eleven. | W | Observer | specified | |\n| Q13 | HOST-M1 | Thirteen. | W | Observer | specified | |\n' \
   >>"$fixture/docs/superpowers/specs/2026-10-07-desktop-integration/CASES.md"

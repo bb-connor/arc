@@ -45,7 +45,7 @@ RETIRED = (
 # The whole case namespace, not only the identifiers CASES.md uses today, so
 # a reference to an undefined case is never silently ignored.
 CASE_ID = re.compile(r"\b([QCH]\d\d[a-z]?)\b")
-CASE_RANGE = re.compile(r"\b([QCH])(\d\d)[a-z]?\s*(?:-|\u2013|\bto\b|\bthrough\b)\s*([QCH])(\d\d)[a-z]?\b")
+CASE_RANGE = re.compile(r"\b([QCH])(\d\d)([a-z]?)\s*(?:-|\u2013|\bto\b|\bthrough\b)\s*([QCH])(\d\d)([a-z]?)\b")
 CASE_ROW = re.compile(r"^\|\s*([QCH]\d\d[a-z]?)\s*\|", re.M)
 LINK_OPEN = re.compile(r"\]\(")
 REF_DEF = re.compile(r"^ {0,3}\[([^\]]+)\]:[ \t]*\n?[ \t]*(?:<([^<>\n]*)>|(\S+))", re.M)
@@ -352,9 +352,18 @@ def check_case_ids(layout: Layout) -> list[str]:
         text = read(path)
         refs = set(CASE_ID.findall(text))
         for match in CASE_RANGE.finditer(text):
-            first_prefix, first, last_prefix, last = match.groups()
+            first_prefix, first, first_suffix, last_prefix, last, last_suffix = match.groups()
+            span = re.sub(r"\s+", " ", match.group(0))
+            if first_suffix or last_suffix:
+                # A suffixed range stays inside one case (Q11a-Q11c) and expands its letters.
+                if (first_prefix, first) != (last_prefix, last) or not (first_suffix and last_suffix) \
+                        or first_suffix > last_suffix:
+                    out.append(f"case-ids: {layout.rel(path)}: malformed range {span}")
+                    continue
+                refs.update(f"{first_prefix}{first}{chr(code)}"
+                            for code in range(ord(first_suffix), ord(last_suffix) + 1))
+                continue
             if first_prefix != last_prefix or int(first) > int(last):
-                span = re.sub(r"\s+", " ", match.group(0))
                 out.append(f"case-ids: {layout.rel(path)}: malformed range {span}")
                 continue
             refs.update(f"{first_prefix}{number:02d}" for number in range(int(first), int(last) + 1))
