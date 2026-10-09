@@ -2061,14 +2061,14 @@
       ]
     },
     "computer_roadmap_revision_5": {
-      "head": "8e41fd4e2be2f83110ebe4f30629c575dd8d2e54",
-      "hosted_source_commit": "8e41fd4e2be2f83110ebe4f30629c575dd8d2e54",
+      "head": "cdc858edefccbb400aae329becbba5b2eb2bdce5",
+      "hosted_source_commit": "cdc858edefccbb400aae329becbba5b2eb2bdce5",
       "hosted_source_commit_matches_recorded_files": true,
-      "inspection": "Computer-0 closure exits, full-hero COMP-5 completion, COMP-6 branch/work prerequisites and non-blocking COMP-7 reuse",
+      "inspection": "Computer-0 closure exits, full-hero COMP-5 completion with a first preview pass, COMP-6 branch/work prerequisites and non-blocking COMP-7 reuse",
       "sources": [
         {
           "path": "docs/operations/UNIFIED_ROADMAP.md",
-          "sha256": "2a9eb9fe72b4235215485ded0a99e3eec637c23d82def34e9a8b7665339ba288",
+          "sha256": "05c29504affb0961debf528e48b0689f09927c52945d9838f04b9781d6491517",
           "lines": 874,
           "matches_head": true
         }

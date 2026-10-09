@@ -33,7 +33,7 @@ dependency delta; a new feature name is not proof of isolation.
 | I3: existing work composition | Bind compiled work, protected verification and C5 closure/view | Real native execution, exact acceptance, six-dimensional observations and admission/closure races |
 | I4: independent computers | C4 owner bindings and qualified transfer/spending/host profiles | Separate operators, issuer keys and stores; receiver refusal; lost-reply and partition evidence |
 | I5: installed surface | SDK/CLI surface, dynamic collaboration and evidence export | Full hero from installed packages outside the source checkout, with supported installation profiles and negative cases |
-| I6: second-application reuse | Application C on the installed Computer-0 surface, after the COMP-5 Exit passes | Accepted dataset revision, governed diff, expected-base apply, source-conflict and lost-reply evidence, with no custom signing, retry, verifier service or ledger |
+| I6: second-application reuse | Application C on the installed Computer-0 surface, after the COMP-5 Exit first passes on a preview build | Accepted dataset revision, governed diff, expected-base apply, source-conflict and lost-reply evidence, with no custom signing, retry, verifier service or ledger |
 
 **Roadmap mapping.** I1 to I5 map to COMP-1 to COMP-5; I6 maps to COMP-7:
 
@@ -43,8 +43,8 @@ dependency delta; a new feature name is not proof of isolation.
 | I2 | COMP-2 | Unblocked now; starts on the explicit start |
 | I3 | COMP-3 | After WORK-W1, KERN-3a and KERN-3b, including KSPEC-04 phase 3 |
 | I4 | COMP-4 | Its exit is G4's complete run |
-| I5 | COMP-5 | Ships in the preview that G5 uses |
-| I6 | COMP-7 | After the COMP-5 Exit passes; final evidence on the G5 release; never gates G5 |
+| I5 | COMP-5 | First passes on a preview build; passes again on the release G5 uses |
+| I6 | COMP-7 | After the COMP-5 Exit's first preview pass; final evidence on the G5 release; never gates G5 |
 
 COMP-6 runs the internal development swarm (#1197) on Computer after the I2 and I3 exits pass.
 It is a separate dogfood rung, not an acceptance increment or prerequisite of
@@ -171,7 +171,8 @@ Under the unified roadmap, Application A is exercised at two gates:
 
 ### Application C: versioned data curation (required second application)
 
-At I6/COMP-7, after the COMP-5 Exit passes, run an application that prepares a
+At I6/COMP-7, after the COMP-5 Exit first passes on a preview build, run an
+application that prepares a
 versioned CSV/JSON dataset on the same git backend. The prerequisite includes
 the full installed hero and its negative cases; installing packages alone is
 insufficient. A receiver-selected TaskLeaf reviews an admitted data contract;
@@ -183,8 +184,9 @@ Application A. Custom work predicates and transformations are application code;
 there is no application-specific signing, retry, verifier service or ledger.
 
 Record installed package identities and reuse evidence outside the source
-checkout. Running early lets a second consumer find API problems before outside
-teams do; the final evidence is recorded on the release G5 uses. This
+checkout. Because it can start before the G5 release is cut, a second consumer
+finds API problems while they can still be fixed in that release; the final
+evidence is recorded on the release G5 uses. This
 second-consumer demonstration may run internally; it does not substitute for
 G5's independent outside-team runs of Application A. Its evidence
 is the required I6/COMP-7 exit; it does not gate I5/COMP-5 or G5. It requires no
