@@ -481,7 +481,7 @@ fn threshold_approval_set_is_policy_bound_and_order_independent(
     let extended_proposal =
         ThresholdApprovalProposal::sign(extended_proposal, &policy_authority).unwrap();
     let extended_hash = extended_proposal.artifact_digest().unwrap();
-    let mut extended = request;
+    let mut extended = request.clone();
     extended.approval_tokens = [&approver_a, &approver_b]
         .into_iter()
         .enumerate()
@@ -508,7 +508,89 @@ fn threshold_approval_set_is_policy_bound_and_order_independent(
         .validate_threshold_approval_set(&extended, &cap, &intent_hash, now)
         .unwrap_err();
     assert!(error.to_string().contains("active policy"));
+
+    // A proposal and tokens bound to a different intent hash (for example the
+    // raw plan body hash) are refused for the intent the kernel derived.
+    let other_hash = sha256_hex(b"raw-plan-body-hash");
+    let mut other_body = proposal.body.clone();
+    other_body.governed_intent_hash = other_hash.clone();
+    let other_proposal = ThresholdApprovalProposal::sign(other_body, &policy_authority).unwrap();
+    let other_proposal_hash = other_proposal.artifact_digest().unwrap();
+    let mut rebound = request.clone();
+    rebound.approval_tokens = [&approver_a, &approver_b]
+        .into_iter()
+        .enumerate()
+        .map(|(index, approver)| {
+            GovernedApprovalToken::sign(
+                GovernedApprovalTokenBody {
+                    id: format!("rebound-token-{index}"),
+                    approver: approver.public_key(),
+                    subject: cap.subject.clone(),
+                    governed_intent_hash: other_hash.clone(),
+                    request_id: "request-threshold-1".to_string(),
+                    threshold_proposal_hash: Some(other_proposal_hash.clone()),
+                    issued_at: now,
+                    expires_at: other_proposal.body.proposal_deadline,
+                    decision: GovernedApprovalDecision::Approved,
+                },
+                approver,
+            )
+            .unwrap()
+        })
+        .collect();
+    rebound.threshold_approval_proposal = Some(other_proposal);
+    let error = kernel
+        .validate_threshold_approval_set(&rebound, &cap, &intent_hash, now)
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        KernelError::GovernedTransactionDenied(ref reason)
+            if reason.contains("proposal does not match")
+    ));
     Ok(())
+}
+
+#[test]
+fn exact_effect_grants_refuse_missing_and_conditional_invoke_grants() {
+    let kernel = make_kernel(make_config());
+    let subject = CoreKeypair::generate();
+    let effects = [
+        GovernedResponseEffect::RestrictEgress,
+        GovernedResponseEffect::SuspendSession,
+    ];
+    let exact = |effects: &[GovernedResponseEffect]| -> Vec<ToolGrant> {
+        effects
+            .iter()
+            .map(|effect| make_grant(ACTIVE_RESPONSE_SERVER_ID, effect.tool_name()))
+            .collect()
+    };
+    let capability =
+        |grants: Vec<ToolGrant>| make_capability(&kernel, &subject, make_scope(grants), 600);
+
+    active_response_admission::validate_exact_effect_grants(&capability(exact(&effects)), &effects)
+        .unwrap();
+
+    let missing = active_response_admission::validate_exact_effect_grants(
+        &capability(exact(&effects[..1])),
+        &effects,
+    )
+    .unwrap_err();
+    assert!(matches!(
+        missing,
+        KernelError::GovernedTransactionDenied(ref reason)
+            if reason.contains("lacks an exact unconditional Invoke grant for suspend_session")
+    ));
+
+    let mut conditional = exact(&effects);
+    conditional[1].max_invocations = Some(1);
+    let limited =
+        active_response_admission::validate_exact_effect_grants(&capability(conditional), &effects)
+            .unwrap_err();
+    assert!(matches!(
+        limited,
+        KernelError::GovernedTransactionDenied(ref reason)
+            if reason.contains("suspend_session")
+    ));
 }
 
 #[test]

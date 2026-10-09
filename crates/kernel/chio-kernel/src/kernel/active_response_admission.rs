@@ -957,7 +957,7 @@ fn validate_declared_automatic_effects(
     Ok(())
 }
 
-fn validate_exact_effect_grants(
+pub(super) fn validate_exact_effect_grants(
     capability: &CapabilityToken,
     ordered_effects: &[GovernedResponseEffect],
 ) -> Result<(), KernelError> {
