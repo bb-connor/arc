@@ -9,6 +9,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 import shutil
 from check_fonts import FONTS, check as check_fonts
+from compare_pages import TOLERANCE, compare as compare_pages
 from idnits_gate import validate
 from normalize_xml import normalize
 
@@ -125,6 +126,49 @@ class FontManifest(unittest.TestCase):
                 change(directory)
                 with self.assertRaises(ValueError):
                     check_fonts(directory)
+
+
+class PageComparison(unittest.TestCase):
+    """Rasterized PDF pages must agree beyond antialiasing noise."""
+
+    def pages(self, tmp, name, pages):
+        directory = Path(tmp) / name
+        directory.mkdir()
+        for index, (width, height, pixels) in enumerate(pages, 1):
+            (directory / f"page-{index}.pgm").write_bytes(b"P5\n%d %d\n255\n" % (width, height) + bytes(pixels))
+        return directory
+
+    def run_compare(self, committed, fresh):
+        with tempfile.TemporaryDirectory() as tmp:
+            return compare_pages(self.pages(tmp, "committed", committed), self.pages(tmp, "fresh", fresh))
+
+    def test_identical_and_noise_level_pages_pass(self):
+        white = (4, 2, [255] * 8)
+        noisy = (4, 2, [255 - TOLERANCE] + [255] * 7)
+        self.assertEqual(self.run_compare([white, white], [white, white]), ([], []))
+        failures, notes = self.run_compare([white], [noisy])
+        self.assertEqual(failures, [])
+        self.assertEqual(len(notes), 1)
+
+    def test_changed_artwork_page_count_and_size_fail(self):
+        white = (4, 2, [255] * 8)
+        stroke = (4, 2, [255, 255, 40, 255, 255, 255, 40, 255])
+        for committed, fresh in [([white], [stroke]), ([white], [white, white]), ([white], [(2, 4, [255] * 8)])]:
+            with self.subTest(fresh=fresh):
+                failures, _ = self.run_compare(committed, fresh)
+                self.assertTrue(failures)
+
+    def test_malformed_or_missing_pages_are_errors(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            empty = Path(tmp) / "empty"
+            empty.mkdir()
+            with self.assertRaises(ValueError):
+                compare_pages(empty, empty)
+            bad = Path(tmp) / "bad"
+            bad.mkdir()
+            (bad / "page-1.pgm").write_bytes(b"P5\n4 2\n255\n" + bytes(3))
+            with self.assertRaises(ValueError):
+                compare_pages(bad, bad)
 
 
 class XmlNormalization(unittest.TestCase):
