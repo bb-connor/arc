@@ -22,8 +22,8 @@ These are pinned research views, not statements about today's merge or release
 status. Since these pins were taken, #1196 has merged into main. Its Computer
 amendment, [#1200](https://github.com/bb-connor/arc/pull/1200), adds Lane COMP
 and decisions D21 to D23. Revision 5 separates the closure exits and assigns
-required second-application reuse to COMP-7, which depends on the completed COMP-5 Exit and never
-gates G5. The kernel and work
+required second-application reuse to COMP-7, which depends on the COMP-5 Exit's
+first preview pass and never gates G5. The kernel and work
 specifications use internal historical names where necessary; public Computer
 examples retain the approved product vocabulary.
 
@@ -31,7 +31,7 @@ examples retain the approved product vocabulary.
 
 | PR | Inspected head | Role |
 | --- | --- | --- |
-| [#1200](https://github.com/bb-connor/arc/pull/1200) | `8e41fd4e2be2f83110ebe4f30629c575dd8d2e54` | Revision-5 closure exits, Computer-0 profiles, COMP gates and the roadmap docs gate |
+| [#1200](https://github.com/bb-connor/arc/pull/1200) | `cdc858edefccbb400aae329becbba5b2eb2bdce5` | Revision-5 closure exits, Computer-0 profiles, COMP gates and the roadmap docs gate |
 | [#1196](https://github.com/bb-connor/arc/pull/1196) | `c32c460fae67c6f21386ab3cffa425cd06f0433b` | Unified contracts, lane owners, gates and superseding decisions |
 | [#1174](https://github.com/bb-connor/arc/pull/1174) | `7419d56e98e84ee57212e293e5f2658f7fef7642` | FTL lessons and all eleven kernel specifications |
 | [#1173](https://github.com/bb-connor/arc/pull/1173) | `cafdc970e4f89bddf810647e4228a605ed9f498a` | Delegation/graph code and W1-W4 work architecture |
@@ -68,7 +68,7 @@ Preserve the constituent contract's canonical transactions, migration inventory,
 sealed-outstanding semantics and conformance obligations. This changes landing
 order, not fence ownership. Computer adds no closure store or mutable balance.
 
-Pinned amendment: [Computer roadmap revision 5](https://github.com/bb-connor/arc/blob/8e41fd4e2be2f83110ebe4f30629c575dd8d2e54/docs/operations/UNIFIED_ROADMAP.md).
+Pinned amendment: [Computer roadmap revision 5](https://github.com/bb-connor/arc/blob/cdc858edefccbb400aae329becbba5b2eb2bdce5/docs/operations/UNIFIED_ROADMAP.md).
 
 Apply acceptance remains distinct from action authority in every profile.
 Computer-0 can accept a revision and still refuse its apply when the source
@@ -101,7 +101,7 @@ The eight frozen-contract workstreams constrain Computer as follows:
 | COOP | Independent peers/keys, local doors, co-signing and evidence delivery | Source rights and receiver consent remain independent. |
 | REL | Qualified installation and supported host/provider distributions | Publish exact profile support, not source-only demonstrations. |
 | OUT | Outside operators and claim/evidence discipline | Qualify the two-computer application with genuinely independent operation. |
-| COMP | This proposal's own lane (#1200): rungs COMP-1 to COMP-7 | Computer-0 is the success-test profile. G4's complete run is Application A, and G5's outside teams run the installed hero. Required Application C reuse evidence closes COMP-7, which depends on the completed COMP-5 Exit and never gates G5; COMP-6 is dogfood after COMP-2 and COMP-3, independently of COMP-7. |
+| COMP | This proposal's own lane (#1200): rungs COMP-1 to COMP-7 | Computer-0 is the success-test profile. G4's complete run is Application A, and G5's outside teams run the installed hero. Required Application C reuse evidence closes COMP-7, which depends on the COMP-5 Exit's first preview pass and never gates G5; COMP-6 is dogfood after COMP-2 and COMP-3, independently of COMP-7. |
 
 Post-success-test scope also supplies sender-funded cross-organization holds,
 multi-hop independent keys, N-organization cooperation, witnessed evidence,

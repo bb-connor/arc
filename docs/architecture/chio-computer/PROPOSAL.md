@@ -304,8 +304,8 @@ incremental delivery to the roadmap's COMP rungs and lists the adverse cases.
 - It includes a dynamic helper, a lost reply and a source apply conflict.
 - It exercises both leaf kinds.
 - Application C (versioned data curation) is the required second application.
-  Its required reuse evidence closes I6/COMP-7, which depends on the completed
-  COMP-5 Exit and never gates G5. It reuses the same contracts without custom
+  Its required reuse evidence closes I6/COMP-7, which depends on the COMP-5
+  Exit's first pass on a preview build and never gates G5. It reuses the same contracts without custom
   signing, retry, verifier service or ledger code.
   Application B (confined work beside private data) remains optional stretch
   scope.
@@ -338,8 +338,9 @@ Claims carry the preview label until their COMP rung and gate pass.
   evidence to I6/COMP-7, independently of COMP-6 dogfood. A same-day follow-up
   makes COMP-7 depend on COMP-5 rather than G5: it can start early, records its
   final evidence on the G5 release and never gates G5. Its prerequisite is the
-  completed COMP-5 Exit, including the full hero and negative cases, not package
-  installation alone. COMP-6 requires both COMP-2 and COMP-3;
+  COMP-5 Exit's first pass on a preview build, including the full hero and
+  negative cases, not package installation alone; G5 re-runs that Exit on its
+  own release. COMP-6 requires both COMP-2 and COMP-3;
 - uses qualified WORK identifiers at the imported closure boundaries;
 - covers repeated occurrences in both `a & a` and `a | a` in C3-02;
 - preserves requester/executor qualification and clarifies G5's ProgramLeaf
@@ -351,7 +352,10 @@ Claims carry the preview label until their COMP rung and gate pass.
   #1171 publication source, and disables Git lazy fetching on every probe;
 - covers absent promised blobs and commits with real partial-clone regressions,
   and bounds the roadmap copy exception at indented ATX/Setext headings and bold
-  paragraphs, with malformed exceptions failing closed.
+  paragraphs, with malformed exceptions failing closed;
+- times COMP-7 from the COMP-5 Exit's first pass on a preview build. G5 re-runs
+  that Exit on its own release, so Application C's findings can still change
+  that release.
 
 **Revision 4** applies the review corrections:
 
