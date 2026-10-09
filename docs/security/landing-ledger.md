@@ -7,6 +7,22 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Required CI fixture checkpoint (October 9)
+
+The canonical ledger contains **1,841 requirements** and current-state entries.
+All 1,840 earlier requirements, source records and current states are preserved.
+The store fixture repair is composed at `fa3ec7cc7752c7a63ca90317411358a89e5a375e`: actual Original
+three passes/three failures became six passing tests, with strict owning
+all-target Clippy, formatting and static checks passing. The [fixture audit](audits/landing-ci-store-fixtures-20261009.json)
+pins both source versions and evidence. It restores the existing replay and
+authority assertions using current approval binding and private directories;
+production validation remains unchanged.
+
+The candidate push remains held for the CLI fixture handoff and independent
+review. These local passes do not establish hosted qualification or merge.
+The explicit OPEN/UNPROVED proof residual and release claim prohibition below
+remain in force.
+
 ## Current landing acceptance amendment (October 9, 19:16:57Z)
 
 **KANI-PROOF-QUAL remains OPEN/UNPROVED.** The owner's recorded decision permits
