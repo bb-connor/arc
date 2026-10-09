@@ -7,6 +7,22 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Independent export review reopened (October 9)
+
+**FINAL-F03 is reopened for a confirmed P1 availability regression.** A supported
+legacy lineage can cause a tenant export refusal to invalidate the shared snapshot
+and interrupt other tenants. The [review dispositions](audits/receipt-export-review-dispositions-20261009.json)
+record all seven findings, including required refusal coverage and two provisionally
+P2 availability concerns. Their repair and composed qualification are in progress.
+The prior component campaign below remains historical evidence for its tested
+cases; it does not close these new findings.
+
+The canonical ledger now contains **1,882 requirements** and matching states.
+All 1,875 previous requirement objects and source records are preserved, with
+F03's prior current state archived. The cluster-authority and operator repairs
+are being composed alongside the bounded capacity and atomic registry changes.
+Final candidate review, protected hosted checks and merge remain pending.
+
 ## Bounded receipt export qualification (October 9)
 
 FINAL-F03 is integrated at `e7d5a7d0e3`. The [component audit](audits/receipt-bounded-export-qualification-20261009.json)
