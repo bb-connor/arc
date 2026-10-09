@@ -4,7 +4,7 @@ title: "SSE parser ignores lone CR line ends, letting a provider hide data lines
 severity: "P2"
 wave: 1
 tier: "premium"
-status: "open"
+status: "in-progress"
 owner: ""
 assignee: ""
 depends_on: []
@@ -30,3 +30,4 @@ Pre-existing on main, found during the #1160 review (protocol/products reviewer)
 
 ## Log
 - 2026-10-09T04:28:59Z connor: created
+- 2026-10-09T07:54:28Z connor: status open -> in-progress: worked by the ws2 Claude lead in the coord/pr1160 flow (claimed 2026-10-09)
