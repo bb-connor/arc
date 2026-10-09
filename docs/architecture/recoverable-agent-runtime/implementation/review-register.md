@@ -11,22 +11,24 @@ provider, formal, hosted, or release qualification.
 | Inventory | Records | Recorded scoped closures | Recorded unclosed |
 | --- | ---: | ---: | ---: |
 | Canonical original findings | 328 | 99 | 229 |
-| Additional maintained or actually executed support findings | 19 | 18 | 1 |
+| Additional maintained or actually executed support findings | 20 | 19 | 1 |
 | Supplemental PR obligations | 1 | 0 | 1 |
-| Current or executed-support total | 348 | 117 | 231 |
+| Current or executed-support total | 349 | 118 | 231 |
 | Prevented candidate issues, counted separately | 31 | Not combined | Not combined |
-| Additional findings in uninstalled candidates | 8 | Not combined | Not combined |
+| Follow-up findings first observed in uninstalled candidates | 13 | Not combined | Not combined |
 | Provenance prerequisite, excluded from implementation findings | 1 | Not applicable | Not applicable |
 
 The canonical 99 recorded closures comprise 92 source-only and seven scoped
-local closures. The additional 18 comprise seven source-only and eleven scoped
-local closures. These are recorded review classifications, not new acceptance.
+local closures. The additional 19 comprise seven source-only and twelve scoped
+local closures, including the newly reviewed bounded SDK readiness closure. The
+original 117-closure snapshot is preserved; the expanded inventory contains 118.
 
-There are **387 findings or candidate issues**, plus the excluded provenance
-prerequisite, for **388 records**. The original prevented inventory retains 23
-assigned IDs and eight unassigned records. The eight candidate follow-ups have
-register keys and null finding IDs. There are still 371 assigned finding IDs,
-or 372 IDs including the provenance prerequisite, and sixteen null IDs. Every
+There are **393 findings or candidate issues**, plus the excluded provenance
+prerequisite, for **394 records**. The original prevented inventory retains 23
+assigned IDs and eight unassigned records. The thirteen candidate follow-ups and
+one additional SDK readiness finding have register keys and null finding IDs.
+There are still 371 assigned finding IDs, or 372 including the provenance
+prerequisite, and twenty-two null IDs. Every
 original ID and exact unassigned reviewer label remains preserved.
 
 The current status counts are:
@@ -35,8 +37,8 @@ The current status counts are:
 | --- | ---: | --- |
 | `open` | 231 | No complete independent disposition is recorded. |
 | `needs_revalidation` | 42 | Historical closure remains, but cited source or document pins differ without an accepted current continuity review. |
-| `recorded_scoped_closed` | 75 | The recorded scoped disposition is retained, with the limits stated per record. |
-| `candidate_only` | 39 | The defective candidate was uninstalled when found; corrected successors may have separate evidence. |
+| `recorded_scoped_closed` | 76 | The recorded scoped disposition is retained, with the limits stated per record. |
+| `candidate_only` | 44 | The defective candidate was uninstalled when found; corrected successors may have separate evidence. |
 | `prerequisite_only` | 1 | Provenance work, not a proved implementation defect. |
 
 The 42 remaining revalidation flags are part of the 117 historical scoped closures. They
@@ -54,7 +56,8 @@ then restores only the original scoped classifications of `H-SDK-02` and
 pins remain recorded; additive `current_review` objects retain both previous
 statuses and reasons. That update left 35 canonical and ten additional
 revalidation flags. Historical closure totals and every other record are unchanged.
-`H-SDK-01`, source-fixture cleanup and metadata work remain pending.
+That historical update left fixture cleanup and metadata work pending. Their
+subsequent bounded installation is recorded below; `H-SDK-01` remains open.
 
 The [coverage locator continuity review](reviews/coverage-locator-continuity.md)
 subsequently restores `C1-08`, `E-knowledge-15` and `G-product-07` for their original
@@ -91,8 +94,8 @@ H-SDK-01 remains open and provisioning is a prerequisite. Those installations
 did not change finding classifications or grant qualification. The subsequent
 foundation reviews add the six candidate records below.
 
-The eight additive `candidate_followup` records do not change canonical closure
-counts or installed-finding totals. All preserve their original finding evidence;
+The first eight additive `candidate_followup` records below did not change
+canonical closure counts or installed-finding totals. All preserve their original finding evidence;
 the Kernel and receipt lifetime records add independently approved corrective successors. Their
 exact local evidence hashes and accounting time are in `candidate_review_evidence`.
 
@@ -143,7 +146,7 @@ exact local evidence hashes and accounting time are in `candidate_review_evidenc
   of 0. Its approved successor gives each command one accounting token across
   queued, dispatched and returned states, with actual actor failure controls.
 
-All eight records use register keys with null assigned finding IDs. The
+Those eight records use register keys with null assigned finding IDs. The
 [Kernel foundation successor](reviews/kernel-foundation.md) also records 1,469
 passing Kernel library cases on the composed candidate. That candidate includes
 the separately approved atomic-ledger overlay, while the foundation source
@@ -178,6 +181,38 @@ No Store/Process implementation, production host activation
 or Capture overlay is imported by the Kernel registration installation. Complete
 funding, retained debt, interruption/reopen, historical settlement and retirement
 retain their own obligations.
+
+## Installed fixture lifecycle and SDK readiness
+
+The [fixture lifecycle and SDK readiness review](reviews/fixture-lifecycle-and-sdk-readiness.md)
+records the eleven-file installation at `c5f53a96dbfc836bfc42805c2fee2d393dd78821`.
+The exact maintained source passed 1,438 SDK/framework cases and 56 composed
+fixture cases in each of normal and optimized Python, with zero recorded network
+attempts. A later full fixture discovery gate remains failed with 129 passed
+and one assurance-map error across 130 tests; its separate scope and source pins
+are preserved in the review. No closure follows from that broader run. The canonical installation record pins the final selection, independent
+reviews, EOF-only quality continuity and final runs. Previous failures and review
+snapshots remain unchanged.
+
+This adds six authentic findings: one maintained P2 readiness defect with both
+inherited immediate and late-drain facets, and five candidate defects. The new
+maintained record has a bounded local closure. The two campaign interruption P2s,
+cooperative-grace P2, stale-import P3 and introduced completed-delivery P2 retain
+`candidate_only` status with approved, installed corrective successors. No
+canonical finding receives cross-credit or a new closure.
+
+Independent final quality also preserves the original scoped contracts of
+`H-SDK-08`, `H-SDK-09` and `SDK-INDEPENDENT-03` against the changed Python host pin.
+Their old pins, prior continuity objects and exact previous reasons remain
+available under additive continuity successors. `H-SDK-01`, `H-SDK-04` and
+`QF-07` remain byte-identical and open, including their native and matched live
+campaign obligations. The stopped Capture work remains parked.
+
+The source-bound hosted snapshot has 64 queued checks and two skipped. Its two
+unresolved comments map to existing `PR-SETTLEMENT-CAPACITY-01` and the
+`R2-X-resources-01` large-database facet; the latter is outdated but unresolved.
+`R2-X-authority-03` remains a distinct related obligation. This adds no duplicate,
+thread resolution, behavioral acceptance or global qualification.
 
 ## Source-pin audit
 
@@ -220,8 +255,9 @@ Each `records` entry has:
 
 - `key`: unique register identity. Assigned IDs are used verbatim. The eight
   `unassigned-prevented:<index>` values are register keys, not invented finding
-  IDs; the index resolves to the unchanged addendum record. The eight descriptive
-  `candidate:<behavior>` keys also identify records without assigned review IDs.
+  IDs; the index resolves to the unchanged addendum record. The thirteen descriptive
+  `candidate:<behavior>` keys and the additional SDK readiness key likewise have
+  null finding IDs, with authentic reviewer labels retained separately.
 - `id`, `severity`, `title`, and `dependency_group`: original identity and review
   priority, plus the execution workstream. A null severity means the reviewer
   did not assign one or the entry is an excluded prerequisite.
@@ -233,7 +269,7 @@ Each `records` entry has:
 - `evidence_refs`: exact source records. `reviewed#/rows/0`, for example, means
   the `reviewed` path in `source_inventory` and JSON Pointer `/rows/0`. Candidate
   follow-ups use direct repository-relative paths pinned in
-  `candidate_review_evidence.files`.
+  `candidate_review_evidence.files` or `fixture_lifecycle_sdk_evidence.files`.
 - `remaining_obligation_refs` or `remaining_obligations`: all applicable owner
   checks remain authoritative. A short summary does not replace the linked
   detailed requirements, nested support findings, same-ID updates, or limits.
@@ -351,3 +387,12 @@ added by this update.
 The installation-specific SDK continuity audit supplements the historical pin
 audit; it does not rerun unrelated flags. Confidence is high for this accounting;
 current integrated behavior remains unqualified.
+
+The fixture/SDK accounting update preserves 385 of the original 388 record bodies
+byte-for-byte. Only the three authorized SDK rows gain a new `current_reason`
+and an additive `current_continuity.successor` preserving their exact prior
+reason; every historical field remains recoverable unchanged. Six null-ID
+records produce the derived 394-record inventory. Original source catalogs,
+pin audit, 20 preceding current updates and candidate evidence remain intact.
+The additive accounting validation and diff are in the installed fixture packet;
+no source test or blocked investigation was rerun for this documentation update.
