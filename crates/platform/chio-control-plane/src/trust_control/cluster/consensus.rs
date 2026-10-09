@@ -123,6 +123,8 @@ pub(crate) async fn handle_internal_cluster_status(
     .into_response()
 }
 
+const UNPINNED_CLUSTER_AUTHORITY: &str = "clustered trust control requires an out-of-band pinned authority replication anchor in --authority-db; initialize it on the signing custodian with `chio federation authority replication-init` and pin it on every follower with `chio federation authority replication-pin` before starting";
+
 pub(crate) fn build_cluster_state(
     config: &TrustServiceConfig,
     local_addr: SocketAddr,
@@ -160,6 +162,12 @@ pub(crate) fn build_cluster_state(
     let mut persisted_leader_url = None;
     if let Some(path) = config.authority_db_path.as_deref() {
         let authority = SqliteCapabilityAuthority::open(path)?;
+        // Clustered authority replicates only as envelopes verified against an
+        // anchor provisioned out of band. Without one every authority sync is
+        // refused, so the node must not start.
+        if authority.pinned_replication_anchor()?.is_none() {
+            return Err(CliError::cli_other_error(UNPINNED_CLUSTER_AUTHORITY));
+        }
         let status = authority.status()?;
         let fence = authority.cluster_fence()?;
         if fence.authority_generation == status.generation

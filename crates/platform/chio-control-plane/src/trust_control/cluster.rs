@@ -52,8 +52,8 @@ pub(crate) use pull_budget::{
     PullError, PullRoundBudget, RevocationPeerContract, PEER_ROUND_WALL_CLOCK_BUDGET,
 };
 pub(crate) use snapshots::{
-    apply_cluster_snapshot, cluster_replication_heads, handle_internal_authority_snapshot,
-    handle_internal_cluster_snapshot,
+    cluster_replication_heads, handle_internal_authority_snapshot,
+    handle_internal_cluster_snapshot, recover_cluster_snapshot,
 };
 
 #[cfg(test)]
@@ -63,7 +63,7 @@ pub(crate) use consensus::{authority_lease_ttl, cluster_authority_lease_view_loc
 pub(crate) use deltas::{
     budget_write_progress_closed_outcome, budget_write_quorum_commit_view,
     collect_budget_mutation_event_views_after_seq, finalize_peer_sync_round,
-    import_budget_delta_response, notify_cluster_progress, peer_was_demoted, route_pull,
+    import_budget_delta_response, notify_cluster_progress, peer_was_demoted, route_pull, sync_peer,
     sync_peer_authority,
 };
 
@@ -71,4 +71,4 @@ pub(crate) use deltas::{
 pub(crate) use partition::with_peer_state;
 
 #[cfg(test)]
-pub(crate) use snapshots::build_cluster_state_snapshot;
+pub(crate) use snapshots::{apply_cluster_snapshot, build_cluster_state_snapshot};

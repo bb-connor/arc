@@ -5927,8 +5927,8 @@
       "sync_peer_tool_receipts::from_value"
     ],
     "crates/platform/chio-control-plane/src/trust_control/cluster/snapshots.rs": [
-      "apply_cluster_snapshot::from_value",
-      "apply_cluster_snapshot::from_value"
+      "recover_cluster_snapshot::from_value",
+      "recover_cluster_snapshot::from_value"
     ],
     "crates/platform/chio-control-plane/src/trust_control/finding_handlers.rs": [
       "strict_artifact_ingress::from_str"
@@ -8198,7 +8198,7 @@
       "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority.",
       "readers": [
         {
-          "reader": "apply_cluster_snapshot",
+          "reader": "recover_cluster_snapshot",
           "decoders": [
             "from_value",
             "from_value"

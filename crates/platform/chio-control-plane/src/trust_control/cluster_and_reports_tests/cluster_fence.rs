@@ -6,6 +6,9 @@ fn build_cluster_state_seeds_persisted_authority_fence_term() {
     let authority_db_path = directory.path().join("authority.sqlite3");
     let authority = SqliteCapabilityAuthority::open(&authority_db_path).test_unwrap();
     authority
+        .initialize_replication("cluster-fence")
+        .test_unwrap();
+    authority
         .seed_cluster_fence(Some("https://node-b"), 7)
         .test_unwrap();
 
@@ -29,6 +32,9 @@ fn build_cluster_state_discards_persisted_authority_fence_for_unknown_leader() {
     let directory = chio_test_support::private_tempdir().test_unwrap();
     let authority_db_path = directory.path().join("authority.sqlite3");
     let authority = SqliteCapabilityAuthority::open(&authority_db_path).test_unwrap();
+    authority
+        .initialize_replication("cluster-fence")
+        .test_unwrap();
     authority
         .seed_cluster_fence(Some("https://node-z"), 7)
         .test_unwrap();
@@ -56,6 +62,9 @@ fn build_cluster_state_discards_persisted_authority_fence_after_rotation() {
     let directory = chio_test_support::private_tempdir().test_unwrap();
     let authority_db_path = directory.path().join("authority.sqlite3");
     let authority = SqliteCapabilityAuthority::open(&authority_db_path).test_unwrap();
+    authority
+        .initialize_replication("cluster-fence")
+        .test_unwrap();
     authority
         .seed_cluster_fence(Some("https://node-b"), 7)
         .test_unwrap();

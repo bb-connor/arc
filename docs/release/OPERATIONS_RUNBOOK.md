@@ -77,6 +77,11 @@ Clustered deployments additionally require:
 
 - `--advertise-url <public-base-url>`
 - one or more `--peer-url <peer-base-url>` values
+- an `--authority-db` that already holds the out-of-band pinned authority
+  replication anchor: `chio federation authority replication-init` on the
+  signing custodian and `chio federation authority replication-pin` on every
+  follower (see `docs/security/kernel-signing-authority.md`). Startup refuses a
+  clustered authority database without one.
 
 ### Remote MCP Edge
 

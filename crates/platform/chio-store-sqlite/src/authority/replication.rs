@@ -101,6 +101,15 @@ impl SqliteCapabilityAuthority {
         Ok(require_replication(&connection)?.anchor)
     }
 
+    /// The out-of-band pinned replication anchor, or `None` when this database
+    /// has never been provisioned for signed replication.
+    pub fn pinned_replication_anchor(
+        &self,
+    ) -> Result<Option<AuthorityReplicationAnchor>, AuthorityStoreError> {
+        let connection = Self::open_connection(&self.custody)?;
+        Ok(read_replication(&connection)?.map(|replication| replication.anchor))
+    }
+
     /// Export a fresh head-signed envelope, or relay the exact still-fresh envelope
     /// accepted from the signing custodian. A follower never invents a signature.
     pub fn signed_snapshot(&self) -> Result<SignedAuthoritySnapshot, AuthorityStoreError> {

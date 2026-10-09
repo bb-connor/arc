@@ -29,6 +29,8 @@ mod cluster_and_reports_tests {
     mod authority_lifecycle;
     #[path = "authority_replication.rs"]
     mod authority_replication;
+    #[path = "authority_sync_isolation.rs"]
+    mod authority_sync_isolation;
 
     #[path = "config.rs"]
     mod config;

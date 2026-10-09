@@ -115,6 +115,26 @@ pub(crate) fn cluster_replication_heads(
     })
 }
 
+/// This node's signed authority envelope for a full snapshot, or `None` when it
+/// cannot authenticate one right now. The importer then keeps its own pinned
+/// authority and meets the refusal on its authority lane, so the replicated
+/// streams in the snapshot never wait on authority.
+fn export_signed_authority(
+    state: &TrustServiceState,
+    path: &Path,
+) -> Option<AuthoritySnapshotView> {
+    let exported =
+        SqliteCapabilityAuthority::open_with_clock(path, state.finding_challenge_clock.clone())
+            .and_then(|authority| authority.signed_snapshot());
+    match exported {
+        Ok(envelope) => Some(envelope),
+        Err(error) => {
+            warn!(%error, "cluster snapshot carries no signed authority envelope");
+            None
+        }
+    }
+}
+
 pub(crate) fn build_cluster_state_snapshot(
     state: &TrustServiceState,
 ) -> Result<ClusterStateSnapshotResponse, CliError> {
@@ -122,15 +142,11 @@ pub(crate) fn build_cluster_state_snapshot(
     let generated_at = clock_now;
     let consensus = cluster_consensus_view(state);
     let authority_lease = cluster_authority_lease_view(state);
-    let authority = if let Some(path) = state.config.authority_db_path.as_deref() {
-        let authority = SqliteCapabilityAuthority::open_with_clock(
-            path,
-            state.finding_challenge_clock.clone(),
-        )?;
-        Some(authority.signed_snapshot()?)
-    } else {
-        None
-    };
+    let authority = state
+        .config
+        .authority_db_path
+        .as_deref()
+        .and_then(|path| export_signed_authority(state, path));
 
     let revocation_export = if let Some(store) = state
         .optional_revocation_store()
@@ -290,11 +306,31 @@ pub(crate) fn build_cluster_state_snapshot(
     })
 }
 
+/// The signed-authority half of a snapshot import, reported apart from the
+/// replicated streams because they never depend on it.
+pub(crate) type SnapshotAuthorityOutcome = Result<(), CliError>;
+
+/// Applies a peer's full snapshot and fails if any part of it, the signed
+/// authority envelope included, is refused.
+#[cfg(test)]
 pub(crate) fn apply_cluster_snapshot(
     state: &TrustServiceState,
     peer_url: &str,
     snapshot: ClusterStateSnapshotResponse,
 ) -> Result<(), CliError> {
+    recover_cluster_snapshot(state, peer_url, snapshot)?
+}
+
+/// Recovers every replicated stream in a peer's full snapshot: revocations,
+/// receipts, lineage, budgets, the cluster fence and the peer cursors. The
+/// signed authority envelope is imported after the streams and its outcome is
+/// returned on its own, so a refused envelope never withholds a revocation or
+/// leaves the peer pending a snapshot.
+pub(crate) fn recover_cluster_snapshot(
+    state: &TrustServiceState,
+    peer_url: &str,
+    snapshot: ClusterStateSnapshotResponse,
+) -> Result<SnapshotAuthorityOutcome, CliError> {
     let ClusterStateSnapshotResponse {
         generated_at,
         election_term,
@@ -315,16 +351,6 @@ pub(crate) fn apply_cluster_snapshot(
 
     normalize_cluster_config_url(peer_url, true)?;
     let validated_revocation_cursor = validate_revocation_snapshot(&revocations, &replication)?;
-
-    if let (Some(path), Some(authority_view)) =
-        (state.config.authority_db_path.as_deref(), authority)
-    {
-        let authority = SqliteCapabilityAuthority::open_with_clock(
-            path,
-            state.finding_challenge_clock.clone(),
-        )?;
-        authority.apply_signed_snapshot(&authority_view)?;
-    }
 
     if let Some(store) = state
         .optional_revocation_store()
@@ -430,6 +456,8 @@ pub(crate) fn apply_cluster_snapshot(
         );
     }
 
+    let authority = import_snapshot_authority(state, authority);
+
     seed_cluster_authority_from_snapshot(state, election_term, authority_lease.as_ref())?;
 
     update_peer_state(state, peer_url, |peer| {
@@ -447,8 +475,8 @@ pub(crate) fn apply_cluster_snapshot(
         // is the single site that clears it WITHOUT going through
         // `finalize_peer_sync_round` (which re-records a validated ack via
         // `update_peer_budget_acks`). If we cleared `force_snapshot` here but left the
-        // old (stale-high) ack map in place, ANY early return after this point (an
-        // authority-sync error, a puller error, a transient failure) would skip
+        // old (stale-high) ack map in place, ANY early return after this point (a
+        // puller error, a transient failure) would skip
         // finalize and leave a Healthy, not-force_snapshot peer WITNESSING at an ack
         // head that this round never validated - an OVER-COUNT / budget double-spend.
         // Snapshot recovery is precisely our admission that our incremental view of
@@ -459,6 +487,19 @@ pub(crate) fn apply_cluster_snapshot(
         peer.force_snapshot = false;
     });
 
+    Ok(authority)
+}
+
+fn import_snapshot_authority(
+    state: &TrustServiceState,
+    authority: Option<AuthoritySnapshotView>,
+) -> SnapshotAuthorityOutcome {
+    let (Some(path), Some(envelope)) = (state.config.authority_db_path.as_deref(), authority)
+    else {
+        return Ok(());
+    };
+    SqliteCapabilityAuthority::open_with_clock(path, state.finding_challenge_clock.clone())?
+        .apply_signed_snapshot(&envelope)?;
     Ok(())
 }
 

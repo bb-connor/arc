@@ -147,9 +147,11 @@ Pinning replaces the follower's public verification set and preserves its privat
 seed. Repeating the same checkpoint is idempotent; changing a stored pin rejects.
 Review every issuer in a legacy checkpoint before distributing it. This operation
 asserts operator trust in the current state; it does not manufacture signatures
-for old rotations. Unconfigured databases continue local use but refuse authority
-network import and export. Schema revision 3 makes older store binaries refuse the
-upgraded database rather than reopening unsigned or lifecycle-unaware paths.
+for old rotations. Unconfigured databases continue single-node use but refuse
+authority network import and export, and clustered trust control (`--authority-db`
+with `--peer-url`) refuses to start on one. Schema revision 3 makes older store
+binaries refuse the upgraded database rather than reopening unsigned or
+lifecycle-unaware paths.
 
 An existing database whose current head is absent from its persisted issuer
 history refuses to open. This includes incomplete legacy initialization with a
