@@ -345,13 +345,15 @@ fn fixed_plans_never_use_a_temporary_btree() {
     assert!(explained > 50, "only {explained} plans were traced");
 }
 
+/// Every maintained count row, in key order.
+pub(super) const MAINTAINED_COUNTS_SQL: &str =
+    "SELECT scope, dim, value, n, min_seq, max_seq FROM snapshot_count ORDER BY 1, 2, 3";
+
 fn count_rows(db: &SnapshotDb) -> Vec<(i64, i64, i64, i64, i64, i64)> {
     let mut statement = db
         .connection()
         .unwrap()
-        .prepare(
-            "SELECT scope, dim, value, n, min_seq, max_seq FROM snapshot_count ORDER BY 1, 2, 3",
-        )
+        .prepare(MAINTAINED_COUNTS_SQL)
         .unwrap();
     statement
         .query_map([], |row| {
@@ -369,7 +371,9 @@ fn count_rows(db: &SnapshotDb) -> Vec<(i64, i64, i64, i64, i64, i64)> {
         .unwrap()
 }
 
-fn grouped_rows(db: &SnapshotDb) -> Vec<(i64, i64, i64, i64, i64, i64)> {
+/// The rows of [`MAINTAINED_COUNTS_SQL`] recomputed with `GROUP BY` over the
+/// owned receipts, in the same key order.
+pub(super) fn grouped_counts_sql() -> String {
     let mut parts = vec![
         "SELECT -1, 0, 0, COUNT(*), MIN(seq), MAX(seq) FROM snapshot_tool_receipt HAVING COUNT(*) > 0".to_string(),
         "SELECT tenant, 0, 0, COUNT(*), MIN(seq), MAX(seq) FROM snapshot_tool_receipt WHERE tenant != 0 GROUP BY tenant".to_string(),
@@ -397,8 +401,15 @@ fn grouped_rows(db: &SnapshotDb) -> Vec<(i64, i64, i64, i64, i64, i64)> {
             "SELECT tenant, {dim}, {column}, COUNT(*), MIN(seq), MAX(seq) FROM snapshot_tool_receipt WHERE tenant != 0 {absent} GROUP BY tenant, {column}"
         ));
     }
-    let sql = format!("{} ORDER BY 1, 2, 3", parts.join(" UNION ALL "));
-    let mut statement = db.connection().unwrap().prepare(&sql).unwrap();
+    format!("{} ORDER BY 1, 2, 3", parts.join(" UNION ALL "))
+}
+
+fn grouped_rows(db: &SnapshotDb) -> Vec<(i64, i64, i64, i64, i64, i64)> {
+    let mut statement = db
+        .connection()
+        .unwrap()
+        .prepare(&grouped_counts_sql())
+        .unwrap();
     statement
         .query_map([], |row| {
             Ok((
