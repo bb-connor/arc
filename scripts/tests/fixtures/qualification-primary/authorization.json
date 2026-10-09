@@ -1,0 +1,237 @@
+{
+  "allowed_substitutions": [
+    "candidate",
+    "configuration"
+  ],
+  "campaign_budget_seconds": 900,
+  "cases": [
+    {
+      "command_template": [
+        "/usr/bin/python3.12",
+        "-B",
+        "{candidate}/scripts/record-rust-compilation.py",
+        "--launch-scope",
+        "{configuration}",
+        "--probe",
+        "--",
+        "/usr/bin/python3.12",
+        "-B",
+        "{candidate}/public-probes/native-scope-probe.py",
+        "allowed-read",
+        "--path",
+        "{candidate}/public-probes/allowed-input.txt"
+      ],
+      "configuration_relative_path": "target/metadata/public-allowed-read.launch.json",
+      "expected_command_exit": 0,
+      "name": "allowed-read",
+      "timeout_seconds": 120
+    },
+    {
+      "command_template": [
+        "/usr/bin/python3.12",
+        "-B",
+        "{candidate}/scripts/record-rust-compilation.py",
+        "--launch-scope",
+        "{configuration}",
+        "--probe",
+        "--",
+        "/usr/bin/python3.12",
+        "-B",
+        "{candidate}/public-probes/native-scope-probe.py",
+        "outside-read",
+        "--path",
+        "{candidate}/target/outside-public/allowed-input.txt"
+      ],
+      "configuration_relative_path": "target/metadata/public-outside-read.launch.json",
+      "expected_command_exit": 0,
+      "name": "outside-read",
+      "timeout_seconds": 120
+    },
+    {
+      "command_template": [
+        "/usr/bin/python3.12",
+        "-B",
+        "{candidate}/scripts/record-rust-compilation.py",
+        "--launch-scope",
+        "{configuration}",
+        "--probe",
+        "--",
+        "/usr/bin/python3.12",
+        "-B",
+        "{candidate}/public-probes/native-scope-probe.py",
+        "outside-write",
+        "--path",
+        "{candidate}/target/outside-public/fresh-output"
+      ],
+      "configuration_relative_path": "target/metadata/public-outside-write.launch.json",
+      "expected_command_exit": 0,
+      "name": "outside-write",
+      "timeout_seconds": 120
+    },
+    {
+      "command_template": [
+        "/usr/bin/python3.12",
+        "-B",
+        "{candidate}/scripts/record-rust-compilation.py",
+        "--launch-scope",
+        "{configuration}",
+        "--probe",
+        "--",
+        "/usr/bin/python3.12",
+        "-B",
+        "{candidate}/public-probes/native-scope-probe.py",
+        "evidence-read"
+      ],
+      "configuration_relative_path": "target/metadata/public-evidence-read.launch.json",
+      "expected_command_exit": 0,
+      "name": "evidence-read",
+      "timeout_seconds": 120
+    },
+    {
+      "command_template": [
+        "/usr/bin/python3.12",
+        "-B",
+        "{candidate}/scripts/record-rust-compilation.py",
+        "--launch-scope",
+        "{configuration}",
+        "--probe",
+        "--",
+        "/usr/bin/python3.12",
+        "-B",
+        "{candidate}/public-probes/native-scope-probe.py",
+        "evidence-write"
+      ],
+      "configuration_relative_path": "target/metadata/public-evidence-write.launch.json",
+      "expected_command_exit": 0,
+      "name": "evidence-write",
+      "timeout_seconds": 120
+    },
+    {
+      "command_template": [
+        "/usr/bin/python3.12",
+        "-B",
+        "{candidate}/scripts/record-rust-compilation.py",
+        "--launch-scope",
+        "{configuration}",
+        "--probe",
+        "--",
+        "/usr/bin/python3.12",
+        "-B",
+        "{candidate}/public-probes/native-scope-probe.py",
+        "network"
+      ],
+      "configuration_relative_path": "target/metadata/public-network.launch.json",
+      "expected_command_exit": 0,
+      "name": "network",
+      "timeout_seconds": 120
+    },
+    {
+      "command_template": [
+        "/usr/bin/python3.12",
+        "-B",
+        "{candidate}/scripts/record-rust-compilation.py",
+        "--launch-scope",
+        "{configuration}",
+        "--probe",
+        "--",
+        "/usr/bin/python3.12",
+        "-B",
+        "{candidate}/public-probes/native-scope-probe.py",
+        "forged-ipc"
+      ],
+      "configuration_relative_path": "target/metadata/public-forged-ipc.launch.json",
+      "expected_command_exit": 0,
+      "name": "forged-ipc",
+      "timeout_seconds": 120
+    },
+    {
+      "command_template": [
+        "/usr/bin/python3.12",
+        "-B",
+        "{candidate}/scripts/record-rust-compilation.py",
+        "--launch-scope",
+        "{configuration}",
+        "--probe",
+        "--",
+        "/usr/bin/python3.12",
+        "-B",
+        "{candidate}/public-probes/native-scope-probe.py",
+        "gnu-native",
+        "--fixture-root",
+        "{candidate}/public-probes",
+        "--output-root",
+        "{candidate}/target/write/gnu-native/outputs/gnu-probe",
+        "--linker",
+        "/usr/bin/x86_64-linux-gnu-gcc-13",
+        "--implicit-linker"
+      ],
+      "configuration_relative_path": "target/metadata/public-gnu-native.launch.json",
+      "expected_command_exit": 0,
+      "name": "gnu-native",
+      "timeout_seconds": 180
+    },
+    {
+      "command_template": [
+        "/usr/bin/python3.12",
+        "-B",
+        "{candidate}/scripts/record-rust-compilation.py",
+        "--launch-scope",
+        "{configuration}",
+        "--probe",
+        "--",
+        "/usr/bin/python3.12",
+        "-B",
+        "{candidate}/public-probes/native-scope-probe.py",
+        "musl-static-pie",
+        "--fixture-root",
+        "{candidate}/public-probes",
+        "--output-root",
+        "{candidate}/target/write/musl-static-pie/outputs/musl-probe",
+        "--linker",
+        "/usr/bin/x86_64-linux-musl-gcc",
+        "--implicit-linker"
+      ],
+      "configuration_relative_path": "target/metadata/public-musl-static-pie.launch.json",
+      "expected_command_exit": 0,
+      "name": "musl-static-pie",
+      "timeout_seconds": 180
+    }
+  ],
+  "native_case_seconds": 180,
+  "ordinary_case_seconds": 120,
+  "payloads": [
+    {
+      "path": "public-probes/allowed-input.txt",
+      "sha256": "a6951fcb41290f05a4cb68504f187fb0fff9d9041a1ec4c210ffd13f4a43f265",
+      "size": 20
+    },
+    {
+      "path": "public-probes/native-scope-probe.py",
+      "sha256": "76f95769fbde2e2ecbd34b0d2ed2e1fd7cb6acb35318d537591e6ddf9cce6a18",
+      "size": 9255
+    },
+    {
+      "path": "public-probes/public-input.txt",
+      "sha256": "9282c9b1536f651a561231c358efe0f9bceae45a90e011854701220ec12a50ae",
+      "size": 15
+    },
+    {
+      "path": "public-probes/src/gnu-main.rs",
+      "sha256": "182be7b42ac5c46a230f97cc46d97411ec666377675444e5fd3a6062c82694ec",
+      "size": 354
+    },
+    {
+      "path": "public-probes/src/musl-main.rs",
+      "sha256": "236f93e8055681f0443d8d85a1538f30ac101c23185ad98b884440079ea2f844",
+      "size": 43
+    },
+    {
+      "path": "public-probes/src/public-macro.rs",
+      "sha256": "a28a24503e66ae419fae27545039d4ff867dc27c140a8894c42a09a3331b7ef5",
+      "size": 1173
+    }
+  ],
+  "profile": "public-linux-x86_64-gnu-musl-explicit-instrumented-compiler",
+  "schema": "chio.public-linux-primary-authorization.v1",
+  "scope": "Six fixed public fixture images and nine fixed command templates. Approval of this exact table is separately required; no native results or current main qualification."
+}

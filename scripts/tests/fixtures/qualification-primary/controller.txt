@@ -1,0 +1,489 @@
+"""Execute only the nine pinned public probes in their original namespace."""
+from contextlib import ExitStack, contextmanager
+import hashlib
+import json
+import os
+from pathlib import Path
+import signal
+import stat
+import subprocess
+import sys
+import time
+
+
+def require(condition, reason):
+    if not condition:
+        raise RuntimeError(reason)
+
+
+def identity(info):
+    return (info.st_dev, info.st_ino, info.st_mode, info.st_uid, info.st_gid,
+            info.st_size, info.st_mtime_ns, info.st_ctime_ns, info.st_nlink)
+
+
+def regular_bytes(path):
+    path = Path(path)
+    require(path.is_absolute() and ".." not in path.parts, "absolute input required")
+    descriptors = [os.open("/", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)]
+    parents = []
+    try:
+        parent = descriptors[-1]
+        for component in path.parts[1:-1]:
+            located = os.stat(component, dir_fd=parent, follow_symlinks=False)
+            fd = os.open(component, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent)
+            descriptors.append(fd)
+            actual = os.fstat(fd)
+            require((actual.st_dev, actual.st_ino, actual.st_mode, actual.st_uid) ==
+                    (located.st_dev, located.st_ino, located.st_mode, located.st_uid), "input parent changed")
+            parents.append((parent, component, fd))
+            parent = fd
+        located = os.stat(path.name, dir_fd=parent, follow_symlinks=False)
+        fd = os.open(path.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
+        descriptors.append(fd)
+        actual = os.fstat(fd)
+        require(stat.S_ISREG(actual.st_mode) and actual.st_nlink == 1 and identity(actual) == identity(located),
+                "input file changed")
+        body = bytearray()
+        while block := os.read(fd, 1024 * 1024):
+            body.extend(block)
+        require(len(body) == actual.st_size and identity(actual) == identity(os.fstat(fd)) ==
+                identity(os.stat(path.name, dir_fd=parent, follow_symlinks=False)), "input file changed")
+        for parent, component, fd in parents:
+            actual, located = os.fstat(fd), os.stat(component, dir_fd=parent, follow_symlinks=False)
+            require((actual.st_dev, actual.st_ino, actual.st_mode, actual.st_uid) ==
+                    (located.st_dev, located.st_ino, located.st_mode, located.st_uid), "input parent changed")
+        return bytes(body)
+    finally:
+        for fd in reversed(descriptors):
+            os.close(fd)
+
+
+def json_bytes(value):
+    return (json.dumps(value, indent=2, sort_keys=True) + "\n").encode()
+
+
+def sha(body):
+    return hashlib.sha256(body).hexdigest()
+
+
+def write_fresh(path, body):
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    try:
+        offset = 0
+        while offset < len(body):
+            offset += os.write(fd, body[offset:])
+        os.fsync(fd)
+        os.fchmod(fd, 0o444)
+    finally:
+        os.close(fd)
+
+
+APPROVED_AUTHORIZATION_SHA256 = "90659258cf73681a01780b0e83018bd418b1cbf3207fa29c2e0454af0a5bac41"
+MAX_LAUNCHER_BYTES = 64 * 1024 * 1024
+
+
+def approved_public_plan(plan, authorization_path):
+    """Bind only the independently approved fixture bytes and command substitutions."""
+    body = regular_bytes(authorization_path)
+    require(sha(body) == APPROVED_AUTHORIZATION_SHA256
+            and plan.get("authorization_sha256") == APPROVED_AUTHORIZATION_SHA256,
+            "public authorization table differs")
+    approved = json.loads(body)
+    candidate = Path(plan["candidate"])
+    require(plan.get("schema") == "chio.public-linux-primary-plan.v2", "bound primary plan required")
+    require(len(plan["configs"]) == len(approved["cases"]), "approved probe denominator differs")
+    for row, contract in zip(plan["configs"], approved["cases"]):
+        configuration = candidate / contract["configuration_relative_path"]
+        command = [argument.replace("{candidate}", str(candidate)).replace("{configuration}", str(configuration))
+                   for argument in contract["command_template"]]
+        require(row["name"] == contract["name"] and row["guest_path"] == str(configuration)
+                and row["command"] == command, "unapproved public probe command or configuration path")
+    def check_payloads():
+        for payload in approved["payloads"]:
+            data = regular_bytes(candidate / payload["path"])
+            require(len(data) == payload["size"] and sha(data) == payload["sha256"],
+                    "unapproved public probe payload")
+    check_payloads()
+    return check_payloads
+
+
+def directory_identity(info):
+    return (info.st_dev, info.st_ino, info.st_mode, info.st_uid, info.st_gid)
+
+
+class LauncherCapture:
+    """Hash closed child output through the same held log descriptors."""
+    def __init__(self, case, parent, streams, parents):
+        self.case, self.parent, self.streams, self.parents = case, parent, streams, parents
+        self.measurements = {}
+
+    def validate(self):
+        for parent, component, descriptor, bound in self.parents:
+            require(directory_identity(os.fstat(descriptor)) == bound
+                    and directory_identity(os.stat(component, dir_fd=parent, follow_symlinks=False)) == bound,
+                    "launcher capture parent changed")
+        for name, bound in self.measurements.items():
+            stream = self.streams[name]
+            actual = os.fstat(stream.fileno())
+            located = os.stat("launcher." + name + ".log", dir_fd=self.parent, follow_symlinks=False)
+            require(identity(actual) == bound == identity(located), "completed launcher capture changed")
+
+    def complete(self):
+        captured = {}
+        for name, stream in self.streams.items():
+            stream.flush()
+            os.fsync(stream.fileno())
+            os.fchmod(stream.fileno(), 0o444)
+            actual = os.fstat(stream.fileno())
+            located = os.stat("launcher." + name + ".log", dir_fd=self.parent, follow_symlinks=False)
+            require(stat.S_ISREG(actual.st_mode) and actual.st_uid == os.getuid() and actual.st_nlink == 1
+                    and identity(actual) == identity(located) and actual.st_size <= MAX_LAUNCHER_BYTES,
+                    "launcher capture is replaced, symbolic or oversized")
+            os.lseek(stream.fileno(), 0, os.SEEK_SET)
+            digest = hashlib.sha256()
+            size = 0
+            while block := os.read(stream.fileno(), 1024 * 1024):
+                size += len(block)
+                require(size <= MAX_LAUNCHER_BYTES, "launcher capture exceeds byte limit")
+                digest.update(block)
+            require(size == actual.st_size and identity(actual) == identity(os.fstat(stream.fileno())) ==
+                    identity(os.stat("launcher." + name + ".log", dir_fd=self.parent, follow_symlinks=False)),
+                    "launcher capture changed during readback")
+            self.measurements[name] = identity(actual)
+            captured[name] = {"path": str(self.case / ("launcher." + name + ".log")),
+                              "sha256": digest.hexdigest(), "size": size}
+        self.validate()
+        return captured
+
+
+@contextmanager
+def held_launcher_logs(case):
+    """Create and retain log ancestry and leaves without following any link."""
+    case = Path(case)
+    require(case.is_absolute() and ".." not in case.parts, "absolute launcher case required")
+    descriptors = [os.open("/", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)]
+    parents = []
+    streams = {}
+    guard = None
+    try:
+        parent = descriptors[-1]
+        for component in case.parts[1:]:
+            located = os.stat(component, dir_fd=parent, follow_symlinks=False)
+            descriptor = os.open(component, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_NONBLOCK,
+                                 dir_fd=parent)
+            descriptors.append(descriptor)
+            opened = os.fstat(descriptor)
+            bound = directory_identity(opened)
+            require(stat.S_ISDIR(opened.st_mode) and bound == directory_identity(located),
+                    "launcher capture directory changed")
+            parents.append((parent, component, descriptor, bound))
+            parent = descriptor
+        metadata = os.fstat(parent)
+        require(metadata.st_uid == os.getuid() and stat.S_IMODE(metadata.st_mode) == 0o700,
+                "launcher case is not private and owned")
+        for name in ("stdout", "stderr"):
+            descriptor = os.open("launcher." + name + ".log",
+                os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600, dir_fd=parent)
+            streams[name] = os.fdopen(descriptor, "w+b")
+        guard = LauncherCapture(case, parent, streams, parents)
+        yield streams["stdout"], streams["stderr"], guard
+        guard.validate()
+    finally:
+        for stream in reversed(list(streams.values())):
+            stream.close()
+        for descriptor in reversed(descriptors):
+            os.close(descriptor)
+
+
+class LauncherObservation:
+    """Retain the actual process observation through audit and result publication."""
+    def __init__(self, path, descriptor, launcher, body):
+        self.path, self.descriptor, self.launcher = path, descriptor, launcher
+        self.bound = identity(os.fstat(descriptor))
+        require(stat.S_ISREG(self.bound[2]) and self.bound[3] == os.getuid()
+                and stat.S_IMODE(self.bound[2]) == 0o444 and self.bound[-1] == 1
+                and self.bound[5] == len(body), "launcher observation is not an owned sealed regular file")
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        readback = bytearray()
+        while block := os.read(descriptor, 65536):
+            readback.extend(block)
+            require(len(readback) <= 1024 * 1024, "launcher observation exceeds byte limit")
+        require(bytes(readback) == body, "launcher observation readback differs")
+        self.validate()
+        self.capture = {"path": str(path), "sha256": sha(bytes(readback)), "size": len(readback)}
+
+    def validate(self):
+        self.launcher.validate()
+        require(identity(os.fstat(self.descriptor)) == self.bound ==
+                identity(os.stat(self.path.name, dir_fd=self.launcher.parent, follow_symlinks=False)),
+                "completed launcher observation changed")
+
+
+@contextmanager
+def held_launcher_observation(case, launcher, value):
+    """Publish a fresh observation without releasing its original file or ancestry."""
+    body = json_bytes(value)
+    require(len(body) <= 1024 * 1024 and case == launcher.case,
+            "launcher observation location or size differs")
+    launcher.validate()
+    path = case / "launcher-observation.json"
+    descriptor = os.open(path.name, os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_NONBLOCK,
+                         0o600, dir_fd=launcher.parent)
+    try:
+        offset = 0
+        while offset < len(body):
+            written = os.write(descriptor, body[offset:])
+            require(written > 0, "launcher observation write made no progress")
+            offset += written
+        os.fsync(descriptor)
+        os.fchmod(descriptor, 0o444)
+        observation = LauncherObservation(path, descriptor, launcher, body)
+        yield observation
+        observation.validate()
+    finally:
+        os.close(descriptor)
+
+
+def stop_owned_child(process):
+    """Stop only the still-owned process group and reap it within the existing drain limits."""
+    if process.poll() is not None:
+        return
+    try:
+        require(os.getpgid(process.pid) == process.pid, "owned process group changed")
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        require(process.poll() is not None, "owned process group disappeared before child exit")
+        return
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        require(process.poll() is None and os.getpgid(process.pid) == process.pid,
+                "owned process group changed before forced stop")
+        os.killpg(process.pid, signal.SIGKILL)
+        process.wait(timeout=5)
+
+
+class OwnedChildLifecycle:
+    """Attempt the existing bounded drain once and retain an unresolved outcome."""
+    def __init__(self, result):
+        self.process = None
+        self.result = result
+        self.observation = None
+
+    def stop(self):
+        if self.process is None or self.observation is not None:
+            return self.observation
+        observed = self.process.poll()
+        self.observation = {"status": "REAPED" if observed is not None else "FAILED/UNKNOWN",
+                            "attempted": observed is None, "observed_exit": observed}
+        self.result["owned_child_cleanup"] = self.observation
+        if observed is None:
+            try:
+                stop_owned_child(self.process)
+            except Exception as error:
+                self.observation["reason"] = type(error).__name__ + ": " + str(error)
+            else:
+                observed = self.process.poll()
+                if observed is not None:
+                    self.observation.update(status="REAPED", observed_exit=observed)
+                else:
+                    self.observation["reason"] = "Owned child exit was not observed after the bounded drain"
+        if self.result["actual_exit"] is None:
+            self.result["actual_exit"] = self.observation["observed_exit"]
+        return self.observation
+
+
+def main():
+    require(len(sys.argv) == 4, "plan, pin and approved public authorization required")
+    plan_path = Path(sys.argv[1])
+    plan_body = regular_bytes(plan_path)
+    require(sha(plan_body) == sys.argv[2], "campaign plan changed")
+    plan = json.loads(plan_body)
+    candidate = Path(plan["candidate"])
+    expected_uid = plan.get("expected_uid")
+    require(type(expected_uid) is int and expected_uid >= 0 and os.getuid() == expected_uid
+            and candidate.parent == Path("/var/tmp") and plan["source_location"]["root"]["uid"] == expected_uid,
+            "wrong campaign owner")
+    require(plan["caps"] == {"total_seconds": 900, "ordinary_seconds": 120, "compiler_seconds": 180, "retry": False},
+            "campaign bounds differ")
+    names = ["allowed-read", "outside-read", "outside-write", "evidence-read", "evidence-write", "network",
+             "forged-ipc", "gnu-native", "musl-static-pie"]
+    require([row["name"] for row in plan["configs"]] == names, "probe denominator differs")
+    check_payloads = approved_public_plan(plan, Path(sys.argv[3]))
+    output = candidate / "target/metadata/primary-observations"
+    os.mkdir(output, 0o700)
+    environment = {"PATH": "/usr/bin:/bin", "HOME": str(candidate / "target/write/home"),
+                   "LC_ALL": "C", "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null"}
+    for image in plan["tools"]:
+        require(sha(regular_bytes(image["path"])) == image["sha256"], "campaign tool changed")
+    expected_inventory = json.loads(regular_bytes(candidate / "target/metadata/runtime-inventory.json"))
+    receipt = json.loads(regular_bytes(candidate / "target/metadata/materialization.json"))
+    require(receipt["source_location"] == plan["source_location"], "candidate location differs")
+    def check_source():
+        check_payloads()
+        metadata = os.stat(candidate, follow_symlinks=False)
+        root = plan["source_location"]["root"]
+        require((metadata.st_dev, metadata.st_ino, metadata.st_uid, stat.S_IMODE(metadata.st_mode)) ==
+                (root["device"], root["inode"], root["uid"], root["mode"]), "candidate location changed")
+        for row in receipt["source_files"]:
+            body = regular_bytes(row["path"])
+            info = os.stat(row["path"], follow_symlinks=False)
+            require(sha(body) == row["sha256"] and (info.st_dev, info.st_ino, info.st_uid, stat.S_IMODE(info.st_mode)) ==
+                    (row["device"], row["inode"], row["uid"], row["mode"]), "public source changed")
+    def capture_inventory(path, timeout):
+        argv = ["/usr/bin/python3.12", "-I", "-B", str(candidate / "target/metadata/inventory-collector.py"),
+                "--inventory", "--source-root", str(candidate)]
+        result = subprocess.run(argv, cwd=candidate, env=environment, capture_output=True, timeout=timeout, check=False)
+        write_fresh(path, result.stdout)
+        write_fresh(path.with_suffix(".stderr.log"), result.stderr)
+        require(result.returncode == 0 and json.loads(result.stdout) == expected_inventory, "actual source inventory differs")
+        return {"command": argv, "actual_exit": result.returncode, "path": str(path), "sha256": sha(result.stdout)}
+
+    check_source()
+    outside = candidate / "target/outside-public"
+    os.mkdir(outside, 0o700)
+    write_fresh(outside / "allowed-input.txt", b"PUBLIC-ALLOWED-READ\n")
+    unconfined = {"read_bytes": regular_bytes(outside / "allowed-input.txt").decode("ascii")}
+    feasibility = outside / "unconfined-write-control"
+    fd = os.open(feasibility, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    os.write(fd, b"PUBLIC-UNCONFINED-WRITE\n")
+    os.fsync(fd)
+    unconfined["written_size"] = os.fstat(fd).st_size
+    os.close(fd)
+    os.unlink(feasibility)
+    require(not feasibility.exists() and unconfined["read_bytes"] == "PUBLIC-ALLOWED-READ\n" and unconfined["written_size"] == len(b"PUBLIC-UNCONFINED-WRITE\n"),
+            "unconfined feasibility failed")
+    write_fresh(output / "unconfined-feasibility.json", json_bytes({"actual_exit": 0, "observed": unconfined,
+        "outside_path": str(outside), "compiler_dispatched": False, "qualified": False}))
+    started = None
+    results = []
+    cleanup_incomplete = False
+    for row in plan["configs"]:
+        result = {"name": row["name"], "command": row["command"], "actual_exit": None,
+                  "status": "not-executed", "qualified": False, "compiled_closure_status": "not-established"}
+        if cleanup_incomplete or (started is not None and time.monotonic() - started >= 900):
+            result["reason"] = "owned-child-cleanup-incomplete" if cleanup_incomplete else "common-deadline-exhausted"
+            results.append(result)
+            write_fresh(output / (row["name"] + ".result.json"), json_bytes(result))
+            print(json.dumps(result), flush=True)
+            continue
+        case = output / row["name"]
+        os.mkdir(case, 0o700)
+        custody = ExitStack()
+        launcher_guard = None
+        observation_guard = None
+        process = None
+        child_lifecycle = OwnedChildLifecycle(result)
+        try:
+            try:
+                check_source()
+                require(sha(regular_bytes(row["guest_path"])) == row["sha256"], "configuration changed")
+                before = capture_inventory(case / "runtime-before.json", min(60, 900 - (time.monotonic() - started)) if started else 60)
+                child_command = row["command"][row["command"].index("--") + 1:]
+                command_path = case / "command.json"
+                write_fresh(command_path, json_bytes(child_command))
+                cap = 180 if row["name"] in {"gnu-native", "musl-static-pie"} else 120
+                if started is None:
+                    started = time.monotonic()
+                    write_fresh(output / "dispatch-start.json", json_bytes({"schema": "chio.public-probe-dispatch-start.v1",
+                        "unix_seconds": time.time(), "monotonic_seconds": started, "caps": plan["caps"],
+                        "plan_sha256": sha(plan_body), "candidate": str(candidate), "source_binding": plan["source_binding"]}))
+                remaining = 900 - (time.monotonic() - started)
+                require(remaining > 0, "common deadline exhausted")
+                bound = min(cap, remaining)
+                command_started = time.monotonic()
+                stdout, stderr, launcher_guard = custody.enter_context(held_launcher_logs(case))
+                process = subprocess.Popen(row["command"], cwd=candidate, env=environment, stdin=subprocess.DEVNULL,
+                    stdout=stdout, stderr=stderr, start_new_session=True)
+                child_lifecycle.process = process
+                result.update(status="running", pid=process.pid, process_group=process.pid, command_timeout_seconds=bound)
+                print(json.dumps({"name": row["name"], "status": "running", "pid": process.pid,
+                    "command_timeout_seconds": bound, "common_remaining_seconds": remaining}), flush=True)
+                try:
+                    wait_remaining = bound - (time.monotonic() - command_started)
+                    require(wait_remaining > 0, "command deadline exhausted during spawn")
+                    result["actual_exit"] = process.wait(timeout=wait_remaining)
+                    result["status"] = "passed-command" if result["actual_exit"] == 0 else "failed-command"
+                except subprocess.TimeoutExpired:
+                    result["status"] = "timed-out"
+                    result["timeout_seconds"] = bound
+                    cleanup = child_lifecycle.stop()
+                    require(cleanup["status"] == "REAPED", "owned child cleanup incomplete")
+                    result["actual_exit"] = process.returncode
+                stdout.flush()
+                stderr.flush()
+                os.fsync(stdout.fileno())
+                os.fsync(stderr.fileno())
+                result["launcher_capture"] = launcher_guard.complete()
+                result["elapsed_seconds"] = time.monotonic() - command_started
+                observation = {"schema": "chio.public-linux-launcher-observation.v1", "candidate": str(candidate),
+                    "source_binding": plan["source_binding"], "name": row["name"], "command": row["command"],
+                    "actual_exit": result["actual_exit"], "command_timeout_seconds": bound,
+                    "elapsed_seconds": result["elapsed_seconds"], "pid": result["pid"],
+                    "process_group": result["process_group"], "launcher_capture": result["launcher_capture"]}
+                observation_guard = custody.enter_context(held_launcher_observation(case, launcher_guard, observation))
+                result["launcher_observation"] = observation_guard.capture
+                result["runtime_before"] = before
+                remaining = 900 - (time.monotonic() - started)
+                require(remaining > 0, "common deadline exhausted before source and original-namespace audit")
+                result["runtime_after"] = capture_inventory(case / "runtime-after.json", min(60, remaining))
+                check_source()
+                scopes = sorted(Path(row["guest_path"]).parents[1].joinpath("evidence", row["name"]).glob("*/scope.json"))
+                require(len(scopes) == 1, "one completed original scope required")
+                audit = ["/usr/bin/python3.12", "-I", "-B", str(candidate / "target/metadata/consumer/verify_public_compilation_probes.py"),
+                    "--auditor", str(candidate / "target/metadata/inventory-collector.py"), "--scope", str(scopes[0]),
+                    "--runtime-before", str(case / "runtime-before.json"), "--runtime-after", str(case / "runtime-after.json"),
+                    "--command", str(command_path), "--launcher-observation", str(case / "launcher-observation.json"),
+                    "--authorization", str(candidate / "target/metadata/public-probe-authorization.json")]
+                remaining = 900 - (time.monotonic() - started)
+                require(remaining > 0, "common deadline exhausted before original-namespace audit")
+                audit_result = subprocess.run(audit, cwd=candidate, env=environment, capture_output=True, timeout=remaining, check=False)
+                write_fresh(case / "original-namespace-audit.stdout.json", audit_result.stdout)
+                write_fresh(case / "original-namespace-audit.stderr.log", audit_result.stderr)
+                result["original_namespace_audit"] = {"command": audit, "actual_exit": audit_result.returncode,
+                    "stdout_sha256": sha(audit_result.stdout), "stderr_sha256": sha(audit_result.stderr), "scope": str(scopes[0])}
+                if audit_result.returncode != 0:
+                    result["status"] = "failed-original-namespace-audit"
+                elif result["actual_exit"] == 0:
+                    result["status"] = "passed-command-and-original-namespace-audit"
+                require(time.monotonic() - started <= 900, "common deadline exhausted during original-namespace audit")
+                require(not (outside / "fresh-output").exists(), "outside unauthorized output exists")
+                if row["name"] == "evidence-write":
+                    require(not scopes[0].with_name("unauthorized-write.json").exists(), "protected unauthorized output exists")
+            except Exception as error:
+                result["status"] = "failed-observation" if result["status"] not in {"timed-out", "failed-command"} else result["status"]
+                result["observation_error"] = type(error).__name__ + ": " + str(error)
+            finally:
+                child_lifecycle.stop()
+            if child_lifecycle.observation is not None and child_lifecycle.observation["status"] == "FAILED/UNKNOWN":
+                cleanup_incomplete = True
+                result["status"] = "failed-owned-child-cleanup"
+            if launcher_guard is not None:
+                launcher_guard.validate()
+            if observation_guard is not None:
+                observation_guard.validate()
+            results.append(result)
+            write_fresh(output / (row["name"] + ".result.json"), json_bytes(result))
+        finally:
+            try:
+                child_lifecycle.stop()
+            finally:
+                custody.close()
+        print(json.dumps(result), flush=True)
+    elapsed = time.monotonic() - started if started else None
+    status = "passed-public-microprobes" if elapsed is not None and elapsed <= 900 and all(
+        r["status"] == "passed-command-and-original-namespace-audit" for r in results) else "failed-public-microprobes"
+    write_fresh(output / "result.json", json_bytes({"schema": "chio.public-linux-primary-result.v2",
+        "authorization_sha256": APPROVED_AUTHORIZATION_SHA256, "expected_uid": expected_uid,
+        "status": status, "results": results, "caps": plan["caps"],
+        "candidate": str(candidate), "source_binding": plan["source_binding"], "qualified": False,
+        "compiled_closure_status": "not-established", "artifacts_exported": False,
+        "elapsed_from_first_dispatch_seconds": elapsed}))
+    print(json.dumps({"status": status, "actual_completed_cases": sum(r["actual_exit"] is not None for r in results),
+        "original_namespace_audits_passed": sum(r.get("original_namespace_audit", {}).get("actual_exit") == 0 for r in results),
+        "qualified": False, "artifacts_exported": False}), flush=True)
+    return 0 if status == "passed-public-microprobes" else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
