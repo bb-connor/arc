@@ -20,7 +20,7 @@ This annex does not restate shared documents. Flows and owner changes are in NOR
 
 ## HOST-M1 on Omarchy
 
-HOST-M1 (NORTH-STAR-FLOWS section 3) runs on two independently operated hosts. On Omarchy it is cut server-first (roadmap COOP-1): headless services and the door come first, desktop review moments are optional follow-ons and never gates (COOP-1.12). An Omarchy host can be either Org A or Org B.
+HOST-M1 (NORTH-STAR-FLOWS section 3) runs on two independently operated hosts. On Omarchy it is cut server-first (roadmap COOP-1): headless services and the door come first, desktop review moments are optional follow-ons and never gates (roadmap COOP-1). An Omarchy host can be either Org A or Org B.
 
 **Services.** `chio trust serve --advertise-url` and, on the executing side, the governed tool behind `chio api protect` with `CHIO_TRUSTED_ISSUER_KEY` set to the local trust-control authority key. Both run as systemd units: user-session units for a personal install, or a system service under a separately enrolled unprivileged service identity for an always-on principal. Installation places inert units; activation requires the profile's enrollment. HTTPS reachability uses existing lanes; iroh is not needed.
 
@@ -83,11 +83,11 @@ The runner and resource owners enforce, before admission, finite per-task and ag
 - **Storage I/O.** Read/write throughput, operation rate and outstanding-I/O bounds across buffered, direct, mmap and flush paths, layered storage and engine writes. Fixed-size rewrite/reread pressure must show real device bounds while receipt, control and stop keep progressing; unsupported paths are denied.
 - **Descriptors and IPC objects.** Per-class and aggregate bounds on descriptors, pipes, sockets, eventfds, epoll instances, queues and allowed shared-memory objects, including host allocations triggered by guests, with reserved native control capacity. A per-process descriptor limit does not bound every class; unneeded classes are denied.
 - **CPU, memory and PIDs.** Measured cgroup v2 delegation and effective limits on the actual cgroup; accepted flags prove nothing. Keep one cgroup writer per delegated subtree.
-- **Fresh task-private state.** Each task gets fresh private writable state. Same-user and cross-user, sequential and concurrent canaries prove no source, secret, result, tool state or queued authority carries over through home, temp, cache, IPC, retained descriptors or reused runtime state. Shared caches must be declared, content-addressed and immutable. Unresolved cleanup fences reuse.
+- **Fresh task-private state.** Each task gets fresh private writable state. Same-user and cross-user, sequential and concurrent canaries prove no source, secret, result, tool state or queued authority carries over through home, temp, cache, IPC, retained descriptors or reused runtime state. Shared caches must be declared, content-addressed, immutable and verified against the current authorized input closure; writable, secret and result caches are never reused across tasks. Unresolved cleanup fences reuse, and a new task ID or recreated directory alone does not prove freshness.
 
 ### Repository and working-tree capture
 
-Capture is a resource-owner boundary before any model, runner or evaluator sees input (Q14, Q22). Repository-controlled configuration, attributes, hooks, filters, helpers, lazy fetching, replacement refs, alternates and external object sources cannot cause host reads, processes or network fallback. Git object parsing enforces per-object and aggregate encoded and expanded bytes, object count, graph and delta depth, CPU, memory, time and staging limits before materialization; bombs and malformed objects refuse before dispatch. Working-tree reads have their own byte, entry, depth and staging caps and refuse FIFOs, sockets, devices and unproved outside links. The capture owner must produce a coherent whole-tree generation, from an immutable atomic snapshot or a proved writer-complete fence covering every writer, or refuse; per-file hashes, stable metadata and advisory locks are insufficient. It binds the approved mount closure to descriptors and native mount identity, so pre-existing or raced bind/FUSE mounts below the root refuse before outside bytes are read. Confinement after capture cannot substitute for any of these.
+Capture is a resource-owner boundary before any model, runner or evaluator sees input (Q14, Q22). Repository-controlled configuration, attributes, hooks, filters, helpers, lazy fetching, replacement refs, alternates and external object sources cannot cause host reads, processes or network fallback. Git object parsing enforces per-object and aggregate encoded and expanded bytes, object count, graph and delta depth, CPU, memory, time and staging limits before materialization; bombs and malformed objects refuse before dispatch. Working-tree reads have their own byte, entry, depth and staging caps and refuse FIFOs, sockets, devices and unproved outside links. The capture owner must produce a coherent whole-tree generation, from an immutable atomic snapshot or a proved writer-complete fence covering every writer, or refuse; per-file hashes, stable metadata and advisory locks are insufficient. It binds the approved mount closure to descriptors and native mount identity, so pre-existing or raced bind/FUSE mounts below the root, and root, ancestor or subtree mount replacement (including between read chunks, across owner restart and with retained descriptors), refuse before outside bytes are read; path prefixes, unchanged device numbers or a one-time mount census are not proof. An oversized or interrupted capture refuses rather than being accepted as truncated input. Confinement after capture cannot substitute for any of these.
 
 ### Process custody and execution clocks
 
@@ -170,7 +170,8 @@ Basic receipt and hook Observe works with W1, recovery and execution owners abse
 | Execution bounds, private state, custody | Q12, Q19, Q22, Q27 | O3 |
 | Capture bounds, coherence and mounts | Q14, Q22 | O3 |
 | Coordination and shared resources | C02-C05, C10, C11, Q25-Q27 | O3 |
-| Organizational cooperation | C06-C09, Q24, Q28 | O3 |
+| HOST-M1 cooperation | C09, Q24, Q28 | O1 |
+| Organizational cooperation (HOST-M3) | C06-C08, Q28 | O3 |
 | Mutations and helper operands | Q02, Q17 | O0, O7 |
 | Distribution, update, rollback, recovery | Q18, Q20, Q30 | O6, O7 |
 | Optional shell and browser | Q04, Q10, Q17 | O2 |
