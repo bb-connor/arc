@@ -31,6 +31,15 @@ review, the four exact protected hosted checks, or normal protected merge.
 Claude's postmerge changes remain on their separate branches. The candidate is
 not yet hosted-qualified or merged, and no release is authorized.
 
+The canonical ledger now contains **1,840 requirements** and the same number of
+current-state entries. All 1,839 earlier historical requirements and source
+records are preserved. The prepared proof and domain-guard repairs are composed
+at `b830fb0f8965dfd4a961cec4cfd540dee8fe9b08`. Local acceptance includes 775 runtime tests, strict all-target
+lint for four Rust owners, 37 coverage tests and strict tooling lint, eight
+residual controls, the existing domain/fixture and runner regressions, locked
+Vet/Deny, CI contract checks and generated coverage parity. These results do
+not complete the deferred proof or qualify the candidate on hosted runners.
+
 ## Current final qualification obligations (October 9)
 
 The canonical ledger contains **1,839 requirements** and the same number of

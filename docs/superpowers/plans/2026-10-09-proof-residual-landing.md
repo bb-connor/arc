@@ -51,7 +51,7 @@ from the separately assumed SHA-256 noncollision property.
 
 ## Task 2: Bind evidence, review and land
 
-- [ ] Add a source-bound residual audit and update canonical current requirement
+- [x] Add a source-bound residual audit and update canonical current requirement
   states, landing boundary and final review without changing historical objects.
   Expected: ledger checker passes; old requirements preserved byte-for-value.
 - [ ] Record runtime and static evidence, commit a clean composition, and post

@@ -32,6 +32,10 @@ recorded scope. All failed, resource-refused and interrupted runs remain
 preserved in [the source-bound residual audit](../security/audits/kani-open-residual-20261009.json).
 Independent review, exact protected checks and normal protected merge remain.
 
+The domain-guard and strict runner repairs are composed at `b830fb0f8965dfd4a961cec4cfd540dee8fe9b08`.
+The residual audit binds their successful local controls and runtime/strict
+checks. The attestation proof remains open independently of that guard repair.
+
 ## V25-ARCHIVE-LATE-LINEAGE: P1, required before landing
 
 Adding valid capability lineage after legacy unsigned-subject receipts have
