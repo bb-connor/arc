@@ -124,6 +124,16 @@ Its terminal review is
 `/tmp/pr1160-v25-final-20261009/full-cp-0fd8/TERMINAL-REVIEW.json`; the full log
 SHA-256 is `f57941525b53b6a1ae1266e308479f8877be644519ef25c55e978b1a9e149580`.
 
+The later repair `41545ff19c` is composed as `135801e303`. Its deterministic
+established-connection test failed on Original, then passed with the fixture
+signaling graceful shutdown and joining the server to completion. Integration
+review found no blocking defect. The composed source passes all 14 focused
+RPC tests and strict control-plane all-target Clippy. The native transport
+source assertions remain intact; no production timeout, retry or sleep was
+introduced. The [qualification record](../security/audits/recovery-rpc-shutdown-qualification-20261009.json)
+binds the source and logs. This closes the local fixture repair obligation;
+final candidate qualification and protected landing remain pending.
+
 ## Capacity acceptance boundary
 
 The same-host 150k runs passed for contended Original, final source and quieter

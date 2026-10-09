@@ -26,8 +26,10 @@ preserved; replaced current-state entries remain in dated observations:
   campaign must check the observation record after joining its walker. Repair
   `dc21b41788` is locally qualified and independently reviewed on the stage.
 - **RECOVERY-RPC-SHUTDOWN (P2):** a stopped test listener must also stop accepted
-  connections before transport-failure assertions. Claude owns the isolated
-  fixture repair, focused regression evidence and strict owning lint.
+  connections before transport-failure assertions. Repair `135801e303` passes
+  all 14 focused controls and strict owning all-target Clippy on the stage.
+  The [source-bound qualification](audits/recovery-rpc-shutdown-qualification-20261009.json)
+  retains the genuine Original failure and independent integration review.
 
 The [observer qualification record](audits/receipt-snapshot-observer-qualification-20261009.json)
 binds two genuine Original failures to 94 repaired default tests, the explicit
@@ -39,14 +41,17 @@ failure remain preserved; neither is relabeled as passing.
 
 The full control-plane suite at predecessor `0fd8aa21ff` finished with
 **1,573 passes, one failure and one ignore**. Its terminal failure remains
-failed while the RPC fixture is repaired. The same-host 150k capacity runs
+failed despite the later focused fixture repair. The same-host 150k capacity runs
 passed on contended Original, final source and quieter Original, but measured
 tail settlement rather than large unpublished checkpoint-covered staging.
 The required 100k covered-range measurement is pending. No performance gain,
 current full-suite pass or final candidate qualification is claimed.
 
 The mandatory unchanged-domain proof remains pending; diagnostic and component
-results do not replace a terminal proof. Source remains `3b0760cfe7` and the
+results do not replace a terminal proof. The Z3 attempt stopped in CBMC's SMT
+type converter before solver execution and remains a tool error. Main
+`3af65d2d23` is merged into the stage with both histories preserved; its changed
+conformance fixture and affected tooling pass. Source remains `3b0760cfe7` and the
 published PR remains `fd8bfdc947`; exact protected checks and protected merge
 follow the completed local batch. Release acceptance remains separate.
 
