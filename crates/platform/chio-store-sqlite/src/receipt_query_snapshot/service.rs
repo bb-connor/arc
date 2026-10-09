@@ -21,6 +21,10 @@ use super::query::{locate, read_outcome, select, SelectedRow, Selection};
 use super::walk::{observe, Observation, OwnedSink, WalkContext, WalkError, WalkLimits};
 use crate::receipt_store::SqliteReceiptStore;
 
+#[cfg(test)]
+#[path = "tests/generation_observer.rs"]
+mod generation_observer_tests;
+
 /// Snapshot limits and schedules. Every limit is enforced; none is a timing
 /// promise.
 #[derive(Debug, Clone)]
@@ -220,15 +224,15 @@ pub(super) struct Published {
     /// Most pending leaves one staging hold wrote.
     #[cfg(test)]
     max_staged_per_hold: AtomicU64,
-    /// Receives every state a hold commits to this lineage.
+    /// Receives the state of every successful walker hold of this lineage.
     #[cfg(test)]
     observer: Option<GenerationObserver>,
 }
 
-/// Receives the snapshot, lineage and generation of every state a walker hold
-/// commits to a published lineage, inside that hold, before any reader can see
-/// the state. Staging and settlement holds report the generation they leave
-/// unchanged.
+/// Receives the snapshot, lineage and generation after every successful walker
+/// hold, with the SQL work handler removed and the snapshot lock still held.
+/// Every committed generation is observed before readers can see it. Reads,
+/// staging and settlement holds report the generation they leave unchanged.
 #[cfg(test)]
 pub(super) type GenerationObserver = Arc<dyn Fn(&SnapshotDb, &str, u64) + Send + Sync>;
 
@@ -357,6 +361,13 @@ impl Published {
             .connection()
             .map_err(SnapshotDbError::from)?
             .progress_handler(0, None::<fn() -> bool>);
+        // Test-only SQL must neither consume the production work budget nor
+        // inherit cancellation after a successful commit. Keep the same lock
+        // through observation so no intermediate generation can be skipped.
+        #[cfg(test)]
+        if result.is_ok() {
+            self.observe(&owned);
+        }
         drop(owned);
         match result {
             Ok(value) => Ok(value),
@@ -380,15 +391,13 @@ impl Published {
         let value = self.hold(|owned| {
             let value = write(&mut owned.db)?;
             owned.meta.generation += 1;
-            #[cfg(test)]
-            self.observe(owned);
             Ok(value)
         })?;
         self.changed.notify_all();
         Ok(value)
     }
 
-    /// Hand the state the current hold committed to the test observer.
+    /// Hand the current held state to the test observer.
     #[cfg(test)]
     fn observe(&self, owned: &Owned) {
         if let Some(observer) = &self.observer {
@@ -441,10 +450,7 @@ impl Published {
             {
                 return Err(fault);
             }
-            owned.db.commit(batch)?;
-            #[cfg(test)]
-            self.observe(owned);
-            Ok(())
+            owned.db.commit(batch)
         })?;
         #[cfg(test)]
         self.max_staged_per_hold.fetch_max(
@@ -474,8 +480,6 @@ impl Published {
             owned.head = Some(checkpoint);
             owned.chain = chain;
             owned.meta.generation += 1;
-            #[cfg(test)]
-            self.observe(owned);
             Ok(())
         })?;
         self.changed.notify_all();
@@ -493,12 +497,7 @@ impl Published {
         chunk: i64,
     ) -> Result<(), WalkError> {
         loop {
-            let removed = self.hold(|owned| {
-                let removed = owned.db.delete_pending_chunk(start, end, chunk)?;
-                #[cfg(test)]
-                self.observe(owned);
-                Ok(removed)
-            })?;
+            let removed = self.hold(|owned| owned.db.delete_pending_chunk(start, end, chunk))?;
             if removed == 0 {
                 return Ok(());
             }
@@ -598,8 +597,6 @@ impl OwnedSink for PublishedSink<'_> {
             owned.db.commit(batch)?;
             owned.meta.through_entry_seq = owned.meta.through_entry_seq.max(through_entry_seq);
             owned.meta.generation += 1;
-            #[cfg(test)]
-            self.published.observe(owned);
             Ok(())
         })?;
         self.published.changed.notify_all();

@@ -163,11 +163,11 @@ type Position = Cell<(usize, usize, &'static str)>;
 /// What a campaign covered, reported when it passes.
 #[derive(Debug, Default)]
 struct Tally {
-    /// Distinct published generations whose counts were compared in their
-    /// own hold.
+    /// Distinct published generations observed, including explicitly
+    /// excluded tampered lineages. All other states are compared in their hold.
     generations: u64,
-    /// Committed states compared in their own hold, staging and settlement
-    /// holds included.
+    /// Held states observed, including successful reads, staging and
+    /// settlement holds and the explicitly excluded tampered lineages.
     held_states: u64,
     /// Comparisons the campaign itself made on the served version, one
     /// while extension may be mid-cycle and one once settled per operation.
@@ -416,6 +416,11 @@ impl<'p> Campaign<'p> {
         self.service.take().unwrap().shutdown();
         tally.sampled_count_checks += self.sampled.get();
         let generations = self.generations.lock().unwrap();
+        if let Some(mismatch) = &generations.mismatch {
+            self.fail(format!(
+                "a committed state's counts differ from GROUP BY after walker shutdown at {mismatch}"
+            ));
+        }
         tally.held_states += generations.held_states;
         tally.generations += generations
             .seen
