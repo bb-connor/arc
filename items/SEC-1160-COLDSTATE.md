@@ -19,7 +19,7 @@ evidence: []
 ---
 ## Brief
 
-Owner decision 2026-10-09 (`pr1160-f01-bounded-landing`): #1160 landed with bounded FINAL-F01. Lineage labels, principal labels, genesis epochs (with the per-principal epoch index) and declassification rows still count toward the 65,536 native current-row budget and cannot be deleted safely. Implement authenticated cold state so that history moves out of the hot budget without being forgotten.
+Owner decision 2026-10-09 (`pr1160-f01-bounded-landing`): #1160 is authorized to land with bounded FINAL-F01 once its required repairs and qualification pass (it is not merged yet). Lineage labels, principal labels, genesis epochs (with the per-principal epoch index) and declassification rows still count toward the 65,536 native current-row budget and cannot be deleted safely. Implement authenticated cold state so that history moves out of the hot budget without being forgotten.
 
 Start from the lane design `claude-pr1160-evidence/hammer/tickets/final-f01-cold-state-design.md` (ws2 coord lane, sha256 prefix dc5b4c9d003fe215), with these binding corrections from Root (2026-10-09T21:10:25Z) and the planner:
 - rehydrate the exact authenticated epoch image, never a manufactured COPY_EPOCH, and keep a retained authenticated marker for cross-tier transition-id uniqueness;
@@ -46,3 +46,4 @@ Start from the lane design `claude-pr1160-evidence/hammer/tickets/final-f01-cold
 
 ## Log
 - 2026-10-09T21:28:44Z connor: created
+- 2026-10-09T21:54:07Z connor: brief wording corrected (#1160 not yet merged), per Root 2026-10-09
