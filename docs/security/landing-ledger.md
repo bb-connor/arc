@@ -7,6 +7,28 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Registry, export and operator composition (October 9)
+
+The [component audit](audits/registry-export-operator-composition-20261009.json)
+records local composition of the passport-status/certification transactions,
+bounded receipt export refusal repairs and authenticated snapshot recovery.
+Store tests passed 191 with 7 existing ignored; control-plane coverage passed 99
+unique cases across two identical-source runs. The audit retains the initial
+test-count harness failure, producer failures, terminal CLI and strict checks.
+These results do not close the new authority/governance findings or qualify the
+whole landing candidate. The [export re-review](audits/export-refix-review-dispositions-20261009.json)
+reopens the HTTP refusal contract and slow-builder readiness acceptance; all six
+observations remain tracked pending repair or explicit classification.
+
+The ledger now preserves **1,898 requirements**, including two explicit
+[adjacent registry obligations](audits/adjacent-registry-review-dispositions-20261009.json):
+offer single-use integrity (P1) and verifier-policy lost updates (P2). Both predate
+this PR. Earlier process-only offer repairs and their evidence remain preserved;
+the current repair must account for them and include local CLI writers. All
+1,890 previous requirement objects remain unchanged, and eight superseded
+current states are archived. Publication remains held for the remaining repairs,
+exact-source review and protected checks.
+
 ## Independent authority review reopened (October 9)
 
 **FINAL-F11 remains blocked by a confirmed P1 authority regression.** An elected
