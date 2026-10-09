@@ -21,12 +21,19 @@ change, and final candidate checks. No feature additions are admitted.
 | V02 P1 | Claude | Compact authenticated dead native transition/fence current rows at automatic checkpoints; retain immutable replay journals | Design accepted; regression pending | Sustained traffic, live cap, replay, retry, crash rollback and reopen controls | #1160 |
 | V03 P2 | Root | `e5a4b9e44b`, `2e02021ab2`: qualify exact source before canonical signatures and bind verification to expected SHA | Original failures retained; composed 13 real-cosign and 17 source-gate tests, CI contract and current actionlint pass | Hosted signing, final candidate and independent delta review | #1160 |
 | V04 P2 | Root | `625f7ae17f`: check committed event ranges early in CI | Original 11 failures; repaired 13 real-Git tests, 11 independent controls; full composed CI mutation suite passes | Final hosted candidate | #1160 |
-| V06 P2 | Claude | Bound registry writes before replacement and safely retire expired offers | Original and repair pending | Prior readable state preserved on refusal; live/redeemed offer and replay controls | #1160 |
+| V06 P2 | Claude | Candidate `c5380ea21c` bounds registry persistence and prunes expired or fully redeemed offers; not integrated | Original oversized-save regression fails; owner reports 25 tests and strict Clippy, complete command evidence requested | Source review, live redemption reserve and persistence failure controls, composed verification | #1160 |
 | V08 P2 | Claude | `b17fee4ee7`, `088d81d84d`: monotonic resilience reads do not sample fenced wall time | Original 3 failures; composed guards 386 tests and strict all-target Clippy pass; regressions prime and reject backward wall time | Final hosted candidate and independent delta review | #1160 |
 | V17 P2 | Claude | `3fe03f89b8`: lazily decode classification payload once per verification | Original 256 parses versus 1; composed flow 47 tests, strict all-target Clippy and trust-boundary gate pass | Final hosted candidate and independent delta review | #1160 |
 | V22 P2 | Claude | `dfb58ee550`, `a902313b4c`: discover sets through live contributions; retain generation and replay state | Original historical-set and orphan controls fail; composed suspension 11 tests and strict all-target Clippy pass | Final hosted candidate and independent delta review | #1160 |
-| V24 P2 | Claude | `6f35827a64`: refuse retained-export reimport over a destination that served | Original rollback acceptance reproduced; owning relocation 13, serving-owner 103, rollback 73 and clock 7 tests pass; full-library timeout stays incomplete | Composed serving-owner tests and strict Clippy running; independent delta review and hosted candidate | #1160 |
-| V25 P2 | Claude | Unresolved: request work bounds conflict with unrestricted whole-corpus authentication | Original work-bound failure reproduced; independent source review rejects head/schema caching and page-only integrity substitution | Concrete bounded-request/store-lifetime design and explicit healthy-large-store handling, then regression and acceptance | #1160 |
+| V24 P2, P1 follow-up | Claude | `6f35827a64` rejects ordinary retained-export rollback; independent review found a zeroed newer anchor slot can expose the old seed and permit reimport | Composed serving-owner 103 tests and strict Clippy pass; full-library timeout stays incomplete | Repair served-destination identity check and test genuine pre-commit retry, zeroed/corrupted slots and byte preservation; then composed and hosted checks | #1160 |
+| V25 P2 | Claude | User requires authenticated query snapshots before landing; persistent control-plane store lifetime is the first prerequisite | Original work-bound failure reproduced; per-request open/page work grows with both archive and live history | Reviewed snapshot spec and implementation, immutable authenticated projection, explicit watermarks/freshness, complete accepted filters/counts, bounded build/query work and large-history lifecycle controls | #1160 |
+
+The user explicitly selected authenticated receipt query snapshots on October
+9. Strict whole-history request budgets that permanently disable healthy
+large-store reads are not an accepted substitute. Snapshot publication must
+retain authenticated filter and count completeness, including empty queries,
+and distinguish initializing, stale and invalid state. This decision does not
+relax the receipt trust boundary or claim unlimited capacity in bounded memory.
 
 The refreshed published state is still `fd8bfdc947`: 117 successful, eight
 failed and 16 skipped hosted checks. No local repair has been promoted to
@@ -39,9 +46,12 @@ The user-approved cryptographic scope below remains in force. The complete
 real-SHA weights determinism/shape proof passed in 948.40 seconds with Kissat
 and a reachable exact completion cover. Both typed receipt proofs passed
 (mismatch 226.68 seconds, match 488.34 seconds). The attestation encoder/SHA-bound run timed out after 1,805.19 seconds without
-a verdict. A fresh run adds a reviewed U64 padding-loop bound of 65; its 30
-selector tests pass. All original symbolic inputs, real SHA evaluations and
-full unwinding assertions remain. This active run is not yet a proof. Cancelled diagnostic runs and
+a verdict. Its successor, with a reviewed U64 padding-loop bound of 65 and
+30 passing selector tests, also timed out after 1,804.77 seconds without a
+verdict. A source-backed stack-encoding repair is undergoing public-function
+allocation RED/GREEN validation; it must retain the exact encoded bytes and
+all three real SHA evaluations. The final strict proof remains open. All
+original symbolic inputs and full unwinding assertions remain. Cancelled diagnostic runs and
 original noncollision timeouts remain separate failed or incomplete evidence.
 Generated coverage, explicit crypto-scope controls and the security CI
 contract mutation suite passed on their recorded staged snapshots; later
@@ -52,8 +62,9 @@ campaign in 916.22 seconds; it does not establish the pending attestation proof.
 The prior combined runtime evidence has been renewed for the later retry,
 budget and dual-clock boundaries. Exact commands, source hashes, failures
 and successful resumptions remain under
-`/tmp/pr1160-integrated-check-20261009/attempt3` through `attempt7`. V24
-composition is recorded separately in `attempt8` when terminal.
+`/tmp/pr1160-integrated-check-20261009/attempt3` through `attempt8`. The latter
+qualifies the initial V24 composition only; its newly discovered rollback
+follow-up still needs repair and verification.
 These focused results do not replace the four required protected hosted
 checks, review-thread dispositions, or the final independent review delta.
 Native/trusted and product release acceptance remain separate prerequisites
