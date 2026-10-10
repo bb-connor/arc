@@ -269,3 +269,20 @@ fn clean_arguments_allow_without_fabricating_detection_evidence() {
         assert!(receipts.bodies().is_empty());
     }
 }
+
+#[test]
+fn padded_credentials_next_to_command_delimiters_are_denied() {
+    const PADDED: &str = "synthetic/credential+data==";
+    for command in [
+        format!("send {PADDED};"),
+        format!("send ({PADDED})"),
+        format!("send [{PADDED}],ordinary"),
+    ] {
+        assert_marker_denied(
+            TripwireKind::CredentialArtifact,
+            PADDED,
+            serde_json::json!({"command": command}),
+            false,
+        );
+    }
+}

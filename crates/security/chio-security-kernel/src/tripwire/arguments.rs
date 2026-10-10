@@ -62,6 +62,7 @@ impl<'a> Candidates<'a> {
         for word in text.split(word_separator) {
             self.emit(word)?;
             for field in word.split([';', ',', '&', '?', '(', ')', '[', ']', '{', '}']) {
+                self.emit(field)?;
                 if let Some((_, value)) = field.split_once('=') {
                     self.emit(value)?;
                 }
