@@ -7,6 +7,22 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Forwarded-term repair and component review (October 10)
+
+The queued forwarded-term repair is integrated at `f3dcbe03cf`. Corrected
+unchanged-production tests had two passes and two genuine failures; the repair
+passed all four controls and 14 composed owning tests, strict control-plane
+Clippy and formatting. Independent source reviews accepted the forwarded-term,
+wallet-expiry and startup-order deltas within their documented scopes. The
+[audit](audits/final-worker-term-and-review-20261010.json) binds source and evidence
+hashes, including the initial compile failure that is not runtime RED.
+
+All **1,931 requirements** remain preserved. Behavioral signer custody and four
+composition controls are still being repaired. Whole-candidate runtime, updated
+coverage metadata, final independent review and the four protected hosted checks
+remain open. The refreshed 65 PR threads include 33 unresolved threads with no
+new content; none was automatically resolved from these component results.
+
 ## Wallet repair and frozen capacity checkpoint (October 10)
 
 The wallet wait/expiry repair is integrated at `7cd19d4cc7`: 30 focused tests,
