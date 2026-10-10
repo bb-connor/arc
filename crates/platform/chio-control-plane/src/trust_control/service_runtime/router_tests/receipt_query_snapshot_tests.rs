@@ -515,3 +515,6 @@ async fn cancelled_point_materialization_keeps_read_admission() -> TestResult {
 
 #[path = "receipt_snapshot_recovery_tests.rs"]
 mod recovery;
+
+#[path = "receipt_snapshot_building_health_tests.rs"]
+mod building_health;
