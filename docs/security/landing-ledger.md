@@ -7,6 +7,25 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Registry admission and remaining recovery repairs (October 10)
+
+The [component checkpoint](audits/registry-core-checkpoint-20261010.json) records
+registry and wallet service admission integrated at `cc2b0b1fa2`: 40 focused,
+680 repeated parallel and 32 CLI tests passed, alongside strict owning lint.
+Root verified producer source and evidence hashes and renewed the reviewed
+wallet reader inventory. These are component passes; final composition remains.
+
+Expected-safe tests confirm that plain-seed requests still provision authority
+material and peer aliases can count toward serving trust. Both are assigned to
+the core repair. Four snapshot crash/placement/startup tests confirm the need
+for bounded abandoned-file reclamation, including during an unavailable seed.
+
+Export attribution repairs remain open. The [review erratum](audits/export-review-evidence-erratum-20261010.json)
+preserves the unavailable preliminary report and pins the immutable final review.
+OID4VP signing remains a named first-after-landing P1 with its plan and residual
+source observations recorded. No candidate push, hosted qualification or merge
+is established by this checkpoint.
+
 ## Authority and crash-recovery acceptance (October 10)
 
 The [follow-on audit](audits/authority-snapshot-followons-20261010.json) records
@@ -64,7 +83,7 @@ consumer triage and a genuine Original before a bug claim. Both remain visible.
 
 ## Bounded readiness repairs and remaining review work (October 10)
 
-The ledger preserves **1,925 requirements**, including all 1,920 earlier objects.
+The ledger preserves **1,926 requirements**, including all 1,925 earlier objects.
 The [readiness audit](audits/readiness-followons-20261010.json) pins 80 renewed
 native tests, registry transaction and governance producer evidence, and the
 shared authority APIs. These are component results; the final source is not
