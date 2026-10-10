@@ -7,6 +7,20 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Earlier repairs reconciled (October 10)
+
+The [component reconciliation](audits/earlier-repair-reconciliation-20261010.json)
+updates twelve earlier review states using 66 verified artifact hashes and 16
+integrated repair commits. Terminal registry capacity, receipt recovery and
+health, native second-lineage admission, operator recovery, and bounded export
+repairs have local evidence. These component results still await final candidate
+qualification. Native `FINAL-F12` is distinct from active snapshot `FINAL-12`.
+
+Building-state HTTP privacy coverage remains open, as do authority and pre-open
+snapshot recovery composition. The fee-forwarding evidence gap stays explicitly
+unverified. All **1,929 requirements** and earlier states are preserved. Final
+independent review, four protected checks and normal merge remain pending.
+
 ## Snapshot and authority recovery checkpoint (October 10)
 
 The [recovery audit](audits/recovery-checkpoint-20261010.json) records snapshot
