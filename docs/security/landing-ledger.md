@@ -7,6 +7,25 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Bounded readiness repairs and remaining review work (October 10)
+
+The ledger preserves **1,908 requirements**, including all 1,899 earlier objects.
+The [readiness audit](audits/readiness-followons-20261010.json) pins 80 renewed
+native tests, registry transaction and governance producer evidence, and the
+shared authority APIs. These are component results; the final source is not
+qualified or merged. The initial failing campaigns remain recorded.
+
+Required work includes fee-binding refusal before commit, actual passport signer
+admission, wallet ingress worker isolation, core replicated authority admission,
+and export attribution ordering. Four additional export review observations have
+explicit rows. The earlier six export observations passed their scoped re-review.
+Inherited OID4VP signer custody is a first-after-landing P1 under the planner's
+scope ruling; the unchanged governance-case evaluator remains an unconfirmed
+review observation requiring consumer-semantics triage. Neither is lost.
+
+`KANI-PROOF-QUAL` stays OPEN/UNPROVED. `SEC-1160-COLDSTATE` stays OPEN P1 and
+blocks G5. No baseline, cap or proof waiver is introduced by these local results.
+
 ## Rewritten passport authority admission (October 10)
 
 The ledger now preserves **1,899 requirements**. The additional
