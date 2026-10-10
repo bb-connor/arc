@@ -453,7 +453,7 @@ pub(crate) fn configured_passport_credential_issuer(
     passport_credential_issuer_with(config, resolve_oid4vp_verifier_signing_key)
 }
 
-fn passport_credential_issuer_with(
+pub(crate) fn passport_credential_issuer_with(
     config: &TrustServiceConfig,
     signing_key: impl FnOnce(&TrustServiceConfig) -> Result<Keypair, CliError>,
 ) -> Result<Oid4vciCredentialIssuerMetadata, CliError> {

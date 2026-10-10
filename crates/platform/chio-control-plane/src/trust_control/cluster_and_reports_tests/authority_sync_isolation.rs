@@ -783,3 +783,64 @@ async fn final_f11_inspection_rechecks_authority_head_after_work() {
         Some(2)
     );
 }
+
+#[tokio::test]
+async fn final_f11_inspection_sync_guard_rechecks_authority_head() {
+    let directory = chio_test_support::private_tempdir().test_unwrap();
+    let mut state = state_with_cluster(IMPORTER_URL, &[], None, None, None);
+    let path = directory.path().join("sync-authority.sqlite3");
+    SqliteCapabilityAuthority::open_with_clock(&path, state.finding_challenge_clock.clone())
+        .test_unwrap();
+    state.config.authority_db_path = Some(path);
+    let result = tokio::task::spawn_blocking(move || {
+        let _permit = state
+            .authority_inspection_lane
+            .clone()
+            .try_acquire_owned()
+            .test_unwrap();
+        inspect_authority_state_blocking(&state, |state| {
+            SqliteCapabilityAuthority::open_with_clock(
+                state.config.authority_db_path.as_ref().test_unwrap(),
+                state.finding_challenge_clock.clone(),
+            )
+            .test_unwrap()
+            .rotate()
+            .test_unwrap();
+            Ok(())
+        })
+    })
+    .await
+    .test_unwrap();
+    assert_inspection_refused(result, "authority state changed during inspection").await;
+}
+
+#[tokio::test]
+async fn final_f11_inspection_sync_guard_rechecks_election_term() {
+    let peer_url = "http://127.0.0.2:3301";
+    let state = state_with_cluster(IMPORTER_URL, &[peer_url], None, None, None);
+    update_peer_reachable(&state, peer_url);
+    let result = tokio::task::spawn_blocking(move || {
+        let _permit = state
+            .authority_inspection_lane
+            .clone()
+            .try_acquire_owned()
+            .test_unwrap();
+        inspect_authority_state_blocking(&state, |state| {
+            state
+                .cluster
+                .as_ref()
+                .test_unwrap()
+                .lock()
+                .test_unwrap()
+                .election_term += 1;
+            Ok(())
+        })
+    })
+    .await
+    .test_unwrap();
+    assert_inspection_refused(
+        result,
+        "cluster authority context changed during inspection",
+    )
+    .await;
+}

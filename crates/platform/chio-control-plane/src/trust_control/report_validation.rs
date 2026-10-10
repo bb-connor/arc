@@ -1,11 +1,28 @@
 #[path = "authority_admission.rs"]
 mod authority_admission;
-pub(crate) use authority_admission::inspect_authority_state;
+pub(crate) use authority_admission::inspect_authority_state_blocking;
 
 use super::cluster::{
     cluster_authority_lease_view, cluster_authority_read_role, ClusterAuthorityReadRole,
 };
 use super::*;
+
+/// Inspect an admitted authority view on the blocking pool. A term/quorum or
+/// authority-head/live-key-set change before return refuses the result. The
+/// caller must additionally bind any artifact's actual signer to this view.
+pub(crate) async fn inspect_authority_state<T, F>(
+    state: &TrustServiceState,
+    inspect: F,
+) -> Result<T, Response>
+where
+    T: Send + 'static,
+    F: FnOnce(&TrustServiceState) -> Result<T, Response> + Send + 'static,
+{
+    authority_admission::run_blocking_authority_operation(state, move |state| {
+        inspect_authority_state_blocking(state, inspect)
+    })
+    .await
+}
 
 pub(crate) fn budget_visibility_matches(
     allowed: bool,

@@ -73,29 +73,34 @@ where
     })?
 }
 
-/// Inspect an admitted authority view on the blocking pool. A term/quorum or
-/// authority-head/live-key-set change before return refuses the result. The
-/// caller must additionally bind any artifact's actual signer to this view.
-pub(crate) async fn inspect_authority_state<T, F>(
+/// Inspect inside an already-admitted, bounded blocking worker. This guard
+/// creates no task, permit or file lock. Complete it successfully before the
+/// surrounding registry transaction persists any mutation. The caller binds
+/// any artifact's actual signer to the admitted live head before and after
+/// signing; an opaque result cannot establish that binding for the caller.
+pub(crate) fn inspect_authority_state_blocking<T, F>(
     state: &TrustServiceState,
     inspect: F,
 ) -> Result<T, Response>
 where
-    T: Send + 'static,
-    F: FnOnce(&TrustServiceState) -> Result<T, Response> + Send + 'static,
+    F: FnOnce(&TrustServiceState) -> Result<T, Response>,
 {
-    run_blocking_authority_operation(state, move |state| {
-        let before = authority_view_bytes(state)?;
-        let result = inspect(state)?;
-        if before != authority_view_bytes(state)? {
-            return Err(plain_http_error(
-                StatusCode::SERVICE_UNAVAILABLE,
-                AUTHORITY_CHANGED,
-            ));
-        }
-        Ok(result)
-    })
-    .await
+    let context = inspection_cluster_context(state)?;
+    let before = authority_view_bytes(state)?;
+    let result = inspect(state)?;
+    if before != authority_view_bytes(state)? {
+        return Err(plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            AUTHORITY_CHANGED,
+        ));
+    }
+    if context != inspection_cluster_context(state)? {
+        return Err(plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            CLUSTER_CHANGED,
+        ));
+    }
+    Ok(result)
 }
 
 fn authority_view_bytes(state: &TrustServiceState) -> Result<Vec<u8>, Response> {
