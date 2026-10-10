@@ -19,9 +19,7 @@ mod policy;
 pub(in crate::admission_operation_store) mod status;
 pub(super) use capture::{capture_tx, verify_capture_tx, SemanticCaptureWitness};
 pub(in crate::admission_operation_store) use capture::{
-    validate_historical_semantic_refused_input_origin, verify_input_tx,
-    HistoricalSemanticRefusedInputObservation, SemanticHistoricalInputOriginData,
-    SemanticInputAssessment, SemanticInputObservation, SemanticRefusedInputOriginData,
+    verify_input_tx, SemanticInputObservation,
 };
 pub(in crate::admission_operation_store) use policy::policy_application_receipt;
 pub use policy::{

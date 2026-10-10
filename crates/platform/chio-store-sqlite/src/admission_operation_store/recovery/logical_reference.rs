@@ -31,7 +31,7 @@ pub(in crate::admission_operation_store) use reference_knowledge::{
 };
 pub(in crate::admission_operation_store) use reference_product::{
     bind_product_reference_source, persist_knowledge_reference_progress,
-    reserve_product_reference_intake, ReservedProductReferenceIntake, VerifiedParticipantAllowance,
+    reserve_product_reference_intake, ReservedProductReferenceIntake,
 };
 
 const ACCOUNT_RECORD_BYTES: usize = 4096;

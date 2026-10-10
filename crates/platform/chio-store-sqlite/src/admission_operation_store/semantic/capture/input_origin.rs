@@ -15,10 +15,6 @@ mod historical;
 #[path = "input_origin/source_records.rs"]
 mod source_records;
 use framing::FramingSources;
-pub(in crate::admission_operation_store) use historical::{
-    validate_historical_semantic_refused_input_origin, HistoricalSemanticRefusedInputObservation,
-    SemanticHistoricalInputOriginData,
-};
 use source_records::{AudienceSources, SourceRecord};
 
 const MAX_ORIGIN_BYTES: usize = 16 * 1024 * 1024;

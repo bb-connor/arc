@@ -2,10 +2,7 @@ use super::*;
 use materialization::{step_key, verify_current_prerequisites, verify_materialized_plan};
 #[path = "capture/input_origin.rs"]
 mod input_origin;
-pub(in crate::admission_operation_store) use input_origin::{
-    validate_historical_semantic_refused_input_origin, HistoricalSemanticRefusedInputObservation,
-    SemanticHistoricalInputOriginData, SemanticRefusedInputOriginData,
-};
+use input_origin::SemanticRefusedInputOriginData;
 
 /// Private, transaction-borrowed semantic evidence cannot be decoded or reused.
 pub(in crate::admission_operation_store) struct SemanticCaptureWitness {

@@ -57,9 +57,9 @@ impl core::fmt::Debug for PreparedProcessReturnSource {
     }
 }
 
-/// The exact original call selection for a native return source. The owning
-/// runtime constructs it from its authenticated call; no decoder exists and
-/// stored descriptive fields cannot mint one.
+/// Borrowed inputs for validating an original call's native return source.
+/// Grouping them does not authenticate them; `verify_source_request` checks
+/// their binding against the owning runtime and journal.
 pub(crate) struct NativeReturnSourceRequest<'a> {
     pub(crate) process_id: &'a str,
     pub(crate) operation_key: &'a str,
