@@ -7,6 +7,29 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Candidate withdrawn; local repairs in progress (October 10)
+
+Published `633cf1d2f6` is **withdrawn as a landing candidate**. On its identical
+runtime source, the bounded control-plane campaign passed 921 tests and failed
+three; CLI certification passed nine and failed four (one existing ignored).
+The broad control-plane attempt timed out after 506 observed passes. All failed
+and partial campaigns remain retained in the [withdrawal audit](audits/final-candidate-withdrawal-20261010.json).
+The queued protected CI run was cancelled to avoid spending its full runtime
+on a known-ineligible source. Cancellation and dependent aggregate failures
+are not qualification.
+
+The shared authority smoke repair is staged at `5cb7ec5ee4`: permission controls,
+actual CLI authority/sidecar smoke and actual Drogon allow/deny/receipt smoke
+pass locally. Two control-plane fixtures, explicit local CLI owner bootstrap,
+and remote budget projection provenance remain in progress. Production custody
+and authoritative replay checks must remain strict. New repairs need independent
+review, composition checks and fresh hosted qualification before normal merge.
+
+The ledger now preserves **1,936 requirements**, including all 1,931 earlier
+requirements unchanged and five explicit repair obligations. No merge or release
+readiness is claimed; the accepted proof, cold-state and product-evidence
+residuals retain their existing boundaries.
+
 ## Final component repairs (October 10)
 
 Behavioral signing custody is repaired at `b1093829bf`: existing-only reads,
