@@ -7,6 +7,32 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## CI repair checkpoint (October 10)
+
+The candidate source is `53f4d394254f3179231e4639a35e774bb6fb3461`. Eight narrow CI repairs are integrated:
+stub comment, exact flow and crypto test inventories, reviewed lockfile pins,
+bounded-token copy classification, checked export byte arithmetic, the existing
+snapshot-directory identifier, and removal of an unnecessary privileged
+dependency with byte-identical encoding. The [checkpoint audit](audits/ci-repair-checkpoint-20261010.json)
+pins their Original failures, component checks, native reviews and local gates.
+The ledger preserves all **1,950 original requirements** and appends eight CI
+obligations, for **1,958 total**. Eight earlier current states are archived before
+recording completed bounded local acceptance and the explicit unverified proof-cost delta.
+
+Published `b9a43b2995` is withdrawn as a landing candidate after genuine hosted
+scanner and inventory failures. Its 385 Rust and 469 Python passes, strict
+four-crate lint and scoped independent review remain valid bounded evidence.
+The one-hour broader workspace attempt expired during compilation and reached
+no tests. All five remaining obsolete workflows were cancelled; their original
+failed jobs and cancellation-induced aggregate failures remain distinct.
+
+The replacement still requires final local gate acceptance, scoped independent
+integration review, four exact-candidate protected checks and normal protected
+merge. Kani remains OPEN/UNPROVED. Authenticated cold state remains OPEN P1 and
+blocks G5 preview. Trusted35, dedicated App and native/cold release evidence
+remain separate postmerge/pre-release obligations. No full-workspace, proof,
+hosted, merge or release-readiness claim follows from this checkpoint.
+
 ## Final hosted review repairs staged (October 10)
 
 All six reported repairs are composed at `274d5a6eeffc22c0e52e98d962f641e46b40c7a9`, with genuine Original
