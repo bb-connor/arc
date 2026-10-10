@@ -23,12 +23,22 @@ export interface RecoveryClientOptions {
   timeoutSeconds?: number;
 }
 
-const schemaBase = "https://chio.world/schemas/chio-wire/v1/recovery/";
 let validateWire: ReturnType<typeof createWireSchemaValidator> | undefined;
+let schemaIds: ReadonlyMap<string, string> | undefined;
 function validates(schema: string, value: unknown): boolean {
   validateWire ??= createWireSchemaValidator(recoveryWireSchemas);
-  const base = ["signed-explanation-view", "decision-report", "decision-report-view", "policy-maintenance-proposal", "policy-maintenance-view", "signed-recovery-setup-probe", "signed-recovery-setup-report"].includes(schema) ? "https://chio.computer/schemas/chio-wire/v1/recovery/" : schemaBase;
-  return validateWire(base + schema + ".schema.json", value);
+  // The pinned generated bundle carries each schema's authoritative registered
+  // $id, including its host. Resolve by filename instead of re-encoding the
+  // host per schema name here; an unknown name fails closed exactly like an
+  // unregistered $id already does.
+  schemaIds ??= new Map(recoveryWireSchemas.flatMap((entry): [string, string][] => {
+    const id = (entry as { $id?: unknown }).$id;
+    if (typeof id !== "string") return [];
+    const name = id.slice(id.lastIndexOf("/") + 1);
+    return name ? [[name, id]] : [];
+  }));
+  const id = schemaIds.get(`${schema}.schema.json`);
+  return id !== undefined && validateWire(id, value);
 }
 
 export class RecoveryClient {

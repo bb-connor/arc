@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { canonicalJsonString } from "../src/canonical.js";
 import { RecoveryClient } from "../src/recovery.js";
@@ -112,7 +113,6 @@ describe("I-JSON canonical values", () => {
     expect(() => canonicalJsonString({ [value]: "field" })).toThrow();
   });
   it("preserves a valid surrogate pair and UTF-16 key order", () => {
-    expect(canonicalJsonString({ "\ue000": 2, "😀": 1, a: 3 })).toBe('{"a":3,"😀":1,"":2}');
+    expect(canonicalJsonString({ "\ue000": 2, "😀": 1, a: 3 })).toBe('{"a":3,"😀":1,"\ue000":2}');
   });
 });
-import { readFileSync } from "node:fs";
