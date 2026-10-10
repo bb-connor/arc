@@ -6,8 +6,10 @@ after the repaired candidate has local acceptance and independent delta review.
 
 **Execution:** Root remains the only integration writer. Existing authorization
 covers implementation, integration, qualification and protected landing. Claude
-and two isolated Rust helpers deliver source-bound commits. The coordination
-board records path ownership and handoffs. No proof campaigns are authorized;
+delivers source-bound commits through the mailbox. Earlier helper work is
+integrated; all further Root execution is in the native thread, without
+subagents. The coordination board records path ownership and handoffs.
+No additional proof campaigns are authorized;
 KANI-PROOF-QUAL remains OPEN/UNPROVED under the recorded owner amendment.
 
 ## Contracts and ownership
@@ -173,3 +175,31 @@ Original evidence. Root remains the only integration writer.
 These are repairs to existing contracts under the standing execution authorization.
 They add no roadmap features, real proof campaigns, external interception experiments,
 new lint allowances or acceptance waivers.
+
+
+## Task 7: Repair hosted qualification failures before another publication
+
+Candidate `b9a43b2995` retains the six review repairs and passing composed local
+qualification (385 Rust tests, 469 Python tests, strict owning lint and static
+checks). Its hosted Build job failed before reaching Rust checks. These results
+remain distinct from full workspace or exact-source hosted qualification.
+
+1. Integrate the comment-only budget provenance clarification after reproducing
+   the stub-surface scanner failure. Run the actual scanner and its regression
+   suite; change no scanner allowance or production behavior.
+2. Move the approval-reservation cleanup test out of the threshold crypto-floor
+   module. Preserve its assertions and execution, and restore the unchanged
+   20-name crypto-floor inventory. Require the exact inventory, moved control
+   and owning strict lint to pass before integration.
+3. Inventory the actual remaining CI steps and run their fast local checks,
+   preserving failures individually. Claude owns hosted failure triage and
+   isolated repairs; Root owns the ordinary local workspace campaign and its
+   findings. Claim paths before edits and exchange exact source/evidence pins.
+4. Hold the replacement push until the known repairs and fast-check sweep are
+   complete. Renew generated source metadata as needed, without changing proof
+   claims or running additional proof campaigns. Preserve the original hosted
+   failures and any incomplete local campaigns.
+5. Review the complete repair delta in the native thread, compose released
+   commits, and qualify the changed boundaries. Then publish one replacement
+   candidate and return to Task 5's protected landing requirements. Automatic
+   hosted formal results do not close KANI-PROOF-QUAL.
