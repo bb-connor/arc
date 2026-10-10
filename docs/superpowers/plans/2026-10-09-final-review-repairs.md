@@ -140,3 +140,36 @@ Check cancellation ownership, cross-tenant effects, snapshot publication and
 freshness, recovery without resource-limit removal, registry worst-case terminal
 growth, session-ID reuse, and future-issued versus expired authority envelopes.
 Review ledger transitions as evidence changes, not as a rewrite of history.
+
+
+## Task 6: Repair the final hosted review findings
+
+The exact-source review of `fd82f2f247` added six obligations in
+[the intake audit](../../security/audits/github-final-review-intake-20261010.json).
+That head is withdrawn despite its 967 distinct bounded local passes. Preserve
+those results and all earlier failures; the new findings require their own
+Original evidence. Root remains the only integration writer.
+
+1. Reject x402 requirement lists containing a token outside ApprovalBinding.
+   Preserve approved symbol case handling and prove mixed-token refusal.
+2. Restore reserved-operation revalidation forwarding through the public runtime
+   facade and preserve invalid binding and stale reservation refusal.
+3. Preserve the next request when an oversized reference-tool line already ended
+   at the bounded read boundary. Test exact boundary, fragmented input and EOF.
+4. Reconcile repository command schema and finite frame limits for escaped UTF-8
+   commands. Drain rejected frames without consuming a following valid request.
+5. Reverify receipt signatures with the independently supplied key, while comparing
+   only documented stable verifier evidence. Diagnostic order and additions are
+   compatible; schema, receipt count, key and integrity contradictions refuse.
+6. Scan nested argument strings and keys for exact registered decoy candidates,
+   including supported header, cookie, URL and word contexts. Bound traversal,
+   candidate count and bytes; refuse exhaustion. Preserve tenant/lifecycle checks,
+   event/receipt evidence and refusal on detector failure. No plaintext-registry
+   enumeration or arbitrary encoded-substring detection claim.
+7. Integrate reviewed commits, retain all six ledger obligations, renew generated
+   source metadata, then run final changed-boundary qualification and independent
+   review before one replacement publication. Hosted protections remain mandatory.
+
+These are repairs to existing contracts under the standing execution authorization.
+They add no roadmap features, real proof campaigns, external interception experiments,
+new lint allowances or acceptance waivers.

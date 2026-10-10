@@ -1,0 +1,172 @@
+{
+  "schema": "chio.github-final-review-intake.v1",
+  "observed_at": "2026-10-10T08:56:44.124278+00:00",
+  "source_head": "fd82f2f247d29dce7d057a160d653ee6261a35eb",
+  "candidate_status": "withdrawn-after-new-review-findings",
+  "review": {
+    "url": "https://github.com/bb-connor/arc/pull/1160#issuecomment-6095802690",
+    "id": 6095802690,
+    "author": "chatgpt-codex-connector[bot]",
+    "body_sha256": "25c07641f0eae780f42719af78ff1b9dbb196a8d2dbd01d756839b2ef6d9706f",
+    "finding_count": 6,
+    "approval": false
+  },
+  "findings": [
+    {
+      "id": "FINAL-REVIEW-FRAME-LIMIT",
+      "priority": "P2",
+      "requirement": "Schema-valid repository commands must fit a finite MCP frame, including JSON escaping and envelope overhead; rejected oversized frames cannot consume a following valid request.",
+      "source_path": "sdks/python/chio-mini-swe/src/chio_mini_swe/repository.py",
+      "source_sha256": "1abc51ac1aef299ba57be311ef3f693b42afac8e12b4faf46bc73f78ca3267db",
+      "disposition": "source-inspected-repair-in-progress",
+      "original_red": "pending-owning-regression"
+    },
+    {
+      "id": "FINAL-REVIEW-TRIPWIRE-INPUT",
+      "priority": "P2",
+      "requirement": "Pre-invocation tripwires must inspect bounded argument candidates for declared decoy surfaces, retaining tenant and lifecycle authentication, fail-closed exhaustion and persisted detection evidence.",
+      "source_path": "crates/security/chio-security-kernel/src/tripwire.rs",
+      "source_sha256": "a25b1ed5707c618b0647b6f03d02dc890011b7f0c296998a84da9d4be92c315c",
+      "disposition": "source-inspected-repair-in-progress",
+      "original_red": "pending-owning-regression"
+    },
+    {
+      "id": "FINAL-REVIEW-PAYMENT-TOKEN",
+      "priority": "P1",
+      "requirement": "Every emitted x402 accepted token must remain inside the approval-bound token authority; membership of one approved token must not authorize additional tokens.",
+      "source_path": "crates/economy/chio-settle/src/payments.rs",
+      "source_sha256": "f18f6762895c1e35d18fbfbc0a97d0c1a31c5f17eabe3000871cd8f9a4ec7373",
+      "disposition": "source-inspected-repair-in-progress",
+      "original_red": "pending-owning-regression"
+    },
+    {
+      "id": "FINAL-REVIEW-RECEIPT-EVIDENCE",
+      "priority": "P2",
+      "requirement": "Independently reverify original receipts with the trusted key and compare stable authenticated verification fields; advisory diagnostic additions or ordering must not invalidate a genuine historical export.",
+      "source_path": "sdks/python/chio-mini-swe/src/chio_mini_swe/repository_review.py",
+      "source_sha256": "f8cac43e1ad0afc91f5bd6a28cdd4d553bb00632d5ff52568b24b4148e6abc95",
+      "disposition": "source-inspected-repair-in-progress",
+      "original_red": "pending-owning-regression"
+    },
+    {
+      "id": "FINAL-REVIEW-LINE-DRAIN",
+      "priority": "P2",
+      "requirement": "Reject an oversized line without discarding a following request when the bounded read already consumed the first newline.",
+      "source_path": "crates/tooling/chio-reference-tools/src/lib.rs",
+      "source_sha256": "3907f6afd04712e2ceda5c4289a886e503a89d799956e686fb32d6397acb0360",
+      "disposition": "source-inspected-repair-in-progress",
+      "original_red": "pending-owning-regression"
+    },
+    {
+      "id": "FINAL-REVIEW-RESERVED-FACADE",
+      "priority": "P2",
+      "requirement": "The public runtime facade must forward operation-owned reserved revalidation to the existing core hook, preserving authority and refusal checks.",
+      "source_path": "crates/kernel/chio-runtime/src/admission_hook.rs",
+      "source_sha256": "55218f8ddebcad4592ec75b67f5f2eefcab7bdf0bda65398888194ef8d5d71e9",
+      "disposition": "source-inspected-repair-in-progress",
+      "original_red": "pending-owning-regression"
+    }
+  ],
+  "retained_qualification": {
+    "changed_boundary": {
+      "source": "fd82f2f247d29dce7d057a160d653ee6261a35eb",
+      "tree": "cda6c42246e3bc7c5fc63d70dcc464200ac7753c",
+      "observed_at": "2026-10-10T08:36:18.201814+00:00",
+      "local_changed_boundary_qualified": true,
+      "commands_verified": 26,
+      "named_results": {
+        "ok": 98,
+        "ignored": 1
+      },
+      "targets": {
+        "chio-control-plane:lib": {
+          "ok": 67
+        },
+        "chio-cli:bin:chio": {
+          "ok": 4
+        },
+        "chio-cli:cli_signing_custody": {
+          "ok": 9
+        },
+        "chio-cli:certify": {
+          "ignored": 1,
+          "ok": 13
+        },
+        "chio-cli:receipt_query_evidence": {
+          "ok": 1
+        },
+        "chio-cli:receipt_query_credit_exposure": {
+          "ok": 2
+        },
+        "chio-cli:receipt_query_capital": {
+          "ok": 1
+        },
+        "chio-cli:receipt_query_credit_loss": {
+          "ok": 1
+        }
+      },
+      "static_gates": 9,
+      "composition_sha256": "a2f3832a4b88a6c6380d1758eb5817a4b99692532bab13d5ad6c5e061c2e423e",
+      "static_sha256": "5a715932ab18084e45039bec49b237eec2fff1a3a57b4c3dc9ecd144f45b3290",
+      "review_sha256": "76ffc7b14394395e83fe9a3987dc295c4c5b89254ca0e977896f2e1f07cb3aaa",
+      "hosted_qualified": false,
+      "merged": false,
+      "broader_cp_runtime": "separate ongoing cached-binary qualification",
+      "limits": [
+        "Not whole-workspace qualification",
+        "Native Windows unverified",
+        "Existing ignored certify case retained",
+        "KANI-PROOF-QUAL open/unproved",
+        "SEC-1160-COLDSTATE open P1, G5 preview blocker",
+        "Earlier failed and cancelled results preserved"
+      ]
+    },
+    "broader_boundary": {
+      "source": "fd82f2f247d29dce7d057a160d653ee6261a35eb",
+      "observed_at": "2026-10-10T08:46:20.267159+00:00",
+      "broader_cp_passed": 936,
+      "broader_cp_ignored": 0,
+      "broader_cp_filtered": 839,
+      "mandatory_names": 291,
+      "cp_composed_subset": 67,
+      "cli_passed": 31,
+      "distinct_passed": 967,
+      "cli_existing_ignored": 1,
+      "broader_summary_sha256": "706ee82477016588d05b96f2e9506019f20700da70d46672fd619aa8bfa508f8",
+      "binary_sha256": "cd7818dda00a363d8184f6c071e9ecaac178de03bc6ce9693e1b1428dcee63cc",
+      "hosted_qualified": false,
+      "merged": false
+    },
+    "scope": "These passes and scoped independent review remain historical evidence; they do not close the six newly reported obligations."
+  },
+  "hosted": {
+    "standalone_cargo_vet": "passed",
+    "main_ci": 38038488138,
+    "main_required_checks": "cancelled-while-queued-after-candidate-withdrawal",
+    "withdrawal_cancellation_requests": 33,
+    "cancellation_record_sha256": "f1b3718d0610f2e884bd9ed0648271726fb01e96c9a698b91e7538b22aba8dbc",
+    "controller_failure": {
+      "run": 38038484905,
+      "cause": "stale authorized source and definition; trusted capture remains post-merge/prerelease under existing owner boundary",
+      "log_sha256": "bcc0aeebfa490b2e450d984d95a18bb8005a02de37918f1d94529cff99c6e138"
+    },
+    "adversarial_failure": {
+      "job": 114174094253,
+      "cause": "authorized-security checkout d0496c14 rejected trusted execution file prerequisites before candidate tests",
+      "log_sha256": "08e482426f7217b9434c1114fc0acf085c4d33bc61b303b386d6231b373af843"
+    },
+    "greptile": "quota-exhausted; no current review approval"
+  },
+  "acceptance": [
+    "Genuine Original failure on fd82 for each applicable report, bounded repair, owning regression and strict lint.",
+    "Independent repair review and exact integrated-source local qualification without baseline or cap waivers.",
+    "One replacement push, four protected exact-source checks, accurate review dispositions and normal protected merge."
+  ],
+  "residuals": {
+    "KANI-PROOF-QUAL": "OPEN/UNPROVED; no new proof campaigns",
+    "SEC-1160-COLDSTATE": "OPEN P1, owner-accepted G5 preview blocker"
+  },
+  "merged": false,
+  "full_qualified": false,
+  "release_permitted": false
+}
