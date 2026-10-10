@@ -438,6 +438,37 @@ fn knowledge_account_joins_same_tenant_and_initializes_foreign_tenant_independen
     for profile in [&sibling.profile, &foreign.profile] {
         store.configure_knowledge(profile)?;
     }
+    // The shared runtime enforcement marker keeps one immutable identity:
+    // neither the same-tenant sibling nor the separately authorized foreign
+    // tenant rewrites its original custody while registering.
+    let (markers, marker_version): (i64, i64) = connection.query_row(
+        "SELECT count(*), max(version) FROM admission_operation_recovery_records
+         WHERE record_key GLOB 'knowledge-runtime:*'",
+        [],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )?;
+    assert_eq!(
+        (markers, marker_version),
+        (1, 1),
+        "the runtime enforcement marker must retain its single original custody"
+    );
+    // Both hosts stay readable through their real public runtime operations.
+    for host in [&sibling, &foreign] {
+        let input = f.input("account-join-readable", b"readable")?;
+        let reference = host
+            .runtime
+            .publish(&f.f.control, &input, b"readable", None)?;
+        let handle = host.runtime.handle(
+            &f.f.control,
+            &reference,
+            &ArtifactRecipientId::new("agent-root")?,
+        )?;
+        let prepared = host
+            .runtime
+            .prepare_read(&f.f.control, &handle)
+            .map_err(|error| format!("reading back the joined account artifact: {error:?}"))?;
+        drop(prepared);
+    }
     assert_eq!(
         store.inspect_live_publication_count(
             &f.actor(RecoveryPermission::KnowledgeAdmin)?,

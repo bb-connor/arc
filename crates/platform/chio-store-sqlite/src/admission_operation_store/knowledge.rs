@@ -497,23 +497,44 @@ impl SqliteAdmissionOperationStore {
             &profile_key(&profile.scope)?,
             profile,
         )?;
-        save(
-            &tx,
-            &self.serving_owner,
-            &profile.scope,
-            &format!(
-                "knowledge-runtime:{}",
-                sha256_hex(
-                    profile
-                        .producer_context
-                        .as_v1()
-                        .session_id()
-                        .as_str()
-                        .as_bytes()
-                )
-            ),
-            &true,
-        )?;
+        // The runtime-wide enforcement marker is owned by its first
+        // installer. One persistent process journal namespace legitimately
+        // serves multiple roots, so a later registration in the same runtime
+        // never reassigns that custody: an existing marker is verified in
+        // place and only its absence initializes a new one. Rewriting the
+        // row under a different scope would strand its original projection
+        // and event, so retained or corrupt custody refuses instead.
+        let runtime_key = format!(
+            "knowledge-runtime:{}",
+            sha256_hex(
+                profile
+                    .producer_context
+                    .as_v1()
+                    .session_id()
+                    .as_str()
+                    .as_bytes()
+            )
+        );
+        match protected::raw_checked(&tx, &runtime_key)? {
+            None => {
+                save(
+                    &tx,
+                    &self.serving_owner,
+                    &profile.scope,
+                    &runtime_key,
+                    &true,
+                )?;
+            }
+            Some(row) => {
+                let enforced: bool = protected::decode(&row.payload)?;
+                if !enforced || row.kind != "command" || row.version == 0 {
+                    return Err(refused(
+                        "runtime enforcement marker lost its original custody",
+                    ));
+                }
+                protected::source_reference(&tx, &runtime_key)?;
+            }
+        }
         self.commit_write(tx)?;
         self.sync_after_write(&connection)
     }
