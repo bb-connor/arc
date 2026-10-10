@@ -40,11 +40,11 @@ Theorem inventory and differential-test artifacts without a machine-readable Rus
 | `chio-kernel-core::capability_verify.rs` | - | - | 2 | 1 | - | - | - | - | - | - |
 | `chio-kernel-core::evaluate.rs` | - | - | 1 | 1 | - | - | - | - | - | - |
 | `chio-kernel-core::formal_aeneas.rs` | - | 18 | - | 2 | - | - | - | 1 | - | - |
-| `chio-kernel-core::formal_core.rs` | 1 | - | 1 | 11 | - | - | - | 1 | - | - |
+| `chio-kernel-core::formal_core.rs` | 1 | - | 1 | 12 | - | - | - | 1 | - | - |
 | `chio-kernel-core::kani_public_harnesses.rs` | - | - | - | 1 | - | - | - | - | - | - |
 | `chio-kernel-core::normalized.rs` | - | - | 5 | 3 | - | - | - | - | - | - |
 | `chio-kernel-core::receipts.rs` | - | - | 1 | 5 | - | - | - | - | - | - |
-| `chio-kernel-core::revocation_view.rs` | - | - | - | 1 | - | - | - | - | - | - |
+| `chio-kernel-core::revocation_view.rs` | - | - | - | - | - | - | - | - | - | - |
 | `chio-kernel-core::scope.rs` | - | - | 2 | 2 | - | - | - | - | - | - |
 | `chio-kernel::*` | 2 | - | - | - | 1 | - | 1 | 3 | 6 | 6 |
 | `chio-kernel::kernel/construction.rs` | - | - | - | - | - | - | - | - | 1 | - |
@@ -374,6 +374,7 @@ Theorem inventory and differential-test artifacts without a machine-readable Rus
 - `.kani/harnesses.toml::chio-kernel-core/verify_replay_fingerprint_uniqueness` (execution_lane=pr)
 - `.kani/harnesses.toml::chio-kernel-core/verify_revocation_admission_projection` (execution_lane=pr)
 - `.kani/harnesses.toml::chio-kernel-core/verify_revocation_predicate_idempotent` (execution_lane=pr)
+- `.kani/harnesses.toml::chio-kernel-core/verify_revocation_view_freshness` (execution_lane=pr)
 - `.kani/harnesses.toml::chio-kernel-core/verify_scope_intersection_associative` (execution_lane=pr)
 - `.kani/harnesses.toml::chio-kernel-core/verify_threshold_distinct_signers` (execution_lane=pr)
 
@@ -418,10 +419,6 @@ Theorem inventory and differential-test artifacts without a machine-readable Rus
 - `.kani/harnesses.toml::chio-kernel-core/verify_receipt_roundtrip` (execution_lane=pr)
 
 ### `chio-kernel-core::revocation_view.rs`
-
-**kani**
-
-- `.kani/harnesses.toml::chio-kernel-core/verify_revocation_view_freshness` (execution_lane=pr)
 
 ### `chio-kernel-core::scope.rs`
 
@@ -1253,7 +1250,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 
 - Generator version: `3`
 - Regenerate: `cargo xtask gen proof-coverage`
-- Input digest: `3fb49de79a3c88449636b2302b1c746a0685b9800f441725c83a802e86ba2a3e`
+- Input digest: `e72d57bf6c3e98ac55b8b22a5f4b7c9424e48a10ab62c91651ef051a2f45baad`
 - Git commit: `@GIT_COMMIT@` (resolved in coverage.json and Proof Room packages)
 - Row identity: file rows use package-relative Rust paths; crate-only artifacts use `package::*`.
 
@@ -1275,7 +1272,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `audits/mutation/per-crate-configs/chio-policy.toml`: `4a0edd1a6711e51cdeaf48e71f6c94ee512612e962f9f49ee1e0ac4707f76ba3`
 - `audits/mutation/per-crate-configs/chio-weights.toml`: `8851bcc823e192ef10d705097257daf8a0ed03a466ead6c1ea11eff467e1e3ce`
 - `cargo-metadata://workspace-packages`: `47c04f8c44de9dc39962661c5b35e3d421e6b76e2795bc4f3369b7990bdac648`
-- `crates/core/chio-core-types/Cargo.toml`: `9d5e6e87b3ed28734face45a3e08262fe0064812fb737b0abaa448ffe6114aae`
+- `crates/core/chio-core-types/Cargo.toml`: `a1ac3fe6efcdbea56eb892d10475325427c3d6ef4c34090ca1d21459457dabac`
 - `crates/core/chio-core-types/src/_generated/chio_wire_v1.rs`: `64327f111c2b52fbdb09cdf86383ef56308244a6579f22b8471c75d39c80ca94`
 - `crates/core/chio-core-types/src/_generated/mod.rs`: `6a8f664ceb143338fff9e0dec10f70fc8c3962d8a0d1d33d7103b971446c19d1`
 - `crates/core/chio-core-types/src/canonical.rs`: `482225f52887027149349a790e3e9110948239b7a4d19f248ef7f169da93dd4e`
@@ -1425,7 +1422,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `crates/trust/chio-revocation-oracle/src/api.rs`: `b1bfcf2fa979f132693ef895f40512b53a5797b8ca2dbe609c3524eac58d0375`
 - `crates/trust/chio-revocation-oracle/src/freshness.rs`: `d699d5c59f1c5a660d9c06f294bb2ac1ee2c0fcd00cd9eebbe043df74ba733b8`
 - `docs/fuzzing/trust-boundary-mutants-baseline.toml`: `7331fb69499474ca22b14b6fb5a6f9a966eae2e2a26d3433d9030a4c985efee9`
-- `formal/MAPPING.md`: `2fb7fe895a48fb76dbf19f0eb2aca985683978fdfaa2a67e4e23a089fdee21b0`
+- `formal/MAPPING.md`: `dafc1a10c623fbf035b15d758fc343725391c5cbb4c2b0940e74f6fad016c69f`
 - `formal/aeneas/pilot.toml`: `86627b363717b47ced94caeb826185d400cf70fe357a55fe34d02ea70670956c`
 - `formal/aeneas/production.toml`: `2a3e3189ae4d283ddd6392ca373da61452c55252247be8050e068239745ef93e`
 - `formal/aeneas/verified_core.rs`: `44ef85fbe6c537e8c65a483a67c167f502ca1a108a25293414b27ab2a85046b8`
@@ -1507,7 +1504,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/mutation/evidence/spec-mutants-7b24142e8523fe08e501063dbf3d4f6cea3397be.json`: `82878e03aaafa1ceeb1f791386cffd57f9f88453b24113bd51e43b67996a66c2`
 - `formal/mutation/evidence/spec-mutants-d292f14df1c493873199f4f9d969ade00472ff28.json`: `d7b7a63401bfb071af87743ec07191e380c29ee1e306cca1fe35859a8194e623`
 - `formal/mutation/registry.toml`: `48387345d00fe7c53e777326f73e31370f7bc3d362a09f1059cadc06c98b6bb6`
-- `formal/proof-manifest.toml`: `8c2ca68ea33e57d95da30c3e954eb75f08e89b7f6ff04f14718a9377f1cbad01`
+- `formal/proof-manifest.toml`: `3fa6731fb3a45b82b87742a8940956271238a34b596e26ce39f903253eea9d1b`
 - `formal/rust-verification/creusot-contracts.toml`: `83000c98743013d3d6d468976a163edaf16d0d621070410d741f146bf61a28a5`
 - `formal/rust-verification/formal-mutants.toml`: `5f15de2f3833b11db3d783d05ab6efcd2c49840ede010fe7ec54fc2846c48fc6`
 - `formal/rust-verification/kani-harnesses.toml`: `60b49af814071bb16f3e027749b26fb9c86d032a00bb022aa0719b6d15c7506f`
@@ -1531,7 +1528,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/tla/trace/TraceEvaluateRevocationPropagation.tla`: `a7e923ace268ed8ca2575fed423c5a963776b2f34929fb547f3d3b61aed81589`
 - `fuzz/owners.toml`: `b3569c8aedf4d8175cc9809fbe052198acad8d6cf18f6ebff6a0248759e1f465`
 - `fuzz/target-map.toml`: `d51f046241b1f125ea8e93e51a40e6411b3b8ed5444c7fd93d72aad7ff036f26`
-- `git-worktree://rust-files`: `c42a21f9784c820d113204e3df7420e67699f63b288b1c29edd30bc2d6e15ef7`
+- `git-worktree://rust-files`: `cf83792be50cb318cd6f172a5078b7f6a2e991ac4ef60aa2fd010d8c95961cf3`
 - `releases.toml`: `8fa34f25cfafa13c5230e5f7305d45cb95ac276e2f2f65d9aaa87a1af3f7431d`
 - `rust-toolchain.toml`: `24ef3b9d3edbd850aa386cb0a98e10450b0030991a4537cb359f54d49dbbb33a`
 - `scripts/check-apalache-negative.sh`: `9441ad16cab3d4edf8c92d542920a60691217f09b65b9be70793b5fbcf24e4a5`

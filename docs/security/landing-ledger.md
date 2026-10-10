@@ -7,6 +7,21 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Final producer integration (October 10)
+
+Authority admission, snapshot pre-open cleanup and Building-phase public health
+coverage are integrated. The [producer audit](audits/final-producer-integration-20261010.json)
+records 98 authority tests across explicitly bounded family evidence and 19
+receipt HTTP controls. Earlier failed campaigns remain failed. Seven authority
+files compose with previously repaired registry, governance and startup code.
+The final combined candidate still requires its own runtime, strict lint,
+independent review, four protected checks and normal protected merge.
+
+All **1,929 original requirements** are preserved. Eleven prior current states
+are archived before updates. Inherited OID4VP signer custody, health-busy behavior,
+fixture cleanup, snapshot refresh cost, authenticated cold state and the unproved
+Kani obligation retain their separate follow-up and release boundaries.
+
 ## Snapshot startup recovery integrated (October 10)
 
 The [pre-open repair audit](audits/snapshot-preopen-repair-20261010.json) records
