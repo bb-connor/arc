@@ -98,7 +98,7 @@ RUN --mount=type=bind,target=/opt/authorized-source,readonly \
  && test "$(cargo mutants --version | awk '{print $2}')" = "25.3.1" \
  && test "$(cargo clippy --version)" = "clippy 0.1.95 (59807616e1 2026-04-14)" \
  && test "$(cargo fmt --version)" = "rustfmt 1.9.0-stable (59807616e1 2026-04-14)" \
- && echo '3381cbc31ebb053fbc301688baf421221e97a497ebe734a326a21cb31f9b8b70  Cargo.lock' | sha256sum -c - \
+ && echo '45791765505850a86d1e17ffa060b7dfc7ec74df5a17a9bd03f117cb0b5c900b  Cargo.lock' | sha256sum -c - \
  && echo '24ef3b9d3edbd850aa386cb0a98e10450b0030991a4537cb359f54d49dbbb33a  rust-toolchain.toml' | sha256sum -c - \
  && cargo fetch --locked \
  && mkdir -p /opt/chio-security/cargo-cache \

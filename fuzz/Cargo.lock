@@ -1695,7 +1695,6 @@ dependencies = [
 name = "chio-core-types"
 version = "0.1.0"
 dependencies = [
- "ascii",
  "chio-security-types",
  "ed25519-dalek",
  "getrandom 0.2.17",
