@@ -555,3 +555,358 @@ fn cyclic_lineage_export_refusal_keeps_other_tenant_readable() {
 fn missing_parent_lineage_export_refusal_keeps_other_tenant_readable() {
     assert_lineage_refusal_keeps_other_tenant_readable(UnexportableLineage::MissingParent);
 }
+
+const CHANGED_ATTRIBUTION: &str =
+    "current unsigned capability attribution differs from the authenticated snapshot";
+const INVALID_LINEAGE_METADATA: &str = "capability lineage row contains invalid metadata";
+
+fn insert_legacy_lineage(path: &std::path::Path, capability: &str, subject: &str) {
+    let connection = Connection::open(path).unwrap();
+    assert_eq!(connection.execute(
+        "INSERT INTO capability_lineage (capability_id, subject_key, issuer_key, issued_at, expires_at, grants_json, delegation_depth, provenance) VALUES (?1, ?2, 'legacy-issuer', 1, 100, '{}', 0, 'legacy_projection')",
+        params![capability, subject],
+    ).unwrap(), 1);
+}
+
+/// Out-of-band lineage edit with triggers left enabled.
+fn edit_lineage(path: &std::path::Path, sql: &str) {
+    let connection = Connection::open(path).unwrap();
+    assert_eq!(connection.execute(sql, []).unwrap(), 1);
+}
+
+/// One signed-token capability `cap` with `receipts` tenant-a receipts and one
+/// unrelated tenant-b receipt.
+fn signed_lineage_store(
+    receipts: u64,
+) -> (
+    tempfile::TempDir,
+    std::path::PathBuf,
+    Arc<SqliteReceiptStore>,
+    Keypair,
+) {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("live.db");
+    let store = Arc::new(SqliteReceiptStore::open(&path).unwrap());
+    let issuer = Keypair::from_seed(&[13; 32]);
+    let subject = Keypair::from_seed(&[14; 32]);
+    store
+        .record_capability_snapshot(&capability_with_id("cap", &subject, &issuer, None), None)
+        .unwrap();
+    for index in 0..receipts {
+        store
+            .append_chio_receipt_returning_seq(&receipt_with_ts_and_tenant(
+                &format!("selected-{index}"),
+                "cap",
+                100 + index,
+                Some("a"),
+            ))
+            .unwrap();
+    }
+    store
+        .append_chio_receipt_returning_seq(&receipt_with_ts_and_tenant(
+            "other",
+            "other-cap",
+            100,
+            Some("b"),
+        ))
+        .unwrap();
+    (directory, path, store, subject)
+}
+
+fn legacy_lineage_store(
+    capabilities: &[(&str, &str, u64)],
+) -> (
+    tempfile::TempDir,
+    std::path::PathBuf,
+    Arc<SqliteReceiptStore>,
+) {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("live.db");
+    let store = Arc::new(SqliteReceiptStore::open(&path).unwrap());
+    for (capability, subject, timestamp) in capabilities {
+        insert_legacy_lineage(&path, capability, subject);
+        store
+            .append_chio_receipt_returning_seq(&receipt_with_ts_and_tenant(
+                &format!("selected-{capability}"),
+                capability,
+                *timestamp,
+                Some("a"),
+            ))
+            .unwrap();
+    }
+    store
+        .append_chio_receipt_returning_seq(&receipt_with_ts_and_tenant(
+            "other",
+            "other-cap",
+            100,
+            Some("b"),
+        ))
+        .unwrap();
+    (directory, path, store)
+}
+
+fn assert_export_invalidates(snapshots: &ReceiptQuerySnapshots, query: &EvidenceExportQuery) {
+    let error = snapshots
+        .build_evidence_export_bundle_with_transparency(query)
+        .unwrap_err();
+    assert!(
+        matches!(&error, EvidenceExportError::ReceiptStore(ReceiptStoreError::QuerySnapshot(chio_kernel::ReceiptQuerySnapshotError::Invalid(reason))) if reason == CHANGED_ATTRIBUTION),
+        "{error:?}"
+    );
+    assert_eq!(
+        snapshots.status().state,
+        ReceiptQuerySnapshotState::Invalid {
+            reason: CHANGED_ATTRIBUTION.into()
+        }
+    );
+}
+
+fn assert_export_refused(snapshots: &ReceiptQuerySnapshots, expected: &str) {
+    let error = snapshots
+        .build_evidence_export_bundle_with_transparency(&EvidenceExportQuery::tenant_scoped("a"))
+        .unwrap_err();
+    assert!(
+        matches!(&error, EvidenceExportError::ReceiptStore(ReceiptStoreError::QuerySnapshot(chio_kernel::ReceiptQuerySnapshotError::ExportRefused(reason))) if reason == expected),
+        "{error:?}"
+    );
+    assert_eq!(snapshots.status().state, ReceiptQuerySnapshotState::Ready);
+    let other = EvidenceExportQuery::tenant_scoped("b");
+    assert_eq!(
+        snapshots
+            .query_receipts(&other.as_receipt_query(None))
+            .unwrap()
+            .total_count,
+        1
+    );
+    assert_eq!(
+        snapshots
+            .build_evidence_export_bundle_with_transparency(&other)
+            .unwrap()
+            .0
+            .tool_receipts
+            .len(),
+        1
+    );
+}
+
+#[test]
+fn non_utf8_captured_legacy_subject_invalidates_the_snapshot() {
+    let (_directory, path, store) = legacy_lineage_store(&[("cap-legacy", "legacy-subject", 100)]);
+    let snapshots = start(store);
+    edit_lineage(&path, "UPDATE capability_lineage SET subject_key = CAST(x'ff' AS TEXT) WHERE capability_id = 'cap-legacy'");
+    assert_export_invalidates(&snapshots, &EvidenceExportQuery::tenant_scoped("a"));
+    snapshots.shutdown();
+}
+
+#[test]
+fn non_utf8_captured_signed_subject_invalidates_the_snapshot() {
+    let (_directory, path, store, _subject) = signed_lineage_store(1);
+    let snapshots = start(store);
+    edit_lineage(&path, "UPDATE capability_lineage SET subject_key = CAST(x'ff' AS TEXT) WHERE capability_id = 'cap'");
+    assert_export_invalidates(&snapshots, &EvidenceExportQuery::tenant_scoped("a"));
+    snapshots.shutdown();
+}
+
+#[test]
+fn oversized_captured_subject_invalidates_before_the_byte_allowance() {
+    let (_directory, path, store, _subject) = signed_lineage_store(1);
+    let snapshots = start(store);
+    edit_lineage(&path, "UPDATE capability_lineage SET subject_key = 'changed-' || hex(zeroblob(16777216)) WHERE capability_id = 'cap'");
+    assert_export_invalidates(&snapshots, &EvidenceExportQuery::tenant_scoped("a"));
+    snapshots.shutdown();
+}
+
+#[test]
+fn earlier_lineage_refusal_does_not_mask_a_later_attribution_change() {
+    let (_directory, path, store) =
+        legacy_lineage_store(&[("cap-1", "subject-1", 100), ("cap-2", "subject-2", 200)]);
+    let snapshots = start(store);
+    edit_lineage(&path, "UPDATE capability_lineage SET subject_key = 'changed-subject' WHERE capability_id = 'cap-2'");
+    assert_export_invalidates(&snapshots, &EvidenceExportQuery::tenant_scoped("a"));
+    snapshots.shutdown();
+}
+
+#[test]
+fn honest_earlier_and_later_legacy_lineage_keep_the_typed_refusal() {
+    let (_directory, _path, store) =
+        legacy_lineage_store(&[("cap-1", "subject-1", 100), ("cap-2", "subject-2", 200)]);
+    let snapshots = start(store);
+    assert_export_refused(
+        &snapshots,
+        "capability lineage cap-1 uses legacy projection provenance outside the local migration boundary",
+    );
+    snapshots.shutdown();
+}
+
+#[test]
+fn signed_subject_change_invalidates_with_multiple_selected_receipts() {
+    let (_directory, path, store, _subject) = signed_lineage_store(2);
+    let snapshots = start(store);
+    let changed = Keypair::from_seed(&[17; 32]).public_key().to_hex();
+    edit_lineage(
+        &path,
+        &format!(
+            "UPDATE capability_lineage SET subject_key = '{changed}' WHERE capability_id = 'cap'"
+        ),
+    );
+    assert_export_invalidates(&snapshots, &EvidenceExportQuery::tenant_scoped("a"));
+    snapshots.shutdown();
+}
+
+#[test]
+fn non_utf8_unattributed_lineage_column_is_a_typed_refusal() {
+    let (_directory, path, store, _subject) = signed_lineage_store(1);
+    let snapshots = start(store);
+    edit_lineage(&path, "UPDATE capability_lineage SET issuer_key = CAST(x'ff' AS TEXT) WHERE capability_id = 'cap'");
+    assert_export_refused(&snapshots, INVALID_LINEAGE_METADATA);
+    snapshots.shutdown();
+}
+
+#[test]
+fn undecodable_signed_lineage_grants_are_a_typed_refusal() {
+    let (_directory, path, store, _subject) = signed_lineage_store(1);
+    let snapshots = start(store);
+    edit_lineage(
+        &path,
+        "UPDATE capability_lineage SET grants_json = 'x' WHERE capability_id = 'cap'",
+    );
+    assert_export_refused(&snapshots, INVALID_LINEAGE_METADATA);
+    snapshots.shutdown();
+}
+
+#[test]
+fn signed_lineage_issuer_change_is_a_request_refusal() {
+    let (_directory, path, store, _subject) = signed_lineage_store(1);
+    let snapshots = start(store);
+    let changed = Keypair::from_seed(&[16; 32]).public_key().to_hex();
+    edit_lineage(
+        &path,
+        &format!(
+            "UPDATE capability_lineage SET issuer_key = '{changed}' WHERE capability_id = 'cap'"
+        ),
+    );
+    assert_export_refused(
+        &snapshots,
+        "capability lineage cap does not match its signed token projection",
+    );
+    snapshots.shutdown();
+}
+
+#[test]
+fn oversized_unrelated_lineage_metadata_stays_a_bounded_refusal() {
+    let (_directory, path, store) = legacy_lineage_store(&[("cap-legacy", "legacy-subject", 100)]);
+    let snapshots = start(store);
+    edit_lineage(&path, "UPDATE capability_lineage SET grants_json = hex(zeroblob(16777216)) WHERE capability_id = 'cap-legacy'");
+    let error = snapshots
+        .build_evidence_export_bundle_with_transparency(&EvidenceExportQuery::tenant_scoped("a"))
+        .unwrap_err();
+    assert!(
+        matches!(&error, EvidenceExportError::ReceiptStore(ReceiptStoreError::QuerySnapshot(chio_kernel::ReceiptQuerySnapshotError::WorkBudgetExhausted(reason))) if reason == "HTTP evidence export byte allowance; narrow the selected receipts or use local operator export"),
+        "{error:?}"
+    );
+    assert_eq!(snapshots.status().state, ReceiptQuerySnapshotState::Ready);
+    snapshots.shutdown();
+}
+
+#[test]
+fn honest_capability_with_multiple_receipts_exports_one_lineage_record() {
+    let (_directory, _path, store, _subject) = signed_lineage_store(2);
+    let snapshots = start(store);
+    let (bundle, _, _) = snapshots
+        .build_evidence_export_bundle_with_transparency(&EvidenceExportQuery::tenant_scoped("a"))
+        .unwrap();
+    assert_eq!(bundle.tool_receipts.len(), 2);
+    assert_eq!(bundle.capability_lineage.len(), 1);
+    assert_eq!(snapshots.status().state, ReceiptQuerySnapshotState::Ready);
+    snapshots.shutdown();
+}
+
+#[test]
+fn legacy_lineage_upgraded_after_capture_exports_without_invalidation() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("live.db");
+    let store = Arc::new(SqliteReceiptStore::open(&path).unwrap());
+    let issuer = Keypair::from_seed(&[13; 32]);
+    let subject = Keypair::from_seed(&[14; 32]);
+    let capability = capability_with_id("cap", &subject, &issuer, None);
+    let connection = Connection::open(&path).unwrap();
+    assert_eq!(connection.execute(
+        "INSERT INTO capability_lineage (capability_id, subject_key, issuer_key, issued_at, expires_at, grants_json, delegation_depth, provenance) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, 'legacy_projection')",
+        params![capability.id, capability.subject.to_hex(), capability.issuer.to_hex(), i64::try_from(capability.issued_at).unwrap(), i64::try_from(capability.expires_at).unwrap(), serde_json::to_string(&capability.scope).unwrap()],
+    ).unwrap(), 1);
+    drop(connection);
+    store
+        .append_chio_receipt_returning_seq(&receipt_with_ts_and_tenant(
+            "selected",
+            "cap",
+            100,
+            Some("a"),
+        ))
+        .unwrap();
+    let snapshots = start(Arc::clone(&store));
+    let mut by_subject = EvidenceExportQuery::tenant_scoped("a").as_receipt_query(None);
+    by_subject.agent_subject = Some(subject.public_key().to_hex());
+    assert_eq!(
+        snapshots.query_receipts(&by_subject).unwrap().total_count,
+        1
+    );
+    let error = snapshots
+        .build_evidence_export_bundle_with_transparency(&EvidenceExportQuery::tenant_scoped("a"))
+        .unwrap_err();
+    assert!(
+        matches!(&error, EvidenceExportError::ReceiptStore(ReceiptStoreError::QuerySnapshot(chio_kernel::ReceiptQuerySnapshotError::ExportRefused(reason))) if reason == "capability lineage cap uses legacy projection provenance outside the local migration boundary"),
+        "{error:?}"
+    );
+    store.record_capability_snapshot(&capability, None).unwrap();
+    let (bundle, _, _) = snapshots
+        .build_evidence_export_bundle_with_transparency(&EvidenceExportQuery::tenant_scoped("a"))
+        .unwrap();
+    assert_eq!(bundle.capability_lineage.len(), 1);
+    assert_eq!(snapshots.status().state, ReceiptQuerySnapshotState::Ready);
+    snapshots.shutdown();
+}
+
+#[test]
+fn utf16_store_exports_honest_attribution_and_invalidates_a_changed_subject() {
+    for encoding in ["UTF-16le", "UTF-16be"] {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("live.db");
+        Connection::open(&path)
+            .unwrap()
+            .execute_batch(&format!(
+                "PRAGMA encoding='{encoding}'; CREATE TABLE encoding_anchor (value TEXT); DROP TABLE encoding_anchor;"
+            ))
+            .unwrap();
+        let store = Arc::new(SqliteReceiptStore::open(&path).unwrap());
+        let issuer = Keypair::from_seed(&[13; 32]);
+        let subject = Keypair::from_seed(&[14; 32]);
+        store
+            .record_capability_snapshot(&capability_with_id("cap", &subject, &issuer, None), None)
+            .unwrap();
+        store
+            .append_chio_receipt_returning_seq(&receipt_with_ts_and_tenant(
+                "selected",
+                "cap",
+                100,
+                Some("a"),
+            ))
+            .unwrap();
+        let snapshots = start(store);
+        let actual: String = Connection::open(&path)
+            .unwrap()
+            .pragma_query_value(None, "encoding", |row| row.get(0))
+            .unwrap();
+        assert_eq!(actual, encoding);
+        let (bundle, _, _) = snapshots
+            .build_evidence_export_bundle_with_transparency(&EvidenceExportQuery::tenant_scoped(
+                "a",
+            ))
+            .unwrap();
+        assert_eq!(bundle.capability_lineage.len(), 1);
+        assert_eq!(snapshots.status().state, ReceiptQuerySnapshotState::Ready);
+        let changed = Keypair::from_seed(&[17; 32]).public_key().to_hex();
+        edit_lineage(&path, &format!("UPDATE capability_lineage SET subject_key = '{changed}' WHERE capability_id = 'cap'"));
+        assert_export_invalidates(&snapshots, &EvidenceExportQuery::tenant_scoped("a"));
+        snapshots.shutdown();
+    }
+}

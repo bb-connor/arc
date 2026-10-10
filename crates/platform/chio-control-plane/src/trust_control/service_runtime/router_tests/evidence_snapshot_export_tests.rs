@@ -387,3 +387,169 @@ async fn captured_legacy_attribution_tamper_invalidates_before_export_refusal() 
     snapshots.shutdown();
     Ok(())
 }
+
+const SNAPSHOT_INVALID_ATTRIBUTION: &str = "receipt query snapshot failed authentication: current unsigned capability attribution differs from the authenticated snapshot";
+
+/// Legacy lineage rows with one tenant-a receipt each, one unrelated tenant-b
+/// receipt, a ready snapshot, and a router state with both tenant tokens.
+async fn legacy_lineage_router(
+    capabilities: &[(&str, &str, u64)],
+) -> Result<
+    (
+        tempfile::TempDir,
+        std::path::PathBuf,
+        Arc<ReceiptQuerySnapshots>,
+        TrustServiceState,
+    ),
+    Box<dyn std::error::Error>,
+> {
+    let directory = chio_test_support::private_tempdir()?;
+    let path = directory.path().join("receipts.db");
+    let store = Arc::new(SqliteReceiptStore::open(&path)?);
+    let connection = rusqlite::Connection::open(&path)?;
+    for (capability, subject, _) in capabilities {
+        connection.execute(
+            "INSERT INTO capability_lineage (capability_id, subject_key, issuer_key, issued_at, expires_at, grants_json, delegation_depth, provenance) VALUES (?1, ?2, 'legacy-issuer', 1, 100, '{}', 0, 'legacy_projection')",
+            rusqlite::params![capability, subject],
+        )?;
+    }
+    drop(connection);
+    let signer = Keypair::from_seed(&[43; 32]);
+    let template = super::receipt_store_ownership_tests::signed_receipt(&signer)?.body();
+    for (index, (capability, _, timestamp)) in capabilities.iter().enumerate() {
+        let mut body = template.clone();
+        body.id = format!("receipt-a-{index}");
+        body.tenant_id = Some("tenant-a".into());
+        body.capability_id = (*capability).into();
+        body.timestamp = *timestamp;
+        store.append_chio_receipt(&ChioReceipt::sign(body, &signer)?)?;
+    }
+    let mut body = template;
+    body.id = "plain-b".into();
+    body.tenant_id = Some("tenant-b".into());
+    body.capability_id = "cap-plain".into();
+    store.append_chio_receipt(&ChioReceipt::sign(body, &signer)?)?;
+    let snapshots = Arc::new(ReceiptQuerySnapshots::start(
+        Arc::clone(&store),
+        ReceiptQuerySnapshotConfig::default(),
+    )?);
+    wait_until_ready(Arc::clone(&snapshots)).await?;
+    let mut state = metrics_state("snapshot-secret");
+    state.receipt_store = Some(store);
+    state.receipt_query_snapshots = Some(Arc::clone(&snapshots));
+    state
+        .config
+        .tenant_read_tokens
+        .insert("tenant-a".into(), "tenant-secret".into());
+    state
+        .config
+        .tenant_read_tokens
+        .insert("tenant-b".into(), "tenant-b-secret".into());
+    Ok((directory, path, snapshots, state))
+}
+
+/// Out-of-band lineage edit with triggers left enabled.
+fn edit_lineage(path: &std::path::Path, sql: &str) -> TestResult {
+    let connection = rusqlite::Connection::open(path)?;
+    assert_eq!(connection.execute(sql, [])?, 1);
+    Ok(())
+}
+
+async fn tenant_b_export_status(
+    state: TrustServiceState,
+) -> Result<StatusCode, Box<dyn std::error::Error>> {
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/evidence/export")
+        .header(AUTHORIZATION, "Bearer tenant-b-secret")
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_vec(&json!({
+            "query": chio_kernel::evidence_export::EvidenceExportQuery::tenant_scoped("tenant-b"),
+            "requireProofs": false,
+        }))?))?;
+    Ok(super::super::build_router(state)
+        .oneshot(request)
+        .await?
+        .status())
+}
+
+async fn assert_http_export_invalidates(
+    snapshots: &ReceiptQuerySnapshots,
+    state: TrustServiceState,
+) -> TestResult {
+    let (status, body) = export(state).await?;
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR, "{body}");
+    assert_eq!(body["code"], "receipt_query_snapshot_invalid");
+    assert_eq!(body["error"], SNAPSHOT_INVALID_ATTRIBUTION);
+    assert!(body.get("bundle").is_none(), "{body}");
+    assert!(matches!(
+        snapshots.status().state,
+        ReceiptQuerySnapshotState::Invalid { .. }
+    ));
+    Ok(())
+}
+
+#[tokio::test]
+async fn non_utf8_captured_subject_returns_snapshot_invalid() -> TestResult {
+    let (_directory, path, snapshots, state) =
+        legacy_lineage_router(&[("cap-legacy", "legacy-subject", 100)]).await?;
+    edit_lineage(&path, "UPDATE capability_lineage SET subject_key = CAST(x'ff' AS TEXT) WHERE capability_id = 'cap-legacy'")?;
+    assert_http_export_invalidates(&snapshots, state).await?;
+    snapshots.shutdown();
+    Ok(())
+}
+
+#[tokio::test]
+async fn oversized_captured_subject_returns_snapshot_invalid() -> TestResult {
+    let (_directory, path, snapshots, state) =
+        legacy_lineage_router(&[("cap-legacy", "legacy-subject", 100)]).await?;
+    edit_lineage(&path, "UPDATE capability_lineage SET subject_key = 'changed-' || hex(zeroblob(16777216)) WHERE capability_id = 'cap-legacy'")?;
+    assert_http_export_invalidates(&snapshots, state).await?;
+    snapshots.shutdown();
+    Ok(())
+}
+
+#[tokio::test]
+async fn earlier_lineage_refusal_does_not_mask_a_later_attribution_change_over_http() -> TestResult
+{
+    let (_directory, path, snapshots, state) =
+        legacy_lineage_router(&[("cap-1", "subject-1", 100), ("cap-2", "subject-2", 200)]).await?;
+    edit_lineage(&path, "UPDATE capability_lineage SET subject_key = 'changed-subject' WHERE capability_id = 'cap-2'")?;
+    assert_http_export_invalidates(&snapshots, state).await?;
+    snapshots.shutdown();
+    Ok(())
+}
+
+#[tokio::test]
+async fn non_utf8_unattributed_lineage_column_returns_typed_refusal() -> TestResult {
+    let (_directory, path, snapshots, state) =
+        legacy_lineage_router(&[("cap-legacy", "legacy-subject", 100)]).await?;
+    edit_lineage(&path, "UPDATE capability_lineage SET issuer_key = CAST(x'ff' AS TEXT) WHERE capability_id = 'cap-legacy'")?;
+    let (status, body) = export(state.clone()).await?;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+    assert_eq!(body["code"], "receipt_query_export_refused");
+    assert_eq!(
+        body["error"],
+        "receipt evidence export refused: capability lineage row contains invalid metadata"
+    );
+    assert!(body.get("bundle").is_none(), "{body}");
+    assert_eq!(snapshots.status().state, ReceiptQuerySnapshotState::Ready);
+    assert_eq!(tenant_b_export_status(state).await?, StatusCode::OK);
+    snapshots.shutdown();
+    Ok(())
+}
+
+#[tokio::test]
+async fn oversized_unrelated_lineage_metadata_returns_bounded_refusal() -> TestResult {
+    let (_directory, path, snapshots, state) =
+        legacy_lineage_router(&[("cap-legacy", "legacy-subject", 100)]).await?;
+    edit_lineage(&path, "UPDATE capability_lineage SET grants_json = hex(zeroblob(16777216)) WHERE capability_id = 'cap-legacy'")?;
+    let (status, body) = export(state.clone()).await?;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+    assert_eq!(body["code"], "receipt_query_work_budget_exhausted");
+    assert!(body.get("bundle").is_none(), "{body}");
+    assert_eq!(snapshots.status().state, ReceiptQuerySnapshotState::Ready);
+    assert_eq!(tenant_b_export_status(state).await?, StatusCode::OK);
+    snapshots.shutdown();
+    Ok(())
+}

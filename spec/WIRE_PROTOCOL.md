@@ -508,8 +508,9 @@ through response finalization and refuses a concurrent export with
 Legacy mutable receipt tables and transport-ineligible lineage or publication
 metadata **MUST** refuse the export with `receipt_query_export_refused` without
 invalidating otherwise authenticated receipt queries. A mismatch or deletion of
-captured unsigned attribution **MUST** instead invalidate that snapshot with
-`receipt_query_snapshot_invalid`, before any mutable-lineage validity refusal.
+captured unsigned attribution for any selected capability **MUST** instead
+invalidate that snapshot with `receipt_query_snapshot_invalid`, before any
+capability lineage is bounded, decoded or refused.
 SQLite resource failures remain operational snapshot errors, not metadata
 refusals. Local operator exports retain their separate full-history contract.
 

@@ -517,8 +517,12 @@ fn divergent_publication_enrichment_refuses_export_but_preserves_owned_receipt_q
                 | ReceiptQuerySnapshotState::Building { .. }
         )
     });
-    assert!(
-        matches!(status.state, ReceiptQuerySnapshotState::Invalid { .. }),
+    let rejected = "conflict: checkpoint publication metadata projection for checkpoint 1 diverges from persisted checkpoint row";
+    assert_eq!(
+        status.state,
+        ReceiptQuerySnapshotState::Invalid {
+            reason: rejected.into()
+        },
         "{status:?}"
     );
     let error = rebuilt
@@ -526,8 +530,8 @@ fn divergent_publication_enrichment_refuses_export_but_preserves_owned_receipt_q
         .unwrap_err();
     assert!(
         matches!(
-            error,
-            ReceiptStoreError::QuerySnapshot(ReceiptQuerySnapshotError::Invalid(_))
+            &error,
+            ReceiptStoreError::QuerySnapshot(ReceiptQuerySnapshotError::Invalid(reason)) if reason == rejected
         ),
         "{error:?}"
     );
@@ -639,14 +643,90 @@ fn publication_resource_errors_remain_operational_outcomes() {
 
 #[test]
 fn publication_malformed_columns_remain_request_refusals() {
-    let error = EvidenceExportError::Sqlite(rusqlite::Error::InvalidColumnType(
-        0,
-        "binding_json".into(),
-        rusqlite::types::Type::Blob,
-    ));
-    let outcome = super::super::query::read_outcome(metadata::publication_error(error));
+    for error in [
+        rusqlite::Error::InvalidColumnType(0, "binding_json".into(), rusqlite::types::Type::Blob),
+        rusqlite::Error::Utf8Error(0, String::from_utf8(vec![0xff]).unwrap_err().utf8_error()),
+    ] {
+        let outcome = super::super::query::read_outcome(metadata::publication_error(
+            EvidenceExportError::Sqlite(error),
+        ));
+        assert!(
+            matches!(&outcome, ReceiptStoreError::QuerySnapshot(ReceiptQuerySnapshotError::ExportRefused(reason)) if reason == "checkpoint publication row contains invalid metadata"),
+            "{outcome:?}"
+        );
+    }
+}
+
+fn lineage_with_subject(subject_sql: &str) -> (tempfile::TempDir, rusqlite::Connection) {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("live.db");
+    drop(SqliteReceiptStore::open(&path).unwrap());
+    let connection = rusqlite::Connection::open(&path).unwrap();
+    assert_eq!(connection.execute(&format!("INSERT INTO capability_lineage (capability_id, subject_key, issuer_key, issued_at, expires_at, grants_json, delegation_depth, provenance) VALUES ('cap', {subject_sql}, 'issuer', 1, 100, '{{}}', 0, 'legacy_projection')"), []).unwrap(), 1);
+    (directory, connection)
+}
+
+/// VM steps of one attribution comparison against `expected`.
+fn attribution_steps(connection: &rusqlite::Connection, expected: &str) -> (bool, i32) {
+    let source = metadata::lineage_source(connection, "cap")
+        .unwrap()
+        .unwrap();
+    let mut statement = connection
+        .prepare(&metadata::attribution_sql(source))
+        .unwrap();
+    let length = i64::try_from(expected.len()).unwrap();
+    let mut rows = statement
+        .query(rusqlite::params![
+            "cap",
+            source_rowid(connection),
+            length,
+            expected
+        ])
+        .unwrap();
+    let matches = rows.next().unwrap().unwrap().get::<_, bool>(0).unwrap();
+    let steps = rows
+        .as_ref()
+        .unwrap()
+        .get_status(rusqlite::StatementStatus::VmStep);
+    (matches, steps)
+}
+
+fn source_rowid(connection: &rusqlite::Connection) -> i64 {
+    connection
+        .query_row(
+            "SELECT rowid FROM capability_lineage WHERE capability_id = 'cap'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap()
+}
+
+#[test]
+fn oversized_subject_is_rejected_from_its_record_header() {
+    let (_directory, connection) = lineage_with_subject("'changed-' || hex(zeroblob(1048576))");
+    let source = metadata::lineage_source(&connection, "cap").unwrap();
+    let error =
+        metadata::captured_attribution(&connection, "cap", source, "legacy-subject").unwrap_err();
     assert!(
-        matches!(&outcome, ReceiptStoreError::QuerySnapshot(ReceiptQuerySnapshotError::ExportRefused(reason)) if reason == "checkpoint publication row contains invalid metadata"),
-        "{outcome:?}"
+        matches!(&error, ReceiptStoreError::QuerySnapshot(ReceiptQuerySnapshotError::Invalid(reason)) if reason == "current unsigned capability attribution differs from the authenticated snapshot"),
+        "{error:?}"
+    );
+    let (_directory, short) = lineage_with_subject("'legacy-subject'");
+    assert!(metadata::captured_attribution(
+        &short,
+        "cap",
+        metadata::lineage_source(&short, "cap").unwrap(),
+        "legacy-subject"
+    )
+    .is_ok());
+    // A length mismatch ends before the content comparison an equal-length
+    // value needs, whatever the stored size.
+    let (exact, exact_steps) = attribution_steps(&short, "legacy-subject");
+    let (differs, differs_steps) = attribution_steps(&short, "legacy-subjecX");
+    let (oversized, oversized_steps) = attribution_steps(&connection, "legacy-subject");
+    assert!(exact && !differs && !oversized);
+    assert!(
+        oversized_steps < exact_steps.min(differs_steps),
+        "{oversized_steps} {exact_steps} {differs_steps}"
     );
 }

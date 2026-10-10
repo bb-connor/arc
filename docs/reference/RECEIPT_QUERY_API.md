@@ -377,9 +377,9 @@ seconds.
 | `receipt_query_snapshot_stale` | `503` | `2` | yes | The snapshot did not reach the receipt log head under the freshness rules, or the version that served the read was replaced by a newer build while the read ran. |
 | `receipt_query_busy` | `503` | `1` | yes | No admission permit was free. Admission never queues; see [Admission](#admission). |
 | `receipt_query_snapshot_unavailable` | `503` | absent | no | A resource outcome: snapshot quota exhausted, a receipt above the per-receipt limit, a read whose payload fetch or head read exhausted its SQL work budget, an I/O failure of the snapshot's private storage, or a snapshot service that is not running. Not an integrity failure. Quota and per-receipt outcomes need operator action. |
-| `receipt_query_snapshot_invalid` | `500` | absent | no | Integrity failure: a returned receipt no longer matches what the snapshot authenticated, the build or a recertification pass found a difference or a regressed receipt log, the snapshot's private storage failed its custody checks, or the receipt writer head is poisoned. |
+| `receipt_query_snapshot_invalid` | `500` | absent | no | Integrity failure: a returned receipt no longer matches what the snapshot authenticated, the build or a recertification pass found a difference or a regressed receipt log, the snapshot's private storage failed its custody checks, the receipt writer head is poisoned, or an evidence export found the current lineage of a selected capability no longer carrying its captured unsigned subject. |
 | `receipt_query_work_budget_exhausted` | `422` | absent | no | The selection and count exceeded 10,000,000 SQLite VM steps. No rows and no count are returned. Narrow the query, for example with an equality filter or a tighter time window. |
-| `receipt_query_export_refused` | `422` | absent | no | Evidence export only: current lineage or publication metadata cannot form a valid complete bundle. No bundle is returned; the authenticated snapshot remains usable by other requests. |
+| `receipt_query_export_refused` | `422` | absent | no | Evidence export only: populated legacy mutable receipt tables, or current lineage or publication metadata that cannot form a valid complete bundle. No bundle is returned; the authenticated snapshot remains usable by other requests. |
 
 Clients retry only `receipt_query_snapshot_building`,
 `receipt_query_snapshot_stale` and `receipt_query_busy`, after the
@@ -845,11 +845,3 @@ To paginate programmatically, capture `nextCursor` from the HTTP response and pa
 Financial `budget_total` and `budget_remaining` are both `null` for uncapped
 grants. Capped values describe the cumulative grant balance, including on denial
 and reconciliation receipts. Consumers must preserve this distinction.
-
-For HTTP evidence export, populated legacy mutable receipt tables also cause
-`422 receipt_query_export_refused`. The exporter compares captured unsigned
-attribution in the live read transaction before decoding or validating lineage.
-Changed or missing captured attribution invalidates the snapshot even when that
-lineage would otherwise be refused as unsupported metadata. SQLite busy and
-resource errors retain their operational status. A new authenticated build
-still rejects immutable publication metadata that diverges from its projection.

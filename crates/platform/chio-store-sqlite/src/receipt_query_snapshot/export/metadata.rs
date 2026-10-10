@@ -1,7 +1,7 @@
 //! Short, budgeted metadata/payload reads. Mutable checkpoint bytes must
-//! reproduce the owned checkpoint digest; current capability lineage uses its
-//! canonical column reader and must preserve owned unsigned attribution before
-//! validating mutable lineage metadata.
+//! reproduce the owned checkpoint digest; current capability lineage must match
+//! owned unsigned attribution, compared in SQL, before its mutable metadata is
+//! bounded, decoded or validated.
 use std::collections::{BTreeMap, BTreeSet};
 
 use chio_core::receipt::lineage::ChildRequestReceipt;
@@ -364,6 +364,23 @@ pub(super) fn lineage(
     tools: &[EvidenceToolReceiptRecord],
     bytes: &mut ByteBudget,
 ) -> Result<Vec<CapabilitySnapshot>, ReceiptStoreError> {
+    // Check every selected capability's captured attribution before any lineage
+    // refusal, so unsupported metadata on one capability cannot hide a changed
+    // subject on another.
+    let mut expected = BTreeMap::<String, Option<String>>::new();
+    for tool in tools {
+        let capability = &tool.receipt.capability_id;
+        if expected.contains_key(capability) {
+            continue;
+        }
+        let subject = captured_subject(lease, tools, capability)?;
+        if let Some(subject) = subject.as_deref() {
+            live_read(lease, |live| {
+                captured_attribution(live, capability, lineage_source(live, capability)?, subject)
+            })?;
+        }
+        expected.insert(capability.clone(), subject);
+    }
     let mut records = BTreeMap::<String, CapabilitySnapshot>::new();
     for tool in tools {
         let mut current = Some(tool.receipt.capability_id.clone());
@@ -381,64 +398,41 @@ pub(super) fn lineage(
                     .or_else(|| cached.federated_parent_capability_id.clone());
                 continue;
             }
-            // Read the immutable attribution before opening a source transaction.
-            // No live SQLite read holds the owned projection mutex or waits on it.
-            let expected_subject = captured_subject(lease, tools, &capability)?;
+            // Only selected capabilities carry captured attribution.
+            let expected_subject = expected.get(&capability).and_then(Option::as_deref);
             let snapshot = live_read(lease, |live| {
-                let mut table = "capability_lineage";
-                let mut key = None;
-                let local_bytes: Option<i64> = live.query_row(&format!("SELECT {LINEAGE_BYTES} FROM capability_lineage WHERE capability_id = ?1"), [&capability], |row| row.get(0)).optional()?;
-                let length = match local_bytes {
-                    Some(length) => length,
-                    None => {
-                        // Preserve the canonical latest-share choice without
-                        // reading the unrelated share's receipt/lineage counts.
-                        let row: Option<(i64, i64)> = live.query_row(&format!("SELECT l.rowid, length(CAST(l.share_id AS BLOB)) + {qualified} FROM federated_share_capability_lineage l JOIN federated_evidence_shares s ON s.share_id = l.share_id WHERE l.capability_id = ?1 ORDER BY s.imported_at DESC, s.share_id DESC LIMIT 1", qualified = LINEAGE_BYTES.replace("CAST(", "CAST(l.")), [&capability], |row| Ok((row.get(0)?, row.get(1)?))).optional()?;
-                        let Some((share, length)) = row else {
-                            captured_attribution(expected_subject.as_deref(), None)?;
-                            return Ok(None);
-                        };
-                        table = "federated_share_capability_lineage";
-                        key = Some(share);
-                        length
-                    }
+                let source = lineage_source(live, &capability)?;
+                // Recheck in this read transaction, before the byte allowance
+                // or any decode of the row it materializes.
+                if let Some(subject) = expected_subject {
+                    captured_attribution(live, &capability, source, subject)?;
+                }
+                let Some(source) = source else {
+                    return Ok(None);
                 };
+                let length: i64 = live.query_row(
+                    &format!(
+                        "SELECT {}{LINEAGE_BYTES} FROM {} WHERE capability_id = ?1 AND rowid = ?2",
+                        source.extra_bytes(),
+                        source.table()
+                    ),
+                    params![capability, source.rowid()],
+                    |row| row.get(0),
+                )?;
                 bytes.preflight(crate::receipt_store::sqlite_u64(
                     length,
                     "capability lineage bytes",
                 )?)?;
-                let predicate = if key.is_some() {
-                    "capability_id = ?1 AND rowid = ?2"
-                } else {
-                    "capability_id = ?1"
-                };
-                // Compare the raw attribution in this same read transaction,
-                // before token decoding or either semantic validation boundary.
-                // The preceding length preflight bounds the subject allocation.
-                let subject_sql = format!("SELECT subject_key FROM {table} WHERE {predicate}");
-                let subject: rusqlite::types::Value = if let Some(share) = key {
-                    live.query_row(&subject_sql, params![capability, share], |row| row.get(0))?
-                } else {
-                    live.query_row(&subject_sql, [&capability], |row| row.get(0))?
-                };
-                captured_attribution(expected_subject.as_deref(), Some(&subject))?;
-                let sql = format!("SELECT {LINEAGE_COLUMNS} FROM {table} WHERE {predicate}");
-                let snapshot = if let Some(share) = key {
-                    live.query_row(
-                        &sql,
-                        params![capability, share],
+                let snapshot = live
+                    .query_row(
+                        &format!(
+                            "SELECT {LINEAGE_COLUMNS} FROM {} WHERE capability_id = ?1 AND rowid = ?2",
+                            source.table()
+                        ),
+                        params![capability, source.rowid()],
                         crate::capability_lineage::snapshot_columns_from_row,
                     )
-                } else {
-                    live.query_row(
-                        &sql,
-                        [&capability],
-                        crate::capability_lineage::snapshot_columns_from_row,
-                    )
-                }
-                .map_err(|error| {
-                    metadata_row_error(error, "capability lineage row contains invalid metadata")
-                })?;
+                    .map_err(|error| metadata_row_error(error, INVALID_LINEAGE_METADATA))?;
                 snapshot
                     .validate_for_local_read()
                     .map_err(lineage_validation_error)?;
@@ -468,6 +462,57 @@ pub(super) fn lineage(
     Ok(records.into_values().collect())
 }
 
+/// The canonical current lineage row of one capability.
+#[derive(Clone, Copy)]
+pub(super) enum LineageSource {
+    Local(i64),
+    /// The most recently imported federated share's row.
+    Shared(i64),
+}
+
+impl LineageSource {
+    fn table(self) -> &'static str {
+        match self {
+            Self::Local(_) => "capability_lineage",
+            Self::Shared(_) => "federated_share_capability_lineage",
+        }
+    }
+
+    fn rowid(self) -> i64 {
+        match self {
+            Self::Local(rowid) | Self::Shared(rowid) => rowid,
+        }
+    }
+
+    /// A shared row also accounts for its share identifier.
+    fn extra_bytes(self) -> &'static str {
+        match self {
+            Self::Local(_) => "",
+            Self::Shared(_) => "length(CAST(share_id AS BLOB)) + ",
+        }
+    }
+}
+
+pub(super) fn lineage_source(
+    live: &Connection,
+    capability: &str,
+) -> Result<Option<LineageSource>, ReceiptStoreError> {
+    let local: Option<i64> = live
+        .query_row(
+            "SELECT rowid FROM capability_lineage WHERE capability_id = ?1",
+            [capability],
+            |row| row.get(0),
+        )
+        .optional()?;
+    if let Some(rowid) = local {
+        return Ok(Some(LineageSource::Local(rowid)));
+    }
+    // Preserve the canonical latest-share choice without reading the unrelated
+    // share's receipt/lineage counts.
+    let shared: Option<i64> = live.query_row("SELECT l.rowid FROM federated_share_capability_lineage l JOIN federated_evidence_shares s ON s.share_id = l.share_id WHERE l.capability_id = ?1 ORDER BY s.imported_at DESC, s.share_id DESC LIMIT 1", [capability], |row| row.get(0)).optional()?;
+    Ok(shared.map(LineageSource::Shared))
+}
+
 // Keep the enrichment error boundary separate from the live-read resource classifier.
 pub(super) fn publication_error(
     error: chio_kernel::evidence_export::EvidenceExportError,
@@ -485,9 +530,15 @@ pub(super) fn publication_error(
     }
 }
 
+const INVALID_LINEAGE_METADATA: &str = "capability lineage row contains invalid metadata";
+
 fn lineage_validation_error(error: ReceiptStoreError) -> ReceiptStoreError {
     match error {
         ReceiptStoreError::Conflict(reason) => metadata_refusal(reason),
+        // Stored grants that fail canonical decoding are malformed metadata.
+        ReceiptStoreError::UntrustedInput(_) | ReceiptStoreError::Json(_) => {
+            metadata_refusal(INVALID_LINEAGE_METADATA)
+        }
         other => other,
     }
 }
@@ -496,7 +547,8 @@ fn metadata_row_error(error: rusqlite::Error, reason: &'static str) -> ReceiptSt
     match error {
         rusqlite::Error::FromSqlConversionFailure(..)
         | rusqlite::Error::InvalidColumnType(..)
-        | rusqlite::Error::IntegralValueOutOfRange(..) => metadata_refusal(reason),
+        | rusqlite::Error::IntegralValueOutOfRange(..)
+        | rusqlite::Error::Utf8Error(..) => metadata_refusal(reason),
         other => other.into(),
     }
 }
@@ -531,24 +583,59 @@ fn captured_subject(
     })
 }
 
-/// Compare only captured attribution. Unsupported metadata without a captured
-/// subject remains a request refusal, not tamper. This performs no store reads.
-fn captured_attribution(
-    expected: Option<&str>,
-    current: Option<&rusqlite::types::Value>,
+/// Compare captured unsigned attribution with the stored subject inside
+/// SQLite. The type and the stored byte length are checked first, from the
+/// record header alone, so a malformed or oversized subject is never decoded,
+/// loaded or size-checked against the export allowance before it is rejected.
+/// Only an equal-length text value is compared, byte for byte under binary
+/// collation in the database encoding. Unsupported metadata without a captured
+/// subject remains a request refusal, not tamper.
+pub(super) fn captured_attribution(
+    live: &Connection,
+    capability: &str,
+    source: Option<LineageSource>,
+    expected: &str,
 ) -> Result<(), ReceiptStoreError> {
-    let Some(expected) = expected else {
-        return Ok(());
-    };
-    if matches!(current, Some(rusqlite::types::Value::Text(actual)) if actual == expected) {
-        Ok(())
-    } else if current.is_none() {
-        Err(invalid(
+    let Some(source) = source else {
+        return Err(invalid(
             "export capability lineage is missing required unsigned attribution",
-        ))
+        ));
+    };
+    let encoding: String = live.pragma_query_value(None, "encoding", |row| row.get(0))?;
+    let stored_bytes = match encoding.as_str() {
+        "UTF-8" => expected.len(),
+        "UTF-16le" | "UTF-16be" => expected.encode_utf16().count().saturating_mul(2),
+        other => {
+            return Err(ReceiptQuerySnapshotError::Unavailable(format!(
+                "receipt store text encoding {other} is not supported"
+            ))
+            .into())
+        }
+    };
+    let matches: bool = live.query_row(
+        &attribution_sql(source),
+        params![
+            capability,
+            source.rowid(),
+            crate::integer::checked::<_, i64>(stored_bytes)?,
+            expected
+        ],
+        |row| row.get(0),
+    )?;
+    if matches {
+        Ok(())
     } else {
         Err(invalid(
             "current unsigned capability attribution differs from the authenticated snapshot",
         ))
     }
+}
+
+/// `CASE` evaluates lazily: `typeof` and `octet_length` of a column read only
+/// its record header, and the content is read only when the lengths agree.
+pub(super) fn attribution_sql(source: LineageSource) -> String {
+    format!(
+        "SELECT CASE WHEN typeof(subject_key) <> 'text' THEN 0 WHEN octet_length(subject_key) <> ?3 THEN 0 ELSE subject_key = ?4 COLLATE BINARY END FROM {} WHERE capability_id = ?1 AND rowid = ?2",
+        source.table()
+    )
 }

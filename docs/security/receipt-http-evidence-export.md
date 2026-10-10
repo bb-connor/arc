@@ -13,26 +13,32 @@ canonical signed checkpoint. Inclusion proofs use authenticated tool and child
 hashes, without loading unselected receipt payloads. The full relevant checkpoint
 prefix from genesis and the existing transparency checks remain required.
 
-Capability lineage is sampled during the export in a bounded live read
-transaction. The raw subject is compared with captured unsigned attribution
-before the canonical column reader and explicit local and transport validation.
-It is not an immutable historical lineage snapshot.
+Capability lineage is sampled during the export in bounded live read
+transactions. It is not an immutable historical lineage snapshot.
 Unsigned subject attribution must agree with the captured projection; signed
-receipt attribution remains authoritative. If a captured unsigned subject was
-known, deleting its current lineage refuses the export. Originally unknown
-unsigned attribution retains the existing empty-lineage behavior. Tenant exports
-omit child payloads that have no tenant join path, as in the local export.
+receipt attribution remains authoritative. Before any capability lineage is
+bounded, decoded or refused, the stored subject of every selected capability is
+compared with its captured unsigned subject inside SQLite: exact text under
+binary collation, never decoded or size-checked first. Each lineage row is
+compared again in the read transaction that materializes it. If a captured
+unsigned subject was known, deleting its current lineage invalidates the
+snapshot. Originally unknown unsigned attribution retains the existing
+empty-lineage behavior. Tenant exports omit child payloads that have no tenant
+join path, as in the local export.
 
-A transport-ineligible live lineage (including a supported legacy projection,
-a cycle, excessive depth or a missing parent) refuses only that export with a
-HTTP 422 and code `receipt_query_export_refused`. No partial bundle or
+Populated legacy mutable receipt tables, or a transport-ineligible live lineage
+(including a supported legacy projection, malformed stored metadata, a cycle,
+excessive depth or a missing parent), refuse only that export with a HTTP 422
+and code `receipt_query_export_refused`. No partial bundle or
 `Retry-After` is returned; changing the unsupported metadata requires operator
 action. Unauthenticated publication enrichment has the same request-only
 boundary. These refusals do not invalidate the shared authenticated snapshot or
 interrupt another tenant's receipt reads. In contrast, missing or altered owned
 checkpoint data, incomplete proof hashes, changed selected payloads, and a
 mismatch or deletion of captured unsigned attribution invalidate that served
-snapshot. The service must rebuild authenticated state before serving it again.
+snapshot, even when that or another selected lineage would otherwise be refused.
+SQLite busy and resource errors keep their operational status. The service must
+rebuild authenticated state before serving it again.
 
 Publication enrichment remains outside the owned receipt query projection.
 A malformed mutable trust-anchor binding, missing publication metadata, or a
@@ -74,11 +80,3 @@ error states this and directs the operator to local complete export. Supporting
 arbitrarily long recent histories within a bounded HTTP response requires a
 separate anchored-prefix or paginated evidence format and verifier contract.
 This implementation does not claim that protocol qualification.
-
-For HTTP evidence export, populated legacy mutable receipt tables also cause
-`422 receipt_query_export_refused`. The exporter compares captured unsigned
-attribution in the live read transaction before decoding or validating lineage.
-Changed or missing captured attribution invalidates the snapshot even when that
-lineage would otherwise be refused as unsupported metadata. SQLite busy and
-resource errors retain their operational status. A new authenticated build
-still rejects immutable publication metadata that diverges from its projection.
