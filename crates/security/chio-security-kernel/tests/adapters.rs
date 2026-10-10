@@ -54,6 +54,9 @@ use chio_test_support::prelude::*;
 #[path = "adapters/security_callbacks.rs"]
 mod security_callbacks;
 
+#[path = "adapters/tripwire_arguments.rs"]
+mod tripwire_arguments;
+
 const FLOW_DENIALS: [FlowDenial; 19] = [
     FlowDenial::StateOverflow,
     FlowDenial::StateChanged,

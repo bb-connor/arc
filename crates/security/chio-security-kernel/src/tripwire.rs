@@ -31,6 +31,8 @@ use serde_json::Value;
 
 use crate::MissingContextPolicy;
 
+mod arguments;
+
 const PRE_INVOCATION_GUARD_NAME: &str = "chio-tripwire-pre-invocation";
 const POST_INVOCATION_HOOK_NAME: &str = "chio-watermark-tripwire";
 
@@ -136,37 +138,46 @@ impl DecoyTripwireDetectorPort {
 
     fn detect_decoy(&self, input: &TripwireInput) -> PortResult<TripwireDecision> {
         let detector = self.decoy.as_ref().ok_or_else(PortError::unavailable)?;
-        let surface = match input.kind {
-            TripwireKind::CanaryCapability => DecoySurface::CanaryCapability,
-            TripwireKind::HoneyTool => DecoySurface::HoneyTool,
-            TripwireKind::CredentialArtifact => DecoySurface::CredentialArtifact,
-            TripwireKind::FileMarker => DecoySurface::FileMarker,
-            TripwireKind::BrowserCookie => DecoySurface::BrowserCookie,
-            TripwireKind::InternalHostname => DecoySurface::InternalHostname,
+        let surfaces: &[DecoySurface] = match input.kind {
+            TripwireKind::CanaryCapability => &[DecoySurface::CanaryCapability],
+            TripwireKind::HoneyTool => &[DecoySurface::HoneyTool],
+            // Credential files carry the same tripwire receipt kind while the
+            // detector authenticates each registry surface independently.
+            TripwireKind::CredentialArtifact => &[
+                DecoySurface::CredentialArtifact,
+                DecoySurface::CredentialFile,
+            ],
+            TripwireKind::FileMarker => &[DecoySurface::FileMarker],
+            TripwireKind::BrowserCookie => &[DecoySurface::BrowserCookie],
+            TripwireKind::InternalHostname => &[DecoySurface::InternalHostname],
             TripwireKind::SignedWatermark => return Err(PortError::invalid_data()),
         };
-        let observation = TripwireObservation {
-            tenant_id: &input.tenant_id,
-            surface,
-            presented: input.content.as_bytes(),
-            class: ObservationClass::DirectPresentation,
-            observed_at_unix_ms: self
-                .clock
-                .unix_millis()
-                .map(chio_security_types::clock::UnixMillis::get)?,
-        };
-        match detector
-            .detect(&observation)
-            .map_err(map_detection_failure)?
-        {
-            DecoyDetection::ActiveMatch { evidence, .. } => Ok(TripwireDecision::Match {
-                artifact_id_hash: evidence.artifact_id_hash,
-                artifact_version_hash: evidence.version_hash,
-            }),
-            DecoyDetection::InactiveObservation { .. } | DecoyDetection::Clear => {
-                Ok(TripwireDecision::Clear)
+        let observed_at_unix_ms = self
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)?;
+        for &surface in surfaces {
+            let observation = TripwireObservation {
+                tenant_id: &input.tenant_id,
+                surface,
+                presented: input.content.as_bytes(),
+                class: ObservationClass::DirectPresentation,
+                observed_at_unix_ms,
+            };
+            match detector
+                .detect(&observation)
+                .map_err(map_detection_failure)?
+            {
+                DecoyDetection::ActiveMatch { evidence, .. } => {
+                    return Ok(TripwireDecision::Match {
+                        artifact_id_hash: evidence.artifact_id_hash,
+                        artifact_version_hash: evidence.version_hash,
+                    });
+                }
+                DecoyDetection::InactiveObservation { .. } | DecoyDetection::Clear => {}
             }
         }
+        Ok(TripwireDecision::Clear)
     }
 
     fn detect_watermark(&self, input: &TripwireInput) -> PortResult<TripwireDecision> {
@@ -228,6 +239,15 @@ impl chio_security_types::ports::TripwireDetectorPort for DecoyTripwireDetectorP
     }
 }
 
+/// Rejects registered decoys before dispatch, including keys and string values
+/// in tool arguments. Argument scanning preserves exact bytes across common
+/// header, cookie, URL and command delimiters; encoded or arbitrary substring
+/// matching is outside this contract.
+///
+/// Inspection fails closed above depth 32, 4096 nodes (including object keys),
+/// 1 MiB of key/value text, 4096 emitted candidates or 4 MiB of candidate text.
+/// Repeated candidates consume the budget before deduplication. Match evidence
+/// contains digests, never the presented marker.
 pub struct TripwireGuard {
     detector: Arc<dyn chio_security_types::ports::TripwireDetectorPort>,
     publisher: Arc<TripwireEventPublisher>,
@@ -297,6 +317,15 @@ impl Guard for TripwireGuard {
                 GuardDecision::allow()
             });
         };
+        let candidates = match arguments::collect(&guard_context.request.arguments) {
+            Ok(candidates) => candidates,
+            Err(_) => {
+                return Ok(denial_evidence(
+                    PRE_INVOCATION_GUARD_NAME,
+                    "tripwire argument inspection budget exceeded",
+                ));
+            }
+        };
         let capability_content = guard_context.request.capability.id.as_bytes().to_vec();
         match self.evaluate_input(
             security_context,
@@ -324,13 +353,40 @@ impl Guard for TripwireGuard {
             TripwireKind::HoneyTool,
             tool_content,
         ) {
-            Ok(Some(decision)) => Ok(decision),
-            Ok(None) => Ok(GuardDecision::allow()),
-            Err(error) => Ok(denial_evidence(
-                PRE_INVOCATION_GUARD_NAME,
-                &format!("tripwire detector failed: {error}"),
-            )),
+            Ok(Some(decision)) => return Ok(decision),
+            Ok(None) => {}
+            Err(error) => {
+                return Ok(denial_evidence(
+                    PRE_INVOCATION_GUARD_NAME,
+                    &format!("tripwire detector failed: {error}"),
+                ));
+            }
         }
+        for candidate in candidates {
+            for kind in [
+                TripwireKind::CredentialArtifact,
+                TripwireKind::FileMarker,
+                TripwireKind::BrowserCookie,
+                TripwireKind::InternalHostname,
+            ] {
+                match self.evaluate_input(
+                    security_context,
+                    guard_context.request,
+                    kind,
+                    candidate.as_bytes().to_vec(),
+                ) {
+                    Ok(Some(decision)) => return Ok(decision),
+                    Ok(None) => {}
+                    Err(error) => {
+                        return Ok(denial_evidence(
+                            PRE_INVOCATION_GUARD_NAME,
+                            &format!("tripwire detector failed: {error}"),
+                        ));
+                    }
+                }
+            }
+        }
+        Ok(GuardDecision::allow())
     }
 }
 
