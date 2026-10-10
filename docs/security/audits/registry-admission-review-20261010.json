@@ -1,0 +1,144 @@
+{
+  "schema": "chio.security.registry-review.v1",
+  "observed_utc": "2026-10-10T00:50:58.865775+00:00",
+  "source_stage_head": "2f5c4f3594b6b49be51975f887a323161b581fd6",
+  "reviewed_producer": "40219859c47c53df5d385991eb603d306e4d1f93",
+  "integration_commit": "66bc596efe2a8bbcc93d814c94b297f07be2cc16",
+  "review_evidence": [
+    {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/hammer/root-adjacent-registries-review.md",
+      "sha256": "30dd3a2b7cf3fd8117138b2c7b8df7b3a3b05bda58e139eca2aaec6988adfbe0"
+    },
+    {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/hammer/root-adjacent-registries-review-flake.log",
+      "sha256": "8618618bc2806865780b382e966448e7a8848cbe789c17322943531b19dc69ed"
+    },
+    {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/hammer/root-adjacent-registries-review-lane-probe.patch",
+      "sha256": "e4004ee9bb4036bcfd2f83426470acaa37629dded96c89f61b08c5d33b4085b3"
+    },
+    {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/hammer/root-adjacent-registries-review-lane-probe.log",
+      "sha256": "089238f4518b8b60638524d1453a382b9fcc5d493c547df5589ab1b76c9d42b9"
+    },
+    {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/hammer/root-adjacent-registries-review-base-red.patch",
+      "sha256": "ec271f179d0f04a2a5cea5b81c018baad3588b622f82e5c3ab707ea60bc420c1"
+    },
+    {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/hammer/root-adjacent-registries-review-base-red.log",
+      "sha256": "82a92e6c384850a5b79b5e2178e86b33cc0f22249dd1407ff7b9cdea55d61ce8"
+    }
+  ],
+  "findings": [
+    {
+      "label": "F13-PARALLEL-LANE-ISOLATION",
+      "priority": "P1",
+      "scope": "now",
+      "classification": "introduced",
+      "state": "repair-in-progress",
+      "requirement": "Independent router fixtures must not share global registry admission permits.",
+      "remaining_acceptance": [
+        "Genuine current-source parallel failure retained.",
+        "Clone-shared injectable service-owned lanes without widening production limits or global test serialization.",
+        "At least20 consecutive eight-thread runs and owning parallel acceptance."
+      ]
+    },
+    {
+      "label": "F13-PUBLIC-OPERATOR-ADMISSION",
+      "priority": "P2",
+      "scope": "now",
+      "classification": "introduced",
+      "state": "repair-in-progress",
+      "requirement": "Unauthenticated public issuance cannot consume authenticated operator revocation permits.",
+      "remaining_acceptance": [
+        "Separate bounded operator/public issuance lanes, each capacity2; preserve stable cross-process locks.",
+        "Token shape validation before admission with existing response semantics.",
+        "Genuine safe RED and real operator progress under public saturation."
+      ]
+    },
+    {
+      "label": "F13-EXACT-ORACLES",
+      "priority": "P3",
+      "scope": "now",
+      "classification": "introduced",
+      "state": "repair-in-progress",
+      "requirement": "Retain exact refusal and durable-winner oracles plus real token/credential cancellation tests.",
+      "remaining_acceptance": [
+        "Port preserved6d1f892555 and6428aaf7c6 controls.",
+        "Exact busy/refusal bodies and CLI stderr; durable winner remains after cancellation."
+      ]
+    },
+    {
+      "label": "F13-TYPED-LOCKED-WRITER",
+      "priority": "P3",
+      "scope": "now",
+      "classification": "introduced",
+      "state": "repair-in-progress",
+      "requirement": "Production bounded registry writes require a destination-bound RegistryLock.",
+      "remaining_acceptance": [
+        "Replace raw-path production writer with guard-typed API.",
+        "Keep raw-path helper test-only; owning unit and CLI checks."
+      ]
+    },
+    {
+      "label": "F13-POLICY-CACHE",
+      "priority": "P2",
+      "scope": "later",
+      "classification": "inherited",
+      "state": "preserved-follow-up",
+      "requirement": "Verifier policy changes must take effect in runtime policy consumers without restart.",
+      "remaining_acceptance": [
+        "Inherited main defect, planner rule2; preserved after-landing work.",
+        "Reproduce actual stale challenge and verification consumers before repair.",
+        "Fresh coherent policy observation and owning mutation/consumer tests."
+      ]
+    },
+    {
+      "label": "FEDERATION-RAW-SIGNER",
+      "priority": "P2",
+      "scope": "later",
+      "classification": "inherited",
+      "state": "preserved-follow-up",
+      "requirement": "Triage inherited federation evaluator raw trusted-kernel selection against admission semantics.",
+      "remaining_acceptance": [
+        "Source observation only; no confirmed runtime bug or Original.",
+        "Current mechanical receipt-store/snapshot reuse does not rewrite the signer-selection defect.",
+        "Consumer-semantics review and genuine expected-safe Original; repair if confirmed."
+      ]
+    }
+  ],
+  "qualification_boundaries": {
+    "atomicity": "Prior Original0PASS4FAIL and focused12/CP66/CLI2+30PASS retained; source repair is not revoked.",
+    "parallel": "Producer used RUST_TEST_THREADS=2; reviewer reports40/40 failures at8threads and20/20 at4. Candidate qualification reopened.",
+    "negative_assertions": "Reviewer identifies weaker assertions; actual current negative gate passes with existing1248 baseline. Do not relabel as an observed gate failure.",
+    "review_limits": "Reviewer full CP lib run cancelled around13min; no result; no CLI,clippy,fmt,Python qualification by reviewer.",
+    "hosted_qualified": false,
+    "merged": false
+  },
+  "federation_scope_comparison": {
+    "base": "2b1d467e17dbb172bbd3080188ff6476192c59f8",
+    "review_source": "aa10c68ac7debdd73747641900130bbc9461107d",
+    "findings": [
+      {
+        "label": "GOVERNANCE-CASE-TRUST",
+        "path": "crates/platform/chio-control-plane/src/trust_control/service_runtime/issuance.rs",
+        "function": "evaluate_generic_governance_case_request",
+        "base_sha256": "ea66b83a17ef7be71ad03948efaa545d4621c9885747f2c9b1d2f8ab870c4349",
+        "current_sha256": "ea66b83a17ef7be71ad03948efaa545d4621c9885747f2c9b1d2f8ab870c4349",
+        "byte_identical": true,
+        "status": "source review observation; no runtime Original reproduced"
+      },
+      {
+        "label": "FEDERATION-RAW-SIGNER",
+        "path": "crates/platform/chio-control-plane/src/trust_control/service_runtime/issuance.rs",
+        "function": "evaluate_federation_policy_request",
+        "base_sha256": "ac322877e868ca9412c106281781cde45d2e58c089d7768e493b52e4d98e153f",
+        "current_sha256": "3a7a31811e407cf72c0299fb49af3fc3706f9a4eaa2c129182a84607d239c3c3",
+        "byte_identical": false,
+        "status": "source review observation; no runtime Original reproduced"
+      }
+    ]
+  },
+  "scope_ruling": "Planner00:24:14Z: mechanical clock/error/rename plumbing does not rewrite an inherited defect; rule2 preserved after landing."
+}
