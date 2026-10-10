@@ -56,8 +56,11 @@ Public JWKS, verifier metadata/discovery and OID4VP issuer verification use
 the same freshness contract and the bounded public passport admission lane.
 Those authority document routes return HTTP 503 when a configured SQLite
 authority cannot pass admission, including absent storage, clock regression or
-unsafe file custody. Generic-market documents and missing plain-seed routes
-retain their existing refusal contracts. With no authority configured, issuer
+unsafe file custody. Generic-market listings require their discovery signer to
+own the locally inspected live authority head and can refuse with HTTP 409 on
+followers. Cluster-wide authority admission for those listings remains follow-up
+work. Missing plain-seed authority routes retain their existing refusal statuses.
+With no authority configured, issuer
 metadata remains unsigned with no portable signing key or JWKS; discovery and
 JWKS refuse with 404, and OID4VP trust reads refuse with 409.
 Unconfigured health returns 200 with `configured: false` and `available: true`
