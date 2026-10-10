@@ -4,7 +4,7 @@
 use alloc::format;
 use alloc::string::String;
 
-/// Fill one owned byte buffer, then validate and transfer it into a string.
+/// Render owned strings and borrowed buffers through the same ASCII hex pairs.
 /// Non-ASCII prefixes use the established general rendering fallback.
 pub(super) fn prefixed_hex(prefix: &str, bytes: &[u8]) -> String {
     let encoded = try_prefixed_hex(prefix, bytes);
@@ -31,14 +31,21 @@ fn try_prefixed_hex(prefix: &str, bytes: &[u8]) -> Option<String> {
         .len()
         .checked_mul(2)
         .and_then(|len| len.checked_add(prefix.len()))?;
-    let mut encoded = alloc::vec![0; len];
-    fill_prefixed_hex(prefix, bytes, &mut encoded)?;
-    String::from_utf8(encoded).ok()
+    if !prefix.is_ascii() {
+        return None;
+    }
+    let mut encoded = String::with_capacity(len);
+    encoded.push_str(prefix);
+    for byte in bytes {
+        let (high, low) = hex_byte_pair(*byte)?;
+        encoded.push(char::from(high));
+        encoded.push(char::from(low));
+    }
+    Some(encoded)
 }
 
 /// Fill an exactly sized byte buffer with the established ASCII wire bytes.
 pub(super) fn fill_prefixed_hex(prefix: &str, bytes: &[u8], encoded: &mut [u8]) -> Option<()> {
-    const DIGITS: &[u8; 16] = b"0123456789abcdef";
     let (prefix_chars, hex_chars) = encoded.split_at_mut_checked(prefix.len())?;
     if hex_chars.len() != bytes.len().checked_mul(2)? || !prefix.is_ascii() {
         return None;
@@ -48,10 +55,17 @@ pub(super) fn fill_prefixed_hex(prefix: &str, bytes: &[u8], encoded: &mut [u8]) 
         let [high, low] = output else {
             return None;
         };
-        *high = *DIGITS.get(usize::from(byte >> 4))?;
-        *low = *DIGITS.get(usize::from(byte & 0x0f))?;
+        (*high, *low) = hex_byte_pair(*byte)?;
     }
     Some(())
+}
+
+fn hex_byte_pair(byte: u8) -> Option<(u8, u8)> {
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
+    Some((
+        *DIGITS.get(usize::from(byte >> 4))?,
+        *DIGITS.get(usize::from(byte & 0x0f))?,
+    ))
 }
 
 #[cfg(test)]
