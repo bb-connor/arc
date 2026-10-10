@@ -1,4 +1,4 @@
-//! HTTP admission for passport status and certification registry writes.
+//! HTTP admission for bounded operator registry writes.
 //!
 //! A registry write is one locked file transaction (load, change, capacity
 //! check, atomic replace) run on the blocking pool. Admission never waits:
@@ -12,7 +12,7 @@ use std::sync::LazyLock;
 use serde::Serialize;
 
 use super::*;
-use crate::passport_verifier::RegistryUpdateError;
+use crate::passport_verifier::{RegistryTransactionError, RegistryUpdateError};
 
 /// Registry write transactions running at once across the process.
 const REGISTRY_WRITE_PERMITS: usize = 2;
@@ -35,6 +35,51 @@ pub(super) fn configured_registry_file(
     })
 }
 
+/// An operation refusal retains its original HTTP status without inferring
+/// the status from an error message.
+pub(super) enum RegistryOperationError {
+    Configuration(String),
+    InvalidEntitlement(String),
+    BadRequest(String),
+}
+
+impl RegistryOperationError {
+    pub(super) fn configuration(error: impl std::fmt::Display) -> Self {
+        Self::Configuration(error.to_string())
+    }
+
+    pub(super) fn invalid_entitlement(error: impl std::fmt::Display) -> Self {
+        Self::InvalidEntitlement(error.to_string())
+    }
+
+    pub(super) fn bad_request(error: impl std::fmt::Display) -> Self {
+        Self::BadRequest(error.to_string())
+    }
+
+    fn into_response(self) -> Response {
+        let (status, error) = match self {
+            Self::Configuration(error) => (StatusCode::CONFLICT, error),
+            Self::InvalidEntitlement(error) => (StatusCode::UNAUTHORIZED, error),
+            Self::BadRequest(error) => (StatusCode::BAD_REQUEST, error),
+        };
+        plain_http_error(status, &error)
+    }
+}
+
+/// Runs a transaction whose operation carries an explicit HTTP refusal.
+pub(super) async fn run_registry_transaction<T: Serialize + Send + 'static>(
+    update: impl FnOnce() -> Result<T, RegistryTransactionError<RegistryOperationError>>
+        + Send
+        + 'static,
+) -> Response {
+    run_registry_response_in(&REGISTRY_WRITE_LANE, move || match update() {
+        Ok(value) => Json(value).into_response(),
+        Err(RegistryTransactionError::Registry(error)) => registry_update_error_response(error),
+        Err(RegistryTransactionError::Refused(error)) => error.into_response(),
+    })
+    .await
+}
+
 /// Runs `update` behind the process registry write lane and answers with its
 /// JSON outcome or its error.
 pub(super) async fn run_registry_update<T: Serialize + Send + 'static>(
@@ -49,6 +94,19 @@ pub(super) async fn run_registry_update_in<T: Serialize + Send + 'static>(
     lane: &Arc<tokio::sync::Semaphore>,
     update: impl FnOnce() -> Result<T, RegistryUpdateError> + Send + 'static,
 ) -> Response {
+    run_registry_response_in(lane, move || match update() {
+        Ok(value) => Json(value).into_response(),
+        Err(error) => registry_update_error_response(error),
+    })
+    .await
+}
+
+/// One permit owner serves both transaction adapters. It stays in the blocking
+/// closure until the full transaction and response construction have ended.
+async fn run_registry_response_in(
+    lane: &Arc<tokio::sync::Semaphore>,
+    update: impl FnOnce() -> Response + Send + 'static,
+) -> Response {
     let Ok(permit) = Arc::clone(lane).try_acquire_owned() else {
         return plain_http_error(
             StatusCode::SERVICE_UNAVAILABLE,
@@ -62,8 +120,7 @@ pub(super) async fn run_registry_update_in<T: Serialize + Send + 'static>(
     })
     .await;
     match outcome {
-        Ok(Ok(value)) => Json(value).into_response(),
-        Ok(Err(error)) => registry_update_error_response(error),
+        Ok(response) => response,
         Err(_) => plain_http_error(
             StatusCode::INTERNAL_SERVER_ERROR,
             "registry write did not complete",

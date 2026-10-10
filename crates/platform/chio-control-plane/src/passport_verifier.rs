@@ -46,6 +46,10 @@ mod older_registry_files_tests;
 #[path = "passport_verifier/tests/registry_writer_lock.rs"]
 mod registry_writer_lock_tests;
 
+#[cfg(all(test, unix))]
+#[path = "passport_verifier/tests/adjacent_registry_transactions.rs"]
+mod adjacent_registry_transactions;
+
 const VERIFIER_POLICY_REGISTRY_VERSION: &str = "chio.passport-verifier-policies.v1";
 const PASSPORT_STATUS_REGISTRY_VERSION: &str = "chio.passport-status-registry.v1";
 const PASSPORT_ISSUANCE_REGISTRY_VERSION: &str = "chio.passport-issuance-offers.v1";
@@ -114,6 +118,26 @@ impl VerifierPolicyRegistry {
         }
     }
 
+    /// Updates the latest verified registry under its stable writer lock,
+    /// returning the outcome only after durable bounded persistence.
+    ///
+    /// `change` receives freshly verified state under the lock and must change
+    /// it in place, preserving signatures and domain invariants. It is a
+    /// trusted Rust caller: replacing state with an earlier copy defeats writer
+    /// exclusion. Persistence does not revalidate arbitrary mutations.
+    pub fn update<R, E>(
+        path: &Path,
+        change: impl FnOnce(&mut Self) -> Result<R, E>,
+    ) -> Result<R, RegistryTransactionError<E>> {
+        crate::signed_input::update_bounded_registry(
+            path,
+            Self::load,
+            crate::signed_input::MAX_SIGNED_FILE_BYTES,
+            change,
+        )
+    }
+
+    #[cfg(test)]
     pub fn save(&self, path: &Path) -> Result<(), CliError> {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
@@ -152,6 +176,42 @@ impl VerifierPolicyRegistry {
 
     pub fn remove(&mut self, policy_id: &str) -> bool {
         self.policies.remove(policy_id).is_some()
+    }
+}
+
+/// A registry transaction failure, preserving the caller's typed refusal.
+#[derive(Debug)]
+pub enum RegistryTransactionError<E> {
+    /// The lock, verified load, or durable persistence failed.
+    Registry(RegistryUpdateError),
+    /// The operation refused to change the verified current registry.
+    Refused(E),
+}
+
+impl<E: std::fmt::Display> std::fmt::Display for RegistryTransactionError<E> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Registry(error) => std::fmt::Display::fmt(error, f),
+            Self::Refused(error) => std::fmt::Display::fmt(error, f),
+        }
+    }
+}
+
+impl<E: std::error::Error + 'static> std::error::Error for RegistryTransactionError<E> {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Registry(error) => Some(error),
+            Self::Refused(error) => Some(error),
+        }
+    }
+}
+
+impl From<RegistryTransactionError<CliError>> for CliError {
+    fn from(error: RegistryTransactionError<CliError>) -> Self {
+        match error {
+            RegistryTransactionError::Registry(error) => error.into(),
+            RegistryTransactionError::Refused(error) => error,
+        }
     }
 }
 
@@ -585,6 +645,45 @@ impl PassportIssuanceOfferRegistry {
         }
     }
 
+    /// Updates a live redemption under the registry's stable writer lock.
+    /// No outcome is returned before the bounded file replacement is durable.
+    ///
+    /// `change` receives freshly verified state under the lock and must change
+    /// it in place, preserving signatures and domain invariants. It is a
+    /// trusted Rust caller: replacing state with an earlier copy defeats writer
+    /// exclusion. Persistence does not revalidate arbitrary mutations.
+    pub fn update<R, E>(
+        path: &Path,
+        change: impl FnOnce(&mut Self) -> Result<R, E>,
+    ) -> Result<R, RegistryTransactionError<E>> {
+        crate::signed_input::update_bounded_registry(
+            path,
+            Self::load,
+            crate::signed_input::MAX_SIGNED_FILE_BYTES,
+            change,
+        )
+    }
+
+    /// Updates offer issuance while preserving its existing redemption reserve.
+    ///
+    /// `change` receives freshly verified state under the lock and must change
+    /// it in place, preserving signatures and domain invariants. It is a
+    /// trusted Rust caller: replacing state with an earlier copy defeats writer
+    /// exclusion. Persistence does not revalidate arbitrary mutations.
+    pub fn update_for_issuance<R, E>(
+        path: &Path,
+        change: impl FnOnce(&mut Self) -> Result<R, E>,
+    ) -> Result<R, RegistryTransactionError<E>> {
+        crate::signed_input::update_bounded_registry(
+            path,
+            Self::load,
+            crate::signed_input::MAX_SIGNED_FILE_BYTES
+                - crate::signed_input::ISSUANCE_RESERVE_BYTES,
+            change,
+        )
+    }
+
+    #[cfg(test)]
     pub fn save(&self, path: &Path) -> Result<(), CliError> {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
@@ -594,6 +693,7 @@ impl PassportIssuanceOfferRegistry {
 
     /// Persists after an issuance, refusing to fill the reserve that live
     /// redemptions need.
+    #[cfg(test)]
     pub fn save_for_issuance(&self, path: &Path) -> Result<(), CliError> {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;

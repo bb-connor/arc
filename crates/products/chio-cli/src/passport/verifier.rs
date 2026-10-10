@@ -31,9 +31,7 @@ pub(crate) fn cmd_passport_policy_create(
             .upsert_verifier_policy(policy_id, &document)?;
         Some(url.to_string())
     } else if let Some(path) = verifier_policies_file {
-        let mut registry = load_verifier_policy_registry_for_admin(path)?;
-        registry.upsert(document.clone())?;
-        registry.save(path)?;
+        VerifierPolicyRegistry::update(path, |registry| registry.upsert(document.clone()))?;
         Some(path.display().to_string())
     } else {
         None
@@ -171,9 +169,7 @@ pub(crate) fn cmd_passport_policy_upsert(
             .upsert_verifier_policy(&document.body.policy_id, &document)?
     } else {
         let path = require_verifier_policy_registry_path(verifier_policies_file)?;
-        let mut registry = load_verifier_policy_registry_for_admin(path)?;
-        registry.upsert(document.clone())?;
-        registry.save(path)?;
+        VerifierPolicyRegistry::update(path, |registry| registry.upsert(document.clone()))?;
         document
     };
 
@@ -202,9 +198,9 @@ pub(crate) fn cmd_passport_policy_delete(
         (response.deleted, true)
     } else {
         let path = require_verifier_policy_registry_path(verifier_policies_file)?;
-        let mut registry = load_verifier_policy_registry_for_admin(path)?;
-        let deleted = registry.remove(policy_id);
-        registry.save(path)?;
+        let deleted = VerifierPolicyRegistry::update(path, |registry| {
+            Ok::<_, CliError>(registry.remove(policy_id))
+        })?;
         (deleted, true)
     };
 

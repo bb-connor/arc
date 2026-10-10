@@ -187,37 +187,35 @@ pub(crate) async fn handle_create_passport_issuance_offer(
         Ok(None) => {}
         Err(response) => return response,
     }
-    let (path, mut registry) = match load_passport_issuance_registry_for_admin(&state.config) {
-        Ok(values) => values,
-        Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
+    use super::registry_write_lane::{run_registry_transaction, RegistryOperationError};
+    let Some(path) = state.config.passport_issuance_offers_file.clone() else {
+        return plain_http_error(StatusCode::CONFLICT,
+            "passport issuance requires --passport-issuance-offers-file on the trust-control service");
     };
-    let metadata = match configured_passport_credential_issuer(&state.config) {
-        Ok(metadata) => metadata,
-        Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
-    };
-    if state.config.passport_statuses_file.is_some() {
-        if let Err(error) = portable_passport_status_reference_for_service(
-            &state.config,
-            &payload.passport,
-            clock_now,
-        ) {
-            return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
-        }
-    }
-    let record = match registry.issue_offer(
-        &metadata,
-        payload.passport,
-        payload.credential_configuration_id.as_deref(),
-        payload.ttl_seconds,
-        clock_now,
-    ) {
-        Ok(record) => record,
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    };
-    if let Err(error) = registry.save_for_issuance(&path) {
-        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-    }
-    Json(record).into_response()
+    run_registry_transaction(move || {
+        PassportIssuanceOfferRegistry::update_for_issuance(&path, |registry| {
+            let metadata = configured_passport_credential_issuer(&state.config)
+                .map_err(RegistryOperationError::configuration)?;
+            if state.config.passport_statuses_file.is_some() {
+                portable_passport_status_reference_for_service(
+                    &state.config,
+                    &payload.passport,
+                    clock_now,
+                )
+                .map_err(RegistryOperationError::bad_request)?;
+            }
+            registry
+                .issue_offer(
+                    &metadata,
+                    payload.passport,
+                    payload.credential_configuration_id.as_deref(),
+                    payload.ttl_seconds,
+                    clock_now,
+                )
+                .map_err(RegistryOperationError::bad_request)
+        })
+    })
+    .await
 }
 
 pub(crate) async fn handle_redeem_passport_issuance_token(
@@ -228,24 +226,24 @@ pub(crate) async fn handle_redeem_passport_issuance_token(
         Ok(now) => now,
         Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
     };
-    let (path, mut registry) = match load_passport_issuance_registry_for_admin(&state.config) {
-        Ok(values) => values,
-        Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
+    use super::registry_write_lane::{run_registry_transaction, RegistryOperationError};
+    let Some(path) = state.config.passport_issuance_offers_file.clone() else {
+        return plain_http_error(StatusCode::CONFLICT,
+            "passport issuance requires --passport-issuance-offers-file on the trust-control service");
     };
-    let metadata =
-        match public_passport_credential_issuer(&state.config, &state.finding_challenge_clock) {
-            Ok(metadata) => metadata,
-            Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
-        };
-    let response = match registry.redeem_pre_authorized_code(&metadata, &payload, clock_now, 300) {
-        Ok(response) => response,
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    };
-    registry.prune_dead(clock_now);
-    if let Err(error) = registry.save(&path) {
-        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-    }
-    Json(response).into_response()
+    run_registry_transaction(move || {
+        PassportIssuanceOfferRegistry::update(&path, |registry| {
+            let metadata =
+                public_passport_credential_issuer(&state.config, &state.finding_challenge_clock)
+                    .map_err(RegistryOperationError::configuration)?;
+            let response = registry
+                .redeem_pre_authorized_code(&metadata, &payload, clock_now, 300)
+                .map_err(RegistryOperationError::bad_request)?;
+            registry.prune_dead(clock_now);
+            Ok(response)
+        })
+    })
+    .await
 }
 
 pub(crate) async fn handle_redeem_passport_issuance_credential(
@@ -261,60 +259,60 @@ pub(crate) async fn handle_redeem_passport_issuance_credential(
         Ok(token) => token,
         Err(response) => return response,
     };
-    let (path, mut registry) = match load_passport_issuance_registry_for_admin(&state.config) {
-        Ok(values) => values,
-        Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
+    use super::registry_write_lane::{run_registry_transaction, RegistryOperationError};
+    let Some(path) = state.config.passport_issuance_offers_file.clone() else {
+        return plain_http_error(StatusCode::CONFLICT,
+            "passport issuance requires --passport-issuance-offers-file on the trust-control service");
     };
-    let Some(issuer) = state.config.advertise_url.as_deref() else {
-        return plain_http_error(
-            StatusCode::CONFLICT,
-            "passport issuance requires --advertise-url on the trust-control service",
-        );
-    };
-    // An upload can outlive its entitlement. Recheck before issuer metadata
-    // resolution can create signing material, keeping this refusal read-only.
-    if let Err(error) = registry.validate_credential_entitlement(issuer, &access_token, clock_now) {
-        return plain_http_error(StatusCode::UNAUTHORIZED, &error.to_string());
-    }
-    let metadata = match configured_passport_credential_issuer(&state.config) {
-        Ok(metadata) => metadata,
-        Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
-    };
-    let portable_signing_keypair =
-        if state.config.authority_seed_path.is_some() || state.config.authority_db_path.is_some() {
-            match resolve_oid4vp_verifier_signing_key(&state.config) {
-                Ok(keypair) => Some(keypair),
-                Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
-            }
-        } else {
-            None
-        };
-    let portable_status_registry = match state.config.passport_statuses_file.as_deref() {
-        Some(path) => match PassportStatusRegistry::load(path) {
-            Ok(registry) => Some(registry),
-            Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
-        },
-        None => None,
-    };
-    let response = match registry.redeem_credential(
-        &metadata,
-        &access_token,
-        &payload,
-        clock_now,
-        portable_signing_keypair.as_ref(),
-        portable_status_registry.as_ref(),
-    ) {
-        Ok(response) => response,
-        Err(error) if error.to_string().contains("access token") => {
-            return plain_http_error(StatusCode::UNAUTHORIZED, &error.to_string());
-        }
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    };
-    registry.prune_dead(clock_now);
-    if let Err(error) = registry.save(&path) {
-        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-    }
-    Json(response).into_response()
+    run_registry_transaction(move || {
+        PassportIssuanceOfferRegistry::update(&path, |registry| {
+            let issuer = state.config.advertise_url.as_deref().ok_or_else(|| {
+                RegistryOperationError::Configuration(
+                    "passport issuance requires --advertise-url on the trust-control service"
+                        .to_string(),
+                )
+            })?;
+            // An upload can outlive its entitlement. Check the fresh locked
+            // state before metadata resolution can create signing material.
+            registry
+                .validate_credential_entitlement(issuer, &access_token, clock_now)
+                .map_err(RegistryOperationError::invalid_entitlement)?;
+            let metadata = configured_passport_credential_issuer(&state.config)
+                .map_err(RegistryOperationError::configuration)?;
+            let portable_signing_keypair = if state.config.authority_seed_path.is_some()
+                || state.config.authority_db_path.is_some()
+            {
+                Some(
+                    resolve_oid4vp_verifier_signing_key(&state.config)
+                        .map_err(RegistryOperationError::configuration)?,
+                )
+            } else {
+                None
+            };
+            let portable_status_registry = state
+                .config
+                .passport_statuses_file
+                .as_deref()
+                .map(PassportStatusRegistry::load)
+                .transpose()
+                .map_err(RegistryOperationError::configuration)?;
+            // All access-token failures are checked above at the same clock
+            // and issuer under this lock; request/profile failures remain 400.
+            let response = registry
+                .redeem_credential(
+                    &metadata,
+                    &access_token,
+                    &payload,
+                    clock_now,
+                    portable_signing_keypair.as_ref(),
+                    portable_status_registry.as_ref(),
+                )
+                .map_err(RegistryOperationError::bad_request)?;
+            registry.prune_dead(clock_now);
+            Ok(response)
+        })
+    })
+    .await
 }
 
 pub(crate) async fn handle_list_passport_statuses(
@@ -506,21 +504,29 @@ pub(crate) async fn handle_upsert_verifier_policy(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    let (path, mut registry) = match load_verifier_policy_registry_for_admin(&state.config) {
-        Ok(values) => values,
-        Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
+    use super::registry_write_lane::{
+        configured_registry_file, run_registry_transaction, RegistryOperationError,
     };
-    document.body.policy_id = policy_id.clone();
-    if let Err(error) = verify_signed_passport_verifier_policy(&document) {
-        return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
-    }
-    if let Err(error) = registry.upsert(document.clone()) {
-        return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
-    }
-    if let Err(error) = registry.save(&path) {
-        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-    }
-    Json(document).into_response()
+    let path = match configured_registry_file(
+        state.config.verifier_policies_file.as_deref(),
+        "--verifier-policies-file",
+        "verifier policy",
+    ) {
+        Ok(path) => path,
+        Err(response) => return response,
+    };
+    run_registry_transaction(move || {
+        VerifierPolicyRegistry::update(&path, |registry| {
+            document.body.policy_id = policy_id;
+            verify_signed_passport_verifier_policy(&document)
+                .map_err(RegistryOperationError::bad_request)?;
+            registry
+                .upsert(document.clone())
+                .map_err(RegistryOperationError::bad_request)?;
+            Ok(document)
+        })
+    })
+    .await
 }
 
 pub(crate) async fn handle_delete_verifier_policy(
@@ -531,15 +537,24 @@ pub(crate) async fn handle_delete_verifier_policy(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    let (path, mut registry) = match load_verifier_policy_registry_for_admin(&state.config) {
-        Ok(values) => values,
-        Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
+    use super::registry_write_lane::{
+        configured_registry_file, run_registry_transaction, RegistryOperationError,
     };
-    let deleted = registry.remove(&policy_id);
-    if let Err(error) = registry.save(&path) {
-        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-    }
-    Json(VerifierPolicyDeleteResponse { policy_id, deleted }).into_response()
+    let path = match configured_registry_file(
+        state.config.verifier_policies_file.as_deref(),
+        "--verifier-policies-file",
+        "verifier policy",
+    ) {
+        Ok(path) => path,
+        Err(response) => return response,
+    };
+    run_registry_transaction(move || {
+        VerifierPolicyRegistry::update(&path, |registry| {
+            let deleted = registry.remove(&policy_id);
+            Ok::<_, RegistryOperationError>(VerifierPolicyDeleteResponse { policy_id, deleted })
+        })
+    })
+    .await
 }
 
 pub(crate) async fn handle_create_passport_challenge(

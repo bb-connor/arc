@@ -7,7 +7,7 @@ use chio_core::canonical::UntrustedJsonText;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use crate::passport_verifier::RegistryUpdateError;
+use crate::passport_verifier::{RegistryTransactionError, RegistryUpdateError};
 use crate::CliError;
 
 pub(crate) const MAX_SIGNED_FILE_BYTES: usize = 16 * 1024 * 1024;
@@ -31,6 +31,7 @@ pub(crate) const ISSUANCE_RESERVE_BYTES: usize = 1024 * 1024;
 
 /// Writes `value` as compact JSON, refusing any file the bounded reader could
 /// not load back. The destination is untouched when the write is refused.
+#[cfg(test)]
 pub(crate) fn write_bounded_json<T: Serialize>(path: &Path, value: &T) -> Result<(), CliError> {
     write_bounded_json_with_limit(path, value, MAX_SIGNED_FILE_BYTES)
 }
@@ -168,6 +169,23 @@ pub(crate) fn update_registry<T: RevocationReserve, R>(
     let mut registry = load(lock.destination()).map_err(RegistryUpdateError::Load)?;
     let outcome = change(&mut registry).map_err(RegistryUpdateError::Refused)?;
     write_reserving_registry(&lock, &registry).map_err(RegistryUpdateError::Persist)?;
+    Ok(outcome)
+}
+
+/// Runs an ordinary bounded registry mutation using the same stable lock as
+/// revocation registries. A typed operation refusal never reaches persistence.
+pub(crate) fn update_bounded_registry<T: Serialize, R, E>(
+    path: &Path,
+    load: impl FnOnce(&Path) -> Result<T, CliError>,
+    limit: usize,
+    change: impl FnOnce(&mut T) -> Result<R, E>,
+) -> Result<R, RegistryTransactionError<E>> {
+    let lock = lock_registry(path).map_err(RegistryTransactionError::Registry)?;
+    let mut registry = load(lock.destination())
+        .map_err(|error| RegistryTransactionError::Registry(RegistryUpdateError::Load(error)))?;
+    let outcome = change(&mut registry).map_err(RegistryTransactionError::Refused)?;
+    write_bounded_json_with_limit(lock.destination(), &registry, limit)
+        .map_err(|error| RegistryTransactionError::Registry(RegistryUpdateError::Persist(error)))?;
     Ok(outcome)
 }
 

@@ -111,16 +111,6 @@ fn load_passport_status_registry_for_admin(
     }
 }
 
-fn load_passport_issuance_registry_for_admin(
-    path: &Path,
-) -> Result<PassportIssuanceOfferRegistry, CliError> {
-    if path.exists() {
-        PassportIssuanceOfferRegistry::load(path)
-    } else {
-        Ok(PassportIssuanceOfferRegistry::default())
-    }
-}
-
 fn load_signed_passport_verifier_policy(
     path: &Path,
 ) -> Result<SignedPassportVerifierPolicy, CliError> {
@@ -1049,25 +1039,24 @@ pub(crate) fn cmd_passport_issuance_offer_create(
             )?
     } else {
         let path = require_passport_issuance_registry_path(passport_issuance_offers_file)?;
-        let mut registry = load_passport_issuance_registry_for_admin(path)?;
-        let metadata = local_passport_issuer_metadata(
-            require_credential_issuer_url(issuer_url)?,
-            signing_seed_file,
-            None,
-            None,
-        )?;
-        if passport_statuses_file.is_some() {
-            portable_passport_status_reference(&passport, unix_now()?, passport_statuses_file)?;
-        }
-        let record = registry.issue_offer(
-            &metadata,
-            passport,
-            credential_configuration_id,
-            ttl_secs,
-            unix_now()?,
-        )?;
-        registry.save_for_issuance(path)?;
-        record
+        PassportIssuanceOfferRegistry::update_for_issuance(path, |registry| {
+            let metadata = local_passport_issuer_metadata(
+                require_credential_issuer_url(issuer_url)?,
+                signing_seed_file,
+                None,
+                None,
+            )?;
+            if passport_statuses_file.is_some() {
+                portable_passport_status_reference(&passport, unix_now()?, passport_statuses_file)?;
+            }
+            registry.issue_offer(
+                &metadata,
+                passport,
+                credential_configuration_id,
+                ttl_secs,
+                unix_now()?,
+            )
+        })?
     };
 
     if let Some(output) = output {
@@ -1116,10 +1105,9 @@ pub(crate) fn cmd_passport_issuance_token_redeem(
             PassportStatusDistribution::default(),
         )?;
         let path = require_passport_issuance_registry_path(passport_issuance_offers_file)?;
-        let mut registry = load_passport_issuance_registry_for_admin(path)?;
-        let token = registry.redeem_pre_authorized_code(&metadata, &request, unix_now()?, 300)?;
-        registry.save(path)?;
-        token
+        PassportIssuanceOfferRegistry::update(path, |registry| {
+            registry.redeem_pre_authorized_code(&metadata, &request, unix_now()?, 300)
+        })?
     };
 
     if let Some(output) = output {
@@ -1188,23 +1176,22 @@ pub(crate) fn cmd_passport_issuance_credential_redeem(
             .redeem_passport_issuance_credential(&token.access_token, &request)?
     } else {
         let path = require_passport_issuance_registry_path(passport_issuance_offers_file)?;
-        let mut registry = load_passport_issuance_registry_for_admin(path)?;
-        let portable_signing_keypair = signing_seed_file
-            .map(crate::load_existing_authority_keypair)
-            .transpose()?;
-        let portable_status_registry = passport_statuses_file
-            .map(load_passport_status_registry_for_admin)
-            .transpose()?;
-        let response = registry.redeem_credential(
-            &metadata,
-            &token.access_token,
-            &request,
-            unix_now()?,
-            portable_signing_keypair.as_ref(),
-            portable_status_registry.as_ref(),
-        )?;
-        registry.save(path)?;
-        response
+        PassportIssuanceOfferRegistry::update(path, |registry| {
+            let portable_signing_keypair = signing_seed_file
+                .map(crate::load_existing_authority_keypair)
+                .transpose()?;
+            let portable_status_registry = passport_statuses_file
+                .map(load_passport_status_registry_for_admin)
+                .transpose()?;
+            registry.redeem_credential(
+                &metadata,
+                &token.access_token,
+                &request,
+                unix_now()?,
+                portable_signing_keypair.as_ref(),
+                portable_status_registry.as_ref(),
+            )
+        })?
     };
 
     if let Some(output) = output {

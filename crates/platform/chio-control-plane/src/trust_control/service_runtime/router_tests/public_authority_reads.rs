@@ -768,3 +768,6 @@ async fn public_authority_routes_refuse_a_regressed_clock_and_unsafe_custody() -
     );
     Ok(())
 }
+
+#[path = "adjacent_registry_races.rs"]
+mod adjacent_registry_races;
