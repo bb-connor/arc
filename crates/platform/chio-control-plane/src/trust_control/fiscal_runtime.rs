@@ -524,11 +524,16 @@ impl TrustFiscalRuntime {
         }
     }
 
-    pub(crate) fn bind_legacy_fee_schedule(
+    /// Binds `legacy` to its governed schedule only if `admit` accepts it
+    /// inside the binding write transaction, immediately before commit. A
+    /// refusal returns `Ok(Err(_))` with nothing persisted; fiscal failures
+    /// stay `Err(_)`.
+    pub(crate) fn bind_legacy_fee_schedule_admitted<E>(
         &self,
         fiscal_schedule_id: &str,
         legacy: &chio_fiscal::fee_schedule::SignedOpenMarketFeeSchedule,
-    ) -> Result<(), TrustFiscalOperationError> {
+        admit: impl FnOnce() -> Result<(), E>,
+    ) -> Result<Result<(), E>, TrustFiscalOperationError> {
         let startup = self
             .reconcile()
             .map_err(|error| TrustFiscalOperationError::Startup(error.to_string()))?;
@@ -537,7 +542,7 @@ impl TrustFiscalRuntime {
             .load_verified_schedule(fiscal_schedule_id, &startup.charters)
             .map_err(TrustFiscalOperationError::Store)?;
         self.store
-            .bind_legacy_fee_schedule(legacy, &schedule, &self.fence)
+            .bind_legacy_fee_schedule_admitted(legacy, &schedule, &self.fence, admit)
             .map_err(TrustFiscalOperationError::Store)
     }
 
@@ -823,7 +828,7 @@ pub(crate) fn compose_trust_fiscal_runtime(
     compose_trust_fiscal_runtime_with_anchor(authority, config, anchor).map(Some)
 }
 
-fn compose_trust_fiscal_runtime_with_anchor(
+pub(crate) fn compose_trust_fiscal_runtime_with_anchor(
     authority: &SqliteAuthorityStore,
     config: &TrustFiscalRuntimeConfig,
     anchor: Arc<dyn FiscalStateAnchor>,

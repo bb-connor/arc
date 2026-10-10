@@ -3,6 +3,9 @@
 //! with that view's admission response before it evaluates or signs anything.
 use super::*;
 use chio_core::capability::scope::MonetaryAmount;
+
+#[path = "governed_fee_binding.rs"]
+mod governed_fee_binding;
 use chio_open_market::evidence::{OpenMarketEvidenceKind, OpenMarketEvidenceReference};
 use chio_open_market::fee_schedule::{
     OpenMarketBondClass, OpenMarketBondRequirement, OpenMarketCollateralReferenceKind,

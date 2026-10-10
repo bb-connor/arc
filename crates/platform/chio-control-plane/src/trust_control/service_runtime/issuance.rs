@@ -1,4 +1,6 @@
-use super::super::report_validation::load_authority_status_for_state;
+use super::super::report_validation::{
+    inspect_authority_state_blocking, load_authority_status_for_state,
+};
 use super::*;
 use chio_fiscal::{FiscalDomain, FiscalResolution};
 use chio_open_market::fiscal_adapter::{
@@ -241,17 +243,36 @@ pub fn evaluate_generic_governance_case_request(
     evaluate_generic_governance_case(request, now).map_err(CliError::cli_other_error)
 }
 
-pub(crate) fn issue_signed_open_market_fee_schedule(
+/// An open-market fee schedule signed under the admitted authority. Signing
+/// persists nothing; a governed schedule still has to be bound.
+pub(crate) struct PreparedFeeSchedule {
+    signed: SignedOpenMarketFeeSchedule,
+    binding: Option<(Arc<TrustFiscalRuntime>, String)>,
+}
+
+impl PreparedFeeSchedule {
+    /// The schedule itself when nothing has to be bound, which makes it final
+    /// once signed.
+    pub(crate) fn into_unbound(self) -> Result<SignedOpenMarketFeeSchedule, Self> {
+        match self.binding {
+            None => Ok(self.signed),
+            Some(_) => Err(self),
+        }
+    }
+}
+
+pub(crate) fn prepare_open_market_fee_schedule(
     state: &TrustServiceState,
     request: &OpenMarketFeeScheduleIssueRequest,
-) -> Result<SignedOpenMarketFeeSchedule, Response> {
-    let fiscal_runtime = state.fiscal_runtime.as_deref();
+) -> Result<PreparedFeeSchedule, Response> {
+    let fiscal_runtime = state.fiscal_runtime.clone();
     let (signed, governed_schedule_id) = sign_with_admitted_authority(
         state,
         |signer_keypair, _| {
             let local_operator = public_generic_registry_publisher(&state.config)?;
             let issued_at = request.issued_at.unwrap_or(now_unix_secs()?);
-            let (artifact, governed_schedule_id) = if let Some(runtime) = fiscal_runtime {
+            let (artifact, governed_schedule_id) = if let Some(runtime) = fiscal_runtime.as_deref()
+            {
                 runtime
                     .with_resolver(|resolver| {
                         match resolver.resolve::<FiscalOpenMarketSchedule>(
@@ -303,14 +324,45 @@ pub(crate) fn issue_signed_open_market_fee_schedule(
         },
         |(signed, _)| signed.signer_key.clone(),
     )?;
-    // A governed schedule binds only a signature that the admitted authority
-    // still names as its live head.
-    if let (Some(runtime), Some(schedule_id)) = (fiscal_runtime, governed_schedule_id) {
-        runtime
-            .bind_legacy_fee_schedule(&schedule_id, &signed)
-            .map_err(|error| rejected(CliError::cli_other_error(error.to_string())))?;
-    }
-    Ok(signed)
+    Ok(PreparedFeeSchedule {
+        signed,
+        binding: fiscal_runtime.zip(governed_schedule_id),
+    })
+}
+
+/// Binds a governed fee schedule and returns it.
+///
+/// The final authority authorization is observed inside the fiscal binding
+/// write transaction, immediately before it commits; that commit is the
+/// durable binding point. The two live in separate databases, so they are
+/// not atomic: an authority change after the observation does not undo or
+/// refuse a binding that has committed, and nothing after the commit reports
+/// a refusal. A refused observation rolls the binding back, so no binding
+/// is ever persisted behind an authority refusal. Fiscal storage failures
+/// stay distinct from that refusal.
+pub(crate) fn bind_governed_fee_schedule(
+    state: &TrustServiceState,
+    prepared: PreparedFeeSchedule,
+) -> Result<SignedOpenMarketFeeSchedule, Response> {
+    let PreparedFeeSchedule { signed, binding } = prepared;
+    let Some((runtime, schedule_id)) = binding else {
+        return Ok(signed);
+    };
+    let authorization = runtime
+        .bind_legacy_fee_schedule_admitted(&schedule_id, &signed, || {
+            inspect_authority_state_blocking(state, |state| {
+                if admitted_authority_signers(state)?.admits_signer(&signed.signer_key) {
+                    Ok(())
+                } else {
+                    Err(plain_http_error(
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        AUTHORITY_CHANGED_DURING_SIGNING,
+                    ))
+                }
+            })
+        })
+        .map_err(|error| rejected(CliError::cli_other_error(error.to_string())))?;
+    authorization.map(|()| signed)
 }
 
 pub(crate) fn issue_signed_open_market_penalty(

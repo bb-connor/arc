@@ -3,7 +3,9 @@
 //! trust-activation, governance, and open-market artifact endpoints.
 
 use super::report_rendering::forward_post_to_leader;
-use super::report_validation::{inspect_authority_state, validate_service_auth};
+use super::report_validation::{
+    inspect_authority_state, run_authority_commit, validate_service_auth,
+};
 use super::*;
 
 pub(crate) async fn handle_list_certifications(
@@ -262,8 +264,22 @@ pub(crate) async fn handle_issue_open_market_fee_schedule(
             Err(response) => return response,
         }
     }
-    match inspect_authority_state(&state, move |state| {
-        service_runtime::issuance::issue_signed_open_market_fee_schedule(state, &request)
+    let prepared = match inspect_authority_state(&state, move |state| {
+        service_runtime::issuance::prepare_open_market_fee_schedule(state, &request)
+    })
+    .await
+    {
+        Ok(prepared) => prepared,
+        Err(response) => return response,
+    };
+    let prepared = match prepared.into_unbound() {
+        Ok(artifact) => return Json(artifact).into_response(),
+        Err(prepared) => prepared,
+    };
+    // The binding observes the admitted authority inside its own commit
+    // transaction, so nothing after that commit may refuse it.
+    match run_authority_commit(&state, move |state| {
+        service_runtime::issuance::bind_governed_fee_schedule(state, prepared)
     })
     .await
     {
