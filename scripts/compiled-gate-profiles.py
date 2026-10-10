@@ -358,7 +358,13 @@ def execute(root, evidence, name, command, environment, pins, verifier, recorder
 def export(root, evidence, gate, producer, runtime, host, environment, verifier, recorder, timeout):
     namespace = Path(host["namespace"])
     rows = [json.loads(path.read_bytes()) for path in sorted((namespace/"records").glob("*.json"))]
-    recorder.require(rows and all(row["status"] == "success" and row["compiler_exit"] == 0 for row in rows), "host_compilation_failed")
+    # Cargo build scripts can deliberately compile feature probes that fail.
+    # Preserve their outcomes; the original graph consumer accepts producers
+    # only from successful units. Instrumentation refusals still fail the gate.
+    recorder.require(rows and all(type(row["compiler_exit"]) is int and
+        (row["status"] == "success" and row["compiler_exit"] == 0 or
+         row["status"] == "compiler_failed" and row["compiler_exit"] != 0)
+        for row in rows), "host_compilation_failed")
     current = {str(root/item["path"]): item["sha256"] for item in runtime["sources"] if "sha256" in item}
     inputs, images = {}, {}
     for row in rows:
