@@ -19,14 +19,17 @@ impl Fixture {
     fn new() -> TestResult<Self> {
         let authority = ProvisionedAuthority::open();
         let store = authority.authority.admission_operation_store();
-        let mut connection = store.connection()?;
-        let read = store.begin_read(&mut connection)?;
-        let provisioned_records: i64 = read.query_row(
-            "SELECT count(*) FROM admission_operation_recovery_records",
-            [],
-            |row| row.get(0),
-        )?;
-        read.commit()?;
+        let provisioned_records: i64 = {
+            let mut connection = store.connection()?;
+            let read = store.begin_read(&mut connection)?;
+            let records: i64 = read.query_row(
+                "SELECT count(*) FROM admission_operation_recovery_records",
+                [],
+                |row| row.get(0),
+            )?;
+            read.commit()?;
+            records
+        };
         let scope = RecoveryScopeV1 {
             authority_domain: AuthorityDomainId::new("participant-isolation-authority")?,
             tenant_id: RecoveryTenantId::new("participant-isolation-tenant")?,
@@ -87,7 +90,7 @@ fn participant_writer_refuses_recovery_owned_record_namespaces() -> TestResult {
     let payload = encode(&serde_json::json!({"fixture": "participant isolation"}))?;
     for (key, kind) in [
         (
-            format!("command:{}", sha256_hex(&encode("participant-command")?)),
+            format!("command:{}", sha256_hex(&encode(&"participant-command")?)),
             "command",
         ),
         (workflow_key(&fixture.scope, &workflow)?, "workflow"),
@@ -98,8 +101,8 @@ fn participant_writer_refuses_recovery_owned_record_namespaces() -> TestResult {
         (
             format!(
                 "recovery-planning-quota:{}:tenant:{}",
-                sha256_hex(&encode("participant-planning-owner")?),
-                sha256_hex(&encode("participant-planning-tenant")?)
+                sha256_hex(&encode(&"participant-planning-owner")?),
+                sha256_hex(&encode(&"participant-planning-tenant")?)
             ),
             "command",
         ),
