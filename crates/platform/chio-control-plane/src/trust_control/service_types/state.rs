@@ -181,7 +181,8 @@ pub(crate) struct RemoteBudgetStore {
 
 /// Fields actually observed at this usage sequence. Legacy mutation responses
 /// can omit counters, either monetary total, and the durable usage timestamp.
-/// Unobserved zero placeholders must never be served as a complete projection.
+/// Unobserved fields default to zero and must never be served as a complete
+/// projection.
 #[derive(Clone, Copy, Default)]
 pub(crate) struct BudgetUsageProvenance {
     pub(crate) invocation_count: bool,
