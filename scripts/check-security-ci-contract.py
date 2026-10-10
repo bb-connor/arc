@@ -5162,7 +5162,7 @@ def validate_isolated_execution_job(
 EXPECTED_NONCE_FIPS_JOBS = {
     "threshold-crypto-floor": "471febe9f13915a777a3504d4b0a635fc96170b7c62abb1a494279525532dc5f",
     "session-reports": "16ad2e1401ffc2ea0361cc508047e837d6ee3c09a01fa863e9cb3f35a461defc",
-    "fips-smoke": "6530286bad2e0e616421639eccc930cc6f39f2c95538d458257c3562b7bd69a6",
+    "fips-smoke": "3adad28e32ec7fa02b178aadcbcc3993dd6adf8cbd18c487abb6e48d3f81220f",
 }
 EXPECTED_NONCE_FIPS_PATHS = [
     ".github/workflows/chio-tee-fips.yml",

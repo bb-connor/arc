@@ -726,6 +726,7 @@ jobs:
             oversized_hex_rejects_before_decoding_invalid_digits \
             valid_ed25519_and_hybrid_transport_encodings_round_trip \
             ecdsa_and_hybrid_wire_bounds_preserve_maximal_encodings \
+            p256_borrowed_hex_matches_wire_encoding_for_every_byte \
             hash_wire_size_is_checked_before_hex_decoding \
             hash_serde_borrows_input_and_preserves_prefixed_wire_format \
             serde_accepts_borrowed_and_owned_strings_without_requesting_a_copy \
