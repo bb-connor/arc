@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise the real broker inventory callers with retained compiled test names."""
+"""Exercise the real broker inventory callers with independent test-name fixtures."""
 
 import re
 import subprocess
@@ -55,17 +55,44 @@ FIXTURES = {'host Docker resource lifetime and bounded stream': {'argv': ['test'
                                                                       'kernel_admission::tests::signed_broker_request_produces_original_operation_bound_quota']}}
 
 
+# Release controls use independent source names and the real libtest substring
+# selectors. These fixtures exercise the gate, not native enforcement.
+RELEASE_NAMES = (
+    "process_boundary_tests::native::confined::native_kernel_confined_broker_mcp_preserves_capture_and_terminal_receipts",
+    "process_boundary_tests::native::cutpoints::confined_broker_process_cutpoints_preserve_provider_and_quota_observations",
+    "process_boundary_tests::native::keyring::recovery::confined_broker_public_keyring_startup_recovers_exact_activation_after_auditor_and_receipt_loss",
+    "process_boundary_tests::native::process_host::confined_broker_process_host_exports_original_call_and_replays_after_restart",
+    "process_boundary_tests::native::process_host::governed_broker_process_host_verifies_original_keyring_authority",
+)
+RELEASE_FIXTURES = {
+    label: {
+        "argv": [
+            "test", "--locked", "-p", "chio-secret-broker",
+            "--features", "real-linux-enforcement", "--lib", selector,
+        ],
+        "names": [name for name in RELEASE_NAMES if selector in name],
+    }
+    for label, selector in (
+        ("confined native broker MCP, process death and terminal cage receipts", "confined_broker_"),
+        (
+            "governed native broker original keyring authority",
+            "process_boundary_tests::native::process_host::governed_broker_process_host_verifies_original_keyring_authority",
+        ),
+    )
+}
+
+
 class BrokerInventoryCallers(unittest.TestCase):
-    def test_exact_library_inventories_accept_current_compiled_names(self):
+    def test_exact_library_inventories_accept_owned_names(self):
         source = (ROOT / "scripts/check-secret-broker-boundary.sh").read_text()
         start = source.index("run_tests() {")
         function = source[start:source.index("\n}\n", start) + 3]
-        for label, fixture in FIXTURES.items():
+        for label, fixture in (FIXTURES | RELEASE_FIXTURES).items():
             with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:
                 work = Path(directory)
                 pattern = (
                     r'run_tests "' + re.escape(label)
-                    + r'" yes "\$\(cat <<\x27EOF\x27\n.*?\nEOF\n\)"[^\n]+'
+                    + r'" yes "\$\(cat <<\x27EOF\x27\n.*?\nEOF\n\)"(?:[^\n]*\\\n)*[^\n]+'
                 )
                 call = re.search(pattern, source, re.S)
                 self.assertIsNotNone(call, "exact broker target caller disappeared")

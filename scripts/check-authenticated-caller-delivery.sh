@@ -58,6 +58,9 @@ export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-1}"
   -- cargo test -p chio-store-sqlite --test caller_execution_ledger --locked
 
 ./scripts/run-exact-cargo-test-inventory.sh --label "native authenticated caller custody" --allow-filtered --expected \
+  security::adapters::tests::native_flow::support::caller::approval_wait::native_caller_approval_resume_refuses_substituted_or_missing_original_custody \
+  security::adapters::tests::native_flow::support::caller::approval_wait::native_caller_approval_wait_past_nonce_ttl_releases_output_and_reopens \
+  security::adapters::tests::native_flow::support::caller::approval_wait::native_caller_approval_within_nonce_ttl_resumes_original_native_custody \
   security::adapters::tests::native_flow::support::caller::denial::native_caller_changed_input_cannot_replace_original_reserved_join \
   security::adapters::tests::native_flow::support::caller::denial::native_caller_output_refusal_revocation_and_stop_never_release_raw_delivery \
   security::adapters::tests::native_flow::support::caller::denial::native_caller_preflight_requires_fresh_host_flow_state_before_reservation \
