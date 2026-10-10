@@ -47,7 +47,7 @@ impl PreparedProcessReturnSource {
     pub(crate) fn canonical_bytes(&self) -> &[u8] {
         &self.bytes
     }
-    pub(super) fn profile(&self) -> &catalog::ProcessWriteProfileData {
+    fn profile(&self) -> &catalog::ProcessWriteProfileData {
         &self.profile
     }
 }
@@ -55,6 +55,18 @@ impl core::fmt::Debug for PreparedProcessReturnSource {
     fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         formatter.write_str("PreparedProcessReturnSource([redacted])")
     }
+}
+
+/// The exact original call selection for a native return source. The owning
+/// runtime constructs it from its authenticated call; no decoder exists and
+/// stored descriptive fields cannot mint one.
+pub(crate) struct NativeReturnSourceRequest<'a> {
+    pub(crate) process_id: &'a str,
+    pub(crate) operation_key: &'a str,
+    pub(crate) request: &'a ToolCallRequest,
+    pub(crate) binding: &'a ProcessCallBinding,
+    pub(crate) known_outcome_only: bool,
+    pub(crate) security_context: Option<&'a chio_kernel::SecurityInvocationContext>,
 }
 
 impl Store {
@@ -105,23 +117,9 @@ impl Store {
     pub(crate) fn prepare_native_return_source(
         &mut self,
         runtime: &ProcessRuntime,
-        process_id: &str,
-        operation_key: &str,
-        request: &ToolCallRequest,
-        binding: &ProcessCallBinding,
-        known_outcome_only: bool,
-        security_context: Option<&chio_kernel::SecurityInvocationContext>,
+        selection: &NativeReturnSourceRequest<'_>,
     ) -> Result<PreparedProcessReturnSource, ProcessError> {
-        source::verify_source_request(
-            self,
-            runtime,
-            process_id,
-            operation_key,
-            request,
-            binding,
-            known_outcome_only,
-            security_context,
-        )?;
+        source::verify_source_request(self, runtime, selection)?;
         // This is the genuine source-entry RED seam. Installation, physical
         // pricing, all writer preservation and native bank enrollment are
         // separately owned dependencies, not shortcuts from valid request DATA.

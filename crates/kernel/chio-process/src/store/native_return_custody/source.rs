@@ -90,13 +90,16 @@ fn source_row_digest(
 pub(super) fn verify_source_request(
     store: &Store,
     runtime: &ProcessRuntime,
-    process_id: &str,
-    operation_key: &str,
-    request: &ToolCallRequest,
-    binding: &ProcessCallBinding,
-    known_outcome_only: bool,
-    security_context: Option<&chio_kernel::SecurityInvocationContext>,
+    selection: &NativeReturnSourceRequest<'_>,
 ) -> Result<(), ProcessError> {
+    let &NativeReturnSourceRequest {
+        process_id,
+        operation_key,
+        request,
+        binding,
+        known_outcome_only,
+        security_context,
+    } = selection;
     crate::validate_id(process_id)?;
     crate::validate_id(operation_key)?;
     if runtime.namespace != store.namespace {

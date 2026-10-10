@@ -9,7 +9,6 @@ use chio_kernel::ToolCallRequest;
 use chio_security_types::recovery::*;
 
 mod commands;
-pub(super) use commands::apply as apply_command;
 pub(super) use commands::apply_with_origin as apply_command_with_origin;
 #[cfg(feature = "admission-test-support")]
 pub(super) mod command_quota_test_support;

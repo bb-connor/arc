@@ -37,7 +37,6 @@ pub(in crate::admission_operation_store) use logical_reference::{
     persist_knowledge_reference_retain, persist_knowledge_reference_retirement,
     persist_product_reference_retirement, reserve_product_reference_intake,
     verify_knowledge_reference_account, ReservedProductReferenceIntake,
-    VerifiedParticipantAllowance,
 };
 pub(in crate::admission_operation_store) use original_owner::{
     original_owner_is_current, require_current_original_owner,

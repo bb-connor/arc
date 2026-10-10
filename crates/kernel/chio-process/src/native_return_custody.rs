@@ -6,6 +6,7 @@ use chio_kernel::process_return_custody::{
 };
 use chio_kernel::{SecurityInvocationContext, ToolCallRequest};
 
+use crate::store::native_return_custody::NativeReturnSourceRequest;
 pub use crate::store::native_return_custody::{
     ProcessFinishingTransactionPriceData, ProcessReturnRowEnvelopeData, ProcessReturnTableData,
     ProcessReturnTransactionData,
@@ -78,12 +79,14 @@ impl ProcessRuntime {
         let original = self.with_store(|store| {
             store.prepare_native_return_source(
                 self,
-                process,
-                operation,
-                request,
-                &binding,
-                known_outcome_only,
-                context,
+                &NativeReturnSourceRequest {
+                    process_id: process,
+                    operation_key: operation,
+                    request,
+                    binding: &binding,
+                    known_outcome_only,
+                    security_context: context,
+                },
             )
         })?;
         Ok(PreparedProcessReturnParticipant { original })

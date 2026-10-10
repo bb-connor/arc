@@ -99,7 +99,15 @@ fn admitted_call_prepares_its_actual_process_return_source() -> TestResult {
     runtime.with_store(|store| store.admit("root", "publish", &request, &binding.binding_hash))?;
     let result = runtime.with_store(|store| {
         store.prepare_native_return_source(
-            &runtime, "root", "publish", &request, &binding, false, None,
+            &runtime,
+            &NativeReturnSourceRequest {
+                process_id: "root",
+                operation_key: "publish",
+                request: &request,
+                binding: &binding,
+                known_outcome_only: false,
+                security_context: None,
+            },
         )
     });
     assert!(
