@@ -1,0 +1,74 @@
+{
+  "schema": "chio.security.export-attribution-repair.v1",
+  "observed_utc": "2026-10-10T02:11:00.708811+00:00",
+  "stage": "c7af747721e22173d0ee268ad8f3b143c907af71",
+  "producer": "ea004c82159ab7b5d4d650300c15f0f710d7b2d0",
+  "integration": "c7af747721e22173d0ee268ad8f3b143c907af71",
+  "source_files": {
+    "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/evidence_snapshot_export_tests.rs": "f43c966ca6465ebefc83ac3097fb71a889a73cb3ed6e4a08fd886d15fd8f3a2f",
+    "crates/platform/chio-store-sqlite/src/evidence_export/tests/snapshot_tests.rs": "b4ea627c17cc0be3d34f508ac3e7c75fe4dfb5563bef20d2409c440d1a9d103c",
+    "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export/metadata.rs": "b50daa27a2c996956c60bcc9810b99e262782e79ed1012eec48ad15d6f16f366",
+    "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export/tests.rs": "6a1a44586ee9d91e52b5a9d95d5c40d03594fb9db2264e3c63030dc079688d68",
+    "docs/reference/RECEIPT_QUERY_API.md": "89bc9b289c986db073f1b6969758473eff3ca67765da368da9a812b0859908da",
+    "docs/security/receipt-http-evidence-export.md": "07de493c111506956cf51d2447c8af7e43896b7e411873842380c9eecfc104b6",
+    "spec/WIRE_PROTOCOL.md": "3ecbde8a2162f74930afeec57e6f4d560d1b0e3d1265ffc4466630a8d8158f56"
+  },
+  "evidence": {
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/bounded-comparison-evidence-tests.patch": "50da3e5c47a86aee723321e487b1660c52c53435af0404831579905b8d553337",
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/bounded-comparison-evidence.log": "d05d3649f798e0f708ecbc5012275f0aa5ffd0e7212c30ffc0f96c6d2d0f6824",
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/clippy-strict.log": "6cf7ad1890db16c40e16e74c1fbd36b1e3e3fdf237a284789e04de2c01ec50bb",
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/commit-source-files.sha256": "d7ad61a3e7a03b08b5abe47ec010f0bc6009e01a1766238169821c6ffe7cbe38",
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/final-source.patch": "9ce5c7b8ccbdf036e2a0a123d9cd049bece1b37606ee8a3c4bc2d5b01f964e4f",
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/fmt-final.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/gate-check-negative-assertions-final.log": "49516e4ccc9c034cbb5fd748bdcae89b35f56d06d12a4c5e01ea61c0e17c45a6",
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/gate-check-receipt-query-http-final.log": "23144522615b2f7e75819cc338f99ccfe8b361c3e8d3886832aab3a8ef714481",
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/gate-check-rust-file-hygiene-final.log": "1fb6add51bd1a5e9eb98506e3bd942c6fcf0ce277fece93863fefd2428fb3bd8",
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/gate-check-security-clocks-final.log": "bd324fbc2aec503258f82917613ce9aeff2296a2cce36fc0e6f3285bcf158bd9",
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/gate-check-trust-boundaries-final.log": "c628712fe748ea911c9c54686a531283f34645391d0322c6321ebe4f513dcf69",
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/green-final.log": "58137a6b9ae8f30a4f816d6d5ba05751540c4e5605b0bd4352b944be6ac021b5",
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/original-red-tests.patch": "c99576968d3acd22ee158155d35981f37278754718ed2d0c2bff1a1c9d52aed9",
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/original-red.log": "b346fd7c637899a36c855bb60d4ef35029d083226a555bee821addb2f18d1dc1",
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/superseded-green-before-bounded-case.log": "8bb4d50b5ea30a74ee84208cb707946b28ba0e0e87a3b09c875f8f1a2232b697",
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/superseded-green-before-bounded-case.patch": "5fca4cdba17d770283eba82c075ae1579f9c3429755f694acdbb87db349f4c90"
+  },
+  "producer_original": {
+    "summary": "CP7PASS4FAIL,store31PASS7FAIL; tests-only overlay on unchanged a862 production.",
+    "genuine_failed_names": [
+      "trust_control::service_runtime::router::tests::evidence_snapshot_export_tests::earlier_lineage_refusal_does_not_mask_a_later_attribution_change_over_http",
+      "trust_control::service_runtime::router::tests::evidence_snapshot_export_tests::non_utf8_captured_subject_returns_snapshot_invalid",
+      "trust_control::service_runtime::router::tests::evidence_snapshot_export_tests::non_utf8_unattributed_lineage_column_returns_typed_refusal",
+      "trust_control::service_runtime::router::tests::evidence_snapshot_export_tests::oversized_captured_subject_returns_snapshot_invalid",
+      "evidence_export::tests::snapshot_tests::earlier_lineage_refusal_does_not_mask_a_later_attribution_change",
+      "evidence_export::tests::snapshot_tests::non_utf8_captured_legacy_subject_invalidates_the_snapshot",
+      "evidence_export::tests::snapshot_tests::non_utf8_captured_signed_subject_invalidates_the_snapshot",
+      "evidence_export::tests::snapshot_tests::non_utf8_unattributed_lineage_column_is_a_typed_refusal",
+      "evidence_export::tests::snapshot_tests::oversized_captured_subject_invalidates_before_the_byte_allowance",
+      "evidence_export::tests::snapshot_tests::undecodable_signed_lineage_grants_are_a_typed_refusal",
+      "receipt_query_snapshot::export::tests::publication_malformed_columns_remain_request_refusals"
+    ]
+  },
+  "producer_final": {
+    "summary": "CP29PASS,store65PASS;94total; strict owning alltargets and format/static gatesPASS.",
+    "all_original_failures_pass_by_exact_name": true,
+    "qualification": "Producer component only; final combined qualification pending."
+  },
+  "source_review": [
+    "All selected captured subjects prechecked before lineage byte limits, UTF-8 decode or lineage refusal; each materialized row rechecked in its own transaction.",
+    "No owned projection lock is read under a live source transaction. Local then latest federated source selection remains unchanged.",
+    "SQLite CASE checks type and encoding-specific octet_length before BINARY content comparison; UTF-16 stores retain positive and tamper controls.",
+    "Specific malformed metadata errors use fixed typed422; SQLite resource errors retain operational503; captured subject mismatch invalidates.",
+    "Exact rebuild refusal and documentation ownership corrected."
+  ],
+  "ordering_ruling": "Prepass before all selected capability-lineage refusals fulfills existing mutable-lineage ordering contract. Earlier unsupported legacy-receipt or checkpoint/publication refusal returns no bundle and does not claim to audit later attribution. No export.rs scope expansion.",
+  "limitations": [
+    "Earlier legacy-receipt/checkpoint/publication refusal does not audit later lineage attribution; no bundle is returned.",
+    "At most4096 selected capabilities; extra short reads use existing SQL and time budgets; this is not an atomic historical lineage snapshot.",
+    "Prior superseded green before bounded CASE remains retained; no workspace-wide or exact-candidate hosted qualification claimed."
+  ],
+  "remaining": [
+    "Integrate core authority and FINAL-12 crash recovery, then run composed owning tests and strict lint.",
+    "Independent final-candidate review, four exact protected checks and normal merge."
+  ],
+  "hosted_qualified": false,
+  "merged": false
+}
