@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import sqlite3
 import subprocess
@@ -23,6 +24,23 @@ from chio_mini_swe.worker import SCHEMA, export_result
 
 HERE = Path(__file__).resolve().parent
 DOCKER = ["/usr/bin/docker", "--host", "unix:///var/run/docker.sock"]
+BEARER = re.compile(r"(?i)(bearer\s+)[A-Za-z0-9._~+/=-]+")
+EVIDENCE = (
+    "run-report.json",
+    "run-stderr.txt",
+    "result.json",
+    "receipts.ndjson",
+    "kernel.pub",
+    "queries.jsonl",
+    "tests-after.txt",
+    "preparation-failure.stderr",
+    "host.log",
+)
+EVIDENCE_LIMIT = 1 << 20
+
+
+def redact(text):
+    return BEARER.sub(r"\1[redacted]", text)
 
 
 def docker(*args, **kwargs):
@@ -195,10 +213,22 @@ def queries(directory):
     return [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
 
 
-def finish(process, success=True):
+def finish(process, directory, success=True):
     out, err = process.communicate(timeout=180)
+    (directory / "run-report.json").write_text(redact(out))
+    (directory / "run-stderr.txt").write_text(redact(err))
     assert (process.returncode == 0) == success, (out, err)
     return json.loads(out), err
+
+
+def preserve(directory, target):
+    target.mkdir(parents=True, exist_ok=True)
+    for name in EVIDENCE:
+        source = directory / name
+        if source.is_file():
+            with source.open("rb") as handle:
+                data = handle.read(EVIDENCE_LIMIT)
+            (target / name).write_text(redact(data.decode(errors="replace")))
 
 
 def read_state(binary, directory, unknown=False):
@@ -274,7 +304,7 @@ def exercise(binary, directory, base, image, profile):
             host.communicate(timeout=15)
             services.stop_provider()
             host = launch(binary, directory)
-        report, error = finish(host, success=profile != "unknown")
+        report, error = finish(host, directory, success=profile != "unknown")
         (directory / "run-report.json").write_text(json.dumps(report))
         (directory / "run-stderr.txt").write_text(error)
         expected_attempts = {"baseline": 1, "known": 3, "unknown": 2}[profile]
@@ -321,7 +351,7 @@ def exercise(binary, directory, base, image, profile):
                 )
                 assert patch["receipt_json"] in exported["command_receipts"]
             before = (directory / "queries.jsonl").read_bytes()
-            repeated, _ = finish(launch(binary, directory))
+            repeated, _ = finish(launch(binary, directory), directory)
             assert repeated["workers"][0]["attempts"] == expected_attempts
             assert (directory / "queries.jsonl").read_bytes() == before
             evidence = {
@@ -389,7 +419,13 @@ def main():
     print("Private native mini-SWE state: " + str(root), file=sys.stderr, flush=True)
     for profile in ("baseline", "known", "unknown"):
         print(f"Starting native mini-SWE profile: {profile}", file=sys.stderr, flush=True)
-        result[profile] = exercise(binary, root / profile, image["base"], image["image"], profile)
+        try:
+            result[profile] = exercise(
+                binary, root / profile, image["base"], image["image"], profile
+            )
+        except BaseException:
+            preserve(root / profile, args.output / profile)
+            raise
         print(f"Passed native mini-SWE profile: {profile}", file=sys.stderr, flush=True)
         target = args.output / profile
         target.mkdir()
