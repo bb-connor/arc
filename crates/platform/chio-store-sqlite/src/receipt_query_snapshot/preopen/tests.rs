@@ -7,7 +7,9 @@ use std::os::unix::fs::{symlink, DirBuilderExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
+use super::super::{ReceiptQuerySnapshotConfig, ReceiptQuerySnapshotState, ReceiptQuerySnapshots};
 use super::{data_directory, reclaim_abandoned_snapshots, Location};
+use crate::receipt_store::SqliteReceiptStore;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -344,6 +346,103 @@ fn reclamation_runs_only_where_the_path_resolves_and_never_opens_the_database() 
     // Reclamation never opened, created or wrote the receipt database.
     for name in ["live.db", "live.db-wal", "live.db-shm", "live.db-journal"] {
         assert!(!data.join(name).exists(), "{name}");
+    }
+    Ok(())
+}
+
+/// A snapshot service serving the receipt store opened at `configured`.
+fn ready_service(configured: &Path) -> Result<ReceiptQuerySnapshots, Box<dyn std::error::Error>> {
+    let store = std::sync::Arc::new(SqliteReceiptStore::open(configured)?);
+    let service = ReceiptQuerySnapshots::start(
+        store,
+        ReceiptQuerySnapshotConfig {
+            extension_tick: Duration::from_millis(20),
+            invalid_retry_backoff: Duration::from_millis(20),
+            walker_busy_timeout: Duration::from_millis(50),
+            ..ReceiptQuerySnapshotConfig::default()
+        },
+    )?;
+    let deadline = Instant::now() + HANG;
+    loop {
+        let state = service.status().state;
+        if state == ReceiptQuerySnapshotState::Ready {
+            return Ok(service);
+        }
+        if Instant::now() >= deadline {
+            service.shutdown();
+            return Err(format!("the snapshot service was not ready: {state:?}").into());
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
+
+/// Snapshot databases in the snapshot parent of `directory`.
+fn snapshot_databases(directory: &Path) -> std::io::Result<Vec<PathBuf>> {
+    let entries = match std::fs::read_dir(directory.join(PARENT_NAME)) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => return Err(error),
+    };
+    let mut databases = Vec::new();
+    for entry in entries {
+        let database = entry?.path().join("snapshot.sqlite3");
+        if database.is_file() {
+            databases.push(database);
+        }
+    }
+    Ok(databases)
+}
+
+#[test]
+fn a_store_under_a_non_utf8_directory_keeps_its_snapshot_there() -> TestResult {
+    let root = private_root()?;
+    let directory = root.path().join(OsStr::from_bytes(b"receipts-\xfe\xff"));
+    private_directory(&directory)?;
+    let service = ready_service(&directory.join("live.db"))?;
+    let databases = snapshot_databases(&directory)?;
+    service.shutdown();
+    assert_eq!(
+        databases.len(),
+        1,
+        "the snapshot was provisioned outside the store's directory: {databases:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn the_walker_provisions_where_the_hook_reclaims() -> TestResult {
+    let root = private_root()?;
+    let plain = root.path().join("plain");
+    private_directory(&plain)?;
+    let real = root.path().join("real");
+    private_directory(&real)?;
+    rusqlite::Connection::open(real.join("live.db"))?;
+    let other = root.path().join("other");
+    private_directory(&other)?;
+    symlink(real.join("live.db"), other.join("link.db"))?;
+    let uri = root.path().join("uri");
+    private_directory(&uri)?;
+    let uri = uri.to_str().ok_or("the temporary root is not UTF-8")?;
+    let non_utf8 = root.path().join(OsStr::from_bytes(b"data-\xff"));
+    private_directory(&non_utf8)?;
+    for configured in [
+        plain.join("live.db"),
+        other.join("link.db"),
+        PathBuf::from(format!("file:{uri}/live.db?cache=private#section")),
+        non_utf8.join("live.db"),
+    ] {
+        // Derived before the store opens, as the hook runs.
+        let Location::Directory(expected) = data_directory(&configured) else {
+            return Err(format!("{configured:?} did not resolve").into());
+        };
+        let service = ready_service(&configured)?;
+        let databases = snapshot_databases(&expected)?;
+        service.shutdown();
+        assert_eq!(
+            databases.len(),
+            1,
+            "{configured:?}: the walker did not provision in {expected:?}"
+        );
     }
     Ok(())
 }

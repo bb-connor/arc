@@ -78,14 +78,33 @@ pub(super) fn reclaim_abandoned(store: &SqliteReceiptStore) {
 }
 
 /// The directory of `store`'s main database file, as SQLite resolved it
-/// (absolute and without links), or `None` for an in-memory store.
+/// (absolute and without links). The name is read as bytes, so a non-UTF-8
+/// name keeps its directory; only an empty name, which SQLite reports for a
+/// database backed by no file, yields `None`.
 #[cfg(target_os = "linux")]
 fn data_directory(store: &SqliteReceiptStore) -> Result<Option<PathBuf>, ReceiptStoreError> {
+    use std::os::unix::ffi::OsStrExt;
     let connection = store.connection()?;
-    let Some(file) = connection.path().filter(|path| !path.is_empty()) else {
+    let file: Vec<u8> = connection.query_row(
+        "SELECT file FROM pragma_database_list WHERE name = 'main'",
+        [],
+        |row| {
+            row.get_ref(0)?
+                .as_bytes()
+                .map(<[u8]>::to_vec)
+                .map_err(|error| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        0,
+                        rusqlite::types::Type::Text,
+                        Box::new(error),
+                    )
+                })
+        },
+    )?;
+    if file.is_empty() {
         return Ok(None);
-    };
-    Path::new(file)
+    }
+    Path::new(std::ffi::OsStr::from_bytes(&file))
         .parent()
         .map(|directory| Some(directory.to_path_buf()))
         .ok_or_else(|| {
