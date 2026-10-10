@@ -7,6 +7,29 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Final candidate review intake (October 10)
+
+The [review intake](audits/final-candidate-review-intake-20261010.json) preserves
+all 1,929 earlier requirements and adds two distinct obligations, for **1,931**
+total. Thirteen previous current states are archived before amendment. The
+startup-order repair `a7540e9b4c` passes six focused controls after four genuine
+Original failures; format and four static gates also pass. Its owning strict
+and final composed qualification remain open.
+
+Wallet tests reproduce four stale-time defects while the healthy flow passes;
+the isolated repair is undergoing qualification. Behavioral-report custody must
+stop request-time bootstrap while preserving legitimate node-local report
+signing. Forwarded-term binding remains conditional on its expected-safe
+Original. Four authority controls in the combined run still fail and require
+diagnosis. That run remains failed, with 334 store passes and 340 control-plane
+passes alongside the four failures; later targets and strict checks did not run.
+
+The frozen 100k-receipt control is separate and has no accepted result here.
+Planner review, repaired-candidate checks, four protected hosted checks and
+normal merge remain outstanding. Named minor and inherited residuals retain
+their stated boundaries, including the unproved Kani obligation and the
+authenticated cold-state preview gate.
+
 ## Final producer integration (October 10)
 
 Authority admission, snapshot pre-open cleanup and Building-phase public health
