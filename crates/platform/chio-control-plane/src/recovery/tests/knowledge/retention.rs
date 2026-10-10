@@ -500,11 +500,8 @@ fn reference_readiness_refusal(remove: bool) -> TestResult {
         "the real installation must have sealed its readiness activation"
     );
     if remove {
-        // Disposable local fault injection: the readiness projection vanishes
-        // while its sealed event history stays retained. Foreign-key
-        // enforcement is connection-local, and the ownership guard is lifted
-        // only for this throwaway connection, mirroring the guarded tamper
-        // setup of the live-capacity account regression.
+        // Remove only this disposable database's projection, retaining history.
+        // Restore its deletion trigger immediately after injecting the fault.
         let trigger: String = connection.query_row(
             "SELECT sql FROM sqlite_master WHERE type='trigger'
              AND name='admission_operation_recovery_no_delete'",
@@ -522,12 +519,10 @@ fn reference_readiness_refusal(remove: bool) -> TestResult {
             1
         );
         connection.execute_batch(&trigger)?;
+        connection.execute_batch("PRAGMA foreign_keys=ON")?;
     } else {
-        // Corrupt the readiness payload on the disposable connection. The
-        // identity trigger permits exactly one payload rewrite together with
-        // its version increment, so the retained event digest no longer
-        // matches the tampered projection and every protected read of the
-        // key fails whole-store integrity before readiness decoding.
+        // A version advance permits the fixture update, but no corresponding
+        // authenticated event exists. Protected reads must reject this row.
         assert_eq!(
             connection.execute(
                 "UPDATE admission_operation_recovery_records
@@ -539,6 +534,11 @@ fn reference_readiness_refusal(remove: bool) -> TestResult {
     }
     let events: i64 = connection.query_row(
         "SELECT count(*) FROM admission_operation_recovery_events",
+        [],
+        |row| row.get(0),
+    )?;
+    let commits: i64 = connection.query_row(
+        "SELECT count(*) FROM authority_global_commits",
         [],
         |row| row.get(0),
     )?;
@@ -554,6 +554,15 @@ fn reference_readiness_refusal(remove: bool) -> TestResult {
         )?,
         events,
         "collection refusal must precede every protected retirement write"
+    );
+    assert_eq!(
+        connection.query_row(
+            "SELECT count(*) FROM authority_global_commits",
+            [],
+            |row| row.get::<_, i64>(0),
+        )?,
+        commits,
+        "collection refusal must not advance the authority"
     );
     assert_eq!(
         f.broker
