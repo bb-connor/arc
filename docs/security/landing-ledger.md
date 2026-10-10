@@ -7,6 +7,21 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Snapshot startup recovery integrated (October 10)
+
+The [pre-open repair audit](audits/snapshot-preopen-repair-20261010.json) records
+`abae247560`, `81bc064899`, and `3fea1185b3`. Cleanup now runs before ordinary
+and anchored receipt-store opens. Both genuine startup failures pass with the
+existing open refusal and database bytes preserved. Snapshot placement retains
+non-UTF8 filenames; both placement regressions pass in the 236-test producer run.
+
+Recovery remains bounded to 256 entries and 16 candidate directories per attempt;
+a single restart may still need operator relief. Producer lint provenance is
+explicit, and final combined strict checks remain required. All **1,929
+requirements** are retained. Core authority and Building health coverage
+integration, final combined qualification, independent review, protected checks
+and merge remain outstanding.
+
 ## Earlier repairs reconciled (October 10)
 
 The [component reconciliation](audits/earlier-repair-reconciliation-20261010.json)
