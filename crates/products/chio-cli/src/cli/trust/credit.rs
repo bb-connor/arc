@@ -153,6 +153,10 @@ pub(crate) fn cmd_trust_credit_loss_lifecycle_issue(
             )
         })?;
         let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
+        crate::trust_commands_cli::provision_local_issuance_authority(
+            authority_seed_path,
+            authority_db_path,
+        )?;
         trust_control::issue_signed_credit_loss_lifecycle(
             &receipt_store,
             authority_seed_path,

@@ -45,7 +45,12 @@ pub(crate) fn cmd_trust_liability_provider_issue(
                     .to_string(),
             )
         })?;
+        report.validate().map_err(CliError::cli_other_error)?;
         let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
+        crate::trust_commands_cli::provision_local_issuance_authority(
+            authority_seed_path,
+            authority_db_path,
+        )?;
         trust_control::issue_signed_liability_provider(
             &receipt_store,
             authority_seed_path,
@@ -203,6 +208,10 @@ pub(crate) fn cmd_trust_liability_quote_request_issue(
             )
         })?;
         let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
+        crate::trust_commands_cli::provision_local_issuance_authority(
+            authority_seed_path,
+            authority_db_path,
+        )?;
         trust_control::issue_signed_liability_quote_request(
             &receipt_store,
             authority_seed_path,
@@ -257,6 +266,10 @@ pub(crate) fn cmd_trust_liability_quote_response_issue(
             )
         })?;
         let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
+        crate::trust_commands_cli::provision_local_issuance_authority(
+            authority_seed_path,
+            authority_db_path,
+        )?;
         trust_control::issue_signed_liability_quote_response(
             &receipt_store,
             authority_seed_path,
@@ -307,6 +320,10 @@ pub(crate) fn cmd_trust_liability_pricing_authority_issue(
             )
         })?;
         let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
+        crate::trust_commands_cli::provision_local_issuance_authority(
+            authority_seed_path,
+            authority_db_path,
+        )?;
         trust_control::issue_signed_liability_pricing_authority(
             &receipt_store,
             authority_seed_path,
@@ -355,6 +372,10 @@ pub(crate) fn cmd_trust_liability_placement_issue(
             )
         })?;
         let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
+        crate::trust_commands_cli::provision_local_issuance_authority(
+            authority_seed_path,
+            authority_db_path,
+        )?;
         trust_control::issue_signed_liability_placement(
             &receipt_store,
             authority_seed_path,
@@ -400,6 +421,10 @@ pub(crate) fn cmd_trust_liability_bound_coverage_issue(
             )
         })?;
         let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
+        crate::trust_commands_cli::provision_local_issuance_authority(
+            authority_seed_path,
+            authority_db_path,
+        )?;
         trust_control::issue_signed_liability_bound_coverage(
             &receipt_store,
             authority_seed_path,
@@ -444,6 +469,10 @@ pub(crate) fn cmd_trust_liability_auto_bind_issue(
             )
         })?;
         let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
+        crate::trust_commands_cli::provision_local_issuance_authority(
+            authority_seed_path,
+            authority_db_path,
+        )?;
         trust_control::issue_signed_liability_auto_bind(
             &receipt_store,
             authority_seed_path,
@@ -506,6 +535,10 @@ pub(crate) fn cmd_trust_liability_claim_issue(
             )
         })?;
         let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
+        crate::trust_commands_cli::provision_local_issuance_authority(
+            authority_seed_path,
+            authority_db_path,
+        )?;
         trust_control::issue_signed_liability_claim_package(
             &receipt_store,
             authority_seed_path,
@@ -550,6 +583,10 @@ pub(crate) fn cmd_trust_liability_claim_response_issue(
             )
         })?;
         let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
+        crate::trust_commands_cli::provision_local_issuance_authority(
+            authority_seed_path,
+            authority_db_path,
+        )?;
         trust_control::issue_signed_liability_claim_response(
             &receipt_store,
             authority_seed_path,
@@ -594,6 +631,10 @@ pub(crate) fn cmd_trust_liability_claim_dispute_issue(
             )
         })?;
         let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
+        crate::trust_commands_cli::provision_local_issuance_authority(
+            authority_seed_path,
+            authority_db_path,
+        )?;
         trust_control::issue_signed_liability_claim_dispute(
             &receipt_store,
             authority_seed_path,
@@ -649,6 +690,10 @@ pub(crate) fn cmd_trust_liability_claim_adjudication_issue(
             })
             .and_then(load_roster_policy)?;
         let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
+        crate::trust_commands_cli::provision_local_issuance_authority(
+            authority_seed_path,
+            authority_db_path,
+        )?;
         trust_control::issue_signed_liability_claim_adjudication(
             &receipt_store,
             authority_seed_path,
@@ -708,6 +753,10 @@ pub(crate) fn cmd_trust_liability_claim_payout_instruction_issue(
             })
             .and_then(load_roster_policy)?;
         let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
+        crate::trust_commands_cli::provision_local_issuance_authority(
+            authority_seed_path,
+            authority_db_path,
+        )?;
         trust_control::issue_signed_liability_claim_payout_instruction(
             &receipt_store,
             authority_seed_path,
@@ -763,6 +812,10 @@ pub(crate) fn cmd_trust_liability_claim_payout_receipt_issue(
             )
         })?;
         let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
+        crate::trust_commands_cli::provision_local_issuance_authority(
+            authority_seed_path,
+            authority_db_path,
+        )?;
         trust_control::issue_signed_liability_claim_payout_receipt(
             &receipt_store,
             authority_seed_path,
@@ -828,6 +881,10 @@ pub(crate) fn cmd_trust_liability_claim_settlement_instruction_issue(
             })
             .and_then(load_roster_policy)?;
         let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
+        crate::trust_commands_cli::provision_local_issuance_authority(
+            authority_seed_path,
+            authority_db_path,
+        )?;
         trust_control::issue_signed_liability_claim_settlement_instruction(
             &receipt_store,
             authority_seed_path,
@@ -883,6 +940,10 @@ pub(crate) fn cmd_trust_liability_claim_settlement_receipt_issue(
             )
         })?;
         let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
+        crate::trust_commands_cli::provision_local_issuance_authority(
+            authority_seed_path,
+            authority_db_path,
+        )?;
         trust_control::issue_signed_liability_claim_settlement_receipt(
             &receipt_store,
             authority_seed_path,

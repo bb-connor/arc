@@ -234,6 +234,18 @@ Accepted before or after the subcommand; every one is optional.
 | `--control-url <URL>` | Shared trust-control service base URL; switches supporting commands to the remote backend. |
 | `--control-token <TOKEN>` | Bearer token for the trust-control service. Prefer the `CHIO_CONTROL_TOKEN` env var over argv so the bearer does not leak via `ps`. |
 
+Local `trust ... issue` commands prepare the configured signing authority as an
+explicit owner phase after input parsing, authority configuration and receipt
+storage preflight. A fresh seed or private SQLite authority can be initialized;
+existing custody is validated. Invalid authority choices create no authority
+material, although receipt storage preflight may already have initialized its
+database. Concurrent seed initialization preserves the first published owner.
+Later business validation can refuse issuance
+while retaining that owner material, and refusal emits no signed artifact.
+Signed exports and report reads require existing custody and never recreate a
+lost seed or database. Commands using `--control-url` leave local authority
+material untouched; the remote service owns its provisioning.
+
 `mcp wrap` has no durable per-call receipt store, including with
 `--strict-execution-nonce`. Remove `--receipt-db` from a wrap invocation only
 when that receipt contract meets the caller's requirements. Other commands

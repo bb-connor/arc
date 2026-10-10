@@ -327,6 +327,10 @@ pub(crate) fn cmd_trust_underwriting_decision_issue(
             )
         })?;
         let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
+        crate::trust_commands_cli::provision_local_issuance_authority(
+            backend.authority_seed_path,
+            backend.authority_db_path,
+        )?;
         trust_control::issue_signed_underwriting_decision(
             &receipt_store,
             backend.budget_db_path,

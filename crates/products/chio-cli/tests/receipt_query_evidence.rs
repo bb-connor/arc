@@ -950,6 +950,9 @@ extensions:
         vec![RuntimeAttestationImportReasonCode::ExporterPolicyRejected]
     );
 
+    chio_store_sqlite::SqliteCapabilityAuthority::open(&authority_db_path)
+        .expect("fixture owner initializes CLI signing authority");
+
     let cli_export_output = Command::new(env!("CARGO_BIN_EXE_chio"))
         .current_dir(workspace_root())
         .args([

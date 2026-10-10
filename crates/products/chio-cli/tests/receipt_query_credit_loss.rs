@@ -1051,6 +1051,9 @@ fn test_provider_risk_package_export_surfaces() {
         issued_facility.body.facility_id
     );
 
+    chio_store_sqlite::SqliteCapabilityAuthority::open(&authority_db_path)
+        .expect("fixture owner initializes CLI signing authority");
+
     let cli_output = Command::new(env!("CARGO_BIN_EXE_chio"))
         .current_dir(workspace_root())
         .args([
