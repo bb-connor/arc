@@ -194,25 +194,26 @@ pub(crate) async fn handle_create_passport_issuance_offer(
     };
     run_registry_transaction(move || {
         PassportIssuanceOfferRegistry::update_for_issuance(&path, |registry| {
-            let metadata = configured_passport_credential_issuer(&state.config)
-                .map_err(RegistryOperationError::configuration)?;
-            if state.config.passport_statuses_file.is_some() {
-                portable_passport_status_reference_for_service(
-                    &state.config,
-                    &payload.passport,
-                    clock_now,
-                )
-                .map_err(RegistryOperationError::bad_request)?;
-            }
-            registry
-                .issue_offer(
-                    &metadata,
-                    payload.passport,
-                    payload.credential_configuration_id.as_deref(),
-                    payload.ttl_seconds,
-                    clock_now,
-                )
-                .map_err(RegistryOperationError::bad_request)
+            issuer_authority::run(&state, |state, signer| {
+                let metadata = issuer_authority::metadata(&state.config, signer)?;
+                if state.config.passport_statuses_file.is_some() {
+                    portable_passport_status_reference_for_service(
+                        &state.config,
+                        &payload.passport,
+                        clock_now,
+                    )
+                    .map_err(RegistryOperationError::bad_request)?;
+                }
+                registry
+                    .issue_offer(
+                        &metadata,
+                        payload.passport,
+                        payload.credential_configuration_id.as_deref(),
+                        payload.ttl_seconds,
+                        clock_now,
+                    )
+                    .map_err(RegistryOperationError::bad_request)
+            })
         })
     })
     .await
@@ -233,14 +234,14 @@ pub(crate) async fn handle_redeem_passport_issuance_token(
     };
     run_registry_transaction(move || {
         PassportIssuanceOfferRegistry::update(&path, |registry| {
-            let metadata =
-                public_passport_credential_issuer(&state.config, &state.finding_challenge_clock)
-                    .map_err(RegistryOperationError::configuration)?;
-            let response = registry
-                .redeem_pre_authorized_code(&metadata, &payload, clock_now, 300)
-                .map_err(RegistryOperationError::bad_request)?;
-            registry.prune_dead(clock_now);
-            Ok(response)
+            issuer_authority::run(&state, |state, signer| {
+                let metadata = issuer_authority::metadata(&state.config, signer)?;
+                let response = registry
+                    .redeem_pre_authorized_code(&metadata, &payload, clock_now, 300)
+                    .map_err(RegistryOperationError::bad_request)?;
+                registry.prune_dead(clock_now);
+                Ok(response)
+            })
         })
     })
     .await
@@ -277,39 +278,30 @@ pub(crate) async fn handle_redeem_passport_issuance_credential(
             registry
                 .validate_credential_entitlement(issuer, &access_token, clock_now)
                 .map_err(RegistryOperationError::invalid_entitlement)?;
-            let metadata = configured_passport_credential_issuer(&state.config)
-                .map_err(RegistryOperationError::configuration)?;
-            let portable_signing_keypair = if state.config.authority_seed_path.is_some()
-                || state.config.authority_db_path.is_some()
-            {
-                Some(
-                    resolve_oid4vp_verifier_signing_key(&state.config)
-                        .map_err(RegistryOperationError::configuration)?,
-                )
-            } else {
-                None
-            };
-            let portable_status_registry = state
-                .config
-                .passport_statuses_file
-                .as_deref()
-                .map(PassportStatusRegistry::load)
-                .transpose()
-                .map_err(RegistryOperationError::configuration)?;
-            // All access-token failures are checked above at the same clock
-            // and issuer under this lock; request/profile failures remain 400.
-            let response = registry
-                .redeem_credential(
-                    &metadata,
-                    &access_token,
-                    &payload,
-                    clock_now,
-                    portable_signing_keypair.as_ref(),
-                    portable_status_registry.as_ref(),
-                )
-                .map_err(RegistryOperationError::bad_request)?;
-            registry.prune_dead(clock_now);
-            Ok(response)
+            issuer_authority::run(&state, |state, signer| {
+                let metadata = issuer_authority::metadata(&state.config, signer)?;
+                let portable_status_registry = state
+                    .config
+                    .passport_statuses_file
+                    .as_deref()
+                    .map(PassportStatusRegistry::load)
+                    .transpose()
+                    .map_err(RegistryOperationError::configuration)?;
+                // All access-token failures are checked above at the same clock
+                // and issuer under this lock; request/profile failures remain 400.
+                let response = registry
+                    .redeem_credential(
+                        &metadata,
+                        &access_token,
+                        &payload,
+                        clock_now,
+                        signer,
+                        portable_status_registry.as_ref(),
+                    )
+                    .map_err(RegistryOperationError::bad_request)?;
+                registry.prune_dead(clock_now);
+                Ok(response)
+            })
         })
     })
     .await
@@ -1701,3 +1693,6 @@ pub(crate) async fn handle_federated_issue(
 #[cfg(test)]
 #[path = "passport_handlers/oid4vp_issuer_fetch_tests.rs"]
 mod oid4vp_issuer_fetch_tests;
+
+#[path = "passport_handlers/issuer_authority.rs"]
+mod issuer_authority;

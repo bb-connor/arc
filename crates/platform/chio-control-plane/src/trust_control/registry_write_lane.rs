@@ -41,6 +41,7 @@ pub(super) enum RegistryOperationError {
     Configuration(String),
     InvalidEntitlement(String),
     BadRequest(String),
+    Authority(Box<Response>),
 }
 
 impl RegistryOperationError {
@@ -56,11 +57,16 @@ impl RegistryOperationError {
         Self::BadRequest(error.to_string())
     }
 
-    fn into_response(self) -> Response {
+    pub(super) fn authority(response: Response) -> Self {
+        Self::Authority(Box::new(response))
+    }
+
+    pub(super) fn into_response(self) -> Response {
         let (status, error) = match self {
             Self::Configuration(error) => (StatusCode::CONFLICT, error),
             Self::InvalidEntitlement(error) => (StatusCode::UNAUTHORIZED, error),
             Self::BadRequest(error) => (StatusCode::BAD_REQUEST, error),
+            Self::Authority(response) => return *response,
         };
         plain_http_error(status, &error)
     }

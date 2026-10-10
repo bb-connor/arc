@@ -771,3 +771,6 @@ async fn public_authority_routes_refuse_a_regressed_clock_and_unsafe_custody() -
 
 #[path = "adjacent_registry_races.rs"]
 mod adjacent_registry_races;
+
+#[path = "issuer_authority_binding.rs"]
+mod issuer_authority_binding;

@@ -447,6 +447,7 @@ fn configured_passport_issuance_registry_path(
     })
 }
 
+#[cfg(test)]
 pub(crate) fn configured_passport_credential_issuer(
     config: &TrustServiceConfig,
 ) -> Result<Oid4vciCredentialIssuerMetadata, CliError> {
