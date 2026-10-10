@@ -162,15 +162,7 @@ impl RecoveryFixture {
             SqliteAuthorityStore::provision(&database, &locks)?;
         }
         let authority = SqliteAuthorityStore::open_serving(&database, &locks)?;
-        let ca = Keypair::from_seed(
-            if path.join("legacy-near-capacity").exists()
-                && path.join("current-recovery-receipt-signer").exists()
-            {
-                &[207; 32]
-            } else {
-                &[140; 32]
-            },
-        );
+        let ca = Keypair::from_seed(&[140; 32]);
         let agent = Keypair::from_seed(&[141; 32]);
         let approval_key = authority_history::fixture_approval_key(&path);
         let issuer = authority_history::fixture_aggregate_key(&path);
