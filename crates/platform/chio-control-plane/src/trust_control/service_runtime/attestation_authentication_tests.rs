@@ -13,7 +13,9 @@ async fn authenticated_issuance_route_rejects_unsigned_matching_attestation(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let directory = chio_test_support::private_tempdir()?;
     let mut state = metrics_state("service-secret");
-    state.config.authority_seed_path = Some(directory.path().join("authority.seed"));
+    let authority_seed_path = directory.path().join("authority.seed");
+    crate::load_or_create_authority_keypair(&authority_seed_path)?;
+    state.config.authority_seed_path = Some(authority_seed_path);
     state.config.authority_workload_token = Some("workload-secret".to_owned());
     let now = chio_test_support::clock::unix_seconds();
     let evidence = RuntimeAttestationEvidence {
