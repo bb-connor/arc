@@ -1,0 +1,645 @@
+{
+  "schema": "chio.security.final-producer-integration.v1",
+  "observed_utc": "2026-10-10T03:46:04.873772+00:00",
+  "source_stage": "1f848544113fc4a16d3f35d27ccf3ca2a109eb12",
+  "core": {
+    "producer_commit": "64032180a0aafaca3512fd4436c4a0dc132830a5",
+    "producer_tree": "e62be907408649f9f0f18943023d8c8d2ddc5946",
+    "producer_parent": "5b9eaca17e16ab0d2849b41f66c6ad85e6d0a3a2",
+    "worktree": "/home/connor/lanes/pr1160-authority-evidence-repair",
+    "branch": "fix/pr1160-authority-evidence-repair",
+    "clean": true,
+    "source_pin_sha256": "fedf6f3f1f6bae39b5d28f0408637992201a6734e6b224abc0689a216361fd06",
+    "source_files": {
+      "crates/platform/chio-control-plane/README.md": {
+        "sha256": "8382f6a6dd8c213aab53accebcf005128cbc6e7ee02f229f6bdf5c5bcac63229",
+        "git_blob": "b7759f558586b845f3a66b52c4382b520b3e4565"
+      },
+      "crates/platform/chio-control-plane/src/trust_control/authority_admission.rs": {
+        "sha256": "a2d5dec577f15aedccd3740f0a341f31e2822784e11c357356d5d82249f4f75e",
+        "git_blob": "ae32477953cead420640c1e0ae9907ff7b53c01a"
+      },
+      "crates/platform/chio-control-plane/src/trust_control/authority_handlers.rs": {
+        "sha256": "d4d365fbc3aa0209b6b367f616fb14ea0690e7dd6c8834f4674c5eee19127786",
+        "git_blob": "95eb1e651b1997491ee0979a5917577e0938e392"
+      },
+      "crates/platform/chio-control-plane/src/trust_control/cluster.rs": {
+        "sha256": "03aeb0b73680ab3dd7c735edb78eeb7aef87c195f93ba955fa938f3f7ec0833f",
+        "git_blob": "a7e83d1bfba0e936e674935e49c7eed4b4974f95"
+      },
+      "crates/platform/chio-control-plane/src/trust_control/cluster/authority_evidence.rs": {
+        "sha256": "feb1debdfe92806151d4ca2e54e0de35ec5bc57c72ce76ca4c02d23b6967415d",
+        "git_blob": "77b0302babef7092caf05f97d694ddaeefc8222e"
+      },
+      "crates/platform/chio-control-plane/src/trust_control/cluster/consensus.rs": {
+        "sha256": "7fbe9d0069960d3c4837b2bb105fb085a44dff5fe98c1425e9f1dcb1f20ca1b3",
+        "git_blob": "33d7157c66e326e117298e0607ce98b05997780d"
+      },
+      "crates/platform/chio-control-plane/src/trust_control/cluster/deltas.rs": {
+        "sha256": "8dc112a2885b78ca7bfd7624f70678c920c56b4cca31516d7693e1129116281d",
+        "git_blob": "723a5783962e221242d1f4f2bbffad44b816b284"
+      },
+      "crates/platform/chio-control-plane/src/trust_control/cluster/deltas_tests.rs": {
+        "sha256": "9285555f86c83869d3e7aa83312f5a37f7ef051c0100eeaafab317011313312d",
+        "git_blob": "5d64161a9b336ff176233bd936125a3bb7d4fb53"
+      },
+      "crates/platform/chio-control-plane/src/trust_control/cluster/partition.rs": {
+        "sha256": "bddd6fc9441509485385eb473c47e49c55f227c3294d7d94c071673baf8f5b86",
+        "git_blob": "025983cce4d34e13d31663a93480e6704b65922b"
+      },
+      "crates/platform/chio-control-plane/src/trust_control/cluster/snapshots.rs": {
+        "sha256": "32600f59051c7ffeed343f7deaf5dd5141bd1d451ed5ed177e8157d4cc4e7fdb",
+        "git_blob": "128a8e7e145210214a83c3c87aa8b7560580f5e9"
+      },
+      "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports_tests/authority_clock_contract.rs": {
+        "sha256": "8daaecf96017cc1b211c1ceeba7f07267e273376d696c65ca95982858f15344a",
+        "git_blob": "45fac5e96d8af2b77eed38dbae047e333728a4c7"
+      },
+      "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports_tests/authority_evidence_contract.rs": {
+        "sha256": "880ecf0a026494cbaebb6160a2e2fd12cde53eeb87e2bcdf608dc69ab7e69ff0",
+        "git_blob": "1c4f39227d291d1c1f55e00ebc71e008b376c943"
+      },
+      "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports_tests/authority_majority_contract.rs": {
+        "sha256": "eb9c2c4c6d581d1dace472182f14039a37de3d2b92b335d0df86942034665733",
+        "git_blob": "cdb2b7defff309a52535bfd4355832b4d21d6bb9"
+      },
+      "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports_tests/authority_sync_isolation.rs": {
+        "sha256": "d5b68f8bcd308d07c00a068c507e03be7365cd55008f22ee3a51097b2f048a12",
+        "git_blob": "3f7441020176aef2c58160cf1b4b15b765d285f6"
+      },
+      "crates/platform/chio-control-plane/src/trust_control/config_and_public.rs": {
+        "sha256": "f927d54b4f9455fe2ae536cf7cc4d95f4d9cd368bc7df1df28f216c2c0eaf2e5",
+        "git_blob": "6a6d85878ef66a98964eae7cf4e2afcb3050bc59"
+      },
+      "crates/platform/chio-control-plane/src/trust_control/config_and_public/public_authority_read.rs": {
+        "sha256": "3c5e09cc7b538450eb1c0d1cd887d2465ff869952ceca256c53990b1a22e27e0",
+        "git_blob": "ca3ddfa48dbc5b032e0b1a1df06130b7b0abe2e3"
+      },
+      "crates/platform/chio-control-plane/src/trust_control/passport_handlers.rs": {
+        "sha256": "1dd2983a0197c0f67680f98908fc2aa8801da729d1580991c61c68e2d2217e7e",
+        "git_blob": "fdd36fc15733762bce416cfa4c2a76dd41e62642"
+      },
+      "crates/platform/chio-control-plane/src/trust_control/passport_handlers/public_authority_trust.rs": {
+        "sha256": "d76fa4219571f94be1f7f7c0401d323b72c1bc6b840bf8714a23f272fdf10cd7",
+        "git_blob": "99437ade3a83c04f8a2215684cb4c2e0fe37a79a"
+      },
+      "crates/platform/chio-control-plane/src/trust_control/report_validation.rs": {
+        "sha256": "b04a6ddc99af01ee21cce19bbceded43790e8203c0cf900e0a697929bd9ac138",
+        "git_blob": "f2af5053959135322ca351194f964619ae6c485b"
+      },
+      "crates/platform/chio-control-plane/src/trust_control/service_runtime.rs": {
+        "sha256": "180d1f3543b6d6578ccb461c51f248902ed1ccbd55a011909b721b17322e1e3d",
+        "git_blob": "4eb5a8690dd77291b0cfccde5c76d5aa60d102fc"
+      },
+      "crates/platform/chio-control-plane/src/trust_control/service_runtime/init.rs": {
+        "sha256": "79218442f874b5be6c1decb62505f685a254ec33ee3bc755a7199acea7609cd4",
+        "git_blob": "e8805f7cb2b25fc5e78698db779c5fb9a3474c3b"
+      },
+      "crates/platform/chio-control-plane/src/trust_control/service_runtime/init/authority_provision_tests.rs": {
+        "sha256": "13be4f4bb41b7ab0162aaa8e3dfb937025f2048194c8784bf1102b70af18f934",
+        "git_blob": "2bc032a552c1abd78b366e5876176ebc5875e0f9"
+      },
+      "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/public_authority_reads.rs": {
+        "sha256": "831205b1677e2d2876742ce94c88ac07f5f9a782d352c14535bc4aa7de932e49",
+        "git_blob": "e4788252f3debea4e5b8ae6474d53e8e2eecb889"
+      },
+      "crates/platform/chio-control-plane/src/trust_control/service_types.rs": {
+        "sha256": "2661b3c02b0eb5a6f670343fcf4c1c44380e7ce6e9d7075844f97027311da93d",
+        "git_blob": "f3379eeb69919a980454b9f30b5356133853fd80"
+      },
+      "crates/platform/chio-control-plane/src/trust_control/service_types/state.rs": {
+        "sha256": "f5d4899a84ec39753610dbb209d6b9534aeb8ca8967b9dfd1d93249061ed0763",
+        "git_blob": "78f311fbdcb5cc1a7109e88c2fb1c2adb8291f16"
+      },
+      "crates/platform/chio-store-sqlite/src/authority.rs": {
+        "sha256": "80937fa8904ea4d5393f98a7b55cf64123a61a091da217778a201ad657a42531",
+        "git_blob": "fa741a8475de4177320ea9c9e92dfa4293be7235"
+      },
+      "crates/platform/chio-store-sqlite/src/authority/read_only.rs": {
+        "sha256": "8b638e3a1569d25e410c8e726e1a7bb456232f3cc50378a01e62642d9ef19e73",
+        "git_blob": "1fee1fefae745266ee773190db40478f5805f468"
+      },
+      "crates/platform/chio-store-sqlite/src/authority/read_only_tests.rs": {
+        "sha256": "491575c803e8e8e72a9b3e230e3a639f000e0d0354b40ebb25be84fca9dd4698",
+        "git_blob": "c14e8ba860702b97f1b2339a24fdc1ef0f8e2b12"
+      },
+      "crates/platform/chio-store-sqlite/src/authority/replication.rs": {
+        "sha256": "8770200615d5a065b063dc18c4e4e89b4088013dfa7f930e929244a510c7d0f0",
+        "git_blob": "4d0a1e9b04653cd0c2f6fe04d6b3e73ca12f18d9"
+      },
+      "crates/products/chio-cli/src/cli/runtime.rs": {
+        "sha256": "171f7a61e6a738999fa6dc78f0922e5df48f94b05b5962857431a3a77080ddc0",
+        "git_blob": "b516b6d87743494773e33ce3c33c17bcc695a38d"
+      },
+      "scripts/negative-assertions-baseline.txt": {
+        "sha256": "f23e7c01d1ba354f9360a8170968a6afc4c7fd1dd77b13b545d8cd8d3143718b",
+        "git_blob": "6e47b73ba8861f8625555183c8061ff393966193"
+      },
+      "spec/PROTOCOL.md": {
+        "sha256": "0274c59065c499273c289bb86b0e0618d8b17e4133b7293da5592b1cc1ad7ac1",
+        "git_blob": "b73315149b02f9c57567b1c00b4ccf0c3259a24a"
+      }
+    },
+    "evidence_artifacts": {
+      "core-final-mandatory-test-inventory.json": "7952aa4ec8b09f14f6df0a5adb045f683a4b2394e469f67ea15e7946e2193da6",
+      "core-final-qualified-family-evidence.json": "25373f51be05fca8297609ca4b384a3429ebe713e448fd321f979f31caa6122e",
+      "core-final-trust-boundary-census-delta.json": "0eaa1f3eaa900a71b7759eace9a9289fd7fd4e65004bd3462a3adfd53d8ae9eb",
+      "core-corrected-v5-runtime-and-strict.json": "2f5670525973bce0e0b46aae4a16150b450e2673274aacfcd837a0fb47c19ffb",
+      "core-corrected-v5-source.json": "fedf6f3f1f6bae39b5d28f0408637992201a6734e6b224abc0689a216361fd06",
+      "negative-baseline-retirement.json": "ff95abd2f1320477935e18722b84924fa4d397607eb2697102bc70bc7531722e",
+      "untouched-oid4vp-signer-followup.json": "11132737f9184601510cb89b0ba4c02d2e8393296abc67d947071b543e570726",
+      "core-final-ledger-discharge-map.json": "e09f1a55340ae82012b0ecb7778a017378390e3114a8a298cbd8920527948ef0"
+    },
+    "passing_family_and_static_logs": {
+      "core-corrected-v3-f11": {
+        "path": "/tmp/pr1160-authority-evidence-repair-20261009/core-corrected-v3-f11.log",
+        "sha256": "c43ab473ec05ad84304f9a40ea31bcf28ce40e4db99b28fa9e4274cde5a027bf",
+        "exit": 0
+      },
+      "core-corrected-v3-startup": {
+        "path": "/tmp/pr1160-authority-evidence-repair-20261009/core-corrected-v3-startup.log",
+        "sha256": "733c5a4149cff16a8f26e9f247b07c6dbd8b3c7933deb06344efd47ebf1c366f",
+        "exit": 0
+      },
+      "core-corrected-v3-config-public": {
+        "path": "/tmp/pr1160-authority-evidence-repair-20261009/core-corrected-v3-config-public.log",
+        "sha256": "6891af0688394de446ea01584b6be606c3e03d56848e913f60f1934d36bd2775",
+        "exit": 0
+      },
+      "core-corrected-v5-public-reads": {
+        "path": "/tmp/pr1160-authority-evidence-repair-20261009/core-corrected-v5-public-reads.log",
+        "sha256": "ce4b14c1e6ae4584f5e687e28edb95a9e4cdf48786ac27cbcde780e2abb18587",
+        "exit": 0
+      },
+      "core-corrected-v5-quorum-timeout": {
+        "path": "/tmp/pr1160-authority-evidence-repair-20261009/core-corrected-v5-quorum-timeout.log",
+        "sha256": "b568532cffabf9f0e2b15d4f69f655bf02578e91a2759f5c2271d58c5ebc6f55",
+        "exit": 0
+      },
+      "core-corrected-v5-store-inspection": {
+        "path": "/tmp/pr1160-authority-evidence-repair-20261009/core-corrected-v5-store-inspection.log",
+        "sha256": "516ca8b5667dec8977d04d8ddadb5dbd814458ce03cee56c6d670725ffa01116",
+        "exit": 0
+      },
+      "core-corrected-v5-store-replication": {
+        "path": "/tmp/pr1160-authority-evidence-repair-20261009/core-corrected-v5-store-replication.log",
+        "sha256": "03bc29a8ab08ca35e711b5ed81301776d7020eb10f7e04bfee378498dbb022f0",
+        "exit": 0
+      },
+      "core-corrected-v5-cli": {
+        "path": "/tmp/pr1160-authority-evidence-repair-20261009/core-corrected-v5-cli.log",
+        "sha256": "468797b2e5c8ff11e51b9ee4a2470c99ad35846c7e88b7c01fa583aeb4ab976e",
+        "exit": 0
+      },
+      "core-corrected-v5-strict": {
+        "path": "/tmp/pr1160-authority-evidence-repair-20261009/core-corrected-v5-strict.log",
+        "sha256": "0605816c35322c9b1a2e8ccacf3d5339ecce30a84e0189d974be4dc9b70385e0",
+        "exit": 0
+      },
+      "core-corrected-v5-negative": {
+        "path": "/tmp/pr1160-authority-evidence-repair-20261009/core-corrected-v5-negative.log",
+        "sha256": "80670f9100bb3c709e4d3cdf5b892da20bcd2bb9b64b6c7807fb3ec713ff3db4",
+        "exit": 0
+      },
+      "core-corrected-v5-hygiene": {
+        "path": "/tmp/pr1160-authority-evidence-repair-20261009/core-corrected-v5-hygiene.log",
+        "sha256": "50a68fe1312742bbb0b866cf803978ca51262f3ababa0f7486d32519dc4f066c",
+        "exit": 0
+      },
+      "core-corrected-v5-clocks": {
+        "path": "/tmp/pr1160-authority-evidence-repair-20261009/core-corrected-v5-clocks.log",
+        "sha256": "bd324fbc2aec503258f82917613ce9aeff2296a2cce36fc0e6f3285bcf158bd9",
+        "exit": 0
+      },
+      "core-corrected-v5-boundaries": {
+        "path": "/tmp/pr1160-authority-evidence-repair-20261009/core-corrected-v5-boundaries.log",
+        "sha256": "1b8cb4595e959b1197f98ed5a16a9fb1b7c4256d29613c52f7662dce6d30ae51",
+        "exit": 0
+      },
+      "core-corrected-v5-scan": {
+        "path": "/tmp/pr1160-authority-evidence-repair-20261009/core-corrected-v5-scan.log",
+        "sha256": "2a62e9f00b96598874b2223afc2a055dccb87a1a066fa72e630c47b1ffbdb5d9",
+        "exit": 0
+      },
+      "core-corrected-v5-fmt": {
+        "path": "/tmp/pr1160-authority-evidence-repair-20261009/core-corrected-v5-fmt.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "exit": 0
+      }
+    },
+    "dependencies_already_delivered": [
+      "0e4ca04bbb6d9c2c5fa0a045955492b92a65bee4",
+      "fa733a051796b3392102656a357d52716cc029d1",
+      "c1be78700531199c2a434e30f5aa6ff1d5234871",
+      "5b9eaca17e16ab0d2849b41f66c6ad85e6d0a3a2"
+    ],
+    "qualification_boundary": "Producer scoped evidence only: V3failed campaign retains67accepted family rows; V5terminal31 plus strict and gates. Root must rerun all98 on exact composed candidate. No original failure/cancel/compile/zero-selector outcome relabelled.",
+    "baseline_retirement": "Exactly one Root-reviewed old private-custody is_err entry removed; count1248->1247, before/after/entry hashes and unchanged-other-bytes proof in qualified-family record. No waiver/cap changes.",
+    "clock_and_trust_census": "No additions; scan observations identical to retained f598 base. MAX_AUTHORITY_CHAIN1024 unchanged.",
+    "integration_notes": [
+      "Preserve governance_authority module enrollment when resolving authority_sync_isolation.rs.",
+      "Preserve Root registry/wallet per-service lane fields in state/init composition; producer diff adds no such fields.",
+      "Root owns stage-only init/tests.rs and FINAL12 pre-open reclaim callsites after core integration.",
+      "Public authority funcs owned here; F13 registry and governance consumer bodies were not edited."
+    ],
+    "final_produced_at_utc": "2026-10-10T03:44:56.964343+00:00"
+  },
+  "core_composition": {
+    "producer": "64032180a0aafaca3512fd4436c4a0dc132830a5",
+    "integrated": "6ea36b553b7a71748b34c16a6bde6d3f7fed8adb",
+    "exact_files": [
+      "crates/platform/chio-control-plane/README.md",
+      "crates/platform/chio-control-plane/src/trust_control/authority_admission.rs",
+      "crates/platform/chio-control-plane/src/trust_control/authority_handlers.rs",
+      "crates/platform/chio-control-plane/src/trust_control/cluster.rs",
+      "crates/platform/chio-control-plane/src/trust_control/cluster/authority_evidence.rs",
+      "crates/platform/chio-control-plane/src/trust_control/cluster/consensus.rs",
+      "crates/platform/chio-control-plane/src/trust_control/cluster/deltas.rs",
+      "crates/platform/chio-control-plane/src/trust_control/cluster/deltas_tests.rs",
+      "crates/platform/chio-control-plane/src/trust_control/cluster/partition.rs",
+      "crates/platform/chio-control-plane/src/trust_control/cluster/snapshots.rs",
+      "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports_tests/authority_clock_contract.rs",
+      "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports_tests/authority_evidence_contract.rs",
+      "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports_tests/authority_majority_contract.rs",
+      "crates/platform/chio-control-plane/src/trust_control/config_and_public/public_authority_read.rs",
+      "crates/platform/chio-control-plane/src/trust_control/passport_handlers/public_authority_trust.rs",
+      "crates/platform/chio-control-plane/src/trust_control/report_validation.rs",
+      "crates/platform/chio-control-plane/src/trust_control/service_runtime.rs",
+      "crates/platform/chio-control-plane/src/trust_control/service_runtime/init/authority_provision_tests.rs",
+      "crates/platform/chio-store-sqlite/src/authority.rs",
+      "crates/platform/chio-store-sqlite/src/authority/read_only.rs",
+      "crates/platform/chio-store-sqlite/src/authority/read_only_tests.rs",
+      "crates/platform/chio-store-sqlite/src/authority/replication.rs",
+      "crates/products/chio-cli/src/cli/runtime.rs",
+      "scripts/negative-assertions-baseline.txt",
+      "spec/PROTOCOL.md"
+    ],
+    "composed_files": [
+      "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports_tests/authority_sync_isolation.rs",
+      "crates/platform/chio-control-plane/src/trust_control/config_and_public.rs",
+      "crates/platform/chio-control-plane/src/trust_control/passport_handlers.rs",
+      "crates/platform/chio-control-plane/src/trust_control/service_runtime/init.rs",
+      "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/public_authority_reads.rs",
+      "crates/platform/chio-control-plane/src/trust_control/service_types.rs",
+      "crates/platform/chio-control-plane/src/trust_control/service_types/state.rs"
+    ],
+    "composition_review": "Seven automatic compositions retain prior registry/gov test enrollment, per-service lanes, issuer transaction binding, and two pre-open reclaim calls. No merge conflict. Final owning runtime and strict remain pending.",
+    "before": "4f0d22d252ac381e00c6ace0d8dd85846017a3d9"
+  },
+  "ledger_discharge_map": {
+    "source_ledger": "docs/security/landing-ledger.json",
+    "source_ledger_sha256": "86271b3da68ff885112f805c0ee41b24588a5d05153afcc8fa6b80df2d4306e5",
+    "state": "Core producer source and scoped focused qualification complete; ledger unchanged and composed/hosted/merge acceptance pending",
+    "producer_source_and_focused_acceptance_to_discharge": [
+      {
+        "id": "incoming-pr1160-final-review-20261009:FINAL-F11",
+        "label": "FINAL-F11",
+        "priority": "P2",
+        "requirement": "Bounded configured authority issue-time skew must preserve strict expiration/replay/signature checks; stale follower trust reads refuse and health degrades."
+      },
+      {
+        "id": "incoming-pr1160-final-review-20261009:F11-REVIEW-P1-1",
+        "label": "F11-REVIEW-P1-1",
+        "priority": "P1",
+        "requirement": "An elected former custodian cannot serve or issue with a superseded issuer merely because it still holds the old key."
+      },
+      {
+        "id": "incoming-pr1160-final-review-20261009:F11-REVIEW-P2-1",
+        "label": "F11-REVIEW-P2-1",
+        "priority": "P2",
+        "requirement": "A successful nonleader relay cannot displace follower authority confirmed by the elected leader or mark consistent older relays as authority loss."
+      },
+      {
+        "id": "incoming-pr1160-final-review-20261009:F11-REVIEW-P3-2",
+        "label": "F11-REVIEW-P3-2",
+        "priority": "P2",
+        "requirement": "Authenticated authority endpoints must not perform bounded but expensive signature-chain verification on async workers."
+      },
+      {
+        "id": "incoming-pr1160-final-review-20261009:F11-REVIEW-P3-3",
+        "label": "F11-REVIEW-P3-3",
+        "priority": "P2",
+        "requirement": "Configured authority issue-time skew and the selected owner clock must reach production opens that serve or validate replicated authority."
+      },
+      {
+        "id": "incoming-pr1160-final-review-20261009:F11-REVIEW-P3-4",
+        "label": "F11-REVIEW-P3-4",
+        "priority": "P2",
+        "requirement": "Discovery cannot imply current admitted authority while signing with a revoked local key or nesting a separately read authority generation."
+      },
+      {
+        "id": "incoming-pr1160-final-review-20261009:F11-PLAIN-SEED-PROVISION",
+        "label": "F11-PLAIN-SEED-PROVISION",
+        "priority": "P2",
+        "requirement": "Owner startup provisions configured plain seed; requests load existing custody and cannot recreate a lost seed."
+      },
+      {
+        "id": "incoming-pr1160-final-review-20261009:F11-PEER-IDENTITY-BINDING",
+        "label": "F11-PEER-IDENTITY-BINDING",
+        "priority": "P2",
+        "requirement": "Configured peer URL aliases cannot count one advertised source as distinct serving-evidence peers. Preserve authenticated newer-chain convergence while refusing and clearing mismatched serving agreement."
+      },
+      {
+        "id": "incoming-pr1160-final-review-20261009:F11-MAJORITY-AVAILABILITY",
+        "label": "F11-MAJORITY-AVAILABILITY",
+        "priority": "P2",
+        "requirement": "A transport-failed minority cannot indefinitely veto a fresh authenticated majority. Authenticated conflicting/newer history and follower source checks still refuse unsafe serving."
+      }
+    ],
+    "shared_dependency_only_consumer_evidence_other_owners": [
+      "F11-REVIEW-P2-2",
+      "F11-PASSPORT-SIGNER",
+      "F11-FEE-BINDING-REFUSAL"
+    ],
+    "required_coverage_contribution": {
+      "label": "F11-REVIEW-P3-5",
+      "covered": "Lowest-URL former custodian, three-node relay, current quorum/term change during reads and actual signing, exact-view mutation/refusal/recovery, clock/restart/rotation/lifecycle, authenticated newer/fork/transport and delayed shorter witness controls",
+      "remaining": "Governance-specific controls belong to the governance packet; any separate deterministic fixture cleanup remains minor follow-up per Root ruling"
+    },
+    "retained_canonical_followups": [
+      "F11-REVIEW-P3-1",
+      "OID4VP-SIGNER-CUSTODY"
+    ],
+    "global_acceptance_still_pending": "Root source composition and all98 exact-name renewal, independent candidate review, protected hosted checks and normal merge; no release claim",
+    "producer_commit": "64032180a0aafaca3512fd4436c4a0dc132830a5",
+    "qualification": "98 nonduplicated mandatory cases: V3accepted67 from failed campaign plus V5terminal31; all-target strict0 and6static0"
+  },
+  "building": {
+    "acceptance": {
+      "hosted_exact_head": false,
+      "merge_or_release": false,
+      "producer_local": true,
+      "root_final_composed": false
+    },
+    "all_campaigns_terminal": true,
+    "base": "183d3c4319749aec4e1cc9dc321169cfaae8d461",
+    "branch": "fix/pr1160-building-health",
+    "checks": [
+      {
+        "command": [
+          "swarm",
+          "build",
+          "--class",
+          "coder",
+          "--",
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-control-plane",
+          "--lib",
+          "--",
+          "receipt_query_snapshot_tests::",
+          "--list"
+        ],
+        "exit": 0,
+        "label": "enumerate-owning-v1",
+        "log": "/tmp/pr1160-building-health-20261010/enumerate-owning-v1.log",
+        "log_sha256": "8d3d0442da074d73e7078c41464218463e725bfb1d632146887d0e5109d8b8cf",
+        "record": "/tmp/pr1160-building-health-20261010/enumerate-owning-v1.json",
+        "record_sha256": "f717da3e3cfee3ff7a031d696a9949b8eff5f77d3fede6a608eefecc0204ff5b",
+        "seconds": 558.7043665479869,
+        "source_stable": true,
+        "test_summaries": []
+      },
+      {
+        "command": [
+          "swarm",
+          "build",
+          "--class",
+          "coder",
+          "--",
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-control-plane",
+          "--lib",
+          "--",
+          "receipt_query_snapshot_tests::",
+          "--list",
+          "--ignored"
+        ],
+        "exit": 0,
+        "label": "enumerate-ignored-v1",
+        "log": "/tmp/pr1160-building-health-20261010/enumerate-ignored-v1.log",
+        "log_sha256": "b94320698f1c6ae1a58b4bf23533873dc055fa0a60fbabffd214a83efac4d7ac",
+        "record": "/tmp/pr1160-building-health-20261010/enumerate-ignored-v1.json",
+        "record_sha256": "7cf63c5c8f4c952fe5ce136a3d402d919442156620b2074ce5b7e1d98ca3f85d",
+        "seconds": 3.2248525209724903,
+        "source_stable": true,
+        "test_summaries": []
+      },
+      {
+        "command": [
+          "swarm",
+          "build",
+          "--class",
+          "coder",
+          "--",
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-control-plane",
+          "--lib",
+          "--",
+          "receipt_query_snapshot_tests::",
+          "--test-threads=8"
+        ],
+        "exit": 0,
+        "label": "owning-eight-v1",
+        "log": "/tmp/pr1160-building-health-20261010/owning-eight-v1.log",
+        "log_sha256": "fc38aa494bdec77f051fe958f1134b7584587ce3c5b144a3e13e1659d13ea55f",
+        "record": "/tmp/pr1160-building-health-20261010/owning-eight-v1.json",
+        "record_sha256": "a38121915cb98bd1a311ec72528d0082234010e032052ce507d38a9fd05df8cf",
+        "seconds": 12.012450070586056,
+        "source_stable": true,
+        "test_summaries": [
+          "test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 1690 filtered out; finished in 8.40s"
+        ]
+      },
+      {
+        "command": [
+          "swarm",
+          "build",
+          "--class",
+          "coder",
+          "--",
+          "cargo",
+          "clippy",
+          "--locked",
+          "-p",
+          "chio-control-plane",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit": 0,
+        "label": "strict-owning-v1",
+        "log": "/tmp/pr1160-building-health-20261010/strict-owning-v1.log",
+        "log_sha256": "49b51e7aa92545ab42d0da1ad8aba8ac6d21518bfe6a39cbc6940231e27045a6",
+        "record": "/tmp/pr1160-building-health-20261010/strict-owning-v1.json",
+        "record_sha256": "b536e7108eb7b760ba195005979ce959cfa18c8baee9c77e43ec230f2b902822",
+        "seconds": 238.676185535267,
+        "source_stable": true,
+        "test_summaries": []
+      },
+      {
+        "command": [
+          "cargo",
+          "fmt",
+          "--all",
+          "--",
+          "--check"
+        ],
+        "exit": 0,
+        "label": "format-v1",
+        "log": "/tmp/pr1160-building-health-20261010/format-v1.log",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "record": "/tmp/pr1160-building-health-20261010/format-v1.json",
+        "record_sha256": "1bd1de3c3893bd6219e0a4e4db5015639c14d81534b4987353be1c27dc51cde0",
+        "seconds": 31.059299170970917,
+        "source_stable": true,
+        "test_summaries": []
+      },
+      {
+        "command": [
+          "python3",
+          "scripts/check-negative-assertions.py"
+        ],
+        "exit": 0,
+        "label": "negative-assertions-v1",
+        "log": "/tmp/pr1160-building-health-20261010/negative-assertions-v1.log",
+        "log_sha256": "49516e4ccc9c034cbb5fd748bdcae89b35f56d06d12a4c5e01ea61c0e17c45a6",
+        "record": "/tmp/pr1160-building-health-20261010/negative-assertions-v1.json",
+        "record_sha256": "b970bf1a26dde8412edf502783aff0840715454839a1c8460a40cc30072a531a",
+        "seconds": 2.223315419163555,
+        "source_stable": true,
+        "test_summaries": []
+      },
+      {
+        "command": [
+          "python3",
+          "scripts/check-security-clocks.py"
+        ],
+        "exit": 0,
+        "label": "security-clocks-v1",
+        "log": "/tmp/pr1160-building-health-20261010/security-clocks-v1.log",
+        "log_sha256": "bd324fbc2aec503258f82917613ce9aeff2296a2cce36fc0e6f3285bcf158bd9",
+        "record": "/tmp/pr1160-building-health-20261010/security-clocks-v1.json",
+        "record_sha256": "2736081864c0a1e440b899d48334f0092f0b99570517c0c2ee0497254142d3e9",
+        "seconds": 29.7550948029384,
+        "source_stable": true,
+        "test_summaries": []
+      },
+      {
+        "command": [
+          "python3",
+          "scripts/check-rust-file-hygiene.py"
+        ],
+        "exit": 0,
+        "label": "file-hygiene-v1",
+        "log": "/tmp/pr1160-building-health-20261010/file-hygiene-v1.log",
+        "log_sha256": "9688c79f8e850aa7c77a943222ebf28cbd8c5ef45d313f6e56be548057c3cc1e",
+        "record": "/tmp/pr1160-building-health-20261010/file-hygiene-v1.json",
+        "record_sha256": "2279b8ab1cb1fc0c207254d04792e53f80180bda0de8eae2d139bcdc1a9e38c4",
+        "seconds": 5.430464971344918,
+        "source_stable": true,
+        "test_summaries": []
+      }
+    ],
+    "clean_git_status": true,
+    "committed_source_content_matches_qualified_source": true,
+    "committed_source_manifest": "/tmp/pr1160-building-health-20261010/committed-source-manifest.json",
+    "committed_source_manifest_sha256": "470837eef235cabcc61b9e605eb97d80e1292ce748bc6ceffc6265304fc964e6",
+    "design": "/tmp/pr1160-building-health-20261010/design-source.json",
+    "design_sha256": "6083e3caf10621965ce803b9b178fc79a31fd78fd3d4c5801f0eac26edd45620",
+    "exact_named_coverage": "/tmp/pr1160-building-health-20261010/exact-named-coverage.json",
+    "exact_named_coverage_sha256": "b42a43330aa71823e4ecf28295f9276104bb4b48caebe71cc7fefcad98dad1a1",
+    "failed_cancelled_or_partial_campaigns": [],
+    "files": {
+      "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/receipt_query_snapshot_tests.rs": {
+        "git_blob": "a73641d9e33cdd1b0adf7fa94db8c62466ccf79c",
+        "sha256": "168cde7987db585ec4558ec37875ef92d67fa15a59da705261f3ef82f9b165d2"
+      },
+      "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/receipt_snapshot_building_health_tests.rs": {
+        "git_blob": "c8c5dee7a64b193aafd5b2dea5fd0921d401caab",
+        "sha256": "873e47a9e96e59d1380ea8b922047f6eeb53a20e3333891399d000a0db6c3307"
+      }
+    },
+    "final_runner_extension": "/tmp/pr1160-building-health-20261010/final-runner-extension.json",
+    "final_runner_extension_sha256": "e6d57ae3d08dc8c792e3ef34d249616cda712b438131c53f2ca4f706ab5db22a",
+    "limitations": [
+      "Test clocks and timeouts are fixture seams; no protocol clock-count assertion.",
+      "Timeout error branches and OS-wide uninterruptible filesystem behavior were not runtime fault-injected.",
+      "Strict owning check covers CP alltargets; broader store/kernel/CLI strict and unaffected native/100k coverage remain Root final composition scope."
+    ],
+    "observed_at": "2026-10-10T03:44:23.966371+00:00",
+    "oracles": [
+      "Writer seeded before snapshot start.",
+      "Actual service phase Building before and after HTTP.",
+      "All four receipt-read permits held before and after HTTP.",
+      "No Authorization header on GET /health.",
+      "HTTP200; receiptQuerySnapshot exact object configured:true,state:building excludes counts/watermarks/raw diagnostics.",
+      "Explicit clock release followed by notification-based Ready progress."
+    ],
+    "producer_commit": "9b4d5b4c57e4999acba0512014daf600879fde5a",
+    "production_changes": [],
+    "remaining": [
+      "Root final composed exact-name qualification on combined source.",
+      "Final independent review/hosted protected checks and merge acceptance remain with Root."
+    ],
+    "requirement": "ROOT-REVIEW-P3-4",
+    "schema": "chio.pr1160.building-health-qualification.v1",
+    "scope": "Test-only actual Building-phase public HTTP health coverage against unchanged production. No bug or Original RED is claimed.",
+    "seam": [
+      "Existing injectable store Clock identifies the named snapshot walker and gates until a weak health observer is installed.",
+      "Observer mutex is released before nonblocking health_status sampling.",
+      "Pause occurs on actual Building; no clock-count or sleep-based success condition.",
+      "Bounded condition-variable timeout returns ClockError::Unavailable.",
+      "RAII releases clock before snapshot shutdown, including assertion/error unwinding."
+    ],
+    "test_binaries_at_handoff": {
+      "/var/tmp/pr1160-bounded-export-20261009/debug/deps/chio_control_plane-bfa30dee57affd74": "e50adcb7aade2b0cd460b9853a28f835875cbe43f8c756659d7ae28ce5c03bb2"
+    },
+    "tests": {
+      "fail": 0,
+      "ignored": [],
+      "names": [
+        "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::building_health::public_building_snapshot_health_ignores_exhausted_receipt_admission",
+        "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::cancelled_export_keeps_its_permit_until_blocking_work_stops",
+        "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::cancelled_page_materialization_keeps_read_admission",
+        "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::cancelled_point_materialization_keeps_read_admission",
+        "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::cancelled_response_finalization_keeps_the_export_lane_occupied",
+        "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::every_receipt_read_route_reports_an_authenticated_watermark",
+        "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::export_lane_refuses_a_second_export_without_borrowing_read_capacity",
+        "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::health_reports_snapshot_readiness",
+        "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::http_pages_use_the_pinned_projection_and_refuse_a_changed_returned_leaf",
+        "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::public_health_is_independent_of_receipt_read_admission",
+        "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::public_snapshot_health_discloses_only_configuration_and_readiness",
+        "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::receipt_admission_is_nonqueued_and_authentication_precedes_it",
+        "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::receipt_response_materialization_runs_off_the_async_worker",
+        "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::recovery::a_dropped_recovery_request_changes_nothing_and_a_stopped_service_refuses_cleanly",
+        "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::recovery::http_reads_recover_after_quota_growth_and_still_verify_selected_payloads",
+        "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::recovery::operator_recovery_refuses_missing_wrong_and_tenant_tokens_before_reading_the_body",
+        "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::recovery::operator_recovery_route_exists_while_reads_are_unavailable_at_quota",
+        "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::recovery::operator_retry_wakes_an_unchanged_quota_backoff_by_request_not_by_its_deadline",
+        "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::snapshot_errors_preserve_codes_status_and_retry_contracts"
+      ],
+      "new_control": "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::building_health::public_building_snapshot_health_ignores_exhausted_receipt_admission",
+      "pass": 19,
+      "threads": 8
+    },
+    "worktree": "/home/connor/lanes/pr1160-building-health"
+  },
+  "building_integration": "1f848544113fc4a16d3f35d27ccf3ca2a109eb12",
+  "acceptance": {
+    "producer_local": true,
+    "exact_composed_candidate": false,
+    "hosted": false,
+    "merged": false
+  },
+  "qualification_boundary": "All98 authority names and19 Building-health names must pass on the final composition. V3 remains failed with only67 unchanged accepted family results carried separately; V5 has31 passing tests and strict three-owner all-target Clippy. Building is a coverage addition, not a production defect or Original RED claim."
+}
