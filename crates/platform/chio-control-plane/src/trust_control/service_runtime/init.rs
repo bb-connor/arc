@@ -69,6 +69,11 @@ async fn serve_async_inner(
         payload_maintenance_config,
     )?;
     let transport = crate::server_transport::prepare(&config.transport, config.listen)?;
+    // Co-located startup stores may need the space held by abandoned snapshots.
+    // Reclaim one bounded window before any of those stores opens or writes.
+    if let Some(receipt_path) = config.receipt_db_path.as_deref() {
+        chio_store_sqlite::receipt_query_snapshot::reclaim_abandoned_snapshots(receipt_path);
+    }
     let authority_keyring_seed_path = config
         .authority_keyring_config_path
         .as_ref()
@@ -82,7 +87,6 @@ async fn serve_async_inner(
         config.authority_keyring_receipt_anchor_root.as_deref(),
     ) {
         (Some(keyring_config), Some(seed_path), Some(receipt_path), Some(anchor_root)) => {
-            chio_store_sqlite::receipt_query_snapshot::reclaim_abandoned_snapshots(receipt_path);
             let receipt_store = Arc::new(SqliteReceiptStore::open_for_finding_pool(
                 receipt_path,
                 anchor_root,

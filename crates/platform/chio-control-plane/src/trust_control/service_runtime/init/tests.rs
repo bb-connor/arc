@@ -349,7 +349,7 @@ fn startup_serves_while_its_one_writer_still_verifies_a_healthy_history(
 mod snapshot_recovery {
     use super::*;
     use std::fs;
-    use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
+    use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt};
 
     type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -369,6 +369,7 @@ mod snapshot_recovery {
                 "CREATE TABLE unrelated(value INTEGER); INSERT INTO unrelated VALUES (42)",
             )?;
             drop(connection);
+            fs::set_permissions(&database, fs::Permissions::from_mode(0o600))?;
             let original_database = fs::read(&database)?;
 
             // Model the on-disk liveness state after owner death: no handle
@@ -419,6 +420,57 @@ mod snapshot_recovery {
         };
         assert!(error.to_string().contains("is not a Chio store"), "{error}");
         fixture.assert_reclaimed_before_open_refusal()
+    }
+
+    async fn assert_plain_serve_reclaims_before_store_refusal(
+        configure_store: impl FnOnce(&mut TrustServiceConfig, &Path),
+    ) -> TestResult {
+        let fixture = Fixture::new()?;
+        let mut config = test_config(fixture.directory.path().join("unused-joint.sqlite3"));
+        config.joint_authority_db_path = None;
+        config.receipt_db_path = Some(fixture.directory.path().join("receipts.sqlite3"));
+        configure_store(&mut config, &fixture.database);
+        let error = tokio::time::timeout(
+            Duration::from_secs(30),
+            super::super::serve_async(config, None, None, None, None, None, None),
+        )
+        .await?
+        .err()
+        .ok_or("a foreign startup database was admitted")?;
+        assert!(error.to_string().contains("is not a Chio store"), "{error}");
+        fixture.assert_reclaimed_before_open_refusal()
+    }
+
+    #[tokio::test]
+    async fn final12_plain_serve_reclaims_before_budget_open_can_refuse() -> TestResult {
+        assert_plain_serve_reclaims_before_store_refusal(|config, database| {
+            config.budget_db_path = Some(database.to_owned());
+        })
+        .await
+    }
+
+    #[tokio::test]
+    async fn final12_plain_serve_reclaims_before_revocation_open_can_refuse() -> TestResult {
+        assert_plain_serve_reclaims_before_store_refusal(|config, database| {
+            config.revocation_db_path = Some(database.to_owned());
+        })
+        .await
+    }
+
+    #[tokio::test]
+    async fn final12_plain_serve_reclaims_before_authority_open_can_refuse() -> TestResult {
+        assert_plain_serve_reclaims_before_store_refusal(|config, database| {
+            config.authority_db_path = Some(database.to_owned());
+        })
+        .await
+    }
+
+    #[tokio::test]
+    async fn final12_plain_serve_reclaims_before_joint_authority_open_can_refuse() -> TestResult {
+        assert_plain_serve_reclaims_before_store_refusal(|config, database| {
+            config.joint_authority_db_path = Some(database.to_owned());
+        })
+        .await
     }
 
     #[tokio::test]
