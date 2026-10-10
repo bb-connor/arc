@@ -469,6 +469,7 @@ fn runtime_regeneration_context_with_options(
     );
 
     let evidence_graph = serde_json::json!({
+        "schema": chio_transaction_passport::TRANSACTION_EVIDENCE_GRAPH_SCHEMA_ID,
         "nodes": [
             runtime_graph_node("runtime-proof-parity-report", chio_runtime_proof_parity::CHIO_RUNTIME_PROOF_PARITY_REPORT_SCHEMA, "runtime-proof-parity-report.json", &parity_report_bytes),
             runtime_graph_node("runtime-proof-regeneration-report", "chio.runtime.proof-regeneration-report.v1", "proof-regeneration-report.json", &proof_report_bytes),
@@ -478,7 +479,8 @@ fn runtime_regeneration_context_with_options(
             runtime_graph_node("runtime-proof-package", "test.runtime-proof-package.v1", "runtime-proof-package.json", artifacts.get("runtime-proof-package.json").ok_or("proof package missing")?),
             runtime_graph_node("runtime-verifier-report", "test.runtime-verifier-report.v1", "runtime-verifier-report.json", artifacts.get("runtime-verifier-report.json").ok_or("verifier report missing")?),
             runtime_graph_node("runtime-workflow-receipt", "test.runtime-workflow-receipt.v1", "runtime-workflow-receipt.json", artifacts.get("runtime-workflow-receipt.json").ok_or("workflow receipt missing")?)
-        ]
+        ],
+        "edges": []
     });
 
     Ok(SourceVerifierContext {
