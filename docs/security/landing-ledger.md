@@ -7,6 +7,26 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Required CI proof-room fixture (October 10)
+
+Source `4ba33a6cc48c746ae921dd2e685527f0760dbcb8` corrects the shared proof-room test graph with
+the canonical schema identifier and an empty edge array. The negative merge
+assertions and production validator are unchanged. The Original reached a
+missing-schema refusal before its intended assertions; the repaired owning
+library passes all 109 tests, with three focused green runs and strict lint.
+
+The [fixture audit](audits/required-ci-proofroom-followup-20261010.json) retains
+exact sources and evidence. All **1,967** earlier requirements, sources, states
+and historical observations remain unchanged, for **1,968 requirements**. The
+queued hygiene/reporting repairs remain part of the same replacement batch.
+Exact-head hosted qualification and Connor's merge go-ahead remain outstanding.
+
+The renewed request to investigate disclosed readiness gaps is being executed
+in isolated native, signing-custody, cold-state and proof preparation lanes.
+Their classification or preparation does not close them. Trusted activation
+still requires genuine protected landing and captured evidence; no variable,
+authorization or proof result is substituted for those prerequisites.
+
 ## Required CI hygiene follow-up (October 10)
 
 Source `058888287f7a15b861c8fd55e17a96d5ee7b57f0` repairs the test-file size failure on candidate
