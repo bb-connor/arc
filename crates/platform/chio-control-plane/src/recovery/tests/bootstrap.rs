@@ -22,16 +22,7 @@ pub(super) fn open_kernel(
     authority: &SqliteAuthorityStore,
     signer: &Keypair,
 ) -> TestResult<(ChioKernel, Arc<AtomicUsize>)> {
-    let mut ca_public_keys = vec![signer.public_key()];
-    if directory.join("legacy-near-capacity").exists()
-        && directory.join("current-recovery-receipt-signer").exists()
-    {
-        // The old35 consumer retains the original public trust root while
-        // its current boot constructs only the independent replacement key.
-        ca_public_keys.push(chio_core::PublicKey::from_hex(
-            "fcbe38632417bb5b875d49a3c02270633917c6093fd01ebb59ff6416e37afe0c",
-        )?);
-    }
+    let ca_public_keys = vec![signer.public_key()];
     let mut kernel = ChioKernel::new(KernelConfig {
         ca_public_keys,
         keypair: signer.clone(),

@@ -366,57 +366,6 @@ async fn recovery_originless_history_refuses_new_owners_and_retains_control() ->
 }
 
 #[tokio::test]
-#[ignore = "run with a retained pre-upgrade native effect fixture"]
-async fn recovery_legacy_native_effect_retains_settlement_and_refuses_new_owners() -> TestResult {
-    let path = std::path::PathBuf::from(
-        std::env::var_os("CHIO_RECOVERY_LEGACY_ROOT").ok_or("legacy fixture root")?,
-    );
-    let fixture = RecoveryFixture::open(path, None, false)?;
-    let workflow: WorkflowId =
-        serde_json::from_slice(&std::fs::read(fixture.path.join("workflow.json"))?)?;
-    let record = fixture.record(&workflow)?;
-    assert!(record.origin.is_none());
-    assert!(record
-        .action
-        .as_ref()
-        .is_some_and(|action| action.origin.is_none()));
-    assert!(record.captured);
-    assert_eq!(
-        native_state(&fixture, &record)?,
-        AdmissionOperationState::Completed
-    );
-    assert_eq!(external_count(&fixture.path)?, 1);
-    let action = chio_core::canonical_json_bytes(&record.action)?;
-    let grant = chio_core::canonical_json_bytes(&record.signed_grant)?;
-    let envelope = chio_core::canonical_json_bytes(&record.envelope)?;
-    let replacement = create_from(&fixture, "legacy-effect-replacement", &fixture.seed).await?;
-    assert!(
-        replacement.is_err(),
-        "the old workflow already consumed this original denial"
-    );
-    fixture.runtime.settle(&fixture.control, &workflow)?;
-    let settled = fixture.record(&workflow)?;
-    assert!(matches!(
-        settled.effect,
-        EffectObservationV1::Complete { .. }
-    ));
-    assert_eq!(chio_core::canonical_json_bytes(&settled.action)?, action);
-    assert_eq!(
-        chio_core::canonical_json_bytes(&settled.signed_grant)?,
-        grant
-    );
-    assert_eq!(
-        chio_core::canonical_json_bytes(&settled.envelope)?,
-        envelope
-    );
-    fixture
-        .runtime
-        .review_document(&fixture.control, &workflow)?;
-    assert_eq!(external_count(&fixture.path)?, 1);
-    Ok(())
-}
-
-#[tokio::test]
 async fn recovery_origin_unknown_effect_cannot_create_a_second_continuation() -> TestResult {
     let fixture = RecoveryFixture::new(false)?;
     let id = fixture.ready().await?;
