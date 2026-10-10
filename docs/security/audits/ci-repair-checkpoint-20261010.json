@@ -1,0 +1,343 @@
+{
+  "schema": "chio.pr1160.ci-repair-checkpoint.v1",
+  "observed_utc": "2026-10-10T18:26:05.299475+00:00",
+  "published_withdrawn_candidate": "b9a43b2995fb4ddec85e2fb1d0731f0e8b1d1507",
+  "composed_source": "53f4d394254f3179231e4639a35e774bb6fb3461",
+  "components": {
+    "CI-STUB-SURFACE": {
+      "commit": "504bd7843bda4a93fe6d3b82eafdb60d5fc9cb38",
+      "requirement": "Preserve budget provenance semantics while making its descriptive comment pass the existing stub-surface gate.",
+      "original": "Actual scanner rejected the comment; no production behavior was changed.",
+      "local": "Scanner and actual regression shell passed; wrong initial test-script path rc127 retained.",
+      "review": "Root independently reviewed producer and retained Original/green hashes.",
+      "related_commits": [],
+      "files": [
+        "crates/platform/chio-control-plane/src/trust_control/service_types/state.rs"
+      ],
+      "source_files_sha256": {
+        "crates/platform/chio-control-plane/src/trust_control/service_types/state.rs": "03aca47040e5051913799a1975648fffd00f8891cea6c270952ab76994994055"
+      }
+    },
+    "CI-LOCK-SOURCE-PINS": {
+      "commit": "4feb8e4c583a68616c277dcd21b701c59af9a186",
+      "requirement": "Bind current evidence image and CI contract to the reviewed Cargo.lock bytes.",
+      "original": "Five image-input controls passed and one errored on the stale lock digest.",
+      "local": "Six image inputs, checker and full mutation suite passed at4feb for the initial lock pin. After removing only the ascii edge, six image inputs and the unchanged checker pass at de879 with the new digest. The earlier full mutation campaign is not relabelled exact-current-pin execution.",
+      "review": "Exactly two existing runtime dev-dependency edges added; all package identities, versions, sources and checksums unchanged. Historical audit hashes preserved.",
+      "superseding_commit": "de879096eb",
+      "current_lock_digest": "45791765505850a86d1e17ffa060b7dfc7ec74df5a17a9bd03f117cb0b5c900b",
+      "related_commits": [],
+      "files": [
+        "deploy/docker/Dockerfile.security-evidence-runner",
+        "scripts/check-security-ci-contract.py"
+      ],
+      "source_files_sha256": {
+        "deploy/docker/Dockerfile.security-evidence-runner": "4a1852b07b41a6aea2730bbe0f50f5e47fa663dc9c94a81dba01beaa46b9d6a8",
+        "scripts/check-security-ci-contract.py": "02c2fea8ea2cdbc395e8590fe081e7d2b8b75abe04b33f86adb951a58187996e"
+      }
+    },
+    "CI-COPY-AUTHORITY": {
+      "commit": "53fa92e51d30a9d610383ab79560a8f712d481a3",
+      "requirement": "Classify mandatory approval-bound token restrictions without permitting external authority overclaims.",
+      "original": "Original copy-loop suite had four positive-case failures; an intermediate classifier accepted two weakening qualifiers, retained as genuine RED.",
+      "local": "Nine final methods passed, including fourteen new cases; full Cargo-backed shell gate is recorded separately.",
+      "review": "Claude native review accepted dfd71be94c; three P3 limits retained: optional matcher scoping, later-sentence semantics, quoted constraints. No source exemptions.",
+      "related_commits": [],
+      "files": [
+        "scripts/check-chio-proof-room-release-truth.sh",
+        "scripts/tests/check-proof-room-historical-protocols.test.py"
+      ],
+      "source_files_sha256": {
+        "scripts/check-chio-proof-room-release-truth.sh": "eabb542cb4e1f0c369b3226b0d93ffba131792e3ee9123258242c1382a582fba",
+        "scripts/tests/check-proof-room-historical-protocols.test.py": "2d415560b94c5941e78cb44b4a87d77518fa4b2e6adecf1b2d73fcad3af5ef59"
+      }
+    },
+    "CI-FLOW-INVENTORY": {
+      "commit": "d4264d1c259737ed0e808f26f8617d612b221aea",
+      "requirement": "Enroll the existing single-decode classification test in its owning exact test inventory.",
+      "original": "All48 Rust tests passed before the stale47-name inventory failed.",
+      "local": "48 Rust tests and exact inventory pass; all69 script inventory controls pass. Formal/model portions were not executed locally.",
+      "review": "Root verified unchanged assertions, exact one-test enrollment and three source-bound log hashes.",
+      "related_commits": [],
+      "files": [
+        "scripts/check-flow-security.sh",
+        "scripts/tests/check-flow-security.test.sh"
+      ],
+      "source_files_sha256": {
+        "scripts/check-flow-security.sh": "8240fb541266f0c8099f98f7284355d1c22db0525cdce96727343060ff50634b",
+        "scripts/tests/check-flow-security.test.sh": "d5f17de9fa22e028a832214a73dfe4007e5390f2d2e90e0401839db29bdd86ca"
+      }
+    },
+    "CI-CRYPTO-FLOOR-INVENTORY": {
+      "commit": "f3a7db988804320a3038379ab1e5af2a4c73512e",
+      "requirement": "Keep approval cleanup coverage in an independent test module and preserve the20-name crypto-floor inventory.",
+      "original": "Hosted exact inventory failed after21 Rust tests passed. A list command exit0 is diagnostic, not RED.",
+      "local": "20 crypto-floor tests, exact inventory, relocated cleanup control and PQ all-target strict lint pass.",
+      "review": "Root verified all ten log hashes; test body unchanged except sibling-fixture import and narrow test-only visibility.",
+      "related_commits": [],
+      "files": [
+        "crates/kernel/chio-kernel/src/kernel/tests.rs",
+        "crates/kernel/chio-kernel/src/kernel/tests/approval_reservation_cleanup.rs",
+        "crates/kernel/chio-kernel/src/kernel/tests/threshold_crypto_floor.rs"
+      ],
+      "source_files_sha256": {
+        "crates/kernel/chio-kernel/src/kernel/tests.rs": "332db0923a6b5abf8e3590a7cd7d3bf6a4d39fa5d204a0fa1cc6da9ec5ac8cc7",
+        "crates/kernel/chio-kernel/src/kernel/tests/approval_reservation_cleanup.rs": "6c3ad9679c6e82f793e1480c8b311d38ab23f4d06259175769f59006c50f174d",
+        "crates/kernel/chio-kernel/src/kernel/tests/threshold_crypto_floor.rs": "f591e4552fdc0f0065033e081ef64edb4a28e4820cebf0babfbf89b6cf159e82"
+      }
+    },
+    "CI-EXPORT-ACCOUNTING": {
+      "commit": "ffe3b23b6932f080520c11c97018bd8b1c28a81b",
+      "requirement": "Use checked byte-budget arithmetic while retaining finite export limits and typed refusals.",
+      "original": "Static arithmetic gate reports two unchecked sites; no runtime exploit or fabricated failing runtime test is claimed.",
+      "local": "Static gate0sites, gate regressions, owning export51tests and strict owning all-target Clippy pass.",
+      "review": "Claude native review accepted arithmetic equivalence under maintained invariants, fail-closed overflow and unchanged32MiB cap/refusal text.",
+      "related_commits": [],
+      "files": [
+        "crates/platform/chio-store-sqlite/src/evidence_export/http_budget.rs"
+      ],
+      "source_files_sha256": {
+        "crates/platform/chio-store-sqlite/src/evidence_export/http_budget.rs": "2bf6c702a5e263d0e11854f458a69cd34e5ba1218a556bb6d8beb9efba73d7d7"
+      }
+    },
+    "CI-WIRE-INVENTORY": {
+      "commit": "934ec62d079571c92274e0998a41194459b15ef6",
+      "requirement": "Record the existing versioned snapshot-directory identifier without altering the layout or checker.",
+      "original": "Actual identifier gate refused the missing chio-receipt-snapshots-v2 entry.",
+      "local": "Identifier gate and its nine regression controls pass; all1115 earlier entries and first_seen values preserved.",
+      "review": "Root reviewed the sole5-line generated entry and its original introducing commit c0b0ee6090.",
+      "related_commits": [],
+      "files": [
+        "spec/wire-schemas.lock"
+      ],
+      "source_files_sha256": {
+        "spec/wire-schemas.lock": "0f46bced8f9101a209dd738d66988cab41e3f9a8b17cb8023cc3d558e10260a4"
+      }
+    },
+    "CI-DEPENDENCY-BUDGET": {
+      "commit": "97ef18cc237fd83f53c967fe2fddc58d73f9ae95",
+      "related_commits": [
+        "82d49bd372173e447322d000115ff5a7d2b4fc2e",
+        "de879096ebd03662287a9bb9819e7b906c9c931c"
+      ],
+      "requirement": "Keep privileged dependency graphs within their unchanged72/481 ceilings while preserving shared public-key/hash encoding and no_std support.",
+      "original": "Actual graphs73/72 and482/481, no denied packages; actual selftest also failed. Added ascii edge attributed to b830fb0f89. Original wire16 and exhaustive-prefix1 pass are preservation controls, not RED.",
+      "local": "Removed the unnecessary core-types ascii edge using checked byte buffers and safe zero-copy UTF8 conversion. Whole owning614 tests pass, strict alltargets and no-default compile pass, actual budgets72/481 and12 graph controls pass. Five active deployment locks renewed with only removed edges/orphan ascii packages.",
+      "review": "Claude native runtime/wire review accepts exact source. Unverified proof-cost delta retained explicitly: allocating encoders now validate UTF8; fixed P256 stack prehash bypasses conversion. No former proof pass carries to changed source, no proof assertion or assumption weakened. KANI-PROOF-QUAL remains OPEN/UNPROVED.",
+      "files": [
+        "Cargo.lock",
+        "crates/core/chio-core-types/Cargo.toml",
+        "crates/core/chio-core-types/src/crypto.rs",
+        "crates/core/chio-core-types/src/crypto/encoding.rs",
+        "crates/core/chio-core-types/tests/crypto_wire_bounds.rs",
+        "crates/tooling/chio-conformance/verdict_matrix/Cargo.lock",
+        "deploy/docker/Dockerfile.security-evidence-runner",
+        "deploy/docker/chio-workspace/Cargo.lock",
+        "deploy/docker/proof-room-workspace/Cargo.lock",
+        "fuzz/Cargo.lock",
+        "scripts/check-security-ci-contract.py",
+        "sdks/lambda/chio-lambda-extension/Cargo.lock"
+      ],
+      "source_files_sha256": {
+        "Cargo.lock": "45791765505850a86d1e17ffa060b7dfc7ec74df5a17a9bd03f117cb0b5c900b",
+        "crates/core/chio-core-types/Cargo.toml": "3bdb0ebf8616995baf5657cd44ee027b02d61b075cf10b269730d4d6e78541dc",
+        "crates/core/chio-core-types/src/crypto.rs": "cfc72b646b547d411ffeb4166d5a7a636f5cdd4111826cd601680d7366dd5aa2",
+        "crates/core/chio-core-types/src/crypto/encoding.rs": "49cbbd0c8cc687c4bb0a1a760571fcbbddf09e7a93ebca9f8b2b5518df660caa",
+        "crates/core/chio-core-types/tests/crypto_wire_bounds.rs": "6ddbb4cffc481d15809777df1a5311db7f3a2ef6cfb6a4c565b6e1e653428e20",
+        "crates/tooling/chio-conformance/verdict_matrix/Cargo.lock": "563c89f697e0d84ae6c70929ee4363fc5a990e15c8ec02cfa8562ce0fef1b294",
+        "deploy/docker/Dockerfile.security-evidence-runner": "4a1852b07b41a6aea2730bbe0f50f5e47fa663dc9c94a81dba01beaa46b9d6a8",
+        "deploy/docker/chio-workspace/Cargo.lock": "3a52ed2e3175a85209114c9a9d9bf50c09e0367fe0784fa1969c04f21182737c",
+        "deploy/docker/proof-room-workspace/Cargo.lock": "b150699e9f0f82e45b1074785c527a37133743a83827e26a36d9765bf368a742",
+        "fuzz/Cargo.lock": "89cf33c09c372f921771bb21b9908b1ad34ae90057ae0d90cc10cdb12773471f",
+        "scripts/check-security-ci-contract.py": "02c2fea8ea2cdbc395e8590fe081e7d2b8b75abe04b33f86adb951a58187996e",
+        "sdks/lambda/chio-lambda-extension/Cargo.lock": "782276e14290b4f775167eb80f02d998b47d024cfa4d20f9175725e30ccef9cb"
+      }
+    }
+  },
+  "prior_b9a_qualification": {
+    "rust_passed": 385,
+    "python_passed": 469,
+    "mandatory_controls": 44,
+    "strict": "four owning crates, all-targets",
+    "independent_review": "Scoped final repair delta accepted; helper report produced before quota error, no helper terminal-success claim.",
+    "hosted": "Build and exact test inventories genuinely failed; obsolete campaign cancelled, no hosted qualification."
+  },
+  "ordinary_workspace_campaign": {
+    "status": "incomplete_timeout",
+    "seconds": 3605.2427608668804,
+    "runtime_tests_reached": 0,
+    "source_stable": true,
+    "owned_group_reaped": true,
+    "acceptance": "No full workspace runtime pass. Warm artifacts reused for focused checks."
+  },
+  "earlier_e4ea_cargo_preflight": {
+    "status": "failed",
+    "passed": 16,
+    "failed": 2,
+    "failures": "dependency budget and its stale-count control; repaired in separately qualified97ef source. The original campaign remains FAILED."
+  },
+  "metadata": "Only reviewed source and lock fingerprints renewed;65 rows and179 artifacts retained. All255 formal mirror anchors match without renewal. No proof/model execution or proof claim change.",
+  "artifacts": [
+    {
+      "path": "/tmp/pr1160-final-github-repairs-20261010/composed-v1/summary.json",
+      "sha256": "7157bab5773dd21926207da09589b7fa69320e843099eaae6a2531e6dc7a896c"
+    },
+    {
+      "path": "/tmp/pr1160-final-github-repairs-20261010/static-v1/summary.json",
+      "sha256": "4b5d9fad5bb08f518bd63796cd7bb829fcc2c420c205c6459a7ced4d7488e404"
+    },
+    {
+      "path": "/tmp/pr1160-final-github-repairs-20261010/supply-preflight-v1/summary.json",
+      "sha256": "e37f73d421b124867e311e0605a22ed7d915e130bbe44674d86997e8dae1f867"
+    },
+    {
+      "path": "/tmp/pr1160-final-github-repairs-20261010/final-independent-review.md",
+      "sha256": "86eac105862b41348db7103acedf92da947887f7c83e94443093c9f371b7f415"
+    },
+    {
+      "path": "/tmp/pr1160-final-github-repairs-20261010/b9a-retired-runs.json",
+      "sha256": "69fe6932513fe36f7a4f50a673d09cc156d164f16955fd4425c1a7686c2fdbb1"
+    },
+    {
+      "path": "/tmp/pr1160-final-github-repairs-20261010/workspace-preflight-v1/summary.json",
+      "sha256": "bc314867fd09f5ea9e4881e09f5bc8e73b4599c458dfded56ef4d90d0bb94b91"
+    },
+    {
+      "path": "/tmp/pr1160-final-github-repairs-20261010/root-security-contract-regressions.log",
+      "sha256": "bb5dac1fc3e0117c366b09758719781c68bde063eaf67bb0e2619352d787b51a"
+    },
+    {
+      "path": "/tmp/pr1160-final-github-repairs-20261010/root-security-contract-regressions.exit",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "/tmp/pr1160-final-github-repairs-20261010/lock-pin-semantic-review.json",
+      "sha256": "8e0bb1bbfd33734735ff83f44a9246f2a5a4c688139bc2c65c4b37d85bcb0059"
+    },
+    {
+      "path": "/tmp/pr1160-final-github-repairs-20261010/root-stub-review.json",
+      "sha256": "2f53b2bc3285b817528a7eb88d275ab8cb0ad3eb05dd67168d28f9fef385237b"
+    },
+    {
+      "path": "/tmp/pr1160-final-github-repairs-20261010/root-flow-inventory-review.json",
+      "sha256": "2d526f7ac5bfc7b08acec5310148e83a2ae4aa8e6cf1d3ed0c2b6103e86aef48"
+    },
+    {
+      "path": "/tmp/pr1160-final-github-repairs-20261010/root-crypto-inventory-review.json",
+      "sha256": "0ea713b88fbc5ace5aa12fe07ebe0419c164ce20fdf9408ba25ef799b685d3db"
+    },
+    {
+      "path": "/tmp/pr1160-final-github-repairs-20261010/root-wire-inventory-review.json",
+      "sha256": "01130cd966ec03ab7dad20ed493ad38fe4f63f4ccfcda5eccd7f503ffd96abb6"
+    },
+    {
+      "path": "/tmp/pr1160-final-github-repairs-20261010/root-sweep-artifact-review.json",
+      "sha256": "749f35e1cf6337414a059fda58e7ab24f66212abbbae719b67122be8ca6cb3db"
+    },
+    {
+      "path": "/tmp/pr1160-final-github-repairs-20261010/ci-compose-fast-v1/summary.json",
+      "sha256": "dbbe846acb17ef11f5c477f6624393d952faa8b12bc2e420a5e493bcd0db243a"
+    },
+    {
+      "path": "/tmp/pr1160-final-github-repairs-20261010/ci-compose-static-v2/summary.json",
+      "sha256": "b003834e098855ee3401d0a6d24b7753cd8cbee8b4b926fdcc700c1e925b0714"
+    },
+    {
+      "path": "/tmp/pr1160-final-github-repairs-20261010/ci-metadata-renewal-v1/original.json",
+      "sha256": "4b7b255216fc1657381ff9e76c8136ae282fe09f3c95e6ebee2993364a274de6"
+    },
+    {
+      "path": "/tmp/pr1160-final-github-repairs-20261010/ci-metadata-renewal-v1/green.json",
+      "sha256": "47e2df9ee59340c4a36749eb7851c49d69da4ebed2172b66449ffe61ad9d32cf"
+    },
+    {
+      "path": "/tmp/pr1160-final-github-repairs-20261010/ci-cargo-preflight-v1/summary.json",
+      "sha256": "48094f8485e128801e2adda8e1918644f8f058076c655fc81aa4977a906708e6"
+    },
+    {
+      "path": "/tmp/pr1160-final-github-repairs-20261010/ci-final-native-review.md",
+      "sha256": "ed799bed43d3550cf637af4ef79b4486848aabcf555b8f4f425f7842902b1fc4"
+    },
+    {
+      "path": "/tmp/pr1160-ci-copy-20261010/handoff.json",
+      "sha256": "a3c5542912b0097fb81d4cc8044c6de3f78dcd3f0a15c08baec69dfaa1dbae7d"
+    },
+    {
+      "path": "/tmp/pr1160-ci-copy-20261010/independent-native-review.json",
+      "sha256": "b28d145d796fe781edf368fd0559958e2ba2f13a148e02ab0cf8399c088f8772"
+    },
+    {
+      "path": "/tmp/pr1160-ci-accounting-20261010/owning-v1/summary.json",
+      "sha256": "823e3e895c3b5b19e4e178c17dec3f6ac1a547eba9c9d2fe0968a8a502b783a9"
+    },
+    {
+      "path": "/tmp/pr1160-ci-accounting-20261010/independent-native-review.json",
+      "sha256": "593b99ef57f8077ba106e8ddbe70c8f3b8439975541185cd2555ab43cfa67577"
+    },
+    {
+      "path": "/tmp/pr1160-ci-dependency-20261010/original-v1/summary.json",
+      "sha256": "c3070ac0ade4b0cf1a90b656b5bf0567f65167e8f4d6d8673ddf2acdebfa40ce"
+    },
+    {
+      "path": "/tmp/pr1160-ci-dependency-20261010/repair-v1/summary.json",
+      "sha256": "b3deadd2666d0af36b0ab852953eb5acf175e6ff0dc427e6b0d936e8f87cdb2a"
+    },
+    {
+      "path": "/tmp/pr1160-ci-dependency-20261010/downstream-v1/summary.json",
+      "sha256": "0d08602e0553f31451442f59664538b3c1ac12e21bf7b20d103ac7d8a2a65d5c"
+    },
+    {
+      "path": "/tmp/pr1160-ci-dependency-20261010/lock-refresh/summary.json",
+      "sha256": "668cc17e835a909546c72a8acf4fdf842ed0c260318681902941967901ae206a"
+    },
+    {
+      "path": "/tmp/pr1160-ci-dependency-20261010/pin-checks/summary.json",
+      "sha256": "e5e66125e44e46d578afdf249da0a3d36ab2307480056aa8ccb6cfbc439c5e9a"
+    },
+    {
+      "path": "/tmp/pr1160-ci-dependency-20261010/pin-checks/2-mode-corrected.log",
+      "sha256": "42e0bda87f001b3984f23ebc31c9b16dec657cc2e0a06bcf46b613e8b026fd92"
+    },
+    {
+      "path": "/tmp/pr1160-ci-dependency-20261010/pin-checks/local-mode-normalization.json",
+      "sha256": "ef8dc16bf270b8234942f621459983a26c29be181e84860c111768a4d3c29116"
+    },
+    {
+      "path": "/tmp/pr1160-ci-dependency-20261010/metadata-renewal/summary.json",
+      "sha256": "a8f6368a8bca04ee7bde8ab0a6770836af58b00702dfb9fb28e9a78100e90a29"
+    },
+    {
+      "path": "/tmp/pr1160-ci-dependency-20261010/independent-native-review.md",
+      "sha256": "ada7d1d468c4d171929ee19f8456be6efea047c5fde9a74ee66c423e7c15e459"
+    },
+    {
+      "path": "/tmp/pr1160-ci-dependency-20261010/supply-preflight-v1/summary.json",
+      "sha256": "525019fe22ddfa46d661cd1b376969aa8c22bbbbdde1e1f15de2913bbadaf10e"
+    },
+    {
+      "path": "/tmp/pr1160-ci-dependency-20261010/static-final-v1/summary.json",
+      "sha256": "689d49d56b0d8480cab65d132a5eb606948b8bfc88387148208ff276b3f68d60"
+    },
+    {
+      "path": "/tmp/pr1160-ci-dependency-20261010/final-metadata-v1/summary.json",
+      "sha256": "57f67434554e5d7a858ff32597861ca4be539a96a68803e7958dce4277f6239c"
+    },
+    {
+      "path": "/tmp/pr1160-final-github-repairs-20261010/root-prospective-patch-hygiene.json",
+      "sha256": "b38e12cde5df8b5f63aafcd0e974e4ce8a565c8938f95ff76bfd5833858b864b"
+    }
+  ],
+  "remaining_acceptance": [
+    "Complete final local gate disposition; native independent integration-delta review at e4ea27159c found no scoped P0/P1/P2.",
+    "Publish one replacement and obtain four exact-candidate protected checks, accurate thread dispositions and normal protected merge."
+  ],
+  "separate_open_obligations": [
+    "KANI-PROOF-QUAL remains OPEN/UNPROVED.",
+    "Authenticated cold state remains OPEN P1 and blocks G5 preview.",
+    "Unmeasured UTF8-validation symbolic cost remains a proof follow-up; no additional proof campaign was run.",
+    "Trusted35 capture, dedicated App enforcement, and native/cold release evidence remain postmerge/pre-release. Missing CHIO_COMMITTED_LINUX_EVIDENCE_SHA is not replaced with invented evidence."
+  ],
+  "hosted_qualified": false,
+  "merged": false,
+  "release_permitted": false
+}
