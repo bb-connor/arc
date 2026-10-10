@@ -17,6 +17,7 @@ COMPOSITION_CONTRACTS = {
     "crates/platform/chio-control-plane/src/security/adapters/effect_port/dispatch.rs::production::native-adapter": "b820998e89b3c902866693dff81ee5a0bda3503d913c1570ec9813c36de0f7f3",
     "crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_authority.rs::build_pinned_remote_capability_authority::native-adapter": "77ed579583f750b932cb00694b8f06349589a0943005a0eeb751b5da46fd7b25",
     "crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_authority.rs::build_remote_capability_authority::native-adapter": "3185cd4f6e23da2be83957f30e52d7d21e580f12735d49e3d72c36b305d2a9fb",
+    "crates/platform/chio-control-plane/src/trust_control/underwriting_and_support/policy_support.rs::report_clock::native-adapter": "7dd59fd660c87b91cad3e4e6be4f583572a9fce163c742ced827a6debf3bfb85",
     "crates/platform/chio-store-sqlite/src/encrypted_blob.rs::open::native-adapter": "f5802e7240e63a3b431febc6a25d549695ef73d56e8e2ff4c500a4a7326462d1",
     "crates/platform/chio-store-sqlite/src/encrypted_blob.rs::open_in_memory::native-adapter": "8e769c19d2fffff93f620917483bd93a91219c8c53c4f30434c9bbd26959bd9d",
     "crates/platform/chio-store-sqlite/src/finding_operator_bundle_store.rs::open::native-adapter": "5bbfddf30d2ca549f46589093e7ce0161ad2a18d489ada61edf18a5ad8949de4",

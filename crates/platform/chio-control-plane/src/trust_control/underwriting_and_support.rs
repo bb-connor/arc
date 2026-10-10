@@ -1480,6 +1480,10 @@ mod policy_support;
 
 pub(crate) use self::policy_support::*;
 
+#[cfg(all(test, target_os = "linux"))]
+#[path = "underwriting_and_support/behavioral_signing_custody_tests.rs"]
+mod behavioral_signing_custody_tests;
+
 #[cfg(test)]
 mod underwriting_and_support_tests {
     use super::*;

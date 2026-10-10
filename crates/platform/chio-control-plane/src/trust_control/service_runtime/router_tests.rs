@@ -29,6 +29,10 @@ mod receipt_store_ownership_tests;
 #[path = "attestation_authentication_tests.rs"]
 mod attestation_authentication_tests;
 
+#[cfg(target_os = "linux")]
+#[path = "router_tests/behavioral_signing_custody.rs"]
+mod behavioral_signing_custody;
+
 fn metrics_state(service_token: &str) -> TrustServiceState {
     let config = TrustServiceConfig {
         transport: Default::default(),

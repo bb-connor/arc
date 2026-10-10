@@ -647,6 +647,8 @@ fn underwriting_receipt_call_chain(
         })
 }
 
+/// Load owner-provisioned custody for node-local signed observations.
+/// A follower's local signer does not assert ownership of the replicated head.
 pub(crate) fn load_behavioral_feed_signing_keypair(
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
@@ -656,8 +658,23 @@ pub(crate) fn load_behavioral_feed_signing_keypair(
             "behavioral feed export requires either --authority-seed-file or --authority-db, not both"
                 .to_string(),
         )),
-        (Some(path), None) => load_or_create_authority_keypair(path),
-        (None, Some(path)) => Ok(SqliteCapabilityAuthority::open(path)?.local_keypair()?),
+        (Some(path), None) => crate::load_existing_authority_keypair(path),
+        (None, Some(path)) => {
+            use chio_store_sqlite::authority::{
+                AuthorityInspectionError, SqliteAuthorityInspection,
+            };
+
+            let inspection_error = |error| match error {
+                AuthorityInspectionError::Uninitialized => CliError::cli_other_error(
+                    "behavioral feed export requires an authority database already initialized by its owner",
+                ),
+                AuthorityInspectionError::Store(error) => error.into(),
+            };
+            SqliteAuthorityInspection::open_existing_with_clock(path, Arc::new(report_clock()))
+                .map_err(inspection_error)?
+                .local_keypair()
+                .map_err(inspection_error)
+        }
         (None, None) => Err(CliError::cli_other_error(
             "behavioral feed export requires --authority-seed-file or --authority-db so the export can be signed"
                 .to_string(),
@@ -946,9 +963,13 @@ fn ratio_option(numerator: u64, denominator: u64) -> Option<f64> {
     }
 }
 
+fn report_clock() -> impl chio_security_types::clock::Clock {
+    chio_security_types::clock::SystemClock
+}
+
 pub(crate) fn unix_timestamp_now() -> Result<u64, chio_security_types::clock::ClockError> {
-    use chio_security_types::clock::{Clock, SystemClock};
-    SystemClock.unix_millis().map(|now| now.as_secs())
+    use chio_security_types::clock::Clock;
+    report_clock().unix_millis().map(|now| now.as_secs())
 }
 
 pub(crate) fn revocation_list_response(

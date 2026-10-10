@@ -974,6 +974,8 @@ mod reports_tests {
         let dir = std::env::temp_dir().join(format!("chio-signed-cs-{}", std::process::id()));
         std::fs::create_dir_all(&dir).test_expect("create temp dir");
         let authority_seed_path = dir.join("authority.seed");
+        crate::load_or_create_authority_keypair(&authority_seed_path)
+            .test_expect("owner provisions comptroller report authority");
 
         let report = ComptrollerSurfaceReport {
             schema: COMPTROLLER_SURFACE_REPORT_SCHEMA.to_string(),
