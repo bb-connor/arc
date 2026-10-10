@@ -147,6 +147,7 @@ run_exact_target --label "flow lattice and enforcement engine" --expected \
   classification::tests::category_map_is_bounded_and_rejects_top \
   classification::tests::classifier_failure_cannot_collapse_to_authenticated_empty \
   classification::tests::identity_request_and_payload_mismatch_deny \
+  classification::tests::many_field_path_findings_decode_payload_once_and_resolve_every_pointer \
   classification::tests::pii_phi_secret_and_tenant_categories_join_all_restrictions \
   classification::tests::unknown_category_and_malformed_findings_deny \
   classification::tests::verified_evidence_retains_exact_findings_without_payload_or_debug_locations \
