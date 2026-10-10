@@ -586,7 +586,7 @@
     "integration_boundary": "The continuation describes private candidate work. Inventorying its controls does not install or qualify it.",
     "working_queue": {
       "integration_branch": "feat/recoverable-agent-runtime-20261002",
-      "integrated_source_commit": "e7ee2b317a4e30ef9a3c630a35501be691547fd4",
+      "integrated_source_commit": "c2548381b636cc9685d47ae1e59c000119c437a3",
       "scope": "Execution states refer to existing register obligations, not a second findings inventory. Historical candidates and their results remain uninstalled unless explicitly recorded otherwise.",
       "items": [
         {
@@ -4448,6 +4448,15 @@
         },
         "scope": "Original lexical-parent and intermediate-alias reproductions refuse before compiler dispatch, with no output or excluded source retention.",
         "qualified": false
+      },
+      "current_continuity": {
+        "update_ref": "#/current_updates/32",
+        "review": {
+          "path": "target/recovery-pr/current-review-followup/p1-integration-20261009/host-compiler-gate/distinct-artifact-reconciliation/root-review.json",
+          "sha256": "ab095f271acb86e2689aa05da6f16c5a7e2e136d0c58c0f8e23522bda19884f9"
+        },
+        "scope": "Current root-reviewed reconciliation delta preserves the original causal closure only. Original successor source and evidence pins are unchanged.",
+        "qualified": false
       }
     },
     {
@@ -4494,6 +4503,15 @@
         },
         "scope": "Original stale nominal-output reproduction refuses before dispatch; exact fresh held output ownership and concurrent-owner controls pass.",
         "qualified": false
+      },
+      "current_continuity": {
+        "update_ref": "#/current_updates/32",
+        "review": {
+          "path": "target/recovery-pr/current-review-followup/p1-integration-20261009/host-compiler-gate/distinct-artifact-reconciliation/root-review.json",
+          "sha256": "ab095f271acb86e2689aa05da6f16c5a7e2e136d0c58c0f8e23522bda19884f9"
+        },
+        "scope": "Current root-reviewed reconciliation delta preserves the original causal closure only. Original successor source and evidence pins are unchanged.",
+        "qualified": false
       }
     },
     {
@@ -4539,6 +4557,15 @@
           "scripts/tests/compiled-gate-profiles.test.py": "ee97f2fe5a133be092bf5ee903d4e373064b5c93f848da17982900e1cd7ba3de"
         },
         "scope": "Original real-filesystem publication replacement and copy controls bind final bytes and inode identities to the verified held descriptors.",
+        "qualified": false
+      },
+      "current_continuity": {
+        "update_ref": "#/current_updates/32",
+        "review": {
+          "path": "target/recovery-pr/current-review-followup/p1-integration-20261009/host-compiler-gate/distinct-artifact-reconciliation/root-review.json",
+          "sha256": "ab095f271acb86e2689aa05da6f16c5a7e2e136d0c58c0f8e23522bda19884f9"
+        },
+        "scope": "Current root-reviewed reconciliation delta preserves the original causal closure only. Original successor source and evidence pins are unchanged.",
         "qualified": false
       }
     },
@@ -5079,6 +5106,15 @@
           "scripts/tests/compiled-gate-profiles.test.py": "ee97f2fe5a133be092bf5ee903d4e373064b5c93f848da17982900e1cd7ba3de"
         },
         "scope": "The exact Cargo credential filename is metadata-only across auditor, recorder, builder and collector; original no-open, no-hash, no-follow and archive-exclusion controls pass.",
+        "qualified": false
+      },
+      "current_continuity": {
+        "update_ref": "#/current_updates/32",
+        "review": {
+          "path": "target/recovery-pr/current-review-followup/p1-integration-20261009/host-compiler-gate/distinct-artifact-reconciliation/root-review.json",
+          "sha256": "ab095f271acb86e2689aa05da6f16c5a7e2e136d0c58c0f8e23522bda19884f9"
+        },
+        "scope": "Current root-reviewed reconciliation delta preserves the original causal closure only. Original successor source and evidence pins are unchanged.",
         "qualified": false
       }
     },
@@ -10715,6 +10751,28 @@
       },
       "current_status_changes": true,
       "counts_changed": true,
+      "qualified": false
+    },
+    {
+      "at_utc": "2026-10-10T04:44:41.544598+00:00",
+      "findings": [
+        "CR-01",
+        "CR-02",
+        "CR-03",
+        "QP-SECRET-01"
+      ],
+      "commit": "c2548381b636cc9685d47ae1e59c000119c437a3",
+      "review": {
+        "path": "target/recovery-pr/current-review-followup/p1-integration-20261009/host-compiler-gate/distinct-artifact-reconciliation/root-review.json",
+        "sha256": "ab095f271acb86e2689aa05da6f16c5a7e2e136d0c58c0f8e23522bda19884f9"
+      },
+      "source_sha256": {
+        "scripts/record-rust-compilation.py": "4589568e169a07603f5c694f6f91ec7968b273354a34fa7bc2aa2b92d07f5103",
+        "scripts/tests/record-rust-compilation.test.py": "0fbea8b3cd5c2b828b7e171dc413d6af91db88528c488514aab01531a4d237d8"
+      },
+      "scope": "Root reviewed and tested the shared-artifact reconciliation repair. All original causal checks remain passing within the 128-test owning suite in both Python modes, with two existing Linux-only skips each. Each original batch is still checked and repeated artifact declarations must agree before one physical observation. Prior source/evidence pins remain historical. Fresh contracts producer acceptance is still pending.",
+      "current_status_changes": false,
+      "counts_changed": false,
       "qualified": false
     }
   ],
