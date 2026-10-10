@@ -10,6 +10,14 @@ use chio_process::ProcessRuntime;
 use chio_security_types::recovery::*;
 use std::sync::{Arc, OnceLock};
 
+type CommandFuture<'a> = std::pin::Pin<
+    Box<
+        dyn std::future::Future<Output = Result<RecoveryCommandResultV1, RecoveryRuntimeError>>
+            + Send
+            + 'a,
+    >,
+>;
+
 #[path = "runtime/native_work.rs"]
 mod native_work;
 
@@ -177,13 +185,16 @@ impl RecoveryRuntime {
         &'a self,
         capability: &'a CapabilityToken,
         command: &'a RecoveryCommandV1,
-    ) -> std::pin::Pin<
-        Box<
-            dyn std::future::Future<Output = Result<RecoveryCommandResultV1, RecoveryRuntimeError>>
-                + Send
-                + 'a,
-        >,
-    > {
+    ) -> CommandFuture<'a> {
+        self.execute_command_with_admission(capability, command, None)
+    }
+
+    pub(super) fn execute_command_with_admission<'a>(
+        &'a self,
+        capability: &'a CapabilityToken,
+        command: &'a RecoveryCommandV1,
+        admission: Option<super::transport::NativeWorkPermit>,
+    ) -> CommandFuture<'a> {
         let fixed_time = chio_kernel::fixed_runtime_unix_secs_for_current_thread();
         Box::pin(async move {
             let wire = chio_core_types::canonical_json_bytes(command)
@@ -195,8 +206,12 @@ impl RecoveryRuntime {
             let runtime = self.clone();
             let capability = capability.clone();
             let command = command.clone();
-            let work =
-                async move { Box::pin(runtime.execute_command_inner(&capability, &command)).await };
+            let work = async move {
+                // Accepted work owns HTTP admission through completion or unwind,
+                // even if the caller stops awaiting its reply.
+                let _admission = admission;
+                Box::pin(runtime.execute_command_inner(&capability, &command)).await
+            };
             native_work::execute(principal, fixed_time, work).await
         })
     }
@@ -205,11 +220,7 @@ impl RecoveryRuntime {
         capability: &CapabilityToken,
         command: &RecoveryCommandV1,
     ) -> Result<RecoveryCommandResultV1, RecoveryRuntimeError> {
-        let wire = chio_core_types::canonical_json_bytes(command)
-            .map_err(|_| RecoveryRuntimeError::InvalidCommand)?;
-        let _: RecoveryCommandV1 =
-            decode_contract(&wire).map_err(|_| RecoveryRuntimeError::InvalidCommand)?;
-        let permission = permission(&command.command);
+        let permission = super::command_permission(&command.command);
         let actor = self
             .kernel
             .authenticate_recovery_actor(&self.scope, capability, permission)
@@ -509,17 +520,6 @@ impl RecoveryRuntime {
             return Err(RecoveryRuntimeError::AuthorityDenied);
         }
         Ok(())
-    }
-}
-fn permission(body: &RecoveryCommandBodyV1) -> RecoveryPermission {
-    match body {
-        RecoveryCommandBodyV1::CreateWorkflow { .. } => RecoveryPermission::Create,
-        RecoveryCommandBodyV1::InspectWorkflow { .. } => RecoveryPermission::Inspect,
-        RecoveryCommandBodyV1::SelectOffer { .. } => RecoveryPermission::Select,
-        RecoveryCommandBodyV1::SubmitApproval { .. } => RecoveryPermission::Approve,
-        RecoveryCommandBodyV1::ResumeWorkflow { .. } => RecoveryPermission::Resume,
-        RecoveryCommandBodyV1::CancelWorkflow { .. } => RecoveryPermission::Cancel,
-        RecoveryCommandBodyV1::ReportDecision { .. } => RecoveryPermission::Report,
     }
 }
 

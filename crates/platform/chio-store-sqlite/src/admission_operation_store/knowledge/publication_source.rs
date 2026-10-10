@@ -70,7 +70,7 @@ impl<'tx, 'conn> VerifiedKnowledgePublicationIntake<'tx, 'conn> {
             || self.record.seal.is_some()
             || self.record.certificate.is_some()
             || self.record.metadata.scope != *self.actor.scope()
-            || self.record.publication_principal.as_ref() != Some(self.actor.principal())
+            || &self.record.publication_principal != self.actor.principal()
             || self.record.installation_generation != current.generation
             || self.record.metadata.content != self.record.input.content
             || self.record.metadata.size_bytes != self.record.input.size_bytes

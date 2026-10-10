@@ -32,9 +32,7 @@ pub struct SemanticPlanV1 {
     pub domain_version: VersionV1,
     pub scope: RecoveryScopeV1,
     pub registry: SemanticRegistryDigest,
-    /// The predecessor's structural ceiling stays readable for already owned
-    /// captures. Fresh acceptance and capture enforce eight top-level steps.
-    pub steps: NonEmptyBoundedList<SemanticPlanStepV1, 16>,
+    pub steps: NonEmptyBoundedList<SemanticPlanStepV1, 8>,
 }
 impl SemanticPlanV1 {
     pub fn validate(&self) -> Result<(), ContractError> {

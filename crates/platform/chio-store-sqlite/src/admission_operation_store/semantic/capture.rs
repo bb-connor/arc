@@ -42,39 +42,6 @@ fn spent_key(
         evidence.as_str()
     ))
 }
-fn current_annotation_answers_required(
-    binding: &NativeSecurityAuthorityBindingV1,
-) -> Result<bool, AdmissionOperationStoreError> {
-    #[cfg(feature = "admission-test-support")]
-    {
-        Ok(!super::legacy_annotation_capture::selected(
-            binding.store_uuid().as_str(),
-        )?)
-    }
-    #[cfg(not(feature = "admission-test-support"))]
-    {
-        let _ = binding;
-        Ok(true)
-    }
-}
-
-fn current_status_audience_required(
-    binding: &NativeSecurityAuthorityBindingV1,
-    request: &ToolCallRequest,
-) -> Result<bool, AdmissionOperationStoreError> {
-    #[cfg(feature = "admission-test-support")]
-    {
-        Ok(!super::legacy_status_capture::selected(
-            binding.store_uuid().as_str(),
-            request,
-        )?)
-    }
-    #[cfg(not(feature = "admission-test-support"))]
-    {
-        let _ = (binding, request);
-        Ok(true)
-    }
-}
 /// Only the owning first-input writer constructs this borrowed observation.
 /// Every supplied snapshot and original binding is independently checked below.
 pub(in crate::admission_operation_store) struct SemanticInputObservation<'a> {
@@ -284,7 +251,6 @@ pub(in crate::admission_operation_store) fn verify_input_tx(
                 .map(|status| &status.audience)
             {
                 Some(audience) => Some(audience.clone()),
-                None if !current_status_audience_required(observed.binding, request)? => None,
                 None => return Err(refused("semantic input status audience absent")),
             }
         } else {
@@ -488,71 +454,13 @@ fn verify_source_tx(
             .map(|grant| grant.body().target_label()),
         now_unix_ms: now,
     };
-    let annotations_required = current_annotation_answers_required(binding)?;
-    let status_audience_required = current_status_audience_required(binding, request)?;
     let before_input = matches!(&phase, SourcePhase::BeforeInput { .. });
-    #[cfg(feature = "admission-test-support")]
-    let verified = {
-        if !annotations_required && !status_audience_required {
-            return Err(refused("legacy capture models cannot be combined"));
-        }
-        if before_input {
-            let input = if !status_audience_required {
-                verify_modeled_legacy_input_restrictions(
-                    &registry,
-                    &invocation,
-                    &expectation,
-                    &mut budget,
-                    ModeledSemanticInputProfileV1::MissingStatus,
-                )
-            } else if !annotations_required {
-                verify_modeled_legacy_input_restrictions(
-                    &registry,
-                    &invocation,
-                    &expectation,
-                    &mut budget,
-                    ModeledSemanticInputProfileV1::IncompleteAnnotations,
-                )
-            } else {
-                verify_semantic_input_restrictions(
-                    &registry,
-                    &invocation,
-                    &expectation,
-                    &mut budget,
-                )
-            };
-            input.map(SemanticSourceFacts::Input)
-        } else {
-            let captured = if !status_audience_required {
-                verify_modeled_legacy_missing_withheld_status(
-                    &registry,
-                    &invocation,
-                    &expectation,
-                    &mut budget,
-                )
-            } else if !annotations_required {
-                verify_modeled_legacy_incomplete_annotations(
-                    &registry,
-                    &invocation,
-                    &expectation,
-                    &mut budget,
-                )
-            } else {
-                verify_semantic_invocation(&registry, &invocation, &expectation, &mut budget)
-            };
-            captured.map(SemanticSourceFacts::Captured)
-        }
-    };
-    #[cfg(not(feature = "admission-test-support"))]
-    let verified = {
-        let _ = status_audience_required;
-        if before_input {
-            verify_semantic_input_restrictions(&registry, &invocation, &expectation, &mut budget)
-                .map(SemanticSourceFacts::Input)
-        } else {
-            verify_semantic_invocation(&registry, &invocation, &expectation, &mut budget)
-                .map(SemanticSourceFacts::Captured)
-        }
+    let verified = if before_input {
+        verify_semantic_input_restrictions(&registry, &invocation, &expectation, &mut budget)
+            .map(SemanticSourceFacts::Input)
+    } else {
+        verify_semantic_invocation(&registry, &invocation, &expectation, &mut budget)
+            .map(SemanticSourceFacts::Captured)
     };
     let verified = verified.map_err(refused)?;
     let acl = invocation.audience.body();
@@ -567,20 +475,16 @@ fn verify_source_tx(
     }
     verify_materialized_plan(tx, &invocation, &mut budget)?;
     verify_current_prerequisites(tx, &invocation, now, &mut budget)?;
-    let input_annotation_floor = if annotations_required {
-        if before_input
-            && invocation.action.output == SemanticOutputDispositionV1::Withhold
-            && contract.withheld_status.is_some()
-        {
-            let current =
-                annotations::assess_current_annotations(tx, &invocation, route, now, &mut budget)?;
-            input_refused |= current.basis_changed;
-            current.basis_changed.then_some(current.restriction_floor)
-        } else {
-            annotations::verify_current_annotations(tx, &invocation, route, now, &mut budget)?;
-            None
-        }
+    let input_annotation_floor = if before_input
+        && invocation.action.output == SemanticOutputDispositionV1::Withhold
+        && contract.withheld_status.is_some()
+    {
+        let current =
+            annotations::assess_current_annotations(tx, &invocation, route, now, &mut budget)?;
+        input_refused |= current.basis_changed;
+        current.basis_changed.then_some(current.restriction_floor)
     } else {
+        annotations::verify_current_annotations(tx, &invocation, route, now, &mut budget)?;
         None
     };
     if load::<NativeSemanticCaptureRecordV1>(
@@ -817,15 +721,13 @@ impl SqliteAdmissionOperationStore {
             now,
         )?;
         materialization::verify_dispatch_prerequisites(&tx, &record, now)?;
-        if current_annotation_answers_required(&record.native_authority)? {
-            annotations::verify_current_annotations(
-                &tx,
-                &record.invocation,
-                &record.route,
-                now,
-                &mut VerificationBudget::new(4096).map_err(refused)?,
-            )?;
-        }
+        annotations::verify_current_annotations(
+            &tx,
+            &record.invocation,
+            &record.route,
+            now,
+            &mut VerificationBudget::new(4096).map_err(refused)?,
+        )?;
         let acl = record.invocation.audience.body();
         let current = current_audience(&tx, acl)?.ok_or_else(|| refused("ACL absent"))?;
         if current != record.invocation.audience || now >= acl.valid_until_unix_ms.get() {

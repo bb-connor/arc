@@ -9,11 +9,11 @@ async fn semantic_recorded_return_child() -> TestResult {
         std::env::var_os("CHIO_RECOVERY_CRASH_ROOT").ok_or("semantic child root absent")?,
     );
     let f = RecoveryFixture::open(path, None, false)?;
-    let store = f.authority.admission_operation_store();
-    let legacy_capture = store.modeled_legacy_incomplete_annotation_capture_for_test()?;
     let key = "recorded-semantic-return";
-    let (runtime, request, profile) = prepare(&f, key, SemanticOutputDispositionV1::ReturnValue)?;
-    assert!(profile.invocation.annotations.as_slice().is_empty());
+    let (runtime, mut request, mut profile) =
+        prepare(&f, key, SemanticOutputDispositionV1::ReturnValue)?;
+    attach_neutral_annotation(&f, &mut request, &mut profile)?;
+    assert_eq!(profile.invocation.annotations.as_slice().len(), 1);
     assert_eq!(
         profile.deployment.body().routes.as_slice()[0]
             .annotators
@@ -21,7 +21,6 @@ async fn semantic_recorded_return_child() -> TestResult {
             .len(),
         1
     );
-    let legacy_input = store.modeled_legacy_semantic_input_floor_for_test(&request)?;
     std::fs::write(
         f.path.join("semantic-recorded-return-request.json"),
         chio_core::canonical_json_bytes(&request)?,
@@ -29,8 +28,6 @@ async fn semantic_recorded_return_child() -> TestResult {
     runtime
         .execute_step(&f.process, "root", key, &request)
         .await?;
-    drop(legacy_input);
-    drop(legacy_capture);
     Err("semantic child did not reach the recorded-return cutpoint".into())
 }
 
@@ -110,7 +107,7 @@ async fn native_recorded_semantic_return_settles_after_selection_rotation_withou
         original_request = retained.canonical_bytes().to_vec();
         let invocation: SemanticInvocationV1 = serde_json::from_value(request.arguments.clone())?;
         scope = invocation.action.scope.clone();
-        assert!(invocation.annotations.as_slice().is_empty());
+        assert_eq!(invocation.annotations.as_slice().len(), 1);
         let mut selected =
             store.read_semantic_installation(&scope, &authority.mutation_fence(), now_ms()?)?;
         let (fixture, _) =
@@ -182,7 +179,7 @@ async fn native_recorded_semantic_return_settles_after_selection_rotation_withou
             || result
                 .as_ref()
                 .is_ok_and(|response| response.verdict == Verdict::Deny),
-        "unknown historical annotations cannot authorize current raw disclosure"
+        "changed semantic selection cannot authorize current raw disclosure"
     );
     let unchanged = store
         .load_by_operation_id(&operation_id)?

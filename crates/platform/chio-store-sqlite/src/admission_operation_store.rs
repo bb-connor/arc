@@ -127,13 +127,12 @@ pub use product::{StoredDecisionReportV1, StoredPolicyMaintenanceProposalV1};
 #[cfg(feature = "admission-test-support")]
 pub use recovery::command_quota_test_support::{
     apply_recovery_quota_fixture_inspections, apply_recovery_quota_fixture_resumptions,
-    checkpoint_recovery_quota_fixture_wal, construct_recovery_quota_fixture_legacy_format,
-    fill_recovery_quota_fixture_intake_bytes, fill_recovery_quota_fixture_intake_events,
-    fill_recovery_quota_fixture_settlement_events, grow_recovery_quota_fixture_retained_history,
+    checkpoint_recovery_quota_fixture_wal, fill_recovery_quota_fixture_intake_bytes,
+    fill_recovery_quota_fixture_intake_events, fill_recovery_quota_fixture_settlement_events,
+    grow_recovery_quota_fixture_retained_history,
     grow_recovery_quota_fixture_uncheckpointed_history, observe_recovery_quota_fixture_clock_work,
     observe_recovery_quota_fixture_errors, recovery_quota_fixture_finalized_shape,
-    retain_recovery_quota_fixture_legacy_inspections, retain_recovery_quota_fixture_records,
-    RecoveryClockWorkFixtureObservation, RecoveryLegacyQuotaFixtureScope,
+    retain_recovery_quota_fixture_records, RecoveryClockWorkFixtureObservation,
     RecoveryQuotaFixtureDiagnostic, RecoveryQuotaFixtureDiagnosticScope,
     RecoveryQuotaFixtureRecord,
 };
@@ -144,11 +143,6 @@ pub use recovery::legacy_audience_test_support::{
 };
 #[cfg(feature = "admission-test-support")]
 pub use recovery::legacy_history_test_support::retain_unadmitted_legacy_recovery_fixture;
-#[cfg(feature = "admission-test-support")]
-pub use recovery::legacy_planning_test_support::{
-    construct_recovery_planning_fixture_legacy_format,
-    retain_recovery_planning_fixture_legacy_revisions, RecoveryLegacyPlanningFixtureScope,
-};
 mod semantic;
 mod setup;
 pub use semantic::{
@@ -270,7 +264,7 @@ pub use security_participant_migration::{
 };
 
 const ADMISSION_OPERATION_SCHEMA_KEY: &str = "admission_operation";
-pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 40;
+pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 42;
 const ADMISSION_OPERATION_SCHEMA_ANCHORS: &[&str] = &[
     "admission_operations",
     "admission_operation_commits",

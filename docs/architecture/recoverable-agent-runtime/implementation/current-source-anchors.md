@@ -4,7 +4,7 @@ Observed October 7, 2026. This is a source-only correction, not implementation o
 
 ## Advisory explanation claims
 
-The retained [explanation operations record](p2/OPERATIONS.md) describes its historical implementation. Use these current meanings when reading that record or its [coverage anchors](p2/requirements-coverage.json).
+The retained [explanation operations record](history/README.md) describes its historical implementation. Use these current meanings when reading that record or its [coverage anchors](history/README.md).
 
 | Retained claim | Current meaning and source |
 |---|---|
@@ -18,7 +18,7 @@ Historical `recovery_p2_` symbols route to current `recovery_` symbols in the sa
 
 ## Authority contract anchors
 
-The retained [authority coverage record](p1/requirements-coverage.json) and later references to it use renamed anchors. These are current source correspondences for REC-05 and REC-22.
+The retained [authority coverage record](history/README.md) and later references to it use renamed anchors. These are current source correspondences for REC-05 and REC-22.
 
 | Retained path and symbol | Current path and symbol |
 |---|---|
@@ -32,7 +32,7 @@ The retained [authority coverage record](p1/requirements-coverage.json) and late
 
 ## Semantic contract anchors
 
-The retained [semantic coverage record](p3/requirements-coverage.json) has these current source correspondences. Duplicate references to the same source and symbol share one row.
+The retained [semantic coverage record](history/README.md) has these current source correspondences. Duplicate references to the same source and symbol share one row.
 
 | Retained path and symbol | Current path and symbol |
 |---|---|

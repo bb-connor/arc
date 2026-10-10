@@ -7,6 +7,15 @@ use chio_security_types::ports::{BoundedVec, FlowJoinRequest, FlowStateSnapshot}
 mod command;
 use command::Command;
 
+/// Borrowed original admission context shared by raw and classified flow joins.
+struct NativeFlowJoinContext<'a> {
+    operation: &'a AdmissionOperationV1,
+    lease: &'a AdmissionRecoveryLease,
+    initialized: &'a SecurityParticipantStateInitialization,
+    context: &'a SecurityInvocationContext,
+    trusted_now_unix_ms: u64,
+}
+
 struct JoinedNativeCommand {
     record: history::Record,
     refused: bool,
@@ -81,13 +90,15 @@ impl SqliteAdmissionOperationStore {
         trusted_now_unix_ms: u64,
     ) -> Result<FlowStateSnapshot, AdmissionOperationStoreError> {
         self.join_native_command(
-            operation,
-            lease,
-            initialized,
-            context,
+            NativeFlowJoinContext {
+                operation,
+                lease,
+                initialized,
+                context,
+                trusted_now_unix_ms,
+            },
             Command::Raw(request),
             None,
-            trusted_now_unix_ms,
         )
         .map(|joined| joined.record.result)
     }
@@ -105,13 +116,15 @@ impl SqliteAdmissionOperationStore {
         AdmissionOperationStoreError,
     > {
         self.join_native_command(
-            operation,
-            lease,
-            initialized,
-            context,
+            NativeFlowJoinContext {
+                operation,
+                lease,
+                initialized,
+                context,
+                trusted_now_unix_ms,
+            },
             Command::Input(input),
             None,
-            trusted_now_unix_ms,
         )?
         .record
         .input_record(initialized)
@@ -128,13 +141,15 @@ impl SqliteAdmissionOperationStore {
         AdmissionOperationStoreError,
     > {
         let joined = self.join_native_command(
-            classification.operation(),
-            classification.lease(),
-            initialized,
-            classification.context(),
+            NativeFlowJoinContext {
+                operation: classification.operation(),
+                lease: classification.lease(),
+                initialized,
+                context: classification.context(),
+                trusted_now_unix_ms: classification.trusted_now_unix_ms(),
+            },
             Command::Input(classification.input()),
             Some(classification),
-            classification.trusted_now_unix_ms(),
         )?;
         let record = joined.record.input_record(initialized)?;
         if joined.refused {
@@ -146,16 +161,19 @@ impl SqliteAdmissionOperationStore {
 
     fn join_native_command(
         &self,
-        operation: &AdmissionOperationV1,
-        lease: &AdmissionRecoveryLease,
-        initialized: &SecurityParticipantStateInitialization,
-        context: &SecurityInvocationContext,
+        original_context: NativeFlowJoinContext<'_>,
         command: Command<'_>,
         classification: Option<
             &chio_kernel::admission_operation::NativeSecurityInputClassificationAuthority<'_>,
         >,
-        trusted_now_unix_ms: u64,
     ) -> Result<JoinedNativeCommand, AdmissionOperationStoreError> {
+        let NativeFlowJoinContext {
+            operation,
+            lease,
+            initialized,
+            context,
+            trusted_now_unix_ms,
+        } = original_context;
         let mut connection = self.connection()?;
         let tx = self.begin_write(&mut connection, Some(lease.store_fence()))?;
         observed_time(&tx, trusted_now_unix_ms)?;
@@ -294,32 +312,22 @@ impl SqliteAdmissionOperationStore {
             )?;
             if let Some(witness) = &assessment {
                 refused = witness.is_refused();
-                #[cfg(feature = "admission-test-support")]
-                let modeled_predecessor =
-                    super::super::semantic::modeled_legacy_input_floor_selected(
-                        &lease.store_fence().store_uuid,
-                        &original,
-                    )?;
-                #[cfg(not(feature = "admission-test-support"))]
-                let modeled_predecessor = false;
-                if !modeled_predecessor {
-                    let mut floor = witness.restriction_floor().clone();
-                    if let Some(status) = witness.withheld_status_audience() {
-                        floor = floor.join_restrictions(status).map_err(invalid)?;
-                    }
-                    request.principal_join = request
-                        .principal_join
-                        .join_restrictions(&floor)
-                        .map_err(invalid)?;
-                    request.lineage_join = request
-                        .lineage_join
-                        .join_restrictions(&floor)
-                        .map_err(invalid)?;
-                    request.session_join = request
-                        .session_join
-                        .join_restrictions(&floor)
-                        .map_err(invalid)?;
+                let mut floor = witness.restriction_floor().clone();
+                if let Some(status) = witness.withheld_status_audience() {
+                    floor = floor.join_restrictions(status).map_err(invalid)?;
                 }
+                request.principal_join = request
+                    .principal_join
+                    .join_restrictions(&floor)
+                    .map_err(invalid)?;
+                request.lineage_join = request
+                    .lineage_join
+                    .join_restrictions(&floor)
+                    .map_err(invalid)?;
+                request.session_join = request
+                    .session_join
+                    .join_restrictions(&floor)
+                    .map_err(invalid)?;
             }
             #[cfg(feature = "admission-test-support")]
             {

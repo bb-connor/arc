@@ -116,7 +116,8 @@ class QualificationAuditTest(unittest.TestCase):
                     ".txz", ".tar.zst", ".tzst", ".zip", ".7z")
         prefixes = ("docs/integrations/acceptance", *(
             f"docs/architecture/recoverable-agent-runtime/implementation/p{number}/evidence"
-            for number in range(7)), "sdks/python/chio-hermes/evidence", "audits/evidence",
+            for number in range(7)), "docs/architecture/recoverable-agent-runtime/implementation/history",
+            "sdks/python/chio-hermes/evidence", "audits/evidence",
             "docs/integrations/session-credentials/evidence", "docs/evidence",
             "docs/research/openappa-2026-10-01/evidence", "labs/openappa-recovery/evidence",
             "formal/mutation/evidence")
@@ -1250,6 +1251,49 @@ class QualificationAuditTest(unittest.TestCase):
             immutable_scope={"scope_id":"5"*64,"path":image["path"],"sha256":image["sha256"]})
         with self.assertRaisesRegex(ValueError,"^qualification.compiled_profile_immutable_producer$"):
             self.audit.compiler_immutable_externs(rows[1:],[image])
+
+    def test_original_host_inspector_requires_recorded_toolchain_evidence_for_cached_extern(self):
+        # Exercise the original namespace entry point. These parser artifacts
+        # establish neither actual compiler execution nor native confinement.
+        with tempfile.TemporaryDirectory() as temporary,tempfile.TemporaryDirectory() as cache:
+            fixture = self.compiler_profile_request_bundle(Path(temporary).resolve())
+            library = Path(cache).resolve()/"project.rlib"
+            payload = b"synthetic cached project image\n"
+            library.write_bytes(payload)
+            digest = hashlib.sha256(payload).hexdigest()
+            (fixture["namespace"]/"artifacts"/digest).write_bytes(payload)
+            image = {"path":str(library),"sha256":digest,"size":len(payload)}
+            external = {**image,"role":"extern","artifact":"artifacts/"+digest,
+                "origin":"declared-immutable-scope","immutable_scope":{
+                    "scope_id":"5"*64,"path":str(library),"sha256":digest}}
+            row = fixture["row"]
+            row["inputs"].append(external)
+            row["semantics"]["native_scope"] = {"scope_id":"5"*64}
+            fixture["request"]["additional_inputs"] = [{**image,"role":"toolchain"}]
+            fixture["request_path"].write_bytes(
+                self.audit.compilation_canonical(fixture["request"])+b"\n")
+
+            def publish_parser_record():
+                raw = self.audit.compilation_canonical(row)+b"\n"
+                fixture["record"].write_bytes(raw)
+                marker = json.loads(fixture["marker"].read_bytes())
+                marker.update(size=len(raw),record_sha256=hashlib.sha256(raw).hexdigest())
+                fixture["marker"].write_bytes(self.audit.compilation_canonical(marker)+b"\n")
+
+            publish_parser_record()
+            with self.assertRaisesRegex(ValueError,"^qualification.compiled_profile_immutable_producer$"):
+                self.audit.inspect_compiler_profile_request(fixture["request_path"])
+            # The conservative host path remains available only with its own
+            # recorded image. A caller-supplied native scope supplies no credit.
+            del row["semantics"]["native_scope"]
+            external.pop("immutable_scope")
+            external.pop("origin")
+            row["inputs"].append({**image,"role":"toolchain","artifact":"artifacts/"+digest,
+                "coverage":"conservative-toolchain-scope"})
+            publish_parser_record()
+            report = self.audit.inspect_compiler_profile_request(fixture["request_path"])
+            self.assertEqual(report["profile"]["unit_graph"]["immutable_extern_edges"],1)
+            self.assertFalse(report["qualified"])
 
     def test_compiled_images_remain_bound_until_the_aggregate_returns(self):
         with tempfile.TemporaryDirectory() as temporary:

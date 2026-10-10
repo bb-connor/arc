@@ -29,15 +29,6 @@ pub(in crate::admission_operation_store) fn prepare_reference_retain<'tx, 'conn>
             retain_heads(state, &mut heads);
             continue;
         }
-        if matches!(source.owner(), ReferenceOwner::LegacyPinSource { .. }) {
-            return Err(refused("legacy reference owner requires its cold cohort"));
-        }
-        if matches!(
-            &state.aggregate.value.inventory,
-            ReferenceInventory::LegacyOverflow { .. }
-        ) {
-            return Err(refused("legacy reference overflow refuses fresh intake"));
-        }
         let identity = reference_identity(&reference)?;
         let owner_identity = source.owner().identity(identity)?;
         let scope = scope_key(&reference.scope)?;
@@ -49,7 +40,7 @@ pub(in crate::admission_operation_store) fn prepare_reference_retain<'tx, 'conn>
             reference: reference.clone(),
             owner: source.owner().clone(),
             original,
-            location: ReferenceLocation::Bucket { bucket },
+            bucket,
             state: ReferenceOwnerState::Active,
             retirement: None,
         };
@@ -102,12 +93,7 @@ pub(in crate::admission_operation_store) fn prepare_reference_retirement<'tx, 'c
         }
         let identity = reference_identity(&reference)?;
         let owner_identity = source.owner().identity(identity)?;
-        if matches!(
-            &state.aggregate.value.inventory,
-            ReferenceInventory::Regular { .. }
-        ) {
-            retire_bucket(&reference, owner_identity, &mut state, &mut writes)?;
-        }
+        retire_bucket(&reference, owner_identity, &mut state, &mut writes)?;
         leaf.value.state = ReferenceOwnerState::Retired;
         leaf.value.retirement = Some(SourceAnchor::capture(source.source()));
         leaf.value.validate(next_version(&leaf.head)?)?;
@@ -174,12 +160,10 @@ fn retain_bucket(
             "reference monotone bucket ordinal was already consumed",
         ));
     }
-    let ReferenceInventory::Regular { active_buckets } = &state.aggregate.value.inventory else {
-        return Err(refused("legacy reference overflow cannot allocate buckets"));
-    };
+    let active_buckets = &state.aggregate.value.inventory.active_buckets;
     let mut inventory = active_buckets.as_slice().to_vec();
     inventory.push(bucket);
-    state.aggregate.value.inventory = ReferenceInventory::Regular {
+    state.aggregate.value.inventory = ReferenceInventory {
         active_buckets: BoundedList::new(inventory).map_err(refused)?,
     };
     state.aggregate.value.next_bucket = increment(bucket)?;
@@ -208,13 +192,10 @@ fn retire_bucket(
     owners.retain(|candidate| *candidate != owner);
     if owners.is_empty() {
         bucket.value.state = BucketState::Retired;
-        let ReferenceInventory::Regular { active_buckets } = &state.aggregate.value.inventory
-        else {
-            return Err(refused("reference regular membership became overflow"));
-        };
+        let active_buckets = &state.aggregate.value.inventory.active_buckets;
         let mut inventory = active_buckets.as_slice().to_vec();
         inventory.retain(|id| *id != bucket.value.bucket);
-        state.aggregate.value.inventory = ReferenceInventory::Regular {
+        state.aggregate.value.inventory = ReferenceInventory {
             active_buckets: BoundedList::new(inventory).map_err(refused)?,
         };
     }

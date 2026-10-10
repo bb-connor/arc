@@ -16,8 +16,6 @@ serde = { version = "1", default-features = false, features = ["derive", "alloc"
 [features]
 default = []
 std = ["chio-core-types/std", "chio-security-types/std", "serde/std"]
-# Modeled predecessor compatibility fixtures only, never selected by wire data.
-admission-test-support = []
 
 [dev-dependencies]
 serde_json = { workspace = true }

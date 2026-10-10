@@ -33,11 +33,10 @@ pub(in crate::admission_operation_store) use knowledge_encoding::persist_knowled
 pub(in crate::admission_operation_store) use knowledge_encoding::retain_restore_extra_ordinal_fixture;
 pub(in crate::admission_operation_store) use logical_reference::{
     bind_product_reference_source, initialize_knowledge_reference_account,
-    persist_knowledge_new_artifact_reference_baseline, persist_knowledge_reference_cold_baseline,
-    persist_knowledge_reference_progress, persist_knowledge_reference_ready,
+    persist_knowledge_new_artifact_reference_baseline, persist_knowledge_reference_progress,
     persist_knowledge_reference_retain, persist_knowledge_reference_retirement,
     persist_product_reference_retirement, reserve_product_reference_intake,
-    ReservedProductReferenceIntake, VerifiedKnowledgeReferenceColdProgress,
+    verify_knowledge_reference_account, ReservedProductReferenceIntake,
     VerifiedParticipantAllowance,
 };
 pub(in crate::admission_operation_store) use original_owner::{
@@ -62,8 +61,6 @@ pub(in crate::admission_operation_store) use finalized_record_shape::{
 };
 #[cfg(feature = "admission-test-support")]
 pub(super) use foreign_fixture_admission::fill_intake_events as fill_fixture_intake_events;
-#[cfg(feature = "admission-test-support")]
-pub(super) use workflow_reservations::save_legacy_inspection;
 use workflow_reservations::verify_native_archive_allocations;
 pub(in crate::admission_operation_store) use workflow_reservations::{
     auxiliary_captured_release, auxiliary_captured_terminal, auxiliary_historical_hold,
@@ -443,34 +440,6 @@ fn generic_pool(
         }
     }
     Err(invariant("protected record namespace or kind refused"))
-}
-
-#[cfg(feature = "admission-test-support")]
-pub(super) fn save_legacy_planning_fixture_profile(
-    tx: &Transaction<'_>,
-    owner: &SqliteServingOwner,
-    profile: &RecoveryDeploymentV1,
-) -> Result<(), AdmissionOperationStoreError> {
-    if !super::legacy_planning_test_support::constructing_legacy_planning(tx, owner, true)? {
-        return Err(invariant("legacy planning construction is not active"));
-    }
-    validate_deployment(profile, &owner.fence)?;
-    let scope = scope_key(&profile.scope)?;
-    let current = deployment_tx(tx, &profile.scope)?;
-    if current.native_authority != profile.native_authority
-        || current.security_context != profile.security_context
-    {
-        return Err(invariant("legacy planning fixture native owner changed"));
-    }
-    persist_record(
-        tx,
-        owner,
-        &format!("deployment:{scope}"),
-        &scope,
-        "deployment",
-        &encode(profile)?,
-        None,
-    )
 }
 
 fn persist_record(

@@ -96,10 +96,14 @@ impl ProcessRuntime {
         &self,
         reservation: &RecoveryCallReservation,
     ) -> Result<(), ProcessError> {
-        if reservation.runtime_id != self.namespace
-            || reservation.request_id
-                != self.request_id(&reservation.process_id, &reservation.operation_key)?
-            || reservation.host_binding != self.recovery_host_binding(&reservation.server_id)?
+        if reservation.data.runtime_id != self.namespace
+            || reservation.data.request_id
+                != self.request_id(
+                    &reservation.data.process_id,
+                    &reservation.data.operation_key,
+                )?
+            || reservation.data.host_binding
+                != self.recovery_host_binding(&reservation.data.server_id)?
         {
             return Err(ProcessError::Conflict);
         }

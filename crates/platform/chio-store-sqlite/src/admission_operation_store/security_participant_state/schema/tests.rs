@@ -13,7 +13,7 @@ fn recorded_admission_versions_preserve_native_catalog_and_refuse_future() -> Te
     connection.execute_batch(&sql()?)?;
     let native_catalog = catalog(&connection)?;
     let native_digest = digest_version(29)?;
-    for version in 29..=40 {
+    for version in (29..=40).chain([ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION]) {
         connection.execute(
             "UPDATE chio_store_schema_versions SET version=?1 WHERE store_key='admission_operation'",
             [version],

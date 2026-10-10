@@ -194,7 +194,7 @@ pub(in crate::admission_operation_store::knowledge) fn acknowledge_collection(
     // Historical content-addressed storage can have several original owners.
     // Enumerate authentic sources without a lifetime bound or a count refund.
     let mut found = false;
-    super::super::publication_census::visit_publication_sources(tx, scope, |record, _| {
+    super::super::publication_catalog::visit_publication_sources(tx, scope, |record, _| {
         if record.metadata.scope == *scope && record.seal.as_ref() == Some(seal) {
             retire_one(tx, owner, record)?;
             found = true;

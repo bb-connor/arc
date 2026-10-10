@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 35f8e30cf30553986a159b074ee485804a85db29547a8102522cd7bfa3080d2e
+# Schema sha256: d2b29cbbc9a0070d3666a33fd5a06bbda07a8e70f6d54bf33c15ca8b74893ff9
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -139,29 +139,3 @@ class RecoveryCommandResponseV1(BaseModel):
     control: RecoveryCommandResponseControl
     effect: RecoveryEffectNeverAdmittedV1 | RecoveryEffectAdmissionUnresolvedV1 | RecoveryEffectClosedBeforeEffectV1 | RecoveryEffectAwaitingApprovalV1 | RecoveryEffectInFlightV1 | RecoveryEffectAwaitingCallerReportV1 | RecoveryEffectUnknownV1 | RecoveryEffectCompleteV1 | RecoveryEffectPartialV1 | RecoveryEffectFailedAfterEffectV1
     release: RecoveryCommandResponseReleaseNotAvailable | RecoveryCommandResponseReleasePending | RecoveryCommandResponseReleaseWithheld | RecoveryCommandResponseReleaseReleased | RecoveryCommandResponseReleaseDenied
-
-# Public compatibility aliases reference the actual current model classes.
-Control = RecoveryCommandResponseControl
-Operation = RecoveryCommandResponseDefinitionsOperation
-RecoveryCommandResponseOpaqueId = OpaqueId
-RecoveryCommandResponseRecoveryDigest32 = RecoveryDigest32
-RecoveryCommandResponseRecoveryDigestOctet = RecoveryDigestOctet
-RecoveryCommandResponseRecoveryEffectAdmissionUnresolvedV1 = RecoveryEffectAdmissionUnresolvedV1
-RecoveryCommandResponseRecoveryEffectAwaitingApprovalV1 = RecoveryEffectAwaitingApprovalV1
-RecoveryCommandResponseRecoveryEffectAwaitingCallerReportV1 = RecoveryEffectAwaitingCallerReportV1
-RecoveryCommandResponseRecoveryEffectClosedBeforeEffectV1 = RecoveryEffectClosedBeforeEffectV1
-RecoveryCommandResponseRecoveryEffectCompleteV1 = RecoveryEffectCompleteV1
-RecoveryCommandResponseRecoveryEffectFailedAfterEffectV1 = RecoveryEffectFailedAfterEffectV1
-RecoveryCommandResponseRecoveryEffectInFlightV1 = RecoveryEffectInFlightV1
-RecoveryCommandResponseRecoveryEffectNeverAdmittedV1 = RecoveryEffectNeverAdmittedV1
-RecoveryCommandResponseRecoveryEffectPartialV1 = RecoveryEffectPartialV1
-RecoveryCommandResponseRecoveryEffectUnknownV1 = RecoveryEffectUnknownV1
-RecoveryCommandResponseSafeInteger = SafeInteger
-RecoveryDigest32Item = RecoveryDigestOctet
-RefusalCode = RecoveryCommandResponseDefinitionsRefusalCode
-Release = RecoveryCommandResponseReleaseNotAvailable
-Release1 = RecoveryCommandResponseReleasePending
-Release2 = RecoveryCommandResponseReleaseWithheld
-Release3 = RecoveryCommandResponseReleaseReleased
-Release4 = RecoveryCommandResponseReleaseDenied
-Scope = RecoveryCommandResponseDefinitionsScope

@@ -47,13 +47,7 @@ impl Fixture {
         let value = ReferenceCapacity {
             schema: ReferenceCapacitySchema::V1,
             account: ReferenceAccount::from_scope(&scope),
-            baseline: CapacityBaseline {
-                cutoff,
-                cohort_digest: CanonicalPayloadDigest::from_bytes([21; 32]),
-                census_digest: CanonicalPayloadDigest::from_bytes([22; 32]),
-                artifact_count: 1,
-                active_owners: 0,
-            },
+            cutoff,
             admitted: 0,
             retired: 0,
             batches: 0,
@@ -212,9 +206,9 @@ fn duplicate_current_reference_counter_global_reference_refuses_read_only() -> T
 fn reference_counter_projection_loss_cannot_initialize_zero() -> TestResult {
     let fixture = Fixture::new()?;
     fixture.advanced()?;
-    fixture
-        .connection
-        .execute_batch("DROP TRIGGER admission_operation_recovery_no_delete")?;
+    fixture.connection.execute_batch(
+        "PRAGMA foreign_keys=OFF; DROP TRIGGER admission_operation_recovery_no_delete",
+    )?;
     let (key, _) = identity(&fixture.scope)?;
     fixture.connection.execute(
         "DELETE FROM admission_operation_recovery_records WHERE record_key=?1",
@@ -226,16 +220,22 @@ fn reference_counter_projection_loss_cannot_initialize_zero() -> TestResult {
 }
 
 #[test]
-fn authenticated_current_reference_counter_retains_immutable_first_census() -> TestResult {
+fn authenticated_current_reference_counter_retains_its_initialization() -> TestResult {
     let fixture = Fixture::new()?;
     fixture.advanced()?;
     let mut value = load_capacity(&fixture.connection, &fixture.scope)?.0;
     value.admitted = 3;
     value.batches = 3;
-    value.baseline.cohort_digest = CanonicalPayloadDigest::from_bytes([99; 32]);
+    let (sequence, chain_digest): (i64, String) = fixture.connection.query_row(
+        "SELECT head_sequence,head_chain_digest FROM authority_global_commit_meta WHERE singleton=1",
+        [], |row| Ok((row.get(0)?, row.get(1)?)),
+    )?;
+    value.cutoff = serde_json::from_value(serde_json::json!({
+        "sequence": sequence, "chain_digest": hex::decode(chain_digest)?
+    }))?;
     fixture.append(&value)?;
     // The altered current frame is genuine in this isolated fixture. Its
-    // immutable first body still carries the original cohort.
+    // immutable first body still carries the original initialization.
     fixture.refuses();
     Ok(())
 }

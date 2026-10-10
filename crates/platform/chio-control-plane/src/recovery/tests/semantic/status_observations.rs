@@ -1,37 +1,6 @@
 //! Native status observations retain authored restrictions and external influence.
 use super::*;
 
-fn attach_neutral_annotation(
-    f: &RecoveryFixture,
-    request: &mut ToolCallRequest,
-    profile: &mut SemanticFixture,
-) -> TestResult<SignedSemanticAnnotationV1> {
-    let neutral = SignedSemanticAnnotationV1::sign(
-        SemanticAnnotationV1 {
-            domain_version: VersionV1,
-            scope: profile.plan.scope.clone(),
-            input: profile.invocation.action.inputs.as_slice()[0].clone(),
-            restrictions: InformationLabel::bottom(),
-            externally_influenced: false,
-            facts: BoundedList::new(vec![])?,
-            confidence_basis_points: SafeInteger::new(10_000)?,
-            issued_at_unix_ms: profile.invocation.action.issued_at_unix_ms,
-            valid_until_unix_ms: profile.invocation.action.valid_until_unix_ms,
-        },
-        &profile.annotator,
-    )?;
-    f.authority
-        .admission_operation_store()
-        .install_semantic_annotation(&neutral)?;
-    profile.invocation.action.influence = chio_semantic_contracts::semantic_annotated_influence(
-        profile.invocation.action.influence,
-        std::slice::from_ref(&neutral),
-    )?;
-    profile.invocation.annotations = BoundedList::new(vec![neutral.clone()])?;
-    request.arguments = serde_json::to_value(&profile.invocation)?;
-    Ok(neutral)
-}
-
 #[tokio::test]
 async fn native_current_selected_annotation_keeps_the_authored_withheld_status_audience(
 ) -> TestResult {

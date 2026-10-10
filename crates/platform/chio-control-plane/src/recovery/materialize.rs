@@ -240,12 +240,8 @@ impl RecoveryRuntime {
             .map_err(|_| RecoveryRuntimeError::Conflict)?;
         #[cfg(test)]
         super::test_cutpoint("reservation");
-        let data = serde_json::from_slice(
-            &canonical_json_bytes(&reservation).map_err(|_| RecoveryRuntimeError::Conflict)?,
-        )
-        .map_err(|_| RecoveryRuntimeError::Conflict)?;
         self.kernel
-            .acknowledge_recovery_reservation(actor, id, &data, &self.process)
+            .acknowledge_recovery_reservation(actor, id, reservation.identity(), &self.process)
             .map_err(|_| RecoveryRuntimeError::Unavailable)?;
         #[cfg(test)]
         super::test_cutpoint("reservation-attached");

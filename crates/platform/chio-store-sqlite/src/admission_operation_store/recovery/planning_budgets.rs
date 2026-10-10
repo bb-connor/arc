@@ -490,24 +490,6 @@ pub(super) fn save(
 
     // The default-off old-format constructor admits only its fresh fixed path,
     // same owner and bounded real writes. It suppresses new metadata only.
-    #[cfg(feature = "admission-test-support")]
-    if super::super::legacy_planning_test_support::constructing_legacy_planning(tx, owner, true)? {
-        let (bytes,events): (i64,i64) = tx.query_row(
-            "SELECT (SELECT coalesce(sum(length(payload)),0) FROM admission_operation_recovery_records),
-                (SELECT count(*) FROM admission_operation_recovery_events)", [], |row| Ok((row.get(0)?,row.get(1)?)),
-        ).map_err(sqlite_error)?;
-        let old = existing.as_ref().map_or(0, |row| row.payload.len() as u64);
-        let next = stored_u64(bytes, "legacy planning retained bytes")?
-            .checked_sub(old)
-            .and_then(|bytes| bytes.checked_add(payload.len() as u64));
-        if next.is_none_or(|bytes| bytes > GLOBAL_BYTES)
-            || stored_u64(events, "legacy planning retained events")? >= GLOBAL_EVENTS
-        {
-            return Err(invariant("recovery legacy retained resource exhausted"));
-        }
-        return persist_record(tx, owner, key, scope, kind, payload, None);
-    }
-
     let retained_global = peek(tx, &domain, None)?;
     let cutoff = match &retained_global {
         Some(global) => global.legacy_cutoff_sequence.get(),

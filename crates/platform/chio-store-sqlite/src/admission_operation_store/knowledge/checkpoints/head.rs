@@ -1,13 +1,12 @@
-//! Authenticated checkpoint history and identity-safe legacy resolution.
+//! Authenticated checkpoint history with framed, disjoint key domains.
 use super::*;
 
 pub(super) fn checkpoint_key(
     scope: &RecoveryScopeV1,
     id: &CheckpointId,
 ) -> Result<String, AdmissionOperationStoreError> {
-    // The format domain precedes the fixed scope digest, so these keys cannot
-    // alias legacy keys. Latest and history have distinct domains, and each
-    // opaque identifier is byte-length framed inside its domain.
+    // Latest and history have distinct domains. Each opaque identifier is
+    // byte-length framed, so a numeric suffix cannot alias another revision.
     Ok(format!(
         "knowledge-checkpoint:v2:latest:{}:{}:{}",
         scope_key(scope)?,
@@ -30,19 +29,6 @@ pub(super) fn checkpoint_revision_key(
         id.as_str().len(),
         id.as_str()
     ))
-}
-
-pub(super) fn legacy_checkpoint_key(
-    scope: &RecoveryScopeV1,
-    id: &CheckpointId,
-    revision: u64,
-) -> Result<String, AdmissionOperationStoreError> {
-    let key = format!("knowledge-checkpoint:{}:{}", scope_key(scope)?, id.as_str());
-    Ok(if revision == 0 {
-        key
-    } else {
-        format!("{key}:{revision}")
-    })
 }
 
 fn validate_checkpoint_identity(
@@ -69,11 +55,7 @@ pub(super) fn validate_record_key(
     let scope = &checkpoint.scope;
     let id = &checkpoint.checkpoint;
     let revision = checkpoint.revision.get();
-    if key != checkpoint_key(scope, id)?
-        && key != checkpoint_revision_key(scope, id, revision)?
-        && key != legacy_checkpoint_key(scope, id, 0)?
-        && key != legacy_checkpoint_key(scope, id, revision)?
-    {
+    if key != checkpoint_key(scope, id)? && key != checkpoint_revision_key(scope, id, revision)? {
         return Err(refused("checkpoint physical record identity"));
     }
     Ok(())
@@ -106,84 +88,10 @@ pub(super) fn load_checkpoint_with_key(
         return Ok(Some((checkpoint, key)));
     }
 
-    let legacy_key = legacy_checkpoint_key(scope, id, revision)?;
-    let Some(checkpoint) = load::<LabeledCheckpointV1>(tx, &legacy_key)? else {
-        return if revision == 0 {
-            highest_legacy_checkpoint(tx, scope, id)
-        } else {
-            Ok(None)
-        };
-    };
-    checkpoint.validate().map_err(refused)?;
-    if checkpoint.scope != *scope
-        || (legacy_key != legacy_checkpoint_key(scope, &checkpoint.checkpoint, 0)?
-            && legacy_key
-                != legacy_checkpoint_key(scope, &checkpoint.checkpoint, checkpoint.revision.get())?)
-    {
-        return Err(refused("legacy checkpoint key identity"));
-    }
-    // A valid legacy slot may be another checkpoint's latest or revision. It
-    // supplies neither a CAS revision nor restore authority for this identity.
-    // Leaving that slot untouched also preserves its existing artifact pins.
-    if checkpoint.checkpoint != *id {
-        return if revision == 0 {
-            highest_legacy_checkpoint(tx, scope, id)
-        } else {
-            Ok(None)
-        };
-    }
-    validate_checkpoint_identity(&checkpoint, scope, id, revision)?;
-    Ok(Some((checkpoint, legacy_key)))
-}
-
-/// Only decimal revision suffixes can belong to this historical identity.
-/// Child identifiers can occupy those same legacy slots, so each candidate is
-/// authenticated and its full checkpoint identity is checked before adoption.
-/// Streaming keeps application memory independent of retained history size.
-fn highest_legacy_checkpoint(
-    tx: &Connection,
-    scope: &RecoveryScopeV1,
-    id: &CheckpointId,
-) -> Result<Option<(LabeledCheckpointV1, String)>, AdmissionOperationStoreError> {
-    let latest = legacy_checkpoint_key(scope, id, 0)?;
-    let prefix = format!("{latest}:");
-    let upper = format!("{latest};");
-    let mut statement = tx
-        .prepare(
-            "SELECT record_key FROM admission_operation_recovery_records
-             WHERE record_key >= ?1 AND record_key < ?2
-               AND length(record_key) > length(?1)
-               AND substr(record_key,length(?1)+1) NOT GLOB '*[^0-9]*'
-             ORDER BY length(record_key) DESC,record_key DESC",
-        )
-        .map_err(sqlite_error)?;
-    let mut keys = statement.query([&prefix, &upper]).map_err(sqlite_error)?;
-    while let Some(row) = keys.next().map_err(sqlite_error)? {
-        let key: String = row.get(0).map_err(sqlite_error)?;
-        let checkpoint: LabeledCheckpointV1 =
-            load(tx, &key)?.ok_or_else(|| refused("legacy checkpoint history"))?;
-        checkpoint.validate().map_err(refused)?;
-        if checkpoint.scope != *scope
-            || (key != legacy_checkpoint_key(scope, &checkpoint.checkpoint, 0)?
-                && key
-                    != legacy_checkpoint_key(
-                        scope,
-                        &checkpoint.checkpoint,
-                        checkpoint.revision.get(),
-                    )?)
-        {
-            return Err(refused("legacy checkpoint history identity"));
-        }
-        if checkpoint.checkpoint == *id {
-            return Ok(Some((checkpoint, key)));
-        }
-    }
     Ok(None)
 }
 
-/// Public revision reads are fenced by the validated current envelope. The
-/// current legacy envelope remains authoritative when its revision slot was
-/// overwritten by another checkpoint identity before the format upgrade.
+/// Public revision reads are fenced by the validated current envelope.
 pub(super) fn load_visible_checkpoint(
     tx: &Connection,
     scope: &RecoveryScopeV1,

@@ -59,10 +59,6 @@ pub(in crate::admission_operation_store) enum ReferenceOwner {
         scope: RecoveryScopeV1,
         release: ReleaseId,
     },
-    LegacyPinSource {
-        scope: RecoveryScopeV1,
-        original: SourceAnchor,
-    },
 }
 
 impl ReferenceOwner {
@@ -79,8 +75,7 @@ impl ReferenceOwner {
             | Self::ProductReport { scope, .. }
             | Self::ProductProposal { scope, .. }
             | Self::ArchivePreparation { scope, .. }
-            | Self::ArchiveDelivery { scope, .. }
-            | Self::LegacyPinSource { scope, .. } => scope,
+            | Self::ArchiveDelivery { scope, .. } => scope,
         }
     }
 

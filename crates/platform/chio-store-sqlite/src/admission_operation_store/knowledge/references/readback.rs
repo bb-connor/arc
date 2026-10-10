@@ -85,13 +85,7 @@ pub(in crate::admission_operation_store) fn require_new_artifact_reference_basel
 ) -> Result<(), AdmissionOperationStoreError> {
     expected_metadata_commit.verify_historical_identity(tx)?;
     let state = load_reference_state(tx, reference)?;
-    let ReferenceBaselineSource::NewArtifact { source } = &state.aggregate.value.baseline.source
-    else {
-        return Err(refused(
-            "new artifact completion lacks its exact metadata baseline",
-        ));
-    };
-    if source != expected_metadata_commit {
+    if &state.aggregate.value.source != expected_metadata_commit {
         return Err(refused(
             "new artifact completion changed its metadata commitment",
         ));

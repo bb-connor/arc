@@ -5,6 +5,105 @@ use crate::admission_operation::{
 use chio_core::canonical::canonical_json_bytes;
 
 #[test]
+fn historical_semantic_commitment_preserves_transient_request_binding() -> TestResult {
+    use crate::admission_operation::{
+        NativeOutputEnvelopeBoundsV1, NativeOutputRetentionProfileV1,
+    };
+    let (kernel, mut request, _, _) = durable_admission_fixture("historical-semantic-binding");
+    let signer = make_keypair();
+    request.dpop_proof = Some(crate::dpop::DpopProof::sign(
+        crate::dpop::DpopProofBody {
+            schema: crate::dpop::DPOP_SCHEMA.into(),
+            replay_authority: None,
+            capability_id: request.capability.id.clone(),
+            tool_server: request.server_id.clone(),
+            tool_name: request.tool_name.clone(),
+            action_hash: sha256_hex(&canonical_json_bytes(&request.arguments)?),
+            nonce: "historical-semantic-proof".into(),
+            issued_at: current_unix_timestamp(),
+            agent_key: signer.public_key(),
+        },
+        &signer,
+    )?);
+    let context = context(&request, 1)?;
+    let security = AdmissionSecurityBindingV1::from_trusted_selection(
+        Some(&context), true, true, Some(binding("native-store", "source", b"initialization")?),
+    )?;
+    let profile = NativeOutputRetentionProfileV1::new(NativeOutputEnvelopeBoundsV1::new(
+        4096, 4096, 4096, 4096, 1,
+    )?);
+    let steps = [profile.materialization_identity()?];
+    let matching = matching(&request)?;
+    let authority = kernel.admission_authority_profile()?;
+    let retained = RetainedToolAdmissionRequestV1::from_admission_with_original_semantics(
+        &request, &matching, &steps, security.as_ref(), Some(&authority), Some(&profile),
+    )?;
+    let original = crate::recovery::semantic_request_semantics(&request)?;
+    let sanitized = crate::recovery::semantic_request_semantics(retained.request_for_revalidation())?;
+    assert_ne!(original, sanitized);
+    assert!(retained.request_for_revalidation().dpop_proof.is_none());
+    let decoded = RetainedToolAdmissionRequestV1::from_canonical_bytes(retained.canonical_bytes())?;
+    assert_eq!(decoded.canonical_bytes(), retained.canonical_bytes());
+    assert_eq!(decoded.historical_semantic_request_commitment()?, original);
+    decoded.validate_original_semantic_request(&request)?;
+    assert!(decoded.validate_original_semantic_request(decoded.request_for_revalidation()).is_err());
+
+    // A legacy original has no full-request commitment. Reading it must neither
+    // invent one nor rewrite the canonical bytes into the newer schema.
+    let legacy = RetainedToolAdmissionRequestV1::from_admission_with_output_retention(
+        &request, &matching, &steps, security.as_ref(), Some(&authority), Some(&profile),
+    )?;
+    let bytes = legacy.canonical_bytes().to_vec();
+    assert_eq!(legacy.original_semantic_request_commitment(), None);
+    assert_eq!(legacy.historical_semantic_request_commitment()?, sanitized);
+    assert_eq!(legacy.canonical_bytes(), bytes);
+    Ok(())
+}
+
+#[test]
+fn historical_verifier_selection_uses_the_original_bounded_materializer() -> TestResult {
+    use crate::admission_operation::{
+        NativeOutputEnvelopeBoundsV1, NativeOutputRetentionProfileV1,
+    };
+    let (kernel, request, _, _) = durable_admission_fixture("historical-materializer");
+    let context = context(&request, 1)?;
+    let selected = binding("native-store", "source", b"initialization")?;
+    let security = AdmissionSecurityBindingV1::from_trusted_selection(
+        Some(&context), true, true, Some(selected),
+    )?;
+    let profile = NativeOutputRetentionProfileV1::new(NativeOutputEnvelopeBoundsV1::new(
+        1024 * 1024, 1024 * 1024, 1024 * 1024, 1024 * 1024, 1,
+    )?);
+    let matching = matching(&request)?;
+    let authority = kernel.admission_authority_profile()?;
+    let expected = profile.materialization_identity()?;
+    let original = RetainedToolAdmissionRequestV1::from_admission_with_output_retention(
+        &request, &matching, std::slice::from_ref(&expected), security.as_ref(),
+        Some(&authority), Some(&profile),
+    )?;
+    let bytes = original.canonical_bytes().to_vec();
+    assert!(kernel.original_output_verifier_is_available(&original)?);
+    assert_eq!(original.canonical_bytes(), bytes);
+
+    // Selecting a different current retention limit must neither replace the
+    // original implementation nor renew capture authority for its old call.
+    let mut rotated = kernel;
+    rotated.select_native_output_retention(NativeOutputRetentionProfileV1::new(
+        NativeOutputEnvelopeBoundsV1::new(4096, 4096, 4096, 4096, 1)?,
+    ))?;
+    assert!(rotated.original_output_verifier_is_available(&original)?);
+    assert_eq!(original.canonical_bytes(), bytes);
+
+    let mut changed = expected;
+    changed.implementation_digest = AdmissionDigest::try_new("implementation_digest", "a".repeat(64))?;
+    let malformed = RetainedToolAdmissionRequestV1::from_admission_with_output_retention(
+        &request, &matching, &[changed], security.as_ref(), Some(&authority), Some(&profile),
+    )?;
+    assert!(rotated.original_output_verifier_is_available(&malformed).is_err());
+    Ok(())
+}
+
+#[test]
 fn native_retained_codec_is_strict_and_hash_domain_is_versioned() -> TestResult {
     let (_, request, _, _) = durable_admission_fixture("native-codec");
     let context = context(&request, 1)?;

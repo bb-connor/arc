@@ -27,16 +27,13 @@ struct RestoreRecord {
     checkpoint: LabeledCheckpointV1,
     recipient: ArtifactRecipientV1,
     intent: ArtifactReleaseIntentV1,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    actor_binding: Option<RestoreActorBinding>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    installation_generation: Option<SafeInteger>,
+    actor_binding: RestoreActorBinding,
+    installation_generation: SafeInteger,
 }
 
 /// Retained custody data. Outcome status is read from the owning restore row.
 pub(in crate::admission_operation_store::knowledge) struct RestoreReferenceSource {
     material: super::reference_source::CheckpointMaterial,
-    request: RequestId,
     release: ReleaseId,
     source: protected::ProtectedSourceReference,
     delivered: bool,
@@ -45,12 +42,6 @@ pub(in crate::admission_operation_store::knowledge) struct RestoreReferenceSourc
 impl RestoreReferenceSource {
     pub(in crate::admission_operation_store::knowledge) fn scope(&self) -> &RecoveryScopeV1 {
         self.material.scope()
-    }
-    pub(in crate::admission_operation_store::knowledge) fn checkpoint(&self) -> &CheckpointId {
-        self.material.checkpoint()
-    }
-    pub(in crate::admission_operation_store::knowledge) fn revision(&self) -> u64 {
-        self.material.revision()
     }
     pub(in crate::admission_operation_store::knowledge) fn envelope(
         &self,
@@ -62,19 +53,11 @@ impl RestoreReferenceSource {
     ) -> &[ArtifactVersionRefV1] {
         self.material.references()
     }
-    pub(in crate::admission_operation_store::knowledge) fn request(&self) -> &RequestId {
-        &self.request
-    }
     pub(in crate::admission_operation_store::knowledge) fn release(&self) -> &ReleaseId {
         &self.release
     }
     pub(in crate::admission_operation_store::knowledge) fn active(&self) -> bool {
         !self.delivered
-    }
-    pub(in crate::admission_operation_store::knowledge) fn source(
-        &self,
-    ) -> &protected::ProtectedSourceReference {
-        &self.source
     }
     pub(in crate::admission_operation_store::knowledge) fn terminal(
         &self,
@@ -102,22 +85,13 @@ pub(in crate::admission_operation_store::knowledge) fn restore_reference_source(
         return Err(refused("restore reference source ownership"));
     }
     validate_restore_identity(&record, scope, request)?;
-    if key != legacy_restore_key(scope, request)? {
-        let binding = record
-            .actor_binding
-            .as_ref()
-            .ok_or_else(|| refused("restore reference source actor absent"))?;
-        if key != actor_restore_key(scope, &binding.principal, request)?
-            || record
-                .installation_generation
-                .is_none_or(|generation| generation.get() == 0)
-        {
-            return Err(refused("restore reference source actor identity"));
-        }
+    if key != actor_restore_key(scope, &record.actor_binding.principal, request)?
+        || record.installation_generation.get() == 0
+    {
+        return Err(refused("restore reference source actor identity"));
     }
     let source = protected::source_reference(connection, key)?;
     Ok(Some(RestoreReferenceSource {
-        request: request.clone(),
         release: record.intent.release.clone(),
         delivered: record.intent.state == ArtifactDeliveryStateV1::Delivered,
         material: super::reference_source::CheckpointMaterial::new(record.checkpoint)?,
@@ -164,17 +138,6 @@ fn actor_restore_key(
     ))
 }
 
-fn legacy_restore_key(
-    scope: &RecoveryScopeV1,
-    request: &RequestId,
-) -> Result<String, AdmissionOperationStoreError> {
-    Ok(format!(
-        "knowledge-restore:{}:{}",
-        scope_key(scope)?,
-        request.as_str()
-    ))
-}
-
 fn validate_restore_identity(
     record: &RestoreRecord,
     scope: &RecoveryScopeV1,
@@ -203,87 +166,17 @@ fn retained_restore(
     authorization: ReleaseAuthorizationDigest,
 ) -> Result<Option<(String, RestoreRecord)>, AdmissionOperationStoreError> {
     let key = restore_key(actor, request)?;
-    if let Some(record) = load_restore(tx, &key)? {
-        validate_restore_identity(&record, actor.scope(), request)?;
-        if record.intent.authorization != authorization
-            || record
-                .installation_generation
-                .is_none_or(|generation| generation.get() == 0)
-            || record
-                .actor_binding
-                .as_ref()
-                .is_none_or(|binding| binding.principal != *actor.principal())
-        {
-            return Err(refused("restore actor identity"));
-        }
-        return Ok(Some((key, record)));
-    }
-
-    let key = legacy_restore_key(actor.scope(), request)?;
     let Some(record) = load_restore(tx, &key)? else {
         return Ok(None);
     };
     validate_restore_identity(&record, actor.scope(), request)?;
-    if let Some(binding) = &record.actor_binding {
-        if binding.principal != *actor.principal() {
-            return Ok(None);
-        }
-        if record.intent.authorization != authorization {
-            return Err(refused("restore original authorization"));
-        }
-    } else {
-        // The original opaque capability digest must match before its subject
-        // can resolve an assignment in the proven original installation.
-        if record.intent.authorization != authorization {
-            return Err(refused("legacy restore original authorization"));
-        }
-        let (principal, _) =
-            super::super::super::recovery::deployment_history::original_restore_actor(
-                tx,
-                actor.scope(),
-                &key,
-                &actor.capability().subject,
-            )?
-            .ok_or_else(|| refused("legacy restore actor proof unavailable"))?;
-        if principal != *actor.principal() {
-            return Ok(None);
-        }
+    if record.intent.authorization != authorization
+        || record.installation_generation.get() == 0
+        || record.actor_binding.principal != *actor.principal()
+    {
+        return Err(refused("restore actor identity"));
     }
     Ok(Some((key, record)))
-}
-
-pub(super) fn pins(
-    tx: &Connection,
-    key: &str,
-    reference: &ArtifactVersionRefV1,
-) -> Result<bool, AdmissionOperationStoreError> {
-    let row = protected::raw_checked(tx, key)?.ok_or_else(|| refused("restore pin absent"))?;
-    let record = encoding::decode(tx, key, row.version, &row.payload)?;
-    let ArtifactReleaseKindV1::IndependentlyAdmitted { request } = &record.intent.kind else {
-        return Err(refused("restore pin kind"));
-    };
-    let scope = &record.checkpoint.scope;
-    if row.kind != "command" || row.scope != scope_key(scope)? {
-        return Err(refused("restore pin source ownership"));
-    }
-    validate_restore_identity(&record, scope, request)?;
-    if key != legacy_restore_key(scope, request)? {
-        let binding = record
-            .actor_binding
-            .as_ref()
-            .ok_or_else(|| refused("restore pin owner absent"))?;
-        if key != actor_restore_key(scope, &binding.principal, request)? {
-            return Err(refused("restore pin owner identity"));
-        }
-    }
-    Ok(record.intent.state != ArtifactDeliveryStateV1::Delivered
-        && (record.checkpoint.artifacts.as_slice().contains(reference)
-            || record
-                .checkpoint
-                .model_contexts
-                .as_slice()
-                .iter()
-                .any(|model| model.side_files.as_slice().contains(reference))))
 }
 
 impl SqliteAdmissionOperationStore {
@@ -456,28 +349,12 @@ impl SqliteAdmissionOperationStore {
                 }
                 return Ok((tx, old.intent));
             }
-            #[cfg(feature = "admission-test-support")]
-            let legacy =
-                super::restore_test_support::consume_legacy_restore_construction(actor, request)?;
-            #[cfg(not(feature = "admission-test-support"))]
-            let legacy = false;
-            let (key, actor_binding, installation_generation) = if legacy {
-                let key = legacy_restore_key(actor.scope(), request)?;
-                if protected::raw(&tx, &key)?.is_some() {
-                    return Err(refused("legacy restore fixture already retained"));
-                }
-                (key, None, None)
-            } else {
-                (
-                    restore_key(actor, request)?,
-                    Some(RestoreActorBinding {
-                        principal: actor.principal().clone(),
-                        authority_scope: protected::deployment_tx(&tx, actor.scope())?
-                            .authority_scope,
-                    }),
-                    Some(profile.generation),
-                )
+            let key = restore_key(actor, request)?;
+            let actor_binding = RestoreActorBinding {
+                principal: actor.principal().clone(),
+                authority_scope: protected::deployment_tx(&tx, actor.scope())?.authority_scope,
             };
+            let installation_generation = profile.generation;
             let id = ReleaseId::new(&uuid::Uuid::new_v4().to_string()).map_err(refused)?;
             let intent = ArtifactReleaseIntentV1 {
                 domain_version: VersionV1,

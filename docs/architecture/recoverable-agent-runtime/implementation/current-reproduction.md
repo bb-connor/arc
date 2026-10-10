@@ -4,9 +4,9 @@ The current implementation is unqualified. A command declaration, source
 locator or locally closed finding does not establish a current native, provider,
 Linux, formal, hosted or release qualification result.
 
-The original coverage records remain at [authority coverage](p1/requirements-coverage.json),
-[knowledge coverage](p4/requirements-coverage.json) and
-[product coverage](p6/requirements-coverage.json). Their original paths, symbols,
+The original coverage records remain at [authority coverage](history/README.md),
+[knowledge coverage](history/README.md) and
+[product coverage](history/README.md). Their original paths, symbols,
 source hashes and execution claims remain historical.
 
 The additive overlay is retained at
@@ -64,7 +64,7 @@ The captured P5 command verified 264 retained artifacts and returned
 `current_qualified: false`; its 643-source historical inventory differs from
 the current source. The captured P6 command refused at
 `qualification.historical_artifact_inventory`. Its published tree includes
-the additive [redaction note](p6/evidence/REDACTIONS.md). A separate exact
+the additive [redaction note](history/README.md). A separate exact
 readback confirmed all 5,099 declared files are present and identified the two
 documented digest changes:
 
@@ -78,7 +78,7 @@ currently passing original-byte package audit. The redaction note records that
 the unredacted originals are retained outside the repository. Reproducing the
 original sealed package requires those exact originals and its exact sealed
 source. Neither this overlay nor the source correspondence reconstructs them.
-The [historical reproduction instructions](p6/REPRODUCE.md) remain unchanged.
+The [historical reproduction instructions](history/README.md) remain unchanged.
 
 A new qualification record must carry its actual source inventory, original
 execution/profile evidence and an independently supplied seal. Check that new
@@ -90,3 +90,20 @@ acceptance. The current per-ID review
 overlay at `target/recovery-pr/current-review-followup/current-reviewed-dispositions.json`
 tracks locally accepted dispositions and remaining checks; it carries no
 whole-source qualification or compiled-closure claim.
+
+Current resource admission measures uncheckpointed WAL backlog and available
+disk, independently of retained database length. New intake requires less than
+64 MiB of WAL backlog and at least 128 MiB available; existing progress requires
+less than 128 MiB of backlog and at least 16 MiB available. These pressure checks
+do not fund native finishing obligations. Active workflow accounts, individual
+command reservations and protected participant accounts retain their separate
+limits. The pinned support connector has four submission slots and four separate
+lookup slots, so pending submissions cannot consume all lookup capacity.
+
+For a newly authorized confined-return Linux campaign, the maintained producer
+is `scripts/run-confined-return-linux-acceptance.py`. It checks the registered
+current test denominator and binds each canary image to its configured mode using
+`CHIO_CONFINED_CANARY_MODE`, `CHIO_CONFINED_READER` and
+`CHIO_CONFINED_CANARY_DIR`. The P5 runner, environment names, operations document
+and sealing commands remain historical evidence. Neither this correspondence nor
+portable runner controls establish a current Linux enforcement result.

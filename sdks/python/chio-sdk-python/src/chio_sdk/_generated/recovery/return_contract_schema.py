@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 35f8e30cf30553986a159b074ee485804a85db29547a8102522cd7bfa3080d2e
+# Schema sha256: d2b29cbbc9a0070d3666a33fd5a06bbda07a8e70f6d54bf33c15ca8b74893ff9
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -147,20 +147,3 @@ class ReturnContractV1(BaseModel):
         if type(value) is not int:
             raise ValueError('recovery integer literal requires an integer')
         return value
-
-# Public compatibility aliases reference the actual current model classes.
-ArtifactInfluence = RecoveryReturnContractDefinitionsArtifactInfluence
-ArtifactRecipient = RecoveryReturnContractDefinitionsArtifactRecipient
-ArtifactReference = RecoveryReturnContractDefinitionsArtifactReference
-ArtifactSink22 = RecoveryReturnContractDefinitionsArtifactSinkAgent
-ArtifactSink23 = RecoveryReturnContractDefinitionsArtifactSinkModel
-ArtifactSink24 = RecoveryReturnContractDefinitionsArtifactSinkArchive
-ModelContext = RecoveryReturnContractDefinitionsModelContext
-RecoveryDigest32Item = RecoveryDigestOctet
-RecoveryReturnContractArtifactSink = ArtifactSink
-RecoveryReturnContractOpaqueId = OpaqueId
-RecoveryReturnContractRecoveryDigest32 = RecoveryDigest32
-RecoveryReturnContractRecoveryDigestOctet = RecoveryDigestOctet
-RecoveryReturnContractReturnContractV1 = ReturnContractV1
-RecoveryReturnContractSafeInteger = SafeInteger
-Scope = RecoveryReturnContractDefinitionsScope

@@ -184,7 +184,7 @@ impl<'tx, 'conn> AuthenticatedCheckpointRestoreEncodingSource<'tx, 'conn> {
                 {
                     return Err(refused("restore outcome changed its monotone custody"));
                 }
-                // Every other field, including optional predecessor identity,
+                // Every other field, including original actor identity,
                 // original opaque authorization and exact labels stays exact.
                 original.intent.state = target;
                 if encoding::canonical(&original)? != encoding::canonical(self.record)? {
@@ -208,17 +208,12 @@ impl<'tx, 'conn> AuthenticatedCheckpointRestoreEncodingSource<'tx, 'conn> {
             return Err(refused("restore admission acquired an existing root"));
         }
         let deployment = protected::deployment_tx(transaction, self.actor.scope())?;
-        match (
-            &self.record.actor_binding,
-            self.record.installation_generation,
-        ) {
-            (Some(binding), Some(generation))
-                if binding.principal == *self.actor.principal()
-                    && binding.authority_scope == deployment.authority_scope
-                    && generation == current.generation
-                    && self.key == restore_key(self.actor, request)? => {}
-            (None, None) if self.key == legacy_restore_key(self.actor.scope(), request)? => {}
-            _ => return Err(refused("restore admission changed its actor identity")),
+        if self.record.actor_binding.principal != *self.actor.principal()
+            || self.record.actor_binding.authority_scope != deployment.authority_scope
+            || self.record.installation_generation != current.generation
+            || self.key != restore_key(self.actor, request)?
+        {
+            return Err(refused("restore admission changed its actor identity"));
         }
         let checkpoint = load_visible_checkpoint(
             transaction,

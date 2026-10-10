@@ -47,7 +47,7 @@ fn service(f: &KnowledgeFixture, workflow: &WorkflowId) -> TestResult<RecoverySe
         f.f.runtime.clone(),
         Arc::new(f.f.authority.admission_operation_store()),
         f.f.authority.mutation_fence(),
-        Some(Arc::new(f.runtime.clone())),
+        Arc::new(f.runtime.clone()),
         Keypair::from_seed(&[211; 32]),
         workflow.clone(),
     )?)

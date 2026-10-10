@@ -41,17 +41,6 @@ fn release_key(
     )
 }
 
-fn legacy_release_key(
-    scope: &RecoveryScopeV1,
-    request: &RequestId,
-) -> Result<String, AdmissionOperationStoreError> {
-    Ok(format!(
-        "knowledge-release:{}:{}",
-        scope_key(scope)?,
-        request.as_str()
-    ))
-}
-
 fn release_for_actor(
     tx: &Connection,
     actor: &AuthenticatedRecoveryActor,
@@ -69,21 +58,7 @@ fn release_for_actor(
         }
         return Ok(Some((key, record)));
     }
-    let legacy = legacy_release_key(actor.scope(), request)?;
-    let Some(record) = load::<ReleaseRecord>(tx, &legacy)? else {
-        return Ok(None);
-    };
-    let handle: HandleRecord = load(tx, &handle_key(actor.scope(), &record.handle.handle)?)?
-        .ok_or_else(|| refused("legacy release original handle absent"))?;
-    if handle.handle != record.handle || record.intent.artifact.scope != *actor.scope() {
-        return Err(refused("legacy release binding changed"));
-    }
-    if handle.principal != *actor.principal() {
-        // Authenticated old handle custody proves a different owner. Its
-        // original flat record remains unchanged while this actor uses v2.
-        return Ok(None);
-    }
-    Ok(Some((legacy, record)))
+    Ok(None)
 }
 fn selected<'a>(
     profile: &'a NativeKnowledgeInstallationV1,
@@ -416,13 +391,4 @@ fn require_current_artifact(
         return Err(refused("artifact release basis changed"));
     }
     Ok(())
-}
-pub(super) fn pins(
-    tx: &Connection,
-    key: &str,
-    reference: &ArtifactVersionRefV1,
-) -> Result<bool, AdmissionOperationStoreError> {
-    let record: ReleaseRecord = load(tx, key)?.ok_or_else(|| refused("release pin"))?;
-    Ok(record.intent.artifact == *reference
-        && record.intent.state != ArtifactDeliveryStateV1::Delivered)
 }

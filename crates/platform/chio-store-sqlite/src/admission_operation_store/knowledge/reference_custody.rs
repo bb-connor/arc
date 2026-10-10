@@ -119,7 +119,7 @@ impl<'tx, 'conn> VerifiedKnowledgeReferenceRetain<'tx, 'conn> {
         tx: &'tx Transaction<'conn>,
         key: &str,
     ) -> Result<Option<Self>, AdmissionOperationStoreError> {
-        let Some(pin) = pins::modern_reference_source(tx, key)? else {
+        let Some(pin) = pins::reference_source(tx, key)? else {
             return Ok(None);
         };
         if !pin.active() {
@@ -278,7 +278,7 @@ impl<'tx, 'conn> VerifiedKnowledgeReferenceRetain<'tx, 'conn> {
                 }
             }
             RetainedSourceEvidence::ModernPin => {
-                let pin = pins::modern_reference_source(tx, self.source.record_key())?
+                let pin = pins::reference_source(tx, self.source.record_key())?
                     .ok_or_else(|| refused("reference pin disappeared"))?;
                 if !pin.active()
                     || self.owner != pin_owner(&pin)
@@ -393,7 +393,7 @@ fn confined_input_envelope_digest(
     ))
 }
 
-fn pin_owner(pin: &pins::ModernPinSource) -> ReferenceOwner {
+fn pin_owner(pin: &pins::PinSource) -> ReferenceOwner {
     let scope = pin.scope().clone();
     match pin.owner() {
         pins::PinOwner::Operator {

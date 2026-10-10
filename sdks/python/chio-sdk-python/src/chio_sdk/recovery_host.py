@@ -79,7 +79,14 @@ class RecoveryHostSession:
             pass
 
     async def _close_within_deadline(self, client: RecoveryClient, deadline: float) -> None:
-        task = asyncio.create_task(self._close_without_diagnostics(client))
+        pending = self._close_without_diagnostics(client)
+        try:
+            task = asyncio.create_task(pending)
+        except Exception:
+            # No task owns this coroutine if scheduling failed. The native
+            # result is already retained independently of local cleanup.
+            pending.close()
+            return
         # Keep a bounded number of strong references until cleanup completes.
         # A transport can delay cancellation; it cannot renew the action wait.
         self._retain(task)
@@ -189,7 +196,14 @@ class RecoveryHostSession:
     async def _execute_admitted(self, choice: str) -> RecoveryHostOutcome:
         deadline = asyncio.get_running_loop().time() + self._timeout_seconds
         delivery: asyncio.Future[RecoveryHostOutcome] = asyncio.get_running_loop().create_future()
-        task = asyncio.create_task(self._execute_native(choice, deadline, delivery))
+        pending = self._execute_native(choice, deadline, delivery)
+        try:
+            task = asyncio.create_task(pending)
+        except Exception:
+            # Scheduling failed before any client or request existed. Close the
+            # unstarted coroutine and keep local diagnostics out of the adapter.
+            pending.close()
+            return RecoveryHostOutcome(RecoveryHostCategory.UNAVAILABLE)
         self._retain(task)
         try:
             remaining = max(0, deadline - asyncio.get_running_loop().time())

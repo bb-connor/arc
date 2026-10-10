@@ -397,7 +397,7 @@ async fn setup_stale_unprobed_selection_can_be_replaced_without_waiting_for_expi
         runtime: f.f.runtime.clone(),
         store: Arc::new(f.f.authority.admission_operation_store()),
         fence: f.f.authority.mutation_fence(),
-        knowledge: Some(Arc::new(f.runtime.clone())),
+        knowledge: Arc::new(f.runtime.clone()),
         operator: Keypair::from_seed(&[211; 32]),
     };
     let replacement = RecoverySetupService::for_creation(host, &f.f.control, &creation).await?;

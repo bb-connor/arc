@@ -13,21 +13,7 @@ mod annotations;
 mod capture;
 mod constraints;
 mod delivery;
-#[cfg(feature = "admission-test-support")]
-mod legacy_annotation_capture;
-#[cfg(feature = "admission-test-support")]
-mod legacy_input_floor;
-#[cfg(feature = "admission-test-support")]
-mod legacy_status_capture;
 mod materialization;
-#[cfg(feature = "admission-test-support")]
-pub use legacy_annotation_capture::ModeledLegacyIncompleteAnnotationCaptureGuard;
-#[cfg(feature = "admission-test-support")]
-pub(in crate::admission_operation_store) use legacy_input_floor::modeled_legacy_input_floor_selected;
-#[cfg(feature = "admission-test-support")]
-pub use legacy_input_floor::ModeledLegacySemanticInputFloorGuard;
-#[cfg(feature = "admission-test-support")]
-pub use legacy_status_capture::ModeledLegacyMissingStatusCaptureGuard;
 pub(in crate::admission_operation_store) mod output;
 mod policy;
 pub(in crate::admission_operation_store) mod status;
@@ -194,8 +180,7 @@ fn audience_key(
     ))
 }
 
-/// Read an old shared slot only when its complete authenticated identity agrees.
-/// A mismatched new slot is an integrity failure, not a reason to fall back.
+/// Read only the exact authenticated ACL identity selected by the invocation.
 fn current_audience(
     tx: &Connection,
     expected: &SemanticAudienceObservationV1,
@@ -222,16 +207,7 @@ fn current_audience(
         }
         return Ok(Some(current));
     }
-    let legacy_key = format!(
-        "semantic-acl:{}:{}",
-        scope_key(&expected.scope)?,
-        sha256_hex(&protected::encode(&(
-            &expected.provider,
-            &expected.account,
-            &expected.resource,
-        ))?)
-    );
-    Ok(load::<SignedSemanticAudienceV1>(tx, &legacy_key)?.filter(|current| exact(current.body())))
+    Ok(None)
 }
 fn capture_key(operation: &str) -> String {
     format!("semantic-capture:{operation}")

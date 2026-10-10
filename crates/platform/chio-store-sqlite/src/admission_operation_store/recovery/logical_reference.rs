@@ -1,34 +1,30 @@
 //! Closed logical reference ownership. Physical finishing credits are separate.
 use super::*;
-use crate::admission_operation_store::knowledge::reference_census::VerifiedKnowledgeReferenceAccountBaseline;
-use crate::admission_operation_store::knowledge::reference_ready::VerifiedKnowledgeReferenceReady;
+use crate::admission_operation_store::knowledge::account::NewKnowledgeAccount;
 use crate::admission_operation_store::knowledge::reference_source::ReferenceCutoff;
 use crate::admission_operation_store::knowledge::references::{
-    aggregate_key, ready_reference_account, reference_identity, PreparedColdReferenceBaseline,
-    PreparedReferenceUpdates, ProductEvidenceOwner, ReadyReferenceAccount, ReferenceAccount,
-    ReferenceOwner, ReferenceReadyRecord, StagedReferenceUpdate,
+    aggregate_key, ready_reference_account, reference_identity, PreparedReferenceUpdates,
+    ProductEvidenceOwner, ReadyReferenceAccount, ReferenceAccount, ReferenceOwner,
+    ReferenceReadyRecord, StagedReferenceUpdate,
 };
 use crate::admission_operation_store::product::reference_intake::VerifiedProductReferenceIntake;
 use chio_security_types::knowledge::ArtifactVersionRefV1;
 use std::ops::Deref;
 
+#[path = "logical_reference/initialization.rs"]
+mod initialization;
 #[path = "logical_reference/reference_capacity.rs"]
 mod reference_capacity;
-#[path = "logical_reference/reference_cold.rs"]
-mod reference_cold;
 #[path = "logical_reference/reference_knowledge.rs"]
 mod reference_knowledge;
 #[path = "logical_reference/reference_product.rs"]
 mod reference_product;
 
-use reference_capacity::{
-    load_capacity, load_capacity_account, require_ready_capacity, save_capacity, ReferenceCapacity,
-};
-pub(in crate::admission_operation_store) use reference_cold::{
+pub(in crate::admission_operation_store) use initialization::{
     initialize_knowledge_reference_account, persist_knowledge_new_artifact_reference_baseline,
-    persist_knowledge_reference_cold_baseline, persist_knowledge_reference_ready,
-    VerifiedKnowledgeReferenceColdProgress,
+    verify_knowledge_reference_account,
 };
+use reference_capacity::{load_capacity, require_ready_capacity, save_capacity, ReferenceCapacity};
 pub(in crate::admission_operation_store) use reference_knowledge::{
     persist_knowledge_reference_retain, persist_knowledge_reference_retirement,
     persist_product_reference_retirement,

@@ -1,4 +1,4 @@
-//! Native journal decoding retains old wire bytes and exact atom/chunk custody.
+//! Native journal decoding authenticates current inline and atom/chunk custody.
 use super::Record;
 use crate::admission_operation_store::knowledge::encoding::chunks::{
     AuthenticatedKnowledgeEncodingRoot, ChunkedBody, EncodingOwner,
@@ -11,7 +11,6 @@ use rusqlite::{Connection, Transaction};
 use serde::{Deserialize, Serialize};
 
 mod atoms;
-mod legacy;
 pub(in crate::admission_operation_store) mod source;
 
 #[derive(Deserialize)]
@@ -61,7 +60,7 @@ pub(super) fn decode(
     }
     let probe: EncodingProbe = serde_json::from_slice(bytes).map_err(|_| invalid())?;
     match probe.knowledge_join_encoding.as_deref() {
-        None | Some("interned_labels_v1") => legacy::decode(tx, bytes),
+        None => atoms::decode_body(bytes),
         Some("interned_label_atoms_v1") => {
             require_atom_format(tx)?;
             atoms::decode_body(bytes)
@@ -99,15 +98,16 @@ pub(super) fn decode(
 fn require_atom_format(tx: &Connection) -> Result<(), AdmissionOperationStoreError> {
     use crate::admission_operation_store::{
         ADMISSION_OPERATION_SCHEMA_ANCHORS, ADMISSION_OPERATION_SCHEMA_KEY,
+        ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION,
     };
     let version = crate::check_schema_version(
         tx,
         ADMISSION_OPERATION_SCHEMA_KEY,
-        40,
+        ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION,
         ADMISSION_OPERATION_SCHEMA_ANCHORS,
     )
     .map_err(|_| invalid())?;
-    if version != 40 {
+    if version != ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION {
         return Err(invalid());
     }
     Ok(())

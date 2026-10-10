@@ -183,7 +183,7 @@ pub(super) fn recorded_version(
         // auxiliary holds and independent protected projections, then v38
         // command aliases. They
         // preserve the v29 native row catalog and digest.
-        29..=40 => Ok(29),
+        29..=40 | ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION => Ok(29),
         _ => Err(invalid("native security schema version is unsupported")),
     }
 }

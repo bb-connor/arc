@@ -53,32 +53,6 @@ fn seal_sweep_key(
     ))
 }
 
-/// Exact immutable collection acknowledgment, independent of a producer's
-/// current execution profile. Missing or shared legacy custody stays live.
-pub(super) fn publication_collection_source(
-    tx: &Connection,
-    record: &NativeArtifactRecordV1,
-) -> Result<Option<protected::ProtectedSourceReference>, AdmissionOperationStoreError> {
-    if record.state != ArtifactPublicationStateV1::Retired {
-        return Ok(None);
-    }
-    let Some(seal) = &record.seal else {
-        // A crash before recording the broker seal can leave an orphan object.
-        // An absent envelope field does not prove its physical collection.
-        return Ok(None);
-    };
-    let key = publication_sweep_key(record, seal)?;
-    let Some(row) = protected::raw_checked(tx, &key)? else {
-        return Ok(None);
-    };
-    let source = protected::source_reference(tx, &key)?;
-    if row.kind != "command" || row.scope != scope_key(&record.metadata.scope)? {
-        return Err(refused("collection source changed its scope"));
-    }
-    let sweep: SweepRecord = protected::decode(&row.payload)?;
-    Ok((sweep.seal == *seal && sweep.state == SweepState::Collected).then_some(source))
-}
-
 fn publication_sweep_key(
     record: &NativeArtifactRecordV1,
     seal: &ArtifactBlobSealV1,
@@ -241,66 +215,9 @@ pub(super) fn pinned(
     }
     let ready = super::references::ready_reference_account(tx, &reference.scope)?;
     ready.verify_current(tx)?;
-    if ready.has_complete_writer_coverage() {
-        return Ok(false);
-    }
-    // V1 and V2 activation predate confined input writer coverage. Their cold
-    // census owns retained references through the authenticated cutoff. Keep
-    // later retained sources as conservative barriers, including vanished
-    // current projections. Streaming has no authority-wide lifetime ceiling.
-    let mut statement = tx.prepare(
-        "SELECT record_key FROM admission_operation_recovery_records
-         WHERE record_key GLOB 'knowledge-publication:*' OR record_key GLOB 'knowledge-checkpoint:*'
-            OR record_key GLOB 'knowledge-pin:*' OR record_key GLOB 'knowledge-release:*'
-            OR record_key GLOB 'knowledge-restore:*'
-         UNION SELECT record_key FROM admission_operation_recovery_events
-         WHERE record_key GLOB 'knowledge-publication:*' OR record_key GLOB 'knowledge-checkpoint:*'
-            OR record_key GLOB 'knowledge-pin:*' OR record_key GLOB 'knowledge-release:*'
-            OR record_key GLOB 'knowledge-restore:*'
-         UNION SELECT projection_key FROM authority_global_commits WHERE projection_kind='recovery'
-            AND (projection_key GLOB 'knowledge-publication:*' OR projection_key GLOB 'knowledge-checkpoint:*'
-            OR projection_key GLOB 'knowledge-pin:*' OR projection_key GLOB 'knowledge-release:*'
-            OR projection_key GLOB 'knowledge-restore:*') ORDER BY 1",
-    ).map_err(sqlite_error)?;
-    let mut keys = statement.query([]).map_err(sqlite_error)?;
-    while let Some(row) = keys.next().map_err(sqlite_error)? {
-        let key: String = row.get(0).map_err(sqlite_error)?;
-        let source = protected::source_reference(tx, &key)?;
-        if source.scope_key() != scope_key(&reference.scope)?
-            || source.global_commit_sequence() <= ready.cutoff().sequence()
-        {
-            continue;
-        }
-        if key.starts_with("knowledge-publication:") {
-            let record: NativeArtifactRecordV1 =
-                load(tx, &key)?.ok_or_else(|| refused("legacy publication disappeared"))?;
-            if record_publication_key(&record)? != key || record.metadata.scope != reference.scope {
-                return Err(refused("legacy publication changed its dependency owner"));
-            }
-            if record.state != ArtifactPublicationStateV1::Retired
-                && record.input.dependencies.as_slice().contains(reference)
-            {
-                return Ok(true);
-            }
-        } else if key.starts_with("knowledge-checkpoint:") {
-            if super::checkpoints::pins(tx, &key, reference)? {
-                return Ok(true);
-            }
-        } else if key.starts_with("knowledge-restore:") {
-            if super::checkpoints::restore_pins(tx, &key, reference)? {
-                return Ok(true);
-            }
-        } else if key.starts_with("knowledge-pin:") {
-            let pinned = super::pins::reference(tx, &key)?;
-            if pinned.as_ref() == Some(reference) {
-                return Ok(true);
-            }
-        } else if super::release::pins(tx, &key, reference)? {
-            return Ok(true);
-        }
-    }
     Ok(false)
 }
+
 impl SqliteAdmissionOperationStore {
     /// A scoped operator pin may be retired without retiring native custody.
     /// This explicit route does not infer pin purpose from historical text.

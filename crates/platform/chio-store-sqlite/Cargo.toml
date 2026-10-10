@@ -25,7 +25,7 @@ lineage = []
 cognition-market-test-support = []
 # Native fault and modeled predecessor fixtures for cross-crate admission tests.
 # Default-off; no arbitrary SQL or fault controls are exposed in production.
-admission-test-support = ["chio-semantic-contracts/admission-test-support"]
+admission-test-support = []
 # Deterministic fault-injection hooks used only by the separate-process chaos
 # harness. Default-off so production store builds expose no environment-driven
 # pause points.

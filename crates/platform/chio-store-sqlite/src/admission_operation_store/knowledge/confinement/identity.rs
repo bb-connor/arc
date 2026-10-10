@@ -52,10 +52,6 @@ fn digest_key(digest: ConfinedCapabilityDigest) -> String {
     format!("confined-token:{}", hex::encode(digest.as_bytes()))
 }
 
-fn legacy_key(capability: &CapabilityToken) -> String {
-    format!("confined-cap:{}", sha256_hex(capability.id.as_bytes()))
-}
-
 fn binding(
     tx: &Connection,
     index: &str,
@@ -73,7 +69,7 @@ fn binding(
 }
 
 /// Complete signed-token lookup also detects attachment under another root or
-/// runtime. The legacy textual index is relevant only for matching token bytes.
+/// runtime. Only the complete signed-token digest identifies its owner.
 pub(super) fn whole_token(
     tx: &Connection,
     capability: &CapabilityToken,
@@ -85,8 +81,7 @@ pub(super) fn whole_token(
         }
         return Ok(Some(record));
     }
-    Ok(binding(tx, &legacy_key(capability))?
-        .filter(|record| record.reservation.boundary.child_capability == digest))
+    Ok(None)
 }
 
 pub(super) fn scoped_token(
@@ -113,8 +108,6 @@ pub(super) fn require_unused(
 ) -> Result<(), AdmissionOperationStoreError> {
     if binding(tx, &capability_key(scope, capability)?)?.is_some()
         || whole_token(tx, capability)?.is_some()
-        || binding(tx, &legacy_key(capability))?
-            .is_some_and(|record| record.reservation.boundary.scope == *scope)
     {
         return Err(refused("child capability reused"));
     }

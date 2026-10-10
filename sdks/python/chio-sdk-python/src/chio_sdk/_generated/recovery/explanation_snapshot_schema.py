@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 35f8e30cf30553986a159b074ee485804a85db29547a8102522cd7bfa3080d2e
+# Schema sha256: d2b29cbbc9a0070d3666a33fd5a06bbda07a8e70f6d54bf33c15ca8b74893ff9
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -232,38 +232,3 @@ class RecoveryExplanationSnapshotV1(BaseModel):
         if type(value) is not int:
             raise ValueError('recovery integer literal requires an integer')
         return value
-
-# Public compatibility aliases reference the actual current model classes.
-Fact = RecoveryExplanationSnapshotObservationsItemsFact
-Influence = RecoveryExplanationSnapshotInfluenceObserved
-Influence1 = RecoveryExplanationSnapshotInfluenceUnknown
-Integrity = RecoveryExplanationSnapshotInfluenceObservedIntegrity
-Observation = RecoveryExplanationSnapshotObservationsItems
-Operation = RecoveryExplanationSnapshotDefinitionsOperation
-Reason = RecoveryExplanationSnapshotObservationsItemsStateGapReason
-RecoveryDigest32Item = RecoveryDigestOctet
-RecoveryExplanationSnapshotDestinationId = DestinationId
-RecoveryExplanationSnapshotOpaqueId = OpaqueId
-RecoveryExplanationSnapshotRecoveryDigest32 = RecoveryDigest32
-RecoveryExplanationSnapshotRecoveryDigestOctet = RecoveryDigestOctet
-RecoveryExplanationSnapshotRecoveryEffectAdmissionUnresolvedV1 = RecoveryEffectAdmissionUnresolvedV1
-RecoveryExplanationSnapshotRecoveryEffectAwaitingApprovalV1 = RecoveryEffectAwaitingApprovalV1
-RecoveryExplanationSnapshotRecoveryEffectAwaitingCallerReportV1 = RecoveryEffectAwaitingCallerReportV1
-RecoveryExplanationSnapshotRecoveryEffectClosedBeforeEffectV1 = RecoveryEffectClosedBeforeEffectV1
-RecoveryExplanationSnapshotRecoveryEffectCompleteV1 = RecoveryEffectCompleteV1
-RecoveryExplanationSnapshotRecoveryEffectFailedAfterEffectV1 = RecoveryEffectFailedAfterEffectV1
-RecoveryExplanationSnapshotRecoveryEffectInFlightV1 = RecoveryEffectInFlightV1
-RecoveryExplanationSnapshotRecoveryEffectNeverAdmittedV1 = RecoveryEffectNeverAdmittedV1
-RecoveryExplanationSnapshotRecoveryEffectPartialV1 = RecoveryEffectPartialV1
-RecoveryExplanationSnapshotRecoveryEffectUnknownV1 = RecoveryEffectUnknownV1
-RecoveryExplanationSnapshotSafeInteger = SafeInteger
-RefusalCode = RecoveryExplanationSnapshotDefinitionsRefusalCode
-Scope = RecoveryExplanationSnapshotDefinitionsScope
-Source = RecoveryExplanationSnapshotObservationsItemsSource
-State = RecoveryExplanationSnapshotObservationsItemsStateGap
-State4 = RecoveryExplanationSnapshotObservationsItemsStateKnown
-State6 = RecoveryExplanationSnapshotObservationsItemsStateFreshnessQualified
-Target = RecoveryExplanationSnapshotObservationsItemsTargetIntent
-Target6 = RecoveryExplanationSnapshotObservationsItemsTargetDestination
-Target7 = RecoveryExplanationSnapshotObservationsItemsTargetAuthority
-Target8 = RecoveryExplanationSnapshotObservationsItemsTargetTemplate

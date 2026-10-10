@@ -8,10 +8,6 @@ mod original_installation;
 pub(in crate::admission_operation_store) const SQL: &str =
     include_str!("../../recovery_deployment_history.sql");
 
-#[cfg(feature = "admission-test-support")]
-#[path = "legacy_restore_actor_trace.rs"]
-mod legacy_restore_actor_trace;
-
 fn key(
     scope: &RecoveryScopeV1,
     digest: DeploymentDigest,
@@ -121,40 +117,4 @@ pub(in crate::admission_operation_store) fn original_record_deployment(
     original_key: &str,
 ) -> Result<Option<RecoveryDeploymentV1>, AdmissionOperationStoreError> {
     original_installation::for_record(tx, scope, original_key)
-}
-
-/// Resolve an old restore actor after the caller checks the original opaque
-/// capability, complete restore identity and purpose. No authority is minted.
-pub(in crate::admission_operation_store) fn original_restore_actor(
-    tx: &Connection,
-    scope: &RecoveryScopeV1,
-    restore_key: &str,
-    supplied_subject: &chio_core::PublicKey,
-) -> Result<
-    Option<(chio_security_types::PrincipalId, AuthorityScopeDigest)>,
-    AdmissionOperationStoreError,
-> {
-    #[cfg(feature = "admission-test-support")]
-    legacy_restore_actor_trace::entered();
-    let prefix = format!("knowledge-restore:{}:", scope_key(scope)?);
-    if restore_key.strip_prefix(&prefix).is_none_or(str::is_empty) {
-        return Err(invariant("legacy restore original scope changed"));
-    }
-    let Some(profile) = original_record_deployment(tx, scope, restore_key)? else {
-        return Ok(None);
-    };
-    let mut assignments = profile.actors.as_slice().iter().filter(|assignment| {
-        &assignment.subject == supplied_subject
-            && assignment
-                .permissions
-                .as_slice()
-                .contains(&RecoveryPermission::KnowledgeRead)
-    });
-    let Some(original) = assignments.next() else {
-        return Ok(None);
-    };
-    if assignments.next().is_some() {
-        return Err(invariant("legacy restore original actor is ambiguous"));
-    }
-    Ok(Some((original.principal.clone(), profile.authority_scope)))
 }

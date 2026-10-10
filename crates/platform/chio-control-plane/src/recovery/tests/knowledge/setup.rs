@@ -24,7 +24,7 @@ fn setup(f: &KnowledgeFixture, workflow: &WorkflowId) -> TestResult<RecoverySetu
         f.f.runtime.clone(),
         Arc::new(f.f.authority.admission_operation_store()),
         f.f.authority.mutation_fence(),
-        Some(Arc::new(f.runtime.clone())),
+        Arc::new(f.runtime.clone()),
         Keypair::from_seed(&[211; 32]),
         workflow.clone(),
     )?)
@@ -301,7 +301,7 @@ async fn replacement_after_profile_change() -> TestResult<Box<OperatorBootstrap>
         runtime: f.f.runtime.clone(),
         store: Arc::new(store),
         fence: f.f.authority.mutation_fence(),
-        knowledge: Some(Arc::new(f.runtime.clone())),
+        knowledge: Arc::new(f.runtime.clone()),
         operator: Keypair::from_seed(&[211; 32]),
     };
     let replacement = RecoverySetupService::for_creation(host, &f.f.control, &creation).await?;
@@ -389,7 +389,7 @@ async fn initial_operator_bootstrap() -> TestResult<Box<OperatorBootstrap>> {
         runtime: f.f.runtime.clone(),
         store: Arc::new(f.f.authority.admission_operation_store()),
         fence: f.f.authority.mutation_fence(),
-        knowledge: Some(Arc::new(f.runtime.clone())),
+        knowledge: Arc::new(f.runtime.clone()),
         operator: Keypair::from_seed(&[211; 32]),
     };
     let service = RecoverySetupService::for_creation(host, &f.f.control, &creation).await?;
@@ -523,15 +523,6 @@ async fn setup_missing_broker_and_failed_benign_cannot_unlock_work() -> TestResu
     let f = KnowledgeFixture::from(super::super::semantic::native_fixture("read")?)?;
     let seed = f.f.denied_seed_named("after-failed-benign").await?;
     let workflow = f.f.ready().await?;
-    assert!(RecoverySetupService::new(
-        f.f.runtime.clone(),
-        Arc::new(f.f.authority.admission_operation_store()),
-        f.f.authority.mutation_fence(),
-        None,
-        Keypair::from_seed(&[211; 32]),
-        workflow.clone()
-    )
-    .is_err());
     let service = setup(&f, &workflow)?;
     let original =
         f.f.record(&workflow)?

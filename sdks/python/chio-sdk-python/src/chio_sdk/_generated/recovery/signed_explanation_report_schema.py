@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 35f8e30cf30553986a159b074ee485804a85db29547a8102522cd7bfa3080d2e
+# Schema sha256: d2b29cbbc9a0070d3666a33fd5a06bbda07a8e70f6d54bf33c15ca8b74893ff9
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -126,25 +126,3 @@ class RecoverySignedExplanationReportV1(BaseModel):
     authority_key: constr(pattern='^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$')
     algorithm: RecoverySignedExplanationReportAlgorithm
     signature: constr(pattern='^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$')
-
-# Public compatibility aliases reference the actual current model classes.
-Algorithm = RecoverySignedExplanationReportAlgorithm
-Operation = RecoverySignedExplanationReportDefinitionsOperation
-RecoveryDigest32Item = RecoveryDigestOctet
-RecoverySignedExplanationReportDestinationId = DestinationId
-RecoverySignedExplanationReportOpaqueId = OpaqueId
-RecoverySignedExplanationReportRecoveryDigest32 = RecoveryDigest32
-RecoverySignedExplanationReportRecoveryDigestOctet = RecoveryDigestOctet
-RecoverySignedExplanationReportRecoveryEffectAdmissionUnresolvedV1 = RecoveryEffectAdmissionUnresolvedV1
-RecoverySignedExplanationReportRecoveryEffectAwaitingApprovalV1 = RecoveryEffectAwaitingApprovalV1
-RecoverySignedExplanationReportRecoveryEffectAwaitingCallerReportV1 = RecoveryEffectAwaitingCallerReportV1
-RecoverySignedExplanationReportRecoveryEffectClosedBeforeEffectV1 = RecoveryEffectClosedBeforeEffectV1
-RecoverySignedExplanationReportRecoveryEffectCompleteV1 = RecoveryEffectCompleteV1
-RecoverySignedExplanationReportRecoveryEffectFailedAfterEffectV1 = RecoveryEffectFailedAfterEffectV1
-RecoverySignedExplanationReportRecoveryEffectInFlightV1 = RecoveryEffectInFlightV1
-RecoverySignedExplanationReportRecoveryEffectNeverAdmittedV1 = RecoveryEffectNeverAdmittedV1
-RecoverySignedExplanationReportRecoveryEffectPartialV1 = RecoveryEffectPartialV1
-RecoverySignedExplanationReportRecoveryEffectUnknownV1 = RecoveryEffectUnknownV1
-RecoverySignedExplanationReportSafeInteger = SafeInteger
-RefusalCode = RecoverySignedExplanationReportDefinitionsRefusalCode
-Scope = RecoverySignedExplanationReportDefinitionsScope

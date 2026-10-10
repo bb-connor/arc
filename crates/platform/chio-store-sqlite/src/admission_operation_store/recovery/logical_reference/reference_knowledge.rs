@@ -80,8 +80,7 @@ fn require_retain_owner(owner: &ReferenceOwner) -> Result<(), AdmissionOperation
         ReferenceOwner::ProductReport { .. }
         | ReferenceOwner::ProductProposal { .. }
         | ReferenceOwner::ArchivePreparation { .. }
-        | ReferenceOwner::ArchiveDelivery { .. }
-        | ReferenceOwner::LegacyPinSource { .. } => Err(invariant(
+        | ReferenceOwner::ArchiveDelivery { .. } => Err(invariant(
             "knowledge intake cannot borrow another participant's source",
         )),
     }
@@ -100,8 +99,7 @@ fn require_retirement_owner(owner: &ReferenceOwner) -> Result<(), AdmissionOpera
         | ReferenceOwner::ProductReport { .. }
         | ReferenceOwner::ProductProposal { .. }
         | ReferenceOwner::ArchivePreparation { .. }
-        | ReferenceOwner::ArchiveDelivery { .. }
-        | ReferenceOwner::LegacyPinSource { .. } => Err(invariant(
+        | ReferenceOwner::ArchiveDelivery { .. } => Err(invariant(
             "knowledge retirement has no terminal authority for this owner",
         )),
     }

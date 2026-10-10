@@ -9,7 +9,6 @@ pub(in crate::admission_operation_store::knowledge) struct ArtifactReleaseRefere
     references: Vec<ArtifactVersionRefV1>,
     envelope: CanonicalPayloadDigest,
     source: protected::ProtectedSourceReference,
-    supporting_sources: Vec<protected::ProtectedSourceReference>,
     delivered: bool,
 }
 
@@ -32,16 +31,6 @@ impl ArtifactReleaseReferenceSource {
     }
     pub(in crate::admission_operation_store::knowledge) fn active(&self) -> bool {
         !self.delivered
-    }
-    pub(in crate::admission_operation_store::knowledge) fn source(
-        &self,
-    ) -> &protected::ProtectedSourceReference {
-        &self.source
-    }
-    pub(in crate::admission_operation_store::knowledge) fn supporting_sources(
-        &self,
-    ) -> &[protected::ProtectedSourceReference] {
-        &self.supporting_sources
     }
     pub(in crate::admission_operation_store::knowledge) fn terminal(
         &self,
@@ -71,8 +60,7 @@ pub(in crate::admission_operation_store::knowledge) fn artifact_reference_source
     let ArtifactReleaseKindV1::IndependentlyAdmitted { request } = &record.intent.kind else {
         return Err(refused("artifact release selected captured-output custody"));
     };
-    if (key != actor_request_key("knowledge-release", scope, &handle.principal, request)?
-        && key != legacy_release_key(scope, request)?)
+    if key != actor_request_key("knowledge-release", scope, &handle.principal, request)?
         || row.kind != "command"
         || row.scope != scope_identity
         || source.scope_key() != scope_identity
@@ -131,7 +119,6 @@ pub(in crate::admission_operation_store::knowledge) fn artifact_reference_source
     {
         return Err(refused("release changed its original native custody order"));
     }
-    let mut supporting_sources = vec![handle_source, observation];
     let mut pending = vec![record.intent.artifact.clone()];
     if let ArtifactSinkV1::Model { context } = &record.intent.recipient.sink {
         pending.extend_from_slice(context.side_files.as_slice());
@@ -186,8 +173,6 @@ pub(in crate::admission_operation_store::knowledge) fn artifact_reference_source
         if pending.len() > MAX_ARTIFACT_TRAVERSAL * MAX_ARTIFACT_DEPENDENCIES {
             return Err(refused("release retained dependency work overflow"));
         }
-        supporting_sources.push(pointer);
-        supporting_sources.push(publication_source);
         references.push(reference);
     }
     Ok(Some(ArtifactReleaseReferenceSource {
@@ -198,7 +183,6 @@ pub(in crate::admission_operation_store::knowledge) fn artifact_reference_source
             *chio_core::sha256(&admitted_bytes).as_bytes(),
         ),
         source,
-        supporting_sources,
         delivered: record.intent.state == ArtifactDeliveryStateV1::Delivered,
     }))
 }

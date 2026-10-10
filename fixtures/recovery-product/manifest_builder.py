@@ -39,6 +39,7 @@ ARCHIVE_SUFFIXES = (
 ARTIFACT_PREFIXES = (
     "docs/integrations/acceptance",
     "docs/architecture/recoverable-agent-runtime/implementation/p0/evidence",
+    "docs/architecture/recoverable-agent-runtime/implementation/history",
     "docs/architecture/recoverable-agent-runtime/implementation/p1/evidence",
     "docs/architecture/recoverable-agent-runtime/implementation/p2/evidence",
     "docs/architecture/recoverable-agent-runtime/implementation/p3/evidence",

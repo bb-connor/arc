@@ -162,44 +162,41 @@ fn highest_retained_revision(
     visible: u64,
 ) -> Result<u64, AdmissionOperationStoreError> {
     let mut highest = visible;
-    let legacy = head::legacy_checkpoint_key(scope, checkpoint, 0)?;
-    let modern = head::checkpoint_revision_key(scope, checkpoint, 1)?;
-    let modern = modern
+    let base = head::checkpoint_revision_key(scope, checkpoint, 1)?;
+    let base = base
         .strip_suffix(":1")
         .ok_or_else(|| refused("checkpoint revision prefix"))?;
-    for base in [legacy.as_str(), modern] {
-        let prefix = format!("{base}:");
-        let upper = format!("{base};");
-        let mut statement = connection
-            .prepare(
-                "SELECT record_key FROM (
-                     SELECT record_key FROM admission_operation_recovery_records
-                     WHERE record_key >= ?1 AND record_key < ?2
-                     UNION
-                     SELECT record_key FROM admission_operation_recovery_events
-                     WHERE record_key >= ?1 AND record_key < ?2
-                     UNION
-                     SELECT projection_key AS record_key FROM authority_global_commits
-                     WHERE projection_kind='recovery'
-                       AND projection_key >= ?1 AND projection_key < ?2
-                 ) WHERE length(record_key) > length(?1)
-                     AND substr(record_key,length(?1)+1) NOT GLOB '*[^0-9]*'
-                   ORDER BY record_key",
-            )
-            .map_err(sqlite_error)?;
-        let mut keys = statement.query([&prefix, &upper]).map_err(sqlite_error)?;
-        while let Some(row) = keys.next().map_err(sqlite_error)? {
-            let record_key: String = row.get(0).map_err(sqlite_error)?;
-            let retained =
-                super::reference_source::checkpoint_reference_source(connection, &record_key)?
-                    .ok_or_else(|| refused("checkpoint retained source disappeared"))?;
-            if retained.scope() != scope {
-                return Err(refused("checkpoint retained source scope"));
-            }
-            // Foreign numeric child identifiers keep their own custody.
-            if retained.checkpoint() == checkpoint {
-                highest = highest.max(retained.revision());
-            }
+    let prefix = format!("{base}:");
+    let upper = format!("{base};");
+    let mut statement = connection
+        .prepare(
+            "SELECT record_key FROM (
+                 SELECT record_key FROM admission_operation_recovery_records
+                 WHERE record_key >= ?1 AND record_key < ?2
+                 UNION
+                 SELECT record_key FROM admission_operation_recovery_events
+                 WHERE record_key >= ?1 AND record_key < ?2
+                 UNION
+                 SELECT projection_key AS record_key FROM authority_global_commits
+                 WHERE projection_kind='recovery'
+                   AND projection_key >= ?1 AND projection_key < ?2
+             ) WHERE length(record_key) > length(?1)
+                 AND substr(record_key,length(?1)+1) NOT GLOB '*[^0-9]*'
+               ORDER BY record_key",
+        )
+        .map_err(sqlite_error)?;
+    let mut keys = statement.query([&prefix, &upper]).map_err(sqlite_error)?;
+    while let Some(row) = keys.next().map_err(sqlite_error)? {
+        let record_key: String = row.get(0).map_err(sqlite_error)?;
+        let retained =
+            super::reference_source::checkpoint_reference_source(connection, &record_key)?
+                .ok_or_else(|| refused("checkpoint retained source disappeared"))?;
+        if retained.scope() != scope {
+            return Err(refused("checkpoint retained source scope"));
+        }
+        // Never infer identity from the key prefix alone.
+        if retained.checkpoint() == checkpoint {
+            highest = highest.max(retained.revision());
         }
     }
     Ok(highest)

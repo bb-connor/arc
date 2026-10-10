@@ -32,7 +32,7 @@
       "recorded_not_closed": 229
     },
     "additional": {
-      "total": 21,
+      "total": 22,
       "recorded_scoped_closed": 19,
       "recorded_not_closed": 1
     },
@@ -49,17 +49,17 @@
       "total": 1,
       "excluded_from_implementation_finding_counts": true
     },
-    "current_or_executed_support_findings": 350,
+    "current_or_executed_support_findings": 351,
     "implementation_recorded_scoped_closed": 118,
     "implementation_recorded_not_closed": 231,
-    "findings_and_prevented_candidates": 394,
-    "all_records_including_provenance": 395,
-    "assigned_finding_ids_excluding_provenance": 371,
+    "findings_and_prevented_candidates": 395,
+    "all_records_including_provenance": 396,
+    "assigned_finding_ids_excluding_provenance": 372,
     "qualified": 0,
     "current_status": {
       "candidate_only": 44,
       "needs_revalidation": 37,
-      "open": 224,
+      "open": 225,
       "prerequisite_only": 1,
       "recorded_scoped_closed": 89
     },
@@ -75,7 +75,7 @@
       },
       "additional": {
         "P1": 2,
-        "P2": 11,
+        "P2": 12,
         "P3": 8
       },
       "supplemental_pr": {
@@ -115,20 +115,20 @@
         "open": 223
       },
       "additional": {
-        "total": 21,
+        "total": 22,
         "scoped_dispositions": 21,
-        "open": 0
+        "open": 1
       },
       "supplemental_pr": {
         "total": 1,
         "scoped_dispositions": 0,
         "open": 1
       },
-      "maintained_or_executed_support": 350,
+      "maintained_or_executed_support": 351,
       "scoped_dispositions": 126,
       "currently_applicable_scoped_closed": 89,
       "historical_scoped_needing_revalidation": 37,
-      "open": 224,
+      "open": 225,
       "qualified": 0
     }
   },
@@ -642,7 +642,549 @@
           ],
           "independent_next_exit": "CP-F01: unchanged real contracts Cargo command, original inspector, positive and aggregate profile acceptance, and refusal of unrelated compiled subjects. Failed attempt02 and repair are preserved; successful acceptance remains pending."
         }
-      ]
+      ],
+      "implementation_pass": {
+        "at_utc": "2026-10-10T05:23:14.912532+00:00",
+        "starting_head": "4b9229dca4329141ba3c929264ef71aee12e37c6",
+        "state": "not_approved_source_reconciliation_in_progress",
+        "scope": "Implementation checkpoint is not approved. Unsupported generic contract summaries and blanket per-record assessments were retracted. The reconciliation entries identify inspected corrections and explicitly unfinished facets; their presence does not complete the implementation pass. Original findings, acceptance obligations and historical dispositions are unchanged.",
+        "blockers": {
+          "native_original_financing": {
+            "dependency": "Maintained AdmissionOperationStore inherits unsupported prepare_original_native_finishing. Real preparation must bind the physical Prepared account, selected Process and exact cumulative producer roster. The retained genuine Process plan requires CaptureTail, Reference and Receipt producers; Capture workflow-identity/cumulative-roster implementation is parked. No marker, supplier callback, partial roster or candidate overlay can replace it.",
+            "source_refs": [
+              "crates/kernel/chio-kernel/src/admission_operation/store.rs",
+              "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/finishing_funding.rs",
+              "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/process-foundation/owning-test-fixtures/dependency-plan.md",
+              "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/process-foundation/prerequisite-clarification.md"
+            ]
+          },
+          "complete_native_source_cohort": {
+            "dependency": "Maintained format 40 cannot activate the complete native influence/original-owner cohort. original_owner requires format 41 with complete authenticated native output/status/artifact sources and genuine finishing funding. The active reader retains the authority-wide 4096 history bound. Enabling a partial catalog or fabricating origins would bypass the parked Capture dependency.",
+            "source_refs": [
+              "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/knowledge.rs",
+              "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/knowledge/current_authority.rs",
+              "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/original_owner.rs"
+            ]
+          },
+          "excluded_primary_execution": {
+            "dependency": "Original mandatory live-provider/cloud/OCI/SSH/native-controller/isolation primary execution is excluded by the handoff. Local verifier/fixture/ordinary-compiler checks remain permitted and required; they cannot substitute for primary results.",
+            "source_refs": [
+              "docs/architecture/recoverable-agent-runtime/10-delivery-decisions.md"
+            ]
+          },
+          "parked_capture": {
+            "dependency": "Capture workflow-identity/cumulative-roster implementation and rejected review remain parked, using the retained descriptions without retry, reconstruction or import.",
+            "source_refs": [
+              "#/continuation/working_queue/items/0"
+            ]
+          }
+        },
+        "execution_questions": [
+          "Kani 0.68.0 original public harness panicked at intrinsics.rs:243, expected I32. Determine the actual intrinsic/type via permitted execution without weakening or skipping the harness.",
+          "Recalculate current Store compile/strict-lint diagnostics. Staged native producer/cohort members cannot be silenced with allowances or fake consumers.",
+          "Execute the public legacy terminal migration regression. Native preparation refusal before capture does not accept terminal retirement."
+        ],
+        "ci_source_repairs": [
+          "iroh-blobs minimum 0.103.1 plus required cfg_aliases 0.2.2 replaces yanked lock entry.",
+          "Borrowed native flow-join context addresses known excessive-arguments owning diagnostic."
+        ],
+        "ci_remaining": [
+          "Current enterprise workflow defines GH_TOKEN, but CI calls an older immutable trusted revision. Exact trusted-definition/base reconciliation remains after local gate.",
+          "Parked syntax/naming work remains excluded; no structural gate weakening.",
+          "No push or hosted execution before mandatory local gates and required review."
+        ],
+        "reconciliation": {
+          "unsupported_default_assessments_retracted": 187,
+          "remaining": "Inspect exact original obligations and maintained corrections per shared contract; implement omitted permitted repairs and distinguish partial local repairs from unresolved native/controller obligations.",
+          "diagnostic": "Legacy worker-scoped fixture regression passes. Legacy terminal intake still fails captured/closed/settled assertion; terminal retirement is not accepted.",
+          "diagnostic_evidence": "target/recovery-pr/current-review-followup/sole-owner-stabilization-20261010/legacy-terminal-after-worker-repair-result.json",
+          "contracts": {
+            "host_immutable_extern_authority": {
+              "findings": [
+                "CP-F02"
+              ],
+              "maintained_correction": "compiler_immutable_externs grants declared immutable edges only from verified_native_inputs; inspect_compiler_profile_request and audit_compiled_profile set that input to None in host mode. Linux paths derive it from audit_compilation_scope_data, never the declared role/scope alone.",
+              "source": "scripts/verify-recovery-qualification.py:2546,3729,3933,4543,4723",
+              "remaining_permitted_change": "Added original host inspector refusal plus conservative-toolchain positive regression; execution deferred. Existing helper-only regression does not establish actual host compilation.",
+              "remaining_native_obligation": "Genuine Linux protected-scope producer/consumer joins require excluded original native-controller/isolation execution.",
+              "evidence": "target/recovery-safety-remediation/all-findings/qualification/compiler-consumer/final-profile-repair/progress/progress.json#/findings/1",
+              "state": "partial_local_repair_native_acceptance_unresolved"
+            },
+            "primary_launcher_capture": {
+              "findings": [
+                "CP-F06"
+              ],
+              "maintained_correction": "Current public audit routes only to audit_current_primary_compiler_probes. It joins original launcher observation to logged controller result, per-stream original path/size/hash and the exact original namespace audit; legacy unbound decoder is not selected.",
+              "source": "scripts/verify-recovery-qualification.py:5215-5291,5322",
+              "remaining_permitted_change": "Inspected exact authorized e3b2cca4 controller: held LauncherCapture verifies full inode/path identity, readback bytes, size/hash and immutable permissions through original audit and per-case result publication; LauncherObservation retains the same descriptors. Current decoder joins those original observations. Final all-case result follows per-case release, and known descendant-cleanup corrective candidates remain separately unresolved; do not credit portable joins as physical controller acceptance.",
+              "remaining_native_obligation": "Actual original nine-case controller namespace, timeouts and physical stream custody require excluded native-controller/isolation campaign.",
+              "evidence": "target/recovery-safety-remediation/all-findings/qualification/compiler-consumer/primary-probe-package-successor/independent-current-package-review/maintained-promotion/REPORT.md",
+              "state": "partial_local_repair_native_controller_obligations_unresolved",
+              "source_refs": [
+                "scripts/verify-recovery-qualification.py:5241",
+                "target/recovery-pr/current-review-followup/compiler-qualification/20261007T145410.123191Z/public-native-authorization-bound-proc-macro-input-successor/run-public-compiler-campaign-current.py:114"
+              ]
+            },
+            "primary_payload_and_argv": {
+              "findings": [
+                "CP-F07"
+              ],
+              "maintained_correction": "checked_primary_compiler_contract pairs fixed authorization hashes and exact six-tool roster; checked_public_launcher_observation enforces approved case command template/configuration. audit_current_primary_compiler_probes checks original report and typed outside publication outcomes.",
+              "source": "scripts/verify-recovery-qualification.py:4010-4054,4945-4992,5215-5320",
+              "remaining_permitted_change": "Inspected exact 0658e3 authorization and e3b2cca4 controller payload checks. Approved GNU payload writes constant.rs, compiles the pinned proc-macro and GNU main with exact extern/libm, executes that produced binary and requires 14; approved MUSL payload reads produced ELF header/program headers and executes that produced binary. Portable decoder still consumes their recorded observation plus verified compilation count, not an independently reconstructed subject-level generated/macro/ELF join. Do not classify full CP-F07 accepted from parser tests or printed observations.",
+              "remaining_native_obligation": "Actual current GNU/musl generated, macro, executable and ELF observations require excluded original campaign.",
+              "evidence": "target/recovery-safety-remediation/all-findings/qualification/compiler-consumer/primary-probe-package-successor/independent-current-package-review/repair-two/FINAL.json",
+              "state": "partial_local_repair_subject_join_reconciliation_pending"
+            },
+            "compiler_execution_and_generator_authority": {
+              "findings": [
+                "CR-S01"
+              ],
+              "maintained_correction": "Recorder supports scoped native/dynamic linkage and enforced Linux scope construction, retains read scopes and source/extern byte bindings. These are narrower than the original complete execution/generator obligation.",
+              "source": "scripts/record-rust-compilation.py:1048-1150,2145-2182,2264-2328,3040-3060",
+              "remaining_permitted_change": "Generated inventory explicitly says individual_writer_authority and transient_output_coverage are not established. Full original task is not implemented; reconcile generator-owner contract before claiming complete repair. This is an implementation gap, not merely a blocked test.",
+              "remaining_native_obligation": "Actual enforced read/write/evidence/network/forged IPC and GNU/musl qualification are excluded campaigns.",
+              "evidence": "target/recovery-safety-remediation/all-findings/qualification/compiler-recorder/independent-review/report.md",
+              "state": "partial_local_repair_permitted_scope_reconciliation_pending"
+            },
+            "recovery_command_accounting": {
+              "findings": [
+                "C2-01",
+                "C2-02",
+                "C2-03",
+                "R2-R-quota-01",
+                "R2-R-quota-03",
+                "R2-X-resources-02",
+                "AQ-read-alias-idempotency-contract"
+              ],
+              "maintained_correction": "commands::inspect_or_replay answers authorized Inspect before writes; workflow_reservations owns six command slots and separate planning/control/native allowances; storage::generic_pool partitions participant families. Same-value aliases retain exact reply/body/accepted generation as cold intake, without workflow finishing debt. They are bounded per record, not by a global alias lifetime counter.",
+              "source": "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/{commands.rs,workflow_reservations.rs,storage.rs,settled_command_aliases.rs}",
+              "remaining_permitted_change": "Reconcile all quota/price callers and physical admission debt before declaring integration complete. Original full command-identity and foreign-pressure regressions remain required.",
+              "remaining_native_obligation": "Capture/settle/finality positive acceptance depends on actual original physical finishing preparation; polling-only success cannot establish it.",
+              "state": "local_source_correction_present_native_integration_unresolved"
+            },
+            "active_workflow_retirement": {
+              "findings": [
+                "C2-04"
+              ],
+              "maintained_correction": "Active allocation counters retain immutable originals while cancellations and authenticated native terminals retire leases. New initialize scan also processes already-captured legacy terminals after all tenant baselines exist.",
+              "source": "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/active_workflows.rs:251-386,585-648",
+              "remaining_permitted_change": "Legacy fixture worker selection repaired. Public terminal migration test still fails its required terminal assertion; diagnostic assertion now retains the workflow state. Resolve actual pre-terminal cause during later focused stabilization.",
+              "evidence": "target/recovery-pr/current-review-followup/sole-owner-stabilization-20261010/legacy-terminal-after-worker-repair-result.json",
+              "state": "integrated_source_change_acceptance_failed"
+            },
+            "physical_headroom": {
+              "findings": [
+                "R2-R-quota-02",
+                "R2-X-authority-03",
+                "R2-X-resources-01"
+              ],
+              "maintained_correction": "resources::PhysicalUsage has only free disk and uncheckpointed WAL backlog. wal_backlog subtracts checkpointed frames; PASSIVE runs outside writers and a read-only observer measures pressure inside transactions. Whole database length is not an admission ceiling.",
+              "source": "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/resources.rs:21-170",
+              "remaining_permitted_change": "Added current-source resource guidance in current-reproduction.md; historical operations bytes remain unchanged. Physical-liability caller reconciliation remains pending; generic family event guards do not establish native financing.",
+              "remaining_native_obligation": "Large shared database and pinned-reader capture/settlement acceptance still needs actual financing; helper arithmetic tests alone are insufficient.",
+              "state": "local_source_correction_present_native_integration_unresolved"
+            },
+            "original_native_finishing": {
+              "findings": [
+                "C1-01",
+                "C1-02",
+                "C1-09",
+                "G-product-13",
+                "R2-R-origin-01",
+                "R2-X-authority-02",
+                "OrdinaryRecordedReturnCapturedOwnerRestoration",
+                "candidate:kernel-foundation-ordinary-durable-original",
+                "candidate:receipt-owner-borrowed-backend-lifetime"
+              ],
+              "maintained_correction": "original_resolution queries authenticated namespace plus request and revalidates the retained operation id; ordinary durable calls without selected Native originals remain eligible. Kernel preparation holds the mutation sequencer through Store preparation, Process enrollment and readback. security_release tries native caller, recovery and recorded-native owner restoration before refusing. Optional receipt registration preserves ordinary borrowed sinks. Final egress commit checks absolute fence/grant/lease deadlines separately from immutable event-time skew, without rewriting retained event bytes.",
+              "source_refs": [
+                "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/original_resolution.rs",
+                "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_finishing.rs",
+                "crates/kernel/chio-kernel/src/kernel/admission_coordinator/security_release.rs"
+              ],
+              "remaining_permitted_change": "Recorded-return restoration authenticates retained envelope, native capture/ledger digest, original context/grant, raw return and evaluation before constructing a release-only owner. Found and repaired a remaining final-writer five-second skew check: final authority expiry now uses a fresh clock while immutable event validation retains its original skew bound. Added delayed commit, separate fence/lease rollback and declassification grant deadline regression source; execution deferred. Original public ordinary/declassified and post-restart positive controls remain required.",
+              "remaining_native_obligation": "Store inherits unsupported prepare/enroll/restore/confirm original finishing defaults. The retained genuine Process dependency plan requires CaptureTail, Reference and Receipt producers; parked Capture workflow-identity/cumulative-roster integration prevents complete native financing. No default success can discharge this.",
+              "evidence": "target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/process-foundation/owning-test-fixtures/dependency-plan.md",
+              "state": "partial_integration_blocked_financing_with_independent_reconciliation_pending"
+            },
+            "preauthentication_and_reserved_work": {
+              "findings": [
+                "R2-X-resources-03",
+                "G-product-03",
+                "authentication-operational-error-category",
+                "duplicate-principal-native-headroom-order",
+                "duplicate-subject-shared-command-headroom-order",
+                "forged-token-authentication-backlog-refusal",
+                "neighbor-route-preauthentication-native-admission",
+                "PR-SETTLEMENT-CAPACITY-01"
+              ],
+              "maintained_correction": "Recovery routes decode and authenticate before native permits. Principal limiter runs before class and total permits. Settlement uses distinct authentication, principal limiter and executor. Connector submissions and lookups have separate owned semaphores; semantic prepared connection owns its one-use permit before native capture.",
+              "source_refs": [
+                "crates/platform/chio-control-plane/src/recovery/transport.rs",
+                "crates/platform/chio-control-plane/src/recovery/transport/admission.rs",
+                "crates/platform/chio-control-plane/src/recovery/connector.rs",
+                "crates/platform/chio-control-plane/src/semantic/connector.rs"
+              ],
+              "remaining_permitted_change": "Inspected actor_authentication: policy denials retain AuthorityDenied, operational failures remain Unavailable. command_executor checks duplicate principal before total permit, and the owned queued/running permit survives caller disconnect. No additional source gap established in these paths; mounted controls and the genuine native settlement positive remain required.",
+              "remaining_native_obligation": "Four-provider-waiter plus genuine native lookup/attachment/finality positive remains dependent on physical original finishing preparation; no semaphore/helper substitute.",
+              "state": "partial_local_repair_native_acceptance_unresolved"
+            },
+            "semantic_annotations_prerequisites_and_output_floor": {
+              "findings": [
+                "D-semantic-01",
+                "D-semantic-02",
+                "D-semantic-03",
+                "D-semantic-04",
+                "R2-X-flow-01",
+                "UnknownSelectedAnnotationFirstPublicReturnDisclosure"
+              ],
+              "maintained_correction": "Both connectors use typed HttpEgressContract. assess_current_annotations demands selected signer/input pairs and current signed restrictions. Pure prerequisite verification rejects dependent input version/material mismatch and enforces expiry; Store revocation fence survives replay and reinstatement requires a newer signed proof and exact generation. Captured output classification joins contract/source/ACL audience and raises incomplete annotation/status provenance to Top.",
+              "source_refs": [
+                "crates/platform/chio-control-plane/src/recovery/connector.rs",
+                "crates/platform/chio-control-plane/src/semantic/http.rs",
+                "crates/security/chio-semantic-contracts/src/verification.rs:474",
+                "crates/platform/chio-store-sqlite/src/admission_operation_store/semantic/annotations.rs",
+                "crates/platform/chio-store-sqlite/src/admission_operation_store/semantic/materialization.rs:375",
+                "crates/platform/chio-store-sqlite/src/admission_operation_store/semantic/output.rs:155"
+              ],
+              "remaining_permitted_change": "No additional defect established in these inspected predicates. Owning omission/stale/wrong-version/expiry/reinstatement/finite-output controls remain required on final source.",
+              "remaining_native_obligation": "Public native capture/disclosure acceptance cannot be replaced by preparation refusal and depends on original physical funding.",
+              "state": "maintained_local_correction_identified_validation_pending"
+            },
+            "scoped_native_influence": {
+              "findings": [
+                "D-semantic-05",
+                "R2-X-flow-02",
+                "R2-X-resources-04",
+                "R2-X-resources-05"
+              ],
+              "maintained_correction": "Registry field/dependency indexes charge bounded lookups. New semantic materialization precharges knowledge history before decoding. Imported nonempty source history is held. These repairs do not implement a bounded complete native influence accumulator.",
+              "source_refs": [
+                "crates/security/chio-semantic-contracts/src/registry.rs",
+                "crates/platform/chio-store-sqlite/src/admission_operation_store/semantic/materialization.rs",
+                "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/knowledge.rs",
+                "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/knowledge/current_authority.rs"
+              ],
+              "remaining_permitted_change": "Active observed_influence still scans all authority knowledge joins and head refuses above 4096. Complete Output/Status/artifact source cohort and tenant-scoped authenticated projections are not active. A partial knowledge-only cache would omit required provenance.",
+              "remaining_native_obligation": "Complete source-cohort activation and funded native output producers depend on original funding and parked Capture cumulative-roster integration. Preserve this incomplete obligation; precharge success is not closure.",
+              "state": "partial_local_repair_complete_source_cohort_unresolved"
+            },
+            "knowledge_reference_and_publication_lifetimes": {
+              "findings": [
+                "E-knowledge-02",
+                "R2-R-checkpoint-01",
+                "R2-X-resources-04",
+                "KN-PUBLICATION-ALLOCATION-PROVENANCE-01"
+              ],
+              "maintained_correction": "Handle identity hashes principal/artifact/recipient/generation and replays without a new append. Tenant/domain ReferenceAccount plus per-artifact active bucket inventory replaces global pin scans. Publication capacity uses baseline+admitted-collected with 512 live slots; immutable allocation identity excludes mutable certification.",
+              "source_refs": [
+                "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/release.rs:137",
+                "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/references/ready.rs",
+                "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/references/reader.rs",
+                "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/publication_capacity.rs"
+              ],
+              "remaining_permitted_change": "Collection calls acknowledge_collection inside the owning transaction only after sealed physical collection acknowledgment. It checks original allocation/current authenticated heads, verified retired source preceding the barrier and complete collected-reference closure; repeated acknowledgment cannot return a second slot. Cold path visits every authenticated original publication source. Reference readiness uses V3 complete writer coverage and holds predecessor markers conservatively. Current-source migration/lifecycle validation remains required.",
+              "remaining_native_obligation": "Native recipient/restore/physical debt producers are required for acceptance beyond helper reference/account tests.",
+              "state": "partial_local_lifetime_repairs_caller_reconciliation_pending"
+            },
+            "chunked_knowledge_encoding": {
+              "findings": [
+                "KN-ENCODING-CHUNK-01",
+                "checkpoint-valid-envelope-protected-record-bound"
+              ],
+              "maintained_correction": "VerifiedKnowledgeEncodingWrite binds authentic Journal/Restore source, canonical full body and exact immutable chunk prefix. prepare and concrete persist both verify pristine complete prefix before writes; the concrete writer checks current root CAS, owner transaction, total bytes and each planned absence.",
+              "source_refs": [
+                "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/encoding/write.rs",
+                "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/knowledge_encoding.rs"
+              ],
+              "remaining_permitted_change": "Restore admission persists exact encoding then retain_restore_references calls restore_reference_source, which typed-decodes the persisted encoding and checks exact actor, scope and native identity in the same writer. Delivered acknowledgment similarly retires references through typed source readback. Original distinct_labels positive still returns an error on representation overflow and demands delivered framing plus exact finite joins. No weakening or replacement of that acceptance.",
+              "state": "maintained_local_correction_identified_validation_pending"
+            },
+            "knowledge_public_views_and_transfer": {
+              "findings": [
+                "E-knowledge-03",
+                "E-knowledge-04",
+                "KN-AUDIENCE-01"
+              ],
+              "maintained_correction": "Public KnowledgeRuntime::reserve returns ArtifactPublicationViewV1, while private seals remain in Store/broker custody. Public release and restore return ArtifactDeliveryOutcomeV1 containing only opaque release and state. Copy/archive/import acceptance checks origin.flows_to(destination), including every imported version; quarantined legacy blob custody is not adopted by a new logical publication.",
+              "source_refs": [
+                "crates/platform/chio-control-plane/src/knowledge.rs:175",
+                "crates/platform/chio-control-plane/src/knowledge/outcome.rs",
+                "crates/platform/chio-control-plane/src/recovery/tests/knowledge.rs:664",
+                "crates/kernel/chio-process/src/store/blobs.rs"
+              ],
+              "remaining_permitted_change": "Confirmed publication.rs allocates a fresh random logical object independently of content. Process store/objects.rs stages by (process,object) with exact immutable content and generation, never content-deduplicates against legacy blob rows. Legacy blob migration quarantines prior rows. Current public reserve/release/restore/copy/archive/import controls remain required; no additional source gap found in inspected projection/storage paths.",
+              "evidence": "target/recovery-safety-remediation/all-findings/knowledge/CURRENT-EXECUTION-MAP.native-storage-lifecycle.json",
+              "state": "partial_local_repair_caller_reconciliation_pending"
+            },
+            "protected_setup_and_signed_responses": {
+              "findings": [
+                "G-product-01",
+                "G-product-02",
+                "G-product-04",
+                "G-product-15",
+                "R2-R-setup-01",
+                "R2-X-wire-compat-02"
+              ],
+              "maintained_correction": "SetupRuntime::probe_inner calls setup_preparation before the benign effect. Store preparation checks original fence, expiry and current uncaptured source; typed failures map to ProbeExpired/RestartRequired/Conflict. Accepted identical setup can re-attest beyond its first window only through retained_qualification; current exact profile and completed original receipt remain required. Required coverage hashes authenticated recovery, semantic, knowledge and optional confinement installations. CLI probe binds requested workflow and qualify binds the full supplied signed probe and authority.",
+              "source_refs": [
+                "crates/platform/chio-control-plane/src/recovery/setup.rs:213",
+                "crates/platform/chio-store-sqlite/src/admission_operation_store/setup/service.rs:203",
+                "crates/platform/chio-store-sqlite/src/admission_operation_store/setup/service.rs:347",
+                "crates/platform/chio-store-sqlite/src/admission_operation_store/setup/inventory.rs",
+                "crates/products/chio-cli/src/recovery.rs:389"
+              ],
+              "remaining_permitted_change": "Source reconciliation is incomplete for explicit completed-legacy retirement: retire_legacy_setup still unconditionally refuses. The original same-namespace predecessor acceptance is retained and cannot be replaced by synthetic history. Do not classify this implementation as repaired merely because preparation and signed-response predicates were fixed.",
+              "remaining_native_obligation": "Unused-source replacement calls original_owner::retire_unused_setup_generation_with_origin, whose format-41 original-owner/cohort prerequisite is inactive at maintained format 40. Genuine completed legacy retirement needs exact historical native custody and consumed-origin fencing; ordinary selection replacement must not bypass those requirements.",
+              "evidence": "target/recovery-safety-remediation/all-findings/product/current-owned-progress.json#/findings/7",
+              "state": "partial_local_repair_original_retirement_unimplemented"
+            },
+            "confined_return_custody": {
+              "findings": [
+                "F-confinement-01",
+                "F-confinement-02",
+                "F-confinement-03",
+                "I-evidence-qualification-04"
+              ],
+              "maintained_correction": "Public stage returns opaque custody; classified staged evidence has a separate audience-governed review. deliver records Uncertain before sink I/O and creates affine ConfinedDeliveryError immediately from the actual sink result before any fallible acknowledgment. Reconcile retains original actor/admission and known fate, never repeats the sink. Store acknowledgment checks original admission under current fence without renewing launch or disclosure authority and cannot downgrade Delivered.",
+              "source_refs": [
+                "crates/platform/chio-control-plane/src/confinement/execution.rs:286",
+                "crates/platform/chio-control-plane/src/confinement.rs:240",
+                "crates/platform/chio-control-plane/src/confinement/acknowledgement.rs",
+                "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/confinement/returns.rs:496"
+              ],
+              "remaining_permitted_change": "Maintained run-confined-return-linux-acceptance.py uses exact current CASES, verifies actual compiled registration, sets CHIO_CONFINED_CANARY_MODE for each measured image, and sets current reader/canary environment. Canary rejects an unconfigured runtime mode. Current-reproduction.md identifies the maintained runner; historical operations, producers and seals remain unchanged. Local runner controls remain required.",
+              "remaining_native_obligation": "Original strict Linux cage/canary/enforcement execution is an excluded isolation campaign. Local refusal or synthetic sink success cannot close it.",
+              "evidence": "target/recovery-safety-remediation/all-findings/report/proof-catalog/20261006T232459.739266Z/final-cli-linux-and-peer-scoped-proof-update.json",
+              "state": "partial_local_repair_native_qualification_excluded"
+            },
+            "current_heads_and_preview_authority": {
+              "findings": [
+                "AQ-current-source-head-contract",
+                "AQ-metadata-current-head-integration",
+                "AQ-reader-absence-contract",
+                "R2-X-flow-03",
+                "C2-08-retained-absence-coarsening"
+              ],
+              "maintained_correction": "raw_checked refuses retained-only missing projections; source_reference checks latest authenticated event/global head. Active allocation and workflow quota readers invoke both before using mutable counters. workflow_preview_tx coarsens genuine absence to AuthorityDenied and joins original plus current flow restrictions; retained-source corruption remains operational failure. Commands inspect/replay and native::settle apply preview before mutation or conflict disclosure. Transport preserves closed policy versus operational error categories.",
+              "source_refs": [
+                "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/storage.rs",
+                "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/active_workflows.rs:78",
+                "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/workflow_reservations.rs:429",
+                "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/preview.rs",
+                "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/native.rs:528",
+                "crates/platform/chio-control-plane/src/recovery/native_store_errors.rs"
+              ],
+              "remaining_permitted_change": "No additional source defect identified in inspected exact-key/current-head/preview callers. Owning stale-authentic-head, retained-only absence and mounted hidden-versus-absent controls remain required; no helper pass substitutes for the actual settlement path.",
+              "state": "maintained_local_correction_identified_validation_pending"
+            },
+            "product_active_lifecycle": {
+              "findings": [
+                "G-product-06",
+                "G06-STARTUP-RETIRED-CUSTODY-01",
+                "G06-REPLAY-CONFLICT-AUDIENCE-01"
+              ],
+              "maintained_correction": "complete_policy_review validates independently applied policy receipt and exact current policy in the same writer; immutable dispositions retire only their own active inventory/quota members. archive requires Maintain, current audience and no active dependent Proposal before releasing Report evidence. verify_terminal_reference_retirements checks each exact original and retired leaf. Existing Proposal replays authorize current reader and joined retained audience before conflict.",
+              "source_refs": [
+                "crates/platform/chio-store-sqlite/src/admission_operation_store/product/lifecycle.rs",
+                "crates/platform/chio-store-sqlite/src/admission_operation_store/product/lifecycle/inventory.rs",
+                "crates/platform/chio-store-sqlite/src/admission_operation_store/product/lifecycle/archive.rs",
+                "crates/platform/chio-store-sqlite/src/admission_operation_store/product/evidence_reclamation/source.rs",
+                "crates/platform/chio-store-sqlite/src/admission_operation_store/product/proposals.rs:96"
+              ],
+              "remaining_validation": "Owning >64 report/>16 Proposal, replay, failed application rollback, restart, retired-leaf inverse and audience-before-conflict controls on final integrated source. No new source defect identified in these inspected paths.",
+              "state": "maintained_local_correction_identified_validation_pending"
+            },
+            "process_knowledge_closure_fences": {
+              "findings": [
+                "PROCESS-CLOSURE-LIVE-HEADER-01",
+                "PROCESS-CLOSURE-LIVE-CATALOG-01",
+                "PROCESS-CLOSURE-PUBLIC-RAW-PROJECTION-01",
+                "PROCESS-CLOSURE-PUBLIC-ACTIVATION-01"
+              ],
+              "maintained_correction": "enable_knowledge verifies closure and confined-delivery catalogs before changing the header inside Immediate. Both raw/enforced readers reverify those catalogs on each live operation; public_process hides checkpoint content whenever raw authority fails. Participant admission verifies closure catalog and exact process/operation permanent closure inside its writer.",
+              "source_refs": [
+                "crates/kernel/chio-process/src/store/knowledge.rs",
+                "crates/kernel/chio-process/src/store/unused_recovery_reservation.rs"
+              ],
+              "remaining_validation": "Owning populated-header downgrade, missing closure family, raw public projection and activation rollback controls; complete native finishing enrollment remains a separate blocked obligation.",
+              "state": "maintained_local_correction_identified_validation_pending"
+            },
+            "sdk_generated_identity_and_publication": {
+              "findings": [
+                "SDK-DESIGN-01",
+                "SDK-DESIGN-02",
+                "SDK-DESIGN-03",
+                "SDK-INTEGRATION-01",
+                "SDK-INTEGRATION-02",
+                "SDK-INTEGRATION-04",
+                "SDK-INTEGRATION-05",
+                "SDK-INTEGRATION-09"
+              ],
+              "maintained_correction": "AST model namespace accounts bindings in execution order, refuses overwritten actual class/dependency bindings and captures aliases at assignment. Dependency fingerprints include nominal contract identity; compatibility approval binds exact before/after plus version transition. Generated tree is copied completely to owned sibling before atomic Linux/macOS exchange; failed preparation preserves maintained tree. Literal field discovery excludes only the exact owned action-validator block before applying the existing strict class-field parser; arbitrary over-indented fields still refuse.",
+              "source_refs": [
+                "xtask/src/codegen/python_api_stability.py:330",
+                "xtask/src/codegen/python_api_stability.py:624",
+                "xtask/src/codegen/python_api_stability.py:686",
+                "xtask/src/codegen/python_publish.rs",
+                "xtask/src/codegen/python_recovery_models.rs:168"
+              ],
+              "remaining_validation": "Public generator and installed model compatibility controls including original overwrite, declaration-time alias, nominal dependency, copy-failure and typed method-parameter regressions; no historical helper result promoted to current generation.",
+              "evidence": "target/recovery-safety-remediation/all-findings/sdk/progress/published-current-additive-owner-declarations-20261007T001840Z.json",
+              "state": "maintained_local_correction_identified_validation_pending"
+            },
+            "sdk_native_state_and_host_lifetime": {
+              "findings": [
+                "H-SDK-01",
+                "H-SDK-03",
+                "H-SDK-08",
+                "H-SDK-09",
+                "H-SDK-10",
+                "SDK-INDEPENDENT-01",
+                "additional:sdk-sync-admission-readiness",
+                "candidate:sdk-completed-delivery-teardown"
+              ],
+              "maintained_correction": "RecoveryHostOutcome preserves native effect, control, release and fixed errors independently. Python AsyncClient disables ambient proxies and redirects; client preserves mount path. Python/TS use 120 seconds for setup, 20 otherwise, and bounded 1..120 override. TS lossless parser applies foundation resource projection while retaining exact opaque result JSON. Sync host delivers completed owned work before unrelated loop teardown, with one-time admission release; resistant request/cleanup keeps admission.",
+              "source_refs": [
+                "sdks/python/chio-sdk-python/src/chio_sdk/recovery.py",
+                "sdks/python/chio-sdk-python/src/chio_sdk/recovery_host.py",
+                "sdks/python/chio-sdk-python/src/chio_sdk/recovery_host_outcome.py",
+                "sdks/typescript/packages/node-http/src/recovery.ts"
+              ],
+              "remaining_permitted_change": "Added scheduler-refusal cleanup for both initial request task and teardown task: close the unstarted coroutine, avoid dispatch on initial refusal, preserve an already received native outcome on teardown refusal, and release request admission in the existing finally. Added both regressions; unexecuted. Scheduler refusal cannot establish that native client teardown completed.",
+              "remaining_validation": "SDK state matrix, direct loopback/proxy controls, deadlines, metadata bounds, running-loop CrewAI and sync teardown controls. Actual mounted native/provider campaign remains separate and cannot be substituted by SDK responses.",
+              "state": "partial_local_repair_lifetime_reconciliation_pending"
+            },
+            "cli_compatibility_aliases": {
+              "findings": [
+                "G-product-05",
+                "H-SDK-02"
+              ],
+              "maintained_correction": "All six process evidence emitters output both qualification_complete and m5_acceptance_complete with identical false semantics. No emitted compatibility key was removed by current changes.",
+              "source_refs": [
+                "crates/products/chio-cli/src/cli/process_host/call_evidence.rs",
+                "crates/products/chio-cli/src/cli/process_host/call_evidence/export.rs",
+                "crates/products/chio-cli/src/cli/process_host/call_evidence/outcomes.rs",
+                "crates/products/chio-cli/src/cli/process_host/call_evidence/outcomes_export.rs",
+                "crates/products/chio-cli/src/cli/process_host/run_evidence.rs",
+                "crates/products/chio-cli/src/cli/process_host/run_evidence/export.rs"
+              ],
+              "remaining_validation": "Retain scoped compatibility review and CLI owning controls; do not reopen parked repository naming review.",
+              "state": "maintained_local_correction_identified_validation_pending"
+            },
+            "historical_native_verifier_and_semantics": {
+              "findings": [
+                "NRET-001",
+                "SEMANTIC-REVALIDATION-APPROVAL-BINDING-01"
+              ],
+              "original_obligation": "Historical caller release must use the authenticated original native plan, independent of current capture configuration. Semantic revalidation must preserve the original full request binding without granting credentials or fresh authority.",
+              "maintained_correction": "Fresh capture already restricts current retention equality to capture and records V6 full semantic commitment before stripping credentials. This reconciliation repairs two omissions: unavailable-verifier quarantine now validates the original bounded materializer and original frozen steps; cold semantic refused-Input validation now uses the original V6 commitment after original operation/native source checks, preserving the legacy sanitized comparison only for older schemas.",
+              "source_refs": [
+                "crates/kernel/chio-kernel/src/kernel/admission_coordinator/recovery_runtime.rs",
+                "crates/kernel/chio-kernel/src/kernel/admission_coordinator/output_retention.rs",
+                "crates/kernel/chio-kernel/src/admission_operation/retained_request.rs",
+                "crates/platform/chio-store-sqlite/src/admission_operation_store/semantic/capture/input_origin/historical.rs"
+              ],
+              "validation_required": "New codec regressions cover historical bounded verifier selection after configuration rotation, altered original step refusal, transient-proof semantic binding, exact canonical roundtrip and unchanged legacy semantics. Tests are unexecuted. Required genuine public native restart/caller-release and refused-Input origin controls remain additional obligations; codec controls do not replace them.",
+              "remaining_native_obligation": "SqliteAdmissionOperationStore still inherits unsupported original native finishing preparation. Genuine capture/settlement/restart positives require actual physical accounts, Process ownership and the parked Capture enrollment dependency; no supplier or success marker was introduced.",
+              "state": "omitted_local_repairs_implemented_validation_pending_native_acceptance_unresolved"
+            },
+            "compiler_physical_publication_and_live_quotas": {
+              "findings": [
+                "CR-01",
+                "CR-02",
+                "CR-03",
+                "CR-04",
+                "CR-R1-01",
+                "BATCH-REVIEW-01",
+                "BATCH-REVIEW-02",
+                "CPD-01",
+                "CPD-02"
+              ],
+              "original_obligation": "Do not grant completed compiler publication from stale output, a substituted physical object, incomplete durability or an over-quota reopened namespace. Validate every actual CAS member and exact typed identity joins.",
+              "maintained_correction_by_finding": {
+                "CR-01": "absolute rejects parent traversal before normalization; declared_component_path and checked_include_path walk physical components for permitted depfile parents without skipping aliases or source exclusions.",
+                "CR-02": "output_paths rejects noncanonical or conflicting output names; OutputLease reserves absent exact emission names and verifies exact additions, preserved baseline and single-link produced images.",
+                "CR-03": "publish_held/verify_publication join final name to originally held staged inode and payload; no pathname-only successful publication.",
+                "CR-04": "Campaign.publish saves reserved state before publishing record/marker, propagates failures and never reports successful same-call completion after outcome failure.",
+                "CR-R1-01": "Physical row and completion contain reciprocal measured inode references; current_compiler_publications verifies original pair and holds/rechecks both through return.",
+                "BATCH-REVIEW-01": "Campaign.publish records required completion-directory fsync outcome and raises UnitPublicationDurabilityUnconfirmed on failure; it latches refusal for subsequent publication.",
+                "BATCH-REVIEW-02": "Campaign.reconcile counts every live artifacts member against MAX_ARTIFACTS both under mutation lock and on reopen before publication.",
+                "CPD-01": "current_compiler_publications enumerates and hashes ALL actual CAS members before reading referenced batch snapshots, accounts aggregate bounds, holds descriptors and rechecks final identities and hashes.",
+                "CPD-02": "same_compilation_json performs canonical type-preserving comparison; original references and nested identities validate exact integer types, excluding bool/float aliases."
+              },
+              "source_refs": [
+                "scripts/record-rust-compilation.py:93",
+                "scripts/record-rust-compilation.py:224",
+                "scripts/record-rust-compilation.py:336",
+                "scripts/record-rust-compilation.py:634",
+                "scripts/record-rust-compilation.py:1346",
+                "scripts/verify-recovery-qualification.py:1182",
+                "scripts/verify-recovery-qualification.py:1285"
+              ],
+              "validation_required": "Retain and rerun owning record-rust-compilation and verify-recovery-qualification regressions on final source, including stale nominal output, replaced marker, state/fsync refusal, over-limit reopen and late artifact mutation. Existing historical controls are not current acceptance.",
+              "remaining_native_obligation": "These local publication corrections do not implement CR-S01 generator authority or qualify actual GNU/MUSL scopes. Original native-controller/isolation campaign is excluded.",
+              "state": "specific_existing_local_repairs_retained_validation_pending"
+            },
+            "compiler_dispatch_and_primary_decoder_composition": {
+              "findings": [
+                "MP-C02",
+                "MP-C03",
+                "MP-C04",
+                "MP-C06",
+                "PP-C01",
+                "PP-C02",
+                "PP-C03",
+                "PP-C04",
+                "PP-C05",
+                "PP-C06",
+                "COMPILER-NATIVE-DIAGNOSTIC-CUSTODY-01"
+              ],
+              "original_obligation": "Actual compiler dispatch, published unit, bounded output, approved source/configuration and sequential deadline must compose exactly; count successful compilation units rather than metadata probes or unjoined dispatch attempts.",
+              "maintained_correction_by_finding": {
+                "MP-C02": "audit_compilation_dispatches joins unique dispatch kind, environment digest, integer exit and compilation cwd to the published row and confines cwd to candidate outside protected roots.",
+                "MP-C03": "Both raw/effective argv are parsed for real linker options and resolved through approved aliases; matching-explicit-linker requires exactly one identical selected driver, not a serialized claim.",
+                "MP-C04": "Every event dispatch must be matched exactly once; verified count advances only for success rows, while nondispatched diagnostics cannot borrow a dispatch.",
+                "MP-C06": "Closed internal version/sysroot metadata probe branch binds exact predetermined argv, selected rustc image, current native scope/batch and unique actual event without requiring an invented wrapper selection.",
+                "PP-C01": "Primary decoder recomputes successful dispatch and compilation counts from outside unit outcomes and checks equality with original report.",
+                "PP-C02": "Finite typed case durations are summed and bounded by original elapsed/shared 900-second budget; each declared case timeout is also bounded by remaining sequential budget.",
+                "PP-C03": "Decoder validates source_location schema/root UID/mode/platform and exact approved configuration guest_path before accepting execution joins.",
+                "PP-C04": "checked_public_compilation_count reads actual records.status and cross-checks unit_publications.record_status instead of indexing a nonexistent projection key.",
+                "PP-C05": "current_primary_sync accepts the actual sized physical reference with exact device/inode object and validates it before recomputing outside outcomes.",
+                "PP-C06": "Both physical and archive parsers require success with integer zero and compiler_failed with integer nonzero; impossible states cannot disappear from accounting.",
+                "COMPILER-NATIVE-DIAGNOSTIC-CUSTODY-01": "bounded_compiler_output drains both actual pipes within an absolute budget and retains complete streams; audit_native_compiler_output checks closed version and retained stream size/hash/EOF joins."
+              },
+              "source_refs": [
+                "scripts/verify-recovery-qualification.py:1510",
+                "scripts/verify-recovery-qualification.py:1758",
+                "scripts/verify-recovery-qualification.py:1792",
+                "scripts/verify-recovery-qualification.py:5061",
+                "scripts/verify-recovery-qualification.py:5122",
+                "scripts/record-rust-compilation.py:2553"
+              ],
+              "validation_required": "Actual-producer publication/decoder composition regression, legal typed outcomes, metadata-probe count refusal, exact argv/dispatch controls and original primary decoder controls on final source. Full native dispatch remains separate.",
+              "remaining_native_obligation": "CP-F06 physical original controller custody and CP-F07 subject-level generated/macro/executable/ELF joins remain unresolved; decoder count/argv controls are not their acceptance.",
+              "state": "specific_existing_local_repairs_retained_validation_pending"
+            },
+            "kani_probe_owned_lifetime": {
+              "findings": [
+                "KANI-COLD-PROXY-PROBE-LIFECYCLE-01"
+              ],
+              "original_obligation": "Own cleanup after child acquisition across timeout, early leader exit with descendant and interruption; explicit pinned setup precedes version probe.",
+              "maintained_correction": "Current check-kani-toolchain.sh has an outer finally around acquired new-session process; stop_probe kills its group and performs bounded drain/direct-child reap. Success requires original group absence. Both formal workflow jobs unconditionally install/setup pinned Kani before this version check. Maintained lifecycle regression includes real SIGINT after observed benign child creation and explicit direct-child returncode check.",
+              "source_refs": [
+                "scripts/check-kani-toolchain.sh",
+                "scripts/tests/check-kani-probe-lifecycle.test.py",
+                ".github/workflows/formal-pr-smoke.yml"
+              ],
+              "validation_required": "Run maintained benign lifecycle controls in ordinary and optimized modes during Stage 2. No downloads or actual cold setup are needed for those local controls. Actual pinned Kani/compiler harnesses are separate checks.",
+              "state": "existing_interruption_successor_integrated_validation_pending"
+            }
+          },
+          "generic_contract_summaries_retracted": true
+        }
+      }
     }
   },
   "supplemental_existing_facets": [
@@ -10219,6 +10761,35 @@
       },
       "confidence": "High for the independently authenticated maintained finding, preserved failed run, exact reviewed installation and bounded local owning results.",
       "qualified": false
+    },
+    {
+      "key": "COMPILER-EXITED-LEADER-LIVE-DESCENDANT-01",
+      "id": "COMPILER-EXITED-LEADER-LIVE-DESCENDANT-01",
+      "category": "additional",
+      "severity": "P2",
+      "title": "Ordinary compiler producer accepts leader success while a pipe-detached owned descendant survives",
+      "dependency_group": "qualification_and_portability",
+      "obligation": "Before final source capture establish that the command group exited. Surviving owned descendants after EOF and leader reap must refuse acceptance and be terminated/reaped within the owned group. Preserve original command exit/failure; clean success remains accepted.",
+      "evidence_refs": [
+        "scripts/compiled-gate-profiles.py#capture_command",
+        "scripts/tests/compiled-gate-profiles.test.py#OrdinaryProcessCleanupTest"
+      ],
+      "recorded_disposition": "open_maintained_source_review_finding",
+      "current_status": "open",
+      "current_reason": "Previous success path skipped owned-group adjudication after EOF and leader exit. Repair and success/refusal regression source written; execution and monitoring review pending.",
+      "installed_when_found": true,
+      "current_implementation_finding": true,
+      "qualified": false,
+      "implementation_assessment": {
+        "checkpoint_state": "integrated_source_repair_validation_pending",
+        "maintained_correction": "capture_command requires owned group exit after leader/pipe completion. If cleanup cannot establish quiescence, execute retains result/log/before state with inventories_complete=false and emits no after inventory or usable execution envelope. Original child exit is preserved.",
+        "source_refs": [
+          "scripts/compiled-gate-profiles.py::capture_command",
+          "scripts/compiled-gate-profiles.py::execute"
+        ],
+        "required_validation": "New real detached-pipe descendant and failed-cleanup final-capture tests, clean-group and existing exception controls in both Python modes. Earlier 17-test results predate this corrective extension.",
+        "qualified": false
+      }
     }
   ],
   "inventory_confidence": "high: exact ID, row-count and recorded-disposition joins; current behavior is not requalified",
@@ -10773,6 +11344,16 @@
       "scope": "Root reviewed and tested the shared-artifact reconciliation repair. All original causal checks remain passing within the 128-test owning suite in both Python modes, with two existing Linux-only skips each. Each original batch is still checked and repeated artifact declarations must agree before one physical observation. Prior source/evidence pins remain historical. Fresh contracts producer acceptance is still pending.",
       "current_status_changes": false,
       "counts_changed": false,
+      "qualified": false
+    },
+    {
+      "at_utc": "2026-10-10T05:23:14.912532+00:00",
+      "kind": "sole_owner_implementation_checkpoint",
+      "scope_ref": "#/continuation/working_queue/implementation_pass",
+      "new_finding": "COMPILER-EXITED-LEADER-LIVE-DESCENDANT-01",
+      "tests_executed": false,
+      "push_performed": false,
+      "existing_status_changes": false,
       "qualified": false
     }
   ],

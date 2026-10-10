@@ -1,5 +1,5 @@
 //! Shared bounded HTTP transport. Rust alone owns recovery transitions.
-use super::{RecoveryCommandResultV1, RecoveryRuntime, RecoveryRuntimeError};
+use super::{command_permission, RecoveryCommandResultV1, RecoveryRuntime, RecoveryRuntimeError};
 use axum::{
     body::Bytes,
     extract::{DefaultBodyLimit, State},
@@ -19,8 +19,8 @@ use tokio::sync::Semaphore;
 
 mod admission;
 mod authentication;
-pub(super) use admission::PrincipalWorkLimiter;
-use admission::{command_class, command_permission, NativeAdmission, WorkClass};
+use admission::{command_class, NativeAdmission, WorkClass};
+pub(super) use admission::{NativeWorkPermit, PrincipalWorkLimiter};
 pub(super) use authentication::AuthenticationLane;
 
 #[derive(Serialize, Deserialize)]
@@ -162,13 +162,9 @@ async fn command_result(
         )
         .await?;
     let permit = host.native.try_acquire(class, &actor)?;
-    let handle = tokio::runtime::Handle::current();
-    tokio::task::spawn_blocking(move || {
-        let _permit = permit;
-        handle.block_on(host.runtime.execute_command(&capability, &command))
-    })
-    .await
-    .unwrap_or(Err(RecoveryRuntimeError::Unavailable))
+    host.runtime
+        .execute_command_with_admission(&capability, &command, Some(permit))
+        .await
 }
 async fn review(State(host): State<RecoveryHost>, bytes: Bytes) -> axum::response::Response {
     response(review_result(host, bytes).await)

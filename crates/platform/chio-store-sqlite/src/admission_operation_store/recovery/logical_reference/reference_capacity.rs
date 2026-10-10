@@ -1,4 +1,4 @@
-//! Tenant counters retain their original census and authenticate every current head.
+//! Tenant counters retain their original initialization and authenticate every current head.
 use super::*;
 
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -14,37 +14,21 @@ enum CapacityIdentity {
 
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct CapacityBaseline {
-    cutoff: ReferenceCutoff,
-    cohort_digest: CanonicalPayloadDigest,
-    census_digest: CanonicalPayloadDigest,
-    artifact_count: u64,
-    active_owners: u64,
-}
-
-#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub(super) struct ReferenceCapacity {
     schema: ReferenceCapacitySchema,
     account: ReferenceAccount,
-    baseline: CapacityBaseline,
+    cutoff: ReferenceCutoff,
     pub(super) admitted: u64,
     pub(super) retired: u64,
     pub(super) batches: u64,
 }
 
 impl ReferenceCapacity {
-    pub(super) fn from_baseline(proof: &VerifiedKnowledgeReferenceAccountBaseline<'_, '_>) -> Self {
+    pub(super) fn new(proof: &NewKnowledgeAccount<'_, '_>) -> Self {
         Self {
             schema: ReferenceCapacitySchema::V1,
             account: ReferenceAccount::from_scope(proof.scope()),
-            baseline: CapacityBaseline {
-                cutoff: proof.global_cutoff().clone(),
-                cohort_digest: proof.cohort_digest(),
-                census_digest: proof.census_digest(),
-                artifact_count: proof.artifact_count(),
-                active_owners: proof.active_reference_owners(),
-            },
+            cutoff: proof.cutoff().clone(),
             admitted: 0,
             retired: 0,
             batches: 0,
@@ -52,10 +36,8 @@ impl ReferenceCapacity {
     }
 
     pub(super) fn active(&self) -> Result<u64, AdmissionOperationStoreError> {
-        self.baseline
-            .active_owners
-            .checked_add(self.admitted)
-            .and_then(|total| total.checked_sub(self.retired))
+        self.admitted
+            .checked_sub(self.retired)
             .ok_or_else(|| invariant("reference capacity counter is inconsistent"))
     }
 
@@ -67,19 +49,9 @@ impl ReferenceCapacity {
         original
     }
 
-    pub(super) fn cutoff(&self) -> &ReferenceCutoff {
-        &self.baseline.cutoff
-    }
-
-    pub(super) fn cohort_digest(&self) -> &CanonicalPayloadDigest {
-        &self.baseline.cohort_digest
-    }
-
     fn validate(&self, version: u64) -> Result<(), AdmissionOperationStoreError> {
         for number in [
             version,
-            self.baseline.artifact_count,
-            self.baseline.active_owners,
             self.admitted,
             self.retired,
             self.batches,
@@ -101,23 +73,7 @@ impl ReferenceCapacity {
     }
 
     pub(super) fn matches_ready(&self, ready: &ReadyReferenceAccount) -> bool {
-        self.baseline.cutoff == *ready.cutoff()
-            && self.baseline.cohort_digest == *ready.cohort_digest()
-            && self.baseline.census_digest == *ready.census_digest()
-            && self.baseline.artifact_count == ready.artifact_count()
-            && self.baseline.active_owners == ready.active_owner_count()
-    }
-
-    pub(super) fn matches_ready_record(&self, ready: &ReferenceReadyRecord) -> bool {
-        self.account == ready.account
-            && self.baseline.cutoff == ready.cutoff
-            && self.baseline.cohort_digest == ready.cohort_digest
-            && self.baseline.census_digest == ready.census_digest
-            && self.baseline.artifact_count == ready.artifact_count.get()
-            && self.baseline.active_owners == ready.active_owner_count.get()
-            && self.admitted == 0
-            && self.retired == 0
-            && self.batches == 0
+        self.cutoff == *ready.cutoff()
     }
 }
 
@@ -166,7 +122,7 @@ pub(super) fn load_capacity_account(
         return Err(invariant("reference capacity changed its tenant"));
     }
     account.validate(row.version)?;
-    account.baseline.cutoff.verify(tx)?;
+    account.cutoff.verify(tx)?;
     if !matches_historical_command_payload(
         tx,
         &key,
@@ -174,7 +130,9 @@ pub(super) fn load_capacity_account(
         1,
         &encode(&account.original())?,
     )? {
-        return Err(invariant("reference capacity changed its original census"));
+        return Err(invariant(
+            "reference capacity changed its original initialization",
+        ));
     }
     Ok((account, source))
 }
@@ -195,7 +153,7 @@ pub(super) fn require_ready_capacity(
     ready.verify_current(tx)?;
     if !account.matches_ready(&ready) {
         return Err(invariant(
-            "reference capacity and readiness disagree on their census",
+            "reference capacity and readiness disagree on their initialization",
         ));
     }
     let ready_source = source_reference(tx, ready.source().record_key())?;

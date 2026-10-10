@@ -25,7 +25,7 @@ pub(super) fn load_reference_state(
         return Err(refused("reference aggregate changed its governed artifact"));
     }
     aggregate.value.validate(aggregate.head.version())?;
-    super::super::verify_reference_baseline(tx, reference, &aggregate.value.baseline.source)?;
+    super::super::verify_reference_baseline(tx, reference, &aggregate.value.source)?;
     if !protected::matches_historical_command_payload(
         tx,
         &key,
@@ -38,47 +38,45 @@ pub(super) fn load_reference_state(
         ));
     }
     let mut buckets = Vec::new();
-    if let ReferenceInventory::Regular { active_buckets } = &aggregate.value.inventory {
-        let mut owners = BTreeSet::new();
-        let mut count = 0_u64;
-        for id in active_buckets.as_slice() {
-            let bucket =
-                indexed::<ReferenceBucket>(tx, &bucket_key(identity, id.get()), &reference.scope)?
-                    .ok_or_else(|| refused("reference active bucket disappeared"))?;
-            bucket.value.validate()?;
-            if bucket.value.reference != *reference
-                || bucket.value.bucket != *id
-                || bucket.value.state != BucketState::Active
-            {
-                return Err(refused("reference active bucket changed its identity"));
-            }
-            for owner in bucket.value.owners.as_slice() {
-                if !owners.insert(*owner.as_bytes()) {
-                    return Err(refused("reference owner occurs in multiple active buckets"));
-                }
-                count = count
-                    .checked_add(1)
-                    .ok_or_else(|| refused("reference active owner count overflow"))?;
-            }
-            buckets.push(bucket);
+    let active_buckets = &aggregate.value.inventory.active_buckets;
+    let mut owners = BTreeSet::new();
+    let mut count = 0_u64;
+    for id in active_buckets.as_slice() {
+        let bucket =
+            indexed::<ReferenceBucket>(tx, &bucket_key(identity, id.get()), &reference.scope)?
+                .ok_or_else(|| refused("reference active bucket disappeared"))?;
+        bucket.value.validate()?;
+        if bucket.value.reference != *reference
+            || bucket.value.bucket != *id
+            || bucket.value.state != BucketState::Active
+        {
+            return Err(refused("reference active bucket changed its identity"));
         }
-        if count != aggregate.value.active_owners.get() {
-            return Err(refused(
-                "reference active inventory disagrees with its counters",
-            ));
+        for owner in bucket.value.owners.as_slice() {
+            if !owners.insert(*owner.as_bytes()) {
+                return Err(refused("reference owner occurs in multiple active buckets"));
+            }
+            count = count
+                .checked_add(1)
+                .ok_or_else(|| refused("reference active owner count overflow"))?;
         }
+        buckets.push(bucket);
+    }
+    if count != aggregate.value.active_owners.get() {
+        return Err(refused(
+            "reference active inventory disagrees with its counters",
+        ));
     }
     Ok(ReferenceState { aggregate, buckets })
 }
 
-/// A zero is returned only from a ready, authenticated regular inventory.
-/// Overflow remains a custody hold even after its one-way count reaches zero.
+/// A zero is returned only from a ready, authenticated bounded inventory.
 pub(in crate::admission_operation_store) fn active_reference_owner_count(
     tx: &Connection,
     reference: &ArtifactVersionRefV1,
 ) -> Result<u64, AdmissionOperationStoreError> {
     let state = load_reference_state(tx, reference)?;
-    state.aggregate.value.collection_count()
+    Ok(state.aggregate.value.active_owners.get())
 }
 
 /// This bounded observer counts authenticated product custody. Queue archival
@@ -89,9 +87,6 @@ pub(in crate::admission_operation_store) fn active_product_evidence_owner_count(
     reference: &ArtifactVersionRefV1,
 ) -> Result<usize, AdmissionOperationStoreError> {
     let state = load_reference_state(tx, reference)?;
-    // An overflow has no bounded bucket inventory. It cannot report a clean
-    // absence while its cold custody awaits an explicitly fenced rebuild.
-    state.aggregate.value.collection_count()?;
     let identity = reference_identity(reference)?;
     let mut count = 0_usize;
     for bucket in &state.buckets {
@@ -158,8 +153,8 @@ pub(super) fn load_owner_leaf(
     Ok(Some(leaf))
 }
 
-/// Cold rebuilds use the same leaf identity and immutable-source validation as
-/// hot exact-owner reads. Decoding an owner cannot grant a mutation role.
+/// Exact owner reads authenticate both the immutable source and live membership.
+/// Decoding an owner cannot grant a mutation role.
 pub(super) fn verify_owner_leaf(
     tx: &Connection,
     reference: &ArtifactVersionRefV1,
@@ -191,46 +186,11 @@ pub(super) fn verify_owner_leaf(
     if let Some(retirement) = &leaf.value.retirement {
         retirement.verify_historical_identity(tx)?;
     }
-    match &leaf.value.location {
-        ReferenceLocation::Bucket { bucket } => {
-            if matches!(
-                state.aggregate.value.inventory,
-                ReferenceInventory::LegacyOverflow { .. }
-            ) {
-                return Err(refused("ordinary reference leaf entered legacy overflow"));
-            }
-            if leaf.value.state == ReferenceOwnerState::Active {
-                let index = membership(state, owner_identity)
-                    .ok_or_else(|| refused("reference active leaf lost its bucket"))?;
-                if state.buckets[index].value.bucket != *bucket {
-                    return Err(refused("reference active leaf changed its bucket"));
-                }
-            }
-        }
-        ReferenceLocation::LegacyCohort { cohort, census } => {
-            let ReferenceBaselineSource::Cold {
-                cutoff,
-                cohort_digest,
-                census_digest,
-                ..
-            } = &state.aggregate.value.baseline.source
-            else {
-                return Err(refused("legacy reference leaf lacks its cold baseline"));
-            };
-            if cohort != cohort_digest
-                || census != census_digest
-                || leaf.value.original.global_commit_sequence() > cutoff.sequence()
-            {
-                return Err(refused("legacy reference leaf changed its census"));
-            }
-            if matches!(
-                state.aggregate.value.inventory,
-                ReferenceInventory::Regular { .. }
-            ) && leaf.value.state == ReferenceOwnerState::Active
-                && membership(state, owner_identity).is_none()
-            {
-                return Err(refused("legacy active leaf lost its rebuilt bucket"));
-            }
+    if leaf.value.state == ReferenceOwnerState::Active {
+        let index = membership(state, owner_identity)
+            .ok_or_else(|| refused("reference active leaf lost its bucket"))?;
+        if state.buckets[index].value.bucket != leaf.value.bucket {
+            return Err(refused("reference active leaf changed its bucket"));
         }
     }
     if leaf.value.state == ReferenceOwnerState::Retired

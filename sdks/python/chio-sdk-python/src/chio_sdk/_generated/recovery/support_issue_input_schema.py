@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 35f8e30cf30553986a159b074ee485804a85db29547a8102522cd7bfa3080d2e
+# Schema sha256: d2b29cbbc9a0070d3666a33fd5a06bbda07a8e70f6d54bf33c15ca8b74893ff9
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -122,23 +122,3 @@ class RecoveryEffectFailedAfterEffectV1(BaseModel):
     kind: Literal['failed_after_effect']
     operation: RecoverySupportIssueInputDefinitionsOperation
     applied_effects: conint(ge=1, le=9007199254740991)
-
-# Public compatibility aliases reference the actual current model classes.
-Operation = RecoverySupportIssueInputDefinitionsOperation
-RecoveryDigest32Item = RecoveryDigestOctet
-RecoverySupportIssueInputOpaqueId = OpaqueId
-RecoverySupportIssueInputRecoveryDigest32 = RecoveryDigest32
-RecoverySupportIssueInputRecoveryDigestOctet = RecoveryDigestOctet
-RecoverySupportIssueInputRecoveryEffectAdmissionUnresolvedV1 = RecoveryEffectAdmissionUnresolvedV1
-RecoverySupportIssueInputRecoveryEffectAwaitingApprovalV1 = RecoveryEffectAwaitingApprovalV1
-RecoverySupportIssueInputRecoveryEffectAwaitingCallerReportV1 = RecoveryEffectAwaitingCallerReportV1
-RecoverySupportIssueInputRecoveryEffectClosedBeforeEffectV1 = RecoveryEffectClosedBeforeEffectV1
-RecoverySupportIssueInputRecoveryEffectCompleteV1 = RecoveryEffectCompleteV1
-RecoverySupportIssueInputRecoveryEffectFailedAfterEffectV1 = RecoveryEffectFailedAfterEffectV1
-RecoverySupportIssueInputRecoveryEffectInFlightV1 = RecoveryEffectInFlightV1
-RecoverySupportIssueInputRecoveryEffectNeverAdmittedV1 = RecoveryEffectNeverAdmittedV1
-RecoverySupportIssueInputRecoveryEffectPartialV1 = RecoveryEffectPartialV1
-RecoverySupportIssueInputRecoveryEffectUnknownV1 = RecoveryEffectUnknownV1
-RecoverySupportIssueInputSafeInteger = SafeInteger
-RefusalCode = RecoverySupportIssueInputDefinitionsRefusalCode
-Scope = RecoverySupportIssueInputDefinitionsScope

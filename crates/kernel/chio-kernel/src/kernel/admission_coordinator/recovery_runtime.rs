@@ -390,7 +390,8 @@ impl ChioKernel {
         actor: &AuthenticatedRecoveryActor,
         command: &RecoveryCommandV1,
     ) -> Result<RecoveryCommandResponseV1, RecoveryCommandError> {
-        self.execute_recovery_command_inner(actor, command, None)
+        self.execute_recovery_command_outcome(actor, command, None)
+            .map(|outcome| outcome.response)
     }
     /// Fresh creation requires the trusted owning process journal. Supplying a
     /// port cannot replace the native original-operation and closure checks.
@@ -400,53 +401,8 @@ impl ChioKernel {
         command: &RecoveryCommandV1,
         original_process: &dyn RecoveryProcessOriginPort,
     ) -> Result<RecoveryCommandResponseV1, RecoveryCommandError> {
-        self.execute_recovery_command_inner(actor, command, Some(original_process))
-    }
-    fn execute_recovery_command_inner(
-        &self,
-        actor: &AuthenticatedRecoveryActor,
-        command: &RecoveryCommandV1,
-        original_process: Option<&dyn RecoveryProcessOriginPort>,
-    ) -> Result<RecoveryCommandResponseV1, RecoveryCommandError> {
-        self.revalidate_recovery_actor(actor)
-            .map_err(|error| match error {
-                KernelError::RecoveryAuthorityDenied => RecoveryCommandError::AuthorityDenied,
-                KernelError::RecoveryMediationRequired => RecoveryCommandError::MediationRequired,
-                _ => RecoveryCommandError::Unavailable,
-            })?;
-        let (port, runtime, now) = self
-            .recovery_port()
-            .map_err(|_| RecoveryCommandError::Unavailable)?;
-        // Do not acquire a process journal while holding the native writer.
-        // Store replay/preflight decides whether fresh origin authority is
-        // needed, and only then consumes this exact cached result.
-        let prepared_original = match (&command.command, original_process) {
-            (RecoveryCommandBodyV1::CreateWorkflow { request_seed, .. }, Some(process)) => {
-                Some(crate::recovery::PreparedOriginalProcessOrigin::new(
-                    process,
-                    actor.scope(),
-                    request_seed.as_str(),
-                    port.deployment(actor.scope(), &runtime.fence, now),
-                ))
-            }
-            _ => None,
-        };
-        let original_process = prepared_original
-            .as_ref()
-            .map(|prepared| prepared as &dyn RecoveryProcessOriginPort);
-        port.command(actor, command, original_process, &runtime.fence, now)
-            .map_err(|error| match error {
-                RecoveryCommandPortError::Store(
-                    crate::admission_operation::AdmissionOperationStoreError::RecoveryAuthorityDenied,
-                ) => RecoveryCommandError::AuthorityDenied,
-                RecoveryCommandPortError::Store(
-                    crate::admission_operation::AdmissionOperationStoreError::RecoveryMediationRequired,
-                ) => RecoveryCommandError::MediationRequired,
-                RecoveryCommandPortError::Conflict => RecoveryCommandError::Conflict,
-                RecoveryCommandPortError::OriginRefused => RecoveryCommandError::OriginRefused,
-                RecoveryCommandPortError::Busy => RecoveryCommandError::Busy,
-                _ => RecoveryCommandError::Unavailable,
-            })
+        self.execute_recovery_command_outcome(actor, command, Some(original_process))
+            .map(|outcome| outcome.response)
     }
     pub fn read_recovery_workflow(
         &self,
@@ -764,14 +720,7 @@ impl ChioKernel {
                 // private finalizer selects current signing for a distinct
                 // withheld attestation; immutable raw faults still propagate.
                 self.frozen_recovery_signer_unavailable(&admission)?;
-                let declarations = super::super::security_dispatch::callback(
-                    "historical output verifier selection",
-                    || Ok(self.post_invocation_pipeline.durable_identities()),
-                )?;
-                if declarations.is_ok()
-                    && original.post_return_steps()
-                        == self.durable_post_return_plan()?.frozen_steps.as_slice()
-                {
+                if self.original_output_verifier_is_available(&original)? {
                     return Ok(false);
                 }
                 // An older signer hold stays authenticated and immutable if a

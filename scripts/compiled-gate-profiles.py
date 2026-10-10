@@ -248,6 +248,7 @@ def capture_command(root, command, environment, log, timeout):
     failure = None
     cleanup_errors = []
     timed_out = disk_floor = completed_pipe = False
+    owned_group_quiescent = False
     cleanup_deadline = None
     try:
         process = subprocess.Popen(command, cwd=root, env=environment, stdout=subprocess.PIPE,
@@ -279,6 +280,12 @@ def capture_command(root, command, environment, log, timeout):
                         selector.unregister(key.fileobj)
                         completed_pipe = True
             actual = process.wait(timeout=5)
+            # EOF and a reaped leader do not establish that its owned children
+            # stopped. A descendant can close the output pipe and keep mutating
+            # sources while the final inventory is captured.
+            if not wait_owned_group_exit(process, grace=0):
+                raise RuntimeError("host command left owned descendants")
+            owned_group_quiescent = True
     except BaseException as error:
         failure = error
     finally:
@@ -286,13 +293,16 @@ def capture_command(root, command, environment, log, timeout):
             try:
                 if failure is not None or timed_out or disk_floor or not completed_pipe or process.poll() is None:
                     stop_owned_group(process)
+                    owned_group_quiescent = True
             except BaseException as error:
+                owned_group_quiescent = False
                 cleanup_errors.append(type(error).__name__)
                 if failure is None:
                     failure = error
             try:
                 actual = process.wait(timeout=5)
             except BaseException as error:
+                owned_group_quiescent = False
                 cleanup_errors.append(type(error).__name__)
                 if failure is None:
                     failure = error
@@ -311,6 +321,7 @@ def capture_command(root, command, environment, log, timeout):
                 failure = error
     return {"actual": actual, "timed_out": timed_out, "disk_floor": disk_floor,
             "completed_pipe": completed_pipe, "cleanup_errors": cleanup_errors,
+            "owned_group_quiescent": owned_group_quiescent,
             "elapsed": time.monotonic()-began, "ended": time.time()}, failure
 
 
@@ -328,6 +339,23 @@ def execute(root, evidence, name, command, environment, pins, verifier, recorder
         observation, failure = capture_command(root, command, environment, log, timeout)
     actual = observation["actual"]
     timed_out, disk_floor, completed_pipe = (observation[key] for key in ["timed_out", "disk_floor", "completed_pipe"])
+    if not observation["owned_group_quiescent"]:
+        # An uncertain owned writer cannot coexist with a final source capture.
+        # Keep the original exit, partial log and failed cleanup without minting
+        # an after-inventory or a usable execution provenance envelope.
+        write(stage/"result.json", {"format": FORMAT, "actual_command_exit": actual,
+            "runner_exit": 86, "inventories_complete": False,
+            "output_pipe_completed": completed_pipe,
+            "provenance_error": type(failure).__name__ if failure is not None else "RuntimeError",
+            "cleanup_errors": observation["cleanup_errors"],
+            "owned_group_quiescent": False, "source_drift": {"detected": None},
+            "before_manifest_sha256": before["content_manifest_sha256"],
+            "log": reference(evidence, stage/"command.log"),
+            "ended_unix_seconds": observation["ended"], "elapsed_seconds": observation["elapsed"],
+            "timed_out": timed_out, "disk_floor_reached": disk_floor})
+        if failure is not None:
+            raise failure
+        raise RuntimeError("host command quiescence was not established")
     after = snapshot(root, pins, verifier, recorder)
     after_runtime = inventory(root, verifier)
     write(stage/"after.json", after)
@@ -339,6 +367,7 @@ def execute(root, evidence, name, command, environment, pins, verifier, recorder
         "inventories_complete": True, "output_pipe_completed": completed_pipe,
         "provenance_error": type(failure).__name__ if failure is not None else None,
         "cleanup_errors": observation["cleanup_errors"],
+        "owned_group_quiescent": True,
         "source_drift": {"detected": drift}, "before_manifest_sha256": before["content_manifest_sha256"],
         "after_manifest_sha256": after["content_manifest_sha256"], "log": log_ref,
         "ended_unix_seconds": observation["ended"], "elapsed_seconds": observation["elapsed"],

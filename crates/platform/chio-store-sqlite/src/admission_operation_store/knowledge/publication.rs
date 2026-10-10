@@ -33,7 +33,7 @@ fn publication(
     let record: NativeArtifactRecordV1 = load(tx, &key)?.ok_or_else(|| refused("reservation"))?;
     if record.input != *input
         || record.metadata.scope != *actor.scope()
-        || record.publication_principal.as_ref() != Some(actor.principal())
+        || &record.publication_principal != actor.principal()
         || record_publication_key(&record)? != key
     {
         return Err(refused("publication conflict"));
@@ -193,7 +193,7 @@ impl SqliteAdmissionOperationStore {
             if let Some(existing) = load::<NativeArtifactRecordV1>(&tx, &key)? {
                 if existing.input != *input
                     || existing.metadata.scope != *actor.scope()
-                    || existing.publication_principal.as_ref() != Some(actor.principal())
+                    || &existing.publication_principal != actor.principal()
                     || record_publication_key(&existing)? != key
                     || existing.state == ArtifactPublicationStateV1::Retired
                 {
@@ -202,16 +202,6 @@ impl SqliteAdmissionOperationStore {
                 ensure_publication_audience(&tx, actor, &existing)?;
                 super::publication_capacity::validate_existing_allocation(&tx, &existing)?;
                 return Ok((tx, existing));
-            }
-            // Older envelopes omitted writer identity. Preserve their custody
-            // rather than assigning the current principal to historical work.
-            if load::<NativeArtifactRecordV1>(
-                &tx,
-                &legacy_publication_key(actor.scope(), &input.publication)?,
-            )?
-            .is_some()
-            {
-                return Err(refused("legacy publication owner unproven"));
             }
             super::publication_capacity::require_intake_capacity(&tx, actor.scope())?;
             let dependencies =
@@ -340,7 +330,7 @@ impl SqliteAdmissionOperationStore {
                 installation_generation: profile.generation,
                 certificate: None,
                 location: ProtectedText::new("private-process-blob").map_err(refused)?,
-                publication_principal: Some(actor.principal().clone()),
+                publication_principal: actor.principal().clone(),
             };
             ensure_publication_audience(&tx, actor, &record)?;
             let intake = super::publication_source::VerifiedKnowledgePublicationIntake::new(

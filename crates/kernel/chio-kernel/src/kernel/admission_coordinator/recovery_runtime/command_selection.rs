@@ -99,14 +99,23 @@ impl ChioKernel {
         command: &RecoveryCommandV1,
         original_process: &dyn RecoveryProcessOriginPort,
     ) -> Result<RecoveryCommandOutcome<'kernel>, RecoveryCommandError> {
+        self.execute_recovery_command_outcome(actor, command, Some(original_process))
+    }
+
+    pub(super) fn execute_recovery_command_outcome<'kernel>(
+        &'kernel self,
+        actor: &AuthenticatedRecoveryActor,
+        command: &RecoveryCommandV1,
+        original_process: Option<&dyn RecoveryProcessOriginPort>,
+    ) -> Result<RecoveryCommandOutcome<'kernel>, RecoveryCommandError> {
         self.revalidate_recovery_actor(actor)
             .map_err(command_kernel_error)?;
         let (port, runtime, now) = self.recovery_port().map_err(command_kernel_error)?;
         // This independent process snapshot occurs before native BEGIN/write.
-        let prepared_original = match &command.command {
-            RecoveryCommandBodyV1::CreateWorkflow { request_seed, .. } => {
+        let prepared_original = match (&command.command, original_process) {
+            (RecoveryCommandBodyV1::CreateWorkflow { request_seed, .. }, Some(process)) => {
                 Some(crate::recovery::PreparedOriginalProcessOrigin::new(
-                    original_process,
+                    process,
                     actor.scope(),
                     request_seed.as_str(),
                     port.deployment(actor.scope(), &runtime.fence, now),

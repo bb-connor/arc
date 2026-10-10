@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 35f8e30cf30553986a159b074ee485804a85db29547a8102522cd7bfa3080d2e
+# Schema sha256: d2b29cbbc9a0070d3666a33fd5a06bbda07a8e70f6d54bf33c15ca8b74893ff9
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -105,23 +105,3 @@ class RecoveryEffectFailedAfterEffectV1(BaseModel):
     kind: Literal['failed_after_effect']
     operation: RecoveryTransportRequestDefinitionsOperation
     applied_effects: conint(ge=1, le=9007199254740991)
-
-# Public compatibility aliases reference the actual current model classes.
-Operation = RecoveryTransportRequestDefinitionsOperation
-RecoveryDigest32Item = RecoveryDigestOctet
-RecoveryTransportRequestOpaqueId = OpaqueId
-RecoveryTransportRequestRecoveryDigest32 = RecoveryDigest32
-RecoveryTransportRequestRecoveryDigestOctet = RecoveryDigestOctet
-RecoveryTransportRequestRecoveryEffectAdmissionUnresolvedV1 = RecoveryEffectAdmissionUnresolvedV1
-RecoveryTransportRequestRecoveryEffectAwaitingApprovalV1 = RecoveryEffectAwaitingApprovalV1
-RecoveryTransportRequestRecoveryEffectAwaitingCallerReportV1 = RecoveryEffectAwaitingCallerReportV1
-RecoveryTransportRequestRecoveryEffectClosedBeforeEffectV1 = RecoveryEffectClosedBeforeEffectV1
-RecoveryTransportRequestRecoveryEffectCompleteV1 = RecoveryEffectCompleteV1
-RecoveryTransportRequestRecoveryEffectFailedAfterEffectV1 = RecoveryEffectFailedAfterEffectV1
-RecoveryTransportRequestRecoveryEffectInFlightV1 = RecoveryEffectInFlightV1
-RecoveryTransportRequestRecoveryEffectNeverAdmittedV1 = RecoveryEffectNeverAdmittedV1
-RecoveryTransportRequestRecoveryEffectPartialV1 = RecoveryEffectPartialV1
-RecoveryTransportRequestRecoveryEffectUnknownV1 = RecoveryEffectUnknownV1
-RecoveryTransportRequestSafeInteger = SafeInteger
-RefusalCode = RecoveryTransportRequestDefinitionsRefusalCode
-Scope = RecoveryTransportRequestDefinitionsScope

@@ -390,8 +390,8 @@ fn require_format(tx: &Connection) -> Result<(), AdmissionOperationStoreError> {
     Ok(())
 }
 
-/// Source40 keeps only its authenticated permanent first owner. Successor
-/// authority is unavailable until the complete Source41 format is published.
+/// The supported catalog retains its authenticated permanent first owner.
+/// Successor ownership remains unavailable until its complete catalog is integrated.
 pub(in crate::admission_operation_store) fn using_original_owner_successor_format(
     tx: &Connection,
 ) -> Result<bool, AdmissionOperationStoreError> {
@@ -403,7 +403,7 @@ pub(in crate::admission_operation_store) fn using_original_owner_successor_forma
         )
         .map_err(sqlite_error)?;
     match version {
-        40 => {
+        ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION => {
             require_predecessor_original_owner_absence(tx)?;
             Ok(false)
         }

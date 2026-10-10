@@ -85,20 +85,12 @@ pub(super) fn materialized_influence(
     budget: &mut VerificationBudget,
 ) -> Result<(CanonicalPayloadDigest, bool, Option<ArtifactInfluenceV1>), AdmissionOperationStoreError>
 {
-    let observed = super::super::security_participant_state::knowledge::observed_influence(
+    let observed = budgeted_observed_influence(
         tx,
         binding.security_authority_id().as_str(),
         &recovery_flow_key(context),
+        budget,
     )?;
-    budget
-        .charge(
-            u32::try_from(super::super::security_participant_state::knowledge::head(
-                tx,
-                binding.security_authority_id().as_str(),
-            )?)
-            .map_err(refused)?,
-        )
-        .map_err(refused)?;
     let action = &invocation.action;
     let plan: SemanticPlanV1 =
         load(tx, &plan_key(&action.scope, &action.plan)?)?.ok_or_else(|| refused("plan absent"))?;
@@ -167,6 +159,21 @@ pub(super) fn materialized_influence(
         observed,
     ))
 }
+/// Charge the retained history before its authenticated bodies are decoded.
+/// The caller holds a transaction so the counted history cannot grow meanwhile.
+fn budgeted_observed_influence(
+    tx: &Transaction<'_>,
+    authority: &str,
+    key: &chio_security_types::ports::FlowStateKey,
+    budget: &mut VerificationBudget,
+) -> Result<Option<ArtifactInfluenceV1>, AdmissionOperationStoreError> {
+    use super::super::security_participant_state::knowledge;
+    budget
+        .charge(u32::try_from(knowledge::head(tx, authority)?).map_err(refused)?)
+        .map_err(refused)?;
+    knowledge::observed_influence(tx, authority, key)
+}
+
 pub(super) fn verify_materialized_plan(
     tx: &Transaction<'_>,
     invocation: &SemanticInvocationV1,
@@ -732,5 +739,50 @@ impl SqliteAdmissionOperationStore {
         )?;
         self.commit_write(tx)?;
         self.sync_after_write(&connection)
+    }
+}
+
+#[cfg(all(test, feature = "admission-test-support"))]
+mod influence_read_budget_tests {
+    use super::*;
+    use crate::admission_operation_store::security_participant_state::knowledge::{
+        prefix, read_work_test_support::NativeInfluenceReadWorkFixture,
+    };
+    use chio_security_types::ports::{
+        FlowStateKey, IsolationEpochId, LineageId, SessionId, TenantId,
+    };
+
+    #[test]
+    fn exhausted_influence_budget_reads_no_retained_bodies(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut connection = Connection::open_in_memory()?;
+        // Only the history census is present. Reading either unauthenticated
+        // body would be both observable and invalid. This tests the work gate,
+        // not successful native capture or influence qualification.
+        connection.execute_batch(
+            "CREATE TABLE admission_operation_recovery_records (record_key TEXT PRIMARY KEY)",
+        )?;
+        let authority = "budgeted-history";
+        for sequence in 1..=2 {
+            connection.execute(
+                "INSERT INTO admission_operation_recovery_records(record_key) VALUES (?1)",
+                [format!("{}{:016}", prefix(authority), sequence)],
+            )?;
+        }
+        let key = FlowStateKey {
+            tenant_id: TenantId::new("tenant")?,
+            principal_id: chio_security_types::PrincipalId::new("principal")?,
+            lineage_id: LineageId::new("lineage")?,
+            session_id: SessionId::new("session")?,
+            isolation_epoch_id: IsolationEpochId::new("epoch")?,
+        };
+        let tx = connection.transaction()?;
+        let work = NativeInfluenceReadWorkFixture::begin()?;
+        let mut budget = VerificationBudget::new(1)?;
+        assert!(budgeted_observed_influence(&tx, authority, &key, &mut budget).is_err());
+        assert_eq!(budget.remaining(), 0);
+        assert_eq!(work.history_bodies(), 0);
+        assert_eq!(work.current_projections(), 0);
+        Ok(())
     }
 }

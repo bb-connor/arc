@@ -560,10 +560,6 @@ pub(in crate::admission_operation_store) fn require_command_slot(
     body: &RecoveryCommandBodyV1,
 ) -> Result<(), AdmissionOperationStoreError> {
     let slot = command_slot(body)?;
-    #[cfg(feature = "admission-test-support")]
-    if command_quota_test_support::constructing_legacy_workflow(tx, scope, workflow, false)? {
-        return Ok(());
-    }
     if workflow_quota(tx, scope, workflow)?.commands[slot].get() >= COMMAND_SLOT_CEILINGS[slot] {
         return Err(invariant("recovery command quota exhausted"));
     }
@@ -598,19 +594,8 @@ pub(in crate::admission_operation_store) fn save_workflow(
             return Err(invariant("auxiliary released workflow cannot be rewritten"));
         }
     }
-    #[cfg(feature = "admission-test-support")]
-    let legacy = command_quota_test_support::constructing_legacy_workflow(
-        tx,
-        &record.scope,
-        &record.workflow_id,
-        true,
-    )?;
-    #[cfg(not(feature = "admission-test-support"))]
-    let legacy = false;
     if existing.is_none() {
-        if !legacy {
-            super::active_workflows::require_capacity(tx, owner, &record.scope)?;
-        }
+        super::active_workflows::require_capacity(tx, owner, &record.scope)?;
         if !matches!(class, WorkflowWriteClass::Planning) {
             return Err(invariant(
                 "new recovery workflow must reserve planning capacity",
@@ -623,21 +608,17 @@ pub(in crate::admission_operation_store) fn save_workflow(
             .checked_add(1)
             .ok_or_else(|| invariant("recovery version exhausted"))
     })?;
-    let mut quota = (!legacy)
-        .then(|| workflow_quota(tx, &record.scope, &record.workflow_id))
-        .transpose()?;
-    if let Some(quota) = &mut quota {
-        let (used, ceiling) = match class {
-            WorkflowWriteClass::Planning => (&mut quota.planning, WORKFLOW_SLOT_CEILINGS[0]),
-            WorkflowWriteClass::Control => (&mut quota.control, WORKFLOW_SLOT_CEILINGS[1]),
-            WorkflowWriteClass::Native => (&mut quota.native, WORKFLOW_SLOT_CEILINGS[2]),
-        };
-        if used.get() >= ceiling {
-            return Err(invariant("recovery workflow allowance exhausted"));
-        }
-        *used = SafeInteger::new(used.get() + 1)
-            .map_err(|_| invariant("recovery workflow allowance exhausted"))?;
+    let mut quota = workflow_quota(tx, &record.scope, &record.workflow_id)?;
+    let (used, ceiling) = match class {
+        WorkflowWriteClass::Planning => (&mut quota.planning, WORKFLOW_SLOT_CEILINGS[0]),
+        WorkflowWriteClass::Control => (&mut quota.control, WORKFLOW_SLOT_CEILINGS[1]),
+        WorkflowWriteClass::Native => (&mut quota.native, WORKFLOW_SLOT_CEILINGS[2]),
+    };
+    if used.get() >= ceiling {
+        return Err(invariant("recovery workflow allowance exhausted"));
     }
+    *used = SafeInteger::new(used.get() + 1)
+        .map_err(|_| invariant("recovery workflow allowance exhausted"))?;
     record.revision =
         SafeInteger::new(next).map_err(|_| invariant("recovery version exhausted"))?;
     let native = record
@@ -673,10 +654,8 @@ pub(in crate::admission_operation_store) fn save_workflow(
         &encode(record)?,
         binding,
     )?;
-    if let Some(quota) = quota {
-        save_quota(tx, owner, &quota)?;
-    }
-    if !legacy && is_new {
+    save_quota(tx, owner, &quota)?;
+    if is_new {
         super::active_workflows::register(tx, owner, record)?;
     }
     super::active_workflows::retire_cancelled(tx, owner, record)?;
@@ -707,95 +686,16 @@ pub(in crate::admission_operation_store) fn save_command(
     {
         return Err(invariant("recovery command owner changed"));
     }
-    #[cfg(feature = "admission-test-support")]
-    let legacy = command_quota_test_support::constructing_legacy_workflow(
-        tx,
-        &record.scope,
-        &record.workflow_id,
-        false,
-    )?;
-    #[cfg(not(feature = "admission-test-support"))]
-    let legacy = false;
-    let mut quota = (!legacy)
-        .then(|| workflow_quota(tx, &record.scope, &record.workflow_id))
-        .transpose()?;
-    if let Some(quota) = &mut quota {
-        let used = &mut quota.commands[slot];
-        if used.get() >= COMMAND_SLOT_CEILINGS[slot] {
-            return Err(invariant("recovery command quota exhausted"));
-        }
-        *used = SafeInteger::new(used.get() + 1)
-            .map_err(|_| invariant("recovery command quota exhausted"))?;
+    let mut quota = workflow_quota(tx, &record.scope, &record.workflow_id)?;
+    let used = &mut quota.commands[slot];
+    if used.get() >= COMMAND_SLOT_CEILINGS[slot] {
+        return Err(invariant("recovery command quota exhausted"));
     }
-    #[cfg(feature = "admission-test-support")]
-    if legacy {
-        command_quota_test_support::retain_legacy_command_identity(
-            tx,
-            &record.scope,
-            &record.workflow_id,
-        )?;
-    }
+    *used = SafeInteger::new(used.get() + 1)
+        .map_err(|_| invariant("recovery command quota exhausted"))?;
     persist_record(tx, owner, key, scope, "command", payload, None)?;
-    if let Some(quota) = quota {
-        save_quota(tx, owner, &quota)?;
-    }
+    save_quota(tx, owner, &quota)?;
     Ok(())
-}
-
-#[cfg(feature = "admission-test-support")]
-pub(in crate::admission_operation_store) fn save_legacy_inspection(
-    tx: &Transaction<'_>,
-    owner: &SqliteServingOwner,
-    actor: &AuthenticatedRecoveryActor,
-    record: &RecoveryWorkflowRecordV1,
-    command_id: &CommandId,
-) -> Result<(), AdmissionOperationStoreError> {
-    if actor.permission() != RecoveryPermission::Inspect
-        || actor.scope() != &record.scope
-        || !command_id.as_str().starts_with("legacy-status-poll-")
-    {
-        return Err(invariant("legacy inspection identity refused"));
-    }
-    let body = RecoveryCommandBodyV1::InspectWorkflow {
-        workflow_id: record.workflow_id.clone(),
-    };
-    let key = format!(
-        "command:{}",
-        sha256_hex(&encode(&(
-            actor.scope(),
-            actor.principal(),
-            body.permission(),
-            command_id,
-        ))?)
-    );
-    if raw(tx, &key)?.is_some() {
-        return Err(invariant("legacy inspection identity already retained"));
-    }
-    command_quota_test_support::retain_legacy_command_identity(
-        tx,
-        actor.scope(),
-        &record.workflow_id,
-    )?;
-    let response = RecoveryCommandResponseV1 {
-        command_id: command_id.clone(),
-        workflow_id: record.workflow_id.clone(),
-        revision: record.revision,
-        control: record.control,
-        effect: record.effect.clone(),
-        release: record.release.clone(),
-    };
-    let payload = encode(
-        &serde_json::json!({ "digest": CommandDigest::from_bytes(hash(RecoveryDigestDomain::Command, &body)?), "response": response }),
-    )?;
-    persist_record(
-        tx,
-        owner,
-        &key,
-        &scope_key(actor.scope())?,
-        "command",
-        &payload,
-        None,
-    )
 }
 
 /// One exact captured deployment snapshot has its own native allocation.

@@ -265,7 +265,9 @@ pub(in crate::admission_operation_store) fn verify_unused_setup_generation_inven
         )
         .optional()
         .map_err(sqlite_error)?;
-    if stamp.is_some_and(|version| version <= 40) {
+    if stamp.is_some_and(|version| {
+        version <= 40 || version == ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION
+    }) {
         return require_predecessor_original_owner_absence(tx);
     }
     require_format(tx)?;

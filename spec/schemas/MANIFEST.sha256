@@ -1,4 +1,4 @@
-9ba368dd112f47b5e2a06be7012b9f141f271304c9958b189d3cf3eb51318e51  spec/schemas/MANIFEST.sha256
+c9f42b0917ac711640a4b13c7efa9288e660e0a34a3560b7e3a15d9666cb7a29  spec/schemas/MANIFEST.sha256
 59854984853104df5c353e2f681a15fc7924742f9a2e468c29af248dce45ce03  spec/schemas/VERSION
 e90c7bc3c555c335559650c71f7fda1e3c13d134a5ff8ceaa0041000536c2ea9  spec/schemas/chio-agent-web/v1/external-projection-manifest.schema.json
 1cd24132ad8f98fad89bb62aa756304c2dee0b51aacd69c922e0f786dce2abec  spec/schemas/chio-agent-web/v1/interop-verifier-report.schema.json
@@ -492,7 +492,7 @@ d3870230c95cc82e734cd3a84838ae4f08e933a19097952d9219730bb2a4ff07  spec/schemas/c
 65cfd3105dcfd12feec2966727b148d91df1d1509d1c08f8541764766631de2e  spec/schemas/chio-wire/v1/recovery/semantic-invocation.schema.json
 aa61c99e2e329b042b8dea5f6215a12dfbffe7e29bd20caf5d223d9717be85f9  spec/schemas/chio-wire/v1/recovery/semantic-package.schema.json
 2791c67482d3465527c503eaab0f7ded613801821d328e8b94151c05fa8f88cb  spec/schemas/chio-wire/v1/recovery/semantic-payload.schema.json
-a8d0f91be28aa132cea55632bb1cf088e14baae3e1a5590d66492fd18cb45020  spec/schemas/chio-wire/v1/recovery/semantic-plan.schema.json
+739afbc9c701bd2c32cb1dad662ba0c3afadd08922e22e55d897f516d28ffc07  spec/schemas/chio-wire/v1/recovery/semantic-plan.schema.json
 268977f10b7ed246f85e56e78c1097bc3673a0d134fe1d3592e9226dac50f042  spec/schemas/chio-wire/v1/recovery/semantic-prerequisite.schema.json
 757cba561c22851ef3265ccf05a578188c8b0cb546e09b95ffe1328d1d0e8314  spec/schemas/chio-wire/v1/recovery/semantic-provider-request.schema.json
 4db8636d60cebdfce246724712be4ff82ae5b78547aa87c1c743ee0d8827a564  spec/schemas/chio-wire/v1/recovery/semantic-provider-response.schema.json

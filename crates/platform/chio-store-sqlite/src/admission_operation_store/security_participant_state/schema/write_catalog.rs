@@ -39,7 +39,7 @@ mod tests {
         connection.execute_batch(&sql()?)?;
         connection.execute_batch(
             "CREATE TABLE chio_store_schema_versions(store_key TEXT PRIMARY KEY,version INTEGER);
-             INSERT INTO chio_store_schema_versions VALUES('admission_operation',40);",
+             INSERT INTO chio_store_schema_versions VALUES('admission_operation',42);",
         )?;
         Ok(connection)
     }
@@ -117,7 +117,7 @@ mod tests {
         native_flow_write_catalog(&connection)?;
         connection.execute_batch(
             "CREATE TEMP TABLE chio_store_schema_versions(store_key TEXT,version INTEGER);
-             INSERT INTO temp.chio_store_schema_versions VALUES('admission_operation',40);",
+             INSERT INTO temp.chio_store_schema_versions VALUES('admission_operation',42);",
         )?;
         assert!(native_flow_write_catalog(&connection).is_err());
         Ok(())

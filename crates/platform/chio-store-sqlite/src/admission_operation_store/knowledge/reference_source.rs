@@ -1,9 +1,7 @@
 //! Native source owners mint affine reference custody inside a fenced writer.
 use super::*;
 
-pub(in crate::admission_operation_store) use super::reference_activation::VerifiedKnowledgeReferenceRebuildAuthority;
 pub(in crate::admission_operation_store) use super::reference_baseline::VerifiedNewArtifactReferenceBaseline;
-pub(in crate::admission_operation_store) use super::reference_census::VerifiedKnowledgeReferenceColdCohort;
 pub(in crate::admission_operation_store) use super::reference_custody::VerifiedKnowledgeReferenceRetain;
 pub(in crate::admission_operation_store) use super::reference_retirement::VerifiedKnowledgeReferenceRetirement;
 
@@ -41,10 +39,6 @@ impl ReferenceCutoff {
 
     pub(in crate::admission_operation_store) fn sequence(&self) -> u64 {
         self.sequence
-    }
-
-    pub(in crate::admission_operation_store) fn chain_digest(&self) -> &[u8; 32] {
-        &self.chain_digest
     }
 
     pub(in crate::admission_operation_store) fn verify(

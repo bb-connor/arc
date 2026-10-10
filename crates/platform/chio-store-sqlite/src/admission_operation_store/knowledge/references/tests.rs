@@ -30,46 +30,19 @@ fn anchor(scope: &RecoveryScopeV1) -> Result<SourceAnchor, Box<dyn std::error::E
 
 fn regular() -> Result<ReferenceAggregate, Box<dyn std::error::Error>> {
     let reference = reference()?;
-    let inventory = ReferenceInventory::Regular {
+    let inventory = ReferenceInventory {
         active_buckets: BoundedList::new(vec![])?,
     };
     Ok(ReferenceAggregate {
         schema: ReferenceSchema::V1,
-        baseline: ReferenceBaseline {
-            source: ReferenceBaselineSource::NewArtifact {
-                source: anchor(&reference.scope)?,
-            },
-            active_owners: SafeInteger::ZERO,
-            next_bucket: SafeInteger::new(1)?,
-            inventory: inventory.clone(),
-        },
+        source: anchor(&reference.scope)?,
         reference,
         accepted: SafeInteger::ZERO,
         retired: SafeInteger::ZERO,
-        rebuilds: SafeInteger::ZERO,
         active_owners: SafeInteger::ZERO,
         next_bucket: SafeInteger::new(1)?,
         inventory,
     })
-}
-
-fn overflow() -> Result<ReferenceAggregate, Box<dyn std::error::Error>> {
-    let mut aggregate = regular()?;
-    let cohort = CanonicalPayloadDigest::from_bytes([2; 32]);
-    let census = CanonicalPayloadDigest::from_bytes([3; 32]);
-    let inventory = ReferenceInventory::LegacyOverflow { cohort, census };
-    aggregate.baseline.source = ReferenceBaselineSource::Cold {
-        cutoff: serde_json::from_value(serde_json::json!({
-            "sequence":1,"chain_digest":vec![4_u8;32]
-        }))?,
-        cohort_digest: cohort,
-        census_digest: census,
-    };
-    aggregate.baseline.active_owners = SafeInteger::new(4097)?;
-    aggregate.baseline.inventory = inventory.clone();
-    aggregate.active_owners = aggregate.baseline.active_owners;
-    aggregate.inventory = inventory;
-    Ok(aggregate)
 }
 
 #[test]
@@ -107,65 +80,20 @@ fn more_than_one_bucket_keeps_the_complete_regular_count() -> TestResult {
     aggregate.accepted = SafeInteger::new(66)?;
     aggregate.active_owners = aggregate.accepted;
     aggregate.next_bucket = SafeInteger::new(3)?;
-    aggregate.inventory = ReferenceInventory::Regular {
+    aggregate.inventory = ReferenceInventory {
         active_buckets: BoundedList::new(vec![SafeInteger::new(1)?, SafeInteger::new(2)?])?,
     };
     aggregate.validate(67)?;
-    assert_eq!(aggregate.collection_count()?, 66);
+    assert_eq!(aggregate.active_owners.get(), 66);
     assert!(aggregate.validate(66).is_err());
     let first = aggregate.original()?;
     first.validate(1)?;
     assert_eq!(first.active_owners.get(), 0);
     assert_eq!(first.next_bucket.get(), 1);
-    aggregate.inventory = ReferenceInventory::Regular {
+    aggregate.inventory = ReferenceInventory {
         active_buckets: BoundedList::new(vec![SafeInteger::new(1)?])?,
     };
     assert!(aggregate.validate(67).is_err());
-    Ok(())
-}
-
-#[test]
-fn ordinary_inventory_cannot_be_reclassified_as_legacy_overflow() -> TestResult {
-    let mut aggregate = regular()?;
-    aggregate.inventory = ReferenceInventory::LegacyOverflow {
-        cohort: CanonicalPayloadDigest::from_bytes([2; 32]),
-        census: CanonicalPayloadDigest::from_bytes([3; 32]),
-    };
-    assert!(aggregate.validate(1).is_err());
-    Ok(())
-}
-
-#[test]
-fn drained_overflow_still_requires_a_fenced_rebuild() -> TestResult {
-    let mut aggregate = overflow()?;
-    aggregate.validate(1)?;
-    aggregate.retired = SafeInteger::new(4097)?;
-    aggregate.active_owners = SafeInteger::ZERO;
-    aggregate.validate(4098)?;
-    assert!(aggregate.collection_count().is_err());
-    aggregate.inventory = ReferenceInventory::Regular {
-        active_buckets: BoundedList::new(vec![])?,
-    };
-    assert!(aggregate.validate(4098).is_err());
-    aggregate.rebuilds = SafeInteger::new(1)?;
-    aggregate.validate(4099)?;
-    assert_eq!(aggregate.collection_count()?, 0);
-    assert_eq!(aggregate.original()?.baseline.active_owners.get(), 4097);
-    Ok(())
-}
-
-#[test]
-fn legacy_overflow_counter_cannot_admit_a_new_owner_or_change_its_census() -> TestResult {
-    let mut aggregate = overflow()?;
-    aggregate.accepted = SafeInteger::new(1)?;
-    aggregate.active_owners = SafeInteger::new(4098)?;
-    assert!(aggregate.validate(2).is_err());
-    aggregate = overflow()?;
-    aggregate.inventory = ReferenceInventory::LegacyOverflow {
-        cohort: CanonicalPayloadDigest::from_bytes([2; 32]),
-        census: CanonicalPayloadDigest::from_bytes([5; 32]),
-    };
-    assert!(aggregate.validate(1).is_err());
     Ok(())
 }
 
@@ -209,9 +137,7 @@ fn product_reference_owner_preserves_full_source_scope_across_processes() -> Tes
             digest: CommandDigest::from_bytes([3; 32]),
         },
         original: anchor(&scope)?,
-        location: ReferenceLocation::Bucket {
-            bucket: SafeInteger::new(1)?,
-        },
+        bucket: SafeInteger::new(1)?,
         state: ReferenceOwnerState::Active,
         retirement: None,
     };
@@ -276,15 +202,13 @@ fn ordinary_reference_slots_cover_the_bounded_encoded_rows() -> TestResult {
     let leaf = ReferenceLeaf {
         schema: ReferenceSchema::V1,
         reference: reference.clone(),
-        owner: ReferenceOwner::LegacyPinSource {
+        owner: ReferenceOwner::OperatorPin {
             scope: reference.scope.clone(),
-            original: source.clone(),
+            principal: chio_security_types::PrincipalId::new(&text)?,
+            evidence: EvidenceRef::new(&text)?,
         },
         original: source.clone(),
-        location: ReferenceLocation::LegacyCohort {
-            cohort: CanonicalPayloadDigest::from_bytes([255; 32]),
-            census: CanonicalPayloadDigest::from_bytes([255; 32]),
-        },
+        bucket: SafeInteger::new(SafeInteger::MAX - 1)?,
         state: ReferenceOwnerState::Retired,
         retirement: Some(serde_json::from_value(terminal)?),
     };
@@ -304,24 +228,15 @@ fn ordinary_reference_slots_cover_the_bounded_encoded_rows() -> TestResult {
         owners: BoundedList::new(owners)?,
     };
     bucket.validate()?;
-    let empty = ReferenceInventory::Regular {
-        active_buckets: BoundedList::new(vec![])?,
-    };
     let aggregate = ReferenceAggregate {
         schema: ReferenceSchema::V1,
         reference,
-        baseline: ReferenceBaseline {
-            source: ReferenceBaselineSource::NewArtifact { source },
-            active_owners: SafeInteger::ZERO,
-            next_bucket: SafeInteger::new(1)?,
-            inventory: empty,
-        },
+        source,
         accepted: SafeInteger::new(4096)?,
         retired: SafeInteger::ZERO,
-        rebuilds: SafeInteger::ZERO,
         active_owners: SafeInteger::new(4096)?,
         next_bucket: SafeInteger::new(SafeInteger::MAX)?,
-        inventory: ReferenceInventory::Regular {
+        inventory: ReferenceInventory {
             active_buckets: BoundedList::new(
                 (SafeInteger::MAX - 64..SafeInteger::MAX)
                     .map(SafeInteger::new)

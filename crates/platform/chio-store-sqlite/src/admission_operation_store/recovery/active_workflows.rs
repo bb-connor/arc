@@ -352,13 +352,17 @@ fn initialize(
             },
         )?;
     }
-    // Old never-admitted cancellations already carry the owning writer fence
-    // against future begin/capture. Revalidate that exact proof before release.
+    // A terminal may have finished before this first intake established live
+    // allocations. Authenticate its retained native custody after every tenant
+    // baseline exists, then retire the newly created lease exactly once. A
+    // workflow's display state alone never proves that its debt has finished.
+    // Old never-admitted cancellations retain their separate no-admission proof.
     let mut closed = tx
         .prepare(
             "SELECT record_key FROM admission_operation_recovery_records
          WHERE kind='workflow' AND record_key GLOB 'workflow:*'
-           AND json_extract(payload,'$.control')='cancelled' ORDER BY record_key",
+           AND (json_extract(payload,'$.control')='cancelled'
+                OR json_extract(payload,'$.captured')=1) ORDER BY record_key",
         )
         .map_err(sqlite_error)?;
     for key in closed
@@ -368,7 +372,13 @@ fn initialize(
         let row = raw(tx, &key.map_err(sqlite_error)?)?
             .ok_or_else(|| invariant("recovery legacy closure disappeared"))?;
         let record: RecoveryWorkflowRecordV1 = decode(&row.payload)?;
-        retire_cancelled(tx, owner, &record)?;
+        if record.captured {
+            if let Some(terminal) = auxiliary_captured_terminal(tx, &record)? {
+                retire_captured_terminal(tx, owner, &record, &terminal)?;
+            }
+        } else {
+            retire_cancelled(tx, owner, &record)?;
+        }
     }
     load_capacity(tx, &domain, None)?
         .ok_or_else(|| invariant("recovery active migration lost its capacity"))

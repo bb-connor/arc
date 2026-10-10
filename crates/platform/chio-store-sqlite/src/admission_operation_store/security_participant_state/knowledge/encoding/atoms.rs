@@ -238,7 +238,7 @@ impl AtomRecord {
 #[serde(untagged)]
 enum StoredBody {
     Atoms(Box<AtomRecord>),
-    Legacy(Box<Record>),
+    Inline(Box<Record>),
 }
 
 pub(super) fn logical_body(record: &Record) -> Result<Vec<u8>, AdmissionOperationStoreError> {
@@ -270,7 +270,7 @@ pub(super) fn decode_body(bytes: &[u8]) -> Result<Record, AdmissionOperationStor
     }
     match body {
         StoredBody::Atoms(atoms) => atoms.expand(),
-        StoredBody::Legacy(record) => {
+        StoredBody::Inline(record) => {
             if bytes.len() > MAX_PRIVATE_ROW_BYTES {
                 return Err(invalid());
             }

@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 35f8e30cf30553986a159b074ee485804a85db29547a8102522cd7bfa3080d2e
+# Schema sha256: d2b29cbbc9a0070d3666a33fd5a06bbda07a8e70f6d54bf33c15ca8b74893ff9
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -10,130 +10,6 @@
 
 from __future__ import annotations
 
-from .signed_semantic_transformation_schema import RecoverySignedSemanticTransformationAlgorithm as Algorithm
-from .artifact_archive_manifest_schema import ArtifactArchiveManifestV1
-from .artifact_certificate_schema import ArtifactCertificateV1
-from .artifact_handle_schema import ArtifactHandleV1
-from .signed_confined_endorsement_schema import RecoverySignedConfinedEndorsementDefinitionsArtifactInfluence as ArtifactInfluence
-from .artifact_influence_schema import ArtifactInfluenceV1
-from .artifact_version_schema import ArtifactProducer
-from .artifact_certificate_schema import RecoveryArtifactCertificateDefinitionsArtifactProducerNativeOperation as ArtifactProducer1
-from .artifact_version_schema import RecoveryArtifactVersionDefinitionsArtifactProducerImport as ArtifactProducer10
-from .artifact_certificate_schema import RecoveryArtifactCertificateDefinitionsArtifactProducerCheckpoint as ArtifactProducer2
-from .artifact_certificate_schema import RecoveryArtifactCertificateDefinitionsArtifactProducerDerivation as ArtifactProducer3
-from .artifact_certificate_schema import RecoveryArtifactCertificateDefinitionsArtifactProducerAdoption as ArtifactProducer4
-from .artifact_certificate_schema import RecoveryArtifactCertificateDefinitionsArtifactProducerImport as ArtifactProducer5
-from .artifact_version_schema import RecoveryArtifactVersionDefinitionsArtifactProducerNativeOperation as ArtifactProducer6
-from .artifact_version_schema import RecoveryArtifactVersionDefinitionsArtifactProducerCheckpoint as ArtifactProducer7
-from .artifact_version_schema import RecoveryArtifactVersionDefinitionsArtifactProducerDerivation as ArtifactProducer8
-from .artifact_version_schema import RecoveryArtifactVersionDefinitionsArtifactProducerAdoption as ArtifactProducer9
-from .artifact_producer_schema import ArtifactProducerV1
-from .artifact_producer_schema import RecoveryArtifactProducerNativeOperation as ArtifactProducerV11
-from .artifact_producer_schema import RecoveryArtifactProducerCheckpoint as ArtifactProducerV12
-from .artifact_producer_schema import RecoveryArtifactProducerDerivation as ArtifactProducerV13
-from .artifact_producer_schema import RecoveryArtifactProducerAdoption as ArtifactProducerV14
-from .artifact_producer_schema import RecoveryArtifactProducerImport as ArtifactProducerV15
-from .signed_confined_endorsement_schema import RecoverySignedConfinedEndorsementDefinitionsArtifactRecipient as ArtifactRecipient
-from .artifact_recipient_schema import ArtifactRecipientV1
-from .signed_confined_endorsement_schema import RecoverySignedConfinedEndorsementDefinitionsArtifactReference as ArtifactReference
-from .artifact_reference_schema import ArtifactReferenceV1
-from .artifact_release_intent_schema import ArtifactReleaseIntentV1
-from .signed_confined_endorsement_schema import ArtifactSink
-from .artifact_recipient_schema import RecoveryArtifactRecipientDefinitionsArtifactSinkAgent as ArtifactSink1
-from .confined_limits_schema import RecoveryConfinedLimitsDefinitionsArtifactSinkAgent as ArtifactSink10
-from .confined_limits_schema import RecoveryConfinedLimitsDefinitionsArtifactSinkModel as ArtifactSink11
-from .confined_limits_schema import RecoveryConfinedLimitsDefinitionsArtifactSinkArchive as ArtifactSink12
-from .confined_return_evidence_schema import RecoveryConfinedReturnEvidenceDefinitionsArtifactSinkAgent as ArtifactSink13
-from .confined_return_evidence_schema import RecoveryConfinedReturnEvidenceDefinitionsArtifactSinkModel as ArtifactSink14
-from .confined_return_evidence_schema import RecoveryConfinedReturnEvidenceDefinitionsArtifactSinkArchive as ArtifactSink15
-from .isolation_boundary_schema import RecoveryIsolationBoundaryDefinitionsArtifactSinkAgent as ArtifactSink16
-from .isolation_boundary_schema import RecoveryIsolationBoundaryDefinitionsArtifactSinkModel as ArtifactSink17
-from .isolation_boundary_schema import RecoveryIsolationBoundaryDefinitionsArtifactSinkArchive as ArtifactSink18
-from .return_admission_schema import RecoveryReturnAdmissionDefinitionsArtifactSinkAgent as ArtifactSink19
-from .artifact_recipient_schema import RecoveryArtifactRecipientDefinitionsArtifactSinkModel as ArtifactSink2
-from .return_admission_schema import RecoveryReturnAdmissionDefinitionsArtifactSinkModel as ArtifactSink20
-from .return_admission_schema import RecoveryReturnAdmissionDefinitionsArtifactSinkArchive as ArtifactSink21
-from .return_contract_schema import RecoveryReturnContractDefinitionsArtifactSinkAgent as ArtifactSink22
-from .return_contract_schema import RecoveryReturnContractDefinitionsArtifactSinkModel as ArtifactSink23
-from .return_contract_schema import RecoveryReturnContractDefinitionsArtifactSinkArchive as ArtifactSink24
-from .signed_confined_disclosure_schema import RecoverySignedConfinedDisclosureDefinitionsArtifactSinkAgent as ArtifactSink25
-from .signed_confined_disclosure_schema import RecoverySignedConfinedDisclosureDefinitionsArtifactSinkModel as ArtifactSink26
-from .signed_confined_disclosure_schema import RecoverySignedConfinedDisclosureDefinitionsArtifactSinkArchive as ArtifactSink27
-from .signed_confined_endorsement_schema import RecoverySignedConfinedEndorsementDefinitionsArtifactSinkAgent as ArtifactSink28
-from .signed_confined_endorsement_schema import RecoverySignedConfinedEndorsementDefinitionsArtifactSinkModel as ArtifactSink29
-from .artifact_recipient_schema import RecoveryArtifactRecipientDefinitionsArtifactSinkArchive as ArtifactSink3
-from .signed_confined_endorsement_schema import RecoverySignedConfinedEndorsementDefinitionsArtifactSinkArchive as ArtifactSink30
-from .artifact_release_intent_schema import RecoveryArtifactReleaseIntentDefinitionsArtifactSinkAgent as ArtifactSink4
-from .artifact_release_intent_schema import RecoveryArtifactReleaseIntentDefinitionsArtifactSinkModel as ArtifactSink5
-from .artifact_release_intent_schema import RecoveryArtifactReleaseIntentDefinitionsArtifactSinkArchive as ArtifactSink6
-from .confined_execution_profile_schema import RecoveryConfinedExecutionProfileDefinitionsArtifactSinkAgent as ArtifactSink7
-from .confined_execution_profile_schema import RecoveryConfinedExecutionProfileDefinitionsArtifactSinkModel as ArtifactSink8
-from .confined_execution_profile_schema import RecoveryConfinedExecutionProfileDefinitionsArtifactSinkArchive as ArtifactSink9
-from .artifact_version_schema import ArtifactVersionV1
-from .explanation_view_schema import RecoveryExplanationViewProjectionCandidatesItemsAssessment as Assessment
-from .profile_requirements_schema import RecoveryProfileRequirementsAttachmentProfile as AttachmentProfile
-from .signed_grant_v2_schema import RecoverySignedGrantV2Body as Body
-from .explanation_view_schema import RecoveryExplanationViewProjectionCandidatesItems as Candidate
-from .semantic_package_schema import RecoverySemanticPackageDefinitionsSemanticChannelChannel as Channel
-from .command_schema import RecoveryCommandCommandCreateWorkflow as Command
-from .command_schema import RecoveryCommandCommandInspectWorkflow as Command1
-from .command_schema import RecoveryCommandCommandSelectOffer as Command2
-from .command_schema import RecoveryCommandCommandSubmitApproval as Command3
-from .command_schema import RecoveryCommandCommandResumeWorkflow as Command4
-from .command_schema import RecoveryCommandCommandCancelWorkflow as Command5
-from .command_schema import RecoveryCommandCommandReportDecision as Command6
-from .semantic_audience_schema import RecoverySemanticAudienceCompleteness as Completeness
-from .confined_execution_profile_schema import ConfinedExecutionProfileV1
-from .confined_limits_schema import ConfinedLimitsV1
-from .confined_return_evidence_schema import ConfinedReturnEvidenceV1
-from .observation_schema import RecoveryObservationControl as Control
-from .remedy_registry_schema import RecoveryRemedyRegistryTemplatesItemsCost as Cost
-from .semantic_audience_schema import RecoverySemanticAudiencePaginationCursor as Cursor
-from .decision_report_schema import RecoveryDecisionReportDecision as Decision
-from .decision_report_schema import DecisionReportV1
-from .decision_report_view_schema import DecisionReportViewV1
-from .signed_explanation_view_schema import DestinationId
-from .semantic_transformation_schema import RecoverySemanticTransformationDisposition as Disposition
-from .trajectory_schema import RecoveryTrajectoryFramesItemsExpected as Expected
-from .explanation_snapshot_schema import RecoveryExplanationSnapshotObservationsItemsFact as Fact
-from .trajectory_schema import RecoveryTrajectoryFramesItems as Frame
-from .explanation_snapshot_schema import RecoveryExplanationSnapshotInfluenceObserved as Influence
-from .explanation_snapshot_schema import RecoveryExplanationSnapshotInfluenceUnknown as Influence1
-from .explanation_snapshot_schema import RecoveryExplanationSnapshotInfluenceObservedIntegrity as Integrity
-from .isolation_boundary_schema import IsolationBoundaryV1
-from .semantic_provider_request_schema import RecoverySemanticProviderRequestKind as Kind
-from .semantic_package_schema import RecoverySemanticPackageDefinitionsSemanticPrerequisiteRequirementKind as Kind13
-from .artifact_release_intent_schema import RecoveryArtifactReleaseIntentKindIndependentlyAdmitted as Kind2
-from .labeled_checkpoint_schema import LabeledCheckpointV1
-from .remedy_registry_schema import RecoveryRemedyRegistryTemplatesItemsCostLatency as Latency
-from .explanation_report_schema import RecoveryExplanationReportLimits as Limits
-from .effect_contract_schema import RecoveryEffectContractLookupFinality as LookupFinality
-from .signed_confined_endorsement_schema import RecoverySignedConfinedEndorsementDefinitionsModelContext as ModelContext
-from .model_context_schema import ModelContextV1
-from .dependency_graph_schema import RecoveryDependencyGraphNodesItems as Node
-from .authorization_requirements_schema import RecoveryAuthorizationRequirementsObligationsItemsOwnerRelease as Obligations
-from .approval_intent_schema import RecoveryApprovalIntentObligationsItemsCompartmentRelease as Obligations1
-from .authorization_requirements_schema import RecoveryAuthorizationRequirementsObligationsItemsUserAcceptance as Obligations10
-from .authorization_requirements_schema import RecoveryAuthorizationRequirementsObligationsItemsIntegrityEndorsement as Obligations11
-from .approval_intent_schema import RecoveryApprovalIntentObligationsItemsUserAcceptance as Obligations2
-from .approval_intent_schema import RecoveryApprovalIntentObligationsItemsIntegrityEndorsement as Obligations3
-from .authority_coverage_schema import RecoveryAuthorityCoverageObligationsItemsCompartmentRelease as Obligations5
-from .authority_coverage_schema import RecoveryAuthorityCoverageObligationsItemsUserAcceptance as Obligations6
-from .authority_coverage_schema import RecoveryAuthorityCoverageObligationsItemsIntegrityEndorsement as Obligations7
-from .authorization_requirements_schema import RecoveryAuthorizationRequirementsObligationsItemsCompartmentRelease as Obligations9
-from .explanation_snapshot_schema import RecoveryExplanationSnapshotObservationsItems as Observation
-from .transport_request_schema import OpaqueId
-from .transport_request_schema import RecoveryTransportRequestDefinitionsOperation as Operation
-from .action_intent_schema import RecoveryActionIntentOrigin as Origin
-from .command_result_schema import RecoveryCommandResultOriginalResponse as OriginalResponse
-from .semantic_plan_schema import RecoverySemanticPlanDefinitionsSemanticPlanStepOutput as Output
-from .semantic_audience_schema import RecoverySemanticAudiencePagination as Pagination
-from .policy_deployment_change_schema import PolicyDeploymentChangeV1
-from .policy_maintenance_proposal_schema import PolicyMaintenanceProposalV1
-from .policy_maintenance_view_schema import PolicyMaintenanceViewV1
-from .policy_trajectory_ref_schema import PolicyTrajectoryRefV1
-from .explanation_view_schema import RecoveryExplanationViewProjection as Projection
-from .explanation_snapshot_schema import RecoveryExplanationSnapshotObservationsItemsStateGapReason as Reason
 from .action_intent_schema import RecoveryActionIntentDefinitionsScope
 from .action_intent_schema import OpaqueId as RecoveryActionIntentOpaqueId
 from .action_intent_schema import RecoveryActionIntentOrigin
@@ -378,23 +254,10 @@ from .decision_report_view_schema import RecoveryDigestOctet as RecoveryDecision
 from .decision_report_view_schema import SafeInteger as RecoveryDecisionReportViewSafeInteger
 from .dependency_graph_schema import RecoveryDependencyGraphNodesItems
 from .dependency_graph_schema import RecoveryDependencyGraphV1
-from .transport_request_schema import RecoveryDigest32
-from .transport_request_schema import RecoveryDigestOctet as RecoveryDigest32Item
 from .disclosure_grant_schema import RecoveryDisclosureGrantRecoveryV2
 from .disclosure_grant_schema import VersionSelectedDisclosureGrant as RecoveryDisclosureGrantVersionSelectedDisclosureGrant
-from .transport_request_schema import RecoveryEffectAdmissionUnresolvedV1
-from .transport_request_schema import RecoveryEffectAwaitingApprovalV1
-from .transport_request_schema import RecoveryEffectAwaitingCallerReportV1
-from .transport_request_schema import RecoveryEffectClosedBeforeEffectV1
-from .transport_request_schema import RecoveryEffectCompleteV1
 from .effect_contract_schema import RecoveryEffectContractLookupFinality
 from .effect_contract_schema import SemanticEffectContractV1 as RecoveryEffectContractSemanticEffectContractV1
-from .transport_request_schema import RecoveryEffectFailedAfterEffectV1
-from .transport_request_schema import RecoveryEffectInFlightV1
-from .transport_request_schema import RecoveryEffectNeverAdmittedV1
-from .transport_request_schema import RecoveryEffectPartialV1
-from .transport_request_schema import RecoveryEffectUnknownV1
-from .action_intent_schema import RecoveryExactActionIntentV1
 from .explanation_evaluation_schema import RecoveryExplanationEvaluationAssessment
 from .explanation_evaluation_schema import RecoveryExplanationEvaluationCandidatesItems
 from .explanation_evaluation_schema import RecoveryExplanationEvaluationDefinitionsOperation
@@ -539,7 +402,6 @@ from .labeled_checkpoint_schema import LabeledCheckpointV1 as RecoveryLabeledChe
 from .labeled_checkpoint_schema import OpaqueId as RecoveryLabeledCheckpointOpaqueId
 from .labeled_checkpoint_schema import RecoveryDigest32 as RecoveryLabeledCheckpointRecoveryDigest32
 from .labeled_checkpoint_schema import RecoveryDigestOctet as RecoveryLabeledCheckpointRecoveryDigestOctet
-from .grant_binding_schema import RecoveryMandatoryGrantBindingV1
 from .model_context_schema import RecoveryModelContextDefinitionsArtifactReference
 from .model_context_schema import RecoveryModelContextDefinitionsScope
 from .model_context_schema import ModelContextV1 as RecoveryModelContextModelContextV1
@@ -604,7 +466,6 @@ from .provider_finality_schema import RecoveryDigest32 as RecoveryProviderFinali
 from .provider_finality_schema import RecoveryDigestOctet as RecoveryProviderFinalityRecoveryDigestOctet
 from .provider_finality_schema import RecoveryProviderPositiveFinalityV1 as RecoveryProviderFinalityRecoveryProviderPositiveFinalityV1
 from .provider_finality_schema import SafeInteger as RecoveryProviderFinalitySafeInteger
-from .provider_finality_schema import RecoveryProviderPositiveFinalityV1
 from .recovery_setup_probe_schema import RecoveryRecoverySetupProbeDefinitionsScope
 from .recovery_setup_probe_schema import OpaqueId as RecoveryRecoverySetupProbeOpaqueId
 from .recovery_setup_probe_schema import RecoveryDigest32 as RecoveryRecoverySetupProbeRecoveryDigest32
@@ -814,8 +675,6 @@ from .semantic_transformation_schema import RecoveryDigest32 as RecoverySemantic
 from .semantic_transformation_schema import RecoveryDigestOctet as RecoverySemanticTransformationRecoveryDigestOctet
 from .semantic_transformation_schema import SafeInteger as RecoverySemanticTransformationSafeInteger
 from .semantic_transformation_schema import SemanticTransformationV1 as RecoverySemanticTransformationSemanticTransformationV1
-from .recovery_setup_probe_schema import RecoverySetupProbeV1
-from .recovery_setup_report_schema import RecoverySetupReportV1
 from .signed_artifact_archive_manifest_schema import RecoverySignedArtifactArchiveManifestAlgorithm
 from .signed_artifact_archive_manifest_schema import SignedArtifactArchiveManifestV1 as RecoverySignedArtifactArchiveManifestSignedArtifactArchiveManifestV1
 from .signed_artifact_certificate_schema import RecoverySignedArtifactCertificateAlgorithm
@@ -1004,224 +863,8 @@ from .transport_request_schema import RecoveryEffectPartialV1 as RecoveryTranspo
 from .transport_request_schema import RecoveryEffectUnknownV1 as RecoveryTransportRequestRecoveryEffectUnknownV1
 from .transport_request_schema import SafeInteger as RecoveryTransportRequestSafeInteger
 from .transport_request_schema import RecoveryTransportRequestV1
-from .transport_request_schema import RecoveryTransportRequestDefinitionsRefusalCode as RefusalCode
-from .observation_schema import RecoveryObservationReleaseNotAvailable as Release
-from .command_response_schema import RecoveryCommandResponseReleasePending as Release1
-from .command_response_schema import RecoveryCommandResponseReleaseWithheld as Release2
-from .command_response_schema import RecoveryCommandResponseReleaseReleased as Release3
-from .command_response_schema import RecoveryCommandResponseReleaseDenied as Release4
-from .observation_schema import RecoveryObservationReleasePending as Release6
-from .observation_schema import RecoveryObservationReleaseWithheld as Release7
-from .observation_schema import RecoveryObservationReleaseReleased as Release8
-from .observation_schema import RecoveryObservationReleaseDenied as Release9
-from .profile_requirements_schema import RecoveryProfileRequirementsRequiredFeaturesItems as RequiredFeature
-from .artifact_version_schema import RecoveryArtifactVersionRetention as Retention
-from .return_admission_schema import ReturnAdmissionV1
-from .return_contract_schema import ReturnContractV1
-from .transport_request_schema import SafeInteger
-from .transport_request_schema import RecoveryTransportRequestDefinitionsScope as Scope
-from .scoped_endorsement_schema import ScopedEndorsementV1
-from .semantic_action_schema import SemanticActionV1
-from .semantic_annotation_schema import SemanticAnnotationV1
-from .semantic_deployment_schema import RecoverySemanticDeploymentDefinitionsSemanticAnnotator as SemanticAnnotator
-from .semantic_audience_schema import SemanticAudienceV1
-from .semantic_package_schema import RecoverySemanticPackageDefinitionsSemanticChannel as SemanticChannel
-from .semantic_deployment_schema import SemanticDeploymentV1
-from .semantic_deployment_schema import RecoverySemanticDeploymentDefinitionsSemanticDestination as SemanticDestination
-from .effect_contract_schema import SemanticEffectContractV1
-from .semantic_payload_schema import RecoverySemanticPayloadDefinitionsSemanticField as SemanticField
-from .semantic_transformation_schema import RecoverySemanticTransformationDefinitionsSemanticInputVersion as SemanticInputVersion
-from .semantic_invocation_schema import SemanticInvocationV1
-from .semantic_action_schema import RecoverySemanticActionDefinitionsSemanticNativeSource as SemanticNativeSource
-from .semantic_package_schema import RecoverySemanticPackageDefinitionsSemanticOperation as SemanticOperation
-from .semantic_deployment_schema import RecoverySemanticDeploymentDefinitionsSemanticOverride as SemanticOverride
-from .semantic_package_schema import SemanticPackageV1
-from .semantic_payload_schema import SemanticPayloadV1
-from .semantic_plan_schema import SemanticPlanInput
-from .semantic_plan_schema import RecoverySemanticPlanDefinitionsSemanticPlanInputExact as SemanticPlanInput1
-from .semantic_plan_schema import RecoverySemanticPlanDefinitionsSemanticPlanInputFutureOutput as SemanticPlanInput2
-from .semantic_plan_schema import RecoverySemanticPlanDefinitionsSemanticPlanStep as SemanticPlanStep
-from .semantic_plan_schema import SemanticPlanV1
-from .semantic_package_schema import RecoverySemanticPackageDefinitionsSemanticPrerequisiteRequirement as SemanticPrerequisiteRequirement
-from .semantic_prerequisite_schema import SemanticPrerequisiteV1
-from .semantic_provider_request_schema import SemanticProviderRequestV1
-from .semantic_provider_response_schema import SemanticProviderResponseV1
-from .semantic_deployment_schema import RecoverySemanticDeploymentDefinitionsSemanticRoute as SemanticRoute
-from .semantic_package_schema import SemanticSelector
-from .semantic_deployment_schema import RecoverySemanticDeploymentDefinitionsSemanticSelectorPresent as SemanticSelector1
-from .semantic_deployment_schema import RecoverySemanticDeploymentDefinitionsSemanticSelectorEquals as SemanticSelector2
-from .semantic_deployment_schema import RecoverySemanticDeploymentDefinitionsSemanticSelectorTextBytesAtMost as SemanticSelector3
-from .semantic_package_schema import RecoverySemanticPackageDefinitionsSemanticSelectorPresent as SemanticSelector4
-from .semantic_package_schema import RecoverySemanticPackageDefinitionsSemanticSelectorEquals as SemanticSelector5
-from .semantic_package_schema import RecoverySemanticPackageDefinitionsSemanticSelectorTextBytesAtMost as SemanticSelector6
-from .semantic_transformation_schema import SemanticTransformationV1
-from .semantic_payload_schema import SemanticValue
-from .semantic_deployment_schema import RecoverySemanticDeploymentDefinitionsSemanticValueText as SemanticValue1
-from .semantic_deployment_schema import RecoverySemanticDeploymentDefinitionsSemanticValueInteger as SemanticValue2
-from .semantic_deployment_schema import RecoverySemanticDeploymentDefinitionsSemanticValueBoolean as SemanticValue3
-from .semantic_package_schema import RecoverySemanticPackageDefinitionsSemanticValueText as SemanticValue4
-from .semantic_package_schema import RecoverySemanticPackageDefinitionsSemanticValueInteger as SemanticValue5
-from .semantic_package_schema import RecoverySemanticPackageDefinitionsSemanticValueBoolean as SemanticValue6
-from .semantic_payload_schema import RecoverySemanticPayloadDefinitionsSemanticValueText as SemanticValue7
-from .semantic_payload_schema import RecoverySemanticPayloadDefinitionsSemanticValueInteger as SemanticValue8
-from .semantic_payload_schema import RecoverySemanticPayloadDefinitionsSemanticValueBoolean as SemanticValue9
-from .semantic_package_schema import SemanticWithheldStatusV1 as SemanticWithheldStatus
-from .signed_artifact_archive_manifest_schema import SignedArtifactArchiveManifestV1
-from .signed_artifact_certificate_schema import SignedArtifactCertificateV1
-from .signed_confined_disclosure_schema import SignedConfinedDisclosureV1
-from .signed_confined_endorsement_schema import SignedConfinedEndorsementV1
-from .signed_policy_deployment_change_schema import SignedPolicyDeploymentChangeV1
-from .signed_authority_coverage_schema import SignedRecoveryAuthorityCoverageV1
-from .signed_grant_v2_schema import SignedRecoveryDeclassificationGrantV2
-from .signed_provider_finality_schema import SignedRecoveryProviderFinalityV1
-from .signed_recovery_setup_probe_schema import SignedRecoverySetupProbeV1
-from .signed_recovery_setup_report_schema import SignedRecoverySetupReportV1
-from .signed_scoped_endorsement_schema import SignedScopedEndorsementV1
-from .signed_semantic_annotation_schema import SignedSemanticAnnotationV1
-from .signed_semantic_audience_schema import SignedSemanticAudienceV1
-from .signed_semantic_deployment_schema import SignedSemanticDeploymentV1
-from .signed_semantic_package_schema import SignedSemanticPackageV1
-from .signed_semantic_prerequisite_schema import SignedSemanticPrerequisiteV1
-from .signed_semantic_transformation_schema import SignedSemanticTransformationV1
-from .explanation_snapshot_schema import RecoveryExplanationSnapshotObservationsItemsSource as Source
-from .explanation_snapshot_schema import RecoveryExplanationSnapshotObservationsItemsStateGap as State
-from .explanation_snapshot_schema import RecoveryExplanationSnapshotObservationsItemsStateKnown as State4
-from .explanation_snapshot_schema import RecoveryExplanationSnapshotObservationsItemsStateFreshnessQualified as State6
-from .explanation_view_schema import RecoveryExplanationViewProjectionSummary as Summary
-from .scoped_endorsement_schema import RecoveryScopedEndorsementTargetExactAction as Target
-from .scoped_endorsement_schema import RecoveryScopedEndorsementTargetPersistentArtifact as Target14
-from .explanation_snapshot_schema import RecoveryExplanationSnapshotObservationsItemsTargetDestination as Target6
-from .explanation_snapshot_schema import RecoveryExplanationSnapshotObservationsItemsTargetAuthority as Target7
-from .explanation_snapshot_schema import RecoveryExplanationSnapshotObservationsItemsTargetTemplate as Target8
-from .remedy_registry_schema import RecoveryRemedyRegistryTemplatesItems as Template
-from .disclosure_grant_schema import VersionSelectedDisclosureGrant
-from .disclosure_grant_schema import RecoveryDisclosureGrantRecoveryV2 as VersionSelectedDisclosureGrant1
 
 __all__ = [
-    "Algorithm",
-    "ArtifactArchiveManifestV1",
-    "ArtifactCertificateV1",
-    "ArtifactHandleV1",
-    "ArtifactInfluence",
-    "ArtifactInfluenceV1",
-    "ArtifactProducer",
-    "ArtifactProducer1",
-    "ArtifactProducer10",
-    "ArtifactProducer2",
-    "ArtifactProducer3",
-    "ArtifactProducer4",
-    "ArtifactProducer5",
-    "ArtifactProducer6",
-    "ArtifactProducer7",
-    "ArtifactProducer8",
-    "ArtifactProducer9",
-    "ArtifactProducerV1",
-    "ArtifactProducerV11",
-    "ArtifactProducerV12",
-    "ArtifactProducerV13",
-    "ArtifactProducerV14",
-    "ArtifactProducerV15",
-    "ArtifactRecipient",
-    "ArtifactRecipientV1",
-    "ArtifactReference",
-    "ArtifactReferenceV1",
-    "ArtifactReleaseIntentV1",
-    "ArtifactSink",
-    "ArtifactSink1",
-    "ArtifactSink10",
-    "ArtifactSink11",
-    "ArtifactSink12",
-    "ArtifactSink13",
-    "ArtifactSink14",
-    "ArtifactSink15",
-    "ArtifactSink16",
-    "ArtifactSink17",
-    "ArtifactSink18",
-    "ArtifactSink19",
-    "ArtifactSink2",
-    "ArtifactSink20",
-    "ArtifactSink21",
-    "ArtifactSink22",
-    "ArtifactSink23",
-    "ArtifactSink24",
-    "ArtifactSink25",
-    "ArtifactSink26",
-    "ArtifactSink27",
-    "ArtifactSink28",
-    "ArtifactSink29",
-    "ArtifactSink3",
-    "ArtifactSink30",
-    "ArtifactSink4",
-    "ArtifactSink5",
-    "ArtifactSink6",
-    "ArtifactSink7",
-    "ArtifactSink8",
-    "ArtifactSink9",
-    "ArtifactVersionV1",
-    "Assessment",
-    "AttachmentProfile",
-    "Body",
-    "Candidate",
-    "Channel",
-    "Command",
-    "Command1",
-    "Command2",
-    "Command3",
-    "Command4",
-    "Command5",
-    "Command6",
-    "Completeness",
-    "ConfinedExecutionProfileV1",
-    "ConfinedLimitsV1",
-    "ConfinedReturnEvidenceV1",
-    "Control",
-    "Cost",
-    "Cursor",
-    "Decision",
-    "DecisionReportV1",
-    "DecisionReportViewV1",
-    "DestinationId",
-    "Disposition",
-    "Expected",
-    "Fact",
-    "Frame",
-    "Influence",
-    "Influence1",
-    "Integrity",
-    "IsolationBoundaryV1",
-    "Kind",
-    "Kind13",
-    "Kind2",
-    "LabeledCheckpointV1",
-    "Latency",
-    "Limits",
-    "LookupFinality",
-    "ModelContext",
-    "ModelContextV1",
-    "Node",
-    "Obligations",
-    "Obligations1",
-    "Obligations10",
-    "Obligations11",
-    "Obligations2",
-    "Obligations3",
-    "Obligations5",
-    "Obligations6",
-    "Obligations7",
-    "Obligations9",
-    "Observation",
-    "OpaqueId",
-    "Operation",
-    "Origin",
-    "OriginalResponse",
-    "Output",
-    "Pagination",
-    "PolicyDeploymentChangeV1",
-    "PolicyMaintenanceProposalV1",
-    "PolicyMaintenanceViewV1",
-    "PolicyTrajectoryRefV1",
-    "Projection",
-    "Reason",
     "RecoveryActionIntentDefinitionsScope",
     "RecoveryActionIntentOpaqueId",
     "RecoveryActionIntentOrigin",
@@ -1466,23 +1109,10 @@ __all__ = [
     "RecoveryDecisionReportViewSafeInteger",
     "RecoveryDependencyGraphNodesItems",
     "RecoveryDependencyGraphV1",
-    "RecoveryDigest32",
-    "RecoveryDigest32Item",
     "RecoveryDisclosureGrantRecoveryV2",
     "RecoveryDisclosureGrantVersionSelectedDisclosureGrant",
-    "RecoveryEffectAdmissionUnresolvedV1",
-    "RecoveryEffectAwaitingApprovalV1",
-    "RecoveryEffectAwaitingCallerReportV1",
-    "RecoveryEffectClosedBeforeEffectV1",
-    "RecoveryEffectCompleteV1",
     "RecoveryEffectContractLookupFinality",
     "RecoveryEffectContractSemanticEffectContractV1",
-    "RecoveryEffectFailedAfterEffectV1",
-    "RecoveryEffectInFlightV1",
-    "RecoveryEffectNeverAdmittedV1",
-    "RecoveryEffectPartialV1",
-    "RecoveryEffectUnknownV1",
-    "RecoveryExactActionIntentV1",
     "RecoveryExplanationEvaluationAssessment",
     "RecoveryExplanationEvaluationCandidatesItems",
     "RecoveryExplanationEvaluationDefinitionsOperation",
@@ -1627,7 +1257,6 @@ __all__ = [
     "RecoveryLabeledCheckpointOpaqueId",
     "RecoveryLabeledCheckpointRecoveryDigest32",
     "RecoveryLabeledCheckpointRecoveryDigestOctet",
-    "RecoveryMandatoryGrantBindingV1",
     "RecoveryModelContextDefinitionsArtifactReference",
     "RecoveryModelContextDefinitionsScope",
     "RecoveryModelContextModelContextV1",
@@ -1692,7 +1321,6 @@ __all__ = [
     "RecoveryProviderFinalityRecoveryDigestOctet",
     "RecoveryProviderFinalityRecoveryProviderPositiveFinalityV1",
     "RecoveryProviderFinalitySafeInteger",
-    "RecoveryProviderPositiveFinalityV1",
     "RecoveryRecoverySetupProbeDefinitionsScope",
     "RecoveryRecoverySetupProbeOpaqueId",
     "RecoveryRecoverySetupProbeRecoveryDigest32",
@@ -1902,8 +1530,6 @@ __all__ = [
     "RecoverySemanticTransformationRecoveryDigestOctet",
     "RecoverySemanticTransformationSafeInteger",
     "RecoverySemanticTransformationSemanticTransformationV1",
-    "RecoverySetupProbeV1",
-    "RecoverySetupReportV1",
     "RecoverySignedArtifactArchiveManifestAlgorithm",
     "RecoverySignedArtifactArchiveManifestSignedArtifactArchiveManifestV1",
     "RecoverySignedArtifactCertificateAlgorithm",
@@ -2092,96 +1718,4 @@ __all__ = [
     "RecoveryTransportRequestRecoveryEffectUnknownV1",
     "RecoveryTransportRequestSafeInteger",
     "RecoveryTransportRequestV1",
-    "RefusalCode",
-    "Release",
-    "Release1",
-    "Release2",
-    "Release3",
-    "Release4",
-    "Release6",
-    "Release7",
-    "Release8",
-    "Release9",
-    "RequiredFeature",
-    "Retention",
-    "ReturnAdmissionV1",
-    "ReturnContractV1",
-    "SafeInteger",
-    "Scope",
-    "ScopedEndorsementV1",
-    "SemanticActionV1",
-    "SemanticAnnotationV1",
-    "SemanticAnnotator",
-    "SemanticAudienceV1",
-    "SemanticChannel",
-    "SemanticDeploymentV1",
-    "SemanticDestination",
-    "SemanticEffectContractV1",
-    "SemanticField",
-    "SemanticInputVersion",
-    "SemanticInvocationV1",
-    "SemanticNativeSource",
-    "SemanticOperation",
-    "SemanticOverride",
-    "SemanticPackageV1",
-    "SemanticPayloadV1",
-    "SemanticPlanInput",
-    "SemanticPlanInput1",
-    "SemanticPlanInput2",
-    "SemanticPlanStep",
-    "SemanticPlanV1",
-    "SemanticPrerequisiteRequirement",
-    "SemanticPrerequisiteV1",
-    "SemanticProviderRequestV1",
-    "SemanticProviderResponseV1",
-    "SemanticRoute",
-    "SemanticSelector",
-    "SemanticSelector1",
-    "SemanticSelector2",
-    "SemanticSelector3",
-    "SemanticSelector4",
-    "SemanticSelector5",
-    "SemanticSelector6",
-    "SemanticTransformationV1",
-    "SemanticValue",
-    "SemanticValue1",
-    "SemanticValue2",
-    "SemanticValue3",
-    "SemanticValue4",
-    "SemanticValue5",
-    "SemanticValue6",
-    "SemanticValue7",
-    "SemanticValue8",
-    "SemanticValue9",
-    "SemanticWithheldStatus",
-    "SignedArtifactArchiveManifestV1",
-    "SignedArtifactCertificateV1",
-    "SignedConfinedDisclosureV1",
-    "SignedConfinedEndorsementV1",
-    "SignedPolicyDeploymentChangeV1",
-    "SignedRecoveryAuthorityCoverageV1",
-    "SignedRecoveryDeclassificationGrantV2",
-    "SignedRecoveryProviderFinalityV1",
-    "SignedRecoverySetupProbeV1",
-    "SignedRecoverySetupReportV1",
-    "SignedScopedEndorsementV1",
-    "SignedSemanticAnnotationV1",
-    "SignedSemanticAudienceV1",
-    "SignedSemanticDeploymentV1",
-    "SignedSemanticPackageV1",
-    "SignedSemanticPrerequisiteV1",
-    "SignedSemanticTransformationV1",
-    "Source",
-    "State",
-    "State4",
-    "State6",
-    "Summary",
-    "Target",
-    "Target14",
-    "Target6",
-    "Target7",
-    "Target8",
-    "Template",
-    "VersionSelectedDisclosureGrant",
-    "VersionSelectedDisclosureGrant1",
 ]

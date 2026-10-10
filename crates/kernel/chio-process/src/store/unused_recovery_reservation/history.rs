@@ -68,18 +68,19 @@ pub(super) fn unused(
     reservation: &RecoveryCallReservation,
 ) -> Result<(), ProcessError> {
     let (_, namespace, _, _) = metadata(connection)?;
-    let process = read_process(connection, &reservation.process_id)?
-        .ok_or_else(|| ProcessError::NotFound(reservation.process_id.clone()))?;
-    if reservation.runtime_id != namespace
-        || reservation.capability_digest != digest(&process.capability)?
-        || reservation.operation_key != format!("recovery:{}", reservation.continuation_id.as_str())
-        || reservation.request_id
+    let process = read_process(connection, &reservation.data.process_id)?
+        .ok_or_else(|| ProcessError::NotFound(reservation.data.process_id.clone()))?;
+    if reservation.data.runtime_id != namespace
+        || reservation.data.capability_digest != digest(&process.capability)?
+        || reservation.data.operation_key
+            != format!("recovery:{}", reservation.data.continuation_id.as_str())
+        || reservation.data.request_id
             != format!(
                 "process:{}",
                 digest(&(
                     &namespace,
-                    &reservation.process_id,
-                    &reservation.operation_key
+                    &reservation.data.process_id,
+                    &reservation.data.operation_key
                 ))?
             )
         || process.tree_calls == 0
@@ -90,13 +91,13 @@ pub(super) fn unused(
         "SELECT continuation_id,
          CASE WHEN typeof(reservation)='blob' AND length(reservation) BETWEEN 1 AND 4096 THEN reservation END,
          final_binding FROM process_recovery_calls WHERE process_id=?1 AND operation_key=?2",
-        params![reservation.process_id,reservation.operation_key],
+        params![reservation.data.process_id,reservation.data.operation_key],
         |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?)),
     ).optional()?;
     let Some((continuation, bytes, final_binding)) = retained else {
         return Err(ProcessError::Conflict);
     };
-    if continuation != reservation.continuation_id.as_str()
+    if continuation != reservation.data.continuation_id.as_str()
         || bytes.as_deref() != Some(chio_core_types::canonical_json_bytes(reservation)?.as_slice())
         || final_binding.is_some()
     {
@@ -105,7 +106,7 @@ pub(super) fn unused(
     let participated: bool = connection.query_row(
         "SELECT EXISTS(SELECT 1 FROM process_calls WHERE process_id=?1 AND operation_key=?2)
          OR EXISTS(SELECT 1 FROM process_call_nonces WHERE process_id=?1 AND operation_key=?2)",
-        params![reservation.process_id, reservation.operation_key],
+        params![reservation.data.process_id, reservation.data.operation_key],
         |row| row.get(0),
     )?;
     if participated {
@@ -121,14 +122,14 @@ pub(super) fn load(
     let row: Option<(String, Option<Vec<u8>>)> = connection.query_row(
         "SELECT continuation_id,CASE WHEN typeof(closure)='blob' AND length(closure) BETWEEN 1 AND 16384 THEN closure END
          FROM process_unused_recovery_reservations WHERE process_id=?1 AND operation_key=?2",
-        params![reservation.process_id,reservation.operation_key], |row| Ok((row.get(0)?,row.get(1)?)),
+        params![reservation.data.process_id,reservation.data.operation_key], |row| Ok((row.get(0)?,row.get(1)?)),
     ).optional()?;
     let Some((continuation, bytes)) = row else {
         return Ok(None);
     };
     let bytes = bytes.ok_or(ProcessError::Conflict)?;
     let value: UnusedRecoveryReservationClosureData = serde_json::from_slice(&bytes)?;
-    if continuation != reservation.continuation_id.as_str()
+    if continuation != reservation.data.continuation_id.as_str()
         || value.reservation() != reservation
         || chio_core_types::canonical_json_bytes(&value)? != bytes
     {
@@ -145,7 +146,7 @@ pub(super) fn verify(
     let (version, namespace, authority, key) = metadata(connection)?;
     let (root, lineage) = lineage(connection, value.reservation().process_id())?;
     if !matches!(version, 6 | 7)
-        || value.reservation().runtime_id != namespace
+        || value.reservation().data.runtime_id != namespace
         || value.authority_domain() != authority
         || value.kernel_key() != key
         || value.root_process() != root

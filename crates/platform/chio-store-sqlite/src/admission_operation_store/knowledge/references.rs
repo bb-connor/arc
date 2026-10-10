@@ -10,25 +10,20 @@ mod prepared;
 mod readback;
 mod reader;
 mod ready;
-mod rebuild;
 mod source;
 #[cfg(test)]
 mod tests;
 
 use bucket::{
-    BucketState, ReferenceAggregate, ReferenceBaseline, ReferenceBucket, ReferenceInventory,
-    ReferenceLeaf, ReferenceLocation, ReferenceOwnerState, ReferenceSchema,
-    MAX_ACTIVE_REFERENCE_BUCKETS, MAX_ACTIVE_REFERENCE_OWNERS, MAX_OWNERS_PER_BUCKET,
+    BucketState, ReferenceAggregate, ReferenceBucket, ReferenceInventory, ReferenceLeaf,
+    ReferenceOwnerState, ReferenceSchema, MAX_ACTIVE_REFERENCE_BUCKETS, MAX_OWNERS_PER_BUCKET,
 };
 use prepared::OwningSource;
 use reader::{load_owner_leaf, load_reference_state, membership, ReferenceState};
 
 pub(in crate::admission_operation_store) use baseline::{
-    prepare_cold_reference_baseline, prepare_new_artifact_reference_baseline,
-    verify_committed_cold_baseline, ColdReferenceWriteFootprint, PreparedColdReferenceBaseline,
-    PreparedNewArtifactReferenceBaseline,
+    prepare_new_artifact_reference_baseline, PreparedNewArtifactReferenceBaseline,
 };
-pub(in crate::admission_operation_store) use bucket::ReferenceBaselineSource;
 pub(in crate::admission_operation_store::knowledge) use collected::collection_sources as verify_collected_publication_sources;
 pub(in crate::admission_operation_store) use collected::{
     collected_publication_closure, CollectedPublicationReferenceClosure,
@@ -51,9 +46,6 @@ pub(in crate::admission_operation_store) use reader::active_reference_owner_coun
 pub(in crate::admission_operation_store) use ready::{
     ready_reference_account, ReadyReferenceAccount, ReferenceAccount, ReferenceReadyRecord,
     ReferenceReadySchema,
-};
-pub(in crate::admission_operation_store) use rebuild::{
-    prepare_reference_rebuild, PreparedReferenceRebuild,
 };
 pub(in crate::admission_operation_store) use source::SourceAnchor;
 

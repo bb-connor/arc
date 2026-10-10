@@ -6,56 +6,20 @@ mod watermark;
 pub(in crate::admission_operation_store) use head_write::VerifiedCheckpointHeadWrite;
 #[cfg(feature = "admission-test-support")]
 mod history_trace;
-#[cfg(feature = "admission-test-support")]
-mod legacy_test_support;
 mod reference_source;
 mod restore;
-#[cfg(feature = "admission-test-support")]
-mod restore_test_support;
 mod retirement;
-use head::{checkpoint_key, load_checkpoint, load_visible_checkpoint, retain_checkpoint_revision};
+#[cfg(feature = "admission-test-support")]
+mod retirement_test_support;
 #[cfg(all(test, unix))]
-use head::{checkpoint_revision_key, legacy_checkpoint_key};
+use head::checkpoint_revision_key;
+use head::{checkpoint_key, load_checkpoint, load_visible_checkpoint, retain_checkpoint_revision};
 pub(super) use reference_source::{checkpoint_reference_source, CheckpointReferenceSource};
 pub(in crate::admission_operation_store) use restore::AuthenticatedCheckpointRestoreEncodingSource;
 pub use restore::NativeCheckpointRestore;
 pub(super) use restore::{restore_reference_source, RestoreReferenceSource};
-#[cfg(feature = "admission-test-support")]
-pub use restore_test_support::{
-    construct_legacy_checkpoint_restore_fixture, LegacyCheckpointRestoreFixtureScope,
-};
 #[cfg(all(test, unix))]
 mod tests;
-
-pub(super) fn pins(
-    tx: &Connection,
-    key: &str,
-    reference: &ArtifactVersionRefV1,
-) -> Result<bool, AdmissionOperationStoreError> {
-    let row = protected::raw_checked(tx, key)?.ok_or_else(|| refused("checkpoint pin absent"))?;
-    let checkpoint: LabeledCheckpointV1 = protected::decode(&row.payload)?;
-    if row.kind != "command" || row.scope != scope_key(&checkpoint.scope)? {
-        return Err(refused("checkpoint pin source ownership"));
-    }
-    head::validate_record_key(&checkpoint, key)?;
-    if retirement::revision_is_retired(tx, &checkpoint)? {
-        return Ok(false);
-    }
-    Ok(checkpoint.artifacts.as_slice().contains(reference)
-        || checkpoint
-            .model_contexts
-            .as_slice()
-            .iter()
-            .any(|model| model.side_files.as_slice().contains(reference)))
-}
-
-pub(super) fn restore_pins(
-    tx: &Connection,
-    key: &str,
-    reference: &ArtifactVersionRefV1,
-) -> Result<bool, AdmissionOperationStoreError> {
-    restore::pins(tx, key, reference)
-}
 
 impl SqliteAdmissionOperationStore {
     pub fn save_labeled_checkpoint(
@@ -151,7 +115,7 @@ impl SqliteAdmissionOperationStore {
             traversal::ensure_audience(&tx, actor, &checkpoint.label)?;
             // Revisions remain individually pinned and restorable. GC cannot
             // discard references required by an older retained checkpoint. On
-            // upgrade, preserve the previous valid legacy current envelope.
+            // update, preserve the previous valid current envelope.
             if let Some(old) = &old {
                 retain_checkpoint_revision(&tx, &self.serving_owner, old)?;
                 if !retirement::revision_is_retired(&tx, old)? {

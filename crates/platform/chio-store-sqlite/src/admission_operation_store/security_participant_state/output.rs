@@ -12,8 +12,6 @@ mod faults;
 #[cfg(feature = "admission-test-support")]
 pub use faults::NativeOutputJoinTestFault;
 mod integrity;
-#[cfg(feature = "admission-test-support")]
-mod legacy_test;
 mod record;
 mod schema;
 mod write;

@@ -58,31 +58,19 @@ impl<T: Serialize + DeserializeOwned> SourceRecord<T> {
 #[serde(deny_unknown_fields)]
 pub(super) struct AudienceSources {
     exact: Option<SourceRecord<SignedSemanticAudienceV1>>,
-    legacy: Option<SourceRecord<SignedSemanticAudienceV1>>,
 }
 
-fn audience_keys(
+fn selected_audience_key(
     expected: &SemanticAudienceObservationV1,
-) -> Result<(String, String), AdmissionOperationStoreError> {
-    Ok((
-        audience_key(
-            &expected.scope,
-            &expected.provider,
-            &expected.account,
-            &expected.resource,
-            &expected.subject_mapping,
-            &expected.query,
-        )?,
-        format!(
-            "semantic-acl:{}:{}",
-            scope_key(&expected.scope)?,
-            sha256_hex(&protected::encode(&(
-                &expected.provider,
-                &expected.account,
-                &expected.resource,
-            ))?)
-        ),
-    ))
+) -> Result<String, AdmissionOperationStoreError> {
+    audience_key(
+        &expected.scope,
+        &expected.provider,
+        &expected.account,
+        &expected.resource,
+        &expected.subject_mapping,
+        &expected.query,
+    )
 }
 
 fn same_audience_identity(
@@ -102,7 +90,7 @@ impl AudienceSources {
         tx: &Connection,
         expected: &SemanticAudienceObservationV1,
     ) -> Result<Self, AdmissionOperationStoreError> {
-        let (exact, legacy) = audience_keys(expected)?;
+        let key = selected_audience_key(expected)?;
         let load_optional = |key: &str| {
             if protected::raw_checked(tx, key)?.is_none() {
                 Ok(None)
@@ -111,8 +99,7 @@ impl AudienceSources {
             }
         };
         let sources = Self {
-            exact: load_optional(&exact)?,
-            legacy: load_optional(&legacy)?,
+            exact: load_optional(&key)?,
         };
         sources.selected(expected)?;
         Ok(sources)
@@ -128,11 +115,7 @@ impl AudienceSources {
             }
             return Ok(Some(&exact.body));
         }
-        Ok(self
-            .legacy
-            .as_ref()
-            .filter(|legacy| same_audience_identity(legacy.body.body(), expected))
-            .map(|legacy| &legacy.body))
+        Ok(None)
     }
 
     pub(super) fn validate_at_cut(
@@ -141,13 +124,11 @@ impl AudienceSources {
         expected: &SemanticAudienceObservationV1,
         cut: u64,
     ) -> Result<(), AdmissionOperationStoreError> {
-        let (exact, legacy) = audience_keys(expected)?;
-        for (source, key) in [(&self.exact, &exact), (&self.legacy, &legacy)] {
-            if let Some(source) = source {
-                source.validate_at_cut(tx, key, &expected.scope, "command", cut)?;
-            } else {
-                require_absent_at_cut(tx, key, cut)?;
-            }
+        let key = selected_audience_key(expected)?;
+        if let Some(source) = &self.exact {
+            source.validate_at_cut(tx, &key, &expected.scope, "command", cut)?;
+        } else {
+            require_absent_at_cut(tx, &key, cut)?;
         }
         self.selected(expected)?;
         Ok(())

@@ -117,16 +117,6 @@ pub(super) async fn initialize_public_native_source(path: &std::path::Path) -> T
     Ok(())
 }
 
-pub(super) async fn native_public_fixture_from_empty_import(
-    kind: &str,
-) -> TestResult<RecoveryFixture> {
-    let directory = tempfile::tempdir()?;
-    std::fs::write(directory.path().join("semantic-kind"), kind)?;
-    std::fs::write(directory.path().join("public-original-profile"), "selected")?;
-    initialize_public_native_source(directory.path()).await?;
-    RecoveryFixture::open(directory.path().to_path_buf(), Some(directory), false)
-}
-
 async fn native_fixture_from_empty_import_with_optional_retention(
     kind: &str,
     payment_adapter: Option<Box<dyn chio_kernel::PaymentAdapter>>,

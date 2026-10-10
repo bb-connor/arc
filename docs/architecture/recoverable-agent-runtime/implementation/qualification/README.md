@@ -4,7 +4,7 @@ The current recovery tree is unqualified until current byte-bound acceptance,
 independent review, Linux execution, live provider trials, formal runs and hosted
 CI are complete. [STATUS.md](../STATUS.md) is the current verdict. Historical
 phase packages retain their original artifacts and describe their archived
-bytes.
+bytes, preserved in the [history archive](../history/README.md).
 
 The maintained auditor is
 [`scripts/verify-recovery-qualification.py`](../../../../../scripts/verify-recovery-qualification.py).
@@ -17,7 +17,7 @@ python3 -B scripts/verify-recovery-qualification.py --catalog
 python3 -B scripts/verify-recovery-qualification.py --inventory --source-root "$PWD"
 ```
 
-The current inventory version is `chio.source-inventory.v3`. Its binding includes the
+The current inventory version is `chio.source-inventory.v4`. Its binding includes the
 base commit, the inventory version, and the complete ordered source rows. The
 current runtime inventory includes clean tracked inputs and new Git-visible
 inputs, contained source aliases, workspace members, model sources and build
@@ -26,13 +26,13 @@ archive members are read through held regular-file descriptors, hashed from
 the same bytes that are archived, and published by an atomic rename after all
 members pass validation. A failed archive does not replace a completed one.
 
-Version 3 includes Git-visible secret-shaped paths as declared metadata-only
+Version 4 includes Git-visible secret-shaped paths as declared metadata-only
 rows. It records their state and permissions through held directory descriptors;
 it does not read or hash their contents, follow their links, or add their bytes
 to the source archive. Missing and unreachable paths retain their observed
 states. Secret metadata and public byte rows share one collision check. Existing
 version 2 inventories and every sealed historical package retain their original
-version and bytes; their hashes cannot be promoted to version 3 bindings.
+version and bytes; their hashes cannot be promoted to version 4 bindings.
 
 ## Record and replay a current gate
 
@@ -74,7 +74,7 @@ for an independently classified cache path under the exact supported policy.
 For commands inside a received candidate, both complete source captures must
 match the final full guest inventory, including unselected original source
 bytes and regular-file modes and sizes. Their index describes newly generated
-empty discovery blobs and absent HEAD. The separate runtime v3 projection
+empty discovery blobs and absent HEAD. The separate runtime v4 projection
 preserves the original qualification identity without inventing guest Git
 history. Ignored build outputs and external dependency or compiler inputs
 require their own compiled-profile evidence; these source joins do not prove

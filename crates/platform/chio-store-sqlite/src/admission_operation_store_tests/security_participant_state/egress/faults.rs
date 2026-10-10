@@ -1,6 +1,61 @@
 use super::*;
 
 #[test]
+fn commit_verification_delay_preserves_event_time_and_checks_absolute_deadlines(
+) -> AnchoredTestResult {
+    let _reset = ResetCutpoint;
+    for expiration in [None, Some("fence"), Some("lease")] {
+        EGRESS_COMMIT_TIME.set(None);
+        let fixture = fixture();
+        hydrate(&fixture, &imported(&fixture, "source")?)?;
+        let mut pending = pending(&fixture, "egress-verification-delay", None)?;
+        if expiration == Some("lease") {
+            pending.plan.expires_at_unix_ms = pending.lease.expires_at_unix_ms() + 30_000;
+        }
+        let acquired = pending.acquire(&fixture)?;
+        let prepared = commitment(&acquired)?;
+        let before = counts(&fixture)?;
+        // Advance only at the final physical-writer boundary, after the event
+        // and authenticated changes have been constructed and checked.
+        let commit_seconds = match expiration {
+            Some("fence") => acquired.expires_at_unix_ms.div_ceil(1_000),
+            Some("lease") => pending.lease.expires_at_unix_ms().div_ceil(1_000),
+            _ => prepared.committed_at_unix_ms / 1_000 + 7,
+        };
+        if expiration == Some("lease") {
+            assert!(commit_seconds * 1_000 < acquired.expires_at_unix_ms);
+        }
+        EGRESS_COMMIT_TIME.set(Some(commit_seconds));
+        let result = pending.commit(&fixture, &prepared);
+        EGRESS_COMMIT_TIME.set(None);
+        if expiration.is_some() {
+            assert!(result.is_err(), "expired {expiration:?} committed");
+            assert_eq!(
+                counts(&fixture)?,
+                before,
+                "expiry must roll back every event"
+            );
+        } else {
+            let committed = result?;
+            assert!(committed.committed_at_unix_ms + 5_000 < commit_seconds * 1_000);
+            assert_eq!(counts(&fixture)?.0, before.0 + 1);
+            let history = fixture
+                .store
+                .load_security_participant_egress(
+                    pending.operation.binding().operation_id(),
+                    &fixture.fence,
+                    now_ms(),
+                )?
+                .ok_or("committed history absent")?;
+            assert_eq!(history.historical_commitment(), Some(&committed));
+            assert_eq!(pending.commit(&fixture, &prepared)?, committed);
+        }
+        native::verify_coverage(&*fixture.store.connection()?)?;
+    }
+    Ok(())
+}
+
+#[test]
 fn nested_label_write_is_rejected_and_rollback_disables_egress_callback() -> AnchoredTestResult {
     let fixture = fixture();
     hydrate(&fixture, &imported(&fixture, "source")?)?;

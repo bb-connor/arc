@@ -122,7 +122,7 @@ impl<'tx, 'conn> VerifiedKnowledgeReferenceRetirement<'tx, 'conn> {
         tx: &'tx Transaction<'conn>,
         key: &str,
     ) -> Result<Option<Self>, AdmissionOperationStoreError> {
-        let Some(pin) = pins::modern_reference_source(tx, key)? else {
+        let Some(pin) = pins::reference_source(tx, key)? else {
             return Ok(None);
         };
         if pin.active() {
@@ -291,7 +291,7 @@ impl<'tx, 'conn> VerifiedKnowledgeReferenceRetirement<'tx, 'conn> {
                 }
             }
             TerminalEvidence::OperatorPin => {
-                let pin = pins::modern_reference_source(tx, self.original.record_key())?
+                let pin = pins::reference_source(tx, self.original.record_key())?
                     .ok_or_else(|| refused("operator retirement source disappeared"))?;
                 let pins::PinOwner::Operator {
                     principal,

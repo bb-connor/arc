@@ -1,6 +1,6 @@
 //! Native work keeps bounded existing-work headroom and verified-principal fairness.
 use crate::recovery::RecoveryRuntimeError;
-use chio_kernel::recovery::{AuthenticatedRecoveryActor, RecoveryPermission};
+use chio_kernel::recovery::AuthenticatedRecoveryActor;
 use chio_security_types::{flow::PrincipalId, recovery::RecoveryCommandBodyV1};
 use std::{
     collections::BTreeSet,
@@ -22,17 +22,6 @@ pub(super) fn command_class(body: &RecoveryCommandBodyV1) -> WorkClass {
         | RecoveryCommandBodyV1::ResumeWorkflow { .. }
         | RecoveryCommandBodyV1::CancelWorkflow { .. }
         | RecoveryCommandBodyV1::ReportDecision { .. } => WorkClass::Existing,
-    }
-}
-pub(super) fn command_permission(body: &RecoveryCommandBodyV1) -> RecoveryPermission {
-    match body {
-        RecoveryCommandBodyV1::CreateWorkflow { .. } => RecoveryPermission::Create,
-        RecoveryCommandBodyV1::InspectWorkflow { .. } => RecoveryPermission::Inspect,
-        RecoveryCommandBodyV1::SelectOffer { .. } => RecoveryPermission::Select,
-        RecoveryCommandBodyV1::SubmitApproval { .. } => RecoveryPermission::Approve,
-        RecoveryCommandBodyV1::ResumeWorkflow { .. } => RecoveryPermission::Resume,
-        RecoveryCommandBodyV1::CancelWorkflow { .. } => RecoveryPermission::Cancel,
-        RecoveryCommandBodyV1::ReportDecision { .. } => RecoveryPermission::Report,
     }
 }
 
@@ -96,7 +85,7 @@ pub(super) struct NativeAdmission {
     planning: Lane,
     existing: Lane,
 }
-pub(super) struct NativeWorkPermit {
+pub(in crate::recovery) struct NativeWorkPermit {
     _principal: PrincipalWorkPermit,
     _class: OwnedSemaphorePermit,
     _total: OwnedSemaphorePermit,

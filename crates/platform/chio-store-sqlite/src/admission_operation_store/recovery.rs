@@ -20,8 +20,6 @@ mod issuance;
 pub(super) mod legacy_audience_test_support;
 #[cfg(feature = "admission-test-support")]
 pub(super) mod legacy_history_test_support;
-#[cfg(feature = "admission-test-support")]
-pub(super) mod legacy_planning_test_support;
 pub(super) mod native;
 pub(in crate::admission_operation_store) mod original_resolution;
 pub(in crate::admission_operation_store) mod origins;
@@ -309,60 +307,67 @@ impl RecoveryAuthorityPort for SqliteAdmissionOperationStore {
         fence: &StoreMutationFence,
         now: u64,
     ) -> Result<ApprovalIntentV1, AdmissionOperationStoreError> {
-        if let Some(reply) = self.read_retained_host_reply(
-            actor,
-            workflow,
-            retained_host_reply::RetainedHostReplyRequest::Review,
-            fence,
-            now,
-        )? {
-            return match reply {
-                retained_host_reply::RetainedHostReplyData::Review(review) => Ok(*review),
-                _ => Err(invariant(
-                    "retained review changed its closed reply purpose",
-                )),
-            };
-        }
-        self.recovery_mutation(actor, fence, now, |tx, profile, now| {
-            if actor.permission() != RecoveryPermission::Approve {
-                return Err(invariant("recovery review scope refused"));
-            }
-            let mut record = workflow_tx(tx, actor.scope(), workflow)?;
-            historical_holds::require_unheld(tx, &record)?;
-            if let Some(reply) = retained_host_reply::authenticate_retained_host_reply(
-                tx,
-                &self.serving_owner,
+        let result = (|| {
+            if let Some(reply) = self.read_retained_host_reply(
                 actor,
-                profile,
-                now,
-                &record,
+                workflow,
                 retained_host_reply::RetainedHostReplyRequest::Review,
+                fence,
+                now,
             )? {
-                reply.verify_current(tx)?;
-                return record
-                    .review
-                    .ok_or_else(|| invariant("retained review disappeared"));
+                return match reply {
+                    retained_host_reply::RetainedHostReplyData::Review(review) => Ok(*review),
+                    _ => Err(invariant(
+                        "retained review changed its closed reply purpose",
+                    )),
+                };
             }
-            retained_host_reply::require_current_preview(tx, actor, profile, &record)?;
-            terminal_custody::require_unfinished(tx, &record)?;
-            require_active(&record)?;
-            if !record.selected {
-                return Err(invariant("recovery identity is not reserved"));
-            }
-            if review.reviewer != *actor.principal() {
-                return Err(invariant("recovery reviewer changed"));
-            }
-            validate_review(&record, review, now)?;
-            fresh_basis(tx, profile, &record, now)?;
-            record.review = Some(review.clone());
-            save_workflow(
-                tx,
-                &self.serving_owner,
-                &mut record,
-                WorkflowWriteClass::Native,
-            )?;
-            Ok(review.clone())
-        })
+            self.recovery_mutation(actor, fence, now, |tx, profile, now| {
+                if actor.permission() != RecoveryPermission::Approve {
+                    return Err(invariant("recovery review scope refused"));
+                }
+                let mut record = workflow_tx(tx, actor.scope(), workflow)?;
+                historical_holds::require_unheld(tx, &record)?;
+                if let Some(reply) = retained_host_reply::authenticate_retained_host_reply(
+                    tx,
+                    &self.serving_owner,
+                    actor,
+                    profile,
+                    now,
+                    &record,
+                    retained_host_reply::RetainedHostReplyRequest::Review,
+                )? {
+                    reply.verify_current(tx)?;
+                    return record
+                        .review
+                        .ok_or_else(|| invariant("retained review disappeared"));
+                }
+                retained_host_reply::require_current_preview(tx, actor, profile, &record)?;
+                terminal_custody::require_unfinished(tx, &record)?;
+                require_active(&record)?;
+                if !record.selected {
+                    return Err(invariant("recovery identity is not reserved"));
+                }
+                if review.reviewer != *actor.principal() {
+                    return Err(invariant("recovery reviewer changed"));
+                }
+                validate_review(&record, review, now)?;
+                fresh_basis(tx, profile, &record, now)?;
+                record.review = Some(review.clone());
+                save_workflow(
+                    tx,
+                    &self.serving_owner,
+                    &mut record,
+                    WorkflowWriteClass::Native,
+                )?;
+                Ok(review.clone())
+            })
+        })();
+        #[cfg(feature = "admission-test-support")]
+        if let Err(error) = &result {
+            command_quota_test_support::record_review_refusal(error);
+        }
+        result
     }
     fn deployment(
         &self,
@@ -395,17 +400,6 @@ impl RecoveryAuthorityPort for SqliteAdmissionOperationStore {
         let record = historical_holds::view(&tx, record)?;
         tx.commit().map_err(sqlite_error)?;
         Ok(record)
-    }
-    fn command(
-        &self,
-        actor: &AuthenticatedRecoveryActor,
-        command: &RecoveryCommandV1,
-        original_process: Option<&dyn RecoveryProcessOriginPort>,
-        fence: &StoreMutationFence,
-        now: u64,
-    ) -> Result<RecoveryCommandResponseV1, RecoveryCommandPortError> {
-        self.recovery_command_outcome(actor, command, original_process, fence, now)
-            .map(|outcome| outcome.response)
     }
     fn command_with_selection(
         &self,

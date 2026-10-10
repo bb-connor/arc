@@ -96,7 +96,7 @@ async fn setup_two_native_processes_in_one_tenant_keep_separate_capture_custody(
             runtime: second.f.runtime.clone(),
             store: Arc::new(store),
             fence,
-            knowledge: Some(Arc::new(second.runtime.clone())),
+            knowledge: Arc::new(second.runtime.clone()),
             operator: Keypair::from_seed(&[211; 32]),
         },
         &second.f.control,

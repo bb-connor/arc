@@ -372,10 +372,14 @@ impl SqliteAdmissionOperationStore {
             ));
         }
         super::super::cutpoint(14)?;
-        let commit_at = super::super::observed_time(&tx, observed_at.max(decision_at))?;
+        #[cfg(test)]
+        let _commit_clock =
+            super::super::super::tests::security_participant_state::egress_commit_clock();
+        let commit_at = physical_commit_time(&tx, observed_at.max(decision_at))?;
+        let commit_at = super::super::observed_time(&tx, commit_at)?;
         record
             .command
-            .validate_observation(commit_at)
+            .validate_commit_authority(commit_at)
             .map_err(invalid)?;
         verify_participant_recovery_tx(&tx, &self.serving_owner, operation, lease, commit_at)?;
         self.commit_write(tx)?;

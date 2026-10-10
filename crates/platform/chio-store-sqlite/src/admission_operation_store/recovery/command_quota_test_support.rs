@@ -85,132 +85,6 @@ pub fn observe_recovery_quota_fixture_clock_work(
     })
 }
 
-struct LegacyWorkflowConstruction {
-    scope: RecoveryScopeV1,
-    workflow: WorkflowId,
-    saves: u16,
-    commands: u16,
-}
-
-thread_local! {
-    static LEGACY_WORKFLOW_CONSTRUCTION: RefCell<Option<LegacyWorkflowConstruction>> = const { RefCell::new(None) };
-}
-
-/// A single old-format construction, never a production allocation reset.
-/// Actual actors, origins, owner/fence checks and protected writes stay active.
-pub struct RecoveryLegacyQuotaFixtureScope {
-    _thread_bound: PhantomData<Rc<()>>,
-}
-
-impl Drop for RecoveryLegacyQuotaFixtureScope {
-    fn drop(&mut self) {
-        LEGACY_WORKFLOW_CONSTRUCTION.with(|state| *state.borrow_mut() = None);
-    }
-}
-
-fn reject_existing_quota_history(tx: &Connection) -> Result<(), AdmissionOperationStoreError> {
-    let exists: bool = tx.query_row(
-        "SELECT EXISTS(SELECT 1 FROM admission_operation_recovery_records WHERE record_key GLOB 'workflow-quota:*')
-            OR EXISTS(SELECT 1 FROM admission_operation_recovery_events WHERE record_key GLOB 'workflow-quota:*')
-            OR EXISTS(SELECT 1 FROM authority_global_commits WHERE projection_kind='recovery' AND projection_key GLOB 'workflow-quota:*')",
-        [], |row| row.get(0),
-    ).map_err(sqlite_error)?;
-    if exists {
-        return Err(invariant(
-            "legacy quota construction requires no existing reservation history",
-        ));
-    }
-    Ok(())
-}
-
-/// Construct one genuine unadmitted ready workflow without the new metadata.
-/// This is legacy-format evidence, separate from old executable upgrade proof.
-pub fn construct_recovery_quota_fixture_legacy_format(
-    store: &SqliteAdmissionOperationStore,
-    fence: &StoreMutationFence,
-    scope: &RecoveryScopeV1,
-    workflow: &WorkflowId,
-) -> Result<RecoveryLegacyQuotaFixtureScope, AdmissionOperationStoreError> {
-    let mut connection = store.connection()?;
-    let tx = store.begin_read(&mut connection)?;
-    verify_active_owner(&tx, &store.serving_owner, Some(fence))?;
-    if scope.authority_domain.as_str() != fence.store_uuid
-        || raw(&tx, &workflow_key(scope, workflow)?)?.is_some()
-    {
-        return Err(invariant("legacy quota construction scope refused"));
-    }
-    deployment_tx(&tx, scope)?;
-    reject_existing_quota_history(&tx)?;
-    tx.commit().map_err(sqlite_error)?;
-    LEGACY_WORKFLOW_CONSTRUCTION.with(|state| {
-        let mut state = state.borrow_mut();
-        if state.is_some() {
-            return Err(invariant("legacy quota construction is already active"));
-        }
-        *state = Some(LegacyWorkflowConstruction {
-            scope: scope.clone(),
-            workflow: workflow.clone(),
-            saves: 0,
-            commands: 0,
-        });
-        Ok(RecoveryLegacyQuotaFixtureScope {
-            _thread_bound: PhantomData,
-        })
-    })
-}
-
-pub(super) fn constructing_legacy_workflow(
-    tx: &Connection,
-    scope: &RecoveryScopeV1,
-    workflow: &WorkflowId,
-    save: bool,
-) -> Result<bool, AdmissionOperationStoreError> {
-    LEGACY_WORKFLOW_CONSTRUCTION.with(|state| {
-        let mut state = state.borrow_mut();
-        let Some(state) = state.as_mut() else {
-            return Ok(false);
-        };
-        if state.scope != *scope || state.workflow != *workflow {
-            return Err(invariant(
-                "legacy quota construction cannot select another workflow",
-            ));
-        }
-        reject_existing_quota_history(tx)?;
-        if save {
-            if state.saves >= 128 {
-                return Err(invariant("legacy quota construction save bound exhausted"));
-            }
-            state.saves += 1;
-        }
-        Ok(true)
-    })
-}
-
-pub(super) fn retain_legacy_command_identity(
-    tx: &Connection,
-    scope: &RecoveryScopeV1,
-    workflow: &WorkflowId,
-) -> Result<(), AdmissionOperationStoreError> {
-    if !constructing_legacy_workflow(tx, scope, workflow, false)? {
-        return Err(invariant(
-            "legacy inspection requires active legacy-format construction",
-        ));
-    }
-    LEGACY_WORKFLOW_CONSTRUCTION.with(|state| {
-        let mut state = state.borrow_mut();
-        let state = state
-            .as_mut()
-            .ok_or_else(|| invariant("legacy construction is absent"))?;
-        if state.commands >= 4096 {
-            return Err(invariant(
-                "legacy quota construction command bound exhausted",
-            ));
-        }
-        state.commands += 1;
-        Ok(())
-    })
-}
-
 /// A foreign command-kind record whose immutable history is retained by the writer.
 pub struct RecoveryQuotaFixtureRecord {
     pub scope: RecoveryScopeV1,
@@ -592,40 +466,6 @@ pub fn apply_recovery_quota_fixture_inspections(
         .collect()
 }
 
-/// Retain exact old-format Inspect tombstones without rewriting their history.
-pub fn retain_recovery_quota_fixture_legacy_inspections(
-    store: &SqliteAdmissionOperationStore,
-    actor: &AuthenticatedRecoveryActor,
-    workflow: &WorkflowId,
-    count: usize,
-    fence: &StoreMutationFence,
-    now: u64,
-) -> Result<(), AdmissionOperationStoreError> {
-    if actor.permission() != RecoveryPermission::Inspect || !(1..=4096).contains(&count) {
-        return Err(invariant("legacy inspection fixture exceeds its bound"));
-    }
-    store.recovery_mutation(actor, fence, now, |tx, profile, _now| {
-        let record = workflow_tx(tx, actor.scope(), workflow)?;
-        verify_preview(actor, profile, &record)?;
-        install_fixture_observed_time_index(tx)?;
-        for index in 0..count {
-            let command_id = CommandId::new(&format!("legacy-status-poll-{index}"))
-                .map_err(|_| invariant("legacy inspection fixture identity refused"))?;
-            let command = RecoveryCommandV1 {
-                schema: RecoveryCommandSchema::V1,
-                version: VersionV1,
-                command_id: command_id.clone(),
-                command: RecoveryCommandBodyV1::InspectWorkflow {
-                    workflow_id: workflow.clone(),
-                },
-            };
-            super::super::setup::require_command(tx, actor, &store.serving_owner.fence, &command)?;
-            storage::save_legacy_inspection(tx, &store.serving_owner, actor, &record, &command_id)?;
-        }
-        restore_fixture_canonical_schema(tx)
-    })
-}
-
 /// Retain bounded, real mutating command identities before native execution.
 pub fn apply_recovery_quota_fixture_resumptions(
     store: &SqliteAdmissionOperationStore,
@@ -772,6 +612,7 @@ pub fn fill_recovery_quota_fixture_settlement_events(
 pub struct RecoveryQuotaFixtureDiagnostic {
     pub command_refusal: Option<String>,
     pub issuance_refusal: Option<String>,
+    pub review_refusal: Option<String>,
     pub native_capture_refusal: Option<String>,
     pub clock_regression: Option<(u64, i64, i64, Option<u64>)>,
 }
@@ -873,6 +714,18 @@ pub(in crate::admission_operation_store) fn record_issuance_refusal(
     });
 }
 
+pub(in crate::admission_operation_store) fn record_review_refusal(
+    error: &AdmissionOperationStoreError,
+) {
+    FIXTURE_DIAGNOSTIC.with(|slot| {
+        if let Some(diagnostic) = slot.borrow_mut().as_mut() {
+            diagnostic
+                .review_refusal
+                .get_or_insert_with(|| bounded_refusal_text(error));
+        }
+    });
+}
+
 pub(in crate::admission_operation_store) fn record_native_capture_refusal(
     error: &AdmissionCaptureError,
 ) {
@@ -937,6 +790,9 @@ mod diagnostic_tests {
         let issuance = invariant("first issuance refusal");
         record_issuance_refusal(&issuance);
         record_issuance_refusal(&invariant("later issuance refusal"));
+        let review = invariant("first review refusal");
+        record_review_refusal(&review);
+        record_review_refusal(&invariant("later review refusal"));
         let capture = AdmissionCaptureError::Invariant("x".repeat(4096));
         record_native_capture_refusal(&capture);
         record_native_capture_refusal(&AdmissionCaptureError::Fenced);
@@ -946,6 +802,7 @@ mod diagnostic_tests {
         let snapshot = observer
             .snapshot()
             .unwrap_or_else(|| panic!("observer is not active"));
+        assert_eq!(snapshot.review_refusal, Some(observer.error_text(&review)));
         let refusal = snapshot
             .command_refusal
             .unwrap_or_else(|| panic!("command refusal missing"));

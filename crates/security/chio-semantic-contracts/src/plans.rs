@@ -8,11 +8,6 @@ pub fn validate_semantic_plan(
     budget: &mut VerificationBudget,
 ) -> Result<Vec<StepId>, ContractError> {
     let nodes = plan.steps.as_slice();
-    // Retained predecessor plans remain structurally readable at sixteen, but
-    // fresh acceptance never exceeds the protocol's eight top-level steps.
-    if nodes.len() > 8 {
-        return Err(ContractError::LimitExceeded);
-    }
     for (index, node) in nodes.iter().enumerate() {
         budget.charge((index + 1) as u32)?;
         if nodes[..index].iter().any(|prior| prior.step == node.step) {

@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 35f8e30cf30553986a159b074ee485804a85db29547a8102522cd7bfa3080d2e
+# Schema sha256: d2b29cbbc9a0070d3666a33fd5a06bbda07a8e70f6d54bf33c15ca8b74893ff9
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -62,17 +62,3 @@ class RecoveryArtifactProducerImport(BaseModel):
 
 class ArtifactProducerV1(RootModel[RecoveryArtifactProducerNativeOperation | RecoveryArtifactProducerCheckpoint | RecoveryArtifactProducerDerivation | RecoveryArtifactProducerAdoption | RecoveryArtifactProducerImport]):
     root: RecoveryArtifactProducerNativeOperation | RecoveryArtifactProducerCheckpoint | RecoveryArtifactProducerDerivation | RecoveryArtifactProducerAdoption | RecoveryArtifactProducerImport = Field(..., title='Artifact Producer V1')
-
-# Public compatibility aliases reference the actual current model classes.
-ArtifactProducerV11 = RecoveryArtifactProducerNativeOperation
-ArtifactProducerV12 = RecoveryArtifactProducerCheckpoint
-ArtifactProducerV13 = RecoveryArtifactProducerDerivation
-ArtifactProducerV14 = RecoveryArtifactProducerAdoption
-ArtifactProducerV15 = RecoveryArtifactProducerImport
-ArtifactReference = RecoveryArtifactProducerDefinitionsArtifactReference
-RecoveryArtifactProducerArtifactProducerV1 = ArtifactProducerV1
-RecoveryArtifactProducerOpaqueId = OpaqueId
-RecoveryArtifactProducerRecoveryDigest32 = RecoveryDigest32
-RecoveryArtifactProducerRecoveryDigestOctet = RecoveryDigestOctet
-RecoveryDigest32Item = RecoveryDigestOctet
-Scope = RecoveryArtifactProducerDefinitionsScope

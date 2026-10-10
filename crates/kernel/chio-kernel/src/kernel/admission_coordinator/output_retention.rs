@@ -206,6 +206,24 @@ impl ChioKernel {
 }
 
 impl ChioKernel {
+    /// Native bounded materialization belongs to the original retained program.
+    /// Later configuration cannot replace it with the legacy materializer or
+    /// introduce current hooks into its already captured private finalization.
+    pub(in crate::kernel) fn original_output_verifier_is_available(
+        &self,
+        original: &RetainedToolAdmissionRequestV1,
+    ) -> Result<bool, KernelError> {
+        if original.native_output_retention().is_some() {
+            let plan = self.durable_post_return_plan_for_original(Some(original))?;
+            return Ok(original.post_return_steps() == plan.frozen_steps.as_slice());
+        }
+        let plan = super::super::security_dispatch::callback(
+            "historical output verifier selection",
+            || Ok(self.durable_post_return_plan()),
+        )?;
+        Ok(plan.is_ok_and(|plan| original.post_return_steps() == plan.frozen_steps.as_slice()))
+    }
+
     pub(super) fn durable_post_return_plan_for_original(
         &self,
         original: Option<&RetainedToolAdmissionRequestV1>,

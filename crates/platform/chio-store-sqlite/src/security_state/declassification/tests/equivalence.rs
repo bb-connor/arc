@@ -209,14 +209,17 @@ fn native_declassification_row_commands_match_shared_semantics_and_reject_substi
     })
 }
 
-#[test]
-fn native_declassification_egress_observation_enforces_both_issuer_time_bounds() -> TestResult {
+fn timed_egress_command(
+    grant_expires_seconds: u64,
+    fence_expires_ms: u64,
+) -> TestResult<crate::security_state::NativeEgressCommand> {
     use chio_core::{DeclassificationPurpose, Keypair, SignedDeclassificationGrant};
     use chio_security_types::ports::{DestinationId, IsolationEpochId, LineageId, SessionId};
     use chio_security_types::{
         DeclassificationGrantBody, DeclassificationGrantClaims, PrincipalId,
     };
     let mut consumed = consumption("tenant", "time-bound-grant")?;
+    consumed.consumption.grant_expires_at_unix_ms = grant_expires_seconds * 1_000;
     let key = FlowStateKey {
         tenant_id: consumed.consumption.tenant_id.clone(),
         principal_id: PrincipalId::new("principal")?,
@@ -239,7 +242,7 @@ fn native_declassification_egress_observation_enforces_both_issuer_time_bounds()
             purpose: DeclassificationPurpose::new("purpose")?,
             request_hash: consumed.consumption.request_hash,
             issued_at_unix_seconds: 1,
-            expires_at_unix_seconds: 2,
+            expires_at_unix_seconds: grant_expires_seconds,
             authority_key_id: RecordId::new("authority-key")?,
         })?,
         &Keypair::generate(),
@@ -264,7 +267,7 @@ fn native_declassification_egress_observation_enforces_both_issuer_time_bounds()
             request_id: request_id.clone(),
             request_hash: consumed.consumption.request_hash,
             expected_context_generation: 1,
-            expires_at_unix_ms: 3_000,
+            expires_at_unix_ms: fence_expires_ms,
         })?;
     let command = crate::security_state::NativeEgressCommand::declassified(
         EgressFenceCommit {
@@ -275,12 +278,37 @@ fn native_declassification_egress_observation_enforces_both_issuer_time_bounds()
         consumed,
         &signed.into(),
     )?;
+    Ok(command)
+}
+
+#[test]
+fn native_declassification_egress_observation_enforces_both_issuer_time_bounds() -> TestResult {
+    let command = timed_egress_command(2, 3_000)?;
     // The consumption and commitment timestamps are otherwise within allowed
     // clock skew. Neither may pull the issuer's start time into the future.
     assert!(command.validate_observation(999).is_err());
     command.validate_observation(1_000)?;
     command.validate_observation(1_999)?;
     assert!(command.validate_observation(2_000).is_err());
+    Ok(())
+}
+
+#[test]
+fn native_commit_authority_survives_verification_delay_without_renewing_deadlines() -> TestResult {
+    let command = timed_egress_command(20, 30_000)?;
+    let original = chio_core::canonical_json_bytes(&command)?;
+    command.validate_observation(1_000)?;
+    assert!(command.validate_observation(7_000).is_err());
+    command.validate_commit_authority(7_000)?;
+    command.validate_commit_authority(19_999)?;
+    assert!(command.validate_commit_authority(999).is_err());
+    assert!(command.validate_commit_authority(20_000).is_err());
+    assert_eq!(chio_core::canonical_json_bytes(&command)?, original);
+    let fence_expires_first = timed_egress_command(30, 20_000)?;
+    fence_expires_first.validate_commit_authority(19_999)?;
+    assert!(fence_expires_first
+        .validate_commit_authority(20_000)
+        .is_err());
     Ok(())
 }
 

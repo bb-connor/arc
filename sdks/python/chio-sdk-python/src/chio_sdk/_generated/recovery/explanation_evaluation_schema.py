@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 35f8e30cf30553986a159b074ee485804a85db29547a8102522cd7bfa3080d2e
+# Schema sha256: d2b29cbbc9a0070d3666a33fd5a06bbda07a8e70f6d54bf33c15ca8b74893ff9
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -138,26 +138,3 @@ class RecoveryExplanationEvaluationV1(BaseModel):
     complete: bool
     planner_version: Literal['chio.recovery.planner.v1']
     work_used: conint(ge=0, le=4096)
-
-# Public compatibility aliases reference the actual current model classes.
-Assessment = RecoveryExplanationEvaluationAssessment
-Candidate = RecoveryExplanationEvaluationCandidatesItems
-Operation = RecoveryExplanationEvaluationDefinitionsOperation
-RecoveryDigest32Item = RecoveryDigestOctet
-RecoveryExplanationEvaluationDestinationId = DestinationId
-RecoveryExplanationEvaluationOpaqueId = OpaqueId
-RecoveryExplanationEvaluationRecoveryDigest32 = RecoveryDigest32
-RecoveryExplanationEvaluationRecoveryDigestOctet = RecoveryDigestOctet
-RecoveryExplanationEvaluationRecoveryEffectAdmissionUnresolvedV1 = RecoveryEffectAdmissionUnresolvedV1
-RecoveryExplanationEvaluationRecoveryEffectAwaitingApprovalV1 = RecoveryEffectAwaitingApprovalV1
-RecoveryExplanationEvaluationRecoveryEffectAwaitingCallerReportV1 = RecoveryEffectAwaitingCallerReportV1
-RecoveryExplanationEvaluationRecoveryEffectClosedBeforeEffectV1 = RecoveryEffectClosedBeforeEffectV1
-RecoveryExplanationEvaluationRecoveryEffectCompleteV1 = RecoveryEffectCompleteV1
-RecoveryExplanationEvaluationRecoveryEffectFailedAfterEffectV1 = RecoveryEffectFailedAfterEffectV1
-RecoveryExplanationEvaluationRecoveryEffectInFlightV1 = RecoveryEffectInFlightV1
-RecoveryExplanationEvaluationRecoveryEffectNeverAdmittedV1 = RecoveryEffectNeverAdmittedV1
-RecoveryExplanationEvaluationRecoveryEffectPartialV1 = RecoveryEffectPartialV1
-RecoveryExplanationEvaluationRecoveryEffectUnknownV1 = RecoveryEffectUnknownV1
-RecoveryExplanationEvaluationSafeInteger = SafeInteger
-RefusalCode = RecoveryExplanationEvaluationDefinitionsRefusalCode
-Scope = RecoveryExplanationEvaluationDefinitionsScope

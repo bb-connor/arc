@@ -72,11 +72,10 @@ pub(in crate::admission_operation_store::knowledge) fn collection_sources(
             "publication closure changed its metadata or pointer",
         ));
     }
-    let terminal_sequence = publication.head.global_commit_sequence();
     let mut sources = Vec::new();
     if let Some(pointer) = pointer {
         let root = load_reference_state(tx, &reference)?;
-        if root.aggregate.value.collection_count()? != 0
+        if root.aggregate.value.active_owners.get() != 0
             || super::super::lifecycle::pinned(tx, &reference)?
         {
             return Err(refused(
@@ -120,31 +119,8 @@ pub(in crate::admission_operation_store::knowledge) fn collection_sources(
     };
     for dependency in record.input.dependencies.as_slice() {
         let state = load_reference_state(tx, dependency)?;
-        let Some(leaf) = load_owner_leaf(tx, dependency, &owner, &state)? else {
-            let ReferenceBaselineSource::Cold { cutoff, .. } =
-                &state.aggregate.value.baseline.source
-            else {
-                return Err(refused("publication closure lacks its dependency owner"));
-            };
-            if terminal_sequence > cutoff.sequence()
-                && super::super::publication_capacity::collection::retired_source_before(
-                    tx,
-                    record,
-                    cutoff
-                        .sequence()
-                        .checked_add(1)
-                        .ok_or_else(|| refused("publication cold cutoff exhausted"))?,
-                )?
-                .is_none()
-            {
-                return Err(refused(
-                    "publication dependency lacks an authentic cold retirement",
-                ));
-            }
-            sources.push(state.aggregate.head);
-            sources.extend(state.buckets.into_iter().map(|bucket| bucket.head));
-            continue;
-        };
+        let leaf = load_owner_leaf(tx, dependency, &owner, &state)?
+            .ok_or_else(|| refused("publication closure lacks its dependency owner"))?;
         if leaf.value.state != ReferenceOwnerState::Retired {
             return Err(refused(
                 "publication closure retains a direct dependency owner",

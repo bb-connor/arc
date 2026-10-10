@@ -30,9 +30,6 @@ impl<'tx, 'conn> VerifiedNewArtifactReferenceBaseline<'tx, 'conn> {
         Ok(witness)
     }
 
-    pub(in crate::admission_operation_store) fn transaction(&self) -> &'tx Transaction<'conn> {
-        self.transaction
-    }
     pub(in crate::admission_operation_store) fn reference(&self) -> &ArtifactVersionRefV1 {
         &self.reference
     }
@@ -41,12 +38,6 @@ impl<'tx, 'conn> VerifiedNewArtifactReferenceBaseline<'tx, 'conn> {
     ) -> &protected::ProtectedSourceReference {
         &self.publication
     }
-    pub(in crate::admission_operation_store) fn pointer_source(
-        &self,
-    ) -> &protected::ProtectedSourceReference {
-        &self.pointer
-    }
-
     pub(in crate::admission_operation_store) fn verify(
         &self,
         tx: &Transaction<'conn>,

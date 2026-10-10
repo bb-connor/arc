@@ -28,7 +28,7 @@ pub struct RecoverySetupHost {
     pub runtime: Arc<RecoveryRuntime>,
     pub store: Arc<SqliteAdmissionOperationStore>,
     pub fence: StoreMutationFence,
-    pub knowledge: Option<Arc<NativeKnowledgeRuntime>>,
+    pub knowledge: Arc<NativeKnowledgeRuntime>,
     pub operator: Keypair,
 }
 impl core::fmt::Debug for RecoverySetupHost {
@@ -65,9 +65,7 @@ impl RecoverySetupService {
         capability: &CapabilityToken,
         command: &RecoveryCommandV1,
     ) -> Result<Self, RecoveryRuntimeError> {
-        let knowledge = host
-            .knowledge
-            .ok_or(RecoveryRuntimeError::UncoveredMediation)?;
+        let knowledge = host.knowledge;
         let selected = host
             .runtime
             .kernel
@@ -103,7 +101,7 @@ impl RecoverySetupService {
             host.runtime,
             host.store,
             host.fence,
-            Some(knowledge),
+            knowledge,
             host.operator,
             workflow,
         )?;
@@ -118,11 +116,10 @@ impl RecoverySetupService {
         runtime: Arc<RecoveryRuntime>,
         store: Arc<SqliteAdmissionOperationStore>,
         fence: StoreMutationFence,
-        knowledge: Option<Arc<NativeKnowledgeRuntime>>,
+        knowledge: Arc<NativeKnowledgeRuntime>,
         operator: Keypair,
         workflow: WorkflowId,
     ) -> Result<Self, RecoveryRuntimeError> {
-        let knowledge = knowledge.ok_or(RecoveryRuntimeError::UncoveredMediation)?;
         let profile = store
             .deployment(runtime.scope(), &fence, now()?)
             .map_err(super::native_store_errors::store_error)?;

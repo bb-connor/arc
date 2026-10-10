@@ -122,7 +122,7 @@ pub fn verify_semantic_invocation(
     expected: &SemanticInvocationExpectationV1<'_>,
     budget: &mut VerificationBudget,
 ) -> Result<VerifiedSemanticInvocationV1, ContractError> {
-    verify_invocation(registry, invocation, expected, budget, true, true, true)
+    verify_invocation(registry, invocation, expected, budget, true)
 }
 
 /// Recompute only input restriction data. Every signature, binding, source,
@@ -134,65 +134,8 @@ pub fn verify_semantic_input_restrictions(
     expected: &SemanticInvocationExpectationV1<'_>,
     budget: &mut VerificationBudget,
 ) -> Result<VerifiedSemanticInputRestrictionsV1, ContractError> {
-    verify_invocation(registry, invocation, expected, budget, true, true, false)
+    verify_invocation(registry, invocation, expected, budget, false)
         .map(|facts| VerifiedSemanticInputRestrictionsV1 { facts })
-}
-
-/// Model the predecessor's missing mandatory answer gate for upgrade tests.
-/// Every other check is shared with the production verifier. This returns only
-/// data and cannot construct or authorize a native capture witness.
-#[cfg(feature = "admission-test-support")]
-pub fn verify_modeled_legacy_incomplete_annotations(
-    registry: &CompiledSemanticRegistryV1,
-    invocation: &SemanticInvocationV1,
-    expected: &SemanticInvocationExpectationV1<'_>,
-    budget: &mut VerificationBudget,
-) -> Result<VerifiedSemanticInvocationV1, ContractError> {
-    verify_invocation(registry, invocation, expected, budget, false, true, true)
-}
-
-/// Model only the predecessor's absent authored status audience. This shares
-/// every other gate and returns data, never native effect or capture authority.
-#[cfg(feature = "admission-test-support")]
-pub fn verify_modeled_legacy_missing_withheld_status(
-    registry: &CompiledSemanticRegistryV1,
-    invocation: &SemanticInvocationV1,
-    expected: &SemanticInvocationExpectationV1<'_>,
-    budget: &mut VerificationBudget,
-) -> Result<VerifiedSemanticInvocationV1, ContractError> {
-    verify_invocation(registry, invocation, expected, budget, true, false, true)
-}
-
-#[cfg(feature = "admission-test-support")]
-pub enum ModeledSemanticInputProfileV1 {
-    IncompleteAnnotations,
-    MissingStatus,
-}
-
-/// The owning fixture selector chooses one predecessor profile. The result
-/// still contains only readonly input data and cannot authorize capture.
-#[cfg(feature = "admission-test-support")]
-pub fn verify_modeled_legacy_input_restrictions(
-    registry: &CompiledSemanticRegistryV1,
-    invocation: &SemanticInvocationV1,
-    expected: &SemanticInvocationExpectationV1<'_>,
-    budget: &mut VerificationBudget,
-    profile: ModeledSemanticInputProfileV1,
-) -> Result<VerifiedSemanticInputRestrictionsV1, ContractError> {
-    let (annotations, status) = match profile {
-        ModeledSemanticInputProfileV1::IncompleteAnnotations => (false, true),
-        ModeledSemanticInputProfileV1::MissingStatus => (true, false),
-    };
-    verify_invocation(
-        registry,
-        invocation,
-        expected,
-        budget,
-        annotations,
-        status,
-        false,
-    )
-    .map(|facts| VerifiedSemanticInputRestrictionsV1 { facts })
 }
 
 fn verify_invocation(
@@ -200,8 +143,6 @@ fn verify_invocation(
     invocation: &SemanticInvocationV1,
     expected: &SemanticInvocationExpectationV1<'_>,
     budget: &mut VerificationBudget,
-    require_complete_annotations: bool,
-    require_status_audience: bool,
     require_native_disclosure: bool,
 ) -> Result<VerifiedSemanticInvocationV1, ContractError> {
     let action = &invocation.action;
@@ -278,7 +219,7 @@ fn verify_invocation(
         .len()
         .checked_mul(action.inputs.as_slice().len())
         .ok_or(ContractError::LimitExceeded)?;
-    if require_complete_annotations && required_annotations > 8 {
+    if required_annotations > 8 {
         return Err(ContractError::LimitExceeded);
     }
     let mut observed_annotations = Vec::new();
@@ -324,13 +265,11 @@ fn verify_invocation(
             .join_restrictions(&body.restrictions)
             .map_err(|_| ContractError::BindingMismatch)?;
     }
-    if require_complete_annotations {
-        for authority in route.annotators.as_slice() {
-            for input in action.inputs.as_slice() {
-                budget.charge(observed_annotations.len() as u32 + 1)?;
-                if !observed_annotations.contains(&(authority.key, input.clone())) {
-                    return Err(ContractError::MissingDependency);
-                }
+    for authority in route.annotators.as_slice() {
+        for input in action.inputs.as_slice() {
+            budget.charge(observed_annotations.len() as u32 + 1)?;
+            if !observed_annotations.contains(&(authority.key, input.clone())) {
+                return Err(ContractError::MissingDependency);
             }
         }
     }
@@ -355,7 +294,7 @@ fn verify_invocation(
             source = source
                 .join_restrictions(&status.audience)
                 .map_err(|_| ContractError::BindingMismatch)?;
-        } else if require_status_audience {
+        } else {
             return Err(ContractError::MissingDependency);
         }
     }

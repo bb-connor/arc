@@ -157,8 +157,11 @@ pub trait RecoveryAuthorityPort: Send + Sync {
         original_process: Option<&dyn RecoveryProcessOriginPort>,
         fence: &StoreMutationFence,
         now: u64,
-    ) -> Result<RecoveryCommandResponseV1, RecoveryCommandPortError>;
-    // Proposed mandatory methods inside RecoveryAuthorityPort.
+    ) -> Result<RecoveryCommandResponseV1, RecoveryCommandPortError> {
+        self.command_with_selection(actor, command, original_process, fence, now)
+            .map(|outcome| outcome.response)
+    }
+    /// Accept one command and retain its exact workflow generation.
     fn command_with_selection(
         &self,
         _actor: &AuthenticatedRecoveryActor,

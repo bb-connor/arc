@@ -3,8 +3,9 @@ use super::reference_source::ReferenceCutoff;
 use super::references::{ReferenceAccount, SourceAnchor};
 use super::*;
 
-mod cold;
+mod catalog;
 pub(super) mod collection;
+mod initialization;
 
 const MAX_LIVE_PUBLICATIONS: u64 = 512;
 const ACCOUNT_BYTES: usize = 4096;
@@ -20,8 +21,6 @@ enum CapacitySchema {
 #[serde(deny_unknown_fields)]
 struct CapacityBaseline {
     cutoff: ReferenceCutoff,
-    census: CanonicalPayloadDigest,
-    live: u64,
 }
 
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -37,10 +36,8 @@ struct CapacityRecord {
 
 impl CapacityRecord {
     fn live(&self) -> Result<u64, AdmissionOperationStoreError> {
-        self.baseline
-            .live
-            .checked_add(self.admitted)
-            .and_then(|value| value.checked_sub(self.collected))
+        self.admitted
+            .checked_sub(self.collected)
             .ok_or_else(|| refused("publication live counter changed its original owners"))
     }
 
@@ -54,7 +51,6 @@ impl CapacityRecord {
 
     fn validate(&self, version: u64) -> Result<(), AdmissionOperationStoreError> {
         for value in [
-            self.baseline.live,
             self.admitted,
             self.collected,
             self.changes,
@@ -92,7 +88,7 @@ struct ReadyRecord {
 #[serde(deny_unknown_fields)]
 struct PublicationIdentity {
     reference: ArtifactVersionRefV1,
-    principal: Option<chio_security_types::PrincipalId>,
+    principal: chio_security_types::PrincipalId,
     publication: CommandId,
     object: ArtifactObjectId,
     input: CanonicalPayloadDigest,
@@ -142,21 +138,12 @@ enum LeaseSchema {
 }
 
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "origin", rename_all = "snake_case", deny_unknown_fields)]
-enum LeaseOrigin {
-    Cold { baseline: CapacityBaseline },
-    NativeIntake,
-}
-
-#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct LeaseRecord {
     schema: LeaseSchema,
     account: ReferenceAccount,
     identity: PublicationIdentity,
     original: SourceAnchor,
-    origin: LeaseOrigin,
-    original_collection: Option<SourceAnchor>,
     collection: Option<SourceAnchor>,
     changes: u64,
 }
@@ -164,18 +151,14 @@ struct LeaseRecord {
 impl LeaseRecord {
     fn original(&self) -> Self {
         let mut original = self.clone();
-        original.collection = original.original_collection.clone();
+        original.collection = None;
         original.changes = 0;
         original
     }
 
     fn validate(&self, version: u64) -> Result<(), AdmissionOperationStoreError> {
-        let expected_changes =
-            u64::from(self.original_collection.is_none() && self.collection.is_some());
-        if self.changes != expected_changes
-            || self.changes.checked_add(1) != Some(version)
-            || (self.original_collection.is_some() && self.original_collection != self.collection)
-        {
+        let expected_changes = u64::from(self.collection.is_some());
+        if self.changes != expected_changes || self.changes.checked_add(1) != Some(version) {
             return Err(refused(
                 "publication lease changed its original disposition",
             ));
@@ -312,7 +295,9 @@ fn current_capacity(
             &protected::encode(&record.original())?,
         )?
     {
-        return Err(refused("publication capacity changed its original census"));
+        return Err(refused(
+            "publication capacity changed its original initialization",
+        ));
     }
     let key = ready_key(&identity)?;
     let (ready, ready_source) =
@@ -385,15 +370,10 @@ fn current_lease(
         ));
     }
     let (capacity, _) = current_capacity(tx, &record.metadata.scope)?;
-    match &lease.origin {
-        LeaseOrigin::Cold { baseline }
-            if *baseline == capacity.baseline
-                && lease.original.global_commit_sequence() <= baseline.cutoff.sequence() => {}
-        LeaseOrigin::NativeIntake
-            if lease.original.version() == 1
-                && lease.original.global_commit_sequence()
-                    > capacity.baseline.cutoff.sequence() => {}
-        _ => return Err(refused("publication lease changed its baseline origin")),
+    if lease.original.version() != 1
+        || lease.original.global_commit_sequence() <= capacity.baseline.cutoff.sequence()
+    {
+        return Err(refused("publication lease predates its native account"));
     }
     if let Some(collected) = &lease.collection {
         collection::verify_retained_collection(tx, record, collected)?;
@@ -442,8 +422,6 @@ pub(super) fn admit_publication<'tx, 'conn>(
         account: capacity.account.clone(),
         identity: identity.clone(),
         original: original.clone(),
-        origin: LeaseOrigin::NativeIntake,
-        original_collection: None,
         collection: None,
         changes: 0,
     };
@@ -494,8 +472,9 @@ pub(super) fn validate_retained_allocation(
     current_lease(tx, record).map(|_| ())
 }
 
-pub(super) use cold::activate_installation_publications;
-pub(in crate::admission_operation_store) use cold::verify_catalog;
+pub(super) use catalog::verify_account;
+pub(in crate::admission_operation_store) use catalog::verify_catalog;
+pub(super) use initialization::initialize_account;
 
 #[cfg(feature = "admission-test-support")]
 impl SqliteAdmissionOperationStore {

@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 35f8e30cf30553986a159b074ee485804a85db29547a8102522cd7bfa3080d2e
+# Schema sha256: d2b29cbbc9a0070d3666a33fd5a06bbda07a8e70f6d54bf33c15ca8b74893ff9
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -112,24 +112,3 @@ class RecoveryCommandResultV1(BaseModel):
     model_config = ConfigDict(extra='forbid')
     original_response: RecoveryCommandResultOriginalResponse | None = None
     status: command_response_schema.RecoveryCommandResponseV1
-
-# Public compatibility aliases reference the actual current model classes.
-Operation = RecoveryCommandResultDefinitionsOperation
-OriginalResponse = RecoveryCommandResultOriginalResponse
-RecoveryCommandResultOpaqueId = OpaqueId
-RecoveryCommandResultRecoveryDigest32 = RecoveryDigest32
-RecoveryCommandResultRecoveryDigestOctet = RecoveryDigestOctet
-RecoveryCommandResultRecoveryEffectAdmissionUnresolvedV1 = RecoveryEffectAdmissionUnresolvedV1
-RecoveryCommandResultRecoveryEffectAwaitingApprovalV1 = RecoveryEffectAwaitingApprovalV1
-RecoveryCommandResultRecoveryEffectAwaitingCallerReportV1 = RecoveryEffectAwaitingCallerReportV1
-RecoveryCommandResultRecoveryEffectClosedBeforeEffectV1 = RecoveryEffectClosedBeforeEffectV1
-RecoveryCommandResultRecoveryEffectCompleteV1 = RecoveryEffectCompleteV1
-RecoveryCommandResultRecoveryEffectFailedAfterEffectV1 = RecoveryEffectFailedAfterEffectV1
-RecoveryCommandResultRecoveryEffectInFlightV1 = RecoveryEffectInFlightV1
-RecoveryCommandResultRecoveryEffectNeverAdmittedV1 = RecoveryEffectNeverAdmittedV1
-RecoveryCommandResultRecoveryEffectPartialV1 = RecoveryEffectPartialV1
-RecoveryCommandResultRecoveryEffectUnknownV1 = RecoveryEffectUnknownV1
-RecoveryCommandResultSafeInteger = SafeInteger
-RecoveryDigest32Item = RecoveryDigestOctet
-RefusalCode = RecoveryCommandResultDefinitionsRefusalCode
-Scope = RecoveryCommandResultDefinitionsScope

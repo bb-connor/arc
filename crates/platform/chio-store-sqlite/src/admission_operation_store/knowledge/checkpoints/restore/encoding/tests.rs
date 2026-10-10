@@ -39,7 +39,7 @@ fn fixture_decode(
     connection: &rusqlite::Connection,
     bytes: &[u8],
 ) -> Result<RestoreRecord, AdmissionOperationStoreError> {
-    // Only inline/Legacy paths are used by these data-only unit controls.
+    // Only inline paths are used by these data-only unit controls.
     // Real chunk roots authenticate their actual key/version in native tests.
     decode(connection, "format-only-unit-data", 1, bytes)
 }
@@ -124,37 +124,41 @@ fn record(label: InformationLabel) -> TestResult<RestoreRecord> {
         checkpoint,
         recipient,
         intent,
-        actor_binding: Some(RestoreActorBinding {
+        actor_binding: RestoreActorBinding {
             principal: PrincipalId::new("reviewer")?,
             authority_scope: AuthorityScopeDigest::from_bytes([5; 32]),
-        }),
-        installation_generation: Some(SafeInteger::new(3)?),
+        },
+        installation_generation: SafeInteger::new(3)?,
     })
 }
 
 #[test]
-fn restore_encoding_preserves_exact_legacy_bytes_and_original_actor_custody() -> TestResult {
-    let connection = format_fixture(40)?;
-    for legacy_identity in [false, true] {
-        let mut original = record(InformationLabel::bottom())?;
-        if legacy_identity {
-            original.actor_binding = None;
-            original.installation_generation = None;
-        }
-        let expected = canonical(&original)?;
-        let encoded = protected::encode(&fixture_body(&connection, &original)?)?;
-        assert_eq!(encoded, expected);
-        assert_eq!(
-            canonical(&fixture_decode(&connection, &encoded)?)?,
-            expected
-        );
-    }
+fn restore_encoding_preserves_exact_inline_bytes_and_original_actor_custody() -> TestResult {
+    let connection = format_fixture(
+        crate::admission_operation_store::ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION,
+    )?;
+    let original = record(InformationLabel::bottom())?;
+    let expected = canonical(&original)?;
+    let encoded = protected::encode(&fixture_body(&connection, &original)?)?;
+    assert_eq!(encoded, expected);
+    assert_eq!(
+        canonical(&fixture_decode(&connection, &encoded)?)?,
+        expected
+    );
+    let mut missing = serde_json::to_value(&original)?;
+    missing
+        .as_object_mut()
+        .ok_or("restore object")?
+        .remove("actor_binding");
+    assert!(fixture_decode(&connection, &protected::encode(&missing)?).is_err());
     Ok(())
 }
 
 #[test]
 fn restore_encoding_reconstructs_complete_large_checkpoint_and_owed_intent() -> TestResult {
-    let connection = format_fixture(40)?;
+    let connection = format_fixture(
+        crate::admission_operation_store::ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION,
+    )?;
     let original = record(large_label(60)?)?;
     assert!(canonical(&original.checkpoint)?.len() <= 65_536);
     assert!(canonical(&original)?.len() > 262_144);
@@ -169,7 +173,9 @@ fn restore_encoding_reconstructs_complete_large_checkpoint_and_owed_intent() -> 
 
 #[test]
 fn restore_encoding_refuses_noncanonical_or_unknown_label_references() -> TestResult {
-    let connection = format_fixture(40)?;
+    let connection = format_fixture(
+        crate::admission_operation_store::ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION,
+    )?;
     let mut original = record(large_label(60)?)?;
     let joined = large_label(59)?;
     assert!(original.checkpoint.label.flows_to(&joined));
@@ -252,7 +258,9 @@ fn restore_encoding_refuses_noncanonical_or_unknown_label_references() -> TestRe
 
 #[test]
 fn restore_encoding_refuses_compact_emission_and_decode_under_predecessor_format() -> TestResult {
-    let current = format_fixture(40)?;
+    let current = format_fixture(
+        crate::admission_operation_store::ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION,
+    )?;
     let original = record(large_label(60)?)?;
     let encoded = protected::encode(&fixture_body(&current, &original)?)?;
     let predecessor = format_fixture(39)?;
@@ -260,19 +268,18 @@ fn restore_encoding_refuses_compact_emission_and_decode_under_predecessor_format
     assert!(fixture_body(&predecessor, &original).is_err());
     assert!(fixture_decode(&predecessor, &encoded).is_err());
     assert_eq!(predecessor.total_changes(), changes);
-    let legacy = record(InformationLabel::bottom())?;
-    let legacy_bytes = canonical(&legacy)?;
-    assert_eq!(
-        canonical(&fixture_decode(&predecessor, &legacy_bytes)?)?,
-        legacy_bytes
-    );
+    let inline = canonical(&record(InformationLabel::bottom())?)?;
+    assert!(fixture_decode(&predecessor, &inline).is_err());
+    assert_eq!(canonical(&fixture_decode(&current, &inline)?)?, inline);
     assert_eq!(predecessor.total_changes(), changes);
     Ok(())
 }
 
 #[test]
 fn restore_encoding_refuses_compact_wire_for_small_logical_records() -> TestResult {
-    let connection = format_fixture(40)?;
+    let connection = format_fixture(
+        crate::admission_operation_store::ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION,
+    )?;
     let small = record(InformationLabel::bottom())?;
     assert!(canonical(&small)?.len() <= 262_144);
     let compact = CompactRestoreRecord::capture(&small)?;
@@ -287,7 +294,9 @@ fn restore_encoding_refuses_compact_wire_for_small_logical_records() -> TestResu
 
 #[test]
 fn restore_encoding_refuses_future_database_floor_without_mutation() -> TestResult {
-    let current = format_fixture(40)?;
+    let current = format_fixture(
+        crate::admission_operation_store::ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION,
+    )?;
     let original = record(large_label(60)?)?;
     let bytes = protected::encode(&fixture_body(&current, &original)?)?;
     let future = format_fixture(41)?;

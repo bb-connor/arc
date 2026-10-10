@@ -7,6 +7,7 @@ use chio_kernel::admission_operation::NativeSecurityAuthorityBindingV1;
 use chio_kernel::{knowledge::*, recovery::*, SecurityInvocationContext};
 use chio_security_types::{knowledge::*, recovery::*, InformationLabel};
 
+pub(in crate::admission_operation_store) mod account;
 mod checkpoints;
 mod confinement;
 pub(in crate::admission_operation_store) mod encoding;
@@ -16,13 +17,11 @@ mod product_artifact_selection;
 mod product_evidence;
 mod publication;
 pub(in crate::admission_operation_store) mod publication_capacity;
-pub(super) mod publication_census;
+pub(super) mod publication_catalog;
 pub(super) mod publication_source;
 pub(in crate::admission_operation_store) mod reference_activation;
 pub(in crate::admission_operation_store) mod reference_baseline;
-pub(in crate::admission_operation_store) mod reference_census;
 pub(in crate::admission_operation_store) mod reference_custody;
-pub(in crate::admission_operation_store) mod reference_ready;
 pub(in crate::admission_operation_store) mod reference_retirement;
 pub(super) mod reference_source;
 pub(in crate::admission_operation_store) mod references;
@@ -39,10 +38,6 @@ mod traversal;
 pub(in crate::admission_operation_store) use checkpoints::AuthenticatedCheckpointRestoreEncodingSource;
 pub use checkpoints::NativeCheckpointRestore;
 pub(in crate::admission_operation_store) use checkpoints::VerifiedCheckpointHeadWrite;
-#[cfg(feature = "admission-test-support")]
-pub use checkpoints::{
-    construct_legacy_checkpoint_restore_fixture, LegacyCheckpointRestoreFixtureScope,
-};
 pub(in crate::admission_operation_store) use confinement::setup_confinement_inventory;
 pub use confinement::*;
 pub(in crate::admission_operation_store) use product_artifact_selection::{
@@ -107,8 +102,7 @@ pub struct NativeArtifactRecordV1 {
     pub installation_generation: SafeInteger,
     pub certificate: Option<SignedArtifactCertificateV1>,
     pub location: ProtectedText<128>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub publication_principal: Option<chio_security_types::PrincipalId>,
+    pub publication_principal: chio_security_types::PrincipalId,
 }
 /// Audience-checked publication state. Private storage custody stays with the host.
 #[derive(Clone, Serialize, Deserialize)]
@@ -185,27 +179,16 @@ fn actor_request_key(
     ))
 }
 
-fn legacy_publication_key(
-    scope: &RecoveryScopeV1,
-    id: &CommandId,
-) -> Result<String, AdmissionOperationStoreError> {
-    Ok(format!(
-        "knowledge-publication:{}:{}",
-        scope_key(scope)?,
-        id.as_str()
-    ))
-}
-
 fn record_publication_key(
     record: &NativeArtifactRecordV1,
 ) -> Result<String, AdmissionOperationStoreError> {
-    match &record.publication_principal {
-        Some(principal) => {
-            publication_key(&record.metadata.scope, principal, &record.input.publication)
-        }
-        None => legacy_publication_key(&record.metadata.scope, &record.input.publication),
-    }
+    publication_key(
+        &record.metadata.scope,
+        &record.publication_principal,
+        &record.input.publication,
+    )
 }
+
 fn version_key(reference: &ArtifactVersionRefV1) -> Result<String, AdmissionOperationStoreError> {
     Ok(format!(
         "knowledge-version:{}",
@@ -484,16 +467,7 @@ impl SqliteAdmissionOperationStore {
                 if physical_owner.is_none() {
                     return Err(refused("physical process ownership absent"));
                 }
-                let _reference_delta = reference_activation::activate_installation_references(
-                    &tx,
-                    &self.serving_owner,
-                    profile,
-                )?;
-                publication_capacity::activate_installation_publications(
-                    &tx,
-                    &self.serving_owner,
-                    profile,
-                )?;
+                account::initialize_or_verify(&tx, &self.serving_owner, profile)?;
                 return self.commit_write(tx);
             }
             if profile.generation <= old.generation
@@ -515,6 +489,7 @@ impl SqliteAdmissionOperationStore {
                 &profile.scope,
             )?;
         }
+        account::initialize_or_verify(&tx, &self.serving_owner, profile)?;
         save(
             &tx,
             &self.serving_owner,
@@ -538,16 +513,6 @@ impl SqliteAdmissionOperationStore {
                 )
             ),
             &true,
-        )?;
-        let _reference_delta = reference_activation::activate_installation_references(
-            &tx,
-            &self.serving_owner,
-            profile,
-        )?;
-        publication_capacity::activate_installation_publications(
-            &tx,
-            &self.serving_owner,
-            profile,
         )?;
         self.commit_write(tx)?;
         self.sync_after_write(&connection)

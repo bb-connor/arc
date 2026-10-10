@@ -84168,7 +84168,7 @@ pub mod recovery_semantic_plan {
     ///      "items": {
     ///        "$ref": "#/$defs/semanticPlanStep"
     ///      },
-    ///      "maxItems": 16,
+    ///      "maxItems": 8,
     ///      "minItems": 1
     ///    }
     ///  },

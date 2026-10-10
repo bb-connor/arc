@@ -1,11 +1,39 @@
 //! Original confined inputs remain held independently of stop or exit state.
 use super::*;
 
+#[cfg(feature = "admission-test-support")]
+impl SqliteAdmissionOperationStore {
+    /// Read the authenticated original input set, including its retained pins.
+    /// This observer grants no reference mutation or collection authority.
+    pub fn inspect_confined_input_reference_count(
+        &self,
+        scope: &RecoveryScopeV1,
+        request: &RequestId,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<usize, AdmissionOperationStoreError> {
+        let mut connection = self.connection()?;
+        let tx = self.begin_read(&mut connection)?;
+        schema::verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
+        schema::authority_validation_time(&tx, now)?;
+        let profile = installation(&tx, scope)?;
+        let recovery = protected::deployment_tx(&tx, scope)?;
+        validate_installation(&tx, &recovery, &profile)?;
+        let source = input_reference_source(&tx, &key(scope, request)?)?
+            .ok_or_else(|| refused("confined input reservation absent"))?;
+        for reference in source.references() {
+            artifact(&tx, reference)?;
+        }
+        let count = source.references().len();
+        tx.commit().map_err(sqlite_error)?;
+        Ok(count)
+    }
+}
+
 pub(in crate::admission_operation_store::knowledge) struct ConfinedInputReferenceSource {
     boundary: IsolationBoundaryV1,
     source: protected::ProtectedSourceReference,
     references: Vec<ArtifactVersionRefV1>,
-    pins: Vec<protected::ProtectedSourceReference>,
 }
 
 impl ConfinedInputReferenceSource {
@@ -23,12 +51,6 @@ impl ConfinedInputReferenceSource {
         &self,
     ) -> &[ArtifactVersionRefV1] {
         &self.references
-    }
-
-    pub(in crate::admission_operation_store::knowledge) fn pins(
-        &self,
-    ) -> &[protected::ProtectedSourceReference] {
-        &self.pins
     }
 }
 
@@ -91,7 +113,6 @@ pub(in crate::admission_operation_store::knowledge) fn input_reference_source(
     }
     let boundary_commit = protected::historical_record_commit(tx, record_key, 1)?;
     let mut references = Vec::new();
-    let mut pins = Vec::new();
     for (ordinal, reference) in boundary
         .seed_artifacts
         .as_slice()
@@ -127,12 +148,10 @@ pub(in crate::admission_operation_store::knowledge) fn input_reference_source(
         if !references.contains(reference) {
             references.push(reference.clone());
         }
-        pins.push(pin);
     }
     Ok(Some(ConfinedInputReferenceSource {
         boundary,
         source,
         references,
-        pins,
     }))
 }

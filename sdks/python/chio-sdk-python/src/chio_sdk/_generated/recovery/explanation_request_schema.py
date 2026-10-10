@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 35f8e30cf30553986a159b074ee485804a85db29547a8102522cd7bfa3080d2e
+# Schema sha256: d2b29cbbc9a0070d3666a33fd5a06bbda07a8e70f6d54bf33c15ca8b74893ff9
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -117,24 +117,3 @@ class RecoveryExplanationRequestV1(BaseModel):
     model_config = ConfigDict(extra='forbid')
     capability: constr(min_length=1, max_length=32768)
     workflow_id: OpaqueId
-
-# Public compatibility aliases reference the actual current model classes.
-Operation = RecoveryExplanationRequestDefinitionsOperation
-RecoveryDigest32Item = RecoveryDigestOctet
-RecoveryExplanationRequestDestinationId = DestinationId
-RecoveryExplanationRequestOpaqueId = OpaqueId
-RecoveryExplanationRequestRecoveryDigest32 = RecoveryDigest32
-RecoveryExplanationRequestRecoveryDigestOctet = RecoveryDigestOctet
-RecoveryExplanationRequestRecoveryEffectAdmissionUnresolvedV1 = RecoveryEffectAdmissionUnresolvedV1
-RecoveryExplanationRequestRecoveryEffectAwaitingApprovalV1 = RecoveryEffectAwaitingApprovalV1
-RecoveryExplanationRequestRecoveryEffectAwaitingCallerReportV1 = RecoveryEffectAwaitingCallerReportV1
-RecoveryExplanationRequestRecoveryEffectClosedBeforeEffectV1 = RecoveryEffectClosedBeforeEffectV1
-RecoveryExplanationRequestRecoveryEffectCompleteV1 = RecoveryEffectCompleteV1
-RecoveryExplanationRequestRecoveryEffectFailedAfterEffectV1 = RecoveryEffectFailedAfterEffectV1
-RecoveryExplanationRequestRecoveryEffectInFlightV1 = RecoveryEffectInFlightV1
-RecoveryExplanationRequestRecoveryEffectNeverAdmittedV1 = RecoveryEffectNeverAdmittedV1
-RecoveryExplanationRequestRecoveryEffectPartialV1 = RecoveryEffectPartialV1
-RecoveryExplanationRequestRecoveryEffectUnknownV1 = RecoveryEffectUnknownV1
-RecoveryExplanationRequestSafeInteger = SafeInteger
-RefusalCode = RecoveryExplanationRequestDefinitionsRefusalCode
-Scope = RecoveryExplanationRequestDefinitionsScope

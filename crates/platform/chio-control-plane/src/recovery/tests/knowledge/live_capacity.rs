@@ -131,6 +131,9 @@ fn scoped_host(
     profile.recipients = NonEmptyBoundedList::new(vec![entry])?;
     profile.generation = SafeInteger::new(1)?;
     let broker = Arc::new(process.enable_durable_knowledge()?);
+    store.configure_knowledge(&profile).map_err(|error| {
+        format!("configuring native knowledge account {tenant}/{process_id}: {error}")
+    })?;
     let runtime = NativeKnowledgeRuntime::new(
         kernel.clone(),
         Arc::new(store),
@@ -284,5 +287,152 @@ fn artifacts_foreign_tenant_live_capacity_does_not_close_native_intake() -> Test
         512
     );
     assert_eq!(f.f.effects.load(Ordering::SeqCst), 0);
+    Ok(())
+}
+
+#[test]
+fn knowledge_account_initialization_rolls_back_and_reconfiguration_preserves_custody() -> TestResult
+{
+    let f = KnowledgeFixture::from_before_activation(
+        RecoveryFixture::new(false)?,
+        |host, profile, _| {
+            let connection = rusqlite::Connection::open(host.path.join("admission.db"))?;
+            let before: i64 = connection.query_row(
+                "SELECT count(*) FROM authority_global_commits",
+                [],
+                |row| row.get(0),
+            )?;
+            let store = host.authority.admission_operation_store();
+            store.set_knowledge_account_completion_failure_for_test(true)?;
+            let failure = store.configure_knowledge(profile);
+            store.set_knowledge_account_completion_failure_for_test(false)?;
+            let error = failure.err().ok_or("account writer missed its cut point")?;
+            assert!(
+                error
+                    .to_string()
+                    .contains("account initialization interrupted"),
+                "wrong refusal: {error}"
+            );
+            let after: i64 = connection.query_row(
+                "SELECT count(*) FROM authority_global_commits",
+                [],
+                |row| row.get(0),
+            )?;
+            assert_eq!(
+                after, before,
+                "partial account initialization committed custody"
+            );
+            let remaining: i64 = connection.query_row(
+                "SELECT count(*) FROM admission_operation_recovery_records WHERE record_key GLOB 'knowledge-*'", [], |row| row.get(0),
+            )?;
+            assert_eq!(remaining, 0);
+            Ok(())
+        },
+    )?;
+    let reference = f.publish("account-owned-artifact", b"retained account bytes")?;
+    let store = f.f.authority.admission_operation_store();
+    let actor = f.actor(RecoveryPermission::KnowledgeRead)?;
+    let fence = f.f.authority.mutation_fence();
+    assert_eq!(
+        store.inspect_live_publication_count(&actor, &fence, now_ms()?)?,
+        1
+    );
+    store.configure_knowledge(&f.profile)?;
+    let mut next = f.profile.clone();
+    next.generation = SafeInteger::new(2)?;
+    store.configure_knowledge(&next)?;
+    assert_eq!(
+        store.inspect_live_publication_count(&actor, &fence, now_ms()?)?,
+        1
+    );
+    let next_runtime = NativeKnowledgeRuntime::new(
+        f.f.kernel.clone(),
+        Arc::new(store.clone()),
+        f.broker.clone(),
+        next,
+        fence.clone(),
+    )?;
+    next_runtime.collect(&f.f.control, &reference)?;
+    assert_eq!(
+        store.inspect_live_publication_count(&actor, &fence, now_ms()?)?,
+        0
+    );
+    Ok(())
+}
+
+#[test]
+fn knowledge_account_installation_refuses_missing_custody_without_resetting() -> TestResult {
+    for pattern in [
+        "knowledge-reference-ready:*",
+        "knowledge-reference-capacity:*",
+        "knowledge-publication-ready:*",
+        "knowledge-publication-capacity:*",
+        "knowledge-profile:*",
+    ] {
+        let f = KnowledgeFixture::new()?;
+        f.publish("retained-owner", b"must not disappear from accounting")?;
+        let connection = rusqlite::Connection::open(f.f.path.join("admission.db"))?;
+        let trigger: String = connection.query_row(
+            "SELECT sql FROM sqlite_master WHERE type='trigger' AND name='admission_operation_recovery_no_delete'", [], |row| row.get(0),
+        )?;
+        connection.execute_batch(
+            "PRAGMA foreign_keys=OFF; DROP TRIGGER admission_operation_recovery_no_delete",
+        )?;
+        assert_eq!(
+            connection.execute(
+                "DELETE FROM admission_operation_recovery_records WHERE record_key GLOB ?1",
+                [pattern],
+            )?,
+            1
+        );
+        connection.execute_batch(&trigger)?;
+        let before: i64 =
+            connection.query_row("SELECT count(*) FROM authority_global_commits", [], |row| {
+                row.get(0)
+            })?;
+        let store = f.f.authority.admission_operation_store();
+        assert!(
+            store.configure_knowledge(&f.profile).is_err(),
+            "reinitialized {pattern}"
+        );
+        let after: i64 =
+            connection.query_row("SELECT count(*) FROM authority_global_commits", [], |row| {
+                row.get(0)
+            })?;
+        assert_eq!(after, before, "refusal changed custody for {pattern}");
+        let restored: i64 = connection.query_row(
+            "SELECT count(*) FROM admission_operation_recovery_records WHERE record_key GLOB ?1",
+            [pattern],
+            |row| row.get(0),
+        )?;
+        assert_eq!(restored, 0, "refusal restored a lost {pattern}");
+    }
+    Ok(())
+}
+
+#[test]
+fn knowledge_account_joins_same_tenant_and_initializes_foreign_tenant_independently() -> TestResult
+{
+    let f = KnowledgeFixture::new()?;
+    f.publish("initial-account-owner", b"first")?;
+    let sibling = scoped_host(&f, f.profile.scope.tenant_id.as_str(), "account-sibling")?;
+    let foreign = scoped_host(&f, "separate-account-tenant", "account-foreign")?;
+    let store = f.f.authority.admission_operation_store();
+    let connection = rusqlite::Connection::open(f.f.path.join("admission.db"))?;
+    let rows: i64 = connection.query_row(
+        "SELECT count(*) FROM admission_operation_recovery_records WHERE record_key GLOB 'knowledge-reference-ready:*'", [], |row| row.get(0),
+    )?;
+    assert_eq!(rows, 2, "process creation multiplied tenant accounts");
+    for profile in [&sibling.profile, &foreign.profile] {
+        store.configure_knowledge(profile)?;
+    }
+    assert_eq!(
+        store.inspect_live_publication_count(
+            &f.actor(RecoveryPermission::KnowledgeRead)?,
+            &f.f.authority.mutation_fence(),
+            now_ms()?,
+        )?,
+        1
+    );
     Ok(())
 }

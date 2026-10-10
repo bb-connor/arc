@@ -504,6 +504,22 @@ impl RetainedToolAdmissionRequestV1 {
         self.wire.original_semantic_request_commitment
     }
 
+    /// Historical semantic comparison DATA, after the caller authenticates the
+    /// retained original and its operation binding. V6 preserves the commitment
+    /// to transient credentials without retaining those credentials. Earlier
+    /// versions keep their original comparison against the sanitized request.
+    /// This accessor does not establish source provenance or fresh authority.
+    pub fn historical_semantic_request_commitment(
+        &self,
+    ) -> Result<chio_security_types::recovery::CanonicalPayloadDigest, AdmissionOperationStoreError>
+    {
+        match self.original_semantic_request_commitment() {
+            Some(commitment) => Ok(commitment),
+            None => crate::recovery::semantic_request_semantics(self.request_for_revalidation())
+                .map_err(invalid),
+        }
+    }
+
     /// Equality against the actual borrowed live request. Historical callers
     /// use the retained scalar only after independently verifying the original
     /// source; they cannot regenerate it from omitted approval/DPoP material.

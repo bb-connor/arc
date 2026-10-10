@@ -1,6 +1,6 @@
 # Current protected setup operating contract
 
-This page describes the current source procedure. Current qualification is tracked in [STATUS.md](STATUS.md). The archived [P6 operating contract](p6/OPERATIONS.md), measurement scripts and source packages remain evidence for their own recorded implementation.
+This page describes the current source procedure. Current qualification is tracked in [STATUS.md](STATUS.md). The archived [P6 operating contract](history/README.md), measurement scripts and source packages remain evidence for their own recorded implementation.
 
 ## Prepare the original call
 

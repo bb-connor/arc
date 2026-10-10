@@ -355,14 +355,10 @@ fn fresh_semantic_plan_refuses_more_than_eight_top_level_steps() -> TestResult {
         step.step = StepId::new(&format!("step-{index:02}"))?;
         steps.push(step);
     }
-    let plan = SemanticPlanV1 {
-        steps: NonEmptyBoundedList::new(steps)?,
-        ..f.plan
-    };
-    assert!(matches!(
-        validate_semantic_plan(&plan, &mut VerificationBudget::new(4096)?),
-        Err(ContractError::LimitExceeded)
-    ));
+    let mut wire = serde_json::to_value(&f.plan)?;
+    wire["steps"] = serde_json::to_value(&steps)?;
+    assert!(serde_json::from_value::<SemanticPlanV1>(wire).is_err());
+    assert!(NonEmptyBoundedList::<SemanticPlanStepV1, 8>::new(steps).is_err());
     Ok(())
 }
 

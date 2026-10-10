@@ -1,12 +1,10 @@
 //! Real authenticated commands retain quota separation and existing-work headroom.
 use super::*;
 use chio_store_sqlite::admission_operation_store::{
-    apply_recovery_quota_fixture_resumptions, construct_recovery_planning_fixture_legacy_format,
-    construct_recovery_quota_fixture_legacy_format, fill_recovery_quota_fixture_intake_bytes,
+    apply_recovery_quota_fixture_resumptions, fill_recovery_quota_fixture_intake_bytes,
     fill_recovery_quota_fixture_intake_events, grow_recovery_quota_fixture_retained_history,
     grow_recovery_quota_fixture_uncheckpointed_history, observe_recovery_quota_fixture_errors,
-    recovery_quota_fixture_finalized_shape, retain_recovery_planning_fixture_legacy_revisions,
-    retain_recovery_quota_fixture_legacy_inspections, retain_recovery_quota_fixture_records,
+    recovery_quota_fixture_finalized_shape, retain_recovery_quota_fixture_records,
     RecoveryQuotaFixtureDiagnosticScope, RecoveryQuotaFixtureRecord,
 };
 
@@ -101,6 +99,7 @@ impl QuotaTestDiagnostics {
                 "fixed_runtime_unix_s": chio_kernel::fixed_runtime_unix_secs_for_current_thread(),
                 "durable_snapshot_after_refusal": durable,
                 "original_typed_store_refusal": refusal.as_ref().and_then(|refusal| refusal.command_refusal.as_ref()),
+                "original_review_store_refusal": refusal.as_ref().and_then(|refusal| refusal.review_refusal.as_ref()),
                 "original_issuance_store_refusal": refusal.as_ref().and_then(|refusal| refusal.issuance_refusal.as_ref()),
                 "original_native_capture_refusal": refusal.as_ref().and_then(|refusal| refusal.native_capture_refusal.as_ref()),
                 "exact_clock_regression_sample": clock,
@@ -861,141 +860,6 @@ async fn recovery_native_capture_survives_large_retained_database_history() -> T
             &current.release,
             ReleaseDispositionV1::Released { .. }
         ));
-        assert_eq!(external_count(&fixture.path)?, 1);
-        Ok(())
-    })
-    .await;
-    diagnostics.finish(Some(&fixture), result)
-}
-
-fn legacy_inspection_snapshot(fixture: &RecoveryFixture) -> TestResult<Vec<(String, i64, String)>> {
-    let connection = connection(fixture)?;
-    let mut statement = connection.prepare(
-        "SELECT record_key,version,payload FROM admission_operation_recovery_records
-         WHERE kind='command' AND record_key GLOB 'command:*'
-           AND json_extract(payload,'$.response.command_id') GLOB 'legacy-status-poll-*'
-         ORDER BY record_key",
-    )?;
-    let rows = statement
-        .query_map([], |row| {
-            Ok((
-                row.get(0)?,
-                row.get(1)?,
-                chio_core::sha256_hex(&row.get::<_, Vec<u8>>(2)?),
-            ))
-        })?
-        .collect::<Result<_, _>>()?;
-    Ok(rows)
-}
-
-#[tokio::test]
-async fn recovery_legacy_inspection_saturation_preserves_native_controls() -> TestResult {
-    let diagnostics = QuotaTestDiagnostics::new();
-    let fixture = diagnostics.finish(None, RecoveryFixture::new(false))?;
-    let result: TestResult = Box::pin(async {
-        // Construct one genuine authenticated old-format workflow from its beginning.
-        // This does not delete/reset any reservation or manufacture protected state.
-        let expected = WorkflowId::new(&format!(
-            "workflow:{}",
-            chio_core::sha256_hex(&chio_core::canonical_json_bytes(&(
-                fixture.runtime.scope(),
-                CreationKey::new("ticket-1")?
-            ))?)
-        ))?;
-        let legacy_scope = construct_recovery_quota_fixture_legacy_format(
-            &fixture.authority.admission_operation_store(),
-            &fixture.authority.mutation_fence(),
-            fixture.runtime.scope(),
-            &expected,
-        )?;
-        let workflow = fixture.ready().await?;
-        assert_eq!(workflow, expected);
-        let inspector = fixture.kernel.authenticate_recovery_actor(
-            fixture.runtime.scope(),
-            &fixture.control,
-            RecoveryPermission::Inspect,
-        )?;
-        diagnostics.phase("retained old-format Inspect identities at tenant ceiling");
-        retain_recovery_quota_fixture_legacy_inspections(
-            &fixture.authority.admission_operation_store(),
-            &inspector,
-            &workflow,
-            4096 - recovery_commands(&fixture)?,
-            &fixture.authority.mutation_fence(),
-            now_ms()?,
-        )?;
-        assert_eq!(recovery_commands(&fixture)?, 4096);
-        drop(legacy_scope);
-        let retained = legacy_inspection_snapshot(&fixture)?;
-        assert!(!retained.is_empty());
-        diagnostics.phase("native capture after legacy Inspect saturation");
-        require_live_quota_capability("control capability", &fixture.control)?;
-        require_live_workflow_seed(&fixture, &workflow)?;
-        fixture
-            .execute(
-                "resume-after-legacy-status-polling",
-                RecoveryCommandBodyV1::ResumeWorkflow {
-                    workflow_id: workflow.clone(),
-                    expected_revision: fixture.record(&workflow)?.revision,
-                },
-            )
-            .await?;
-        let record = fixture.record(&workflow)?;
-        assert!(record.captured);
-        assert!(record.effect.is_settled());
-        assert!(matches!(
-            &record.release,
-            ReleaseDispositionV1::Released { .. }
-        ));
-        let before = protected_usage(&fixture)?;
-        let old_inspect = fixture.command(
-            "legacy-status-poll-0",
-            RecoveryCommandBodyV1::InspectWorkflow {
-                workflow_id: workflow.clone(),
-            },
-        )?;
-        let latest = fixture
-            .kernel
-            .execute_recovery_command(&inspector, &old_inspect)?;
-        assert_eq!(latest.revision, record.revision);
-        assert_eq!(latest.effect, record.effect);
-        assert_eq!(latest.release, record.release);
-        assert_eq!(protected_usage(&fixture)?, before);
-        for (id, permission, report) in [
-            (
-                "cancel-after-legacy-status-polling",
-                RecoveryPermission::Cancel,
-                false,
-            ),
-            (
-                "report-after-legacy-status-polling",
-                RecoveryPermission::Report,
-                true,
-            ),
-        ] {
-            let expected_revision = fixture.record(&workflow)?.revision;
-            let body = if report {
-                RecoveryCommandBodyV1::ReportDecision {
-                    workflow_id: workflow.clone(),
-                    expected_revision,
-                    decision: RecoveryReportedDecision::Accepted,
-                }
-            } else {
-                RecoveryCommandBodyV1::CancelWorkflow {
-                    workflow_id: workflow.clone(),
-                    expected_revision,
-                }
-            };
-            let actor = fixture.kernel.authenticate_recovery_actor(
-                fixture.runtime.scope(),
-                &fixture.control,
-                permission,
-            )?;
-            fixture
-                .kernel
-                .execute_recovery_command(&actor, &fixture.command(id, body)?)?;
-        }
-        assert_eq!(legacy_inspection_snapshot(&fixture)?, retained);
         assert_eq!(external_count(&fixture.path)?, 1);
         Ok(())
     })
@@ -2465,51 +2329,6 @@ async fn recovery_finalized_candidate_keeps_native_progress_at_admitted_byte_edg
         assert_eq!(verify_finalized_shape_invariance(&completed)?, normalized.len());
         verify_captured_native_bounds(&fixture, &completed)?;
         assert_eq!(external_count(&fixture.path)?, 1);
-        Ok(())
-    }).await;
-    diagnostics.finish(Some(&fixture), result)
-}
-
-#[tokio::test]
-async fn recovery_legacy_planning_history_preserves_current_operator_rotation() -> TestResult {
-    let diagnostics = QuotaTestDiagnostics::new();
-    let directory = tempfile::tempdir()?;
-    let database_path = directory.path().join("admission.db");
-    let legacy_scope = construct_recovery_planning_fixture_legacy_format(&database_path)?;
-    let fixture = diagnostics.finish(
-        None,
-        RecoveryFixture::open(directory.path().to_path_buf(), Some(directory), false),
-    )?;
-    let result: TestResult = Box::pin(async {
-        diagnostics.phase("thirty thousand valid protected old-format operator revisions");
-        let current = fixture.kernel.recovery_deployment(fixture.runtime.scope())?;
-        let alternate = retain_recovery_planning_fixture_legacy_revisions(
-            &fixture.authority.admission_operation_store(), &fixture.authority.mutation_fence(), fixture.runtime.scope(), 30000,
-        )?;
-        assert_eq!(chio_core::canonical_json_bytes(&fixture.kernel.recovery_deployment(fixture.runtime.scope())?)?, chio_core::canonical_json_bytes(&current)?);
-        let connection = connection(&fixture)?;
-        let (events, roots): (i64,i64) = connection.query_row(
-            "SELECT (SELECT count(*) FROM admission_operation_recovery_events WHERE record_key GLOB 'deployment:*'),
-                (SELECT count(*) FROM admission_operation_recovery_records WHERE record_key GLOB 'deployment-history:*')",
-            [], |row| Ok((row.get(0)?,row.get(1)?)),
-        )?;
-        assert!((30000..57344).contains(&events));
-        assert!(roots <= 3);
-        let new_metadata: i64 = connection.query_row("SELECT count(*) FROM admission_operation_recovery_records WHERE record_key GLOB 'recovery-planning-quota:*'", [], |row| row.get(0))?;
-        assert_eq!(new_metadata, 0, "legacy format fixture created new allocation metadata");
-        drop(connection);
-        drop(legacy_scope);
-        diagnostics.phase("current trusted operator rotation after accepted legacy planning history");
-        require_live_quota_capability("current operator control capability", &fixture.control)?;
-        let rotation = fixture.authority.admission_operation_store().configure_recovery_deployment(&alternate);
-        diagnostics.observe_failure(Some(&fixture), &rotation);
-        if let Err(error) = rotation {
-            assert_eq!(error, chio_kernel::admission_operation::AdmissionOperationStoreError::Invariant(
-                "recovery tenant planning resource exhausted".to_owned()), "legacy history RED failed outside new tenant planning accounting");
-            return Err("accepted legacy operator history exhausted its newly introduced planning allowance".into());
-        }
-        assert_eq!(chio_core::canonical_json_bytes(&fixture.kernel.recovery_deployment(fixture.runtime.scope())?)?, chio_core::canonical_json_bytes(&alternate)?);
-        assert_eq!(external_count(&fixture.path)?, 0);
         Ok(())
     }).await;
     diagnostics.finish(Some(&fixture), result)

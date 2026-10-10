@@ -1019,6 +1019,10 @@ def apply(models_dir: Path, plan, baseline, compatibility, sdk_version, inventor
             if name.startswith("_") or name == "SCHEMA_SHA256":
                 continue
             owner, raw_name = original.resolve(relative, name)
+            # Recovery is unreleased. Its generated names have no predecessor
+            # API to preserve; export only the selected model identities below.
+            if owner.startswith("recovery/"):
+                continue
             target = owner, plans[owner][raw_name]
             public = exports.setdefault(relative, {})
             if name in public and public[name] != target:
@@ -1029,7 +1033,10 @@ def apply(models_dir: Path, plan, baseline, compatibility, sdk_version, inventor
         for stable in names.values():
             canonical = stable if stable.startswith(module_prefix(relative)) else module_prefix(relative) + stable
             target = relative, stable
-            for public_module in (relative, str(Path(relative).parent / "__init__.py"), "__init__.py"):
+            public_modules = (str(Path(relative).parent / "__init__.py"), "__init__.py")
+            if not relative.startswith("recovery/"):
+                public_modules = (relative, *public_modules)
+            for public_module in public_modules:
                 public = exports.setdefault(public_module, {})
                 if canonical in public and public[canonical] != target:
                     raise StabilityError(f"canonical export collides with protected identity: {public_module}:{canonical}")
@@ -1043,7 +1050,10 @@ def apply(models_dir: Path, plan, baseline, compatibility, sdk_version, inventor
         for relative in plans:
             body = rewrite_module(original.modules[relative], plans)
             aliases = [name + " = " + target[1] for name, target in sorted(exports[relative].items()) if name != target[1]]
-            (staging / relative).write_text(body.rstrip() + "\n\n# Public compatibility aliases reference the actual current model classes.\n" + "\n".join(aliases) + "\n", encoding="utf-8")
+            suffix = "\n"
+            if aliases:
+                suffix += "\n# Public compatibility aliases reference the actual current model classes.\n" + "\n".join(aliases) + "\n"
+            (staging / relative).write_text(body.rstrip() + suffix, encoding="utf-8")
         for relative, public in exports.items():
             if not relative.endswith("__init__.py"):
                 continue

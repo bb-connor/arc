@@ -25,6 +25,21 @@ pub use runtime::{
     RecoveryCommandResultV1, RecoveryResultProjectionV1, RecoveryRuntime, RecoveryRuntimeError,
 };
 
+use chio_kernel::recovery::RecoveryPermission;
+use chio_security_types::recovery::RecoveryCommandBodyV1;
+
+pub(super) fn command_permission(body: &RecoveryCommandBodyV1) -> RecoveryPermission {
+    match body {
+        RecoveryCommandBodyV1::CreateWorkflow { .. } => RecoveryPermission::Create,
+        RecoveryCommandBodyV1::InspectWorkflow { .. } => RecoveryPermission::Inspect,
+        RecoveryCommandBodyV1::SelectOffer { .. } => RecoveryPermission::Select,
+        RecoveryCommandBodyV1::SubmitApproval { .. } => RecoveryPermission::Approve,
+        RecoveryCommandBodyV1::ResumeWorkflow { .. } => RecoveryPermission::Resume,
+        RecoveryCommandBodyV1::CancelWorkflow { .. } => RecoveryPermission::Cancel,
+        RecoveryCommandBodyV1::ReportDecision { .. } => RecoveryPermission::Report,
+    }
+}
+
 // Test-only process death. Production builds contain neither an environment
 // switch nor a recovery fault API.
 #[cfg(test)]

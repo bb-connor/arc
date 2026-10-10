@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 35f8e30cf30553986a159b074ee485804a85db29547a8102522cd7bfa3080d2e
+# Schema sha256: d2b29cbbc9a0070d3666a33fd5a06bbda07a8e70f6d54bf33c15ca8b74893ff9
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -159,27 +159,3 @@ class SemanticPackageV1(BaseModel):
         if type(value) is not int:
             raise ValueError('recovery integer literal requires an integer')
         return value
-
-# Public compatibility aliases reference the actual current model classes.
-Channel = RecoverySemanticPackageDefinitionsSemanticChannelChannel
-Kind = RecoverySemanticPackageDefinitionsSemanticOperationKind
-Kind13 = RecoverySemanticPackageDefinitionsSemanticPrerequisiteRequirementKind
-RecoveryDigest32Item = RecoveryDigestOctet
-RecoverySemanticPackageOpaqueId = OpaqueId
-RecoverySemanticPackageRecoveryDigest32 = RecoveryDigest32
-RecoverySemanticPackageRecoveryDigestOctet = RecoveryDigestOctet
-RecoverySemanticPackageSafeInteger = SafeInteger
-RecoverySemanticPackageSemanticPackageV1 = SemanticPackageV1
-RecoverySemanticPackageSemanticSelector = SemanticSelector
-RecoverySemanticPackageSemanticValue = SemanticValue
-RecoverySemanticPackageSemanticWithheldStatusV1 = SemanticWithheldStatusV1
-SemanticChannel = RecoverySemanticPackageDefinitionsSemanticChannel
-SemanticOperation = RecoverySemanticPackageDefinitionsSemanticOperation
-SemanticPrerequisiteRequirement = RecoverySemanticPackageDefinitionsSemanticPrerequisiteRequirement
-SemanticSelector4 = RecoverySemanticPackageDefinitionsSemanticSelectorPresent
-SemanticSelector5 = RecoverySemanticPackageDefinitionsSemanticSelectorEquals
-SemanticSelector6 = RecoverySemanticPackageDefinitionsSemanticSelectorTextBytesAtMost
-SemanticValue4 = RecoverySemanticPackageDefinitionsSemanticValueText
-SemanticValue5 = RecoverySemanticPackageDefinitionsSemanticValueInteger
-SemanticValue6 = RecoverySemanticPackageDefinitionsSemanticValueBoolean
-SemanticWithheldStatus = SemanticWithheldStatusV1

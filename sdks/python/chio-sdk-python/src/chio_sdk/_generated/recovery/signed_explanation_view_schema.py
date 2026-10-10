@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 35f8e30cf30553986a159b074ee485804a85db29547a8102522cd7bfa3080d2e
+# Schema sha256: d2b29cbbc9a0070d3666a33fd5a06bbda07a8e70f6d54bf33c15ca8b74893ff9
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -126,25 +126,3 @@ class RecoverySignedExplanationViewV1(BaseModel):
     authority_key: constr(pattern='^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$')
     algorithm: RecoverySignedExplanationViewAlgorithm
     signature: constr(pattern='^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$')
-
-# Public compatibility aliases reference the actual current model classes.
-Algorithm = RecoverySignedExplanationViewAlgorithm
-Operation = RecoverySignedExplanationViewDefinitionsOperation
-RecoveryDigest32Item = RecoveryDigestOctet
-RecoverySignedExplanationViewDestinationId = DestinationId
-RecoverySignedExplanationViewOpaqueId = OpaqueId
-RecoverySignedExplanationViewRecoveryDigest32 = RecoveryDigest32
-RecoverySignedExplanationViewRecoveryDigestOctet = RecoveryDigestOctet
-RecoverySignedExplanationViewRecoveryEffectAdmissionUnresolvedV1 = RecoveryEffectAdmissionUnresolvedV1
-RecoverySignedExplanationViewRecoveryEffectAwaitingApprovalV1 = RecoveryEffectAwaitingApprovalV1
-RecoverySignedExplanationViewRecoveryEffectAwaitingCallerReportV1 = RecoveryEffectAwaitingCallerReportV1
-RecoverySignedExplanationViewRecoveryEffectClosedBeforeEffectV1 = RecoveryEffectClosedBeforeEffectV1
-RecoverySignedExplanationViewRecoveryEffectCompleteV1 = RecoveryEffectCompleteV1
-RecoverySignedExplanationViewRecoveryEffectFailedAfterEffectV1 = RecoveryEffectFailedAfterEffectV1
-RecoverySignedExplanationViewRecoveryEffectInFlightV1 = RecoveryEffectInFlightV1
-RecoverySignedExplanationViewRecoveryEffectNeverAdmittedV1 = RecoveryEffectNeverAdmittedV1
-RecoverySignedExplanationViewRecoveryEffectPartialV1 = RecoveryEffectPartialV1
-RecoverySignedExplanationViewRecoveryEffectUnknownV1 = RecoveryEffectUnknownV1
-RecoverySignedExplanationViewSafeInteger = SafeInteger
-RefusalCode = RecoverySignedExplanationViewDefinitionsRefusalCode
-Scope = RecoverySignedExplanationViewDefinitionsScope

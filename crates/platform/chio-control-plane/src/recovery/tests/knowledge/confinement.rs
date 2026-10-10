@@ -255,13 +255,13 @@ impl ConfinedFixture {
         Ok(count)
     }
 
-    fn cold_input_reference_count(&self, request: &RequestId) -> TestResult<usize> {
+    fn original_input_reference_count(&self, request: &RequestId) -> TestResult<usize> {
         Ok(self
             .knowledge
             .f
             .authority
             .admission_operation_store()
-            .inspect_confined_input_cold_reference_count(
+            .inspect_confined_input_reference_count(
                 &self.profile.scope,
                 request,
                 &self.knowledge.f.authority.mutation_fence(),
@@ -593,7 +593,7 @@ fn native_cancel_revokes_context_and_keeps_inputs_pinned_and_slot_consumed() -> 
         "the original observation has no typed confinement custody"
     );
     assert_eq!(
-        f.cold_input_reference_count(&RequestId::new("spawn-a")?)?,
+        f.original_input_reference_count(&RequestId::new("spawn-a")?)?,
         1
     );
     f.runtime.cancel(
@@ -612,7 +612,7 @@ fn native_cancel_revokes_context_and_keeps_inputs_pinned_and_slot_consumed() -> 
         "Stop retired the original observation owner"
     );
     assert_eq!(
-        f.cold_input_reference_count(&RequestId::new("spawn-a")?)?,
+        f.original_input_reference_count(&RequestId::new("spawn-a")?)?,
         1
     );
     assert!(f
@@ -656,7 +656,7 @@ fn native_original_confined_seed_and_observation_remain_held_after_stop_and_reop
             "the original input has no typed confinement owner"
         );
     }
-    assert_eq!(f.cold_input_reference_count(&request)?, 2);
+    assert_eq!(f.original_input_reference_count(&request)?, 2);
     f.runtime
         .cancel(&f.knowledge.f.control, &f.knowledge.f.process, &request)?;
     for reference in [&seed, &f.observation] {
@@ -671,7 +671,7 @@ fn native_original_confined_seed_and_observation_remain_held_after_stop_and_reop
             .collect(&f.knowledge.f.control, reference)
             .is_err());
     }
-    assert_eq!(f.cold_input_reference_count(&request)?, 2);
+    assert_eq!(f.original_input_reference_count(&request)?, 2);
     f.knowledge
         .runtime
         .collect(&f.knowledge.f.control, &unrelated)?;
@@ -700,7 +700,7 @@ fn native_original_confined_seed_and_observation_remain_held_after_stop_and_reop
         reopened.authority.mutation_fence(),
     )?;
     assert_eq!(
-        store.inspect_confined_input_cold_reference_count(
+        store.inspect_confined_input_reference_count(
             &scope,
             &request,
             &reopened.authority.mutation_fence(),

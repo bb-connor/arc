@@ -2,7 +2,7 @@
 use super::*;
 
 #[cfg(feature = "admission-test-support")]
-mod legacy_custody_test_support;
+mod test_support;
 
 #[derive(Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "owner", rename_all = "snake_case", deny_unknown_fields)]
@@ -46,16 +46,15 @@ impl PinOwner {
     }
 }
 
-/// Authenticated modern custody data. Its active state is not caller selected.
-pub(super) struct ModernPinSource {
+/// Authenticated custody data. Its active state is not caller selected.
+pub(super) struct PinSource {
     scope: RecoveryScopeV1,
     owner: PinOwner,
     reference: ArtifactVersionRefV1,
     active: bool,
-    source: protected::ProtectedSourceReference,
 }
 
-impl ModernPinSource {
+impl PinSource {
     pub(super) fn scope(&self) -> &RecoveryScopeV1 {
         &self.scope
     }
@@ -68,15 +67,12 @@ impl ModernPinSource {
     pub(super) fn active(&self) -> bool {
         self.active
     }
-    pub(super) fn source(&self) -> &protected::ProtectedSourceReference {
-        &self.source
-    }
 }
 
-pub(super) fn modern_reference_source(
+pub(super) fn reference_source(
     tx: &Connection,
     key: &str,
-) -> Result<Option<ModernPinSource>, AdmissionOperationStoreError> {
+) -> Result<Option<PinSource>, AdmissionOperationStoreError> {
     if ![
         "knowledge-pin:operator:v2:",
         "knowledge-pin:native-operation:v2:",
@@ -87,23 +83,22 @@ pub(super) fn modern_reference_source(
     {
         return Ok(None);
     }
-    let row = protected::raw_checked(tx, key)?.ok_or_else(|| refused("modern pin disappeared"))?;
-    let source = protected::source_reference(tx, key)?;
+    let row = protected::raw_checked(tx, key)?.ok_or_else(|| refused("pin disappeared"))?;
+    protected::source_reference(tx, key)?;
     let pin: PinRecord = protected::decode(&row.payload)?;
     if row.kind != "command"
         || row.scope != scope_key(&pin.scope)?
         || pin.reference.scope != pin.scope
         || pin.owner.key(&pin.scope)? != key
     {
-        return Err(refused("modern pin source changed its purpose"));
+        return Err(refused("pin source changed its purpose"));
     }
     validate_state(&pin)?;
-    Ok(Some(ModernPinSource {
+    Ok(Some(PinSource {
         scope: pin.scope,
         owner: pin.owner,
         reference: pin.reference,
         active: pin.state == PinState::Active,
-        source,
     }))
 }
 
@@ -191,59 +186,13 @@ pub(super) fn retain(
     super::reference_custody::retain_pin_references(tx, serving_owner, &key)
 }
 
-/// Historical flat pins remain conservative collection barriers. Their text
-/// never supplies native-operation or approval authority to a new writer.
+/// Resolve active custody through the authenticated typed pin reader.
 pub(super) fn reference(
     tx: &Connection,
     key: &str,
 ) -> Result<Option<ArtifactVersionRefV1>, AdmissionOperationStoreError> {
-    let row = protected::raw_checked(tx, key)?.ok_or_else(|| refused("pin disappeared"))?;
-    let source = protected::source_reference(tx, key)?;
-    if row.kind != "command" || row.version == 0 {
-        return Err(refused("pin protected identity changed"));
-    }
-    let typed = [
-        "knowledge-pin:operator:v2:",
-        "knowledge-pin:native-operation:v2:",
-        "knowledge-pin:pending-approval:v2:",
-    ]
-    .iter()
-    .any(|prefix| key.starts_with(prefix));
-    if typed {
-        let pin: PinRecord = protected::decode(&row.payload)?;
-        if pin.scope != pin.reference.scope
-            || row.scope != scope_key(&pin.scope)?
-            || pin.owner.key(&pin.scope)? != key
-        {
-            return Err(refused("pin purpose changed"));
-        }
-        validate_state(&pin)?;
-        return Ok((pin.state == PinState::Active).then_some(pin.reference));
-    }
-    let reference: Option<ArtifactVersionRefV1> = protected::decode(&row.payload)?;
-    if !key.starts_with(&format!("knowledge-pin:{}:", row.scope)) {
-        return Err(refused("historical pin source changed its scope"));
-    }
-    if let Some(reference) = &reference {
-        let scope = scope_key(&reference.scope)?;
-        if row.scope != scope || !key.starts_with(&format!("knowledge-pin:{scope}:")) {
-            return Err(refused("historical pin scope changed"));
-        }
-    }
-    // The closed predecessor writer never cleared or rebound a flat pin.
-    // Matching only the first and current values would conceal A -> B -> A.
-    // Authenticate every retained version without a lifetime scan ceiling.
-    for version in 1..=source.version() {
-        if !protected::matches_historical_source_command_payload(
-            tx,
-            &source,
-            version,
-            &row.payload,
-        )? {
-            return Err(refused("historical pin changed its original custody"));
-        }
-    }
-    Ok(reference)
+    let pin = reference_source(tx, key)?.ok_or_else(|| refused("unsupported pin source"))?;
+    Ok(pin.active.then_some(pin.reference))
 }
 
 fn validate_state(pin: &PinRecord) -> Result<(), AdmissionOperationStoreError> {
@@ -261,7 +210,7 @@ fn validate_state(pin: &PinRecord) -> Result<(), AdmissionOperationStoreError> {
 }
 
 /// The caller has authenticated a current KnowledgeAdmin in this same fenced
-/// writer. Only its own exact modern operator pin can enter a terminal state.
+/// writer. Only its own exact operator pin can enter a terminal state.
 pub(super) fn retire_operator(
     tx: &Transaction<'_>,
     serving_owner: &SqliteServingOwner,

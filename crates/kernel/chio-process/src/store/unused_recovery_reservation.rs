@@ -30,7 +30,7 @@ impl Store {
             tx.commit()?;
             return Ok(existing);
         }
-        let (root, lineage) = history::lineage(&tx, &reservation.process_id)?;
+        let (root, lineage) = history::lineage(&tx, &reservation.data.process_id)?;
         let value = UnusedRecoveryReservationClosureData::from_actual_journal(
             reservation.clone(),
             authority,
@@ -44,7 +44,7 @@ impl Store {
         }
         tx.execute(
             "INSERT INTO process_unused_recovery_reservations(process_id,operation_key,continuation_id,closure) VALUES(?1,?2,?3,?4)",
-            params![reservation.process_id,reservation.operation_key,reservation.continuation_id.as_str(),bytes],
+            params![reservation.data.process_id,reservation.data.operation_key,reservation.data.continuation_id.as_str(),bytes],
         )?;
         if version == 5
             && tx.execute(
@@ -140,9 +140,9 @@ pub(super) fn verify_cohort(connection: &Connection) -> Result<(), ProcessError>
         let bytes: Option<Vec<u8>> = row.get(3)?;
         let bytes = bytes.ok_or(ProcessError::Conflict)?;
         let value: UnusedRecoveryReservationClosureData = serde_json::from_slice(&bytes)?;
-        if value.reservation().process_id != process
-            || value.reservation().operation_key != operation
-            || value.reservation().continuation_id.as_str() != continuation
+        if value.reservation().data.process_id != process
+            || value.reservation().data.operation_key != operation
+            || value.reservation().data.continuation_id.as_str() != continuation
             || chio_core_types::canonical_json_bytes(&value)? != bytes
         {
             return Err(ProcessError::Conflict);

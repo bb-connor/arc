@@ -478,3 +478,17 @@ values. One additional null-ID P2 produces 395 records. Historical disposition
 counters, catalogs, previous updates, failed runs and earlier review bytes remain
 unchanged; current acceptance is counted separately. The exact baseline, diff
 and validation are retained in the fixture-environment accounting packet.
+
+## Sole-owner implementation reconciliation
+
+The 2026-10-10 proposed checkpoint was rejected by monitoring review. Blanket
+`existing_repair_retained_validation_pending` assessments have been retracted.
+The working queue's contract summaries are inspection leads pending reconciliation
+against original findings and maintained corrections. The checkpoint is not
+approved; broader stabilization and push remain suspended.
+
+Current open counts are 12 P1 and 124 P2. Original obligations, historical
+observations and dispositions are preserved. No new closure or qualification is
+claimed. The owned-worker legacy fixture diagnostic passes, but the public legacy
+terminal intake test still fails its captured/closed/settled assertion. Both
+results are retained under the existing sole-owner stabilization evidence path.

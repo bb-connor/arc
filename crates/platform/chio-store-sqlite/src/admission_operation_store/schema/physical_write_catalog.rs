@@ -111,8 +111,8 @@ fn expected(original: bool) -> Result<&'static [Entry], AdmissionOperationStoreE
     let cached = if original { &ORIGINAL } else { &BASE };
     cached
         .get_or_init(|| {
-            // Reuse the complete trusted current40 birth catalog, including
-            // every36-40 immutable guard and expression/partial index. A35
+            // Reuse the complete supported catalog, including each immutable
+            // guard and expression/partial index. An incomplete
             // recovery-only model cannot price a real current authority.
             let model = current_command_catalog_model().map_err(|error| error.to_string())?;
             if original {
@@ -131,7 +131,8 @@ fn expected(original: bool) -> Result<&'static [Entry], AdmissionOperationStoreE
 }
 
 fn current_command_catalog_model() -> Result<Connection, AdmissionOperationStoreError> {
-    let model = super::expected_admission_operation_schema(40)?;
+    let model =
+        super::expected_admission_operation_schema(ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION)?;
     model
         .execute_batch(crate::serving_owner::compiled_global_commit_schema())
         .map_err(sqlite_error)?;
@@ -194,7 +195,9 @@ mod tests {
     use super::*;
 
     fn model() -> Result<Connection, Box<dyn std::error::Error>> {
-        let connection = super::super::expected_admission_operation_schema(40)?;
+        let connection = super::super::expected_admission_operation_schema(
+            ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION,
+        )?;
         connection.execute_batch(crate::serving_owner::compiled_global_commit_schema())?;
         Ok(connection)
     }

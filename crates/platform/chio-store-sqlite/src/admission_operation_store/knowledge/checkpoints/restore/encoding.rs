@@ -32,7 +32,7 @@ const MAX_CHECKPOINT_ENVELOPE_BYTES: usize = 64 * 1024;
 enum StoredRestoreRecord {
     Chunked(Box<ChunkedRestoreRecord>),
     Compact(Box<CompactRestoreRecord>),
-    Legacy(Box<RestoreRecord>),
+    Inline(Box<RestoreRecord>),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -140,10 +140,8 @@ pub(super) struct CompactRestoreRecord {
     checkpoint: StoredCheckpoint,
     recipient: StoredRecipient,
     intent: StoredRelease,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    actor_binding: Option<RestoreActorBinding>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    installation_generation: Option<SafeInteger>,
+    actor_binding: RestoreActorBinding,
+    installation_generation: SafeInteger,
     labels: LabelTable,
 }
 
@@ -221,7 +219,7 @@ impl CompactRestoreRecord {
 
     fn expand(&self) -> Result<RestoreRecord, AdmissionOperationStoreError> {
         let record = self.expand_unchecked()?;
-        // A compact record is admissible only when the unchanged legacy wire
+        // A compact record is admissible only when the unchanged inline wire
         // cannot fit. Delivery outcomes cannot shrink an admitted restore.
         if canonical(&record)?.len() <= MAX_PRIVATE_ROW_BYTES {
             return Err(invalid());
@@ -239,7 +237,7 @@ impl CompactRestoreRecord {
 
 /// Source-private write verification uses this exact body. The shared affine
 /// plan frames it into bounded immutable rows only when it cannot fit inline.
-/// Small Legacy records retain their original canonical byte preimages.
+/// Small Inline records retain their original canonical byte preimages.
 pub(super) fn logical_body(
     record: &RestoreRecord,
 ) -> Result<Vec<u8>, AdmissionOperationStoreError> {
@@ -260,18 +258,15 @@ pub(super) fn decode(
     version: u64,
     bytes: &[u8],
 ) -> Result<RestoreRecord, AdmissionOperationStoreError> {
+    require_restore_format(connection)?;
     let stored: StoredRestoreRecord = protected::decode(bytes)?;
     match stored {
-        StoredRestoreRecord::Legacy(record) => {
+        StoredRestoreRecord::Inline(record) => {
             validate_record(&record)?;
             Ok(*record)
         }
-        StoredRestoreRecord::Compact(record) => {
-            require_restore_format(connection)?;
-            record.expand()
-        }
+        StoredRestoreRecord::Compact(record) => record.expand(),
         StoredRestoreRecord::Chunked(chunked) => {
-            require_restore_format(connection)?;
             let owner = chunked.body.owner();
             let EncodingOwner::Restore {
                 scope,
@@ -310,15 +305,16 @@ pub(super) fn require_restore_format(
 ) -> Result<(), AdmissionOperationStoreError> {
     use crate::admission_operation_store::{
         ADMISSION_OPERATION_SCHEMA_ANCHORS, ADMISSION_OPERATION_SCHEMA_KEY,
+        ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION,
     };
     let observed = crate::check_schema_version(
         connection,
         ADMISSION_OPERATION_SCHEMA_KEY,
-        40,
+        ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION,
         ADMISSION_OPERATION_SCHEMA_ANCHORS,
     )
     .map_err(|_| invalid())?;
-    if observed != 40 {
+    if observed != ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION {
         return Err(invalid());
     }
     Ok(())

@@ -189,18 +189,7 @@ fn memory_checkpoint_absent_suffix_read_never_delivers_a_foreign_envelope() -> T
     Ok(())
 }
 
-fn legacy_key(f: &KnowledgeFixture, id: &str, revision: u64) -> TestResult<String> {
-    let scope =
-        chio_core_types::sha256_hex(&chio_core_types::canonical_json_bytes(&f.profile.scope)?);
-    let key = format!("knowledge-checkpoint:{scope}:{id}");
-    Ok(if revision == 0 {
-        key
-    } else {
-        format!("{key}:{revision}")
-    })
-}
-
-fn legacy_envelope(
+fn checkpoint_envelope(
     template: &LabeledCheckpointV1,
     id: &str,
     revision: u64,
@@ -213,7 +202,10 @@ fn legacy_envelope(
     Ok(envelope)
 }
 
-fn seed_legacy(f: &KnowledgeFixture, records: &[(String, &LabeledCheckpointV1)]) -> TestResult {
+fn seed_retained_checkpoints(
+    f: &KnowledgeFixture,
+    records: &[(String, &LabeledCheckpointV1)],
+) -> TestResult {
     let mut identities = Vec::new();
     for (_, checkpoint) in records {
         let identity = (checkpoint.checkpoint.clone(), checkpoint.revision.get());
@@ -252,130 +244,6 @@ fn seed_legacy(f: &KnowledgeFixture, records: &[(String, &LabeledCheckpointV1)])
     }
     Ok(())
 }
-
-#[test]
-fn memory_legacy_damaged_latest_recovers_public_cas_restore_and_pins() -> TestResult {
-    let mut f = KnowledgeFixture::new()?;
-    let old = f.publish("legacy-old", b"intact-legacy-revision")?;
-    let new = f.publish("legacy-new", b"post-upgrade-revision")?;
-    let template = f.runtime.checkpoint(
-        &f.f.control,
-        &CheckpointId::new("template")?,
-        0,
-        std::slice::from_ref(&new),
-        &[],
-    )?;
-    let first = legacy_envelope(&template, "job:1", 1, &old)?;
-    let latest = legacy_envelope(&template, "job:1", 2, &old)?;
-    let foreign = legacy_envelope(&template, "job", 1, &new)?;
-    seed_legacy(
-        &f,
-        &[
-            (legacy_key(&f, "job:1", 1)?, &first),
-            (legacy_key(&f, "job:1", 2)?, &latest),
-            (legacy_key(&f, "job:1", 0)?, &foreign),
-        ],
-    )?;
-    let connection = rusqlite::Connection::open(f.f.path.join("admission.db"))?;
-    let legacy: Vec<(String, i64, Vec<u8>)> = connection
-        .prepare(
-            "SELECT record_key,version,payload FROM admission_operation_recovery_records
-         WHERE record_key GLOB ?1 ORDER BY record_key",
-        )?
-        .query_map(
-            [format!(
-                "knowledge-checkpoint:{}:*",
-                chio_core_types::sha256_hex(&chio_core_types::canonical_json_bytes(
-                    &f.profile.scope
-                )?,)
-            )],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-        )?
-        .collect::<Result<_, _>>()?;
-    let sink = f.sink();
-    f.runtime.restore_into(
-        &f.f.control,
-        &CheckpointId::new("job:1")?,
-        0,
-        &RequestId::new("legacy-latest")?,
-        &sink,
-    )?;
-    assert_restored_checkpoint(&sink, "job:1", 2, b"intact-legacy-revision")?;
-    assert!(f.runtime.collect(&f.f.control, &old).is_err());
-    let saved = f.runtime.checkpoint(
-        &f.f.control,
-        &CheckpointId::new("job:1")?,
-        2,
-        std::slice::from_ref(&new),
-        &[],
-    )?;
-    assert_eq!(saved.revision.get(), 3);
-    for (key, version, payload) in &legacy {
-        let observed: (i64, Vec<u8>) = connection.query_row(
-            "SELECT version,payload FROM admission_operation_recovery_records WHERE record_key=?1",
-            [key],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )?;
-        assert_eq!(observed, (*version, payload.clone()));
-    }
-    drop(connection);
-    let path = f.f.path.clone();
-    let directory = f.f._directory.take();
-    drop(f);
-    let f = KnowledgeFixture::from(RecoveryFixture::open(path, directory, false)?)?;
-    assert!(f.runtime.collect(&f.f.control, &old).is_err());
-    let sink = f.sink();
-    f.runtime.restore_into(
-        &f.f.control,
-        &CheckpointId::new("job:1")?,
-        2,
-        &RequestId::new("legacy-reopen")?,
-        &sink,
-    )?;
-    assert_restored_checkpoint(&sink, "job:1", 2, b"intact-legacy-revision")?;
-    Ok(())
-}
-
-#[test]
-fn memory_legacy_latest_restores_when_its_revision_slot_belongs_to_another_id() -> TestResult {
-    let f = KnowledgeFixture::new()?;
-    let reference = f.publish("legacy-latest-only", b"latest-envelope-content")?;
-    let template = f.runtime.checkpoint(
-        &f.f.control,
-        &CheckpointId::new("template")?,
-        0,
-        std::slice::from_ref(&reference),
-        &[],
-    )?;
-    let latest = legacy_envelope(&template, "k", 1, &reference)?;
-    let foreign = legacy_envelope(&template, "k:1", 1, &reference)?;
-    seed_legacy(
-        &f,
-        &[
-            (legacy_key(&f, "k", 0)?, &latest),
-            (legacy_key(&f, "k", 1)?, &foreign),
-        ],
-    )?;
-    let sink = f.sink();
-    f.runtime.restore_into(
-        &f.f.control,
-        &CheckpointId::new("k")?,
-        0,
-        &RequestId::new("legacy-latest-only")?,
-        &sink,
-    )?;
-    assert_restored_checkpoint(&sink, "k", 1, b"latest-envelope-content")?;
-    let next = f.runtime.checkpoint(
-        &f.f.control,
-        &CheckpointId::new("k")?,
-        1,
-        std::slice::from_ref(&reference),
-        &[],
-    )?;
-    assert_eq!(next.revision.get(), 2);
-    Ok(())
-}
-
 fn restore_outcome(
     f: &KnowledgeFixture,
     request: &RequestId,
@@ -864,14 +732,16 @@ fn memory_checkpoint_reset_history_cannot_escape_the_latest_revision_fence() -> 
             &[],
         )
         .map_err(|error| format!("reset history template checkpoint: {error}"))?;
-    let latest = legacy_envelope(&template, "reset-history", 1, &new)?;
-    let previous_epoch = legacy_envelope(&latest, "reset-history", 2, &old)?;
-    let key = legacy_key(&f, "reset-history", 2)?;
+    let latest = checkpoint_envelope(&template, "reset-history", 1, &new)?;
+    let previous_epoch = checkpoint_envelope(&latest, "reset-history", 2, &old)?;
+    let digest =
+        chio_core_types::sha256_hex(&chio_core_types::canonical_json_bytes(&f.profile.scope)?);
+    let key = format!("knowledge-checkpoint:v2:revision:{digest}:13:reset-history:2");
     // Seed the old v2 latest and revision before any new-code activation of
     // this identity. A new checkpoint-head descriptor must fold these rows.
     let scope =
         chio_core_types::sha256_hex(&chio_core_types::canonical_json_bytes(&f.profile.scope)?);
-    seed_legacy(
+    seed_retained_checkpoints(
         &f,
         &[
             (
@@ -1106,114 +976,6 @@ fn memory_restore_request_is_owned_by_the_original_actor_principal() -> TestResu
         "request names are actor-scoped"
     );
     assert_eq!(sink.delivered.lock().map_err(|_| "sink")?.len(), 2);
-    Ok(())
-}
-
-#[test]
-fn memory_legacy_restore_preserves_opaque_authority_and_proves_its_original_actor() -> TestResult {
-    let f = KnowledgeFixture::new()?;
-    let reference = f.publish("legacy-restore-owner", b"legacy-owned-material")?;
-    let id = CheckpointId::new("legacy-restore-owner")?;
-    let checkpoint = f
-        .runtime
-        .checkpoint(&f.f.control, &id, 0, &[reference], &[])?;
-    let request = RequestId::new("legacy-restore-owner")?;
-    let sink = f.sink();
-    let actor = f.actor(RecoveryPermission::KnowledgeRead)?;
-    let guard = construct_legacy_checkpoint_restore_fixture(&actor, &request)?;
-    let first =
-        f.f.authority
-            .admission_operation_store()
-            .admit_checkpoint_restore(
-                &actor,
-                NativeCheckpointRestore {
-                    checkpoint: &checkpoint,
-                    recipient: &sink.recipient,
-                    request: &request,
-                    installation_generation: f.profile.generation,
-                },
-                &f.f.authority.mutation_fence(),
-                now_ms()?,
-            )?;
-    drop(guard);
-    assert!(sink.delivered.lock().map_err(|_| "sink")?.is_empty());
-    let connection = rusqlite::Connection::open(f.f.path.join("admission.db"))?;
-    let (key, bytes): (String, Vec<u8>) = connection.query_row(
-        "SELECT record_key,payload FROM admission_operation_recovery_records
-         WHERE record_key GLOB 'knowledge-restore:*'",
-        [],
-        |row| Ok((row.get(0)?, row.get(1)?)),
-    )?;
-    let legacy: serde_json::Value = serde_json::from_slice(&bytes)?;
-    assert!(legacy.get("actor_binding").is_none());
-    assert!(legacy.get("installation_generation").is_none());
-    assert!(!key.starts_with("knowledge-restore:v2:"));
-    let store = f.f.authority.admission_operation_store();
-    store.take_legacy_restore_actor_resolution_calls_for_test();
-    let proven = f
-        .runtime
-        .restore_into(&f.f.control, &id, 1, &request, &sink);
-    let resolver_calls = store.take_legacy_restore_actor_resolution_calls_for_test();
-    let proven = proven.map_err(|error| {
-        format!("legacy actual restore resolver_calls={resolver_calls}: {error}")
-    })?;
-    assert!(
-        resolver_calls > 0,
-        "legacy replay proves its original actor"
-    );
-    assert_eq!(proven.release, first.release);
-    let original_observation = super::acceptance::private_release_observation(&f, &proven.release)?;
-    assert_eq!(original_observation.authorization, first.authorization);
-    assert_eq!(sink.delivered.lock().map_err(|_| "sink")?.len(), 1);
-    let before: (i64, Vec<u8>) = connection.query_row(
-        "SELECT version,payload FROM admission_operation_recovery_records WHERE record_key=?1",
-        [&key],
-        |row| Ok((row.get(0)?, row.get(1)?)),
-    )?;
-    assert_eq!(restore_state(&f, &request)?, "delivered");
-
-    let mut deployment = f.f.kernel.recovery_deployment(&f.profile.scope)?;
-    let mut actors = deployment.actors.as_slice().to_vec();
-    actors[0].principal = chio_security_types::PrincipalId::new("legacy-replacement-reviewer")?;
-    deployment.actors = NonEmptyBoundedList::new(actors)?;
-    deployment.authority_scope = recovery_authority_scope_digest(&deployment)?;
-    f.f.authority
-        .admission_operation_store()
-        .configure_recovery_deployment(&deployment)?;
-    assert_eq!(
-        f.actor(RecoveryPermission::KnowledgeRead)?
-            .principal()
-            .as_str(),
-        "legacy-replacement-reviewer"
-    );
-    assert!(f
-        .f
-        .authority
-        .admission_operation_store()
-        .acknowledge_checkpoint_delivery(
-            &f.actor(RecoveryPermission::KnowledgeRead)?,
-            &request,
-            &first,
-            true,
-            &f.f.authority.mutation_fence(),
-            now_ms()?,
-        )
-        .is_err());
-    assert_eq!(sink.delivered.lock().map_err(|_| "sink")?.len(), 1);
-    let independent = f
-        .runtime
-        .restore_into(&f.f.control, &id, 1, &request, &sink)?;
-    assert_ne!(independent.release, first.release);
-    assert_eq!(sink.delivered.lock().map_err(|_| "sink")?.len(), 2);
-    let after: (i64, Vec<u8>) = connection.query_row(
-        "SELECT version,payload FROM admission_operation_recovery_records WHERE record_key=?1",
-        [&key],
-        |row| Ok((row.get(0)?, row.get(1)?)),
-    )?;
-    assert_eq!(
-        after, before,
-        "proving a legacy owner must not rewrite opaque custody"
-    );
     Ok(())
 }
 

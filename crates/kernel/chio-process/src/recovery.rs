@@ -6,38 +6,37 @@ pub use unused_reservation::{
 };
 
 use crate::{digest, validate_id, ProcessError, ProcessRuntime};
+use chio_kernel::recovery::RecoveryProcessReservationV1;
 use chio_kernel::{RecoveryRequestCustody, ToolCallRequest};
 use chio_security_types::recovery::{ContinuationId, IntentDigest};
 use serde::{Deserialize, Serialize};
 
+/// Process reservation identity. The journal, not this serializable value,
+/// proves that the logical call was reserved.
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(transparent)]
 pub struct RecoveryCallReservation {
-    pub(crate) runtime_id: String,
-    pub(crate) process_id: String,
-    pub(crate) continuation_id: ContinuationId,
-    pub(crate) operation_key: String,
-    pub(crate) request_id: String,
-    pub(crate) capability_digest: String,
-    pub(crate) unsigned_intent: IntentDigest,
-    pub(crate) server_id: String,
-    pub(crate) host_binding: String,
+    pub(crate) data: RecoveryProcessReservationV1,
 }
 impl RecoveryCallReservation {
     pub fn process_id(&self) -> &str {
-        &self.process_id
+        &self.data.process_id
     }
     pub fn request_id(&self) -> &str {
-        &self.request_id
+        &self.data.request_id
     }
     pub fn operation_key(&self) -> &str {
-        &self.operation_key
+        &self.data.operation_key
     }
     pub fn continuation_id(&self) -> &ContinuationId {
-        &self.continuation_id
+        &self.data.continuation_id
     }
     pub const fn unsigned_intent(&self) -> IntentDigest {
-        self.unsigned_intent
+        self.data.unsigned_intent
+    }
+    /// Borrow identity data for independent verification by the native owner.
+    pub fn identity(&self) -> &RecoveryProcessReservationV1 {
+        &self.data
     }
 }
 impl core::fmt::Debug for RecoveryCallReservation {
@@ -99,15 +98,17 @@ impl ProcessRuntime {
         validate_id(server_id)?;
         let process = self.process(process_id)?;
         let reservation = RecoveryCallReservation {
-            runtime_id: self.namespace.clone(),
-            process_id: process_id.to_owned(),
-            continuation_id: continuation.clone(),
-            operation_key: operation_key.to_owned(),
-            request_id: self.request_id(process_id, operation_key)?,
-            capability_digest: digest(&process.capability)?,
-            unsigned_intent,
-            server_id: server_id.to_owned(),
-            host_binding: self.recovery_host_binding(server_id)?,
+            data: RecoveryProcessReservationV1 {
+                runtime_id: self.namespace.clone(),
+                process_id: process_id.to_owned(),
+                continuation_id: continuation.clone(),
+                operation_key: operation_key.to_owned(),
+                request_id: self.request_id(process_id, operation_key)?,
+                capability_digest: digest(&process.capability)?,
+                unsigned_intent,
+                server_id: server_id.to_owned(),
+                host_binding: self.recovery_host_binding(server_id)?,
+            },
         };
         self.with_store(|store| store.reserve_recovery(&reservation))?;
         Ok(reservation)
@@ -121,21 +122,21 @@ impl ProcessRuntime {
         custody: &RecoveryRequestCustody,
     ) -> Result<(), ProcessError> {
         let request = custody.request();
-        if custody.continuation() != &reservation.continuation_id
-            || custody.action_intent() != reservation.unsigned_intent
-            || custody.scope().process_id.as_str() != reservation.process_id
+        if custody.continuation() != &reservation.data.continuation_id
+            || custody.action_intent() != reservation.data.unsigned_intent
+            || custody.scope().process_id.as_str() != reservation.data.process_id
             || self.kernel.durable_authority_id() != Some(custody.scope().authority_domain.as_str())
-            || reservation.runtime_id != self.namespace
-            || reservation.request_id != request.request_id
-            || reservation.server_id != request.server_id
+            || reservation.data.runtime_id != self.namespace
+            || reservation.data.request_id != request.request_id
+            || reservation.data.server_id != request.server_id
             || request.execution_nonce.is_some()
-            || reservation.host_binding != self.recovery_host_binding(&request.server_id)?
+            || reservation.data.host_binding != self.recovery_host_binding(&request.server_id)?
         {
             return Err(ProcessError::Conflict);
         }
         let binding = self.derive_call_binding(
-            &reservation.process_id,
-            &reservation.operation_key,
+            &reservation.data.process_id,
+            &reservation.data.operation_key,
             request,
             true,
         )?;
@@ -148,8 +149,8 @@ impl ProcessRuntime {
             store.finalize_recovery(reservation, request, &binding.binding_hash)?;
             if let Some(nonce) = custody.original_execution_nonce() {
                 store.retain_nonce(
-                    &reservation.process_id,
-                    &reservation.operation_key,
+                    &reservation.data.process_id,
+                    &reservation.data.operation_key,
                     1,
                     &binding.binding_hash,
                     nonce,
@@ -183,12 +184,15 @@ impl chio_kernel::recovery::RecoveryProcessReservationPort for ProcessRuntime {
         data: &chio_kernel::recovery::RecoveryProcessReservationV1,
     ) -> Result<(), chio_kernel::admission_operation::AdmissionOperationStoreError> {
         let verify = || -> Result<(), ProcessError> {
-            let reservation: RecoveryCallReservation =
-                serde_json::from_slice(&chio_core_types::canonical_json_bytes(data)?)?;
-            if reservation.runtime_id != self.namespace
-                || reservation.host_binding != self.recovery_host_binding(&reservation.server_id)?
-                || reservation.request_id
-                    != self.request_id(&reservation.process_id, &reservation.operation_key)?
+            let reservation = RecoveryCallReservation { data: data.clone() };
+            if reservation.data.runtime_id != self.namespace
+                || reservation.data.host_binding
+                    != self.recovery_host_binding(&reservation.data.server_id)?
+                || reservation.data.request_id
+                    != self.request_id(
+                        &reservation.data.process_id,
+                        &reservation.data.operation_key,
+                    )?
             {
                 return Err(ProcessError::Conflict);
             }

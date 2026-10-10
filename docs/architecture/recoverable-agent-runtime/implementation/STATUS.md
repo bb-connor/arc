@@ -6,6 +6,40 @@ reviews apply to their exact recorded subjects. Later source changes need their
 owning validation and review. Complete current resource-reserve, historical
 authority and qualification-source custody acceptance remains pending.
 
+The architecture cleanup establishes an explicit [storage support boundary](storage-support.md)
+and separates the [immutable historical packages](history/README.md) from maintained source.
+Unsupported experimental-format readers and duplicate command plumbing are being removed.
+These changes require current-source acceptance; the historical packages remain historical.
+
+The 2026-10-10 cleanup removes experimental admission upgrades, old checkpoint,
+restore, publication, label and flat-pin readers, modeled semantic and quota
+switches, the unused reference-overflow rebuild representation, and unreleased
+Python recovery aliases. Command selection, HTTP job ownership and Process
+reservation data now use their shared implementations. Relative to the saved
+starting worktree, handwritten Rust is reduced by 5,679 lines including tests;
+this excludes generated code and historical evidence. No finding is closed by
+that size reduction.
+
+Focused cleanup verification passes: 16 Store knowledge tests, 3 schema boundary
+and crash/upgrade tests, 2 checkpoint retirement/restart tests, 2 operator-pin
+tests, 8 command-executor tests, the Process reservation test, 31 semantic
+contract/doc tests, 493 Python API/contract/transport tests, strict semantic
+contract Clippy, formatting, schema registry and recovery dependency boundaries.
+The historical archive was reconstructed and compared against all 5,924 original
+files before their expanded copies were removed. Those archived results still
+do not qualify current code.
+
+Acceptance remains incomplete. The native-custody pin test fails before the
+required unknown-effect state. Semantic framing fails while observing current
+knowledge influence; the imported influence source remains held. The semantic
+recorded-return test does not reach its crash cutpoint. The Process native-return
+source is still uninstalled. The remaining account-adoption census and
+unfinished native ownership paths require further integration; their guards,
+assertions and open qualification requirements have not been weakened. Store
+and Process still emit unused integration-code warnings, so whole-runtime strict
+Clippy and production readiness are not claimed. Raw cleanup runs are in
+`target/architecture-cleanup/`. No cleanup changes have been pushed.
+
 The authoritative original inventory is
 `target/recovery-safety-remediation/all-findings/ledger/findings-ledger.json`
 (`recovery-findings-inventory.v1`, 158 original IDs). It preserves original,
@@ -39,7 +73,7 @@ supported profiles. They do not establish qualification for naming changes,
 runtime repairs, tooling changes or documentation edits. Historical records,
 failed attempts, missing outcomes, archives and seals remain as retained. The
 published P6 package has two explicitly documented metadata redactions; their
-original and published hashes remain in [the redaction note](p6/evidence/REDACTIONS.md).
+original and published hashes remain in [the redaction note](history/README.md).
 The original seal is not rewritten to accept those published bytes.
 
 At the cumulative review snapshot, 113 of the 735 P6-qualified source paths
@@ -53,7 +87,7 @@ metadata to reuse old runs would not qualify the changed implementation.
 ## Source drift at the recorded commit
 
 At source commit `c5f53a96dbfc836bfc42805c2fee2d393dd78821`, 581 of the 735
-original paths in the retained [P6 verification inventory](p6/verification.json)
+original paths in the retained [P6 verification inventory](history/README.md)
 do not match. This compares Git commit objects with the historical
 `chio.recovery-p6-verification.v1` record created at
 `2026-10-05T16:05:08.880789+00:00`, with runtime source binding `b1bcd48c` and
@@ -417,23 +451,23 @@ and dependency authority is still pending.
 
 ## Retained historical qualification
 
-The [P5 verification](p5/verification.json), [review](p5/REVIEW.md),
-[review manifest](p5/review-manifest.json) and
-[operating contract](p5/OPERATIONS.md) record local and real Linux acceptance for
+The [P5 verification](history/README.md), [review](history/README.md),
+[review manifest](history/README.md) and
+[operating contract](history/README.md) record local and real Linux acceptance for
 the bounded Boolean-only, model-disabled, no-provider GNU/musl profile.
 Its 643-source binding is
 `562a3c3556f31e5afedbd7c7a426e542cc5e8cd51c28a7a43d8e9704ba4e9bc4`.
-The [final source archive](p5/evidence/p5-final-sources.tar.gz) has SHA-256
+The [final source archive](history/README.md) has SHA-256
 `85c9c7f4903c3a3c8a9e89c89141ade9a23caf3b1ad3120b0a4d42284d801085`.
 At that binding, the record retains 46 local gates, ten real recovery cases,
 72 cage tests, 27 required runtime probes, ten actual helper mutants and eleven
 measured images. The fresh review and the author's fix pass retain their separate
 source scopes; final fixes did not receive a second fresh-context review.
 
-The [P6 verification](p6/verification.json), [review](p6/REVIEW.md),
-[review manifest](p6/review-manifest.json),
-[supported matrix](p6/supported-matrix.json) and
-[read-only reproduction instructions](p6/REPRODUCE.md) record the bounded native
+The [P6 verification](history/README.md), [review](history/README.md),
+[review manifest](history/README.md),
+[supported matrix](history/README.md) and
+[read-only reproduction instructions](history/README.md) record the bounded native
 Rust/SQLite product composition, guided CLI setup, classified policy maintenance,
 reserved settlement, pinned LangGraph/CrewAI integration and finite comparative
 workloads. The recorded bindings are:
@@ -445,9 +479,9 @@ workloads. The recorded bindings are:
 - Original 733-source fresh-review scope:
   `0ae9c64641df39623275e33f3dc0ff48a917eb036605c17b1a06007b9492317f`.
 
-The [P6 final source archive](p6/evidence/p6-final-sources.tar.gz) has SHA-256
+The [P6 final source archive](history/README.md) has SHA-256
 `2cfee4369eb9ff0b0afa75f5a2b8213cba9e00a403221f654b85149bb28b092a`;
-the [original reviewed archive](p6/evidence/p6-reviewed-sources.tar.gz) has SHA-256
+the [original reviewed archive](history/README.md) has SHA-256
 `88d4f34b6cbc8f27519ce9d8102f531928d2c63961db1a22df5d6ac38aa14036`.
 The original review's two P1 findings and the author's single test-first fix pass
 remain explicit. Final fix bytes were not assigned a second fresh-context review.
@@ -456,7 +490,7 @@ review or current repair bytes.
 
 At the recorded bindings, P6 retains 33 local gates and four complete Linux
 suites. The top-level Store summary in
-[evidence/final-linux-postfix/store-full.log](p6/evidence/final-linux-postfix/store-full.log)
+[evidence/final-linux-postfix/store-full.log](history/README.md)
 records 1,831 passed and four ignored; its nested invocation remains separately
 recorded. Recovery, kernel and CLI summaries retain 122, 1,460 and three passes
 respectively, with zero failures. The immutable archival parser's 1,832 Store
@@ -520,7 +554,7 @@ requalification. Release integration follows a qualified candidate with positive
 current P5 Linux acceptance. Expanded providers, platforms or confined channels
 require their own specified acceptance scope. There is no roadmap P7.
 
-[Cloud cleanup evidence](p6/CLEANUP.md) records the task-owned resources and their
+[Cloud cleanup evidence](history/README.md) records the task-owned resources and their
 observed terminal/restored states when captured. It is retained historical
 evidence, not a fresh inspection of current cloud state.
 

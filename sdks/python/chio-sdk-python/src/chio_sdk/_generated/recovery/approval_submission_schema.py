@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 35f8e30cf30553986a159b074ee485804a85db29547a8102522cd7bfa3080d2e
+# Schema sha256: d2b29cbbc9a0070d3666a33fd5a06bbda07a8e70f6d54bf33c15ca8b74893ff9
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -34,11 +34,3 @@ class RecoveryApprovalSubmissionV1(BaseModel):
     model_config = ConfigDict(extra='forbid')
     intent: approval_intent_schema.RecoveryApprovalIntentV1
     coverage: list[signed_authority_coverage_schema.SignedRecoveryAuthorityCoverageV1] = Field(..., max_length=16, min_length=1)
-
-# Public compatibility aliases reference the actual current model classes.
-RecoveryApprovalSubmissionOpaqueId = OpaqueId
-RecoveryApprovalSubmissionRecoveryDigest32 = RecoveryDigest32
-RecoveryApprovalSubmissionRecoveryDigestOctet = RecoveryDigestOctet
-RecoveryApprovalSubmissionSafeInteger = SafeInteger
-RecoveryDigest32Item = RecoveryDigestOctet
-Scope = RecoveryApprovalSubmissionDefinitionsScope

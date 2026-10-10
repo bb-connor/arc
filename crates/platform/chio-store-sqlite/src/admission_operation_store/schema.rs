@@ -1,8 +1,6 @@
 use super::*;
-mod captured_terminal_format;
-mod command_alias_format;
-mod knowledge_encoding_format;
 mod physical_write_catalog;
+mod recovery;
 #[cfg(test)]
 pub(in crate::admission_operation_store) use physical_write_catalog::command_catalog_difference_for_test;
 #[cfg(test)]
@@ -27,14 +25,6 @@ mod migration_v31;
 mod migration_v32;
 mod migration_v33;
 mod migration_v34;
-mod recovery_format_migration;
-
-#[cfg(test)]
-pub(super) fn require_predecessor_knowledge_encoding_absence(
-    connection: &Connection,
-) -> Result<(), AdmissionOperationStoreError> {
-    knowledge_encoding_format::require_predecessor_absence(connection)
-}
 
 #[cfg(test)]
 pub(crate) fn pre_caller_wait_schema_fixture() -> String {
@@ -84,6 +74,11 @@ pub(crate) fn initialize_admission_operation_schema(
         ADMISSION_OPERATION_SCHEMA_ANCHORS,
     )
     .map_err(|error| invariant(error.to_string()))?;
+    // These were unqualified development formats introduced within the recovery
+    // PR. Refuse before any migration instead of guessing at retained custody.
+    if (35..=41).contains(&on_disk) {
+        return Err(invariant("experimental recovery store format is unsupported; preserve the database and use its matching development revision for inspection"));
+    }
     if on_disk == ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION {
         return verify_admission_operation_invariants(connection);
     }
@@ -151,10 +146,6 @@ fn migrate_schema(
         verify_admission_operation_schema(&transaction, 34)?;
         verify_admission_operation_data_invariants(&transaction)?;
     }
-    recovery_format_migration::verify_predecessor(&transaction, on_disk)?;
-    command_alias_format::verify_predecessor(&transaction, on_disk)?;
-    captured_terminal_format::verify_predecessor(&transaction, on_disk)?;
-    knowledge_encoding_format::verify_predecessor(&transaction, on_disk)?;
     if on_disk < 18 && table_exists(&transaction, "admission_operations")? {
         // The legacy report-after-effect contract could refund an executed
         // caller as pre-dispatch compensation. A refunded terminal is not
@@ -253,27 +244,7 @@ fn migrate_schema(
     transaction
         .execute_batch(super::security_participant_state::nonce_preflight::sql())
         .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(super::recovery::SQL)
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(super::recovery::deployment_history::SQL)
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(super::recovery::historical_holds::SQL)
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(recovery_format_migration::SQL)
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(command_alias_format::SQL)
-        .map_err(sqlite_error)?;
-    if on_disk < 39 {
-        transaction
-            .execute_batch(captured_terminal_format::TERMINAL_SQL)
-            .map_err(sqlite_error)?;
-    }
-    knowledge_encoding_format::install_current(&transaction)?;
+    recovery::install(&transaction)?;
     crate::stamp_schema_version(
         &transaction,
         ADMISSION_OPERATION_SCHEMA_KEY,
@@ -294,7 +265,7 @@ fn migrate_schema(
     #[cfg(test)]
     if on_disk == 34 {
         if let Some(marker) = std::env::var_os("CHIO_RECOVERY_MIGRATION_MARKER") {
-            std::fs::write(marker, b"verified-v35-before-commit")
+            std::fs::write(marker, b"verified-upgrade-before-commit")
                 .map_err(|_| invariant("migration test marker is unavailable"))?;
             // The fresh-process parent verifies SQLite crash rollback. No
             // destructor, Rust unwind or transaction rollback callback runs.
@@ -657,12 +628,15 @@ fn verify_admission_operation_schema(
 /// source, reservation, financing role or successor-format acceptance.
 pub(in crate::admission_operation_store) fn current_admission_write_catalog_model(
 ) -> Result<Connection, AdmissionOperationStoreError> {
-    expected_admission_operation_schema(40)
+    expected_admission_operation_schema(ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION)
 }
 
 fn expected_admission_operation_schema(
     version: i32,
 ) -> Result<Connection, AdmissionOperationStoreError> {
+    if version > 34 && version != ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION {
+        return Err(invariant("unsupported recovery catalog version"));
+    }
     let expected = Connection::open_in_memory().map_err(sqlite_error)?;
     expected
         .execute_batch(&if version < 20 {
@@ -758,49 +732,8 @@ fn expected_admission_operation_schema(
             .execute_batch(super::security_participant_state::nonce_preflight::sql())
             .map_err(sqlite_error)?;
     }
-    if version >= 35 {
-        expected
-            .execute_batch(super::recovery::SQL)
-            .map_err(sqlite_error)?;
-    }
-    if version >= 36 {
-        expected
-            .execute_batch(super::recovery::deployment_history::SQL)
-            .map_err(sqlite_error)?;
-    }
-    if version >= 37 {
-        expected
-            .execute_batch(super::recovery::historical_holds::SQL)
-            .map_err(sqlite_error)?;
-        expected
-            .execute_batch(recovery_format_migration::SQL)
-            .map_err(sqlite_error)?;
-    }
-    if version >= 38 {
-        expected
-            .execute_batch(command_alias_format::SQL)
-            .map_err(sqlite_error)?;
-    }
-    if version >= 39 {
-        expected
-            .execute_batch(captured_terminal_format::TERMINAL_SQL)
-            .map_err(sqlite_error)?;
-        if version < 40 {
-            expected
-                .execute_batch(captured_terminal_format::ENCODING_SQL)
-                .map_err(sqlite_error)?;
-        }
-    }
-    if version >= 40 {
-        expected
-            .execute_batch(knowledge_encoding_format::ENCODING_SQL)
-            .map_err(sqlite_error)?;
-        expected
-            .execute_batch(knowledge_encoding_format::REFERENCE_SQL)
-            .map_err(sqlite_error)?;
-        expected
-            .execute_batch(knowledge_encoding_format::CHUNK_ACCOUNTING_SQL)
-            .map_err(sqlite_error)?;
+    if version == ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION {
+        recovery::install(&expected)?;
     }
     Ok(expected)
 }

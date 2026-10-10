@@ -31,25 +31,17 @@ impl ReferenceAccount {
 }
 
 /// This is descriptive data only. The owning source adapter and closed writer
-/// must finish the entire cold census before persisting its first event.
+/// create the account before any installation or artifact can use it.
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(in crate::admission_operation_store) struct ReferenceReadyRecord {
     pub(in crate::admission_operation_store) schema: ReferenceReadySchema,
     pub(in crate::admission_operation_store) account: ReferenceAccount,
     pub(in crate::admission_operation_store) cutoff: ReferenceCutoff,
-    pub(in crate::admission_operation_store) cohort_digest: CanonicalPayloadDigest,
-    pub(in crate::admission_operation_store) census_digest: CanonicalPayloadDigest,
-    pub(in crate::admission_operation_store) artifact_count: SafeInteger,
-    pub(in crate::admission_operation_store) active_owner_count: SafeInteger,
 }
 
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub(in crate::admission_operation_store) enum ReferenceReadySchema {
-    #[serde(rename = "chio.knowledge.reference-ready.v1")]
-    V1,
-    #[serde(rename = "chio.knowledge.reference-ready.v2")]
-    V2,
     #[serde(rename = "chio.knowledge.reference-ready.v3")]
     V3,
 }
@@ -60,31 +52,8 @@ pub(in crate::admission_operation_store) struct ReadyReferenceAccount {
 }
 
 impl ReadyReferenceAccount {
-    /// The original input producer is integrated only by this schema. Both
-    /// predecessor markers retain their authenticated historical cutoff and
-    /// conservative source barriers; they cannot assert complete coverage.
-    pub(in crate::admission_operation_store) fn has_complete_writer_coverage(&self) -> bool {
-        self.record.schema == ReferenceReadySchema::V3
-    }
-
     pub(in crate::admission_operation_store) fn cutoff(&self) -> &ReferenceCutoff {
         &self.record.cutoff
-    }
-
-    pub(in crate::admission_operation_store) fn cohort_digest(&self) -> &CanonicalPayloadDigest {
-        &self.record.cohort_digest
-    }
-
-    pub(in crate::admission_operation_store) fn census_digest(&self) -> &CanonicalPayloadDigest {
-        &self.record.census_digest
-    }
-
-    pub(in crate::admission_operation_store) fn artifact_count(&self) -> u64 {
-        self.record.artifact_count.get()
-    }
-
-    pub(in crate::admission_operation_store) fn active_owner_count(&self) -> u64 {
-        self.record.active_owner_count.get()
     }
 
     pub(in crate::admission_operation_store) fn source(
@@ -102,8 +71,7 @@ impl ReadyReferenceAccount {
     }
 }
 
-/// Missing or historical-only readiness refuses. Counts are the immutable
-/// activation census, not current live-owner counters or a zero-custody proof.
+/// Missing or historical-only readiness refuses; it never means zero custody.
 pub(in crate::admission_operation_store) fn ready_reference_account(
     tx: &Connection,
     scope: &RecoveryScopeV1,
@@ -143,7 +111,7 @@ pub(in crate::admission_operation_store) fn ready_reference_account(
         &protected::encode(&record)?,
     )? {
         return Err(refused(
-            "reference account activation changed its first census",
+            "reference account activation changed its original initialization",
         ));
     }
     Ok(ReadyReferenceAccount { record, source })

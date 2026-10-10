@@ -3,8 +3,11 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
 import signal
 import subprocess
+import sys
+import time
 from pathlib import Path
 import tempfile
 import unittest
@@ -189,6 +192,132 @@ class OrdinaryProcessCleanupTest(unittest.TestCase):
         if cleanup_timeout or group_survives_term:
             self.assertIn(mock.call(process.pid, signal.SIGKILL), kill.call_args_list)
         self.assertEqual(process.wait.call_count, 1)
+
+    def completed_command(self, *, descendants):
+        producer = load("completed_group_producer", ROOT/"scripts/compiled-gate-profiles.py")
+        process = mock.Mock(pid=12345, stdout=io.BytesIO())
+        process.poll.return_value = 0
+        process.wait.return_value = 0
+        selector = mock.MagicMock()
+        selector.__enter__.return_value = selector
+        selector.select.return_value = [(SimpleNamespace(fd=99, fileobj=process.stdout), 0)]
+        with tempfile.TemporaryFile() as log, \
+             mock.patch.object(producer.subprocess, "Popen", return_value=process), \
+             mock.patch.object(producer.selectors, "DefaultSelector", return_value=selector), \
+             mock.patch.object(producer.shutil, "disk_usage", return_value=SimpleNamespace(free=20*1024**3)), \
+             mock.patch.object(producer.os, "read", return_value=b""), \
+             mock.patch.object(producer.os, "killpg") as kill, \
+             mock.patch.object(producer, "wait_owned_group_exit", side_effect=[False, True] if descendants else [True]) as group_exit:
+            observation, failure = producer.capture_command(Path.cwd(), ["mock-child"], {}, log, 1800)
+        self.assertEqual(observation["actual"], 0)
+        self.assertTrue(observation["completed_pipe"])
+        self.assertTrue(observation["owned_group_quiescent"])
+        self.assertTrue(process.stdout.closed)
+        group_exit.assert_any_call(process, grace=0)
+        if descendants:
+            self.assertIsInstance(failure, RuntimeError)
+            self.assertEqual(str(failure), "host command left owned descendants")
+            kill.assert_called_once_with(process.pid, signal.SIGTERM)
+        else:
+            self.assertIsNone(failure)
+            kill.assert_not_called()
+
+    def test_successful_leader_with_closed_pipe_still_refuses_live_descendants(self):
+        self.completed_command(descendants=True)
+
+    def test_successful_exited_group_preserves_command_success(self):
+        self.completed_command(descendants=False)
+
+    def test_uncertain_cleanup_retains_failure_without_final_source_capture(self):
+        producer = load("uncertain_cleanup_producer", ROOT/"scripts/compiled-gate-profiles.py")
+        failure = subprocess.TimeoutExpired("owned command process group", 10)
+        observation = {"actual": 0, "timed_out": False, "disk_floor": False,
+            "completed_pipe": True, "cleanup_errors": ["TimeoutExpired"],
+            "owned_group_quiescent": False, "ended": 1, "elapsed": 1}
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            evidence = root/"evidence"
+            evidence.mkdir()
+            with mock.patch.object(producer, "inventory", return_value={"source_binding":"a"*64}) as inventory, \
+                 mock.patch.object(producer, "snapshot", return_value={"content_manifest_sha256":"b"*64}) as snapshot, \
+                 mock.patch.object(producer, "capture_command", return_value=(observation, failure)), \
+                 mock.patch.object(producer.shutil, "disk_usage", return_value=SimpleNamespace(free=20*1024**3)):
+                with self.assertRaises(subprocess.TimeoutExpired) as raised:
+                    producer.execute(root, evidence, "producer", ["synthetic-child"], {}, [],
+                                     mock.Mock(), mock.Mock(), 30)
+            self.assertIs(raised.exception, failure)
+            inventory.assert_called_once()
+            snapshot.assert_called_once()
+            stage = evidence/"producer"
+            result = json.loads((stage/"result.json").read_bytes())
+            self.assertEqual(result["actual_command_exit"], 0)
+            self.assertEqual(result["runner_exit"], 86)
+            self.assertFalse(result["inventories_complete"])
+            self.assertFalse(result["owned_group_quiescent"])
+            self.assertEqual(result["cleanup_errors"], ["TimeoutExpired"])
+            for name in ["after.json", "runtime-after.json", "execution.json"]:
+                self.assertFalse((stage/name).exists())
+
+    @unittest.skipUnless(os.name == "posix", "owned Unix process groups")
+    def test_actual_pipe_detached_descendant_is_stopped_after_leader_success(self):
+        producer = load("actual_cleanup_producer", ROOT/"scripts/compiled-gate-profiles.py")
+        child_source = '''import os, signal, sys, time
+from pathlib import Path
+signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+Path(sys.argv[1]).write_text(str(os.getpid()))
+time.sleep(60)
+'''
+        leader_source = '''import os, subprocess, sys, time
+from pathlib import Path
+Path(sys.argv[1]).write_text(str(os.getpid()))
+child = subprocess.Popen([sys.executable, "-I", "-B", "-c", sys.argv[3], sys.argv[2]],
+    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+deadline = time.monotonic()+5
+while not Path(sys.argv[2]).exists():
+    if child.poll() is not None or time.monotonic() >= deadline:
+        child.kill()
+        child.wait()
+        raise SystemExit(2)
+    time.sleep(0.01)
+print("leader complete", flush=True)
+'''
+        with tempfile.TemporaryDirectory() as temporary, tempfile.TemporaryFile() as log:
+            root = Path(temporary).resolve()
+            leader, child = root/"leader.pid", root/"child.pid"
+            try:
+                # Disk accounting is a separate control; real process launch,
+                # group observation, pipe EOF, signals and reaping stay intact.
+                with mock.patch.object(producer.shutil, "disk_usage", return_value=SimpleNamespace(free=20*1024**3)):
+                    observation, failure = producer.capture_command(root,
+                        [sys.executable, "-I", "-B", "-c", leader_source,
+                         str(leader), str(child), child_source], {}, log, 15)
+                self.assertEqual(observation["actual"], 0)
+                self.assertTrue(observation["completed_pipe"])
+                self.assertTrue(observation["owned_group_quiescent"])
+                self.assertEqual(observation["cleanup_errors"], [])
+                self.assertIsInstance(failure, RuntimeError)
+                self.assertEqual(str(failure), "host command left owned descendants")
+                with self.assertRaises(ProcessLookupError):
+                    os.killpg(int(leader.read_text()), 0)
+                log.seek(0)
+                self.assertEqual(log.read(), b"leader complete\n")
+            finally:
+                # Even a failed assertion owns cleanup of this exact launch.
+                if leader.exists():
+                    group = int(leader.read_text())
+                    try:
+                        os.killpg(group, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    deadline = time.monotonic()+5
+                    while True:
+                        try:
+                            os.killpg(group, 0)
+                        except ProcessLookupError:
+                            break
+                        if time.monotonic() >= deadline:
+                            raise RuntimeError("test-owned descendant group did not stop")
+                        time.sleep(0.05)
 
     def test_selector_failure_terminates_reaps_and_closes(self):
         self.exercise()

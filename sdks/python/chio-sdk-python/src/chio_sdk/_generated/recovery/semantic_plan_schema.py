@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 35f8e30cf30553986a159b074ee485804a85db29547a8102522cd7bfa3080d2e
+# Schema sha256: d2b29cbbc9a0070d3666a33fd5a06bbda07a8e70f6d54bf33c15ca8b74893ff9
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -62,7 +62,7 @@ class SemanticPlanV1(BaseModel):
     domain_version: Literal[1]
     scope: RecoverySemanticPlanDefinitionsScope
     registry: RecoveryDigest32
-    steps: list[RecoverySemanticPlanDefinitionsSemanticPlanStep] = Field(..., max_length=16, min_length=1)
+    steps: list[RecoverySemanticPlanDefinitionsSemanticPlanStep] = Field(..., max_length=8, min_length=1)
 
     @field_validator('domain_version', mode='before')
     @classmethod
@@ -70,16 +70,3 @@ class SemanticPlanV1(BaseModel):
         if type(value) is not int:
             raise ValueError('recovery integer literal requires an integer')
         return value
-
-# Public compatibility aliases reference the actual current model classes.
-Output = RecoverySemanticPlanDefinitionsSemanticPlanStepOutput
-RecoveryDigest32Item = RecoveryDigestOctet
-RecoverySemanticPlanOpaqueId = OpaqueId
-RecoverySemanticPlanRecoveryDigest32 = RecoveryDigest32
-RecoverySemanticPlanRecoveryDigestOctet = RecoveryDigestOctet
-RecoverySemanticPlanSemanticPlanInput = SemanticPlanInput
-RecoverySemanticPlanSemanticPlanV1 = SemanticPlanV1
-Scope = RecoverySemanticPlanDefinitionsScope
-SemanticPlanInput1 = RecoverySemanticPlanDefinitionsSemanticPlanInputExact
-SemanticPlanInput2 = RecoverySemanticPlanDefinitionsSemanticPlanInputFutureOutput
-SemanticPlanStep = RecoverySemanticPlanDefinitionsSemanticPlanStep

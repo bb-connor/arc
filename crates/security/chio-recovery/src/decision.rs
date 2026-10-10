@@ -1,6 +1,6 @@
 use crate::planning::{CandidatePlanV1, PlannerSearchLimit};
 use chio_security_types::recovery::{
-    AdmissionIntentRef, ApprovalIntentRef, BoundedList, EvidenceRef, OperationRef, StepId,
+    AdmissionIntentRef, BoundedList, EvidenceRef, OperationRef, StepId,
 };
 use chio_security_types::InformationLabel;
 
@@ -30,7 +30,6 @@ impl core::fmt::Debug for PlanDecision {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum WorkflowDirective {
     Materialize(StepId),
-    RequestApproval(ApprovalIntentRef),
     ResumeNativeApproval(OperationRef),
     ResolveAdmission(AdmissionIntentRef),
     AwaitOutcome(OperationRef),

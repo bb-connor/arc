@@ -180,8 +180,7 @@ pub(in crate::admission_operation_store) fn validate_historical_semantic_refused
                 .map_err(refused)?
                 .as_bytes(),
         ),
-        request_semantics: chio_kernel::recovery::semantic_request_semantics(request)
-            .map_err(refused)?,
+        request_semantics: observed.original.historical_semantic_request_commitment()?,
         source_label: &source,
         // Extra historical influence remains conservative. The independent
         // framing digest and authenticated source flags prohibit clean forgery.

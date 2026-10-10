@@ -214,13 +214,28 @@ impl NativeEgressCommand {
 
     /// Recheck the same temporal contract when reading immutable history.
     pub(crate) fn validate_observation(&self, trusted_now: u64) -> PortResult<()> {
-        if self.fence()?.expires_at_unix_ms <= trusted_now {
-            return Err(PortError::conflict());
-        }
+        self.validate_commit_authority(trusted_now)?;
         if let Self::Commit(commitment) | Self::CommitDeclassified { commitment, .. } = self {
             if commitment.committed_at_unix_ms.abs_diff(trusted_now) > MAX_CLOCK_SKEW_MS {
                 return Err(PortError::invalid_data());
             }
+        }
+        if let Self::CommitDeclassified { consumption, .. } = self {
+            if trusted_now.abs_diff(consumption.consumption.consumed_at_unix_ms) > MAX_CLOCK_SKEW_MS
+            {
+                return Err(PortError::conflict());
+            }
+        }
+        Ok(())
+    }
+
+    /// Recheck live authority after verification inside the physical writer.
+    /// The event has already been constructed and validated at its recorded
+    /// observation time. Verification latency cannot renew its absolute
+    /// deadlines, but is not clock skew in that immutable evidence.
+    pub(crate) fn validate_commit_authority(&self, trusted_now: u64) -> PortResult<()> {
+        if self.fence()?.expires_at_unix_ms <= trusted_now {
+            return Err(PortError::conflict());
         }
         if let Self::CommitDeclassified {
             consumption, grant, ..
@@ -228,8 +243,6 @@ impl NativeEgressCommand {
         {
             if trusted_now / 1000 < grant.body.issued_at_unix_seconds()
                 || trusted_now >= consumption.consumption.grant_expires_at_unix_ms
-                || trusted_now.abs_diff(consumption.consumption.consumed_at_unix_ms)
-                    > MAX_CLOCK_SKEW_MS
             {
                 return Err(PortError::conflict());
             }

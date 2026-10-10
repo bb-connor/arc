@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 35f8e30cf30553986a159b074ee485804a85db29547a8102522cd7bfa3080d2e
+# Schema sha256: d2b29cbbc9a0070d3666a33fd5a06bbda07a8e70f6d54bf33c15ca8b74893ff9
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -134,23 +134,3 @@ class RecoveryEffectFailedAfterEffectV1(BaseModel):
     kind: Literal['failed_after_effect']
     operation: RecoverySupportIssueEffectDefinitionsOperation
     applied_effects: conint(ge=1, le=9007199254740991)
-
-# Public compatibility aliases reference the actual current model classes.
-Operation = RecoverySupportIssueEffectDefinitionsOperation
-RecoveryDigest32Item = RecoveryDigestOctet
-RecoverySupportIssueEffectOpaqueId = OpaqueId
-RecoverySupportIssueEffectRecoveryDigest32 = RecoveryDigest32
-RecoverySupportIssueEffectRecoveryDigestOctet = RecoveryDigestOctet
-RecoverySupportIssueEffectRecoveryEffectAdmissionUnresolvedV1 = RecoveryEffectAdmissionUnresolvedV1
-RecoverySupportIssueEffectRecoveryEffectAwaitingApprovalV1 = RecoveryEffectAwaitingApprovalV1
-RecoverySupportIssueEffectRecoveryEffectAwaitingCallerReportV1 = RecoveryEffectAwaitingCallerReportV1
-RecoverySupportIssueEffectRecoveryEffectClosedBeforeEffectV1 = RecoveryEffectClosedBeforeEffectV1
-RecoverySupportIssueEffectRecoveryEffectCompleteV1 = RecoveryEffectCompleteV1
-RecoverySupportIssueEffectRecoveryEffectFailedAfterEffectV1 = RecoveryEffectFailedAfterEffectV1
-RecoverySupportIssueEffectRecoveryEffectInFlightV1 = RecoveryEffectInFlightV1
-RecoverySupportIssueEffectRecoveryEffectNeverAdmittedV1 = RecoveryEffectNeverAdmittedV1
-RecoverySupportIssueEffectRecoveryEffectPartialV1 = RecoveryEffectPartialV1
-RecoverySupportIssueEffectRecoveryEffectUnknownV1 = RecoveryEffectUnknownV1
-RecoverySupportIssueEffectSafeInteger = SafeInteger
-RefusalCode = RecoverySupportIssueEffectDefinitionsRefusalCode
-Scope = RecoverySupportIssueEffectDefinitionsScope

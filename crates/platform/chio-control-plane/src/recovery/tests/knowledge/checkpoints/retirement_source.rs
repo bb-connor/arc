@@ -1,4 +1,4 @@
-//! Direct legacy retirement keeps the original cold source through suffix collisions.
+//! Retirement preserves exact current source ownership across suffix identifiers.
 use super::*;
 
 mod fixture;
@@ -18,7 +18,7 @@ fn checkpoint_owner(f: &KnowledgeFixture, id: &str) -> TestResult<serde_json::Va
     Ok(serde_json::from_slice(&payload)?)
 }
 
-fn assert_current_source(f: &KnowledgeFixture, original: &LegacyCheckpoint) -> TestResult {
+fn assert_current_source(f: &KnowledgeFixture, original: &RetainedCheckpoint) -> TestResult {
     let store = f.f.authority.admission_operation_store();
     let read = store.read_labeled_checkpoint(
         &f.actor(RecoveryPermission::KnowledgeRead)?,
@@ -39,16 +39,6 @@ fn assert_current_source(f: &KnowledgeFixture, original: &LegacyCheckpoint) -> T
         original.checkpoint
     );
     let connection = rusqlite::Connection::open(f.f.path.join("admission.db"))?;
-    let aliases: i64 = connection.query_row(
-        "SELECT count(*) FROM admission_operation_recovery_records
-         WHERE record_key GLOB 'knowledge-checkpoint:v2:*'",
-        [],
-        |row| row.get(0),
-    )?;
-    assert_eq!(
-        aliases, 0,
-        "current reads must preserve the original legacy source"
-    );
     let (version, payload, digest, event_sequence): (i64, Vec<u8>, String, i64) = connection
         .query_row(
             "SELECT r.version,r.payload,e.record_digest,e.sequence
@@ -126,7 +116,7 @@ fn retained_state(f: &KnowledgeFixture) -> TestResult<RetainedState> {
     })
 }
 
-fn retire(f: &KnowledgeFixture, original: &LegacyCheckpoint) -> TestResult {
+fn retire(f: &KnowledgeFixture, original: &RetainedCheckpoint) -> TestResult {
     f.f.authority
         .admission_operation_store()
         .retire_checkpoint_revision(
@@ -139,7 +129,10 @@ fn retire(f: &KnowledgeFixture, original: &LegacyCheckpoint) -> TestResult {
     Ok(())
 }
 
-fn assert_retired_restore_refused(f: &KnowledgeFixture, original: &LegacyCheckpoint) -> TestResult {
+fn assert_retired_restore_refused(
+    f: &KnowledgeFixture,
+    original: &RetainedCheckpoint,
+) -> TestResult {
     let sink = f.sink();
     for revision in [0, 1] {
         assert!(f
@@ -148,7 +141,7 @@ fn assert_retired_restore_refused(f: &KnowledgeFixture, original: &LegacyCheckpo
                 &f.f.control,
                 &original.checkpoint.checkpoint,
                 revision,
-                &RequestId::new("retired-legacy-refusal")?,
+                &RequestId::new("retired-checkpoint-refusal")?,
                 &sink,
             )
             .is_err());
@@ -158,24 +151,20 @@ fn assert_retired_restore_refused(f: &KnowledgeFixture, original: &LegacyCheckpo
 }
 
 #[test]
-fn memory_legacy_revision_retirement_uses_its_exact_owning_source_when_revision_slot_is_foreign(
-) -> TestResult {
-    let ColdRetirementFixture {
+fn memory_checkpoint_retirement_uses_its_exact_owner_with_suffix_identifiers() -> TestResult {
+    let RetirementFixture {
         mut knowledge,
         own,
         foreign,
-    } = ColdRetirementFixture::new()?;
+    } = RetirementFixture::new()?;
     assert_current_source(&knowledge, &own)?;
     assert_current_source(&knowledge, &foreign)?;
     let ready = rows(&knowledge, "knowledge-reference-ready:*")?;
     assert_eq!(ready.len(), 1);
-    let marker: serde_json::Value = serde_json::from_slice(&ready[0].2)?;
-    assert_eq!(marker["artifact_count"], 2);
-    assert_eq!(marker["active_owner_count"], 2);
     let originals = rows(&knowledge, "knowledge-checkpoint:*")?;
     for (original, bytes) in [
-        (&own, b"own-legacy".as_slice()),
-        (&foreign, b"foreign-legacy".as_slice()),
+        (&own, b"own-checkpoint".as_slice()),
+        (&foreign, b"foreign-checkpoint".as_slice()),
     ] {
         assert_eq!(knowledge.broker.read_private(&original.seal)?, bytes);
         let sink = knowledge.sink();
@@ -205,7 +194,7 @@ fn memory_legacy_revision_retirement_uses_its_exact_owning_source_when_revision_
     }
     assert!(
         retired.is_ok(),
-        "authentic own legacy source must retire despite a foreign revision slot: {retired:?}"
+        "authentic checkpoint must retire without changing the suffix identity: {retired:?}"
     );
     retired?;
     assert_eq!(checkpoint_owner(&knowledge, "job")?["state"], "retired");
@@ -225,7 +214,7 @@ fn memory_legacy_revision_retirement_uses_its_exact_owning_source_when_revision_
     assert!(knowledge.broker.read_private(&own.seal).is_err());
     assert_eq!(
         knowledge.broker.read_private(&foreign.seal)?,
-        b"foreign-legacy"
+        b"foreign-checkpoint"
     );
     assert!(knowledge
         .runtime
@@ -241,7 +230,7 @@ fn memory_legacy_revision_retirement_uses_its_exact_owning_source_when_revision_
     assert_eq!(
         rows(&knowledge, "knowledge-reference-ready:*")?,
         ready,
-        "reopen must not reset the cold census"
+        "reopen must not reset reference activation"
     );
     let reopened = retained_state(&knowledge)?;
     retire(&knowledge, &own)?;
@@ -256,7 +245,7 @@ fn memory_legacy_revision_retirement_uses_its_exact_owning_source_when_revision_
         &RequestId::new("foreign-after-reopen")?,
         &sink,
     )?;
-    assert_restored_checkpoint(&sink, "job:1", 1, b"foreign-legacy")?;
+    assert_restored_checkpoint(&sink, "job:1", 1, b"foreign-checkpoint")?;
     assert!(knowledge
         .runtime
         .collect(&knowledge.f.control, foreign.reference())
@@ -292,9 +281,8 @@ fn memory_legacy_revision_retirement_uses_its_exact_owning_source_when_revision_
 }
 
 #[test]
-fn memory_legacy_revision_retirement_rolls_back_after_its_original_owner_write_fault() -> TestResult
-{
-    let mut f = ColdRetirementFixture::new()?;
+fn memory_checkpoint_retirement_rolls_back_after_its_owner_write_fault() -> TestResult {
+    let mut f = RetirementFixture::new()?;
     assert_current_source(&f.knowledge, &f.own)?;
     assert_current_source(&f.knowledge, &f.foreign)?;
     let fault = RetirementWriteFault::install(&f.knowledge)?;
@@ -320,7 +308,7 @@ fn memory_legacy_revision_retirement_rolls_back_after_its_original_owner_write_f
         &RequestId::new("rollback-live")?,
         &sink,
     )?;
-    assert_restored_checkpoint(&sink, "job", 1, b"own-legacy")?;
+    assert_restored_checkpoint(&sink, "job", 1, b"own-checkpoint")?;
     retire(&f.knowledge, &f.own)?;
     f.knowledge
         .runtime
@@ -328,7 +316,7 @@ fn memory_legacy_revision_retirement_rolls_back_after_its_original_owner_write_f
     assert!(f.knowledge.broker.read_private(&f.own.seal).is_err());
     assert_eq!(
         f.knowledge.broker.read_private(&f.foreign.seal)?,
-        b"foreign-legacy"
+        b"foreign-checkpoint"
     );
     let path = f.knowledge.f.path.clone();
     let directory = f.knowledge.f._directory.take();

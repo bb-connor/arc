@@ -207,7 +207,7 @@ async fn interrupted_unmaterialized_setup_can_replace_its_writer_without_reusing
             runtime: reopened.f.runtime.clone(),
             store: Arc::new(store.clone()),
             fence: fence.clone(),
-            knowledge: Some(Arc::new(reopened.runtime.clone())),
+            knowledge: Arc::new(reopened.runtime.clone()),
             operator: Keypair::from_seed(&[211; 32]),
         },
         &reopened.f.control,
