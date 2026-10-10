@@ -1,0 +1,276 @@
+{
+  "observed_utc": "2026-10-10T04:53:47.049266+00:00",
+  "stage_head": "7cd19d4cc77e4fdcaf3dac379e4fe886d27b9217",
+  "scope": "Component repair and frozen storage capacity evidence; revised candidate not yet qualified or published.",
+  "wallet": {
+    "producer": "dd91d84979922c50b9ae2ae33a551abbf59b077e",
+    "integrated": "7cd19d4cc77e4fdcaf3dac379e4fe886d27b9217",
+    "source_objects_verified": 7,
+    "evidence_records_verified": 12,
+    "passing_logs_verified": 10,
+    "all_integrated_source_bytes_identical": true,
+    "runtime_passed": 30,
+    "composed_candidate_qualified": false,
+    "manifest_sha256": "13e01cc837c78abbe8a97ad4c426a77f8b18bcdd155b2107d5bc5598e77dfd42"
+  },
+  "wallet_handoff": {
+    "requirement_label": "FINAL-WALLET-QUEUED-EXPIRY",
+    "producer_commit": "dd91d84979922c50b9ae2ae33a551abbf59b077e",
+    "base_sha": "0c457859c6e715df75709490f3e3b4f5e2aee735",
+    "branch": "fix/pr1160-wallet-clock",
+    "worktree": "/home/connor/lanes/pr1160-wallet-clock",
+    "clean": true,
+    "source_pin_sha256": "f8ccff7ee13a0a45d38b0ecee031b2357d974404ea7e2286f34736acab01ed09",
+    "source_objects": {
+      "crates/platform/chio-control-plane/src/trust_control/config_and_public.rs": {
+        "sha256": "57703c9f26df8927b4f9aac195a171025ebff08ec416ea74985724831cfca02c",
+        "git_blob": "f18aadfe243c60d36936132c39cc7d72af6ad2fd"
+      },
+      "crates/platform/chio-control-plane/src/trust_control/json_ingress.rs": {
+        "sha256": "1d26ce4f378acb086fda8d415274257c35cdd2f261f13dddbd3bc4c8858424ff",
+        "git_blob": "5c8538564c0920f48cecc5aeab805485a0524dc3"
+      },
+      "crates/platform/chio-control-plane/src/trust_control/passport_handlers.rs": {
+        "sha256": "9097bca1c5c00d452e947213c438db6b1aa0b667f39437939defcbb5d537c5f8",
+        "git_blob": "16d4c91b63d5341954892ffab44940b14f7f5b15"
+      },
+      "crates/platform/chio-control-plane/src/trust_control/service_runtime/ingress_tests/wallet_entitlement_admission.rs": {
+        "sha256": "a0fcf4ff9e5621873ccbf133fa5a1f68028c96d2db787d7abee504d5ab7381e3",
+        "git_blob": "d4990b54503dfeb8846e43324f6d40a49a1f5f13"
+      },
+      "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests.rs": {
+        "sha256": "d96555d7f9b6a8c759bf076466790e26a24d2159a746db288388c86d2be2f0ed",
+        "git_blob": "0639cd91c584872770303a41f6bf93ee0cee70b5"
+      },
+      "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/queued_wallet_expiry.rs": {
+        "sha256": "624b450940c70da4bb5e241f9b1f9e7b396b55189f7e9c20e5fb02f9105710a6",
+        "git_blob": "f99d312e2dd860f1fd675e6f325571aa16630d3f"
+      },
+      "docs/security/http-ingress-contracts.json": {
+        "sha256": "a6246f49e2b38c32efa8be87e1c9ba21d80d6dff5a8132d7d40573ebb4e0bdce",
+        "git_blob": "85d4c1db33bfb175acfe94c80fc7708c8ca6d5ac"
+      }
+    },
+    "mandatory_test_inventory_sha256": "c7cda6cde2b6ed8b4daa0ec1826440dca98de893de734b46b0a151a505d504cd",
+    "qualified_runtime_passed": 30,
+    "qualified_strict": "chio-control-plane --all-targets -- -D warnings, exit0",
+    "passing_logs": {
+      "expiry": {
+        "path": "/tmp/pr1160-wallet-clock-20261010/final-expiry.log",
+        "sha256": "38948e808d0e7a3f8438ad0613a2195b102ad6934de98e2a0508f312a78ecb28",
+        "exit": 0
+      },
+      "ingress": {
+        "path": "/tmp/pr1160-wallet-clock-20261010/final-ingress.log",
+        "sha256": "65bedbaf466c3fd2d603b063b07c4644d30d12b97fd3d4252559d6f73739fe94",
+        "exit": 0
+      },
+      "transactions": {
+        "path": "/tmp/pr1160-wallet-clock-20261010/final-transactions.log",
+        "sha256": "93c9f4ce2064d59044670dfc04dee8c47c77883607d99226e285b0a9e91c84bb",
+        "exit": 0
+      },
+      "strict": {
+        "path": "/tmp/pr1160-wallet-clock-20261010/final-strict.log",
+        "sha256": "55bb8674527b652f310a9448f091bea36f28228dc4b355fab544fb58a924bdbb",
+        "exit": 0
+      },
+      "negative": {
+        "path": "/tmp/pr1160-wallet-clock-20261010/final-negative.log",
+        "sha256": "80670f9100bb3c709e4d3cdf5b892da20bcd2bb9b64b6c7807fb3ec713ff3db4",
+        "exit": 0
+      },
+      "hygiene": {
+        "path": "/tmp/pr1160-wallet-clock-20261010/final-hygiene.log",
+        "sha256": "fd145decc12f7e664c9a8705ba5fc5840cd3d5661f520553a45389abb0e4e66d",
+        "exit": 0
+      },
+      "clocks": {
+        "path": "/tmp/pr1160-wallet-clock-20261010/final-clocks.log",
+        "sha256": "bd324fbc2aec503258f82917613ce9aeff2296a2cce36fc0e6f3285bcf158bd9",
+        "exit": 0
+      },
+      "boundaries": {
+        "path": "/tmp/pr1160-wallet-clock-20261010/final-boundaries.log",
+        "sha256": "c628712fe748ea911c9c54686a531283f34645391d0322c6321ebe4f513dcf69",
+        "exit": 0
+      },
+      "scan": {
+        "path": "/tmp/pr1160-wallet-clock-20261010/final-scan.log",
+        "sha256": "5140bdcb808b5c515394abeb7fdb6f219d9dfcc591dd8420bc2dfb5a12d2cffb",
+        "exit": 0
+      },
+      "fmt": {
+        "path": "/tmp/pr1160-wallet-clock-20261010/final-fmt.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "exit": 0
+      }
+    },
+    "evidence_records": {
+      "original-source.json": "137a73b7fcf2b3dc05121899b2895725062bf0a708ca52a7dfb306bc51c7884f",
+      "original-result.json": "f5dc75ab547e6577be90b9bc0bc63d60c0d821c2246b75973ea1de725c72830c",
+      "corrected-original-source.json": "14b0fd1244ca05ad04dd47caee2ecee57176687eee6ee2e1f6c9968d53ce0567",
+      "corrected-original-result.json": "69a43aa1f65c64f3c0c6562e1a6a08a7f6d1b1d185ef5ae7bbb28bf9003ececa",
+      "repair-source.json": "76237f2aa658a62ca422b909144bda715f75602ad33bcef0a3e090a80f17cf13",
+      "repair-runtime-and-strict.json": "1ca500fa60e2d943b8dc1f1b0e3401b2f3f1aab88077b239332c6718c80bf0c3",
+      "repair-boundaries.json": "4985d8ca6391499b79372c102ec01d10c435663b84effa588a3bc6642435a176",
+      "inherited-unused-export.json": "cce34795b583a08d5bb38e94d5ece0a4bfe7ee1c3193022f6c3880c74d7ecf0c",
+      "ingress-pin-renewal.json": "41aa5e4be79996e32d39e726426b3f797a92b5f42f78ad3d229bd277b37c0e2d",
+      "final-source.json": "f8ccff7ee13a0a45d38b0ecee031b2357d974404ea7e2286f34736acab01ed09",
+      "final-runtime-and-strict.json": "9153c66a23169492133ef1c3cbf4176f582f1a50d0419818c9904b930fbf5f45",
+      "mandatory-tests.json": "c7cda6cde2b6ed8b4daa0ec1826440dca98de893de734b46b0a151a505d504cd"
+    },
+    "Original": "Corrected expected-safe Original1PASS4FAIL on unchanged0c production; middleware body_polls1 and400, expired credential200+registry mutation, expired code200+registry mutation, new offer used pre-queue timestamp. Healthy token/signed credential200PASS. Initial mixed0PASS5FAIL retains wrong healthy retained-record oracle.",
+    "retention": "Initial mixed Original, genuine corrected Original, first strict inherited-unused-import failure, first middleware source-pin gate failure all remain separate.",
+    "implementation": "Existing owner clock sampled after queued registry read/load/lock and again after signer/status reads before final credential redemption; current entitlement rechecked with401 expiry and503 clock-error refusals before persistence. Auth-before-body and cancellation permit custody retained.",
+    "scope_notes": [
+      "Only JSON ingress and create-offer/token/credential handler time reads changed behavior.",
+      "Three existing direct wallet-auth fixture clock arguments updated.",
+      "Inherited production-unused reexport moved under cfg(test), implementation/with_status export unchanged.",
+      "ONLY control_reader_sha256 field renewed; all other catalog bytes/fields equal, no baseline/cap/waiver changes.",
+      "No state/init production edits or new global clock reads/debt;413existing debt/40pinned native compositions unchanged.",
+      "Composed full/hosted qualification and protected merge remain Root-owned."
+    ]
+  },
+  "frozen_capacity": {
+    "source": "0c457859c6e715df75709490f3e3b4f5e2aee735",
+    "status": "terminal_pass",
+    "passed": 1,
+    "failed": 0,
+    "ignored": 0,
+    "duration_seconds": 1428.664946988225,
+    "source_stable": true,
+    "binary_stable": true,
+    "store_source_unchanged_through_stage": "7cd19d4cc77e4fdcaf3dac379e4fe886d27b9217",
+    "measurement": {
+      "append_seconds": 442.177,
+      "cancellation": {
+        "gate": "Publication",
+        "gate_skipped_publication_steps": 4,
+        "range_entries": 10000,
+        "shutdown_ms": 14.392,
+        "state": "stopped"
+      },
+      "claimed": true,
+      "config": {
+        "hold_sql_steps": 5000000,
+        "insert_rows": 256,
+        "quota_bytes": 2147483648,
+        "step_bytes": 16777216,
+        "step_rows": 1024
+      },
+      "covered_entries": 100000,
+      "divisor": 1,
+      "host": {
+        "cpus": 12,
+        "hostname": "workstation",
+        "mem_total_kib": 49222636
+      },
+      "label": "linux-file",
+      "memory": {
+        "after": {
+          "vm_hwm_kib": 458732,
+          "vm_peak_kib": 1846932,
+          "vm_rss_kib": 350220,
+          "vm_size_kib": 1781900
+        },
+        "before": {
+          "vm_hwm_kib": 456636,
+          "vm_peak_kib": 1846892,
+          "vm_rss_kib": 456636,
+          "vm_size_kib": 1846892
+        },
+        "peak": {
+          "vm_hwm_kib": 458732,
+          "vm_peak_kib": 1846932,
+          "vm_rss_kib": 460076,
+          "vm_size_kib": 1846912
+        },
+        "peak_reset": true
+      },
+      "n": 111000,
+      "prefix_entries": 1000,
+      "publication": {
+        "max_settled_per_hold": 256,
+        "per_call_parity": {
+          "admin": {
+            "total_count": 101000
+          },
+          "tenant_a": {
+            "total_count": 50500
+          }
+        },
+        "seconds_after_release": 125.221,
+        "served_total": 101000,
+        "settle": {
+          "accepted_after_ms": 125217.613,
+          "checkpoint_seq": 2,
+          "reads_refused": {
+            "receipt_query_snapshot_stale": 62
+          },
+          "reads_served": 2,
+          "rotation": {
+            "archived": 101000,
+            "attempts": 1,
+            "refusals": 0,
+            "seconds": 122.711
+          },
+          "slowest_read_ms": 2076.723
+        },
+        "used_bytes_after": 56647680
+      },
+      "staging": {
+        "max_leaves_per_hold": 256,
+        "seconds": 96.992,
+        "served_total_while_staged": null,
+        "used_bytes_before": 626688,
+        "used_bytes_staged": 4939776
+      },
+      "test": "linux_file_large_covered_range_staging"
+    },
+    "scope": "100k covered range only, not million-scale or final whole-candidate acceptance. Earlier cancellation retained."
+  },
+  "artifacts": {
+    "/tmp/pr1160-final-review-20261009/final-candidate-v2/capacity100k-frozen-0c457859c6/summary.json": {
+      "sha256": "de6b2b4a8ee379765f66931ce910643989cfa28e431975b20976bc85fc21e7ae"
+    },
+    "/tmp/pr1160-final-review-20261009/final-candidate-v2/capacity100k-frozen-0c457859c6/003-runtime/output.log": {
+      "sha256": "5153b8f7aba0dc061a692363bb4dfd598b70871ef0d5616ed2550ebb6f8ed181"
+    },
+    "/tmp/pr1160-final-review-20261009/final-candidate-v2/capacity100k-frozen-0c457859c6/003-runtime/result.json": {
+      "sha256": "fac54fb20feb8cedd2a4d0d9eda0cc90ca83fa97c7e51a247db1c1b5868b689b"
+    },
+    "/tmp/pr1160-final-review-20261009/final-candidate-v2/capacity-frozen-binary/BINDING.json": {
+      "sha256": "31e550822535b1853f043d193cd01b0e3571c7a3be5fa38c0c3957a234a30450"
+    },
+    "/tmp/pr1160-wallet-clock-20261010/immutable-handoff.json": {
+      "sha256": "13e01cc837c78abbe8a97ad4c426a77f8b18bcdd155b2107d5bc5598e77dfd42"
+    },
+    "/tmp/pr1160-wallet-clock-20261010/final-runtime-and-strict.json": {
+      "sha256": "9153c66a23169492133ef1c3cbf4176f582f1a50d0419818c9904b930fbf5f45"
+    },
+    "/tmp/pr1160-wallet-clock-20261010/corrected-original-result.json": {
+      "sha256": "69a43aa1f65c64f3c0c6562e1a6a08a7f6d1b1d185ef5ae7bbb28bf9003ececa"
+    },
+    "/tmp/pr1160-wallet-clock-20261010/corrected-original-runtime.log": {
+      "sha256": "f6a02f83311de1c6aadccb29a01f51aed244938e2f5acc184be1a6e130d6c085"
+    },
+    "/tmp/pr1160-final-review-20261009/final-candidate-v2/WALLET-INTEGRATION.json": {
+      "sha256": "c8f0da73d543d8856efcf054ab7e31a2ab58014e3b858e240008b626d741f98e"
+    },
+    "/tmp/pr1160-final-review-20261009/final-candidate-v2/CLAUDE-QUOTA-HANDOFF.json": {
+      "sha256": "74966cfe0eefb79dba14e138735ab66dab2c2447163b0b4b9047c1985859f67b"
+    }
+  },
+  "remaining": [
+    "Root forwarded-term Original and conditional repair",
+    "Four composition authority controls",
+    "Behavioral report custody existing-only repair",
+    "Independent final delta review",
+    "Frozen combined owning runtime and strict",
+    "Four exact protected hosted checks and normal merge"
+  ],
+  "proof_boundary": "No real proof campaigns. KANI-PROOF-QUAL remains OPEN/UNPROVED; cold-state P1 remains release-gating per owner decision.",
+  "hosted_qualified": false,
+  "merged": false
+}
