@@ -29,7 +29,6 @@ serde_json = { version = "1", default-features = false, features = ["alloc", "fl
 ed25519-dalek = { version = "2", default-features = false, features = ["rand_core", "zeroize", "alloc"] }
 rand_core = { version = "0.6", default-features = false, features = ["getrandom"] }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
-ascii = { version = "=1.1.0", default-features = false, features = ["alloc"] }
 ryu = { version = "1", default-features = false }
 sha2 = { version = "0.10", default-features = false }
 percent-encoding = { version = "2", default-features = false, features = ["alloc"] }

@@ -4,7 +4,7 @@
 use alloc::format;
 use alloc::string::String;
 
-/// Fill one owned typed ASCII buffer, then transfer it into a string.
+/// Fill one owned byte buffer, then validate and transfer it into a string.
 /// Non-ASCII prefixes use the established general rendering fallback.
 pub(super) fn prefixed_hex(prefix: &str, bytes: &[u8]) -> String {
     let encoded = try_prefixed_hex(prefix, bytes);
@@ -31,42 +31,19 @@ fn try_prefixed_hex(prefix: &str, bytes: &[u8]) -> Option<String> {
         .len()
         .checked_mul(2)
         .and_then(|len| len.checked_add(prefix.len()))?;
-    let mut encoded = alloc::vec![ascii::AsciiChar::Null; len];
+    let mut encoded = alloc::vec![0; len];
     fill_prefixed_hex(prefix, bytes, &mut encoded)?;
-    Some(String::from(ascii::AsciiString::from(encoded)))
+    String::from_utf8(encoded).ok()
 }
 
-/// Fill an exactly sized typed ASCII buffer with the established wire bytes.
-pub(super) fn fill_prefixed_hex(
-    prefix: &str,
-    bytes: &[u8],
-    encoded: &mut [ascii::AsciiChar],
-) -> Option<()> {
-    const DIGITS: [ascii::AsciiChar; 16] = [
-        ascii::AsciiChar::_0,
-        ascii::AsciiChar::_1,
-        ascii::AsciiChar::_2,
-        ascii::AsciiChar::_3,
-        ascii::AsciiChar::_4,
-        ascii::AsciiChar::_5,
-        ascii::AsciiChar::_6,
-        ascii::AsciiChar::_7,
-        ascii::AsciiChar::_8,
-        ascii::AsciiChar::_9,
-        ascii::AsciiChar::a,
-        ascii::AsciiChar::b,
-        ascii::AsciiChar::c,
-        ascii::AsciiChar::d,
-        ascii::AsciiChar::e,
-        ascii::AsciiChar::f,
-    ];
+/// Fill an exactly sized byte buffer with the established ASCII wire bytes.
+pub(super) fn fill_prefixed_hex(prefix: &str, bytes: &[u8], encoded: &mut [u8]) -> Option<()> {
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
     let (prefix_chars, hex_chars) = encoded.split_at_mut_checked(prefix.len())?;
-    if hex_chars.len() != bytes.len().checked_mul(2)? {
+    if hex_chars.len() != bytes.len().checked_mul(2)? || !prefix.is_ascii() {
         return None;
     }
-    for (output, byte) in prefix_chars.iter_mut().zip(prefix.bytes()) {
-        *output = ascii::AsciiChar::from_ascii(byte).ok()?;
-    }
+    prefix_chars.copy_from_slice(prefix.as_bytes());
     for (output, byte) in hex_chars.chunks_exact_mut(2).zip(bytes) {
         let [high, low] = output else {
             return None;

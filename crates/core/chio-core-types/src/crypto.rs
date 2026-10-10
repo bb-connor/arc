@@ -587,10 +587,9 @@ impl PublicKey {
     /// rendering. The consumer cannot retain a borrow of the temporary buffer.
     pub fn with_hex_bytes<R>(&self, consume: impl FnOnce(&[u8]) -> R) -> R {
         if let PublicKeyMaterial::P256 { encoded_point } = &self.material {
-            let mut encoded = [ascii::AsciiChar::Null; 135];
+            let mut encoded = [0; 135];
             if encoding::fill_prefixed_hex("p256:", encoded_point, &mut encoded).is_some() {
-                let text: &ascii::AsciiStr = encoded.as_slice().into();
-                return consume(text.as_bytes());
+                return consume(&encoded);
             }
             #[cfg(kani)]
             panic!("bounded P-256 hex encoding must succeed");
