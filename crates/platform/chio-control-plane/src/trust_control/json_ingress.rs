@@ -301,6 +301,7 @@ pub(super) async fn authenticate(
             authenticate_wallet_credential(
                 request.headers(),
                 state.config,
+                Arc::clone(&state.finding_challenge_clock),
                 &state.wallet_entitlement_lane,
             )
             .await
@@ -321,19 +322,29 @@ pub(super) async fn authenticate(
 pub(super) async fn authenticate_wallet_credential(
     headers: &HeaderMap,
     config: TrustServiceConfig,
+    clock: Arc<dyn chio_security_types::clock::Clock>,
     lane: &IngressLane,
 ) -> Result<(), Response> {
     let access_token = bearer_token_from_headers(headers)?;
-    let now = unix_timestamp_now()
-        .map_err(|error| plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()))?;
-    lane.run(move || wallet_credential_entitlement(&config, &access_token, now))
+    lane.run(move || wallet_credential_entitlement(&config, &access_token, &clock))
         .await?
+}
+
+/// Sample the service owner's time at the eligibility decision, after any
+/// blocking-pool wait and the data reads the decision depends on.
+pub(super) fn wallet_time(
+    clock: &Arc<dyn chio_security_types::clock::Clock>,
+) -> Result<u64, Response> {
+    clock
+        .unix_millis()
+        .map(|now| now.as_secs())
+        .map_err(|error| plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()))
 }
 
 fn wallet_credential_entitlement(
     config: &TrustServiceConfig,
     access_token: &str,
-    now: u64,
+    clock: &Arc<dyn chio_security_types::clock::Clock>,
 ) -> Result<(), Response> {
     let (_, registry) = load_passport_issuance_registry_for_admin(config)
         .map_err(|error| plain_http_error(StatusCode::CONFLICT, &error.to_string()))?;
@@ -345,6 +356,7 @@ fn wallet_credential_entitlement(
     })?;
     // Full issuer metadata resolution can create signing material. Entitlement
     // needs only the configured issuer and the existing verified registry.
+    let now = wallet_time(clock)?;
     registry
         .validate_credential_entitlement(issuer, access_token, now)
         .map(|_| ())

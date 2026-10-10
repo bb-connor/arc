@@ -189,10 +189,6 @@ pub(crate) async fn handle_create_passport_issuance_offer(
     headers: HeaderMap,
     Json(payload): Json<CreatePassportIssuanceOfferRequest>,
 ) -> Response {
-    let clock_now = match unix_timestamp_now() {
-        Ok(now) => now,
-        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
-    };
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
@@ -212,6 +208,9 @@ pub(crate) async fn handle_create_passport_issuance_offer(
             issuer_authority::run(&state, |state, signer| {
                 let metadata = issuer_authority::metadata(&state.config, signer)?;
                 if state.config.passport_statuses_file.is_some() {
+                    let clock_now =
+                        super::json_ingress::wallet_time(&state.finding_challenge_clock)
+                            .map_err(RegistryOperationError::authority)?;
                     portable_passport_status_reference_for_service(
                         &state.config,
                         &payload.passport,
@@ -219,6 +218,8 @@ pub(crate) async fn handle_create_passport_issuance_offer(
                     )
                     .map_err(RegistryOperationError::bad_request)?;
                 }
+                let clock_now = super::json_ingress::wallet_time(&state.finding_challenge_clock)
+                    .map_err(RegistryOperationError::authority)?;
                 registry
                     .issue_offer(
                         &metadata,
@@ -238,10 +239,6 @@ pub(crate) async fn handle_redeem_passport_issuance_token(
     State(state): State<TrustServiceState>,
     Json(payload): Json<Oid4vciTokenRequest>,
 ) -> Response {
-    let clock_now = match unix_timestamp_now() {
-        Ok(now) => now,
-        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
-    };
     use super::registry_write_lane::{run_registry_transaction, RegistryOperationError};
     let Some(path) = state.config.passport_issuance_offers_file.clone() else {
         return plain_http_error(StatusCode::CONFLICT,
@@ -255,6 +252,8 @@ pub(crate) async fn handle_redeem_passport_issuance_token(
         PassportIssuanceOfferRegistry::update(&path, |registry| {
             issuer_authority::run(&state, |state, signer| {
                 let metadata = issuer_authority::metadata(&state.config, signer)?;
+                let clock_now = super::json_ingress::wallet_time(&state.finding_challenge_clock)
+                    .map_err(RegistryOperationError::authority)?;
                 let response = registry
                     .redeem_pre_authorized_code(&metadata, &payload, clock_now, 300)
                     .map_err(RegistryOperationError::bad_request)?;
@@ -271,10 +270,6 @@ pub(crate) async fn handle_redeem_passport_issuance_credential(
     headers: HeaderMap,
     Json(payload): Json<Oid4vciCredentialRequest>,
 ) -> Response {
-    let clock_now = match unix_timestamp_now() {
-        Ok(now) => now,
-        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
-    };
     let access_token = match bearer_token_from_headers(&headers) {
         Ok(token) => token,
         Err(response) => return response,
@@ -293,6 +288,8 @@ pub(crate) async fn handle_redeem_passport_issuance_credential(
                         .to_string(),
                 )
             })?;
+            let clock_now = super::json_ingress::wallet_time(&state.finding_challenge_clock)
+                .map_err(RegistryOperationError::authority)?;
             // An upload can outlive its entitlement. Check the fresh locked
             // state before metadata resolution can create signing material.
             registry
@@ -307,8 +304,18 @@ pub(crate) async fn handle_redeem_passport_issuance_credential(
                     .map(PassportStatusRegistry::load)
                     .transpose()
                     .map_err(RegistryOperationError::configuration)?;
-                // All access-token failures are checked above at the same clock
-                // and issuer under this lock; request/profile failures remain 400.
+                // Signing custody and status reads can outlive the first
+                // entitlement check. Recheck at current owner time before the
+                // final redemption; request/profile failures remain 400.
+                let clock_now = super::json_ingress::wallet_time(&state.finding_challenge_clock)
+                    .map_err(RegistryOperationError::authority)?;
+                registry
+                    .validate_credential_entitlement(
+                        &metadata.credential_issuer,
+                        &access_token,
+                        clock_now,
+                    )
+                    .map_err(RegistryOperationError::invalid_entitlement)?;
                 let response = registry
                     .redeem_credential(
                         &metadata,

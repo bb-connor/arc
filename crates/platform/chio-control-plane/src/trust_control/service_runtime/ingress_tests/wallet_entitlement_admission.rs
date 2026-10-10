@@ -175,7 +175,8 @@ async fn held_check(
     let headers = bearer(&fixture.token)?;
     let held = tokio::spawn({
         let lane = lane.clone();
-        async move { authenticate_wallet_credential(&headers, config, &lane).await }
+        let clock = Arc::clone(&fixture.state.finding_challenge_clock);
+        async move { authenticate_wallet_credential(&headers, config, clock, &lane).await }
     });
     tokio::time::timeout(HANG_GUARD, opened.recv())
         .await?
@@ -192,9 +193,14 @@ fn refused_check_polled_once(
     headers: &HeaderMap,
     lane: &IngressLane,
 ) -> TestResult<Response> {
-    let decision = authenticate_wallet_credential(headers, fixture.state.config.clone(), lane)
-        .now_or_never()
-        .ok_or("a check beyond the lane waited for admission")?;
+    let decision = authenticate_wallet_credential(
+        headers,
+        fixture.state.config.clone(),
+        Arc::clone(&fixture.state.finding_challenge_clock),
+        lane,
+    )
+    .now_or_never()
+    .ok_or("a check beyond the lane waited for admission")?;
     match decision {
         Err(refusal) => Ok(refusal),
         Ok(()) => Err("a check beyond the lane let its request through".into()),
@@ -298,7 +304,8 @@ async fn wallet_clones_share_admission_and_independent_service_states_remain_rea
         let headers = bearer(&fixture.token)?;
         let check = tokio::spawn({
             let lane = lane.clone();
-            async move { authenticate_wallet_credential(&headers, config, &lane).await }
+            let clock = Arc::clone(&fixture.state.finding_challenge_clock);
+            async move { authenticate_wallet_credential(&headers, config, clock, &lane).await }
         });
         tokio::time::timeout(HANG_GUARD, opened.recv())
             .await?

@@ -20,6 +20,9 @@ use std::time::Duration;
 #[path = "ingress_tests.rs"]
 mod ingress_tests;
 
+#[path = "router_tests/queued_wallet_expiry.rs"]
+mod queued_wallet_expiry;
+
 #[path = "router_tests/receipt_store_ownership_tests.rs"]
 mod receipt_store_ownership_tests;
 
