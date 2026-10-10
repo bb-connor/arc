@@ -7,9 +7,22 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Registry admission qualification reopened (October 10)
+
+The [registry review audit](audits/registry-admission-review-20261010.json) records
+six additional obligations. The transaction fix retains its scoped atomicity
+evidence, but its two-thread producer run did not qualify normal parallel tests.
+Required repairs isolate fixture lanes, separate public issuance from operator
+revocation admission, retain exact refusal and cancellation controls, and bind
+the production writer to its registry lock. Production limits stay unchanged.
+
+The verifier-policy startup cache is an inherited after-landing P2. Federation
+raw signer selection is a separate inherited source observation requiring
+consumer triage and a genuine Original before a bug claim. Both remain visible.
+
 ## Bounded readiness repairs and remaining review work (October 10)
 
-The ledger preserves **1,908 requirements**, including all 1,899 earlier objects.
+The ledger preserves **1,914 requirements**, including all 1,908 earlier objects.
 The [readiness audit](audits/readiness-followons-20261010.json) pins 80 renewed
 native tests, registry transaction and governance producer evidence, and the
 shared authority APIs. These are component results; the final source is not
