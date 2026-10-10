@@ -4,12 +4,15 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import sqlite3
 import subprocess
 import sys
 import tempfile
+import threading
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 
 from broker_campaign import POLICY, BrokerCampaign
@@ -141,21 +144,100 @@ def prepare(binary, directory, base_image, worker_image, profile):
         raise
 
 
+BEARER = re.compile(r"(?i)(bearer\s+)[A-Za-z0-9._~+/=-]+")
+EVIDENCE_FILES = (
+    "run-report.json",
+    "run-stderr.txt",
+    "result.json",
+    "receipts.ndjson",
+    "kernel.pub",
+    "queries.jsonl",
+    "tests-after.txt",
+    "preparation-failure.stderr",
+    "host.log",
+)
+EVIDENCE_LIMIT = 1 << 20
+
+
+def redact(text):
+    return BEARER.sub(r"\1[redacted]", text)
+
+
+def stamp():
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+
+
+class Host:
+    """Host process whose output is timestamped per line and persisted as it arrives."""
+
+    def __init__(self, binary, directory):
+        self.attempt = len(list(directory.glob("host-*.stderr"))) + 1
+        self.stdout_path = directory / f"host-{self.attempt}.stdout"
+        self.stderr_path = directory / f"host-{self.attempt}.stderr"
+        self.process = subprocess.Popen(
+            [
+                str(binary),
+                "process",
+                "run",
+                "--state",
+                str(directory / "host"),
+                "--plan",
+                str(directory / "plan.json"),
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        self.log = self.stderr_path.open("w")
+        self.lock = threading.Lock()
+        self.note(f"launched pid={self.process.pid}")
+        self.out = []
+        self.threads = [
+            threading.Thread(target=self.pump_stdout, daemon=True),
+            threading.Thread(target=self.pump_stderr, daemon=True),
+        ]
+        for thread in self.threads:
+            thread.start()
+
+    def note(self, message, tag="[harness] "):
+        with self.lock:
+            self.log.write(f"{stamp()} {tag}{message}\n")
+            self.log.flush()
+
+    def pump_stdout(self):
+        self.out.append(self.process.stdout.read())
+
+    def pump_stderr(self):
+        for line in self.process.stderr:
+            self.note(redact(line.rstrip("\n")), tag="")
+
+    def poll(self):
+        return self.process.poll()
+
+    def kill(self):
+        self.note("kill requested")
+        self.process.kill()
+
+    def communicate(self, timeout):
+        try:
+            self.process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            self.note(f"still running after {timeout}s")
+            raise
+        for thread in self.threads:
+            thread.join(timeout=15)
+        self.note(f"exited rc={self.process.returncode}")
+        out = "".join(self.out)
+        self.stdout_path.write_text(redact(out))
+        return out, self.stderr_path.read_text()
+
+    @property
+    def returncode(self):
+        return self.process.returncode
+
+
 def launch(binary, directory):
-    return subprocess.Popen(
-        [
-            str(binary),
-            "process",
-            "run",
-            "--state",
-            str(directory / "host"),
-            "--plan",
-            str(directory / "plan.json"),
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
+    return Host(binary, directory)
 
 
 def wait_until(process, read):
@@ -197,8 +279,20 @@ def queries(directory):
 
 def finish(process, success=True):
     out, err = process.communicate(timeout=180)
+    (process.stdout_path.parent / "run-report.json").write_text(redact(out))
+    (process.stdout_path.parent / "run-stderr.txt").write_text(err)
     assert (process.returncode == 0) == success, (out, err)
     return json.loads(out), err
+
+
+def preserve(directory, target):
+    target.mkdir(parents=True, exist_ok=True)
+    names = [path.name for path in directory.glob("host-*.std*")]
+    for name in (*EVIDENCE_FILES, *names):
+        source = directory / name
+        if source.is_file():
+            data = source.read_bytes()[:EVIDENCE_LIMIT]
+            (target / name).write_text(redact(data.decode(errors="replace")))
 
 
 def read_state(binary, directory, unknown=False):
@@ -389,7 +483,13 @@ def main():
     print("Private native mini-SWE state: " + str(root), file=sys.stderr, flush=True)
     for profile in ("baseline", "known", "unknown"):
         print(f"Starting native mini-SWE profile: {profile}", file=sys.stderr, flush=True)
-        result[profile] = exercise(binary, root / profile, image["base"], image["image"], profile)
+        try:
+            result[profile] = exercise(
+                binary, root / profile, image["base"], image["image"], profile
+            )
+        except BaseException:
+            preserve(root / profile, args.output / profile)
+            raise
         print(f"Passed native mini-SWE profile: {profile}", file=sys.stderr, flush=True)
         target = args.output / profile
         target.mkdir()
