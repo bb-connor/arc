@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).absolute().parents[2]
 TOOL = ROOT / "scripts/record-rust-compilation.py"
@@ -444,6 +445,69 @@ sys.exit(m.main(sys.argv[2:]))
         self.assertTrue(self.rows())
         self.assertTrue(all(r["kind"] == "probe" for r in self.rows()))
         self.assertTrue(all(not r["outputs"] for r in self.rows()))
+
+
+class RetentionBatchReconciliationTest(unittest.TestCase):
+    def setUp(self):
+        spec = importlib.util.spec_from_file_location("batch_reconciliation_recorder", TOOL)
+        self.recorder = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.recorder)
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.namespace = Path(self.temporary.name).resolve()
+        campaign = self.recorder.Campaign(self.namespace, "a" * 64)
+        try:
+            for _ in range(3):
+                with campaign.retention_batch():
+                    self.image = campaign.retain(b"public retained compiler image")
+        finally:
+            campaign.close()
+
+    def reopen(self):
+        campaign = self.recorder.Campaign(self.namespace, "a" * 64)
+        campaign.close()
+
+    def test_reopen_checks_shared_artifact_once_across_all_batches(self):
+        opened = []
+        original = self.recorder.HeldPath
+
+        def observe(path, *args, **kwargs):
+            if Path(path).parent == self.namespace / "artifacts":
+                opened.append(Path(path).name)
+            return original(path, *args, **kwargs)
+
+        with mock.patch.object(self.recorder, "HeldPath", side_effect=observe):
+            self.reopen()
+        self.assertEqual(opened, [self.image["sha256"]])
+
+    def test_repeated_artifact_does_not_skip_later_batch_validation(self):
+        path = sorted((self.namespace / "batches").glob("*.complete.json"))[-1]
+        complete = json.loads(path.read_bytes())
+        complete["schema"] = "unsupported-batch-format"
+        path.write_bytes(self.recorder.canonical(complete) + b"\n")
+        with self.assertRaisesRegex(self.recorder.Refusal, "retention_batch_incomplete"):
+            self.reopen()
+
+    def test_repeated_artifact_cannot_claim_conflicting_physical_identities(self):
+        complete_path = sorted((self.namespace / "batches").glob("*.complete.json"))[-1]
+        complete = json.loads(complete_path.read_bytes())
+        start_path = self.namespace / complete["start"]["path"]
+        start = json.loads(start_path.read_bytes())
+        # Change both sides of one internally consistent later declaration.
+        # Earlier batches still bind the original physical identity.
+        for inventory in [start["before"], complete["after"]]:
+            for member in inventory["artifacts"]:
+                member["identity"][4] += 1
+        for member in complete["retained"]:
+            member["identity"][4] += 1
+        complete["before_sha256"] = self.recorder.digest(start["before"])
+        start_body = self.recorder.canonical(start) + b"\n"
+        start_path.write_bytes(start_body)
+        complete["start"]["sha256"] = hashlib.sha256(start_body).hexdigest()
+        complete["start"]["size"] = len(start_body)
+        complete_path.write_bytes(self.recorder.canonical(complete) + b"\n")
+        with self.assertRaisesRegex(self.recorder.Refusal, "retention_batch_incomplete"):
+            self.reopen()
 
 
 class ActualRustCompilerTest(unittest.TestCase):
