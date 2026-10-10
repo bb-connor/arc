@@ -156,13 +156,15 @@ fn read_line(input: &mut impl BufRead, buffer: &mut Vec<u8>) -> std::io::Result<
         return Ok(None);
     }
     if buffer.len() > MAX_LINE_BYTES {
-        let mut discard = Vec::new();
-        loop {
-            discard.clear();
-            let read =
-                Read::take(&mut *input, MAX_LINE_BYTES as u64).read_until(b'\n', &mut discard)?;
-            if read == 0 || discard.last() == Some(&b'\n') {
-                break;
+        if buffer.last() != Some(&b'\n') {
+            let mut discard = Vec::new();
+            loop {
+                discard.clear();
+                let read = Read::take(&mut *input, MAX_LINE_BYTES as u64)
+                    .read_until(b'\n', &mut discard)?;
+                if read == 0 || discard.last() == Some(&b'\n') {
+                    break;
+                }
             }
         }
         return Ok(Some(true));
@@ -289,6 +291,9 @@ pub fn single_flag_argument(arguments: &[String], flag: &str) -> Result<String, 
         _ => Err(format!("usage: {flag} <value>")),
     }
 }
+
+#[cfg(test)]
+mod line_boundary_tests;
 
 #[cfg(test)]
 mod tests {
