@@ -7,6 +7,22 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Final component repairs (October 10)
+
+Behavioral signing custody is repaired at `b1093829bf`: existing-only reads,
+19 passing regression/preservation tests and strict owning lint. The four
+authority composition failures are repaired at `eac80ffde3`, with all 40 owning
+controls and strict lint passing. Five active detached/Docker locks are repaired
+at `a0b57da046`; all six active dependency graphs and fork source checks pass.
+Reviewed formal anchors and generated coverage now match, without proof execution.
+The [component audit](audits/final-component-qualification-20261010.json) retains
+the failed predecessor campaigns and source-bound evidence.
+
+All **1,931 requirements** remain preserved. Combined runtime, final independent
+review, exact protected hosted checks and merge remain open. The accepted Kani,
+cold-state and release-evidence residuals remain open under their existing scope.
+Earlier entries below retain their observed historical states.
+
 ## Forwarded-term repair and component review (October 10)
 
 The queued forwarded-term repair is integrated at `f3dcbe03cf`. Corrected
