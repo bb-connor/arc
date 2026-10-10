@@ -8,6 +8,8 @@ use super::*;
 
 #[path = "service_types/admission_authority.rs"]
 mod admission_authority;
+#[path = "service_types/blocking.rs"]
+mod blocking;
 #[path = "service_types/budget_lifecycle.rs"]
 mod budget_lifecycle;
 #[path = "service_types/cluster_budget.rs"]
@@ -30,6 +32,7 @@ mod state;
 mod structured_budget;
 
 pub(crate) use self::admission_authority::*;
+pub(crate) use self::blocking::{run_bounded_blocking, BlockingLane, BlockingLaneError};
 pub(crate) use self::budget_lifecycle::BudgetMutationLifecycleView;
 pub(crate) use self::cluster_budget::{
     AbandonedSeqRange, AuthoritySnapshotView, BudgetAuthorityMetadataView,

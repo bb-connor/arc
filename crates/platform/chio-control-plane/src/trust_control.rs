@@ -352,6 +352,8 @@ pub mod finding_status_publisher;
 pub mod finding_status_verifier;
 #[path = "trust_control/finding_verified_fix.rs"]
 pub mod finding_verified_fix;
+#[path = "trust_control/ingress_lanes.rs"]
+mod ingress_lanes;
 #[path = "trust_control/passport_handlers.rs"]
 mod passport_handlers;
 #[path = "trust_control/receipt_handlers.rs"]

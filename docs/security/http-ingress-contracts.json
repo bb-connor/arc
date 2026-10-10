@@ -1,7 +1,7 @@
 {
   "version": 1,
   "scope": "Framework request extraction, transport response decoding, non-JSON formats, and resolved shared-reader call sites. This supplements the direct serde census and never changes its raw-input baseline.",
-  "control_reader_sha256": "0b6400aff59ab1e097c1216a02ee103734b2197fc6054c124fe0d6cfccedcd7c",
+  "control_reader_sha256": "88d8dbc93c688c3f39c31496de26a0644a0da4f143f291665e733bdc78afb3d4",
   "requests": [
     {
       "source": "crates/platform/chio-control-plane/src/trust_control/authority_handlers.rs",

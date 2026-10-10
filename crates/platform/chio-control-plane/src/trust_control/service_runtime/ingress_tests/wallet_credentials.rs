@@ -11,6 +11,10 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
+#[cfg(unix)]
+#[path = "wallet_ingress.rs"]
+mod wallet_ingress;
+
 struct WalletFixture {
     _directory: tempfile::TempDir,
     registry_path: std::path::PathBuf,
@@ -319,3 +323,7 @@ async fn f047_wallet_consumed_during_upload_cannot_create_signing_seed() -> Test
     );
     Ok(())
 }
+
+#[cfg(target_os = "linux")]
+#[path = "wallet_entitlement_admission.rs"]
+mod wallet_entitlement_admission;

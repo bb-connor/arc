@@ -7,6 +7,7 @@
 //! existing format-specific readers.
 use super::config_and_public::load_passport_issuance_registry_for_admin;
 use super::frost::*;
+use super::ingress_lanes::{wallet_entitlement_lane, IngressLane};
 use super::receipt_handlers::resolve_admin_report_read_context;
 use super::report_validation::{
     bearer_token_from_headers, resolve_control_read_principal, validate_authority_issue_auth,
@@ -297,7 +298,12 @@ pub(super) async fn authenticate(
             resolve_admin_report_read_context(request.headers(), &state.config, surface).map(|_| ())
         }
         Authentication::WalletCredential => {
-            authenticate_wallet_credential(request.headers(), &state)
+            authenticate_wallet_credential(
+                request.headers(),
+                state.config,
+                wallet_entitlement_lane(),
+            )
+            .await
         }
         Authentication::Handler => Ok(()),
     };
@@ -309,16 +315,29 @@ pub(super) async fn authenticate(
     next.run(request).await
 }
 
-fn authenticate_wallet_credential(
+/// Refuses a credential upload whose bearer token is not entitled now. The
+/// offers file check runs in `lane`, and a refusal from the lane is a refusal
+/// of the request, so no request passes without a completed check.
+pub(super) async fn authenticate_wallet_credential(
     headers: &HeaderMap,
-    state: &TrustServiceState,
+    config: TrustServiceConfig,
+    lane: &IngressLane,
 ) -> Result<(), Response> {
     let access_token = bearer_token_from_headers(headers)?;
     let now = unix_timestamp_now()
         .map_err(|error| plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()))?;
-    let (_, registry) = load_passport_issuance_registry_for_admin(&state.config)
+    lane.run(move || wallet_credential_entitlement(&config, &access_token, now))
+        .await?
+}
+
+fn wallet_credential_entitlement(
+    config: &TrustServiceConfig,
+    access_token: &str,
+    now: u64,
+) -> Result<(), Response> {
+    let (_, registry) = load_passport_issuance_registry_for_admin(config)
         .map_err(|error| plain_http_error(StatusCode::CONFLICT, &error.to_string()))?;
-    let issuer = state.config.advertise_url.as_deref().ok_or_else(|| {
+    let issuer = config.advertise_url.as_deref().ok_or_else(|| {
         plain_http_error(
             StatusCode::CONFLICT,
             "passport issuance requires --advertise-url on the trust-control service",
@@ -327,7 +346,7 @@ fn authenticate_wallet_credential(
     // Full issuer metadata resolution can create signing material. Entitlement
     // needs only the configured issuer and the existing verified registry.
     registry
-        .validate_credential_entitlement(issuer, &access_token, now)
+        .validate_credential_entitlement(issuer, access_token, now)
         .map(|_| ())
         .map_err(|error| plain_http_error(StatusCode::UNAUTHORIZED, &error.to_string()))
 }
