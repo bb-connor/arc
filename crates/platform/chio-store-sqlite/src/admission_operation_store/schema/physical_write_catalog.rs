@@ -248,8 +248,7 @@ mod tests {
     }
 
     #[test]
-    fn unsupported_ownership_indexes_refuse_pricing(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn unsupported_ownership_indexes_refuse_pricing() -> Result<(), Box<dyn std::error::Error>> {
         let connection = model()?;
         verify_physical_command_catalog(&connection)?;
         for index in UNSUPPORTED_OWNERSHIP_INDEXES {

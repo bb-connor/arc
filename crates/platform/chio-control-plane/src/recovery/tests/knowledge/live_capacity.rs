@@ -423,9 +423,12 @@ fn knowledge_account_installation_refuses_missing_custody_without_resetting() ->
 fn knowledge_account_joins_same_tenant_and_initializes_foreign_tenant_independently() -> TestResult
 {
     let f = KnowledgeFixture::new()?;
-    f.publish("initial-account-owner", b"first")?;
-    let sibling = scoped_host(&f, f.profile.scope.tenant_id.as_str(), "account-sibling")?;
-    let foreign = scoped_host(&f, "separate-account-tenant", "account-foreign")?;
+    f.publish("initial-account-owner", b"first")
+        .map_err(|error| format!("publishing the initial account artifact: {error:?}"))?;
+    let sibling = scoped_host(&f, f.profile.scope.tenant_id.as_str(), "account-sibling")
+        .map_err(|error| format!("opening the sibling account: {error:?}"))?;
+    let foreign = scoped_host(&f, "separate-account-tenant", "account-foreign")
+        .map_err(|error| format!("opening the foreign account: {error:?}"))?;
     let store = f.f.authority.admission_operation_store();
     let connection = rusqlite::Connection::open(f.f.path.join("admission.db"))?;
     let rows: i64 = connection.query_row(
