@@ -9,7 +9,7 @@ pub(in crate::admission_operation_store) fn prepare_reference_retain<'tx, 'conn>
     tx: &'tx Transaction<'conn>,
     proof: VerifiedKnowledgeReferenceRetain<'tx, 'conn>,
 ) -> Result<PreparedReferenceUpdates<'tx, 'conn>, AdmissionOperationStoreError> {
-    let source = OwningSource::Retain(proof);
+    let source = OwningSource::Retain(Box::new(proof));
     source.verify(tx)?;
     let references = unique_references(source.references())?;
     let mut heads = Vec::new();
@@ -75,7 +75,7 @@ pub(in crate::admission_operation_store) fn prepare_reference_retirement<'tx, 'c
     tx: &'tx Transaction<'conn>,
     proof: VerifiedKnowledgeReferenceRetirement<'tx, 'conn>,
 ) -> Result<PreparedReferenceUpdates<'tx, 'conn>, AdmissionOperationStoreError> {
-    let source = OwningSource::Retirement(proof);
+    let source = OwningSource::Retirement(Box::new(proof));
     source.verify(tx)?;
     let references = unique_references(source.references())?;
     let mut heads = Vec::new();

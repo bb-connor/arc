@@ -15,7 +15,7 @@ use std::ops::Deref;
 
 enum Source<'tx, 'conn> {
     Journal(AuthenticatedNativeKnowledgeEncodingSource<'tx, 'conn>),
-    Restore(AuthenticatedCheckpointRestoreEncodingSource<'tx, 'conn>),
+    Restore(Box<AuthenticatedCheckpointRestoreEncodingSource<'tx, 'conn>>),
 }
 
 impl<'tx, 'conn> Source<'tx, 'conn> {
@@ -112,7 +112,7 @@ impl<'tx, 'conn> VerifiedKnowledgeEncodingWrite<'tx, 'conn> {
         source: AuthenticatedCheckpointRestoreEncodingSource<'tx, 'conn>,
         stored_body: Vec<u8>,
     ) -> Result<Self, AdmissionOperationStoreError> {
-        Self::prepare(Source::Restore(source), stored_body)
+        Self::prepare(Source::Restore(Box::new(source)), stored_body)
     }
 
     fn prepare(

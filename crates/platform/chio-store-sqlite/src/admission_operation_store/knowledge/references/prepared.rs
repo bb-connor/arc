@@ -14,8 +14,9 @@ pub(in crate::admission_operation_store) struct PreparedReferenceUpdates<'tx, 'c
 }
 
 pub(super) enum OwningSource<'tx, 'conn> {
-    Retain(VerifiedKnowledgeReferenceRetain<'tx, 'conn>),
-    Retirement(VerifiedKnowledgeReferenceRetirement<'tx, 'conn>),
+    // Boxing both variants bounds the carrier independently of proof size.
+    Retain(Box<VerifiedKnowledgeReferenceRetain<'tx, 'conn>>),
+    Retirement(Box<VerifiedKnowledgeReferenceRetirement<'tx, 'conn>>),
 }
 
 impl<'tx, 'conn> OwningSource<'tx, 'conn> {

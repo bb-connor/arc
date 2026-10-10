@@ -38,7 +38,7 @@ enum CommittedSource<'tx, 'conn> {
         operation: AdmissionOperationId,
         origin: NativeSourceTransactionOrigin<'tx>,
     },
-    Status(AuthenticatedNativeStatusAppend<'tx, 'conn>),
+    Status(Box<AuthenticatedNativeStatusAppend<'tx, 'conn>>),
     Artifact {
         reference: protected::ProtectedSourceReference,
         sequence: u64,
@@ -103,7 +103,7 @@ impl<'tx, 'conn> CommittedNativeInfluenceSource<'tx, 'conn> {
         Ok(Self {
             tx,
             owner,
-            source: CommittedSource::Status(append),
+            source: CommittedSource::Status(Box::new(append)),
             native_authority: data.binding,
             key: data.key,
             reference: data.reference,

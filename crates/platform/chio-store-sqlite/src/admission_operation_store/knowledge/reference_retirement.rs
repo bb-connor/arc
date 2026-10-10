@@ -26,7 +26,7 @@ enum TerminalEvidence<'tx, 'conn> {
         envelope: CanonicalPayloadDigest,
     },
     ProductProposal {
-        proof: VerifiedProductEvidenceReclamation<'tx, 'conn>,
+        proof: Box<VerifiedProductEvidenceReclamation<'tx, 'conn>>,
     },
 }
 
@@ -47,7 +47,9 @@ impl<'tx, 'conn> VerifiedKnowledgeReferenceRetirement<'tx, 'conn> {
             references: proof.references().to_vec(),
             original,
             terminal,
-            evidence: TerminalEvidence::ProductProposal { proof },
+            evidence: TerminalEvidence::ProductProposal {
+                proof: Box::new(proof),
+            },
         };
         witness.verify(tx)?;
         Ok(witness)
