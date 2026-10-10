@@ -15,6 +15,16 @@ struct DeliveryReceipt {
     admission: ReturnAdmissionV1,
 }
 
+/// One exact retained broker slot row. Private typed shape; no authority.
+struct ConfinedReturnSlotRow {
+    parent_id: String,
+    boundary_id: String,
+    boundary_digest: String,
+    generation: String,
+    content_sha256: Option<String>,
+    data: Option<Vec<u8>>,
+}
+
 impl Store {
     pub(crate) fn begin_verified_confined_delivery(
         &mut self,
@@ -143,32 +153,33 @@ fn verify_receipt(connection: &Connection, receipt: &DeliveryReceipt) -> Result<
     {
         return Err(ProcessError::Conflict);
     }
-    let slot: Option<(
-        String,
-        String,
-        String,
-        String,
-        Option<String>,
-        Option<Vec<u8>>,
-    )> = connection
+    let slot: Option<ConfinedReturnSlotRow> = connection
         .query_row(
             "SELECT parent_id,boundary_id,boundary_digest,generation,sha256,
          CASE WHEN typeof(data)='blob' AND length(data) IN(4,5) THEN data END
          FROM process_confined_return_slots WHERE child_id=?1",
             [boundary.child.as_str()],
             |row| {
-                Ok((
-                    row.get(0)?,
-                    row.get(1)?,
-                    row.get(2)?,
-                    row.get(3)?,
-                    row.get(4)?,
-                    row.get(5)?,
-                ))
+                Ok(ConfinedReturnSlotRow {
+                    parent_id: row.get(0)?,
+                    boundary_id: row.get(1)?,
+                    boundary_digest: row.get(2)?,
+                    generation: row.get(3)?,
+                    content_sha256: row.get(4)?,
+                    data: row.get(5)?,
+                })
             },
         )
         .optional()?;
-    let Some((slot_parent, slot_boundary, slot_digest, generation, hash, bytes)) = slot else {
+    let Some(ConfinedReturnSlotRow {
+        parent_id: slot_parent,
+        boundary_id: slot_boundary,
+        boundary_digest: slot_digest,
+        generation,
+        content_sha256: hash,
+        data: bytes,
+    }) = slot
+    else {
         return Err(ProcessError::Conflict);
     };
     let bytes = bytes.ok_or(ProcessError::Conflict)?;
