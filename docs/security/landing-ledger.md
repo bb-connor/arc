@@ -7,6 +7,26 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Final hosted review repairs staged (October 10)
+
+All six reported repairs are composed at `274d5a6eeffc22c0e52e98d962f641e46b40c7a9`, with genuine Original
+regressions and component evidence in the [repair audit](audits/github-final-review-repairs-20261010.json).
+The ledger retains **1,950 original requirements** and their history. Seven
+current states are updated: the six recent findings and the matching inherited
+payment-token obligation from PR #956, now assigned to foundation PR #1160.
+
+Local component results are 78 security-kernel tests with strict lint, 276
+settlement tests, seven runtime/reference-tool focused tests, and 469 Python
+tests without failures or skips. The exact composed four-crate suite, remaining
+strict checks, static gates and independent final review are pending. Earlier
+failed or cancelled campaigns remain recorded separately. Published `fd82f2f247`
+remains withdrawn until a qualified replacement is published.
+
+Four protected hosted checks and normal protected merge remain mandatory.
+Kani is OPEN/UNPROVED; cold-state remains an OPEN P1 blocking G5 preview. No
+full-workspace, proof completion, hosted qualification or release readiness is
+claimed by this source checkpoint.
+
 ## Final hosted review intake (October 10)
 
 The ledger now preserves **1,950 requirements**, including six new findings from
