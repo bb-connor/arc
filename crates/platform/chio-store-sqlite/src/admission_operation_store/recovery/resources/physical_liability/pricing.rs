@@ -264,32 +264,7 @@ fn matching_partial_indexes(
             }
         }
     }
-    let original: bool = tx
-        .query_row(
-            "SELECT EXISTS(SELECT 1 FROM main.sqlite_schema
-         WHERE name='admission_operation_recovery_original_owner')",
-            [],
-            |row| row.get(0),
-        )
-        .map_err(sqlite_error)?;
-    if !original {
-        return Ok(0);
-    }
-    if command.source.is_none() {
-        return Ok(u64::from(
-            [
-                "recovery-original-owner:",
-                "recovery-original-transfer:",
-                "recovery-original-tombstone:",
-                "unused-setup-generation:",
-            ]
-            .iter()
-            .any(|prefix| command.key.starts_with(prefix)),
-        ));
-    }
-    // Only transfer's payload expression is mutable in an existing fixed
-    // header. The other known partial indexes depend exclusively on that header.
-    Ok(u64::from(
-        command.key.starts_with("recovery-original-transfer:"),
-    ))
+    // The never-released successor-ownership prototype indexes refuse
+    // pricing through the verified catalog, so no partial index is priced.
+    Ok(0)
 }

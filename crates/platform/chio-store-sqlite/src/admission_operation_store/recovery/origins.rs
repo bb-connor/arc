@@ -94,17 +94,6 @@ fn verify_history_workflow(tx: &Connection, key: &str) -> Result<(), AdmissionOp
         return Err(invariant("recovery workflow history owner changed"));
     }
     if let Some(origin) = &record.origin {
-        let version: Option<i32> = tx
-            .query_row(
-                "SELECT version FROM chio_store_schema_versions WHERE store_key=?1",
-                [ADMISSION_OPERATION_SCHEMA_KEY],
-                |row| row.get(0),
-            )
-            .optional()
-            .map_err(sqlite_error)?;
-        if version == Some(41) {
-            return verify_original_owner_membership(tx, &record);
-        }
         let retained = raw(tx, &claim_key(origin)?)?
             .ok_or_else(|| invariant("recovery history lost its original claim"))?;
         let claim: OriginClaim = decode(&retained.payload)?;

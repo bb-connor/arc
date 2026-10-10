@@ -441,15 +441,7 @@ pub(in crate::admission_operation_store) fn apply(
     now: u64,
     original_process: Option<&dyn RecoveryProcessOriginPort>,
 ) -> Result<RecoveryCommandResponseV1, RecoveryCommandPortError> {
-    apply_in_origin(
-        tx,
-        (owner, None),
-        actor,
-        command,
-        deployment,
-        now,
-        original_process,
-    )
+    apply_in_origin(tx, owner, actor, command, deployment, now, original_process)
 }
 
 /// Setup supplies its actual pre-mutation cut across Selection and creation.
@@ -470,30 +462,18 @@ pub(in crate::admission_operation_store) fn apply_with_origin(
     if !cut.matches_owner(owner) {
         return Err(invariant("setup creation changed its actual source owner").into());
     }
-    apply_in_origin(
-        tx,
-        (owner, Some(cut)),
-        actor,
-        command,
-        deployment,
-        now,
-        original_process,
-    )
+    apply_in_origin(tx, owner, actor, command, deployment, now, original_process)
 }
 
 fn apply_in_origin(
     tx: &Transaction<'_>,
-    writer: (
-        &SqliteServingOwner,
-        Option<&crate::serving_owner::NativeSourceTransactionOrigin<'_>>,
-    ),
+    owner: &SqliteServingOwner,
     actor: &AuthenticatedRecoveryActor,
     command: &RecoveryCommandV1,
     deployment: &RecoveryDeploymentV1,
     now: u64,
     original_process: Option<&dyn RecoveryProcessOriginPort>,
 ) -> Result<RecoveryCommandResponseV1, RecoveryCommandPortError> {
-    let (owner, initial_cut) = writer;
     if let Some(response) = inspect_or_replay(tx, owner, actor, command, deployment)? {
         return Ok(response);
     }
@@ -597,32 +577,14 @@ fn apply_in_origin(
                     provider_finality: None,
                     provider_lookups: SafeInteger::ZERO,
                 };
-                if using_original_owner_successor_format(tx)? {
-                    let prepared_cut;
-                    let cut = match initial_cut {
-                        Some(cut) => cut,
-                        None => {
-                            prepared_cut = owner
-                                .prepare_native_source_transaction(tx)
-                                .map_err(map_owner_error)?;
-                            &prepared_cut
-                        }
-                    };
-                    let mut original = prepare_original_owner_creation(
-                        tx,
-                        (owner, cut),
-                        actor,
-                        deployment,
-                        &new,
-                        now,
-                    )?;
-                    seal_original_owner_predecessor(tx, owner, &mut original)?;
-                    save_workflow(tx, owner, &mut new, WorkflowWriteClass::Planning)?;
-                    publish_original_owner_creation(tx, owner, original, &new)?;
-                } else {
-                    origins::claim(tx, owner, &new)?;
-                    save_workflow(tx, owner, &mut new, WorkflowWriteClass::Planning)?;
-                }
+                // The supported catalog retains the permanent immutable origin
+                // claim. The complete successor-owner contract is not
+                // integrated, so a retained predecessor prototype catalog must
+                // stay absent and a consumed claim conflicts with any other
+                // prospective owner.
+                require_predecessor_original_owner_absence(tx)?;
+                origins::claim(tx, owner, &new)?;
+                save_workflow(tx, owner, &mut new, WorkflowWriteClass::Planning)?;
                 new
             }
         }
@@ -633,8 +595,9 @@ fn apply_in_origin(
                 && matches!(body, RecoveryCommandBodyV1::CancelWorkflow { .. })
             {
                 // Historical control keeps its exact retained source without
-                // acquiring a fresh original or effect authority.
-                using_original_owner_successor_format(tx)?;
+                // acquiring a fresh original or effect authority. The removed
+                // successor-ownership prototype must stay absent.
+                require_predecessor_original_owner_absence(tx)?;
             } else {
                 require_current_original_owner(tx, &record)?;
             }

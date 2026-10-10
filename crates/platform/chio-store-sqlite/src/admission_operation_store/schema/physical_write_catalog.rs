@@ -8,7 +8,9 @@ const TABLES: [&str; 4] = [
     "authority_global_commits",
     "authority_global_commit_meta",
 ];
-const ORIGINAL_INDEXES: [&str; 4] = [
+/// Indexes of the never-released successor-ownership prototype. No supported
+/// store installs them, and their retained presence refuses pricing.
+const SUCCESSOR_PROTOTYPE_INDEXES: [&str; 4] = [
     "admission_operation_recovery_original_owner",
     "admission_operation_recovery_original_transfer",
     "admission_operation_recovery_original_tombstone",
@@ -30,9 +32,9 @@ impl PhysicalCommandCatalogData {
 pub(in crate::admission_operation_store) fn verify_physical_command_catalog(
     connection: &Connection,
 ) -> Result<PhysicalCommandCatalogData, AdmissionOperationStoreError> {
-    let original = original_index_inventory(connection)?;
+    refuse_successor_prototype_cohort(connection)?;
     let actual = catalog(connection)?;
-    if actual.as_slice() != expected(original)? {
+    if actual.as_slice() != expected()? {
         return Err(invariant(
             "physical command catalog differs from its compiled definition",
         ));
@@ -44,9 +46,10 @@ pub(in crate::admission_operation_store) fn verify_physical_command_catalog(
     })
 }
 
-fn original_index_inventory(connection: &Connection) -> Result<bool, AdmissionOperationStoreError> {
-    let mut present = 0_usize;
-    for name in ORIGINAL_INDEXES {
+fn refuse_successor_prototype_cohort(
+    connection: &Connection,
+) -> Result<(), AdmissionOperationStoreError> {
+    for name in SUCCESSOR_PROTOTYPE_INDEXES {
         let found: bool = connection
             .query_row(
                 "SELECT EXISTS(SELECT 1 FROM main.sqlite_schema WHERE name=?1)",
@@ -54,15 +57,13 @@ fn original_index_inventory(connection: &Connection) -> Result<bool, AdmissionOp
                 |row| row.get(0),
             )
             .map_err(sqlite_error)?;
-        present += usize::from(found);
+        if found {
+            return Err(invariant(
+                "physical command catalog contains the unsupported successor-ownership prototype",
+            ));
+        }
     }
-    match present {
-        0 => Ok(false),
-        4 => Ok(true),
-        _ => Err(invariant(
-            "physical command catalog contains a partial original-owner cohort",
-        )),
-    }
+    Ok(())
 }
 
 fn catalog(connection: &Connection) -> Result<Vec<Entry>, AdmissionOperationStoreError> {
@@ -105,29 +106,18 @@ fn catalog(connection: &Connection) -> Result<Vec<Entry>, AdmissionOperationStor
     rows.map(|row| row.map_err(sqlite_error)).collect()
 }
 
-fn expected(original: bool) -> Result<&'static [Entry], AdmissionOperationStoreError> {
+fn expected() -> Result<&'static [Entry], AdmissionOperationStoreError> {
     static BASE: OnceLock<Result<Vec<Entry>, String>> = OnceLock::new();
-    static ORIGINAL: OnceLock<Result<Vec<Entry>, String>> = OnceLock::new();
-    let cached = if original { &ORIGINAL } else { &BASE };
-    cached
-        .get_or_init(|| {
-            // Reuse the complete supported catalog, including each immutable
-            // guard and expression/partial index. An incomplete
-            // recovery-only model cannot price a real current authority.
-            let model = current_command_catalog_model().map_err(|error| error.to_string())?;
-            if original {
-                model
-                    .execute_batch(super::super::recovery::storage::ORIGINAL_OWNER_SQL)
-                    .map_err(|error| error.to_string())?;
-                model
-                    .execute_batch(super::super::recovery::storage::UNUSED_SETUP_GENERATION_SQL)
-                    .map_err(|error| error.to_string())?;
-            }
-            catalog(&model).map_err(|error| error.to_string())
-        })
-        .as_ref()
-        .map(|entries| entries.as_slice())
-        .map_err(|error| invariant(error.to_string()))
+    BASE.get_or_init(|| {
+        // Reuse the complete supported catalog, including each immutable
+        // guard and expression/partial index. An incomplete
+        // recovery-only model cannot price a real current authority.
+        let model = current_command_catalog_model().map_err(|error| error.to_string())?;
+        catalog(&model).map_err(|error| error.to_string())
+    })
+    .as_ref()
+    .map(|entries| entries.as_slice())
+    .map_err(|error| invariant(error.to_string()))
 }
 
 fn current_command_catalog_model() -> Result<Connection, AdmissionOperationStoreError> {
@@ -157,7 +147,7 @@ pub(in crate::admission_operation_store) fn command_catalog_difference_for_test(
 ) -> Result<Vec<CommandCatalogDifferenceForTest>, AdmissionOperationStoreError> {
     use std::collections::{BTreeMap, BTreeSet};
     let actual = catalog(connection)?;
-    let expected = expected(original_index_inventory(connection)?)?;
+    let expected = expected()?;
     let keyed = |entries: &[Entry]| {
         entries
             .iter()
@@ -258,18 +248,19 @@ mod tests {
     }
 
     #[test]
-    fn partial_original_owner_index_cohort_refuses_the_priced_catalog(
+    fn successor_ownership_prototype_index_cohort_refuses_pricing(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let connection = model()?;
-        connection.execute_batch(
-            crate::admission_operation_store::recovery::storage::ORIGINAL_OWNER_SQL,
-        )?;
-        connection.execute_batch(
-            crate::admission_operation_store::recovery::storage::UNUSED_SETUP_GENERATION_SQL,
-        )?;
         verify_physical_command_catalog(&connection)?;
-        connection.execute_batch("DROP INDEX admission_operation_recovery_original_tombstone")?;
-        assert!(verify_physical_command_catalog(&connection).is_err());
+        for index in SUCCESSOR_PROTOTYPE_INDEXES {
+            connection.execute_batch(&format!(
+                "CREATE INDEX {index} ON admission_operation_recovery_records(record_key);"
+            ))?;
+            assert!(
+                verify_physical_command_catalog(&connection).is_err(),
+                "the successor-ownership prototype index {index} remained priceable"
+            );
+        }
         Ok(())
     }
 }
