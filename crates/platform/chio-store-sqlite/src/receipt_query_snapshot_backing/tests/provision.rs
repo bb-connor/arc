@@ -46,7 +46,10 @@ fn directory_open_fd_exhaustion_cleans_exclusively_created_entries() -> TestResu
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
-    assert_eq!(fs::read_dir(root.path())?.count(), 0);
+    assert_eq!(
+        custody_entries(root.path())?,
+        Vec::<std::path::PathBuf>::new()
+    );
     Ok(())
 }
 
@@ -73,13 +76,14 @@ fn directory_open_exhaustion_probe() -> TestResult {
     let parent = Path::new(&parent);
     assert_eq!(fs::read_dir(parent)?.count(), 0);
     let limit = rustix::process::getrlimit(rustix::process::Resource::Nofile);
-    // stdin/stdout/stderr plus the three held ancestor directories fill the
-    // actual descriptor table. mkdirat still succeeds; opening its new child
-    // fails with EMFILE. This limit applies only to this subprocess.
+    // stdin/stdout/stderr, the three held ancestor directories, the held
+    // snapshot parent and its held reclaim cursor fill the actual descriptor
+    // table. mkdirat still succeeds; opening its new child fails with EMFILE.
+    // This limit applies only to this subprocess.
     rustix::process::setrlimit(
         rustix::process::Resource::Nofile,
         rustix::process::Rlimit {
-            current: Some(6),
+            current: Some(8),
             maximum: limit.maximum,
         },
     )?;
@@ -93,8 +97,8 @@ fn directory_open_exhaustion_probe() -> TestResult {
             "expected actual native EMFILE: {failure:?}"
         );
         assert_eq!(
-            fs::read_dir(parent)?.count(),
-            0,
+            custody_entries(parent)?,
+            Vec::<std::path::PathBuf>::new(),
             "failed directory open leaked an exclusively created custody entry"
         );
     }

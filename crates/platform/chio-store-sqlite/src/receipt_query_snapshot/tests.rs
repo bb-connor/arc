@@ -11,6 +11,9 @@ mod late_lineage;
 mod lineage;
 #[path = "tests/memory.rs"]
 mod memory;
+#[cfg(target_os = "linux")]
+#[path = "tests/placement.rs"]
+mod placement;
 #[path = "tests/publication.rs"]
 mod publication;
 #[path = "tests/query.rs"]

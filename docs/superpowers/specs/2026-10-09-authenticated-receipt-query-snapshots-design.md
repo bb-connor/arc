@@ -184,9 +184,21 @@ prerequisite.
 
 **Linux: private file backing (production).** `SnapshotFileBacking`
 (`receipt_query_snapshot_backing.rs`) was delivered under the constraints of
-the 06:09:22Z ruling:
-- a process-owned private directory (mode `0700`) provisioned automatically
-  under `/tmp`, with no operator `SQLITE_TMPDIR` prerequisite;
+the 06:09:22Z ruling, with its location amended as the first item states:
+- **Location (amends the 06:09:22Z fixed-`/tmp` clause).** Snapshot
+  directories live in one versioned private parent,
+  `chio-receipt-snapshots-v2` (mode `0700`, owned by the effective user),
+  inside the receipt store's own data directory: the directory of its main
+  database file, as SQLite resolved it. Only a store without a data directory
+  (in memory) falls back to `/tmp/chio-receipt-snapshots-v2-<euid>`. There is
+  no operator setting and no `SQLITE_TMPDIR` prerequisite. The data directory
+  itself may also be group-writable (a setgid volume root, for example); every
+  ancestor keeps the strict rule. Group writers can rename or remove the data
+  directory or the parent, which denies service as their access to the
+  receipt store already can, but a replacement fails the held identity checks
+  and is never used;
+- one private directory (mode `0700`) per snapshot, named by a UUIDv7, whose
+  owner holds an exclusive `flock` on it for the custody's lifetime;
 - a dedicated named snapshot database (single link, mode `0600`) under that
   directory, opened without `CREATE` or URI interpretation, with no WAL, an
   in-memory rollback journal and in-memory temp store;
@@ -194,15 +206,42 @@ the 06:09:22Z ruling:
   identities, rechecked on every checked borrow of the connection, so each
   snapshot hold re-validates custody before it runs SQL;
 - negative controls that replace the parent or the path;
-- cleanup of the directory when the backing is dropped;
+- cleanup of the directory when the backing is dropped, and reclamation of the
+  directories of owners that died without unwinding (below);
 - no mutation of process-global SQLite temp settings, no custom VFS, and reuse
   of the repository's file primitives (`chio-sqlite-file-identity`, `rustix`).
+
+**Reclamation.** The kernel releases an owner's `flock` however the owner
+dies, so an unlocked directory in the parent has no live owner. Provisioning
+takes a non-blocking exclusive lock on the parent before it publishes a
+directory and keeps it until that directory's own lock is held; reclamation
+takes the same lock, so it never observes a live directory unlocked. Under the
+lock, each provisioning first reclaims one bounded window (at most 256 entries
+read and 16 snapshot directories examined) and records where the next attempt
+resumes in `reclaim-cursor`, an 8-byte private file created before any
+snapshot directory and rewritten in place; only then does it publish its own
+directory. Reclaimed space is freed before the cursor is rewritten. An
+in-place rewrite needs no new block on a filesystem that overwrites in place,
+but can on a copy-on-write one (btrfs, ZFS); a failed rewrite refuses that
+attempt as `Unavailable`. The walker also reclaims before it
+waits for the writer seed, and again every 30 seconds of the store clock while
+that wait lasts. Reclamation examines only UUIDv7-named, owner-only `0700`
+directories, checks each identity through held descriptors without following
+links, unlinks only the known snapshot leaves and then the empty directory, and
+never recurses. Directories of earlier builds
+(`/tmp/chio-receipt-snapshot-<uuid>`) carry no liveness lock and are never
+examined.
 
 A custody refusal (a substituted directory, file, leaf or descriptor, a
 sidecar, or changed journal settings) is an integrity outcome: the read or step
 fails `Invalid`. A filesystem I/O error is a resource outcome: `Unavailable`.
-Under the stated trust boundary (3), the private directory is part of the
-process's custody. If `/tmp` is a `tmpfs`, the file occupies system memory.
+So are the location refusals raised before a snapshot is admitted: a contended
+parent lock, or a parent or cursor that is not a private entry of this user.
+They leave the refused entries untouched. Under the stated trust boundary (3),
+the private directory is part of the process's custody. The snapshot shares
+the receipt store's filesystem. For an in-memory store, if `/tmp` is a
+`tmpfs`, the file occupies system memory, and a local user who pre-creates the
+fixed fallback parent denies the fallback with an operational refusal.
 
 **Other platforms, and tests: `memory`.** The snapshot connection is a private
 `:memory:` database. Custody is process memory, and no file exists.
@@ -847,8 +886,10 @@ distinctly:
 Resource policy:
 
 - **Storage.** The snapshot database, up to the quota (default 2 GiB,
-  reported): a private file under `/tmp` on Linux (system memory if `/tmp` is a
-  `tmpfs`), process memory on other platforms (4.2).
+  reported): a private file in the receipt store's data directory on Linux,
+  on that filesystem (under `/tmp` only for an in-memory store), process
+  memory on other platforms (4.2). Files left by owners that died are
+  reclaimed (4.2).
 - **RAM outside the quota.** The quota is not a process RSS limit. Outside it:
   - the in-process intern maps of every distinct dimension value and signer
     (reported as `dimensions` and `dimensionBytes`);
@@ -1003,8 +1044,8 @@ budgets, and export is bounded only in concurrency.
   Task 8).
 - **Snapshot connection contention.** One snapshot connection means requests
   can wait behind bounded holds.
-- **Snapshot capacity.** Linux uses the private file backend under `/tmp`;
-  other platforms use `memory`. On either backend a store larger than the quota
+- **Snapshot capacity.** Linux uses the private file backend in the receipt
+  store's data directory; other platforms use `memory`. On either backend a store larger than the quota
   becomes `Unavailable(capacity)`. The service retries without removing its
   resource bound. Transient backing pressure can recover without restart;
   genuine page-budget exhaustion requires an explicit larger owner budget.

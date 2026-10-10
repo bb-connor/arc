@@ -28,7 +28,7 @@ use crate::receipt_query_snapshot::service::{
 };
 use crate::receipt_query_snapshot::walk::{observe, WalkContext, WalkError, WalkLimits};
 use crate::receipt_store::support::receipt_signature_verifications;
-use crate::receipt_store::BackgroundCheckpointSigner;
+use crate::receipt_store::{BackgroundCheckpointSigner, SqliteReceiptStore};
 
 const LINUX_FILE: &str = "linux-file";
 const SIGNED_RECEIPTS: u64 = 1_000_000;
@@ -720,8 +720,12 @@ impl HoldSteps {
 
 /// VM steps of each walker hold kind for a large checkpoint over `entries`
 /// uncheckpointed receipts, measured on the production backing.
-fn hold_steps(entries: u64, config: &ReceiptQuerySnapshotConfig) -> Value {
-    let mut db = SnapshotDb::open_private(config.quota_bytes).unwrap();
+fn hold_steps(
+    store: &SqliteReceiptStore,
+    entries: u64,
+    config: &ReceiptQuerySnapshotConfig,
+) -> Value {
+    let mut db = SnapshotDb::open_private(store, config.quota_bytes).unwrap();
     let chunk = i64::try_from(config.insert_rows).unwrap();
     let last = i64::try_from(entries).unwrap();
     let signer = SIGNER.to_string();
@@ -900,7 +904,7 @@ fn linux_file_large_checkpoint_and_rotation_holds() {
         json!({ "skipped": "the development history fits the minimum quota" })
     };
 
-    let holds = hold_steps(tail, &config);
+    let holds = hold_steps(&fixture.store, tail, &config);
     emit(
         "linux_file_large_checkpoint_and_rotation_holds",
         LINUX_FILE,

@@ -25,6 +25,8 @@ use crate::receipt_store::SqliteReceiptStore;
 mod health;
 #[path = "service/recovery.rs"]
 mod recovery;
+#[path = "service/seed_wait.rs"]
+mod seed_wait;
 
 pub use recovery::{
     ReceiptQuerySnapshotRecovery, ReceiptQuerySnapshotRecoveryError,
@@ -1316,10 +1318,12 @@ fn sleep_until_cancelled(inner: &Inner, wait: Duration, requested_quota: u64, an
 /// Wait without a deadline until the writer finished seeding its verified
 /// head. Returns false when cancelled.
 fn await_writer_seed(inner: &Inner) -> bool {
+    let mut reclaim = seed_wait::SeedWaitReclaim::default();
     loop {
         if inner.cancel.load(Ordering::SeqCst) {
             return false;
         }
+        reclaim.poll(inner);
         match inner
             .store
             .wait_for_writer_ready(Duration::from_millis(200))

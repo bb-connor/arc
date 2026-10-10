@@ -4,8 +4,14 @@ use std::os::unix::fs::{symlink, DirBuilderExt, MetadataExt, OpenOptionsExt, Per
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
+#[path = "tests/cursor.rs"]
+mod cursor;
+#[path = "tests/location.rs"]
+mod location;
 #[path = "tests/provision.rs"]
 mod provision;
+#[path = "tests/reclaim.rs"]
+mod reclaim;
 fn require_refusal<T>(
     outcome: Result<T, SnapshotBackingError>,
     expected: SnapshotCustodyRefusal,
@@ -18,15 +24,148 @@ fn require_refusal<T>(
     Ok(())
 }
 
+fn require_unusable<T>(
+    outcome: Result<T, SnapshotBackingError>,
+    expected: SnapshotLocationRefusal,
+) -> TestResult {
+    match outcome {
+        Err(SnapshotBackingError::Unusable(actual)) => assert_eq!(actual, expected),
+        Err(actual) => return Err(format!("expected {expected:?}, got {actual:?}").into()),
+        Ok(_) => return Err(format!("expected {expected:?}, but the location was used").into()),
+    }
+    Ok(())
+}
+
+/// Diagnostic bound on waiting for another thread or process. A regression
+/// fails the test instead of hanging it; it is not a timing claim.
+const HANG: std::time::Duration = std::time::Duration::from_secs(300);
+
+/// A child process that is killed and reaped if the test ends first.
+struct Reaped(std::process::Child);
+
+impl Drop for Reaped {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
+/// Wait, within `HANG`, until `child` prints a line containing `marker`.
+fn await_marker(child: &mut std::process::Child, marker: &'static str) -> TestResult {
+    use std::io::BufRead;
+    let stdout = child.stdout.take().ok_or("the child has no piped stdout")?;
+    let (seen, seen_by) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let found = std::io::BufReader::new(stdout)
+            .lines()
+            .map_while(Result::ok)
+            .any(|line| line.contains(marker));
+        let _ = seen.send(found);
+    });
+    match seen_by.recv_timeout(HANG) {
+        Ok(true) => Ok(()),
+        Ok(false) => Err(format!("the child exited before printing {marker}").into()),
+        Err(_) => Err(format!("the child did not print {marker} within the hang bound").into()),
+    }
+}
+
+/// Run `command` to completion within `HANG`; otherwise kill and reap it.
+fn output_within_hang(
+    command: &mut std::process::Command,
+) -> Result<(std::process::ExitStatus, String, String), Box<dyn std::error::Error>> {
+    use std::io::Read;
+    let mut child = Reaped(
+        command
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()?,
+    );
+    let drain = |stream: Option<Box<dyn Read + Send>>| {
+        std::thread::spawn(move || {
+            let mut text = String::new();
+            if let Some(mut stream) = stream {
+                let _ = stream.read_to_string(&mut text);
+            }
+            text
+        })
+    };
+    let stdout = drain(
+        child
+            .0
+            .stdout
+            .take()
+            .map(|s| Box::new(s) as Box<dyn Read + Send>),
+    );
+    let stderr = drain(
+        child
+            .0
+            .stderr
+            .take()
+            .map(|s| Box::new(s) as Box<dyn Read + Send>),
+    );
+    let deadline = std::time::Instant::now() + HANG;
+    let status = loop {
+        if let Some(status) = child.0.try_wait()? {
+            break status;
+        }
+        if std::time::Instant::now() >= deadline {
+            return Err("the child did not finish within the hang bound".into());
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    };
+    let stdout = stdout.join().map_err(|_| "stdout reader panicked")?;
+    let stderr = stderr.join().map_err(|_| "stderr reader panicked")?;
+    Ok((status, stdout, stderr))
+}
+
+/// Retry, a bounded number of times, while another provisioner holds the
+/// shared `/tmp` parent lock, as the service retries a contended attempt.
+fn uncontended<T>(
+    mut attempt: impl FnMut() -> Result<T, SnapshotBackingError>,
+) -> Result<T, SnapshotBackingError> {
+    for _ in 0..100_000 {
+        match attempt() {
+            Err(SnapshotBackingError::Unusable(SnapshotLocationRefusal::Contended)) => {
+                std::thread::yield_now();
+            }
+            outcome => return outcome,
+        }
+    }
+    attempt()
+}
+
 fn private_tempdir() -> std::io::Result<tempfile::TempDir> {
     tempfile::Builder::new()
         .permissions(fs::Permissions::from_mode(0o700))
         .tempdir_in("/tmp")
 }
 
+/// Entries of `base` other than its snapshot parent, plus the snapshot
+/// directories inside that parent. Empty once every custody is released.
+fn custody_entries(base: &Path) -> std::io::Result<Vec<std::path::PathBuf>> {
+    let parent = base.join(super::reclaim::PARENT_NAME);
+    let mut entries = Vec::new();
+    for entry in fs::read_dir(base)? {
+        let path = entry?.path();
+        if path != parent {
+            entries.push(path);
+        }
+    }
+    if parent.exists() {
+        for entry in fs::read_dir(&parent)? {
+            let path = entry?.path();
+            if path.file_name() != Some(std::ffi::OsStr::new("reclaim-cursor")) {
+                entries.push(path);
+            }
+        }
+    }
+    entries.sort();
+    Ok(entries)
+}
+
 #[test]
 fn creates_real_sqlite_backing_with_checked_borrows() -> TestResult {
-    let mut backing = SnapshotFileBacking::create()?;
+    let mut backing = uncontended(|| SnapshotFileBacking::create(None))?;
     backing.checked_connection_mut()?.execute_batch(
         "CREATE TABLE probe(value TEXT NOT NULL); INSERT INTO probe VALUES('authenticated');",
     )?;
@@ -59,7 +198,10 @@ fn private_named_file_uses_memory_journal_and_memory_temp_store() -> TestResult 
     assert_eq!(fs::read_dir(&backing.custody.directory.path)?.count(), 1);
     connection.execute_batch("ROLLBACK;")?;
     backing.close()?;
-    assert_eq!(fs::read_dir(root.path())?.count(), 0);
+    assert_eq!(
+        custody_entries(root.path())?,
+        Vec::<std::path::PathBuf>::new()
+    );
     Ok(())
 }
 
@@ -316,7 +458,10 @@ fn drop_removes_healthy_custody_with_an_open_transaction() -> TestResult {
         .checked_connection()?
         .execute_batch("CREATE TABLE probe(value); BEGIN; INSERT INTO probe VALUES(1);")?;
     drop(backing);
-    assert_eq!(fs::read_dir(root.path())?.count(), 0);
+    assert_eq!(
+        custody_entries(root.path())?,
+        Vec::<std::path::PathBuf>::new()
+    );
     Ok(())
 }
 

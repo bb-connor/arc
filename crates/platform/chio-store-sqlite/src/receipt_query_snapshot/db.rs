@@ -8,6 +8,8 @@ use storage::Storage;
 use chio_kernel::{ReceiptQuerySnapshotError, ReceiptStoreError};
 use rusqlite::{params, Connection, ErrorCode, OptionalExtension};
 
+use crate::receipt_store::SqliteReceiptStore;
+
 /// Interned dimension kinds. Count rows reuse them as their `dim` column.
 pub(super) const DIM_TENANT: i64 = 1;
 pub(super) const DIM_CAPABILITY: i64 = 2;
@@ -214,9 +216,19 @@ pub(super) struct SnapshotDb {
 }
 
 impl SnapshotDb {
-    /// Linux uses a process-private file. Other platforms use private memory.
-    pub(super) fn open_private(quota_bytes: u64) -> Result<Self, SnapshotDbError> {
-        Self::from_storage(Storage::create()?, quota_bytes)
+    /// Linux uses a process-private file in `store`'s data directory. Other
+    /// platforms use private memory.
+    pub(super) fn open_private(
+        store: &SqliteReceiptStore,
+        quota_bytes: u64,
+    ) -> Result<Self, SnapshotDbError> {
+        Self::from_storage(Storage::create(store)?, quota_bytes)
+    }
+
+    /// Reclaim snapshot files abandoned at `store`'s snapshot location by
+    /// owners that died, without provisioning one. Bounded and best effort.
+    pub(super) fn reclaim_abandoned(store: &SqliteReceiptStore) {
+        storage::reclaim_abandoned(store);
     }
 
     #[cfg(test)]

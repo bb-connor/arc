@@ -1,10 +1,21 @@
 //! Linux custody for a named, process-private receipt query snapshot database.
 //!
-//! This component owns one connection, a private 0700 temporary directory and a
+//! This component owns one connection, a private 0700 snapshot directory and a
 //! single-link 0600 main file. It grants checked borrows only while the held
 //! directory/file identities, their no-follow entries, the configured path and
 //! SQLite's actual descriptor agree. SQLite identity inspection reuses the
 //! existing audited boundary; this module contains no unsafe code.
+//!
+//! Snapshot directories live in one versioned private parent (0700, owned by
+//! the effective user) inside the receipt store's data directory, or under
+//! `/tmp` when the store has no data directory. Each directory holds a
+//! lifetime lock, so provisioning can reclaim the directories of owners that
+//! died without unwinding (see `reclaim`).
+//!
+//! The data directory may be group-writable. Its group writers can rename or
+//! remove the data directory or the private parent, which denies service just
+//! as their access to the receipt store itself can, but every held identity is
+//! rechecked on each borrow, so a replacement is refused rather than used.
 //!
 //! The private directory is inside the snapshot trust boundary. These checks
 //! detect substitutions between operations; they are not atomic protection
@@ -21,8 +32,12 @@ use rusqlite::{Connection, OpenFlags};
 mod custody;
 #[path = "receipt_query_snapshot_backing/directory.rs"]
 mod directory;
+#[path = "receipt_query_snapshot_backing/reclaim.rs"]
+mod reclaim;
 
 use custody::FileCustody;
+use directory::{open_data_directory, open_parents, DirectoryCustody};
+pub(crate) use reclaim::ReclaimReport;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
 pub(crate) enum SnapshotCustodyRefusal {
@@ -60,10 +75,24 @@ pub(crate) enum SnapshotCustodyRefusal {
     MemorySettings,
 }
 
+/// Operational refusals of the snapshot location, raised before a snapshot
+/// is admitted. They leave the refused entries untouched and are retried.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
+pub(crate) enum SnapshotLocationRefusal {
+    #[error("another process holds the snapshot parent lock")]
+    Contended,
+    #[error("the snapshot parent is not a 0700 directory of this user")]
+    ForeignParent,
+    #[error("the snapshot reclaim cursor is not a private regular file of this user")]
+    UnusableCursor,
+}
+
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum SnapshotBackingError {
     #[error("receipt query snapshot custody refused: {0}")]
     Refused(SnapshotCustodyRefusal),
+    #[error("receipt query snapshot location is unusable: {0}")]
+    Unusable(SnapshotLocationRefusal),
     #[error("receipt query snapshot filesystem failed: {0}")]
     Io(#[from] std::io::Error),
     #[error("receipt query snapshot SQLite failed: {0}")]
@@ -80,14 +109,25 @@ pub(crate) struct SnapshotFileBacking {
 }
 
 impl SnapshotFileBacking {
-    /// Provision under Linux /tmp without consulting or changing SQLite's
+    /// Provision in the receipt store's data directory, or under Linux `/tmp`
+    /// when the store has none, without consulting or changing SQLite's
     /// process-global temporary-directory settings.
-    pub(crate) fn create() -> Result<Self, SnapshotBackingError> {
-        Self::create_in(Path::new("/tmp"))
+    pub(crate) fn create(data_directory: Option<&Path>) -> Result<Self, SnapshotBackingError> {
+        let (base, parent_name) = held_base(data_directory)?;
+        Self::provision(base, &parent_name)
     }
 
+    /// Provision under `parent` with the strict ancestor rule.
+    #[cfg(test)]
     fn create_in(parent: &Path) -> Result<Self, SnapshotBackingError> {
-        let custody = FileCustody::create_in(parent)?;
+        Self::provision(open_parents(parent)?, reclaim::PARENT_NAME)
+    }
+
+    fn provision(
+        base: Vec<DirectoryCustody>,
+        parent_name: &str,
+    ) -> Result<Self, SnapshotBackingError> {
+        let custody = FileCustody::create_in(base, parent_name)?;
         custody.validate_filesystem()?;
         // NOFOLLOW protects the leaf only. The checks after open also compare
         // every held parent and the actual descriptor, before any SQLite SQL.
@@ -166,6 +206,45 @@ impl SnapshotFileBacking {
             }
         }
         Ok(())
+    }
+}
+
+/// Reclaim one bounded window of abandoned snapshot directories where
+/// `create` would provision, without provisioning or creating anything there
+/// beyond the reclaim cursor.
+pub(crate) fn reclaim_abandoned(
+    data_directory: Option<&Path>,
+) -> Result<ReclaimReport, SnapshotBackingError> {
+    let (base, parent_name) = held_base(data_directory)?;
+    let held = base.last().ok_or(SnapshotBackingError::Refused(
+        SnapshotCustodyRefusal::MissingParent,
+    ))?;
+    let Some(parent) = DirectoryCustody::open_snapshot_parent(held, &parent_name, false)? else {
+        return Ok(ReclaimReport::default());
+    };
+    let lock = reclaim::ParentLock::acquire(&parent)?;
+    let persisted = reclaim::begin(&parent, &lock)?.finish(&parent)?;
+    Ok(persisted.report)
+}
+
+/// The held base and the name of its snapshot parent. The `/tmp` parent is
+/// per user, because `/tmp` is shared.
+fn held_base(
+    data_directory: Option<&Path>,
+) -> Result<(Vec<DirectoryCustody>, String), SnapshotBackingError> {
+    match data_directory {
+        Some(directory) => Ok((
+            open_data_directory(directory)?,
+            reclaim::PARENT_NAME.to_string(),
+        )),
+        None => Ok((
+            open_parents(Path::new("/tmp"))?,
+            format!(
+                "{}-{}",
+                reclaim::PARENT_NAME,
+                rustix::process::geteuid().as_raw()
+            ),
+        )),
     }
 }
 

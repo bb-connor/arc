@@ -1,12 +1,13 @@
 use std::fs::{self, File};
 use std::os::unix::fs::MetadataExt;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use chio_sqlite_file_identity::{inspect_main_database_file_identity, SqliteFileIdentity};
 use rusqlite::Connection;
 use rustix::fs::{openat, statat, unlinkat, AtFlags, FileType, Mode, OFlags};
 
-use super::directory::{open_parents, validate_parents, DirectoryCustody};
+use super::directory::{validate_parents, DirectoryCustody};
+use super::reclaim::{self, ParentLock};
 use super::{SnapshotBackingError, SnapshotCustodyRefusal};
 
 const DATABASE_NAME: &str = "snapshot.sqlite3";
@@ -24,12 +25,36 @@ pub(super) struct FileCustody {
 }
 
 impl FileCustody {
-    pub(super) fn create_in(parent: &Path) -> Result<Self, SnapshotBackingError> {
-        let parents = open_parents(parent)?;
+    /// Provision one snapshot under the held `base`, in its versioned private
+    /// parent `parent_name`. Under the parent lock this reclaims one bounded
+    /// window of abandoned directories, persists where the next reclamation
+    /// resumes, then publishes and locks the new directory.
+    pub(super) fn create_in(
+        mut parents: Vec<DirectoryCustody>,
+        parent_name: &str,
+    ) -> Result<Self, SnapshotBackingError> {
+        let base = parents.last().ok_or(SnapshotBackingError::Refused(
+            SnapshotCustodyRefusal::MissingParent,
+        ))?;
+        let snapshot_parent = DirectoryCustody::open_snapshot_parent(base, parent_name, true)?
+            .ok_or(SnapshotBackingError::Refused(
+                SnapshotCustodyRefusal::MissingParent,
+            ))?;
+        parents.push(snapshot_parent);
         let parent = parents.last().ok_or(SnapshotBackingError::Refused(
             SnapshotCustodyRefusal::MissingParent,
         ))?;
-        let directory = DirectoryCustody::create_private(parent)?;
+        let directory = {
+            let lock = ParentLock::acquire(parent)?;
+            // Reclaim and persist progress before publishing anything: space
+            // is freed and progress kept even when provisioning then fails,
+            // and no directory is created without a whole cursor.
+            let persisted = reclaim::begin(parent, &lock)?.finish(parent)?;
+            let directory = DirectoryCustody::create_private(parent)?;
+            drop(persisted);
+            drop(lock);
+            directory
+        };
         let descriptor = match openat(
             &directory.handle,
             DATABASE_NAME,
