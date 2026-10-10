@@ -366,7 +366,7 @@ jobs:
           RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
           # Match the flow gate's fixture isolation; explicit races still run.
           RUST_TEST_THREADS: "1"
-        run: cargo test --workspace --exclude chio-wasm-guards
+        run: cargo test --workspace --no-fail-fast --exclude chio-wasm-guards
 
       - name: Protocol peer-negotiation gate
         env:
@@ -685,7 +685,7 @@ jobs:
           RUST_TEST_THREADS: "1"
         run: |
           cargo build --workspace
-          cargo test --workspace --exclude chio-conformance --exclude chio-wasm-guards --exclude chio-formal-diff-tests
+          cargo test --workspace --no-fail-fast --exclude chio-conformance --exclude chio-wasm-guards --exclude chio-formal-diff-tests
           cargo test -p chio-formal-diff-tests --no-run
           cargo test -p chio-wasm-guards --lib
 

@@ -1165,7 +1165,7 @@ EXPECTED_CI_EVIDENCE_STEPS = (
         "cargo clippy --workspace --lib --bins --examples -- -D warnings",
     ),
     ("Workspace build", "cargo build --workspace"),
-    ("Workspace tests", "cargo test --workspace --exclude chio-wasm-guards"),
+    ("Workspace tests", "cargo test --workspace --no-fail-fast --exclude chio-wasm-guards"),
     ("Protocol peer-negotiation gate", "./scripts/check-protocol-peer-negotiation.sh"),
     (
         "cognition-market promoted-default build, clippy, and tests",
@@ -1216,7 +1216,7 @@ EXPECTED_KANI_STEP_EXTRAS = {
 }
 EXPECTED_MSRV_RUN = r"""
 cargo build --workspace
-cargo test --workspace --exclude chio-conformance --exclude chio-wasm-guards --exclude chio-formal-diff-tests
+cargo test --workspace --no-fail-fast --exclude chio-conformance --exclude chio-wasm-guards --exclude chio-formal-diff-tests
 cargo test -p chio-formal-diff-tests --no-run
 cargo test -p chio-wasm-guards --lib
 """.strip()
@@ -8649,7 +8649,7 @@ def validate(root: Path) -> None:
         )
     for command in (
         "cargo build --workspace",
-        "cargo test --workspace --exclude chio-wasm-guards",
+        "cargo test --workspace --no-fail-fast --exclude chio-wasm-guards",
         "cargo clippy --workspace --lib --bins --examples -- -D warnings",
         "bash scripts/check-mapping.sh",
         "python3 scripts/check-patch-hygiene.py",

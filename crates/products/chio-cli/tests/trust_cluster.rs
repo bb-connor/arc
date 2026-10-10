@@ -32,6 +32,10 @@ use serde_json::{json, Value};
 mod authority_fixture;
 use authority_fixture::provision_cluster_authorities;
 
+#[path = "trust_cluster/health.rs"]
+mod health;
+use health::{assert_unavailable_leader_health, wait_for_node_health};
+
 #[path = "trust_cluster/revocation_proof.rs"]
 mod revocation_proof;
 const TRUST_CLUSTER_QUALIFICATION_RUNS: usize = 5;
@@ -441,21 +445,6 @@ fn cluster_timeout_diagnostics(
         "leader": node_diagnostics(client, leader_url, token, capability_id),
         "follower": node_diagnostics(client, follower_url, token, capability_id),
     })
-}
-
-fn wait_for_node_health(client: &Client, base_url: &str, token: &str, label: &str) {
-    wait_until_with_diagnostics(
-        label,
-        Duration::from_secs(30),
-        || try_get_json(client, &format!("{base_url}/health"), token).is_some(),
-        || {
-            json!({
-                "baseUrl": base_url,
-                "health": try_get_json(client, &format!("{base_url}/health"), token),
-                "clusterStatus": try_internal_cluster_status(client, base_url, token),
-            })
-        },
-    );
 }
 
 fn post_json(client: &Client, url: &str, token: &str, body: &Value) -> Value {
@@ -2929,20 +2918,7 @@ fn trust_control_cluster_snapshot_replays_holds_and_mutation_events() {
         || cluster_status_diagnostics(&client, &all_urls, service_token),
     );
 
-    let health_response = client
-        .get(format!("{late_url}/health"))
-        .header(AUTHORIZATION, bearer(service_token))
-        .send()
-        .expect("read late leader health");
-    assert_eq!(
-        health_response.status(),
-        reqwest::StatusCode::SERVICE_UNAVAILABLE
-    );
-    let health: Value = health_response.json().expect("decode late leader health");
-    assert_eq!(health["leaderUrl"].as_str(), Some(late_url.as_str()));
-    assert_eq!(health["ok"].as_bool(), Some(false));
-    assert_eq!(health["authority"]["configured"].as_bool(), Some(true));
-    assert_eq!(health["authority"]["available"].as_bool(), Some(false));
+    assert_unavailable_leader_health(&client, &late_url, service_token);
 
     let late_store = SqliteBudgetStore::open(&late_budget_db).expect("open late budget db");
     let pre_reconcile_events = late_store
