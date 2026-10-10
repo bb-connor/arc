@@ -381,6 +381,9 @@ pub(super) fn lineage(
                     .or_else(|| cached.federated_parent_capability_id.clone());
                 continue;
             }
+            // Read the immutable attribution before opening a source transaction.
+            // No live SQLite read holds the owned projection mutex or waits on it.
+            let expected_subject = captured_subject(lease, tools, &capability)?;
             let snapshot = live_read(lease, |live| {
                 let mut table = "capability_lineage";
                 let mut key = None;
@@ -392,7 +395,7 @@ pub(super) fn lineage(
                         // reading the unrelated share's receipt/lineage counts.
                         let row: Option<(i64, i64)> = live.query_row(&format!("SELECT l.rowid, length(CAST(l.share_id AS BLOB)) + {qualified} FROM federated_share_capability_lineage l JOIN federated_evidence_shares s ON s.share_id = l.share_id WHERE l.capability_id = ?1 ORDER BY s.imported_at DESC, s.share_id DESC LIMIT 1", qualified = LINEAGE_BYTES.replace("CAST(", "CAST(l.")), [&capability], |row| Ok((row.get(0)?, row.get(1)?))).optional()?;
                         let Some((share, length)) = row else {
-                            captured_attribution(lease, tools, &capability, None)?;
+                            captured_attribution(expected_subject.as_deref(), None)?;
                             return Ok(None);
                         };
                         table = "federated_share_capability_lineage";
@@ -418,7 +421,7 @@ pub(super) fn lineage(
                 } else {
                     live.query_row(&subject_sql, [&capability], |row| row.get(0))?
                 };
-                captured_attribution(lease, tools, &capability, Some(&subject))?;
+                captured_attribution(expected_subject.as_deref(), Some(&subject))?;
                 let sql = format!("SELECT {LINEAGE_COLUMNS} FROM {table} WHERE {predicate}");
                 let snapshot = if let Some(share) = key {
                     live.query_row(
@@ -498,31 +501,46 @@ fn metadata_row_error(error: rusqlite::Error, reason: &'static str) -> ReceiptSt
     }
 }
 
-/// Compare only the attribution that the owned snapshot captured. Unsupported
-/// metadata without a captured subject remains a request refusal, not tamper.
-fn captured_attribution(
+/// Resolve immutable attribution outside the live database transaction. Multiple
+/// selected receipts for one capability must agree on its captured subject.
+fn captured_subject(
     lease: &Lease<'_>,
     tools: &[EvidenceToolReceiptRecord],
     capability: &str,
-    current: Option<&rusqlite::types::Value>,
-) -> Result<(), ReceiptStoreError> {
-    let matches = lease.read(|db| {
+) -> Result<Option<String>, ReceiptStoreError> {
+    lease.read(|db| {
         if db.dim_id(DIM_CAPABILITY, capability).is_none() {
-            return Ok(true);
+            return Ok(None);
         }
+        let mut expected = None;
         for tool in tools.iter().filter(|tool| tool.receipt.capability_id == capability) {
             let entry = crate::integer::checked::<_, i64>(tool.seq)?;
             if let Some(subject) = lease.unsigned_subjects.get(&entry).filter(|subject| **subject != ABSENT) {
-                if let Some(expected) = db.dim_value(*subject).map_err(snapshot_error)? {
-                    if !matches!(current, Some(rusqlite::types::Value::Text(actual)) if *actual == expected) {
-                        return Ok(false);
+                if let Some(subject) = db.dim_value(*subject).map_err(snapshot_error)? {
+                    match &expected {
+                        Some(previous) if previous != &subject => return Err(invalid(
+                            "current unsigned capability attribution differs from the authenticated snapshot",
+                        )),
+                        Some(_) => {},
+                        None => expected = Some(subject),
                     }
                 }
             }
         }
-        Ok(true)
-    })?;
-    if matches {
+        Ok(expected)
+    })
+}
+
+/// Compare only captured attribution. Unsupported metadata without a captured
+/// subject remains a request refusal, not tamper. This performs no store reads.
+fn captured_attribution(
+    expected: Option<&str>,
+    current: Option<&rusqlite::types::Value>,
+) -> Result<(), ReceiptStoreError> {
+    let Some(expected) = expected else {
+        return Ok(());
+    };
+    if matches!(current, Some(rusqlite::types::Value::Text(actual)) if actual == expected) {
         Ok(())
     } else if current.is_none() {
         Err(invalid(
