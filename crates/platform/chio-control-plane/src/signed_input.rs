@@ -59,11 +59,25 @@ impl std::io::Write for LimitedBuffer {
     }
 }
 
+/// Persists bounded JSON only through the lock that owns its destination.
+pub(crate) fn write_bounded_registry<T: Serialize>(
+    lock: &RegistryLock,
+    value: &T,
+    limit: usize,
+) -> Result<(), CliError> {
+    write_bounded_at(lock.destination(), value, limit)
+}
+
+#[cfg(test)]
 pub(crate) fn write_bounded_json_with_limit<T: Serialize>(
     path: &Path,
     value: &T,
     limit: usize,
 ) -> Result<(), CliError> {
+    write_bounded_at(path, value, limit)
+}
+
+fn write_bounded_at<T: Serialize>(path: &Path, value: &T, limit: usize) -> Result<(), CliError> {
     match encode_within(value, limit)? {
         Some(bytes) => replace_file(path, &bytes),
         None => Err(CliError::policy_constraint_error(format!(
@@ -184,7 +198,7 @@ pub(crate) fn update_bounded_registry<T: Serialize, R, E>(
     let mut registry = load(lock.destination())
         .map_err(|error| RegistryTransactionError::Registry(RegistryUpdateError::Load(error)))?;
     let outcome = change(&mut registry).map_err(RegistryTransactionError::Refused)?;
-    write_bounded_json_with_limit(lock.destination(), &registry, limit)
+    write_bounded_registry(&lock, &registry, limit)
         .map_err(|error| RegistryTransactionError::Registry(RegistryUpdateError::Persist(error)))?;
     Ok(outcome)
 }

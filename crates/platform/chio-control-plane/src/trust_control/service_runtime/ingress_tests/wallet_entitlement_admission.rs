@@ -273,8 +273,94 @@ const HANG_GUARD: Duration = Duration::from_secs(30);
 
 async fn assert_same_response(actual: Response, expected: Response) -> TestResult {
     assert_eq!(actual.status(), expected.status());
+    assert_eq!(
+        actual.headers().get(CONTENT_TYPE),
+        expected.headers().get(CONTENT_TYPE)
+    );
     let actual = axum::body::to_bytes(actual.into_body(), 4096).await?;
     let expected = axum::body::to_bytes(expected.into_body(), 4096).await?;
     assert_eq!(actual, expected);
+    Ok(())
+}
+
+/// Service clones share the fixed four-permit wallet lane. Constructing an
+/// independent service gives it fresh admission, even when the first is full.
+#[tokio::test(flavor = "current_thread")]
+async fn wallet_clones_share_admission_and_independent_service_states_remain_readable() -> TestResult
+{
+    let first = WalletFixture::live()?;
+    let lane = first.state.wallet_entitlement_lane.clone();
+    let mut fixtures = Vec::new();
+    let mut held = Vec::new();
+    for _ in 0..4 {
+        let fixture = WalletFixture::live()?;
+        let (offers, mut opened, config) = paused_offers(&fixture)?;
+        let headers = bearer(&fixture.token)?;
+        let check = tokio::spawn({
+            let lane = lane.clone();
+            async move { authenticate_wallet_credential(&headers, config, &lane).await }
+        });
+        tokio::time::timeout(HANG_GUARD, opened.recv())
+            .await?
+            .ok_or("wallet read did not enter its pause")?;
+        held.push((offers, check));
+        fixtures.push(fixture);
+    }
+    assert_eq!(
+        first
+            .state
+            .wallet_entitlement_lane
+            .blocking_lane()
+            .available_permits(),
+        0
+    );
+    let polls = Arc::new(AtomicUsize::new(0));
+    let observed = Arc::clone(&polls);
+    let stream = futures_util::stream::once(async move {
+        observed.fetch_add(1, Ordering::SeqCst);
+        Ok::<_, std::io::Error>(axum::body::Bytes::from_static(b"{}"))
+    });
+    let request = Request::builder()
+        .method("POST")
+        .uri(PASSPORT_ISSUANCE_CREDENTIAL_PATH)
+        .header(CONTENT_TYPE, "application/json")
+        .header(AUTHORIZATION, "Bearer unentitled-wallet")
+        .body(Body::from_stream(stream))?;
+    let response = super::super::super::super::build_router(first.state.clone())
+        .oneshot(request)
+        .await?;
+    assert_same_response(response, at_capacity()).await?;
+    assert_eq!(polls.load(Ordering::SeqCst), 0);
+    let independent = WalletFixture::live()?;
+    assert_eq!(
+        independent
+            .state
+            .wallet_entitlement_lane
+            .blocking_lane()
+            .available_permits(),
+        4
+    );
+    independent
+        .submit(
+            Some("Bearer unentitled-wallet"),
+            StatusCode::UNAUTHORIZED,
+            0,
+        )
+        .await?;
+    for (offers, check) in held {
+        offers.release()?;
+        tokio::time::timeout(HANG_GUARD, check)
+            .await??
+            .map_err(|_| "entitled wallet check refused")?;
+    }
+    assert_eq!(lane.blocking_lane().available_permits(), 4);
+    first
+        .submit(
+            Some("Bearer unentitled-wallet"),
+            StatusCode::UNAUTHORIZED,
+            0,
+        )
+        .await?;
+    drop(fixtures);
     Ok(())
 }

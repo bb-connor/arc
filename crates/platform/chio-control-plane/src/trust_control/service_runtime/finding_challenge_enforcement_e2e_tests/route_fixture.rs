@@ -1,4 +1,5 @@
 use super::*;
+use crate::trust_control::BlockingLane;
 
 pub(super) fn challenge_route_state(
     deployment: &Deployment,
@@ -64,6 +65,9 @@ pub(super) fn challenge_route_state(
         leader_forward_lane: Arc::new(tokio::sync::Semaphore::new(1)),
         authority_health_lane: Arc::new(tokio::sync::Semaphore::new(1)),
         authority_inspection_lane: Arc::new(tokio::sync::Semaphore::new(8)),
+        operator_registry_write_lane: BlockingLane::new("operator_registry_write", 2),
+        public_passport_issuance_lane: BlockingLane::new("public_passport_issuance", 2),
+        wallet_entitlement_lane: crate::trust_control::ingress_lanes::wallet_entitlement_lane(),
         public_passport_challenge_lane: Arc::new(tokio::sync::Semaphore::new(
             crate::trust_control::report_rendering::PUBLIC_PASSPORT_CHALLENGE_PERMITS,
         )),

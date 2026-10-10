@@ -1,4 +1,4 @@
-//! HTTP admission for bounded operator registry writes.
+//! HTTP admission for bounded registry writes.
 //!
 //! A registry write is one locked file transaction (load, change, capacity
 //! check, atomic replace) run on the blocking pool. Admission never waits:
@@ -7,18 +7,10 @@
 //! the registry lock, so a request dropped mid-write releases neither before
 //! the transaction ends, and nothing awaits while the lock is held.
 
-use std::sync::LazyLock;
-
 use serde::Serialize;
 
 use super::*;
 use crate::passport_verifier::{RegistryTransactionError, RegistryUpdateError};
-
-/// Registry write transactions running at once across the process.
-const REGISTRY_WRITE_PERMITS: usize = 2;
-
-static REGISTRY_WRITE_LANE: LazyLock<Arc<tokio::sync::Semaphore>> =
-    LazyLock::new(|| Arc::new(tokio::sync::Semaphore::new(REGISTRY_WRITE_PERMITS)));
 
 /// The registry file configured for `subject`, or the 409 answered when the
 /// service was started without `flag`.
@@ -74,11 +66,12 @@ impl RegistryOperationError {
 
 /// Runs a transaction whose operation carries an explicit HTTP refusal.
 pub(super) async fn run_registry_transaction<T: Serialize + Send + 'static>(
+    lane: &BlockingLane,
     update: impl FnOnce() -> Result<T, RegistryTransactionError<RegistryOperationError>>
         + Send
         + 'static,
 ) -> Response {
-    run_registry_response_in(&REGISTRY_WRITE_LANE, move || match update() {
+    run_registry_response_in(lane, move || match update() {
         Ok(value) => Json(value).into_response(),
         Err(RegistryTransactionError::Registry(error)) => registry_update_error_response(error),
         Err(RegistryTransactionError::Refused(error)) => error.into_response(),
@@ -86,18 +79,19 @@ pub(super) async fn run_registry_transaction<T: Serialize + Send + 'static>(
     .await
 }
 
-/// Runs `update` behind the process registry write lane and answers with its
+/// Runs `update` behind the supplied service lane and answers with its
 /// JSON outcome or its error.
 pub(super) async fn run_registry_update<T: Serialize + Send + 'static>(
+    lane: &BlockingLane,
     update: impl FnOnce() -> Result<T, RegistryUpdateError> + Send + 'static,
 ) -> Response {
-    run_registry_update_in(&REGISTRY_WRITE_LANE, update).await
+    run_registry_update_in(lane, update).await
 }
 
 /// Runs `update` on the blocking pool under a permit from `lane`, refusing at
 /// once with 503 when `lane` has none free.
 pub(super) async fn run_registry_update_in<T: Serialize + Send + 'static>(
-    lane: &Arc<tokio::sync::Semaphore>,
+    lane: &BlockingLane,
     update: impl FnOnce() -> Result<T, RegistryUpdateError> + Send + 'static,
 ) -> Response {
     run_registry_response_in(lane, move || match update() {
@@ -110,24 +104,16 @@ pub(super) async fn run_registry_update_in<T: Serialize + Send + 'static>(
 /// One permit owner serves both transaction adapters. It stays in the blocking
 /// closure until the full transaction and response construction have ended.
 async fn run_registry_response_in(
-    lane: &Arc<tokio::sync::Semaphore>,
+    lane: &BlockingLane,
     update: impl FnOnce() -> Response + Send + 'static,
 ) -> Response {
-    let Ok(permit) = Arc::clone(lane).try_acquire_owned() else {
-        return plain_http_error(
+    match run_bounded_blocking(lane, update).await {
+        Ok(response) => response,
+        Err(BlockingLaneError::Saturated(_)) => plain_http_error(
             StatusCode::SERVICE_UNAVAILABLE,
             "registry writes are at capacity; nothing was changed, retry",
-        );
-    };
-    let outcome = tokio::task::spawn_blocking(move || {
-        let outcome = update();
-        drop(permit);
-        outcome
-    })
-    .await;
-    match outcome {
-        Ok(response) => response,
-        Err(_) => plain_http_error(
+        ),
+        Err(BlockingLaneError::Join(_)) => plain_http_error(
             StatusCode::INTERNAL_SERVER_ERROR,
             "registry write did not complete",
         ),

@@ -13,20 +13,14 @@ pub(super) const WALLET_ENTITLEMENT_INCOMPLETE: &str =
 /// Wallet entitlement checks this node runs at once. Any caller that presents
 /// a bearer token starts one, and each reads, decodes and verifies the whole
 /// offers file, so four bound the blocking-pool threads and the offers-file
-/// buffers, each at most `MAX_SIGNED_FILE_BYTES`, that such callers can hold,
-/// as the pre-authorized code redemption lane does for the same file.
+/// buffers, each at most `MAX_SIGNED_FILE_BYTES`, that such callers can hold.
+/// Public redemption and operator registry writes use separate service lanes.
 const WALLET_ENTITLEMENT_PERMITS: usize = 4;
-
-/// Separate from the redemption lanes that read the same file: presenting
-/// bearer tokens can exhaust only this lane, never the permits that admitted
-/// redemptions hold.
-static WALLET_ENTITLEMENT_LANE: LazyLock<IngressLane> =
-    LazyLock::new(|| IngressLane::wallet_entitlement(WALLET_ENTITLEMENT_PERMITS));
 
 /// One ingress check family's lane and the fixed refusals it answers with
 /// when its check produces no decision.
 #[derive(Clone, Debug)]
-pub(super) struct IngressLane {
+pub(crate) struct IngressLane {
     lane: BlockingLane,
     at_capacity: &'static str,
     incomplete: &'static str,
@@ -71,7 +65,7 @@ impl IngressLane {
     }
 }
 
-/// The lane for wallet credential entitlement checks.
-pub(super) fn wallet_entitlement_lane() -> &'static IngressLane {
-    &WALLET_ENTITLEMENT_LANE
+/// A fresh service-owned lane for wallet credential entitlement checks.
+pub(super) fn wallet_entitlement_lane() -> IngressLane {
+    IngressLane::wallet_entitlement(WALLET_ENTITLEMENT_PERMITS)
 }

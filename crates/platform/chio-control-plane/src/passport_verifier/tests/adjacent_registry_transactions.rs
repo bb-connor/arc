@@ -76,13 +76,13 @@ fn unrelated_offer_update_preserves_consumption_after_busy_retry_and_reopen() ->
         grant_type: chio_credentials::OID4VCI_PRE_AUTHORIZED_GRANT_TYPE.to_string(),
         pre_authorized_code: offered.offer.pre_authorized_code()?.to_string(),
     };
-    let inside = Arc::new(Barrier::new(2));
-    let attempted = Arc::new(Barrier::new(2));
+    let (inside, entered) = std::sync::mpsc::channel();
+    let (attempted, released) = std::sync::mpsc::channel();
     let redeemer = {
         let (path, inside, attempted, metadata, request) = (
             path.clone(),
-            Arc::clone(&inside),
-            Arc::clone(&attempted),
+            inside,
+            released,
             metadata.clone(),
             request.clone(),
         );
@@ -90,14 +90,26 @@ fn unrelated_offer_update_preserves_consumption_after_busy_retry_and_reopen() ->
             PassportIssuanceOfferRegistry::update(&path, |registry| {
                 let response =
                     registry.redeem_pre_authorized_code(&metadata, &request, ISSUED_AT, 300)?;
-                inside.wait();
-                attempted.wait();
+                inside
+                    .send(())
+                    .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+                attempted
+                    .recv_timeout(std::time::Duration::from_secs(30))
+                    .map_err(|error| CliError::cli_other_error(error.to_string()))?;
                 Ok::<_, CliError>(response)
             })
             .map_err(|error| format!("{error:?}"))
         })
     };
-    inside.wait();
+    if let Err(error) = entered.recv_timeout(std::time::Duration::from_secs(30)) {
+        let outcome = redeemer
+            .join()
+            .map_err(|_| "offer redeemer panicked before entering")?;
+        return Err(format!(
+            "offer redeemer never entered its held transaction ({error}): {outcome:?}"
+        )
+        .into());
+    }
     let fresh = passport_issued_at(123, ISSUED_AT)?;
     let before = fs::read(&path)?;
     let create = || {
@@ -112,7 +124,7 @@ fn unrelated_offer_update_preserves_consumption_after_busy_retry_and_reopen() ->
         ))
     ));
     assert_eq!(fs::read(&path)?, before);
-    attempted.wait();
+    attempted.send(())?;
     let token = redeemer.join().map_err(|_| "offer redeemer panicked")??;
     let unrelated = create()?;
     let reopened = PassportIssuanceOfferRegistry::load(&path)?;
@@ -131,7 +143,8 @@ fn unrelated_offer_update_preserves_consumption_after_busy_retry_and_reopen() ->
         PassportIssuanceOfferRegistry::update(&path, |registry| {
             registry.redeem_pre_authorized_code(&metadata, &request, ISSUED_AT, 300)
         }),
-        Err(RegistryTransactionError::Refused(_))
+        Err(RegistryTransactionError::Refused(error))
+            if error.to_string() == CliError::cli_other_error("pre-authorized code has already been redeemed").to_string()
     ));
     assert_eq!(fs::read(&path)?, before);
     Ok(())

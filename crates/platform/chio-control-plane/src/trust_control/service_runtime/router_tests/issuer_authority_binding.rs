@@ -85,9 +85,8 @@ impl IssuerFixture {
         } else {
             actual.clone()
         };
-        // Selection is asserted through the exact loaders used by unchanged
-        // handlers. A fixture that naturally selects the head does not prove
-        // this boundary and must not be labelled a signer-binding Original.
+        // Both issuer loaders select the local key; recovery changes the
+        // admitted head and live set independently of that private key.
         assert_eq!(
             resolve_oid4vp_verifier_signing_key(&state.config)?.public_key(),
             actual
@@ -189,10 +188,12 @@ impl IssuerFixture {
             String::from_utf8_lossy(&body)
         );
         let value: serde_json::Value = serde_json::from_slice(&body)?;
-        assert!(value.get("error").is_some());
-        assert!(value.get("credential").is_none());
-        assert!(value.get("accessToken").is_none());
-        assert!(value.get("offer").is_none());
+        assert_eq!(
+            value,
+            serde_json::json!({
+                "error": "passport issuer signing key is not the admitted live authority head"
+            })
+        );
         assert_eq!(std::fs::read(&self.offers)?, before);
         Ok(())
     }
@@ -307,11 +308,10 @@ async fn unconfigured_unsigned_issuer_operations_keep_the_legacy_profile() -> Te
     Ok(())
 }
 
-/// A source-specific fixture seam: each inspection constructor and its lookup
-/// read the explicit authority clock. Key selection is reads 1-2, guard pre-view
-/// 3-4, pre-binding 5-6, then post-binding starts at read 7 after the real
-/// credential construction callback returns. Refusal completes at read 8.
-/// This count describes this owning implementation, not a protocol guarantee.
+/// Inspection constructors and lookups each read the authority clock. Key
+/// selection is reads 1-2, the guard pre-view 3-4, and signer pre-binding 5-6.
+/// Read 7 pauses signer post-binding after credential construction; the rotated
+/// head is observed at read 8 before the registry can persist.
 struct PausePostSignerRead {
     inner: Arc<dyn chio_security_types::clock::Clock>,
     reads: std::sync::atomic::AtomicUsize,

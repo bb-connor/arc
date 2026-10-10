@@ -252,6 +252,12 @@ fn local_offer_token_and_credential_writers_observe_busy_and_keep_consumption_af
     let spent = run(&redeem_credential)?;
     assert!(!spent.status.success(), "credential was issued twice");
     assert!(spent.stdout.is_empty());
+    assert!(
+        String::from_utf8_lossy(&spent.stderr)
+            .contains("credential has already been issued for this access token"),
+        "{}",
+        String::from_utf8_lossy(&spent.stderr)
+    );
     let mut create_unrelated = create;
     let unrelated_offer = directory.path().join("unrelated-offer.json");
     // Keep the original wallet offer file so the replay uses the spent code.
@@ -267,5 +273,11 @@ fn local_offer_token_and_credential_writers_observe_busy_and_keep_consumption_af
         "an unrelated write restored a spent code"
     );
     assert!(replay.stdout.is_empty());
+    assert!(
+        String::from_utf8_lossy(&replay.stderr)
+            .contains("pre-authorized code is not present in the issuance registry"),
+        "{}",
+        String::from_utf8_lossy(&replay.stderr)
+    );
     Ok(())
 }

@@ -7,6 +7,7 @@
 use super::*;
 use crate::passport_verifier::{
     PassportIssuanceOfferRecord, PassportIssuanceOfferRegistry, PassportIssuanceOfferState,
+    RegistryUpdateError,
 };
 
 const HANG_GUARD: Duration = Duration::from_secs(30);
@@ -15,9 +16,9 @@ use chio_credentials::{
     CHIO_PASSPORT_OID4VCI_CREDENTIAL_CONFIGURATION_ID, CHIO_PASSPORT_OID4VCI_FORMAT,
 };
 use chio_security_types::clock::{Clock, ClockError, ClockReading};
+use futures_util::FutureExt;
 use std::future::Future;
 use std::sync::mpsc;
-use std::task::Poll;
 
 /// An issuer clock whose first reading waits until the test releases it.
 /// Code redemption reads it while resolving the issuer metadata, after it has
@@ -43,6 +44,19 @@ impl Clock for PausedFirstReading {
     }
 }
 
+fn paused_clock(
+    state: &TrustServiceState,
+) -> (TrustServiceState, mpsc::Receiver<()>, mpsc::Sender<()>) {
+    let (arrived_tx, arrived) = mpsc::channel();
+    let (release, release_rx) = mpsc::channel();
+    let mut state = state.clone();
+    state.finding_challenge_clock = Arc::new(PausedFirstReading {
+        inner: Arc::clone(&state.finding_challenge_clock),
+        pause: std::sync::Mutex::new(Some((arrived_tx, release_rx))),
+    });
+    (state, arrived, release)
+}
+
 /// A code redemption held between its offers file read and its write.
 struct PausedRedemption {
     release: mpsc::Sender<()>,
@@ -57,13 +71,7 @@ impl PausedRedemption {
         state: &TrustServiceState,
         request: Oid4vciTokenRequest,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let (arrived_tx, arrived) = mpsc::channel();
-        let (release, release_rx) = mpsc::channel();
-        let mut state = state.clone();
-        state.finding_challenge_clock = Arc::new(PausedFirstReading {
-            inner: Arc::clone(&state.finding_challenge_clock),
-            pause: std::sync::Mutex::new(Some((arrived_tx, release_rx))),
-        });
+        let (state, arrived, release) = paused_clock(state);
         let runtime = tokio::runtime::Handle::current();
         let redemption = tokio::task::spawn_blocking(move || {
             runtime.block_on(handle_redeem_passport_issuance_token(
@@ -87,21 +95,30 @@ impl PausedRedemption {
     }
 }
 
-/// Polls `request` once while `paused` sits between its offers file read and
-/// its write, then lets `paused` write. Returns the paused redemption's
-/// response and then `request`'s.
-async fn race(
-    paused: PausedRedemption,
-    request: impl Future<Output = Response>,
-) -> Result<(Response, Response), Box<dyn std::error::Error>> {
-    let mut request = std::pin::pin!(request);
-    let first_poll = std::future::poll_fn(|cx| Poll::Ready(request.as_mut().poll(cx))).await;
-    let redeemed = paused.finish().await?;
-    let response = match first_poll {
-        Poll::Ready(response) => response,
-        Poll::Pending => tokio::time::timeout(HANG_GUARD, request).await?,
-    };
-    Ok((redeemed, response))
+fn assert_registry_busy(path: &Path) {
+    assert!(matches!(
+        crate::signed_input::lock_registry(path),
+        Err(RegistryUpdateError::Busy)
+    ));
+}
+
+async fn assert_error(response: Response, status: StatusCode, error: &str) -> TestResult {
+    let (actual_status, text) = status_and_text(response).await?;
+    assert_eq!(actual_status, status, "{text}");
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&text)?,
+        serde_json::json!({"error": error})
+    );
+    Ok(())
+}
+
+async fn assert_busy(response: Response) -> TestResult {
+    assert_error(
+        response,
+        StatusCode::SERVICE_UNAVAILABLE,
+        &CliError::from(RegistryUpdateError::Busy).to_string(),
+    )
+    .await
 }
 
 /// Offers issued by the provisioned authority, written as the service's
@@ -213,22 +230,6 @@ fn persisted_offers(
     Ok(PassportIssuanceOfferRegistry::load(path)?)
 }
 
-/// Redeems a credential with the access token `response` granted, if it
-/// granted one, and returns how many tokens and credentials that issued.
-async fn credentials_from(
-    state: &TrustServiceState,
-    record: &PassportIssuanceOfferRecord,
-    response: Response,
-) -> Result<(usize, usize), Box<dyn std::error::Error>> {
-    let (status, body) = status_and_text(response).await?;
-    if status != StatusCode::OK {
-        return Ok((0, 0));
-    }
-    let token = serde_json::from_str::<Oid4vciTokenResponse>(&body)?.access_token;
-    let (status, _) = status_and_text(redeem_credential(state, &token, record)?.await).await?;
-    Ok((1, usize::from(status == StatusCode::OK)))
-}
-
 #[tokio::test(flavor = "current_thread")]
 async fn one_pre_authorized_code_redeemed_during_a_paused_redemption_issues_one_credential(
 ) -> TestResult {
@@ -236,30 +237,45 @@ async fn one_pre_authorized_code_redeemed_during_a_paused_redemption_issues_one_
     let mut offers = OffersFile::new(&fixture)?;
     let (record, request) = offers.offer()?;
     offers.write()?;
+    let before = std::fs::read(&offers.path)?;
 
     let paused = PausedRedemption::start(&fixture.state, request.clone())?;
-    let second = tokio::task::spawn_blocking({
-        let state = fixture.state.clone();
-        let runtime = tokio::runtime::Handle::current();
-        move || {
-            runtime.block_on(handle_redeem_passport_issuance_token(
-                State(state),
-                Json(request),
-            ))
-        }
-    });
-    let second = tokio::time::timeout(HANG_GUARD, second).await??;
-    let (second_tokens, second_credentials) =
-        credentials_from(&fixture.state, &record, second).await?;
-    let (first_tokens, first_credentials) =
-        credentials_from(&fixture.state, &record, paused.finish().await?).await?;
-    let tokens = first_tokens + second_tokens;
-    let credentials = first_credentials + second_credentials;
+    assert_registry_busy(&offers.path);
+    assert_busy(
+        handle_redeem_passport_issuance_token(State(fixture.state.clone()), Json(request.clone()))
+            .await,
+    )
+    .await?;
+    assert_eq!(std::fs::read(&offers.path)?, before);
+    let token = issued_token(paused.finish().await?).await?;
+    let persisted = persisted_offers(&offers.path)?;
+    let winner = persisted
+        .offers
+        .get(&record.offer_id)
+        .ok_or("winner disappeared")?;
+    assert_eq!(winner.state, PassportIssuanceOfferState::TokenIssued);
     assert_eq!(
-        (tokens, credentials),
-        (1, 1),
-        "one pre-authorized code issued {tokens} access tokens and {credentials} credentials"
+        winner.access_token.as_deref(),
+        Some(token.access_token.as_str())
     );
+    assert_error(
+        handle_redeem_passport_issuance_token(State(fixture.state.clone()), Json(request)).await,
+        StatusCode::BAD_REQUEST,
+        &CliError::cli_other_error("pre-authorized code has already been redeemed").to_string(),
+    )
+    .await?;
+    let response = redeem_credential(&fixture.state, &token.access_token, &record)?.await;
+    assert_eq!(response.status(), StatusCode::OK);
+    assert!(!persisted_offers(&offers.path)?
+        .offers
+        .contains_key(&record.offer_id));
+    assert_error(
+        redeem_credential(&fixture.state, &token.access_token, &record)?.await,
+        StatusCode::UNAUTHORIZED,
+        &CliError::cli_other_error("access token is not present in the issuance registry")
+            .to_string(),
+    )
+    .await?;
     Ok(())
 }
 
@@ -273,24 +289,22 @@ async fn a_credential_redeemed_during_a_paused_code_redemption_is_issued_once() 
     offers.write()?;
 
     let paused = PausedRedemption::start(&fixture.state, waiting_code)?;
-    let credential = redeem_credential(&fixture.state, &access_token, &entitled)?;
-    let (redeemed, credential) = race(paused, credential).await?;
-    let credential = if credential.status() == StatusCode::SERVICE_UNAVAILABLE {
-        redeem_credential(&fixture.state, &access_token, &entitled)?.await
-    } else {
-        credential
-    };
-    let token = issued_token(redeemed).await?;
+    assert_registry_busy(&offers.path);
+    let before = std::fs::read(&offers.path)?;
+    assert_busy(redeem_credential(&fixture.state, &access_token, &entitled)?.await).await?;
+    assert_eq!(std::fs::read(&offers.path)?, before);
+    let token = issued_token(paused.finish().await?).await?;
+    let credential = redeem_credential(&fixture.state, &access_token, &entitled)?.await;
     let (status, body) = status_and_text(credential).await?;
     assert_eq!(status, StatusCode::OK, "{body}");
 
-    let (status, body) =
-        status_and_text(redeem_credential(&fixture.state, &access_token, &entitled)?.await).await?;
-    assert_eq!(
-        status,
+    assert_error(
+        redeem_credential(&fixture.state, &access_token, &entitled)?.await,
         StatusCode::UNAUTHORIZED,
-        "one access token issued a second credential: {body}"
-    );
+        &CliError::cli_other_error("access token is not present in the issuance registry")
+            .to_string(),
+    )
+    .await?;
     let persisted = persisted_offers(&offers.path)?;
     assert!(!persisted.offers.contains_key(&entitled.offer_id));
     let waiting = persisted
@@ -327,22 +341,21 @@ async fn an_offer_created_during_a_paused_code_redemption_is_kept() -> TestResul
             credential_configuration_id: None,
         }),
     );
-    let (redeemed, created) = race(paused, created).await?;
-    let created = if created.status() == StatusCode::SERVICE_UNAVAILABLE {
-        handle_create_passport_issuance_offer(
-            State(fixture.state.clone()),
-            bearer("service-secret")?,
-            Json(CreatePassportIssuanceOfferRequest {
-                passport: issuable_passport(offers.issued_at)?,
-                ttl_seconds: 3_600,
-                credential_configuration_id: None,
-            }),
-        )
-        .await
-    } else {
-        created
-    };
-    let token = issued_token(redeemed).await?;
+    assert_registry_busy(&offers.path);
+    let before = std::fs::read(&offers.path)?;
+    assert_busy(created.await).await?;
+    assert_eq!(std::fs::read(&offers.path)?, before);
+    let token = issued_token(paused.finish().await?).await?;
+    let created = handle_create_passport_issuance_offer(
+        State(fixture.state.clone()),
+        bearer("service-secret")?,
+        Json(CreatePassportIssuanceOfferRequest {
+            passport: issuable_passport(offers.issued_at)?,
+            ttl_seconds: 3_600,
+            credential_configuration_id: None,
+        }),
+    )
+    .await;
     let (status, body) = status_and_text(created).await?;
     assert_eq!(status, StatusCode::OK, "{body}");
     let created: PassportIssuanceOfferRecord = serde_json::from_str(&body)?;
@@ -432,30 +445,27 @@ async fn an_unrelated_policy_upsert_cannot_restore_a_deleted_policy() -> TestRes
     });
     tokio::task::spawn_blocking(move || opened_rx.recv_timeout(HANG_GUARD)).await??;
     std::fs::remove_file(&path)?;
-    std::fs::write(&path, bytes)?;
+    std::fs::write(&path, &bytes)?;
     let deletion = handle_delete_verifier_policy(
         State(state.clone()),
         AxumPath("removed".to_string()),
         bearer("service-secret")?,
     )
     .await;
-    let refused = deletion.status() == StatusCode::SERVICE_UNAVAILABLE;
-    if !refused {
-        assert_eq!(deletion.status(), StatusCode::OK);
-    }
+    assert_registry_busy(&path);
+    assert_busy(deletion).await?;
+    assert_eq!(std::fs::read(&path)?, bytes);
     release_tx.send(())?;
     let response = tokio::time::timeout(HANG_GUARD, upsert).await??;
     assert_eq!(response.status(), StatusCode::OK);
     writer.join().map_err(|_| "FIFO writer panicked")??;
-    if refused {
-        let response = handle_delete_verifier_policy(
-            State(state),
-            AxumPath("removed".to_string()),
-            bearer("service-secret")?,
-        )
-        .await;
-        assert_eq!(response.status(), StatusCode::OK);
-    }
+    let response = handle_delete_verifier_policy(
+        State(state),
+        AxumPath("removed".to_string()),
+        bearer("service-secret")?,
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
     let reopened = VerifierPolicyRegistry::load(&path)?;
     assert!(
         reopened.get("removed").is_none(),
@@ -533,5 +543,234 @@ async fn invalid_policy_preserves_the_original_400_body_and_leaves_bytes_unchang
     .await;
     assert_eq!(response.status(), StatusCode::OK);
     assert!(VerifierPolicyRegistry::load(&path)?.get("next").is_some());
+    Ok(())
+}
+
+/// Unrelated operator writes retain admission while two public token
+/// operations hold the service's public issuance budget.
+#[tokio::test(flavor = "current_thread")]
+async fn public_token_work_cannot_starve_unrelated_operator_mutation() -> TestResult {
+    let (first, _first_db) = PublicAuthorityFixture::provisioned()?;
+    let (mut second, _second_db) = PublicAuthorityFixture::provisioned()?;
+    // These two independently configured files share one service's public
+    // budget; an operator clone shares only its own separate budget.
+    second.state.public_passport_issuance_lane = first.state.public_passport_issuance_lane.clone();
+    let mut first_offers = OffersFile::new(&first)?;
+    let (_, first_code) = first_offers.offer()?;
+    first_offers.write()?;
+    let mut second_offers = OffersFile::new(&second)?;
+    let (_, second_code) = second_offers.offer()?;
+    second_offers.write()?;
+    let first_paused = PausedRedemption::start(&first.state, first_code)?;
+    let second_paused = PausedRedemption::start(&second.state, second_code)?;
+    assert_eq!(
+        first
+            .state
+            .public_passport_issuance_lane
+            .available_permits(),
+        0
+    );
+    assert_eq!(
+        first.state.operator_registry_write_lane.available_permits(),
+        2
+    );
+    let directory = chio_test_support::private_tempdir()?;
+    let path = directory.path().join("operator-policies.json");
+    let mut operator = first.state.clone();
+    operator.config.verifier_policies_file = Some(path.clone());
+    let document = policy("operator")?;
+    let response = handle_upsert_verifier_policy(
+        State(operator.clone()),
+        AxumPath("operator".to_string()),
+        bearer("service-secret")?,
+        Json(document.clone()),
+    )
+    .await;
+    let (status, text) = status_and_text(response).await?;
+    let statuses = directory.path().join("operator-passport-statuses.json");
+    let passport = issuable_passport(first_offers.issued_at)?;
+    let record = PassportStatusRegistry::update(&statuses, |registry| {
+        registry.publish(&passport, first_offers.issued_at, Default::default())
+    })?;
+    operator.config.passport_statuses_file = Some(statuses.clone());
+    let revoked = handle_revoke_passport_status(
+        State(operator),
+        AxumPath(record.passport_id.clone()),
+        bearer("service-secret")?,
+        Json(PassportStatusRevocationRequest {
+            reason: Some("compromised".to_string()),
+            revoked_at: Some(first_offers.issued_at + 1),
+        }),
+    )
+    .await;
+    let (revocation_status, revocation_text) = status_and_text(revoked).await?;
+    issued_token(first_paused.finish().await?).await?;
+    issued_token(second_paused.finish().await?).await?;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "public token work denied an unrelated operator mutation: {text}"
+    );
+    assert_eq!(revocation_status, StatusCode::OK, "{revocation_text}");
+    assert_eq!(
+        PassportStatusRegistry::load(&statuses)?
+            .get(&record.passport_id)
+            .map(|record| record.status),
+        Some(chio_credentials::PassportLifecycleState::Revoked)
+    );
+    assert_eq!(
+        VerifierPolicyRegistry::load(&path)?.get("operator"),
+        Some(&document)
+    );
+    Ok(())
+}
+
+/// Dropping the async handler cannot drop the blocking transaction's lock or
+/// admission. The clock pause is inside the real fresh mutation callback.
+#[tokio::test(flavor = "current_thread")]
+async fn cancelled_token_redemption_keeps_its_permit_and_still_consumes_the_code() -> TestResult {
+    let (mut fixture, _authority_db) = PublicAuthorityFixture::provisioned()?;
+    fixture.state.public_passport_issuance_lane = BlockingLane::new("public_passport_issuance", 1);
+    let lane = fixture.state.public_passport_issuance_lane.clone();
+    let mut offers = OffersFile::new(&fixture)?;
+    let (record, request) = offers.offer()?;
+    offers.write()?;
+    let before = std::fs::read(&offers.path)?;
+    let (paused, arrived, release) = paused_clock(&fixture.state);
+    let redemption = tokio::spawn(handle_redeem_passport_issuance_token(
+        State(paused),
+        Json(request.clone()),
+    ));
+    tokio::task::spawn_blocking(move || arrived.recv_timeout(HANG_GUARD)).await??;
+    assert_registry_busy(&offers.path);
+    assert_eq!(std::fs::read(&offers.path)?, before);
+    redemption.abort();
+    let cancelled = tokio::time::timeout(HANG_GUARD, redemption)
+        .await?
+        .err()
+        .ok_or("aborted token request still answered")?;
+    assert!(cancelled.is_cancelled());
+    assert_eq!(lane.available_permits(), 0);
+    assert_registry_busy(&offers.path);
+    let refused =
+        handle_redeem_passport_issuance_token(State(fixture.state.clone()), Json(request.clone()))
+            .now_or_never()
+            .ok_or("saturated token request queued")?;
+    assert_error(
+        refused,
+        StatusCode::SERVICE_UNAVAILABLE,
+        "registry writes are at capacity; nothing was changed, retry",
+    )
+    .await?;
+    // Malformed unauthenticated input retains its historical 400 even while
+    // the public lane and this file's lock are occupied.
+    let malformed = Oid4vciTokenRequest {
+        grant_type: request.grant_type.clone(),
+        pre_authorized_code: String::new(),
+    };
+    let expected =
+        CliError::from(malformed.validate().err().ok_or("empty code was valid")?).to_string();
+    assert_error(
+        handle_redeem_passport_issuance_token(State(fixture.state.clone()), Json(malformed)).await,
+        StatusCode::BAD_REQUEST,
+        &expected,
+    )
+    .await?;
+    assert_eq!(std::fs::read(&offers.path)?, before);
+
+    release.send(())?;
+    tokio::time::timeout(HANG_GUARD, lane.wait_for_free_permit()).await?;
+    assert_eq!(lane.available_permits(), 1);
+    drop(crate::signed_input::lock_registry(&offers.path).map_err(CliError::from)?);
+    let reopened = persisted_offers(&offers.path)?;
+    let consumed = reopened
+        .offers
+        .get(&record.offer_id)
+        .ok_or("consumed code was lost")?;
+    assert_eq!(consumed.state, PassportIssuanceOfferState::TokenIssued);
+    let token = consumed
+        .access_token
+        .as_deref()
+        .ok_or("cancelled redemption did not persist its token")?;
+    assert_error(
+        handle_redeem_passport_issuance_token(State(fixture.state.clone()), Json(request)).await,
+        StatusCode::BAD_REQUEST,
+        &CliError::cli_other_error("pre-authorized code has already been redeemed").to_string(),
+    )
+    .await?;
+    let credential = redeem_credential(&fixture.state, token, &record)?.await;
+    assert_eq!(credential.status(), StatusCode::OK);
+    assert!(!persisted_offers(&offers.path)?
+        .offers
+        .contains_key(&record.offer_id));
+    Ok(())
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn cancelled_credential_redemption_keeps_its_permit_and_still_consumes_the_token(
+) -> TestResult {
+    let (mut fixture, _authority_db) = PublicAuthorityFixture::provisioned()?;
+    fixture.state.public_passport_issuance_lane = BlockingLane::new("public_passport_issuance", 1);
+    let lane = fixture.state.public_passport_issuance_lane.clone();
+    let mut offers = OffersFile::new(&fixture)?;
+    let (record, code) = offers.offer()?;
+    let token = offers.redeem(&code)?;
+    let (next, next_code) = offers.offer()?;
+    offers.write()?;
+    let before = std::fs::read(&offers.path)?;
+    let (paused, arrived, release) = paused_clock(&fixture.state);
+    let redemption = tokio::spawn(handle_redeem_passport_issuance_credential(
+        State(paused),
+        bearer(&token)?,
+        Json(credential_request(&record)),
+    ));
+    tokio::task::spawn_blocking(move || arrived.recv_timeout(HANG_GUARD)).await??;
+    assert_registry_busy(&offers.path);
+    assert_eq!(std::fs::read(&offers.path)?, before);
+    redemption.abort();
+    let cancelled = tokio::time::timeout(HANG_GUARD, redemption)
+        .await?
+        .err()
+        .ok_or("aborted credential request still answered")?;
+    assert!(cancelled.is_cancelled());
+    assert_eq!(lane.available_permits(), 0);
+    assert_registry_busy(&offers.path);
+    let refused = redeem_credential(&fixture.state, &token, &record)?
+        .now_or_never()
+        .ok_or("saturated credential request queued")?;
+    assert_error(
+        refused,
+        StatusCode::SERVICE_UNAVAILABLE,
+        "registry writes are at capacity; nothing was changed, retry",
+    )
+    .await?;
+    assert_eq!(std::fs::read(&offers.path)?, before);
+
+    release.send(())?;
+    tokio::time::timeout(HANG_GUARD, lane.wait_for_free_permit()).await?;
+    assert_eq!(lane.available_permits(), 1);
+    drop(crate::signed_input::lock_registry(&offers.path).map_err(CliError::from)?);
+    assert!(!persisted_offers(&offers.path)?
+        .offers
+        .contains_key(&record.offer_id));
+    assert_error(
+        redeem_credential(&fixture.state, &token, &record)?.await,
+        StatusCode::UNAUTHORIZED,
+        &CliError::cli_other_error("access token is not present in the issuance registry")
+            .to_string(),
+    )
+    .await?;
+    let next_token = issued_token(
+        handle_redeem_passport_issuance_token(State(fixture.state.clone()), Json(next_code)).await,
+    )
+    .await?;
+    let reopened = persisted_offers(&offers.path)?;
+    assert_eq!(
+        reopened
+            .offers
+            .get(&next.offer_id)
+            .and_then(|record| record.access_token.as_deref()),
+        Some(next_token.access_token.as_str())
+    );
     Ok(())
 }

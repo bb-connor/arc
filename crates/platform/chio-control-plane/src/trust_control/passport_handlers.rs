@@ -192,7 +192,8 @@ pub(crate) async fn handle_create_passport_issuance_offer(
         return plain_http_error(StatusCode::CONFLICT,
             "passport issuance requires --passport-issuance-offers-file on the trust-control service");
     };
-    run_registry_transaction(move || {
+    let lane = state.operator_registry_write_lane.clone();
+    run_registry_transaction(&lane, move || {
         PassportIssuanceOfferRegistry::update_for_issuance(&path, |registry| {
             issuer_authority::run(&state, |state, signer| {
                 let metadata = issuer_authority::metadata(&state.config, signer)?;
@@ -232,7 +233,11 @@ pub(crate) async fn handle_redeem_passport_issuance_token(
         return plain_http_error(StatusCode::CONFLICT,
             "passport issuance requires --passport-issuance-offers-file on the trust-control service");
     };
-    run_registry_transaction(move || {
+    if let Err(error) = payload.validate() {
+        return plain_http_error(StatusCode::BAD_REQUEST, &CliError::from(error).to_string());
+    }
+    let lane = state.public_passport_issuance_lane.clone();
+    run_registry_transaction(&lane, move || {
         PassportIssuanceOfferRegistry::update(&path, |registry| {
             issuer_authority::run(&state, |state, signer| {
                 let metadata = issuer_authority::metadata(&state.config, signer)?;
@@ -265,7 +270,8 @@ pub(crate) async fn handle_redeem_passport_issuance_credential(
         return plain_http_error(StatusCode::CONFLICT,
             "passport issuance requires --passport-issuance-offers-file on the trust-control service");
     };
-    run_registry_transaction(move || {
+    let lane = state.public_passport_issuance_lane.clone();
+    run_registry_transaction(&lane, move || {
         PassportIssuanceOfferRegistry::update(&path, |registry| {
             let issuer = state.config.advertise_url.as_deref().ok_or_else(|| {
                 RegistryOperationError::Configuration(
@@ -370,7 +376,8 @@ pub(crate) async fn handle_publish_passport_status(
     if request.distribution.resolve_urls.is_empty() {
         request.distribution = default_passport_status_distribution(&state.config);
     }
-    run_registry_update(move || {
+    let lane = state.operator_registry_write_lane.clone();
+    run_registry_update(&lane, move || {
         PassportStatusRegistry::update(&path, |registry| {
             registry.publish(&request.passport, clock_now, request.distribution)
         })
@@ -440,7 +447,8 @@ pub(crate) async fn handle_revoke_passport_status(
         Ok(path) => path,
         Err(response) => return response,
     };
-    run_registry_update(move || {
+    let lane = state.operator_registry_write_lane.clone();
+    run_registry_update(&lane, move || {
         PassportStatusRegistry::update(&path, |registry| {
             registry.revoke(&passport_id, request.reason.as_deref(), request.revoked_at)
         })
@@ -507,7 +515,8 @@ pub(crate) async fn handle_upsert_verifier_policy(
         Ok(path) => path,
         Err(response) => return response,
     };
-    run_registry_transaction(move || {
+    let lane = state.operator_registry_write_lane.clone();
+    run_registry_transaction(&lane, move || {
         VerifierPolicyRegistry::update(&path, |registry| {
             document.body.policy_id = policy_id;
             verify_signed_passport_verifier_policy(&document)
@@ -540,7 +549,8 @@ pub(crate) async fn handle_delete_verifier_policy(
         Ok(path) => path,
         Err(response) => return response,
     };
-    run_registry_transaction(move || {
+    let lane = state.operator_registry_write_lane.clone();
+    run_registry_transaction(&lane, move || {
         VerifierPolicyRegistry::update(&path, |registry| {
             let deleted = registry.remove(&policy_id);
             Ok::<_, RegistryOperationError>(VerifierPolicyDeleteResponse { policy_id, deleted })

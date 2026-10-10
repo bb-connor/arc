@@ -64,7 +64,8 @@ pub(crate) async fn handle_publish_certification(
         Ok(path) => path,
         Err(response) => return response,
     };
-    run_registry_update(move || {
+    let lane = state.operator_registry_write_lane.clone();
+    run_registry_update(&lane, move || {
         CertificationRegistry::update(&path, |registry| registry.publish(artifact))
     })
     .await
@@ -447,7 +448,8 @@ pub(crate) async fn handle_revoke_certification(
         Ok(path) => path,
         Err(response) => return response,
     };
-    run_registry_update(move || {
+    let lane = state.operator_registry_write_lane.clone();
+    run_registry_update(&lane, move || {
         CertificationRegistry::update(&path, |registry| {
             registry.revoke(&artifact_id, request.reason.as_deref(), request.revoked_at)
         })
@@ -473,7 +475,8 @@ pub(crate) async fn handle_dispute_certification(
         Ok(path) => path,
         Err(response) => return response,
     };
-    run_registry_update(move || {
+    let lane = state.operator_registry_write_lane.clone();
+    run_registry_update(&lane, move || {
         CertificationRegistry::update(&path, |registry| registry.dispute(&artifact_id, &request))
     })
     .await

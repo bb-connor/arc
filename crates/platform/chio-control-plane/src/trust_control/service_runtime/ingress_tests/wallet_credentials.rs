@@ -139,7 +139,9 @@ impl WalletFixture {
         let response = super::super::super::build_router(self.state.clone())
             .oneshot(request.body(Body::from_stream(stream))?)
             .await?;
-        assert_eq!(response.status(), expected);
+        let status = response.status();
+        let body = axum::body::to_bytes(response.into_body(), 4096).await?;
+        assert_eq!(status, expected, "{}", String::from_utf8_lossy(&body));
         assert_eq!(polls.load(Ordering::SeqCst), expected_polls);
         assert_eq!(std::fs::read(&self.registry_path)?, before);
         assert!(
@@ -151,7 +153,7 @@ impl WalletFixture {
 }
 
 #[tokio::test]
-async fn f047_wallet_missing_or_malformed_bearer_never_polls_body() -> TestResult {
+async fn wallet_missing_or_malformed_bearer_never_polls_body() -> TestResult {
     let fixture = WalletFixture::live()?;
     for credential in [
         None,
@@ -167,7 +169,7 @@ async fn f047_wallet_missing_or_malformed_bearer_never_polls_body() -> TestResul
 }
 
 #[tokio::test]
-async fn f047_wallet_forged_or_service_bearer_never_polls_body() -> TestResult {
+async fn wallet_forged_or_service_bearer_never_polls_body() -> TestResult {
     let fixture = WalletFixture::live()?;
     for credential in [
         "Bearer forged-wallet-token",
@@ -182,7 +184,7 @@ async fn f047_wallet_forged_or_service_bearer_never_polls_body() -> TestResult {
 }
 
 #[tokio::test]
-async fn f047_wallet_expired_offer_or_token_never_polls_or_refreshes_registry() -> TestResult {
+async fn wallet_expired_offer_or_token_never_polls_or_refreshes_registry() -> TestResult {
     for fixture in [
         WalletFixture::new(600, 3_600, 60)?,
         WalletFixture::new(600, 60, 60)?,
@@ -196,7 +198,7 @@ async fn f047_wallet_expired_offer_or_token_never_polls_or_refreshes_registry() 
 }
 
 #[tokio::test]
-async fn f047_wallet_consumed_or_unissued_entitlement_never_polls_body() -> TestResult {
+async fn wallet_consumed_or_unissued_entitlement_never_polls_body() -> TestResult {
     for state in [
         PassportIssuanceOfferState::CredentialIssued,
         PassportIssuanceOfferState::Offered,
@@ -212,7 +214,7 @@ async fn f047_wallet_consumed_or_unissued_entitlement_never_polls_body() -> Test
 }
 
 #[tokio::test]
-async fn f047_wallet_issuer_binding_is_checked_before_body_without_signing() -> TestResult {
+async fn wallet_issuer_binding_is_checked_before_body_without_signing() -> TestResult {
     let mut fixture = WalletFixture::live()?;
     fixture.state.config.advertise_url = Some("https://another-issuer.example.test".into());
     let credential = format!("Bearer {}", fixture.token);
@@ -223,7 +225,7 @@ async fn f047_wallet_issuer_binding_is_checked_before_body_without_signing() -> 
 }
 
 #[tokio::test]
-async fn f047_wallet_live_opaque_token_keeps_duplicate_validation_and_storage() -> TestResult {
+async fn wallet_live_opaque_token_keeps_duplicate_validation_and_storage() -> TestResult {
     let fixture = WalletFixture::live()?;
     let credential = format!("Bearer {}", fixture.token);
     fixture
@@ -233,7 +235,7 @@ async fn f047_wallet_live_opaque_token_keeps_duplicate_validation_and_storage() 
 }
 
 #[tokio::test]
-async fn f047_wallet_entitlement_is_rechecked_after_upload_without_consumption() -> TestResult {
+async fn wallet_entitlement_is_rechecked_after_upload_without_consumption() -> TestResult {
     let mut fixture = WalletFixture::live()?;
     fixture.state.config.authority_seed_path = None;
     let mut consumed = PassportIssuanceOfferRegistry::load(&fixture.registry_path)?;
@@ -270,7 +272,14 @@ async fn f047_wallet_entitlement_is_rechecked_after_upload_without_consumption()
     let response = super::super::super::build_router(fixture.state.clone())
         .oneshot(request)
         .await?;
-    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    let status = response.status();
+    let refusal = axum::body::to_bytes(response.into_body(), 4096).await?;
+    assert_eq!(
+        status,
+        StatusCode::UNAUTHORIZED,
+        "{}",
+        String::from_utf8_lossy(&refusal)
+    );
     assert_eq!(polls.load(Ordering::SeqCst), 1);
     assert_eq!(std::fs::read(&fixture.registry_path)?, consumed_bytes);
     assert!(!fixture.seed_path.exists());
@@ -278,7 +287,7 @@ async fn f047_wallet_entitlement_is_rechecked_after_upload_without_consumption()
 }
 
 #[tokio::test]
-async fn f047_wallet_consumed_during_upload_cannot_create_signing_seed() -> TestResult {
+async fn wallet_consumed_during_upload_cannot_create_signing_seed() -> TestResult {
     let fixture = WalletFixture::live()?;
     let mut consumed = PassportIssuanceOfferRegistry::load(&fixture.registry_path)?;
     let record = consumed
@@ -314,7 +323,14 @@ async fn f047_wallet_consumed_during_upload_cannot_create_signing_seed() -> Test
     let response = super::super::super::build_router(fixture.state.clone())
         .oneshot(request)
         .await?;
-    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    let status = response.status();
+    let refusal = axum::body::to_bytes(response.into_body(), 4096).await?;
+    assert_eq!(
+        status,
+        StatusCode::UNAUTHORIZED,
+        "{}",
+        String::from_utf8_lossy(&refusal)
+    );
     assert_eq!(polls.load(Ordering::SeqCst), 1);
     assert_eq!(std::fs::read(&fixture.registry_path)?, consumed_bytes);
     assert!(

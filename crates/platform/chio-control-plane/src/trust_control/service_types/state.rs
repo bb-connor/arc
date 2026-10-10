@@ -48,6 +48,12 @@ pub(crate) struct TrustServiceState {
     pub(crate) authority_health_lane: Arc<tokio::sync::Semaphore>,
     /// Eight non-queued process permits for authenticated blocking authority inspection.
     pub(crate) authority_inspection_lane: Arc<tokio::sync::Semaphore>,
+    /// Service-authenticated registry work, independent of public wallets.
+    pub(crate) operator_registry_write_lane: BlockingLane,
+    /// Public issuance work with a separate fixed admission budget.
+    pub(crate) public_passport_issuance_lane: BlockingLane,
+    /// Wallet bearer admission is independent of redemption and operators.
+    pub(crate) wallet_entitlement_lane: crate::trust_control::ingress_lanes::IngressLane,
     /// Evidenced rail seam for finding-market fee collection;
     /// `None` fails activation closed.
     pub(crate) finding_rail: Option<Arc<dyn super::super::finding_handlers::FindingRailObserver>>,

@@ -7,7 +7,7 @@
 //! existing format-specific readers.
 use super::config_and_public::load_passport_issuance_registry_for_admin;
 use super::frost::*;
-use super::ingress_lanes::{wallet_entitlement_lane, IngressLane};
+use super::ingress_lanes::IngressLane;
 use super::receipt_handlers::resolve_admin_report_read_context;
 use super::report_validation::{
     bearer_token_from_headers, resolve_control_read_principal, validate_authority_issue_auth,
@@ -301,7 +301,7 @@ pub(super) async fn authenticate(
             authenticate_wallet_credential(
                 request.headers(),
                 state.config,
-                wallet_entitlement_lane(),
+                &state.wallet_entitlement_lane,
             )
             .await
         }

@@ -30,8 +30,21 @@ async fn error_of(
 
 #[tokio::test]
 async fn a_saturated_lane_refuses_at_once_and_runs_nothing() -> TestResult {
-    let lane = Arc::new(tokio::sync::Semaphore::new(REGISTRY_WRITE_PERMITS));
-    let held = Arc::clone(&lane).try_acquire_many_owned(u32::try_from(REGISTRY_WRITE_PERMITS)?)?;
+    let lane = BlockingLane::new("operator_registry_write", 1);
+    let (entered_tx, entered_rx) = std::sync::mpsc::channel();
+    let (release_tx, release_rx) = std::sync::mpsc::channel();
+    let held = tokio::spawn({
+        let lane = lane.clone();
+        async move {
+            run_registry_update_in(&lane, move || {
+                let _ = entered_tx.send(());
+                let _ = release_rx.recv_timeout(HANG_GUARD);
+                Ok::<(), RegistryUpdateError>(())
+            })
+            .await
+        }
+    });
+    tokio::task::spawn_blocking(move || entered_rx.recv_timeout(HANG_GUARD)).await??;
     let ran = Arc::new(AtomicBool::new(false));
     let response = tokio::time::timeout(
         HANG_GUARD,
@@ -53,7 +66,11 @@ async fn a_saturated_lane_refuses_at_once_and_runs_nothing() -> TestResult {
     );
     assert!(!ran.load(Ordering::SeqCst));
 
-    drop(held);
+    release_tx.send(())?;
+    assert_eq!(
+        tokio::time::timeout(HANG_GUARD, held).await??.status(),
+        StatusCode::OK
+    );
     let response = run_registry_update_in(&lane, || Ok::<(), RegistryUpdateError>(())).await;
     assert_eq!(response.status(), StatusCode::OK);
     Ok(())
@@ -92,10 +109,9 @@ async fn a_dropped_write_keeps_its_permit_and_lock_until_the_write_ends() -> Tes
         file.write_all(&bytes)
     });
 
-    let lane = Arc::new(tokio::sync::Semaphore::new(REGISTRY_WRITE_PERMITS));
+    let lane = BlockingLane::new("operator_registry_write", 1);
     let request = tokio::spawn({
-        let (lane, path, passport_id) =
-            (Arc::clone(&lane), path.clone(), record.passport_id.clone());
+        let (lane, path, passport_id) = (lane.clone(), path.clone(), record.passport_id.clone());
         async move {
             run_registry_update_in(&lane, move || {
                 PassportStatusRegistry::update(&path, |registry| {
@@ -112,19 +128,15 @@ async fn a_dropped_write_keeps_its_permit_and_lock_until_the_write_ends() -> Tes
         .await
         .err()
         .is_some_and(|error| error.is_cancelled()));
-    assert_eq!(lane.available_permits(), REGISTRY_WRITE_PERMITS - 1);
+    assert_eq!(lane.available_permits(), 0);
     assert!(matches!(
         crate::signed_input::lock_registry(&path),
         Err(RegistryUpdateError::Busy)
     ));
 
     release_tx.send(())?;
-    let returned = tokio::time::timeout(
-        HANG_GUARD,
-        Arc::clone(&lane).acquire_many_owned(u32::try_from(REGISTRY_WRITE_PERMITS)?),
-    )
-    .await??;
-    drop(returned);
+    tokio::time::timeout(HANG_GUARD, lane.wait_for_free_permit()).await?;
+    assert_eq!(lane.available_permits(), 1);
     server.join().map_err(|_| "registry server panicked")??;
 
     let reopened = PassportStatusRegistry::load(&path)?;
