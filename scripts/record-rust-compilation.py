@@ -429,6 +429,7 @@ class Campaign:
             "retention_batch_incomplete")
         ids = sorted({name.split(".")[0] for name in names})
         references = []
+        artifact_members = {}
         for batch_id in ids:
             start_name, complete_name = batch_id + ".start.json", batch_id + ".complete.json"
             require(start_name in names and complete_name in names, "retention_batch_incomplete")
@@ -470,14 +471,25 @@ class Campaign:
                             and complete["retained"] == [after_members[sha] for sha in sorted(set(after_members) - set(before_members))],
                             "retention_batch_incomplete")
                     for member in after["artifacts"]:
-                        with HeldPath(self.directory.path / member["artifact"]) as handle:
-                            require(list(handle.initial) == member["identity"] and handle.initial[3] == member["size"], "retention_batch_incomplete")
-                            if verify_artifacts:
-                                require(hashlib.sha256(handle.read()).hexdigest() == member["sha256"], "retention_batch_incomplete")
+                        previous = artifact_members.setdefault(member["sha256"], member)
+                        require(previous == member and len(artifact_members) <= MAX_ARTIFACTS,
+                                "retention_batch_incomplete")
                     references.append({"batch_id": batch_id, "source_binding": self.binding,
                                        "start": start_reference, "complete": complete_reference})
             except (KeyError, TypeError, ValueError, OSError, Refusal) as error:
                 raise Refusal("retention_batch_incomplete") from error
+        # Every declaration above is checked. Their immutable artifact claims
+        # must agree, so observe each distinct physical object once under the
+        # caller's held campaign lock instead of once for every prior batch.
+        try:
+            for member in artifact_members.values():
+                with HeldPath(self.directory.path / member["artifact"]) as handle:
+                    require(list(handle.initial) == member["identity"] and handle.initial[3] == member["size"],
+                            "retention_batch_incomplete")
+                    if verify_artifacts:
+                        require(hashlib.sha256(handle.read()).hexdigest() == member["sha256"], "retention_batch_incomplete")
+        except (KeyError, TypeError, ValueError, OSError, Refusal) as error:
+            raise Refusal("retention_batch_incomplete") from error
         return references
 
     def batch_file_reference(self, name, payload, handle):
