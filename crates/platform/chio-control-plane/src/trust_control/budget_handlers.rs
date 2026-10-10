@@ -76,7 +76,7 @@ pub(crate) async fn handle_list_budgets(
                 total_cost_exposed: usage.total_cost_exposed,
                 total_cost_realized_spend: usage.total_cost_realized_spend,
                 updated_at: usage.updated_at,
-                seq: None,
+                seq: Some(usage.seq),
             })
             .collect(),
     })

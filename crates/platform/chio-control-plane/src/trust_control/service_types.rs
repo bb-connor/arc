@@ -186,9 +186,10 @@ pub(crate) use self::retained_budget_hold::*;
 pub use self::state::TrustControlClient;
 pub(crate) use self::state::{
     AuthorityAgreementConfirmation, AuthorityHistoryWitness, AuthorityImportConfirmation,
-    AuthorityKeyCache, BudgetCursor, CachedBudgetUsage, ClusterConsensusView,
-    ClusterPeerClientAuth, ClusterProgress, ClusterRuntimeState, FederationAdmissionRateLimiter,
-    PeerHealth, PeerSyncState, RemoteBudgetStore, RemoteCapabilityAuthority, RemoteReceiptStore,
-    RemoteRevocationStore, RevocationCursor, TrustServiceState,
+    AuthorityKeyCache, BudgetCursor, BudgetUsageProvenance, CachedBudgetUsage,
+    ClusterConsensusView, ClusterPeerClientAuth, ClusterProgress, ClusterRuntimeState,
+    FederationAdmissionRateLimiter, PeerHealth, PeerSyncState, RemoteBudgetStore,
+    RemoteCapabilityAuthority, RemoteReceiptStore, RemoteRevocationStore, RevocationCursor,
+    TrustServiceState,
 };
 pub(crate) use self::structured_budget::*;

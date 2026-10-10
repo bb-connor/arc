@@ -9,6 +9,9 @@ use super::support::{assert_json_post, StaticResponseServer};
 use chio_kernel::budget_store::ReservedHoldEnvelope;
 use chio_test_support::prelude::*;
 
+#[path = "legacy_budget_projection.rs"]
+mod legacy_budget_projection;
+
 #[test]
 fn budget_wrappers_use_split_budget_routes() {
     let server = StaticResponseServer::spawn(200, "{}", "application/json", 4);
@@ -758,7 +761,7 @@ fn remote_budget_store_preserves_captured_authorize_replay_decision(
         "totalRealizedSpend": 0,
     })
     .to_string();
-    let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
+    let server = legacy_budget_projection::ProjectionServer::spawn(&body)?;
     let store = build_remote_budget_store(&server.url, "secret")?;
 
     let decision = store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
@@ -792,24 +795,57 @@ fn remote_budget_store_preserves_captured_authorize_replay_decision(
         mutation.metadata.event_id.as_deref(),
         Some("hold-budget:original-capture")
     );
+    server.set_body(&legacy_budget_projection::list_body(&[
+        BudgetUsageRecord {
+            capability_id: "cap-budget".to_string(),
+            grant_index: 0,
+            seq: 9,
+            invocation_count: 2,
+            total_cost_exposed: 200,
+            total_cost_realized_spend: 0,
+            updated_at: 9,
+        },
+    ])?);
     let usage = store
         .get_usage("cap-budget", 0)?
         .ok_or_else(|| std::io::Error::other("current replay usage was not cached"))?;
     assert_eq!(usage.seq, 9);
     assert_eq!(usage.invocation_count, 2);
     assert_eq!(usage.total_cost_exposed, 200);
+    assert_eq!(usage.updated_at, 9);
     Ok(())
 }
 
 #[test]
 fn remote_capture_cancel_and_authorize_replays_cannot_regress_cached_usage(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let server = StaticResponseServer::spawn(200, "{}", "application/json", 0);
+    let baseline = BudgetUsageRecord {
+        capability_id: "cap-budget".to_string(),
+        grant_index: 0,
+        seq: 12,
+        invocation_count: 3,
+        total_cost_exposed: 300,
+        total_cost_realized_spend: 25,
+        updated_at: 12,
+    };
+    let unversioned = BudgetUsageRecord {
+        capability_id: "cap-budget".to_string(),
+        grant_index: 1,
+        seq: 0,
+        invocation_count: 1,
+        total_cost_exposed: 10,
+        total_cost_realized_spend: 5,
+        updated_at: 0,
+    };
+    let server = legacy_budget_projection::ProjectionServer::spawn(
+        &legacy_budget_projection::list_body(&[baseline, unversioned])?,
+    )?;
     let store = RemoteBudgetStore {
         client: build_client(&server.url, "secret")?,
         cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
         recovery_fence: None,
     };
+    assert_eq!(store.list_usages(10, Some("cap-budget"))?.len(), 2);
     store.cache_usage("cap-budget", 0, Some(12), Some(3), Some(300), Some(25))?;
 
     for replay_seq in [Some(4), Some(8), None] {
@@ -832,14 +868,18 @@ fn remote_capture_cancel_and_authorize_replays_cannot_regress_cached_usage(
         .ok_or_else(|| std::io::Error::other("newer cache did not survive stale removal"))?;
     assert_eq!(usage.seq, 12);
     store.cache_usage("cap-budget", 1, Some(0), Some(1), Some(10), Some(5))?;
+    let usage = store
+        .get_usage("cap-budget", 1)?
+        .ok_or("unversioned baseline missing")?;
+    assert_eq!(usage.seq, 0);
+    assert_eq!(usage.invocation_count, 1);
+    assert_eq!(usage.total_cost_exposed, 10);
+    assert_eq!(usage.total_cost_realized_spend, 5);
     store.cache_usage("cap-budget", 1, Some(1), None, None, None)?;
     let unprojected = store
-        .get_usage("cap-budget", 1)?
+        .cached_usage("cap-budget", 1)
         .ok_or_else(|| std::io::Error::other("unprojected replay removed cached usage"))?;
-    assert_eq!(unprojected.seq, 0);
-    assert_eq!(unprojected.invocation_count, 1);
-    assert_eq!(unprojected.total_cost_exposed, 10);
-    assert_eq!(unprojected.total_cost_realized_spend, 5);
+    assert_eq!(unprojected.seq, 1);
     Ok(())
 }
 
@@ -878,13 +918,26 @@ fn remote_budget_list_cannot_regress_or_conflict_with_newer_cached_usage(
         }]
     })
     .to_string();
-    let server = StaticResponseServer::spawn(200, &stale, "application/json", 2);
+    let baseline = BudgetUsageRecord {
+        capability_id: "cap-budget".to_string(),
+        grant_index: 0,
+        seq: 12,
+        invocation_count: 3,
+        total_cost_exposed: 300,
+        total_cost_realized_spend: 25,
+        updated_at: 12,
+    };
+    let server = legacy_budget_projection::ProjectionServer::spawn(
+        &legacy_budget_projection::list_body(std::slice::from_ref(&baseline))?,
+    )?;
     let store = RemoteBudgetStore {
         client: build_client(&server.url, "secret")?,
         cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
         recovery_fence: None,
     };
+    assert_eq!(store.get_usage("cap-budget", 0)?, Some(baseline));
     store.cache_usage("cap-budget", 0, Some(12), Some(3), Some(300), Some(25))?;
+    server.set_body(&stale);
     let stale_result = store.list_usages(10, Some("cap-budget"));
     server.set_body(&conflict);
     let conflict_result = store.list_usages(10, Some("cap-budget"));
@@ -1120,7 +1173,8 @@ fn remote_budget_store_preserves_authority_term_and_commit_metadata() {
         }
     })
     .to_string();
-    let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
+    let server = legacy_budget_projection::ProjectionServer::spawn(&body)
+        .test_expect("bounded response server");
     let store =
         build_remote_budget_store(&server.url, "secret").test_expect("build remote budget store");
 
@@ -1161,6 +1215,18 @@ fn remote_budget_store_preserves_authority_term_and_commit_metadata() {
         Some("hold-budget:authorize")
     );
 
+    server.set_body(
+        &legacy_budget_projection::list_body(&[BudgetUsageRecord {
+            capability_id: "cap-budget".to_string(),
+            grant_index: 2,
+            seq: 41,
+            invocation_count: 5,
+            total_cost_exposed: 120,
+            total_cost_realized_spend: 75,
+            updated_at: 41,
+        }])
+        .test_expect("authoritative usage response"),
+    );
     let usage = store
         .get_usage("cap-budget", 2)
         .test_expect("get cached usage")
@@ -1169,6 +1235,7 @@ fn remote_budget_store_preserves_authority_term_and_commit_metadata() {
     assert_eq!(usage.invocation_count, 5);
     assert_eq!(usage.total_cost_exposed, 120);
     assert_eq!(usage.total_cost_realized_spend, 75);
+    assert_eq!(usage.updated_at, 41);
 }
 
 #[test]

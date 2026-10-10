@@ -118,8 +118,7 @@ impl RemoteBudgetStore {
                 "remote captured cancellation response returned an invalid reversed state",
             ));
         }
-        self.cache_structured_usage(&request.capability_id, request.grant_index, usage)?;
-        Ok(match decision {
+        let result = match decision {
             StructuredBudgetMutationDecisionView::Applied => {
                 BudgetCapturedBeforeDispatchCancellationDecision::Cancelled(mutation)
             }
@@ -131,7 +130,9 @@ impl RemoteBudgetStore {
                     "remote captured cancellation omitted exact replay status",
                 ));
             }
-        })
+        };
+        self.cache_structured_usage(&request.capability_id, request.grant_index, usage)?;
+        Ok(result)
     }
 
     pub(super) fn authorize_structured_budget_hold(
@@ -727,17 +728,21 @@ impl RemoteBudgetStore {
             Ok(guard) => guard,
             Err(poisoned) => poisoned.into_inner(),
         };
-        if let Some(existing) = cached_usage.get(&key).map(|entry| &entry.record) {
-            if existing.seq > record.seq {
+        if let Some(existing) = cached_usage.get(&key) {
+            if existing.record.seq > record.seq {
                 return Ok(());
             }
-            if existing.seq == record.seq {
-                if existing != &record {
+            if existing.record.seq == record.seq {
+                if existing.observed.is_complete() && existing.record != record
+                    || !existing.observed.agrees_with(&existing.record, &record)
+                {
                     return Err(structured_budget_error(
                         "structured remote replay changed the exact usage projection",
                     ));
                 }
-                return Ok(());
+                if existing.observed.is_complete() {
+                    return Ok(());
+                }
             }
         }
         record.committed_cost_units()?;
@@ -746,7 +751,7 @@ impl RemoteBudgetStore {
             key,
             CachedBudgetUsage {
                 record,
-                cost_authoritative: true,
+                observed: BudgetUsageProvenance::complete(),
             },
         );
         Ok(())

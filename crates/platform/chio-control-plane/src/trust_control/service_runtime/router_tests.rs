@@ -297,12 +297,34 @@ fn fiscal_marketplace_credit_limit_rejects_client_trust_claims() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn standalone_legacy_holds_use_exact_versioned_rich_lifecycle(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    use chio_security_types::clock::{
+        Clock, ClockError, ClockReading, MonotonicInstant, UnixMillis,
+    };
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    struct LegacyBudgetClock(AtomicU64);
+    impl Clock for LegacyBudgetClock {
+        fn read(&self) -> Result<ClockReading, ClockError> {
+            let seconds = self.0.load(Ordering::SeqCst);
+            Ok(ClockReading::new(
+                UnixMillis::from_secs(seconds)?,
+                MonotonicInstant::from_nanos(
+                    seconds
+                        .checked_mul(1_000_000_000)
+                        .ok_or(ClockError::Overflow)?,
+                ),
+            ))
+        }
+    }
+
     let temp = crate::durable_admission::private_tempdir()?;
-    let sqlite = Arc::new(SqliteBudgetStore::open(
+    let clock = Arc::new(LegacyBudgetClock(AtomicU64::new(1_000)));
+    let sqlite = Arc::new(SqliteBudgetStore::open_with_clock(
         temp.path().join("legacy-budget.sqlite3"),
+        clock.clone(),
     )?);
     let mut state = metrics_state("service-secret");
-    state.budget_store = Some(sqlite);
+    state.budget_store = Some(sqlite.clone());
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
     let url = format!("http://{}", listener.local_addr()?);
     let server =
@@ -335,7 +357,11 @@ async fn standalone_legacy_holds_use_exact_versioned_rich_lifecycle(
         let authorization_usage = store
             .get_usage("legacy-rich", 0)?
             .ok_or_else(|| std::io::Error::other("authorization usage was not cached"))?;
-        std::thread::sleep(Duration::from_millis(1_100));
+        let authorization_projection = sqlite
+            .usage_projection_for_event_id("legacy-capture:authorize")?
+            .ok_or_else(|| std::io::Error::other("authorization projection was not durable"))?;
+        assert_eq!(authorization_projection.updated_at, 1_000);
+        clock.0.store(1_002, Ordering::SeqCst);
         let capture = store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
             capability_id: "legacy-rich".to_string(),
             grant_index: 0,
@@ -343,6 +369,8 @@ async fn standalone_legacy_holds_use_exact_versioned_rich_lifecycle(
             event_id: format!("{capture_hold}:capture-invocation"),
             trusted_time: None,
             authority: None,
+        }).inspect_err(|error| {
+            eprintln!("capture failed: {error}; cached authorization={authorization_usage:?}; durable authorization={authorization_projection:?}");
         })?;
         let capture = match capture {
             BudgetInvocationCaptureDecision::Captured(mutation) => mutation,
@@ -366,6 +394,14 @@ async fn standalone_legacy_holds_use_exact_versioned_rich_lifecycle(
         assert_eq!(capture_usage.seq, authorization_usage.seq);
         assert_eq!(capture_usage.updated_at, authorization_usage.updated_at);
         assert!(capture_usage.seq < capture_commit);
+        assert_eq!(authorization_usage, authorization_projection);
+        assert_eq!(capture_usage, authorization_projection);
+        let capture_event = sqlite
+            .mutation_event_for_event_id("legacy-capture:capture-invocation")?
+            .ok_or_else(|| std::io::Error::other("capture event was not durable"))?;
+        assert_eq!(capture_event.recorded_at, 1_002);
+        assert_eq!(capture_event.event_seq, capture_commit);
+        assert_eq!(capture_event.usage_seq, Some(authorization_projection.seq));
 
         let release_hold = "legacy-release";
         assert!(matches!(

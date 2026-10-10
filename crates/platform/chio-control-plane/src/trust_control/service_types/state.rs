@@ -179,14 +179,56 @@ pub(crate) struct RemoteBudgetStore {
     pub(crate) cached_usage: Mutex<HashMap<(String, usize), CachedBudgetUsage>>,
 }
 
-/// A cached usage projection together with whether its monetary totals were actually
-/// observed. Partial responses such as `try_increment` carry only the invocation
-/// count, so their entries default the cost fields to zero; serving one as real usage
-/// would report no spend for a grant that has some.
+/// Fields actually observed at this usage sequence. Legacy mutation responses
+/// can omit counters, either monetary total, and the durable usage timestamp.
+/// Unobserved zero placeholders must never be served as a complete projection.
+#[derive(Clone, Copy, Default)]
+pub(crate) struct BudgetUsageProvenance {
+    pub(crate) invocation_count: bool,
+    pub(crate) total_cost_exposed: bool,
+    pub(crate) total_cost_realized_spend: bool,
+    pub(crate) updated_at: bool,
+}
+
+impl BudgetUsageProvenance {
+    pub(crate) fn complete() -> Self {
+        Self {
+            invocation_count: true,
+            total_cost_exposed: true,
+            total_cost_realized_spend: true,
+            updated_at: true,
+        }
+    }
+
+    pub(crate) fn is_complete(self) -> bool {
+        self.invocation_count
+            && self.total_cost_exposed
+            && self.total_cost_realized_spend
+            && self.updated_at
+    }
+
+    pub(crate) fn agrees_with(
+        self,
+        observed: &BudgetUsageRecord,
+        incoming: &BudgetUsageRecord,
+    ) -> bool {
+        observed.capability_id == incoming.capability_id
+            && observed.grant_index == incoming.grant_index
+            && observed.seq == incoming.seq
+            && (!self.invocation_count || observed.invocation_count == incoming.invocation_count)
+            && (!self.total_cost_exposed
+                || observed.total_cost_exposed == incoming.total_cost_exposed)
+            && (!self.total_cost_realized_spend
+                || observed.total_cost_realized_spend == incoming.total_cost_realized_spend)
+            && (!self.updated_at || observed.updated_at == incoming.updated_at)
+    }
+}
+
+/// A cached projection and the fields known at its exact usage sequence.
 #[derive(Clone)]
 pub(crate) struct CachedBudgetUsage {
     pub(crate) record: BudgetUsageRecord,
-    pub(crate) cost_authoritative: bool,
+    pub(crate) observed: BudgetUsageProvenance,
 }
 
 impl TrustServiceState {
