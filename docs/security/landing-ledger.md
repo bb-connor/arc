@@ -7,6 +7,22 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Final repair components (October 10)
+
+The ledger preserves **1,944 requirements**. The budget projection and CLI
+owner-custody repairs are integrated and independently source-reviewed.
+CLI has 31 focused passes and one ignored case before an unchanged test-module
+move; budget has 59 passes before six reviewed test-only style substitutions.
+Both final sources pass strict lint. Final composed runtime remains pending.
+The [component audit](audits/final-repair-components-20261010.json) records
+four further CLI review findings, their repairs, and all prior failed evidence.
+Native Windows execution remains unverified.
+
+Published `633cf1d2f6` remains withdrawn. Replacement publication requires the
+frozen 98-control composition, metadata checks and independent delta review;
+landing still requires four protected exact-source hosted checks. No merge,
+full-workspace pass, proof completion or release readiness is claimed.
+
 ## Final repair review intake (October 10)
 
 The ledger preserves **1,940 requirements**. The two control-plane fixture
