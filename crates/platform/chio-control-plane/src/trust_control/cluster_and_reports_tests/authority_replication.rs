@@ -278,14 +278,37 @@ pub(super) fn pull_snapshot(
 #[test]
 fn authority_replication_both_import_paths_reject_injected_issuer_and_kernel_denies_it() {
     let root = chio_test_support::private_tempdir().test_unwrap();
-    let source = SqliteCapabilityAuthority::open(root.path().join("source.db")).test_unwrap();
+    let early_time = chio_test_support::clock::unix_seconds()
+        .checked_sub(1)
+        .test_expect("fixture clock permits an earlier envelope");
+    let early_clock = chio_test_support::clock::scope_unix_secs(early_time);
+    let source = SqliteCapabilityAuthority::open_with_clock(
+        root.path().join("source.db"),
+        chio_test_support::clock::clock(),
+    )
+    .test_unwrap();
     let follower_path = root.path().join("follower.db");
-    let follower = SqliteCapabilityAuthority::open(&follower_path).test_unwrap();
+    let follower = SqliteCapabilityAuthority::open_with_clock(
+        &follower_path,
+        chio_test_support::clock::clock(),
+    )
+    .test_unwrap();
     let anchor = source.initialize_replication("network-test").test_unwrap();
     follower.pin_replication_anchor(&anchor).test_unwrap();
     source.rotate().test_unwrap();
     let signed = source.signed_snapshot().test_unwrap();
+    drop(early_clock);
     let pair = AdmittedReplicationPair::new(root.path().join("source.db"), follower_path.clone());
+    let imported = follower.signed_snapshot().test_unwrap();
+    assert!(
+        imported
+            .proof
+            .as_ref()
+            .test_expect("bootstrap proof")
+            .issued_at
+            > signed.proof.as_ref().test_expect("early proof").issued_at,
+        "bootstrap must import a strictly later signed envelope"
+    );
     let state = pair.follower.state.clone();
     let template = build_cluster_state_snapshot(&state).test_unwrap();
     let template = serde_json::to_value(template).test_unwrap();
@@ -324,7 +347,8 @@ fn authority_replication_both_import_paths_reject_injected_issuer_and_kernel_den
         assert_eq!(follower.snapshot().test_unwrap(), before);
         assert_kernel_rejects_issuer(&follower_path, &attacker, root.path());
     }
-    pull_snapshot(&state, &signed).test_unwrap();
+    let fresh = source.signed_snapshot().test_unwrap();
+    pull_snapshot(&state, &fresh).test_unwrap();
     assert_eq!(
         follower.snapshot().test_unwrap(),
         source.snapshot().test_unwrap()
@@ -338,6 +362,57 @@ fn authority_replication_both_import_paths_reject_injected_issuer_and_kernel_den
         source.snapshot().test_unwrap()
     );
     assert_kernel_rejects_issuer(&follower_path, &attacker, root.path());
+}
+
+#[test]
+fn authority_replication_rejects_older_signed_envelope_after_bootstrap_without_mutation() {
+    let root = chio_test_support::private_tempdir().test_unwrap();
+    let early_time = chio_test_support::clock::unix_seconds()
+        .checked_sub(1)
+        .test_expect("fixture clock permits an earlier envelope");
+    let early_clock = chio_test_support::clock::scope_unix_secs(early_time);
+    let source_path = root.path().join("source.db");
+    let follower_path = root.path().join("follower.db");
+    let source =
+        SqliteCapabilityAuthority::open_with_clock(&source_path, chio_test_support::clock::clock())
+            .test_unwrap();
+    let follower = SqliteCapabilityAuthority::open_with_clock(
+        &follower_path,
+        chio_test_support::clock::clock(),
+    )
+    .test_unwrap();
+    let anchor = source
+        .initialize_replication("old-envelope-control")
+        .test_unwrap();
+    follower.pin_replication_anchor(&anchor).test_unwrap();
+    source.rotate().test_unwrap();
+    let old = source.signed_snapshot().test_unwrap();
+    drop(early_clock);
+    let pair = AdmittedReplicationPair::new(source_path, follower_path);
+    let state = &pair.follower.state;
+    let imported = follower.signed_snapshot().test_unwrap();
+    assert!(
+        imported
+            .proof
+            .as_ref()
+            .test_expect("bootstrap proof")
+            .issued_at
+            > old.proof.as_ref().test_expect("early proof").issued_at
+    );
+    let before = follower.snapshot().test_unwrap();
+    for full_import in [false, true] {
+        let outcome = if full_import {
+            let mut full = build_cluster_state_snapshot(state).test_unwrap();
+            full.authority = Some(old.clone());
+            apply_cluster_snapshot(state, &pair.source.url, full)
+        } else {
+            pull_snapshot(state, &old)
+        };
+        assert!(matches!(outcome,
+            Err(CliError::AuthorityStore(chio_kernel::AuthorityStoreError::Fence(message)))
+                if message == "authority envelope replay regresses issuance time"));
+        assert_eq!(follower.snapshot().test_unwrap(), before);
+    }
 }
 
 fn assert_kernel_rejects_issuer(
