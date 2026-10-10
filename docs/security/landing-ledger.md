@@ -7,6 +7,26 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Final hosted review intake (October 10)
+
+The ledger now preserves **1,950 requirements**, including six new findings from
+[the exact-head GitHub review](https://github.com/bb-connor/arc/pull/1160#issuecomment-6095802690).
+Published `fd82f2f247` is **withdrawn as a landing candidate**. Its 936 control-plane
+and 31 distinct CLI passes, one existing ignored case, strict lint, formatting,
+nine static gates and scoped independent review remain valid bounded evidence.
+They do not close the new payment-token P1 or the five reported P2 obligations.
+
+The [intake audit](audits/github-final-review-intake-20261010.json) records their
+source pins, repair contracts and retained hosted failures. Isolated lanes now
+own the six repairs. All earlier requirement objects and current states remain
+unchanged; the new rows are repair-in-progress. The obsolete hosted runs were
+cancelled to avoid spending another full cycle on a withdrawn source.
+
+A replacement requires Original regressions, owning strict checks, independent
+review and exact-source qualification before publication. Four protected hosted
+checks and normal merge remain mandatory. No merge, full-workspace pass, proof
+completion, preview or release readiness is claimed.
+
 ## Final repair components (October 10)
 
 The ledger preserves **1,944 requirements**. The budget projection and CLI
