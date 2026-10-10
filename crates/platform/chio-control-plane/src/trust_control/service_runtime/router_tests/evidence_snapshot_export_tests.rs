@@ -268,3 +268,122 @@ async fn legacy_lineage_refusal_returns_typed_422_and_preserves_other_tenants() 
     snapshots.shutdown();
     Ok(())
 }
+
+#[tokio::test]
+async fn invalid_signed_lineage_is_a_typed_refusal_without_dropping_other_tenants() -> TestResult {
+    let directory = chio_test_support::private_tempdir()?;
+    let path = directory.path().join("receipts.db");
+    let store = Arc::new(SqliteReceiptStore::open(&path)?);
+    let signer = Keypair::from_seed(&[43; 32]);
+    let template = super::receipt_store_ownership_tests::signed_receipt(&signer)?.body();
+    for (id, tenant, capability) in [
+        ("bad-a", "tenant-a", "cap-bad-signed"),
+        ("plain-b", "tenant-b", "cap-plain"),
+    ] {
+        let mut body = template.clone();
+        body.id = id.into();
+        body.tenant_id = Some(tenant.into());
+        body.capability_id = capability.into();
+        store.append_chio_receipt(&ChioReceipt::sign(body, &signer)?)?;
+    }
+    let snapshots = Arc::new(ReceiptQuerySnapshots::start(
+        Arc::clone(&store),
+        ReceiptQuerySnapshotConfig::default(),
+    )?);
+    wait_until_ready(Arc::clone(&snapshots)).await?;
+    let connection = rusqlite::Connection::open(&path)?;
+    let inserted = connection.execute(
+        "INSERT INTO capability_lineage (capability_id, subject_key, issuer_key, issued_at, expires_at, grants_json, delegation_depth, provenance) VALUES ('cap-bad-signed', 'bad-subject', 'bad-issuer', 1, 100, '{}', 0, 'signed_token')",
+        [],
+    );
+    assert_eq!(inserted?, 1);
+    drop(connection);
+    let mut state = metrics_state("snapshot-secret");
+    state.receipt_store = Some(store);
+    state.receipt_query_snapshots = Some(Arc::clone(&snapshots));
+    state
+        .config
+        .tenant_read_tokens
+        .insert("tenant-a".into(), "tenant-secret".into());
+    state
+        .config
+        .tenant_read_tokens
+        .insert("tenant-b".into(), "tenant-b-secret".into());
+    let (status, body) = export(state.clone()).await?;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+    assert_eq!(body["code"], "receipt_query_export_refused");
+    assert_eq!(body["error"], "receipt evidence export refused: capability lineage cap-bad-signed claims signed-token provenance without a signed token");
+    assert_eq!(snapshots.status().state, ReceiptQuerySnapshotState::Ready);
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/evidence/export")
+        .header(AUTHORIZATION, "Bearer tenant-b-secret")
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_vec(&json!({
+            "query": chio_kernel::evidence_export::EvidenceExportQuery::tenant_scoped("tenant-b"),
+            "requireProofs": false,
+        }))?))?;
+    let response = super::super::build_router(state).oneshot(request).await?;
+    assert_eq!(response.status(), StatusCode::OK);
+    snapshots.shutdown();
+    Ok(())
+}
+
+#[tokio::test]
+async fn captured_legacy_attribution_tamper_invalidates_before_export_refusal() -> TestResult {
+    let directory = chio_test_support::private_tempdir()?;
+    let path = directory.path().join("receipts.db");
+    let store = Arc::new(SqliteReceiptStore::open(&path)?);
+    let connection = rusqlite::Connection::open(&path)?;
+    connection.execute(
+        "INSERT INTO capability_lineage (capability_id, subject_key, issuer_key, issued_at, expires_at, grants_json, delegation_depth, provenance) VALUES ('cap-legacy', 'legacy-subject', 'legacy-issuer', 1, 100, '{}', 0, 'legacy_projection')",
+        [],
+    )?;
+    drop(connection);
+    let signer = Keypair::from_seed(&[43; 32]);
+    let template = super::receipt_store_ownership_tests::signed_receipt(&signer)?.body();
+    for (id, tenant, capability) in [
+        ("legacy-a", "tenant-a", "cap-legacy"),
+        ("plain-b", "tenant-b", "cap-plain"),
+    ] {
+        let mut body = template.clone();
+        body.id = id.into();
+        body.tenant_id = Some(tenant.into());
+        body.capability_id = capability.into();
+        store.append_chio_receipt(&ChioReceipt::sign(body, &signer)?)?;
+    }
+    let snapshots = Arc::new(ReceiptQuerySnapshots::start(
+        Arc::clone(&store),
+        ReceiptQuerySnapshotConfig::default(),
+    )?);
+    wait_until_ready(Arc::clone(&snapshots)).await?;
+    let mut by_subject =
+        chio_kernel::evidence_export::EvidenceExportQuery::tenant_scoped("tenant-a")
+            .as_receipt_query(None);
+    by_subject.agent_subject = Some("legacy-subject".into());
+    assert_eq!(snapshots.query_receipts(&by_subject)?.total_count, 1);
+    let connection = rusqlite::Connection::open(&path)?;
+    let updated = connection.execute(
+        "UPDATE capability_lineage SET subject_key = 'tampered-subject' WHERE capability_id = 'cap-legacy'",
+        [],
+    );
+    assert_eq!(updated?, 1);
+    drop(connection);
+    let mut state = metrics_state("snapshot-secret");
+    state.receipt_store = Some(store);
+    state.receipt_query_snapshots = Some(Arc::clone(&snapshots));
+    state
+        .config
+        .tenant_read_tokens
+        .insert("tenant-a".into(), "tenant-secret".into());
+    let (status, body) = export(state).await?;
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR, "{body}");
+    assert_eq!(body["code"], "receipt_query_snapshot_invalid");
+    assert_eq!(body["error"], "receipt query snapshot failed authentication: current unsigned capability attribution differs from the authenticated snapshot");
+    assert!(matches!(
+        snapshots.status().state,
+        ReceiptQuerySnapshotState::Invalid { .. }
+    ));
+    snapshots.shutdown();
+    Ok(())
+}

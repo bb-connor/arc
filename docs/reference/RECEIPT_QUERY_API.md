@@ -845,3 +845,11 @@ To paginate programmatically, capture `nextCursor` from the HTTP response and pa
 Financial `budget_total` and `budget_remaining` are both `null` for uncapped
 grants. Capped values describe the cumulative grant balance, including on denial
 and reconciliation receipts. Consumers must preserve this distinction.
+
+For HTTP evidence export, populated legacy mutable receipt tables also cause
+`422 receipt_query_export_refused`. The exporter compares captured unsigned
+attribution in the live read transaction before decoding or validating lineage.
+Changed or missing captured attribution invalidates the snapshot even when that
+lineage would otherwise be refused as unsupported metadata. SQLite busy and
+resource errors retain their operational status. A new authenticated build
+still rejects immutable publication metadata that diverges from its projection.

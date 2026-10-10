@@ -7,7 +7,7 @@ use crate::receipt_store::SqliteReceiptStore;
 use chio_kernel::ReceiptStore;
 use std::cell::RefCell;
 use std::sync::atomic::{AtomicBool, AtomicU64};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 type AfterSelectionHook = Box<dyn FnOnce(u64)>;
 thread_local! { static AFTER_SELECTION: RefCell<Option<AfterSelectionHook>> = RefCell::new(None); }
@@ -410,23 +410,12 @@ fn benign_head_advancement_during_multiple_payload_pages_does_not_starve_export(
         }
     });
     let hook_snapshots = Arc::clone(&snapshots);
-    let progress = Arc::clone(&appended);
     AFTER_SELECTION.with(|hook| {
         *hook.borrow_mut() = Some(Box::new(move |captured| {
-            let deadline = Instant::now() + Duration::from_secs(10);
-            while progress.load(Ordering::SeqCst) == 0
-                || hook_snapshots
-                    .status()
-                    .watermark
-                    .as_ref()
-                    .is_none_or(|watermark| watermark.through_entry_seq <= captured)
-            {
-                assert!(
-                    Instant::now() < deadline,
-                    "benign extension did not advance the head"
-                );
-                std::thread::sleep(Duration::from_millis(1));
-            }
+            assert!(
+                hook_snapshots.wait_for_entry_after_for_test(captured, Duration::from_secs(600)),
+                "benign extension did not advance the head"
+            );
         }))
     });
     let result = snapshots
@@ -467,7 +456,7 @@ fn missing_owned_checkpoint_prefix_invalidates_the_shared_snapshot() {
         .build_evidence_export_bundle_with_transparency(&EvidenceExportQuery::tenant_scoped("a"))
         .unwrap_err();
     assert!(
-        matches!(&error, EvidenceExportError::ReceiptStore(ReceiptStoreError::QuerySnapshot(ReceiptQuerySnapshotError::Invalid(reason))) if reason.contains("checkpoint prefix")),
+        matches!(&error, EvidenceExportError::ReceiptStore(ReceiptStoreError::QuerySnapshot(ReceiptQuerySnapshotError::Invalid(reason))) if reason == "authenticated checkpoint prefix is missing 1"),
         "{error:?}"
     );
     assert!(matches!(
@@ -479,7 +468,7 @@ fn missing_owned_checkpoint_prefix_invalidates_the_shared_snapshot() {
 
 #[test]
 fn divergent_publication_enrichment_refuses_export_but_preserves_owned_receipt_queries() {
-    let (directory, _store, snapshots) = fixture(
+    let (directory, store, snapshots) = fixture(
         1,
         1,
         ReceiptQuerySnapshotConfig {
@@ -517,6 +506,32 @@ fn divergent_publication_enrichment_refuses_export_but_preserves_owned_receipt_q
         1
     );
     snapshots.shutdown();
+    // Rebuilding must authenticate the immutable publication projection again;
+    // a request-only enrichment refusal does not certify the corrupted source.
+    let rebuilt =
+        ReceiptQuerySnapshots::start(store, ReceiptQuerySnapshotConfig::default()).unwrap();
+    let status = rebuilt.wait_for_recovery(Duration::from_secs(600), |status| {
+        !matches!(
+            status.state,
+            ReceiptQuerySnapshotState::WaitingForWriterSeed
+                | ReceiptQuerySnapshotState::Building { .. }
+        )
+    });
+    assert!(
+        matches!(status.state, ReceiptQuerySnapshotState::Invalid { .. }),
+        "{status:?}"
+    );
+    let error = rebuilt
+        .query_receipts(&EvidenceExportQuery::tenant_scoped("a").as_receipt_query(None))
+        .unwrap_err();
+    assert!(
+        matches!(
+            error,
+            ReceiptStoreError::QuerySnapshot(ReceiptQuerySnapshotError::Invalid(_))
+        ),
+        "{error:?}"
+    );
+    rebuilt.shutdown();
 }
 
 #[test]
@@ -596,4 +611,42 @@ fn malformed_mutable_publication_binding_refuses_export_with_triggers_enabled() 
         1
     );
     snapshots.shutdown();
+}
+
+#[test]
+fn publication_resource_errors_remain_operational_outcomes() {
+    for code in [
+        rusqlite::ffi::SQLITE_BUSY,
+        rusqlite::ffi::SQLITE_LOCKED,
+        rusqlite::ffi::SQLITE_IOERR,
+        rusqlite::ffi::SQLITE_NOMEM,
+        rusqlite::ffi::SQLITE_FULL,
+    ] {
+        let error = EvidenceExportError::Sqlite(rusqlite::Error::SqliteFailure(
+            rusqlite::ffi::Error::new(code),
+            None,
+        ));
+        let outcome = super::super::query::read_outcome(metadata::publication_error(error));
+        assert!(
+            matches!(
+                outcome,
+                ReceiptStoreError::QuerySnapshot(ReceiptQuerySnapshotError::Unavailable(_))
+            ),
+            "code {code}: {outcome:?}"
+        );
+    }
+}
+
+#[test]
+fn publication_malformed_columns_remain_request_refusals() {
+    let error = EvidenceExportError::Sqlite(rusqlite::Error::InvalidColumnType(
+        0,
+        "binding_json".into(),
+        rusqlite::types::Type::Blob,
+    ));
+    let outcome = super::super::query::read_outcome(metadata::publication_error(error));
+    assert!(
+        matches!(&outcome, ReceiptStoreError::QuerySnapshot(ReceiptQuerySnapshotError::ExportRefused(reason)) if reason == "checkpoint publication row contains invalid metadata"),
+        "{outcome:?}"
+    );
 }

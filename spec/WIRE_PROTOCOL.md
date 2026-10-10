@@ -486,6 +486,7 @@ of seconds.
 | `receipt_query_snapshot_unavailable` | 503 | absent | do not retry; resource outcome |
 | `receipt_query_snapshot_invalid` | 500 | absent | do not retry; integrity failure |
 | `receipt_query_work_budget_exhausted` | 422 | absent | do not retry; narrow the query |
+| `receipt_query_export_refused` | 422 | absent | do not retry; export metadata requires operator action |
 
 Clients **MAY** retry only the three retryable codes, after `Retry-After`, and
 **MUST NOT** automatically retry any other snapshot code or a `503` without
@@ -500,9 +501,17 @@ Admission has two non-queued layers, and either refusing returns
 2. the snapshot service's own read permit, which bounds every consumer of the
    snapshot, including non-HTTP callers.
 
-`POST /v1/evidence/export` does not use the snapshot. It runs under its own
-single non-queued permit, which covers the whole export through response
-finalization, and refuses a concurrent export with `receipt_query_busy`.
+`POST /v1/evidence/export` selects from the authenticated snapshot and returns
+its watermark. Its separate single non-queued HTTP permit covers the export
+through response finalization and refuses a concurrent export with
+`receipt_query_busy`; the snapshot service also applies its own read admission.
+Legacy mutable receipt tables and transport-ineligible lineage or publication
+metadata **MUST** refuse the export with `receipt_query_export_refused` without
+invalidating otherwise authenticated receipt queries. A mismatch or deletion of
+captured unsigned attribution **MUST** instead invalidate that snapshot with
+`receipt_query_snapshot_invalid`, before any mutable-lineage validity refusal.
+SQLite resource failures remain operational snapshot errors, not metadata
+refusals. Local operator exports retain their separate full-history contract.
 
 ### 4.4 Revocation
 

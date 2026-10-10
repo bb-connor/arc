@@ -1,6 +1,7 @@
 //! Short, budgeted metadata/payload reads. Mutable checkpoint bytes must
 //! reproduce the owned checkpoint digest; current capability lineage uses its
-//! canonical validated reader and must preserve owned unsigned attribution.
+//! canonical column reader and must preserve owned unsigned attribution before
+//! validating mutable lineage metadata.
 use std::collections::{BTreeMap, BTreeSet};
 
 use chio_core::receipt::lineage::ChildRequestReceipt;
@@ -344,15 +345,8 @@ pub(super) fn checkpoints(
                 .transpose()?
                 .unwrap_or(0);
             bytes.preflight(core_bytes.saturating_add(binding_bytes))?;
-            SqliteReceiptStore::enrich_transparency_on_connection(live, partial).map_err(|error| {
-                match error {
-                    chio_kernel::evidence_export::EvidenceExportError::ReceiptStore(
-                        ReceiptStoreError::Conflict(reason),
-                    ) => metadata_refusal(reason),
-                    chio_kernel::evidence_export::EvidenceExportError::ReceiptStore(error) => error,
-                    error => metadata_refusal(error.to_string()),
-                }
-            })
+            SqliteReceiptStore::enrich_transparency_on_connection(live, partial)
+                .map_err(publication_error)
         })?;
         *publication = enriched.publications.into_iter().next().ok_or_else(|| {
             metadata_refusal("checkpoint publication enrichment omitted its record")
@@ -398,6 +392,7 @@ pub(super) fn lineage(
                         // reading the unrelated share's receipt/lineage counts.
                         let row: Option<(i64, i64)> = live.query_row(&format!("SELECT l.rowid, length(CAST(l.share_id AS BLOB)) + {qualified} FROM federated_share_capability_lineage l JOIN federated_evidence_shares s ON s.share_id = l.share_id WHERE l.capability_id = ?1 ORDER BY s.imported_at DESC, s.share_id DESC LIMIT 1", qualified = LINEAGE_BYTES.replace("CAST(", "CAST(l.")), [&capability], |row| Ok((row.get(0)?, row.get(1)?))).optional()?;
                         let Some((share, length)) = row else {
+                            captured_attribution(lease, tools, &capability, None)?;
                             return Ok(None);
                         };
                         table = "federated_share_capability_lineage";
@@ -409,29 +404,44 @@ pub(super) fn lineage(
                     length,
                     "capability lineage bytes",
                 )?)?;
-                let sql = format!(
-                    "SELECT {LINEAGE_COLUMNS} FROM {table} WHERE capability_id = ?1{}",
-                    if key.is_some() { " AND rowid = ?2" } else { "" }
-                );
+                let predicate = if key.is_some() {
+                    "capability_id = ?1 AND rowid = ?2"
+                } else {
+                    "capability_id = ?1"
+                };
+                // Compare the raw attribution in this same read transaction,
+                // before token decoding or either semantic validation boundary.
+                // The preceding length preflight bounds the subject allocation.
+                let subject_sql = format!("SELECT subject_key FROM {table} WHERE {predicate}");
+                let subject: rusqlite::types::Value = if let Some(share) = key {
+                    live.query_row(&subject_sql, params![capability, share], |row| row.get(0))?
+                } else {
+                    live.query_row(&subject_sql, [&capability], |row| row.get(0))?
+                };
+                captured_attribution(lease, tools, &capability, Some(&subject))?;
+                let sql = format!("SELECT {LINEAGE_COLUMNS} FROM {table} WHERE {predicate}");
                 let snapshot = if let Some(share) = key {
                     live.query_row(
                         &sql,
                         params![capability, share],
-                        crate::capability_lineage::snapshot_from_row,
-                    )?
+                        crate::capability_lineage::snapshot_columns_from_row,
+                    )
                 } else {
                     live.query_row(
                         &sql,
                         [&capability],
-                        crate::capability_lineage::snapshot_from_row,
-                    )?
-                };
+                        crate::capability_lineage::snapshot_columns_from_row,
+                    )
+                }
+                .map_err(|error| {
+                    metadata_row_error(error, "capability lineage row contains invalid metadata")
+                })?;
+                snapshot
+                    .validate_for_local_read()
+                    .map_err(lineage_validation_error)?;
                 snapshot
                     .validate_for_transport()
-                    .map_err(|error| match error {
-                        ReceiptStoreError::Conflict(reason) => metadata_refusal(reason),
-                        other => other,
-                    })?;
+                    .map_err(lineage_validation_error)?;
                 Ok(Some(snapshot))
             })?;
             let Some(snapshot) = snapshot else {
@@ -440,50 +450,10 @@ pub(super) fn lineage(
                         "export capability lineage references a missing parent",
                     ));
                 }
-                // A missing first capability preserves the old empty-lineage
-                // semantics only when selection knew no unsigned subject. A
-                // captured attribution cannot silently lose its current proof.
-                for tool in tools
-                    .iter()
-                    .filter(|tool| tool.receipt.capability_id == capability)
-                {
-                    let entry = crate::integer::checked::<_, i64>(tool.seq)?;
-                    if lease
-                        .unsigned_subjects
-                        .get(&entry)
-                        .is_some_and(|subject| *subject != ABSENT)
-                    {
-                        return lease.invalid(
-                            "export capability lineage is missing required unsigned attribution",
-                        );
-                    }
-                }
+                // No captured attribution existed; retain the empty-lineage
+                // semantics for a capability that was unknown at selection.
                 break;
             };
-            let subject_matches = lease.read(|db| {
-                let Some(_) = db.dim_id(DIM_CAPABILITY, &capability) else {
-                    return Ok(true);
-                };
-                for tool in tools
-                    .iter()
-                    .filter(|tool| tool.receipt.capability_id == capability)
-                {
-                    let entry = crate::integer::checked::<_, i64>(tool.seq)?;
-                    if let Some(subject) = lease.unsigned_subjects.get(&entry) {
-                        if db
-                            .dim_value(*subject)
-                            .map_err(snapshot_error)?
-                            .is_some_and(|subject| subject != snapshot.subject_key)
-                        {
-                            return Ok(false);
-                        }
-                    }
-                }
-                Ok(true)
-            })?;
-            if !subject_matches {
-                return lease.invalid("current unsigned capability attribution differs from the authenticated snapshot");
-            }
             current = snapshot
                 .parent_capability_id
                 .clone()
@@ -493,4 +463,74 @@ pub(super) fn lineage(
         }
     }
     Ok(records.into_values().collect())
+}
+
+// Keep the enrichment error boundary separate from the live-read resource classifier.
+pub(super) fn publication_error(
+    error: chio_kernel::evidence_export::EvidenceExportError,
+) -> ReceiptStoreError {
+    match error {
+        chio_kernel::evidence_export::EvidenceExportError::ReceiptStore(
+            ReceiptStoreError::Conflict(reason),
+        ) => metadata_refusal(reason),
+        chio_kernel::evidence_export::EvidenceExportError::ReceiptStore(error) => error,
+        chio_kernel::evidence_export::EvidenceExportError::Sqlite(error) => metadata_row_error(
+            error,
+            "checkpoint publication row contains invalid metadata",
+        ),
+        error => metadata_refusal(error.to_string()),
+    }
+}
+
+fn lineage_validation_error(error: ReceiptStoreError) -> ReceiptStoreError {
+    match error {
+        ReceiptStoreError::Conflict(reason) => metadata_refusal(reason),
+        other => other,
+    }
+}
+
+fn metadata_row_error(error: rusqlite::Error, reason: &'static str) -> ReceiptStoreError {
+    match error {
+        rusqlite::Error::FromSqlConversionFailure(..)
+        | rusqlite::Error::InvalidColumnType(..)
+        | rusqlite::Error::IntegralValueOutOfRange(..) => metadata_refusal(reason),
+        other => other.into(),
+    }
+}
+
+/// Compare only the attribution that the owned snapshot captured. Unsupported
+/// metadata without a captured subject remains a request refusal, not tamper.
+fn captured_attribution(
+    lease: &Lease<'_>,
+    tools: &[EvidenceToolReceiptRecord],
+    capability: &str,
+    current: Option<&rusqlite::types::Value>,
+) -> Result<(), ReceiptStoreError> {
+    let matches = lease.read(|db| {
+        if db.dim_id(DIM_CAPABILITY, capability).is_none() {
+            return Ok(true);
+        }
+        for tool in tools.iter().filter(|tool| tool.receipt.capability_id == capability) {
+            let entry = crate::integer::checked::<_, i64>(tool.seq)?;
+            if let Some(subject) = lease.unsigned_subjects.get(&entry).filter(|subject| **subject != ABSENT) {
+                if let Some(expected) = db.dim_value(*subject).map_err(snapshot_error)? {
+                    if !matches!(current, Some(rusqlite::types::Value::Text(actual)) if *actual == expected) {
+                        return Ok(false);
+                    }
+                }
+            }
+        }
+        Ok(true)
+    })?;
+    if matches {
+        Ok(())
+    } else if current.is_none() {
+        Err(invalid(
+            "export capability lineage is missing required unsigned attribution",
+        ))
+    } else {
+        Err(invalid(
+            "current unsigned capability attribution differs from the authenticated snapshot",
+        ))
+    }
 }

@@ -281,7 +281,56 @@ fn current_unsigned_lineage_must_match_the_subject_captured_by_selection() {
         .build_evidence_export_bundle_with_transparency(&query)
         .unwrap_err();
     assert!(
-        matches!(&error, EvidenceExportError::ReceiptStore(ReceiptStoreError::QuerySnapshot(chio_kernel::ReceiptQuerySnapshotError::Invalid(reason))) if reason.contains("unsigned capability attribution")),
+        matches!(&error, EvidenceExportError::ReceiptStore(ReceiptStoreError::QuerySnapshot(chio_kernel::ReceiptQuerySnapshotError::Invalid(reason))) if reason == "current unsigned capability attribution differs from the authenticated snapshot"),
+        "{error:?}"
+    );
+    assert!(matches!(
+        snapshots.status().state,
+        ReceiptQuerySnapshotState::Invalid { .. }
+    ));
+    snapshots.shutdown();
+}
+
+#[test]
+fn subject_only_signed_lineage_tamper_invalidates_before_row_validation() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("live.db");
+    let store = Arc::new(SqliteReceiptStore::open(&path).unwrap());
+    let issuer = Keypair::from_seed(&[13; 32]);
+    let original_subject = Keypair::from_seed(&[14; 32]);
+    store
+        .record_capability_snapshot(
+            &capability_with_id("cap", &original_subject, &issuer, None),
+            None,
+        )
+        .unwrap();
+    store
+        .append_chio_receipt_returning_seq(&receipt_with_ts_and_tenant(
+            "selected",
+            "cap",
+            100,
+            Some("a"),
+        ))
+        .unwrap();
+    let snapshots = start(Arc::clone(&store));
+    let replacement = capability_with_id("cap", &Keypair::from_seed(&[15; 32]), &issuer, None);
+    let connection = Connection::open(path).unwrap();
+    assert_eq!(
+        connection
+            .execute(
+                "UPDATE capability_lineage SET subject_key = ?1 WHERE capability_id = 'cap'",
+                params![replacement.subject.to_hex()]
+            )
+            .unwrap(),
+        1
+    );
+    let mut query = EvidenceExportQuery::tenant_scoped("a");
+    query.agent_subject = Some(original_subject.public_key().to_hex());
+    let error = snapshots
+        .build_evidence_export_bundle_with_transparency(&query)
+        .unwrap_err();
+    assert!(
+        matches!(&error, EvidenceExportError::ReceiptStore(ReceiptStoreError::QuerySnapshot(chio_kernel::ReceiptQuerySnapshotError::Invalid(reason))) if reason == "current unsigned capability attribution differs from the authenticated snapshot"),
         "{error:?}"
     );
     assert!(matches!(

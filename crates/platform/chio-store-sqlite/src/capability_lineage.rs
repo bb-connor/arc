@@ -17,23 +17,26 @@ fn snapshot_from_row_with_boundary(
     row: &Row<'_>,
     allow_legacy: bool,
 ) -> rusqlite::Result<CapabilitySnapshot> {
-    validate_snapshot_from_row(
-        CapabilitySnapshot {
-            capability_id: row.get::<_, String>(0)?,
-            subject_key: row.get::<_, String>(1)?,
-            issuer_key: row.get::<_, String>(2)?,
-            issued_at: non_negative_u64_from_column(row, 3, "issued_at")?,
-            expires_at: non_negative_u64_from_column(row, 4, "expires_at")?,
-            grants_json: row.get::<_, String>(5)?,
-            delegation_depth: non_negative_u64_from_column(row, 6, "delegation_depth")?,
-            parent_capability_id: row.get::<_, Option<String>>(7)?,
-            federated_parent_capability_id: row.get::<_, Option<String>>(8)?,
-            provenance: provenance_from_row(row, 9)?,
-            signed_capability: signed_capability_from_row(row, 10)?,
-        },
-        10,
-        allow_legacy,
-    )
+    validate_snapshot_from_row(snapshot_columns_from_row(row)?, 10, allow_legacy)
+}
+
+/// Decode stored columns without validating the resulting lineage. The caller
+/// must validate before use; export first compares captured subject attribution
+/// so a malformed token cannot mask an authenticated-attribution mismatch.
+pub(crate) fn snapshot_columns_from_row(row: &Row<'_>) -> rusqlite::Result<CapabilitySnapshot> {
+    Ok(CapabilitySnapshot {
+        capability_id: row.get::<_, String>(0)?,
+        subject_key: row.get::<_, String>(1)?,
+        issuer_key: row.get::<_, String>(2)?,
+        issued_at: non_negative_u64_from_column(row, 3, "issued_at")?,
+        expires_at: non_negative_u64_from_column(row, 4, "expires_at")?,
+        grants_json: row.get::<_, String>(5)?,
+        delegation_depth: non_negative_u64_from_column(row, 6, "delegation_depth")?,
+        parent_capability_id: row.get::<_, Option<String>>(7)?,
+        federated_parent_capability_id: row.get::<_, Option<String>>(8)?,
+        provenance: provenance_from_row(row, 9)?,
+        signed_capability: signed_capability_from_row(row, 10)?,
+    })
 }
 
 pub(crate) fn validate_snapshot_from_row(

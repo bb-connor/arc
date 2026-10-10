@@ -1505,6 +1505,25 @@ fn duration_ms(duration: Duration) -> u64 {
 
 #[cfg(test)]
 impl ReceiptQuerySnapshots {
+    /// Wait on the publication notification; the timeout only bounds a hung test.
+    pub(super) fn wait_for_entry_after_for_test(&self, entry: u64, timeout: Duration) -> bool {
+        let Ok(entry) = i64::try_from(entry) else {
+            return false;
+        };
+        let Ok((published, _)) = self.inner.ready() else {
+            return false;
+        };
+        let Ok(owned) = published.owned.lock() else {
+            return false;
+        };
+        published
+            .changed
+            .wait_timeout_while(owned, timeout, |owned| {
+                owned.meta.through_entry_seq <= entry
+            })
+            .is_ok_and(|(owned, _)| owned.meta.through_entry_seq > entry)
+    }
+
     /// Start a service whose published lineages hand every committed state
     /// to `observer` (see [`GenerationObserver`]).
     pub(super) fn start_observed_for_test(

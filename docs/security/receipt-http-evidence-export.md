@@ -13,8 +13,10 @@ canonical signed checkpoint. Inclusion proofs use authenticated tool and child
 hashes, without loading unselected receipt payloads. The full relevant checkpoint
 prefix from genesis and the existing transparency checks remain required.
 
-Capability lineage is sampled during the export through the canonical validated
-current-lineage reader. It is not an immutable historical lineage snapshot.
+Capability lineage is sampled during the export in a bounded live read
+transaction. The raw subject is compared with captured unsigned attribution
+before the canonical column reader and explicit local and transport validation.
+It is not an immutable historical lineage snapshot.
 Unsigned subject attribution must agree with the captured projection; signed
 receipt attribution remains authoritative. If a captured unsigned subject was
 known, deleting its current lineage refuses the export. Originally unknown
@@ -72,3 +74,11 @@ error states this and directs the operator to local complete export. Supporting
 arbitrarily long recent histories within a bounded HTTP response requires a
 separate anchored-prefix or paginated evidence format and verifier contract.
 This implementation does not claim that protocol qualification.
+
+For HTTP evidence export, populated legacy mutable receipt tables also cause
+`422 receipt_query_export_refused`. The exporter compares captured unsigned
+attribution in the live read transaction before decoding or validating lineage.
+Changed or missing captured attribution invalidates the snapshot even when that
+lineage would otherwise be refused as unsupported metadata. SQLite busy and
+resource errors retain their operational status. A new authenticated build
+still rejects immutable publication metadata that diverges from its projection.

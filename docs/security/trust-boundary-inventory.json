@@ -19392,8 +19392,9 @@
       "persist_compatible_snapshot::shared-reader::crates/platform/chio-store-sqlite/src/capability_lineage.rs::ensure_snapshots_compatible",
       "record_capability_snapshot_bounded::shared-reader::crates/platform/chio-store-sqlite/src/capability_lineage.rs::persist_compatible_snapshot",
       "signed_capability_from_row::original-json-reader::UntrustedJsonText",
+      "snapshot_columns_from_row::shared-reader::crates/platform/chio-store-sqlite/src/capability_lineage.rs::signed_capability_from_row",
       "snapshot_from_row::shared-reader::crates/platform/chio-store-sqlite/src/capability_lineage.rs::snapshot_from_row_with_boundary",
-      "snapshot_from_row_with_boundary::shared-reader::crates/platform/chio-store-sqlite/src/capability_lineage.rs::signed_capability_from_row",
+      "snapshot_from_row_with_boundary::shared-reader::crates/platform/chio-store-sqlite/src/capability_lineage.rs::snapshot_columns_from_row",
       "upsert_capability_snapshot::shared-reader::crates/platform/chio-store-sqlite/src/capability_lineage.rs::persist_compatible_snapshot"
     ],
     "crates/platform/chio-store-sqlite/src/channel_lifecycle_store.rs": [

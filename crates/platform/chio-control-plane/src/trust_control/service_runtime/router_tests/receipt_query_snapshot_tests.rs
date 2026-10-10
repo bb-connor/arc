@@ -143,6 +143,7 @@ async fn snapshot_errors_preserve_codes_status_and_retry_contracts() -> TestResu
         (E::Unavailable("capacity".into()), 503, None),
         (E::Invalid("leaf".into()), 500, None),
         (E::WorkBudgetExhausted("query".into()), 422, None),
+        (E::ExportRefused("metadata".into()), 422, None),
     ] {
         let code = error.wire_code();
         let response = snapshot_error_response(error.into());
