@@ -12,16 +12,16 @@ The live inventory and effective scoped dispositions are:
 
 | Inventory | Records | Effective scoped dispositions | Currently open |
 | --- | ---: | ---: | ---: |
-| Canonical original findings | 328 | 101 | 227 |
+| Canonical original findings | 328 | 105 | 223 |
 | Additional maintained or actually executed support findings | 21 | 21 | 0 |
 | Supplemental PR obligations | 1 | 0 | 1 |
-| Current or executed-support total | 350 | 122 | 228 |
+| Current or executed-support total | 350 | 126 | 224 |
 | Prevented candidate issues, counted separately | 31 | Not combined | Not combined |
 | Follow-up findings first observed in uninstalled candidates | 13 | Not combined | Not combined |
 | Provenance prerequisite, excluded from implementation findings | 1 | Not applicable | Not applicable |
 
-The 122 scoped dispositions include 37 historical closures whose current source
-applicability still needs review. They are not 122 current-source approvals.
+The 126 scoped dispositions include 37 historical closures whose current source
+applicability still needs review. They are not 126 current-source approvals.
 `counts.current_acceptance` separates these dispositions from current applicability.
 
 The explicitly historical **394-record baseline** retains 99 canonical closures
@@ -42,14 +42,14 @@ The current status counts are:
 
 | Status | Records | Meaning |
 | --- | ---: | --- |
-| `open` | 228 | No complete independent disposition is recorded. |
+| `open` | 224 | No complete independent disposition is recorded. |
 | `needs_revalidation` | 37 | Historical closure remains, but cited source or document pins differ without an accepted current continuity review. |
-| `recorded_scoped_closed` | 85 | Historical or additive accepted scoped disposition currently applies, with the limits stated per record. |
+| `recorded_scoped_closed` | 89 | Historical or additive accepted scoped disposition currently applies, with the limits stated per record. |
 | `candidate_only` | 44 | The defective candidate was uninstalled when found; corrected successors may have separate evidence. |
 | `prerequisite_only` | 1 | Provenance work, not a proved implementation defect. |
 
 The 37 remaining revalidation flags are part of the original 117 historical scoped
-closures. They are not added to the 228 currently open findings. No finding is declared
+closures. They are not added to the 224 currently open findings. No finding is declared
 regressed merely because its bytes changed, and no matching pin constitutes a
 new behavioral test. The initial audit flagged 48 closures. An independent
 [explanation evidence continuity review](reviews/explanation-evidence-continuity.md)
@@ -97,7 +97,7 @@ closes only `CK-LEGACY-RETIREMENT-SOURCE-01` in bounded local scope at
 public-interface regressions and independent spec/quality reviews satisfy its
 three preserved obligations. The original finding fields and historical counters
 remain unchanged; its additive successor supplies the current disposition.
-There are now 16 P1, 123 P2 and 89 P3 open records. Full-module, strict-lint,
+That update left 16 P1, 123 P2 and 89 P3 open records. Full-module, strict-lint,
 native-prerequisite and qualification gates remain open. The same review records
 the independently approved required-CI routing repair and its queued hosted run.
 `continuation.working_queue` holds the dependency-ordered execution queue within
@@ -110,6 +110,14 @@ regressions and all 159 owning tests passing in both Python modes. These results
 leave all 16 open P1 records and their native/primary acceptance obligations open.
 There are now 29 canonical and eight additional revalidation flags; historical
 dispositions, changed pins and prior reasons remain preserved.
+
+The [compiler causal remediation](reviews/compiler-causal-remediation.md) closes
+`CR-01`, `CR-02`, `CR-03` and `QP-SECRET-01` against their original current-source
+acceptance. Final disposition includes root review after sub-agent execution was
+stopped; the earlier independent reviews keep their exact scope. There are now
+12 P1, 123 P2 and 89 P3 open records. The actual contracts producer remains
+unaccepted, and native tests expose the unsupported finishing-account prerequisite.
+These four closures grant no whole-runtime or release qualification.
 
 ## Candidate follow-ups
 

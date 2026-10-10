@@ -59,9 +59,9 @@
     "current_status": {
       "candidate_only": 44,
       "needs_revalidation": 37,
-      "open": 228,
+      "open": 224,
       "prerequisite_only": 1,
-      "recorded_scoped_closed": 85
+      "recorded_scoped_closed": 89
     },
     "needs_revalidation_by_category": {
       "additional": 8,
@@ -111,8 +111,8 @@
       "scope": "Effective scoped dispositions include historical closures requiring revalidation. Current applicability is separately counted; no qualification follows.",
       "canonical": {
         "total": 328,
-        "scoped_dispositions": 101,
-        "open": 227
+        "scoped_dispositions": 105,
+        "open": 223
       },
       "additional": {
         "total": 21,
@@ -125,10 +125,10 @@
         "open": 1
       },
       "maintained_or_executed_support": 350,
-      "scoped_dispositions": 122,
-      "currently_applicable_scoped_closed": 85,
+      "scoped_dispositions": 126,
+      "currently_applicable_scoped_closed": 89,
       "historical_scoped_needing_revalidation": 37,
-      "open": 228,
+      "open": 224,
       "qualified": 0
     }
   },
@@ -586,13 +586,15 @@
     "integration_boundary": "The continuation describes private candidate work. Inventorying its controls does not install or qualify it.",
     "working_queue": {
       "integration_branch": "feat/recoverable-agent-runtime-20261002",
-      "integrated_source_commit": "7f5163ac4e8d0ef10f8ca0af41f2c8ea82542b69",
+      "integrated_source_commit": "e7ee2b317a4e30ef9a3c630a35501be691547fd4",
       "scope": "Execution states refer to existing register obligations, not a second findings inventory. Historical candidates and their results remain uninstalled unless explicitly recorded otherwise.",
       "items": [
         {
           "area": "native_durable_lifecycle",
           "state": "incomplete",
-          "next_exit": "Original-operation capture, interruption, restart, historical settlement, retention and retirement under pressure through real public entry points. The selected Native fixture depends on parked Capture work; no replacement fixture or imported overlay receives credit."
+          "next_exit": "Original-operation capture, interruption, restart, historical settlement, retention and retirement under pressure through real public entry points. The selected Native fixture depends on parked Capture work; no replacement fixture or imported overlay receives credit.",
+          "observed_dependency": "Original known-return, emergency-stop and annotation tests now pass genuine native first-input initialization and normal reopening, but fail before dispatch because selected SqliteAdmissionOperationStore inherits unsupported prepare_original_native_finishing. A real before-effect physical Prepared account is required; parked Capture implementation remains excluded.",
+          "dependency_evidence": "target/recovery-pr/current-review-followup/p1-integration-20261009/semantic-framing/repair/final-result.json"
         },
         {
           "area": "checkpoint_retirement",
@@ -602,8 +604,21 @@
         },
         {
           "area": "required_ci_and_build_environment",
-          "state": "routing_repaired_hosted_acceptance_pending",
-          "next_exit": "Required checks must finish on the final PR head. Use one Cargo stream, the shared target, two jobs, no incremental/debug data, and at least 10 GiB free before builds."
+          "state": "routing_repaired_hosted_run_failed",
+          "next_exit": "Required checks must finish on the final PR head. Use one Cargo stream, the shared target, two jobs, no incremental/debug data, and at least 10 GiB free before builds.",
+          "observed_run": {
+            "head": "dc13d38d126f92731f390d03b3e1062df58425a0",
+            "url": "https://github.com/bb-connor/arc/actions/runs/38005246334",
+            "conclusion": "failure",
+            "failed_log": "target/recovery-pr/current-review-followup/p1-integration-20261009/ci/dc13d38d1-failed-jobs.log",
+            "dependencies": [
+              "Store has 242 warning-as-error build failures and 248 strict lint failures.",
+              "Workspace structural gate rejects the current repository shape. Parked syntax/naming review remains excluded.",
+              "Kani 0.68.0 panics in intrinsics.rs while compiling chio-kernel-core.",
+              "cargo-deny reports yanked iroh-blobs.",
+              "Enterprise merge-binding step has no GH_TOKEN wiring; no credentials were accessed."
+            ]
+          }
         },
         {
           "area": "semantic_and_knowledge_integration",
@@ -618,7 +633,14 @@
         {
           "area": "whole_change_qualification",
           "state": "incomplete",
-          "next_exit": "Revalidate earlier closures, finish strict lints, portability/formal and remaining findings, then independently review and qualify exact final sources and executed artifacts."
+          "next_exit": "Revalidate earlier closures, finish strict lints, portability/formal and remaining findings, then independently review and qualify exact final sources and executed artifacts.",
+          "current_causal_closures": [
+            "CR-01",
+            "CR-02",
+            "CR-03",
+            "QP-SECRET-01"
+          ],
+          "independent_next_exit": "CP-F01: unchanged real contracts Cargo command, original inspector, positive and aggregate profile acceptance, and refusal of unrelated compiled subjects. Failed attempt02 and repair are preserved; successful acceptance remains pending."
         }
       ]
     }
@@ -4398,8 +4420,35 @@
       "remaining_obligation_refs": [
         "reviewed#/rows/163/expected_remaining_obligations"
       ],
-      "current_status": "open",
-      "current_reason": "No complete independent disposition is recorded. Retain the original obligation and every referenced current or historical owner check; partial observations do not close it."
+      "current_status": "recorded_scoped_closed",
+      "current_reason": "Original lexical-parent and intermediate-alias reproductions refuse before compiler dispatch, with no output or excluded source retention. Exact current controls and reviews support only the original causal finding; broader compiler/native/runtime qualification remains open.",
+      "current_successor": {
+        "recorded_at_utc": "2026-10-10T04:17:54.663803+00:00",
+        "recorded_disposition": "closed_scoped_local",
+        "previous_current_status": "open",
+        "previous_current_reason": "No complete independent disposition is recorded. Retain the original obligation and every referenced current or historical owner check; partial observations do not close it.",
+        "review_ref": "docs/architecture/recoverable-agent-runtime/implementation/reviews/compiler-causal-remediation.md",
+        "review_sha256": "2aaacc7a167ecef8d4b30985f23d8d2edb419c982ac7b45d4c93600e4df6833d",
+        "review_evidence": {
+          "target/recovery-pr/current-review-followup/p1-integration-20261009/host-compiler-gate/causal-spec-review.json": "290fe0fa279a12c1609eda9f26b5a9dc79e900192bd4c582f6316fefa6d376d6",
+          "target/recovery-pr/current-review-followup/p1-integration-20261009/host-compiler-gate/causal-quality-review.json": "db6270b81ad147cfe2d01354b8df711d61a6c9c0df043670e26c7f265d060c7c",
+          "target/recovery-pr/current-review-followup/p1-integration-20261009/host-compiler-gate/quality-review.json": "27fd62ed4542edda03978c0dc75e38fb5a2a692ce6ef7140fbaf4623d1e12262"
+        },
+        "spec_verdict": "SPEC_PASS",
+        "quality_verdict": "QUALITY_PASS",
+        "quality_review_scope": "Earlier independent source quality plus final root causal disposition and narrow source-delta review after sub-agent execution was stopped.",
+        "installed": true,
+        "commit": "e7ee2b317a4e30ef9a3c630a35501be691547fd4",
+        "source_sha256": {
+          "scripts/record-rust-compilation.py": "fe07f58ac4630ca5e8a6156ce7a97a3571f3ba946ce0cbfc7e86ad630148e4a5",
+          "scripts/verify-recovery-qualification.py": "2f146b17565d748f4b593fa66df37b695daf1d59e29b786da8aabd4421ddc4c4",
+          "scripts/compiled-gate-profiles.py": "faddd44751f253b55d8c6959c87673a9d8231220ae3a6a27992f1ad3b8fdd110",
+          "scripts/tests/record-rust-compilation.test.py": "12e9cac75c7dcc5884905b9e8cce5413577eb7b70febccdcd43fde6141948ce8",
+          "scripts/tests/compiled-gate-profiles.test.py": "ee97f2fe5a133be092bf5ee903d4e373064b5c93f848da17982900e1cd7ba3de"
+        },
+        "scope": "Original lexical-parent and intermediate-alias reproductions refuse before compiler dispatch, with no output or excluded source retention.",
+        "qualified": false
+      }
     },
     {
       "key": "CR-02",
@@ -4417,8 +4466,35 @@
       "remaining_obligation_refs": [
         "reviewed#/rows/164/expected_remaining_obligations"
       ],
-      "current_status": "open",
-      "current_reason": "No complete independent disposition is recorded. Retain the original obligation and every referenced current or historical owner check; partial observations do not close it."
+      "current_status": "recorded_scoped_closed",
+      "current_reason": "Original stale nominal-output reproduction refuses before dispatch; exact fresh held output ownership and concurrent-owner controls pass. Exact current controls and reviews support only the original causal finding; broader compiler/native/runtime qualification remains open.",
+      "current_successor": {
+        "recorded_at_utc": "2026-10-10T04:17:54.663803+00:00",
+        "recorded_disposition": "closed_scoped_local",
+        "previous_current_status": "open",
+        "previous_current_reason": "No complete independent disposition is recorded. Retain the original obligation and every referenced current or historical owner check; partial observations do not close it.",
+        "review_ref": "docs/architecture/recoverable-agent-runtime/implementation/reviews/compiler-causal-remediation.md",
+        "review_sha256": "2aaacc7a167ecef8d4b30985f23d8d2edb419c982ac7b45d4c93600e4df6833d",
+        "review_evidence": {
+          "target/recovery-pr/current-review-followup/p1-integration-20261009/host-compiler-gate/causal-spec-review.json": "290fe0fa279a12c1609eda9f26b5a9dc79e900192bd4c582f6316fefa6d376d6",
+          "target/recovery-pr/current-review-followup/p1-integration-20261009/host-compiler-gate/causal-quality-review.json": "db6270b81ad147cfe2d01354b8df711d61a6c9c0df043670e26c7f265d060c7c",
+          "target/recovery-pr/current-review-followup/p1-integration-20261009/host-compiler-gate/quality-review.json": "27fd62ed4542edda03978c0dc75e38fb5a2a692ce6ef7140fbaf4623d1e12262"
+        },
+        "spec_verdict": "SPEC_PASS",
+        "quality_verdict": "QUALITY_PASS",
+        "quality_review_scope": "Earlier independent source quality plus final root causal disposition and narrow source-delta review after sub-agent execution was stopped.",
+        "installed": true,
+        "commit": "e7ee2b317a4e30ef9a3c630a35501be691547fd4",
+        "source_sha256": {
+          "scripts/record-rust-compilation.py": "fe07f58ac4630ca5e8a6156ce7a97a3571f3ba946ce0cbfc7e86ad630148e4a5",
+          "scripts/verify-recovery-qualification.py": "2f146b17565d748f4b593fa66df37b695daf1d59e29b786da8aabd4421ddc4c4",
+          "scripts/compiled-gate-profiles.py": "faddd44751f253b55d8c6959c87673a9d8231220ae3a6a27992f1ad3b8fdd110",
+          "scripts/tests/record-rust-compilation.test.py": "12e9cac75c7dcc5884905b9e8cce5413577eb7b70febccdcd43fde6141948ce8",
+          "scripts/tests/compiled-gate-profiles.test.py": "ee97f2fe5a133be092bf5ee903d4e373064b5c93f848da17982900e1cd7ba3de"
+        },
+        "scope": "Original stale nominal-output reproduction refuses before dispatch; exact fresh held output ownership and concurrent-owner controls pass.",
+        "qualified": false
+      }
     },
     {
       "key": "CR-03",
@@ -4436,8 +4512,35 @@
       "remaining_obligation_refs": [
         "reviewed#/rows/165/expected_remaining_obligations"
       ],
-      "current_status": "open",
-      "current_reason": "No complete independent disposition is recorded. Retain the original obligation and every referenced current or historical owner check; partial observations do not close it."
+      "current_status": "recorded_scoped_closed",
+      "current_reason": "Original real-filesystem publication replacement and copy controls bind final bytes and inode identities to the verified held descriptors. Exact current controls and reviews support only the original causal finding; broader compiler/native/runtime qualification remains open.",
+      "current_successor": {
+        "recorded_at_utc": "2026-10-10T04:17:54.663803+00:00",
+        "recorded_disposition": "closed_scoped_local",
+        "previous_current_status": "open",
+        "previous_current_reason": "No complete independent disposition is recorded. Retain the original obligation and every referenced current or historical owner check; partial observations do not close it.",
+        "review_ref": "docs/architecture/recoverable-agent-runtime/implementation/reviews/compiler-causal-remediation.md",
+        "review_sha256": "2aaacc7a167ecef8d4b30985f23d8d2edb419c982ac7b45d4c93600e4df6833d",
+        "review_evidence": {
+          "target/recovery-pr/current-review-followup/p1-integration-20261009/host-compiler-gate/causal-spec-review.json": "290fe0fa279a12c1609eda9f26b5a9dc79e900192bd4c582f6316fefa6d376d6",
+          "target/recovery-pr/current-review-followup/p1-integration-20261009/host-compiler-gate/causal-quality-review.json": "db6270b81ad147cfe2d01354b8df711d61a6c9c0df043670e26c7f265d060c7c",
+          "target/recovery-pr/current-review-followup/p1-integration-20261009/host-compiler-gate/quality-review.json": "27fd62ed4542edda03978c0dc75e38fb5a2a692ce6ef7140fbaf4623d1e12262"
+        },
+        "spec_verdict": "SPEC_PASS",
+        "quality_verdict": "QUALITY_PASS",
+        "quality_review_scope": "Earlier independent source quality plus final root causal disposition and narrow source-delta review after sub-agent execution was stopped.",
+        "installed": true,
+        "commit": "e7ee2b317a4e30ef9a3c630a35501be691547fd4",
+        "source_sha256": {
+          "scripts/record-rust-compilation.py": "fe07f58ac4630ca5e8a6156ce7a97a3571f3ba946ce0cbfc7e86ad630148e4a5",
+          "scripts/verify-recovery-qualification.py": "2f146b17565d748f4b593fa66df37b695daf1d59e29b786da8aabd4421ddc4c4",
+          "scripts/compiled-gate-profiles.py": "faddd44751f253b55d8c6959c87673a9d8231220ae3a6a27992f1ad3b8fdd110",
+          "scripts/tests/record-rust-compilation.test.py": "12e9cac75c7dcc5884905b9e8cce5413577eb7b70febccdcd43fde6141948ce8",
+          "scripts/tests/compiled-gate-profiles.test.py": "ee97f2fe5a133be092bf5ee903d4e373064b5c93f848da17982900e1cd7ba3de"
+        },
+        "scope": "Original real-filesystem publication replacement and copy controls bind final bytes and inode identities to the verified held descriptors.",
+        "qualified": false
+      }
     },
     {
       "key": "CR-04",
@@ -4949,8 +5052,35 @@
       "remaining_obligation_refs": [
         "reviewed#/rows/191/expected_remaining_obligations"
       ],
-      "current_status": "open",
-      "current_reason": "No complete independent disposition is recorded. Retain the original obligation and every referenced current or historical owner check; partial observations do not close it."
+      "current_status": "recorded_scoped_closed",
+      "current_reason": "The exact Cargo credential filename is metadata-only across auditor, recorder, builder and collector; original no-open, no-hash, no-follow and archive-exclusion controls pass. Exact current controls and reviews support only the original causal finding; broader compiler/native/runtime qualification remains open.",
+      "current_successor": {
+        "recorded_at_utc": "2026-10-10T04:17:54.663803+00:00",
+        "recorded_disposition": "closed_scoped_local",
+        "previous_current_status": "open",
+        "previous_current_reason": "No complete independent disposition is recorded. Retain the original obligation and every referenced current or historical owner check; partial observations do not close it.",
+        "review_ref": "docs/architecture/recoverable-agent-runtime/implementation/reviews/compiler-causal-remediation.md",
+        "review_sha256": "2aaacc7a167ecef8d4b30985f23d8d2edb419c982ac7b45d4c93600e4df6833d",
+        "review_evidence": {
+          "target/recovery-pr/current-review-followup/p1-integration-20261009/host-compiler-gate/causal-spec-review.json": "290fe0fa279a12c1609eda9f26b5a9dc79e900192bd4c582f6316fefa6d376d6",
+          "target/recovery-pr/current-review-followup/p1-integration-20261009/host-compiler-gate/causal-quality-review.json": "db6270b81ad147cfe2d01354b8df711d61a6c9c0df043670e26c7f265d060c7c",
+          "target/recovery-pr/current-review-followup/p1-integration-20261009/host-compiler-gate/quality-review.json": "27fd62ed4542edda03978c0dc75e38fb5a2a692ce6ef7140fbaf4623d1e12262"
+        },
+        "spec_verdict": "SPEC_PASS",
+        "quality_verdict": "QUALITY_PASS",
+        "quality_review_scope": "Earlier independent source quality plus final root causal disposition and narrow source-delta review after sub-agent execution was stopped.",
+        "installed": true,
+        "commit": "e7ee2b317a4e30ef9a3c630a35501be691547fd4",
+        "source_sha256": {
+          "scripts/record-rust-compilation.py": "fe07f58ac4630ca5e8a6156ce7a97a3571f3ba946ce0cbfc7e86ad630148e4a5",
+          "scripts/verify-recovery-qualification.py": "2f146b17565d748f4b593fa66df37b695daf1d59e29b786da8aabd4421ddc4c4",
+          "scripts/compiled-gate-profiles.py": "faddd44751f253b55d8c6959c87673a9d8231220ae3a6a27992f1ad3b8fdd110",
+          "scripts/tests/record-rust-compilation.test.py": "12e9cac75c7dcc5884905b9e8cce5413577eb7b70febccdcd43fde6141948ce8",
+          "scripts/tests/compiled-gate-profiles.test.py": "ee97f2fe5a133be092bf5ee903d4e373064b5c93f848da17982900e1cd7ba3de"
+        },
+        "scope": "The exact Cargo credential filename is metadata-only across auditor, recorder, builder and collector; original no-open, no-hash, no-follow and archive-exclusion controls pass.",
+        "qualified": false
+      }
     },
     {
       "key": "SDK-CONFORMANCE-01",
@@ -10564,6 +10694,27 @@
       },
       "current_status_changes": false,
       "counts_changed": false,
+      "qualified": false
+    },
+    {
+      "at_utc": "2026-10-10T04:17:54.663803+00:00",
+      "findings": [
+        "CR-01",
+        "CR-02",
+        "CR-03",
+        "QP-SECRET-01"
+      ],
+      "review": "docs/architecture/recoverable-agent-runtime/implementation/reviews/compiler-causal-remediation.md",
+      "review_sha256": "2aaacc7a167ecef8d4b30985f23d8d2edb419c982ac7b45d4c93600e4df6833d",
+      "commit": "e7ee2b317a4e30ef9a3c630a35501be691547fd4",
+      "scope": "Four original compiler-publication and credential-classification causal P1s locally closed. Preserve broader compiler/native acceptance and historical dispositions. Native fixture repair only exposes the actual unsupported finishing prerequisite.",
+      "review_evidence": {
+        "target/recovery-pr/current-review-followup/p1-integration-20261009/host-compiler-gate/causal-spec-review.json": "290fe0fa279a12c1609eda9f26b5a9dc79e900192bd4c582f6316fefa6d376d6",
+        "target/recovery-pr/current-review-followup/p1-integration-20261009/host-compiler-gate/causal-quality-review.json": "db6270b81ad147cfe2d01354b8df711d61a6c9c0df043670e26c7f265d060c7c",
+        "target/recovery-pr/current-review-followup/p1-integration-20261009/host-compiler-gate/quality-review.json": "27fd62ed4542edda03978c0dc75e38fb5a2a692ce6ef7140fbaf4623d1e12262"
+      },
+      "current_status_changes": true,
+      "counts_changed": true,
       "qualified": false
     }
   ],
