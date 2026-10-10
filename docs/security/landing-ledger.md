@@ -7,6 +7,24 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Fee-binding composition and wallet review (October 10)
+
+The [fee and wallet audit](audits/fee-wallet-review-20261010.json) records the
+integrated fee-binding repair, its composed focused tests, and all five minor
+wallet review observations. A refused final authorization rolls back the fiscal
+binding. Fiscal forwarding is explicitly unverified by these component runs.
+
+The wallet port passed independent source review, while the service-lane defect
+remains a landing blocker. Comment accuracy and Content-Type controls accompany
+that repair; join-failure coverage and timing robustness remain named follow-ups.
+The unchanged four-permit wallet overload contract remains explicit.
+
+The same audit reopens the export attribution requirement and related P3 rows:
+the independent a862 review found malformed-text and oversized-subject paths
+that still skip invalidation. N1-N6 map to the existing requirements; their
+earlier component passes remain partial evidence. Claude owns the isolated
+follow-on repair, and Root remains the only integration writer.
+
 ## Wallet, export and signer component evidence (October 10)
 
 The [component audit](audits/wallet-export-signer-20261010.json) pins the export
@@ -34,7 +52,7 @@ consumer triage and a genuine Original before a bug claim. Both remain visible.
 
 ## Bounded readiness repairs and remaining review work (October 10)
 
-The ledger preserves **1,915 requirements**, including all 1,914 earlier objects.
+The ledger preserves **1,920 requirements**, including all 1,915 earlier objects.
 The [readiness audit](audits/readiness-followons-20261010.json) pins 80 renewed
 native tests, registry transaction and governance producer evidence, and the
 shared authority APIs. These are component results; the final source is not
