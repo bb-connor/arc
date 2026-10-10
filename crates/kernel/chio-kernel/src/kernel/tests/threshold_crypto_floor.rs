@@ -7,11 +7,11 @@ use crate::threshold_approval::{
 use chio_core::{Ed25519Backend, SigningAlgorithm, SigningBackend};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
+pub(super) type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
-struct Fixture {
-    kernel: ChioKernel,
-    request: ToolCallRequest,
+pub(super) struct Fixture {
+    pub(super) kernel: ChioKernel,
+    pub(super) request: ToolCallRequest,
     requirement: ThresholdApprovalRequirement,
     intent_hash: String,
     now: u64,
@@ -41,7 +41,11 @@ impl Fixture {
         )
     }
 
-    fn with_grant(hybrid_proposal: bool, hybrid_vote: bool, grant: ToolGrant) -> TestResult<Self> {
+    pub(super) fn with_grant(
+        hybrid_proposal: bool,
+        hybrid_vote: bool,
+        grant: ToolGrant,
+    ) -> TestResult<Self> {
         let authority = backend(10, hybrid_proposal)?;
         let approver = backend(20, hybrid_vote)?;
         let issuer = backend(30, hybrid_proposal || hybrid_vote)?;
@@ -587,6 +591,3 @@ fn allow_classical_rejects_hybrid_threshold_artifacts() -> TestResult {
         .is_err());
     Ok(())
 }
-
-#[path = "threshold_crypto_floor/approval_reservation_cleanup.rs"]
-mod approval_reservation_cleanup;

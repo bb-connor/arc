@@ -1,5 +1,6 @@
 //! A failed approval-set reservation still unwinds runtime custody.
 
+use super::threshold_crypto_floor::{Fixture, TestResult};
 use super::*;
 use std::sync::atomic::AtomicU64;
 
