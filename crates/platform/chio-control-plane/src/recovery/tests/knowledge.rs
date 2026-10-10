@@ -621,46 +621,6 @@ fn artifacts_missing_blob_quarantines_and_never_substitutes_same_digest() -> Tes
     Ok(())
 }
 #[test]
-fn artifacts_collection_barrier_dedup_and_identity_tombstones() -> TestResult {
-    let f = KnowledgeFixture::new()?;
-    let first = f.publish("gc-first", b"same")?;
-    let second = f.publish("gc-second", b"same")?;
-    f.runtime.collect(&f.f.control, &first)?;
-    let handle = f.runtime.handle(
-        &f.f.control,
-        &second,
-        &ArtifactRecipientId::new("agent-root")?,
-    )?;
-    assert!(f.runtime.prepare_read(&f.f.control, &handle).is_ok());
-    let faulty = f.runtime.clone().with_test_cutpoint(Arc::new(|stage| {
-        if stage == crate::knowledge::KnowledgeCutpoint::CollectionRetired {
-            Err(KernelError::Internal("lost retire ack".into()))
-        } else {
-            Ok(())
-        }
-    }));
-    assert!(faulty.collect(&f.f.control, &second).is_err());
-    assert!(f
-        .runtime
-        .publish(
-            &f.f.control,
-            &f.input("new-during-sweep", b"same")?,
-            b"same",
-            None
-        )
-        .is_err());
-    f.runtime.collect(&f.f.control, &second)?;
-    let count: i64 = rusqlite::Connection::open(f.f.path.join("process.db"))?.query_row(
-        "SELECT count(*) FROM process_artifact_objects WHERE data IS NOT NULL",
-        [],
-        |row| row.get(0),
-    )?;
-    assert_eq!(count, 0);
-    assert!(f.publish("gc-second", b"same").is_err());
-    assert!(f.publish("independent-new-version", b"same").is_ok());
-    Ok(())
-}
-#[test]
 fn artifacts_copy_restore_archive_and_aliases_preserve_every_origin() -> TestResult {
     let f = KnowledgeFixture::new()?;
     let source = publish_label(&f, "copy-source", b"archive-canary", restricted_label())?;

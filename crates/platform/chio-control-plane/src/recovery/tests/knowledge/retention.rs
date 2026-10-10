@@ -52,6 +52,13 @@ fn artifacts_equal_content_collection_reclaims_only_exact_logical_object() -> Te
         &ArtifactRecipientId::new("agent-root")?,
     )?;
     assert!(f.runtime.prepare_read(&f.f.control, &second_handle).is_ok());
+    // A collected publication keeps its identity tombstone: reusing the same
+    // publication id refuses, while an independent equal-byte logical object
+    // remains publishable (covered above by the surviving second object).
+    assert!(
+        f.publish("equal-custody-first", b"same").is_err(),
+        "a collected publication id must stay retired"
+    );
     Ok(())
 }
 
@@ -490,16 +497,23 @@ fn reference_readiness_refusal(remove: bool) -> TestResult {
     )?;
     assert_eq!(
         retained, 1,
-        "the real installation must have sealed its census"
+        "the real installation must have sealed its readiness activation"
     );
     if remove {
+        // Disposable local fault injection: the readiness projection vanishes
+        // while its sealed event history stays retained. Foreign-key
+        // enforcement is connection-local, and the ownership guard is lifted
+        // only for this throwaway connection, mirroring the guarded tamper
+        // setup of the live-capacity account regression.
         let trigger: String = connection.query_row(
             "SELECT sql FROM sqlite_master WHERE type='trigger'
              AND name='admission_operation_recovery_no_delete'",
             [],
             |row| row.get(0),
         )?;
-        connection.execute_batch("DROP TRIGGER admission_operation_recovery_no_delete")?;
+        connection.execute_batch(
+            "PRAGMA foreign_keys=OFF; DROP TRIGGER admission_operation_recovery_no_delete",
+        )?;
         assert_eq!(
             connection.execute(
                 "DELETE FROM admission_operation_recovery_records WHERE record_key=?1",
@@ -509,9 +523,15 @@ fn reference_readiness_refusal(remove: bool) -> TestResult {
         );
         connection.execute_batch(&trigger)?;
     } else {
+        // Corrupt the readiness payload on the disposable connection. The
+        // identity trigger permits exactly one payload rewrite together with
+        // its version increment, so the retained event digest no longer
+        // matches the tampered projection and every protected read of the
+        // key fails whole-store integrity before readiness decoding.
         assert_eq!(
             connection.execute(
-                "UPDATE admission_operation_recovery_records SET payload=?2 WHERE record_key=?1",
+                "UPDATE admission_operation_recovery_records
+                 SET payload=?2, version=version+1 WHERE record_key=?1",
                 rusqlite::params![&key, b"null".as_slice()],
             )?,
             1
@@ -545,7 +565,7 @@ fn reference_readiness_refusal(remove: bool) -> TestResult {
 }
 
 #[test]
-fn artifacts_collection_refuses_missing_current_reference_readiness_with_retained_census(
+fn artifacts_collection_refuses_missing_current_reference_readiness_with_retained_history(
 ) -> TestResult {
     reference_readiness_refusal(true)
 }
