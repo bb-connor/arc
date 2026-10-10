@@ -460,9 +460,14 @@ impl SqliteAdmissionOperationStore {
                 "physical process belongs to a different tenant scope",
             ));
         }
+        let runtime = profile.producer_context.as_v1().session_id().as_str();
+        let runtime_enforced = enforced(&tx, runtime)?;
         if let Some(old) =
             load::<NativeKnowledgeInstallationV1>(&tx, &profile_key(&profile.scope)?)?
         {
+            if !runtime_enforced {
+                return Err(refused("installed runtime lost its enforcement marker"));
+            }
             if protected::encode(&old)? == protected::encode(profile)? {
                 if physical_owner.is_none() {
                     return Err(refused("physical process ownership absent"));
@@ -497,43 +502,16 @@ impl SqliteAdmissionOperationStore {
             &profile_key(&profile.scope)?,
             profile,
         )?;
-        // The runtime-wide enforcement marker is owned by its first
-        // installer. One persistent process journal namespace legitimately
-        // serves multiple roots, so a later registration in the same runtime
-        // never reassigns that custody: an existing marker is verified in
-        // place and only its absence initializes a new one. Rewriting the
-        // row under a different scope would strand its original projection
-        // and event, so retained or corrupt custody refuses instead.
-        let runtime_key = format!(
-            "knowledge-runtime:{}",
-            sha256_hex(
-                profile
-                    .producer_context
-                    .as_v1()
-                    .session_id()
-                    .as_str()
-                    .as_bytes()
-            )
-        );
-        match protected::raw_checked(&tx, &runtime_key)? {
-            None => {
-                save(
-                    &tx,
-                    &self.serving_owner,
-                    &profile.scope,
-                    &runtime_key,
-                    &true,
-                )?;
-            }
-            Some(row) => {
-                let enforced: bool = protected::decode(&row.payload)?;
-                if !enforced || row.kind != "command" || row.version == 0 {
-                    return Err(refused(
-                        "runtime enforcement marker lost its original custody",
-                    ));
-                }
-                protected::source_reference(&tx, &runtime_key)?;
-            }
+        // A journal can serve multiple roots and tenants. Enforcement is
+        // activated once; later installations retain the first writer's custody.
+        if !runtime_enforced {
+            save(
+                &tx,
+                &self.serving_owner,
+                &profile.scope,
+                &runtime_enforcement_key(runtime),
+                &true,
+            )?;
         }
         self.commit_write(tx)?;
         self.sync_after_write(&connection)
@@ -588,9 +566,19 @@ pub(super) fn enforced(
     tx: &Connection,
     runtime: &str,
 ) -> Result<bool, AdmissionOperationStoreError> {
-    Ok(load::<bool>(
-        tx,
-        &format!("knowledge-runtime:{}", sha256_hex(runtime.as_bytes())),
-    )?
-    .unwrap_or(false))
+    let key = runtime_enforcement_key(runtime);
+    let Some(row) = protected::raw_checked(tx, &key)? else {
+        return Ok(false);
+    };
+    if row.kind != "command" || row.version == 0 || !protected::decode::<bool>(&row.payload)? {
+        return Err(refused(
+            "runtime enforcement marker lost its original custody",
+        ));
+    }
+    protected::source_reference(tx, &key)?;
+    Ok(true)
+}
+
+fn runtime_enforcement_key(runtime: &str) -> String {
+    format!("knowledge-runtime:{}", sha256_hex(runtime.as_bytes()))
 }

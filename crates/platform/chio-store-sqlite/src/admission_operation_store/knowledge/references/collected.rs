@@ -75,9 +75,7 @@ pub(in crate::admission_operation_store::knowledge) fn collection_sources(
     let mut sources = Vec::new();
     if let Some(pointer) = pointer {
         let root = load_reference_state(tx, &reference)?;
-        if root.aggregate.value.active_owners.get() != 0
-            || super::super::lifecycle::pinned(tx, &reference)?
-        {
+        if root.aggregate.value.active_owners.get() != 0 {
             return Err(refused(
                 "publication closure retains active reference owners",
             ));

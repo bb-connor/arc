@@ -206,18 +206,6 @@ fn publications(
         .map(|key| load(tx, &key)?.ok_or_else(|| refused("publication inventory")))
         .collect()
 }
-pub(super) fn pinned(
-    tx: &Connection,
-    reference: &ArtifactVersionRefV1,
-) -> Result<bool, AdmissionOperationStoreError> {
-    if super::references::active_reference_owner_count(tx, reference)? > 0 {
-        return Ok(true);
-    }
-    let ready = super::references::ready_reference_account(tx, &reference.scope)?;
-    ready.verify_current(tx)?;
-    Ok(false)
-}
-
 impl SqliteAdmissionOperationStore {
     /// A scoped operator pin may be retired without retiring native custody.
     /// This explicit route does not infer pin purpose from historical text.
@@ -346,7 +334,7 @@ impl SqliteAdmissionOperationStore {
             traversal::ensure_audience(&tx, actor, &record.metadata.label)?;
             if artifact_version_reference(&record.metadata).map_err(refused)? != *reference
                 || record.metadata.retention != ArtifactRetentionV1::Ephemeral
-                || pinned(&tx, reference)?
+                || super::references::active_reference_owner_count(&tx, reference)? > 0
             {
                 return Err(refused("retention pin"));
             }

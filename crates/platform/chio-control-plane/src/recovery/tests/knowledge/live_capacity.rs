@@ -377,6 +377,7 @@ fn knowledge_account_installation_refuses_missing_custody_without_resetting() ->
         "knowledge-publication-ready:*",
         "knowledge-publication-capacity:*",
         "knowledge-profile:*",
+        "knowledge-runtime:*",
     ] {
         let f = KnowledgeFixture::new()?;
         f.publish("retained-owner", b"must not disappear from accounting")?;
@@ -452,7 +453,7 @@ fn knowledge_account_joins_same_tenant_and_initializes_foreign_tenant_independen
         (1, 1),
         "the runtime enforcement marker must retain its single original custody"
     );
-    // Both hosts stay readable through their real public runtime operations.
+    // Both hosts can prepare mediated reads through their public runtimes.
     for host in [&sibling, &foreign] {
         let input = f.input("account-join-readable", b"readable")?;
         let reference = host
@@ -466,7 +467,7 @@ fn knowledge_account_joins_same_tenant_and_initializes_foreign_tenant_independen
         let prepared = host
             .runtime
             .prepare_read(&f.f.control, &handle)
-            .map_err(|error| format!("reading back the joined account artifact: {error:?}"))?;
+            .map_err(|error| format!("preparing the joined account artifact read: {error:?}"))?;
         drop(prepared);
     }
     assert_eq!(
@@ -475,7 +476,7 @@ fn knowledge_account_joins_same_tenant_and_initializes_foreign_tenant_independen
             &f.f.authority.mutation_fence(),
             now_ms()?,
         )?,
-        1
+        2
     );
     Ok(())
 }
