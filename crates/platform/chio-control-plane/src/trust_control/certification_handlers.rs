@@ -3,7 +3,7 @@
 //! trust-activation, governance, and open-market artifact endpoints.
 
 use super::report_rendering::forward_post_to_leader;
-use super::report_validation::validate_service_auth;
+use super::report_validation::{inspect_authority_state, validate_service_auth};
 use super::*;
 
 pub(crate) async fn handle_list_certifications(
@@ -166,10 +166,13 @@ pub(crate) async fn handle_issue_generic_trust_activation(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    match service_runtime::issuance::issue_signed_generic_trust_activation(&state.config, &request)
+    match inspect_authority_state(&state, move |state| {
+        service_runtime::issuance::issue_signed_generic_trust_activation(state, &request)
+    })
+    .await
     {
         Ok(artifact) => Json(artifact).into_response(),
-        Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        Err(response) => response,
     }
 }
 
@@ -181,12 +184,13 @@ pub(crate) async fn handle_evaluate_generic_trust_activation(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    match service_runtime::issuance::evaluate_generic_trust_activation_request(
-        &state.config,
-        &request,
-    ) {
+    match inspect_authority_state(&state, move |state| {
+        service_runtime::issuance::evaluate_generic_trust_activation_request(state, &request)
+    })
+    .await
+    {
         Ok(report) => Json(report).into_response(),
-        Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        Err(response) => response,
     }
 }
 
@@ -198,12 +202,13 @@ pub(crate) async fn handle_issue_generic_governance_charter(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    match service_runtime::issuance::issue_signed_generic_governance_charter(
-        &state.config,
-        &request,
-    ) {
+    match inspect_authority_state(&state, move |state| {
+        service_runtime::issuance::issue_signed_generic_governance_charter(state, &request)
+    })
+    .await
+    {
         Ok(artifact) => Json(artifact).into_response(),
-        Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        Err(response) => response,
     }
 }
 
@@ -215,9 +220,13 @@ pub(crate) async fn handle_issue_generic_governance_case(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    match service_runtime::issuance::issue_signed_generic_governance_case(&state.config, &request) {
+    match inspect_authority_state(&state, move |state| {
+        service_runtime::issuance::issue_signed_generic_governance_case(state, &request)
+    })
+    .await
+    {
         Ok(artifact) => Json(artifact).into_response(),
-        Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        Err(response) => response,
     }
 }
 
@@ -253,13 +262,13 @@ pub(crate) async fn handle_issue_open_market_fee_schedule(
             Err(response) => return response,
         }
     }
-    match service_runtime::issuance::issue_signed_open_market_fee_schedule(
-        &state.config,
-        &request,
-        state.fiscal_runtime.as_deref(),
-    ) {
+    match inspect_authority_state(&state, move |state| {
+        service_runtime::issuance::issue_signed_open_market_fee_schedule(state, &request)
+    })
+    .await
+    {
         Ok(artifact) => Json(artifact).into_response(),
-        Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        Err(response) => response,
     }
 }
 
@@ -281,13 +290,13 @@ pub(crate) async fn handle_issue_open_market_penalty(
             Err(response) => return response,
         }
     }
-    match service_runtime::issuance::issue_signed_open_market_penalty(
-        &state.config,
-        &request,
-        state.fiscal_runtime.as_deref(),
-    ) {
+    match inspect_authority_state(&state, move |state| {
+        service_runtime::issuance::issue_signed_open_market_penalty(state, &request)
+    })
+    .await
+    {
         Ok(artifact) => Json(artifact).into_response(),
-        Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        Err(response) => response,
     }
 }
 
@@ -299,13 +308,13 @@ pub(crate) async fn handle_evaluate_open_market_penalty(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    match service_runtime::issuance::evaluate_open_market_penalty_request(
-        &state.config,
-        &request,
-        state.fiscal_runtime.as_deref(),
-    ) {
+    match inspect_authority_state(&state, move |state| {
+        service_runtime::issuance::evaluate_open_market_penalty_request(state, &request)
+    })
+    .await
+    {
         Ok(report) => Json(report).into_response(),
-        Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        Err(response) => response,
     }
 }
 

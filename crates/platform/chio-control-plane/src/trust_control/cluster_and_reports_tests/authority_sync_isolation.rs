@@ -19,6 +19,8 @@ const UNPINNED_STARTUP: &str = "clustered trust control requires an out-of-band 
 
 #[path = "authority_clock_contract.rs"]
 mod authority_clock_contract;
+#[path = "governance_authority.rs"]
+mod governance_authority;
 
 /// Holds one numbered authority-snapshot request inside the exporter until
 /// the test releases it, so the importer is observable mid-round.
