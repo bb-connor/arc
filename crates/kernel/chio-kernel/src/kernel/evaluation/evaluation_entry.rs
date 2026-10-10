@@ -1,6 +1,27 @@
+use super::async_evaluation_core::SessionEvaluationContext;
 use super::*;
 
 impl ChioKernel {
+    /// Qualification bridge to the existing session-aware evaluator. Its
+    /// production visibility and every admission check remain unchanged.
+    #[cfg(feature = "admission-test-support")]
+    pub(in crate::kernel) async fn evaluate_authenticated_original_session_for_test(
+        &self,
+        request: &ToolCallRequest,
+        session: &SessionId,
+        context: &SecurityInvocationContext,
+    ) -> Result<ToolCallResponse, KernelError> {
+        Box::pin(self.evaluate_tool_call_async_with_session_context(
+            request,
+            None,
+            None,
+            Some(session),
+            Some(context),
+            EvaluationDisposition::kernel(),
+        ))
+        .await
+    }
+
     pub(super) async fn evaluate_tool_call_async_with_session_context(
         &self,
         request: &ToolCallRequest,
@@ -21,6 +42,45 @@ impl ChioKernel {
                 session_id,
                 security_context,
                 disposition,
+            ),
+        ))
+        .await
+    }
+
+    /// Carry the actual Process invocation source through this one evaluation.
+    /// The provider is descriptive until the physical original bank verifies.
+    pub async fn evaluate_tool_call_with_native_finishing_provider(
+        &self,
+        request: &ToolCallRequest,
+        context: &SecurityInvocationContext,
+        provider: &dyn crate::native_finishing::NativeProcessFinishingSourceProvider,
+    ) -> Result<ToolCallResponse, KernelError> {
+        self.evaluate_tool_call_with_metadata_and_native_finishing_provider(
+            request, None, context, provider,
+        )
+        .await
+    }
+
+    /// Preserve the existing Process attribution, host and launch metadata.
+    pub async fn evaluate_tool_call_with_metadata_and_native_finishing_provider(
+        &self,
+        request: &ToolCallRequest,
+        metadata: Option<serde_json::Value>,
+        context: &SecurityInvocationContext,
+        provider: &dyn crate::native_finishing::NativeProcessFinishingSourceProvider,
+    ) -> Result<ToolCallResponse, KernelError> {
+        reject_reserved_receipt_metadata(metadata.as_ref())?;
+        scope_async_receipt_context(Box::pin(
+            self.evaluate_tool_call_async_with_session_context_scoped_finishing(
+                request,
+                SessionEvaluationContext {
+                    filesystem_roots: None,
+                    session_id: None,
+                },
+                metadata,
+                Some(context),
+                EvaluationDisposition::kernel(),
+                Some(provider),
             ),
         ))
         .await

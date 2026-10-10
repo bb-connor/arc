@@ -3,9 +3,9 @@
 use super::native_acquisition::store_call;
 use super::*;
 use crate::admission_operation::{
-    AdmissionOperationId, NativeSecurityAuthorityBindingV1, NativeSecurityEgressContext,
-    NativeSecurityEgressHistoryV1, NativeSecurityFlowJoinRecordV1, NativeSecurityFlowObservationV1,
-    RetainedToolAdmissionRequestV1,
+    AdmissionOperationId, AdmissionRecoveryLease, NativeSecurityAuthorityBindingV1,
+    NativeSecurityEgressContext, NativeSecurityEgressHistoryV1, NativeSecurityFlowJoinRecordV1,
+    NativeSecurityFlowObservationV1, RetainedToolAdmissionRequestV1,
 };
 use chio_security_types::ports::{
     CommittedEgressFence, Digest32, EgressFenceCommit, EgressFenceRequest, FlowStateKey, RecordId,
@@ -14,13 +14,25 @@ use chio_security_types::ports::{
 
 #[path = "native_egress/capture.rs"]
 mod capture;
+#[cfg(feature = "admission-test-support")]
+#[path = "native_egress/commit_observer.rs"]
+mod commit_observer;
 #[path = "native_egress/ledger.rs"]
 mod ledger;
+#[path = "native_egress/policy_refusal.rs"]
+mod policy_refusal;
+#[path = "native_egress/prepared_commit.rs"]
+mod prepared_commit;
 #[cfg(feature = "admission-test-support")]
 pub(crate) use capture::NativeCaptureCheckpointInput;
-#[cfg(feature = "admission-test-support")]
-pub use capture::NativeSecurityCaptureCheckpointHook;
 pub use capture::NativeSecurityDispatchCaptureAuthority;
+#[cfg(feature = "admission-test-support")]
+pub use capture::{NativeSecurityCaptureCheckpointHook, NativeSecurityCaptureObserver};
+pub use policy_refusal::{NativeFlowPolicyRefusal, NativeFlowPolicyRefusalOwner};
+pub(in crate::kernel) use policy_refusal::{
+    NativeFlowPolicyWitnessRegistration, RESERVED_NATIVE_POLICY_OWNER,
+};
+pub use prepared_commit::PreparedNativeSecurityEgressCommit;
 
 /// Test-only observer at the still-closed native pre-dispatch boundary. It can
 /// exercise real kernel custody without bypassing the final dispatch refusal.
@@ -82,6 +94,16 @@ impl ChioKernel {
         hook: NativeSecurityEgressCheckpointHook,
     ) {
         self.native_egress_checkpoint_hook = Some(hook);
+    }
+}
+
+impl PreparedNativeSecurityEgress<'_> {
+    /// Protected original verifier input, not permission to capture or release.
+    pub fn recovery_verification_context(
+        &self,
+    ) -> Result<Option<crate::recovery::RecoveryVerificationContextV1>, KernelError> {
+        self.kernel
+            .recovery_verification_context_for(self.operation.binding().operation_id())
     }
 }
 
@@ -459,6 +481,11 @@ impl AcquiredNativeSecurityEgress<'_> {
         &self,
         consumption: Option<&chio_security_types::ports::DeclassificationConsumptionEvidenceCommit>,
     ) -> Result<NativeSecurityEgressHistoryV1, KernelError> {
+        let (lease, now) = self.prepare_commit_context()?;
+        self.commit_prepared(&lease, now, consumption)
+    }
+
+    fn prepare_commit_context(&self) -> Result<(AdmissionRecoveryLease, u64), KernelError> {
         let prepared = &self.prepared;
         let runtime = prepared.kernel.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
@@ -470,23 +497,37 @@ impl AcquiredNativeSecurityEgress<'_> {
                 "native egress acquisition changed before commitment",
             ));
         }
+        let lease = prepared
+            .kernel
+            .claim_admission_recovery(&prepared.operation, now)?;
+        let now = runtime.refresh_trusted_time(now);
+        require_deadline(self.history.acquisition.fence.expires_at_unix_ms, now)?;
+        Ok((lease, now))
+    }
+
+    fn commit_prepared(
+        &self,
+        lease: &AdmissionRecoveryLease,
+        now: u64,
+        consumption: Option<&chio_security_types::ports::DeclassificationConsumptionEvidenceCommit>,
+    ) -> Result<NativeSecurityEgressHistoryV1, KernelError> {
+        let prepared = &self.prepared;
+        let runtime = prepared.kernel.durable_runtime()?;
+        let _guard = runtime.lock_mutations()?;
+        let current = runtime.refresh_trusted_time(now);
+        require_deadline(self.history.acquisition.fence.expires_at_unix_ms, current)?;
+        // The physical transaction rechecks this original lease, observation,
+        // signed grant and deadline. Preparation never renews those bindings.
         let command = EgressFenceCommit {
             fence: self.history.acquisition.fence.clone(),
             dispatch_commitment_id: prepared.dispatch_commitment_id.clone(),
             committed_at_unix_ms: now,
         };
-        let expected = CommittedEgressFence {
-            fence_id: command.fence.fence_id.clone(),
-            request_id: command.fence.request_id.clone(),
-            request_hash: command.fence.request_hash,
-            context_generation: command.fence.context_generation,
-            dispatch_commitment_id: command.dispatch_commitment_id.clone(),
-            committed_at_unix_ms: now,
-        };
-        let lease = prepared
-            .kernel
-            .claim_admission_recovery(&prepared.operation, now)?;
-        let input = prepared.command_context(&lease, now);
+        #[cfg(feature = "admission-test-support")]
+        commit_observer::observe(&runtime.fence.store_uuid, now)?;
+        let submitted_at = runtime.refresh_trusted_time(current);
+        require_deadline(command.fence.expires_at_unix_ms, submitted_at)?;
+        let input = prepared.command_context(lease, submitted_at);
         let acknowledged = store_call(|| match consumption {
             Some(consumption) => runtime.store.commit_native_security_declassified_egress(
                 &input,
@@ -497,9 +538,27 @@ impl AcquiredNativeSecurityEgress<'_> {
                 .store
                 .commit_native_security_egress(&input, &command),
         });
-        let history = prepared.read_history(runtime, now);
+        let completed_at = runtime.refresh_trusted_time(submitted_at);
+        let history = prepared.read_history(runtime, completed_at);
         let committed = acknowledged?;
         let history = history?;
+        let event_at = committed.committed_at_unix_ms;
+        if event_at < now || event_at > completed_at {
+            return Err(invalid(
+                "native egress event clock differs from physical confirmation",
+            ));
+        }
+        let expected = CommittedEgressFence {
+            fence_id: command.fence.fence_id.clone(),
+            request_id: command.fence.request_id.clone(),
+            request_hash: command.fence.request_hash,
+            context_generation: command.fence.context_generation,
+            dispatch_commitment_id: command.dispatch_commitment_id.clone(),
+            committed_at_unix_ms: event_at,
+        };
+        let expected_consumption = consumption
+            .map(|prepared| prepared_commit::consumption_at(prepared, event_at))
+            .transpose()?;
         let evidence = history
             .commitment
             .as_ref()
@@ -509,13 +568,13 @@ impl AcquiredNativeSecurityEgress<'_> {
             || history.acquisition != self.history.acquisition
             || evidence.acquisition_digest != self.history.acquisition.event_digest
             || evidence.event_digest == evidence.acquisition_digest
-            || evidence.declassification.as_ref() != consumption
+            || evidence.declassification.as_ref() != expected_consumption.as_ref()
         {
             return Err(invalid(
                 "native egress commitment differs from acquired command history",
             ));
         }
-        let after = runtime.refresh_trusted_time(now);
+        let after = runtime.refresh_trusted_time(completed_at);
         require_deadline(command.fence.expires_at_unix_ms, after)?;
         prepared.revalidate(runtime, after)?;
         if prepared.read_history(runtime, after)? != history {

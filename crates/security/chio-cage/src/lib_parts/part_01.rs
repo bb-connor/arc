@@ -20,8 +20,8 @@ pub use launch::{
     launch, launch_prepared, prepare_launch, prepare_launch_with_options, run_cage_init,
     validate_cage_target_fd_binding_production_paths, CageLaunchError, CageLaunchOptions,
     CageLaunchPreparationEvidence, CageTargetFdBindingMutation,
-    CageTargetFdBindingProductionValidation, EnforcedChild, EnforcedStdio, PreparedCageLaunch,
-    TerminationSignal,
+    CageTargetFdBindingProductionValidation, EnforcedChild, EnforcedStdio, ObservedCageExit,
+    PreparedCageLaunch, TerminationSignal,
 };
 pub use receipt::{
     persist_signed_cage_receipt, persist_signed_cage_receipt_with_trusted_key,
@@ -1619,7 +1619,6 @@ fn build_environment(
     }
     Ok(environment)
 }
-
 
 fn build_fd_table(
     admitted: &AdmittedManifest,

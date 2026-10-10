@@ -1,0 +1,16 @@
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/fixtures/recovery-product/host_acceptance.py", line 105, in main
+    outputs = asyncio.run(graph_case(session, revoked))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/runners.py", line 194, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/fixtures/recovery-product/host_acceptance.py", line 29, in graph_case
+    assert first["recovery"]["category"] == "complete"
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

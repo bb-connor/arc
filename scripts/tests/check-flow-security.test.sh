@@ -323,7 +323,7 @@ def validate(calls: dict[str, tuple[bool, list[str], list[str]]]) -> None:
 source = Path(sys.argv[1]).read_text(encoding="utf-8")
 validate(parse(source))
 
-# The standalone restart gate must name exactly the M2/M3 process/race subset of the
+# The standalone restart gate must name exactly the process recovery and authenticated-delivery race subset of the
 # composed native gate, not a smaller passing filter.
 restart_source = Path("scripts/check-native-restart-safety.sh").read_text(encoding="utf-8")
 restart_lines = [line for line in restart_source.replace("\\\n", " ").splitlines()

@@ -38,10 +38,21 @@ job_end = workflow.index("\n  kani-manifest-pr:", job_start)
 job = workflow[job_start:job_end]
 if "timeout-minutes: 120" not in job:
     raise SystemExit("public Kani PR job does not retain its 120-minute budget")
-if workflow.count("if ! cargo kani --version >/dev/null 2>&1; then") != 2:
-    raise SystemExit("formal PR Kani jobs do not repair incomplete tool caches")
-if workflow.count("cargo kani setup") != 2:
-    raise SystemExit("formal PR Kani jobs do not ensure the verifier is installed")
+installer = 'cargo install kani-verifier --locked --version "${CHIO_KANI_VERSION}" --force'
+if workflow.count(installer) != 2:
+    raise SystemExit("formal PR Kani jobs must replace cached proxies with the pinned installer")
+if "if ! cargo kani --version" in workflow or "if ! bash scripts/check-kani-toolchain.sh" in workflow:
+    raise SystemExit("formal PR Kani jobs must not probe cold proxies before explicit setup")
+for name, following in (("kani-public-pr", "kani-manifest-pr"), ("kani-manifest-pr", "rust-verification-metadata")):
+    start = workflow.index(f"  {name}:")
+    end = workflow.find(f"\n  {following}:", start)
+    block = workflow[start:] if end < 0 else workflow[start:end]
+    setup = "cargo kani setup"
+    guard = "run: bash scripts/check-kani-toolchain.sh"
+    if block.count(installer) != 1 or block.count(setup) != 1 or block.count(guard) != 1:
+        raise SystemExit(f"{name} must install, set up and verify one pinned Kani proxy")
+    if not block.index(installer) < block.index(setup) < block.index(guard):
+        raise SystemExit(f"{name} must set up the pinned bundle before its owned version probe")
 
 ci = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
 for command in (

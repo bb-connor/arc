@@ -1,0 +1,10 @@
+
+running 1 test
+test enterprise_migration_state::connection_recovery::a_panic_after_commit_recovers_with_the_write_visible ... 
+thread '<unnamed>' (19684195) panicked at crates/platform/chio-store-sqlite/src/store_connection.rs:280:13:
+injected panic after commit
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1834 filtered out; finished in 0.01s
+

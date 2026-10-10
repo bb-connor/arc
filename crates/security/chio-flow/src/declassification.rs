@@ -303,7 +303,41 @@ pub fn verify_declassification(
     grant: &SignedDeclassificationGrant,
     request: &DeclassificationVerificationRequest,
 ) -> Result<VerifiedDeclassification, DeclassificationError> {
-    let body = grant.body();
+    verify_common_declassification(grant.body(), request, grant.authority_key(), || {
+        grant.verify_signature()
+    })
+}
+
+/// Recovery authority is verified against its exact binding and independently
+/// checked coverage before entering the original one-shot flow participant.
+pub fn verify_recovery_declassification(
+    grant: &chio_core_types::recovery::SignedRecoveryGrantV2,
+    request: &DeclassificationVerificationRequest,
+    expected: &chio_security_types::recovery::RecoveryGrantBindingV1,
+    coverage: &crate::VerifiedRecoveryCoverage,
+) -> Result<VerifiedDeclassification, DeclassificationError> {
+    grant
+        .body()
+        .validate()
+        .map_err(|_| DeclassificationError::InvalidGrant)?;
+    if &grant.body().recovery != expected
+        || expected.coverage_digest != coverage.digest()
+        || expected.process_id.as_str().is_empty()
+    {
+        return Err(DeclassificationError::BindingMismatch);
+    }
+    coverage.verify_grant_binding(grant.body(), request.now_unix_ms)?;
+    verify_common_declassification(&grant.body().claims, request, grant.authority_key(), || {
+        grant.verify_signature()
+    })
+}
+
+fn verify_common_declassification(
+    body: &chio_security_types::DeclassificationGrantBody,
+    request: &DeclassificationVerificationRequest,
+    authority_key: &PublicKey,
+    signature: impl FnOnce() -> chio_core_types::Result<bool>,
+) -> Result<VerifiedDeclassification, DeclassificationError> {
     body.validate()
         .map_err(|_| DeclassificationError::InvalidGrant)?;
     let request_hash = canonical_request_hash(&request.canonical_request)?;
@@ -346,13 +380,10 @@ pub fn verify_declassification(
         .trusted_authorities
         .get(body.authority_key_id())
         .ok_or(DeclassificationError::UntrustedAuthority)?;
-    if trusted_key != grant.authority_key() {
+    if trusted_key != authority_key {
         return Err(DeclassificationError::UntrustedAuthority);
     }
-    if !grant
-        .verify_signature()
-        .map_err(|_| DeclassificationError::InvalidSignature)?
-    {
+    if !signature().map_err(|_| DeclassificationError::InvalidSignature)? {
         return Err(DeclassificationError::InvalidSignature);
     }
     Ok(VerifiedDeclassification {
@@ -369,7 +400,7 @@ pub fn verify_declassification(
         tool_name: body.tool_name().clone(),
         purpose: body.purpose().clone(),
         authority_key_id: body.authority_key_id().clone(),
-        authority_key: grant.authority_key().clone(),
+        authority_key: authority_key.clone(),
         issued_at_unix_seconds: body.issued_at_unix_seconds(),
         expires_at_unix_seconds: body.expires_at_unix_seconds(),
     })

@@ -12,16 +12,84 @@ impl SqliteBudgetStore {
         operation: &AdmissionOperationV1,
         original: &RetainedToolAdmissionRequestV1,
     ) -> Result<BudgetHoldMutationDecision, BudgetStoreError> {
-        let dispatch = operation
-            .dispatch_commit()
-            .ok_or_else(|| invalid("missing dispatch commit"))?;
-        let hold = operation
-            .budget_hold_id()
-            .ok_or_else(|| invalid("missing capture hold"))?;
-        // Do not choose the latest event or trust the acknowledgement's event
-        // identifier. Follow the named participant of this exact dispatch version.
-        // LIMIT 2 detects ambiguous references without unbounded result allocation.
-        let mut statement = transaction.prepare(
+        let event = load_verified_native_capture_event(transaction, operation, original)?;
+        transition_decision_from_event(self, transaction, event)
+    }
+}
+
+/// Historical physical participant data borrows the real writer and its
+/// initial transaction cut. It grants no capture or finishing allowance.
+pub(crate) struct AuthenticatedNativeBudgetCapture<'tx, 'conn, 'owner> {
+    transaction: &'tx Transaction<'conn>,
+    owner: &'owner crate::serving_owner::SqliteServingOwner,
+    origin: crate::serving_owner::NativeSourceTransactionOrigin<'owner>,
+    event: BudgetMutationRecord,
+}
+
+impl AuthenticatedNativeBudgetCapture<'_, '_, '_> {
+    pub(crate) fn verify(&self, transaction: &Transaction<'_>) -> Result<(), BudgetStoreError> {
+        if !std::ptr::eq(&**self.transaction, &**transaction)
+            || !self.origin.matches_owner(self.owner)
+        {
+            return Err(invalid("capture source changed its transaction or owner"));
+        }
+        self.origin
+            .verify(transaction)
+            .map_err(|error| invalid(&error.to_string()))?;
+        crate::serving_owner::verify_budget_fence(transaction, Some(self.owner))
+    }
+
+    pub(crate) fn event(&self) -> &BudgetMutationRecord {
+        &self.event
+    }
+}
+
+pub(crate) fn authenticate_native_budget_capture<'tx, 'conn, 'owner>(
+    transaction: &'tx Transaction<'conn>,
+    owner: &'owner crate::serving_owner::SqliteServingOwner,
+    origin: &crate::serving_owner::NativeSourceTransactionOrigin<'owner>,
+    operation: &AdmissionOperationV1,
+    original: &RetainedToolAdmissionRequestV1,
+) -> Result<AuthenticatedNativeBudgetCapture<'tx, 'conn, 'owner>, BudgetStoreError> {
+    origin
+        .verify(transaction)
+        .map_err(|error| invalid(&error.to_string()))?;
+    if !origin.matches_owner(owner)
+        || original
+            .native_security_authority_binding()
+            .is_none_or(|binding| binding.store_uuid().as_str() != owner.fence.store_uuid)
+    {
+        return Err(invalid("capture source changed its actual native owner"));
+    }
+    crate::serving_owner::verify_budget_fence(transaction, Some(owner))?;
+    let event = load_verified_native_capture_event(transaction, operation, original)?;
+    let result = AuthenticatedNativeBudgetCapture {
+        transaction,
+        owner,
+        origin: origin.fork_for_source(),
+        event,
+    };
+    result.verify(transaction)?;
+    Ok(result)
+}
+
+/// Shared with ordinary readback. This authenticates the original physical
+/// event and every quota delta without constructing a Store from decoded data.
+fn load_verified_native_capture_event(
+    transaction: &Transaction<'_>,
+    operation: &AdmissionOperationV1,
+    original: &RetainedToolAdmissionRequestV1,
+) -> Result<BudgetMutationRecord, BudgetStoreError> {
+    let dispatch = operation
+        .dispatch_commit()
+        .ok_or_else(|| invalid("missing dispatch commit"))?;
+    let hold = operation
+        .budget_hold_id()
+        .ok_or_else(|| invalid("missing capture hold"))?;
+    // Do not choose the latest event or trust the acknowledgement's event
+    // identifier. Follow the named participant of this exact dispatch version.
+    // LIMIT 2 detects ambiguous references without unbounded result allocation.
+    let mut statement = transaction.prepare(
             "SELECT CASE WHEN length(CAST(budget.projection_key AS BLOB)) BETWEEN 1 AND 1024 THEN budget.projection_key END,
                     budget.projection_sequence,
                     CASE WHEN length(CAST(budget.projection_reference_digest AS BLOB)) = 64 THEN budget.projection_reference_digest END
@@ -39,86 +107,83 @@ impl SqliteBudgetStore {
                AND budget.store_owner_epoch = admission.store_owner_epoch
              LIMIT 2",
         )?;
-        let mut rows = statement.query(params![
-            operation.binding().operation_id().as_str(),
-            budget_u64_to_sqlite(dispatch.committed_version, "dispatch_version")?,
-            dispatch.store_fence.store_uuid,
-            dispatch.store_fence.lease_id,
-            budget_u64_to_sqlite(dispatch.store_fence.owner_epoch, "dispatch_owner_epoch")?,
-        ])?;
-        let row = rows
-            .next()?
-            .ok_or_else(|| invalid("missing budget commitment"))?;
-        let event_id: Option<String> = row.get(0)?;
-        let event_id =
-            event_id.ok_or_else(|| invalid("capture event identifier exceeds its bound"))?;
-        let sequence: i64 = row.get(1)?;
-        let sequence =
-            u64::try_from(sequence).map_err(|_| invalid("invalid capture event sequence"))?;
-        let digest: Option<String> = row.get(2)?;
-        let digest =
-            digest.ok_or_else(|| invalid("capture projection digest exceeds its bound"))?;
-        if rows.next()?.is_some() {
-            return Err(invalid("ambiguous capture budget commitment"));
-        }
-        drop(rows);
-        drop(statement);
-        let actual_digest =
-            crate::serving_owner::budget_event_reference_digest(transaction, &event_id, sequence)
-                .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
-        if actual_digest != digest {
-            return Err(invalid(
-                "capture budget projection differs from its admission commitment",
-            ));
-        }
-        let event = Self::load_projected_mutation_event(transaction, &event_id)?
-            .ok_or_else(|| invalid("missing committed capture event"))?;
-        let physical_hold = load_structured_hold(transaction, hold.as_str())?
-            .ok_or_else(|| invalid("missing physical capture hold"))?;
-        // Authenticate current physical members in this same anchored snapshot.
-        // Callers need not perform a second full custody read before readback.
-        super::admission_custody::verify_committed_custody(transaction, &physical_hold)?;
-        let grant_index = usize::try_from(event.grant_index)
-            .map_err(|_| invalid("capture grant index exceeds its bound"))?;
-        let authority = BudgetEventAuthority {
-            authority_id: dispatch.store_fence.store_uuid.clone(),
-            lease_id: dispatch.store_fence.lease_id.clone(),
-            lease_epoch: dispatch.store_fence.owner_epoch,
-        };
-        if event.kind != BudgetMutationKind::CaptureInvocation
-            || event.allowed != Some(true)
-            || event.event_id != event_id
-            || event.hold_id.as_deref() != Some(hold.as_str())
-            || event.capability_id != operation.binding().capability_id().as_str()
-            || event.admission_binding.as_ref().is_none_or(|binding| {
-                binding.operation_id != operation.binding().operation_id().as_str()
-            })
-            || original.retained_matching_grant(grant_index).is_none()
-            || physical_hold.grant_index != grant_index
-            || physical_hold.capability_id != event.capability_id
-            || physical_hold.invocation_state != BudgetInvocationState::Captured
-            || physical_hold.admission.operation_id != operation.binding().operation_id().as_str()
-            || event.authority.as_ref() != Some(&authority)
-            || event.invocation_state_before != BudgetInvocationState::Authorized
-            || event.invocation_state_after != BudgetInvocationState::Captured
-            || event.monetary_state_before != event.monetary_state_after
-            || event.realized_spend_units != 0
-            || event.event_seq == 0
-            || event.event_seq != sequence
-            || event.recorded_at < 0
-        {
-            return Err(invalid("capture event differs from its original dispatch"));
-        }
-        verify_capture_quota_delta(
-            &event.invocation_quota_usages,
-            &event.invocation_quota_mutations,
-        )?;
-        verify_capture_cumulative_delta(
-            event.cumulative_approval.as_ref(),
-            event.cumulative_approval_mutation.as_ref(),
-        )?;
-        transition_decision_from_event(self, transaction, event)
+    let mut rows = statement.query(params![
+        operation.binding().operation_id().as_str(),
+        budget_u64_to_sqlite(dispatch.committed_version, "dispatch_version")?,
+        dispatch.store_fence.store_uuid,
+        dispatch.store_fence.lease_id,
+        budget_u64_to_sqlite(dispatch.store_fence.owner_epoch, "dispatch_owner_epoch")?,
+    ])?;
+    let row = rows
+        .next()?
+        .ok_or_else(|| invalid("missing budget commitment"))?;
+    let event_id: Option<String> = row.get(0)?;
+    let event_id = event_id.ok_or_else(|| invalid("capture event identifier exceeds its bound"))?;
+    let sequence: i64 = row.get(1)?;
+    let sequence =
+        u64::try_from(sequence).map_err(|_| invalid("invalid capture event sequence"))?;
+    let digest: Option<String> = row.get(2)?;
+    let digest = digest.ok_or_else(|| invalid("capture projection digest exceeds its bound"))?;
+    if rows.next()?.is_some() {
+        return Err(invalid("ambiguous capture budget commitment"));
     }
+    drop(rows);
+    drop(statement);
+    let actual_digest =
+        crate::serving_owner::budget_event_reference_digest(transaction, &event_id, sequence)
+            .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
+    if actual_digest != digest {
+        return Err(invalid(
+            "capture budget projection differs from its admission commitment",
+        ));
+    }
+    let event = SqliteBudgetStore::load_projected_mutation_event(transaction, &event_id)?
+        .ok_or_else(|| invalid("missing committed capture event"))?;
+    let physical_hold = load_structured_hold(transaction, hold.as_str())?
+        .ok_or_else(|| invalid("missing physical capture hold"))?;
+    // Authenticate current physical members in this same anchored snapshot.
+    // Callers need not perform a second full custody read before readback.
+    super::admission_custody::verify_committed_custody(transaction, &physical_hold)?;
+    let grant_index = usize::try_from(event.grant_index)
+        .map_err(|_| invalid("capture grant index exceeds its bound"))?;
+    let authority = BudgetEventAuthority {
+        authority_id: dispatch.store_fence.store_uuid.clone(),
+        lease_id: dispatch.store_fence.lease_id.clone(),
+        lease_epoch: dispatch.store_fence.owner_epoch,
+    };
+    if event.kind != BudgetMutationKind::CaptureInvocation
+        || event.allowed != Some(true)
+        || event.event_id != event_id
+        || event.hold_id.as_deref() != Some(hold.as_str())
+        || event.capability_id != operation.binding().capability_id().as_str()
+        || event.admission_binding.as_ref().is_none_or(|binding| {
+            binding.operation_id != operation.binding().operation_id().as_str()
+        })
+        || original.retained_matching_grant(grant_index).is_none()
+        || physical_hold.grant_index != grant_index
+        || physical_hold.capability_id != event.capability_id
+        || physical_hold.invocation_state != BudgetInvocationState::Captured
+        || physical_hold.admission.operation_id != operation.binding().operation_id().as_str()
+        || event.authority.as_ref() != Some(&authority)
+        || event.invocation_state_before != BudgetInvocationState::Authorized
+        || event.invocation_state_after != BudgetInvocationState::Captured
+        || event.monetary_state_before != event.monetary_state_after
+        || event.realized_spend_units != 0
+        || event.event_seq == 0
+        || event.event_seq != sequence
+        || event.recorded_at < 0
+    {
+        return Err(invalid("capture event differs from its original dispatch"));
+    }
+    verify_capture_quota_delta(
+        &event.invocation_quota_usages,
+        &event.invocation_quota_mutations,
+    )?;
+    verify_capture_cumulative_delta(
+        event.cumulative_approval.as_ref(),
+        event.cumulative_approval_mutation.as_ref(),
+    )?;
+    Ok(event)
 }
 
 fn verify_capture_quota_delta(

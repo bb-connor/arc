@@ -178,7 +178,7 @@ def _score_fixture(fixture: dict[str, Any], paths: list[str], latency_ms: float,
     forbidden_any = [_norm(path) for path in fixture.get("forbidden_any_paths", [])]
     expected_text_terms = [str(term).lower() for term in fixture.get("expected_text_terms", [])]
     forbidden_text_terms = [str(term).lower() for term in fixture.get("forbidden_text_terms", [])]
-    p5_matches = _matched_expected(paths, relevant, 5)
+    matched_at_five = _matched_expected(paths, relevant, 5)
     r10_matches = _matched_expected(paths, relevant, 10)
     first_rank = _first_rank(paths, expected_top or relevant)
     forbidden_hits = _forbidden_hits(paths, forbidden_top)
@@ -217,7 +217,7 @@ def _score_fixture(fixture: dict[str, Any], paths: list[str], latency_ms: float,
         mrr_at_10 = 1.0 if matched_text_terms else 0.0
     else:
         relevant_denominator = max(1, min(5, len(relevant)))
-        precision_at_5 = len(p5_matches) / relevant_denominator
+        precision_at_5 = len(matched_at_five) / relevant_denominator
         recall_at_10 = len(r10_matches) / max(1, len(relevant))
         mrr_at_10 = 0.0 if first_rank is None or first_rank > 10 else 1.0 / first_rank
     fixture_pass = required_hit and not critical_misses and precision_at_5 >= 0.80 and recall_at_10 >= 0.50
@@ -233,7 +233,7 @@ def _score_fixture(fixture: dict[str, Any], paths: list[str], latency_ms: float,
         "forbidden_any_hits": forbidden_any_hits,
         "matched_text_terms": matched_text_terms,
         "missing_text_terms": [term for term in expected_text_terms if term not in matched_text_terms],
-        "matched_at_5": p5_matches,
+        "matched_at_5": matched_at_five,
         "matched_at_10": r10_matches,
         "precision_at_5": precision_at_5,
         "recall_at_10": recall_at_10,

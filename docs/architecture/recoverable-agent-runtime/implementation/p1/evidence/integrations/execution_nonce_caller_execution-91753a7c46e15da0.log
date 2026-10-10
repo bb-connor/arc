@@ -1,0 +1,38 @@
+
+running 33 tests
+test a_nonce_of_an_unreserved_operation_cannot_reconcile ... ok
+test a_second_reservation_is_bounded_by_the_shared_budget ... ok
+test a_report_for_other_arguments_is_refused_and_keeps_the_reservation ... ok
+test authenticated::negative_controls::authenticated_executor_pin_does_not_bypass_native_release_custody ... ok
+test an_expired_caller_reservation_is_compensated_by_startup_recovery ... ok
+test authenticated::monetary::monetary_exposure_survives_lost_report_and_settles_original_authenticated_cost ... ok
+test authenticated::authenticated_report_finalizes_after_expiry_and_restart_without_readmission ... ok
+test authenticated::negative_controls::changed_executor_pin_cannot_adopt_original_start_or_report ... ok
+test authenticated::negative_controls::unused_expired_reservation_cannot_publish_start_authority ... ok
+test authenticated::private_evidence::private_delivery_evidence_rejects_tampering_and_schema_confusion ... ok
+test authenticated::negative_controls::revocation_blocks_historical_output_and_completed_receipt_replay ... ok
+test authenticated::start_captures_before_publication_and_retries_original_authorization ... ok
+test caller_reservation_holds_the_budget_until_the_report_settles ... ok
+test delegated_share::an_expired_caller_share_stays_owned_until_recovery_compensates_it ... ok
+test authenticated::process_loss::process_loss_retains_capture_and_never_reexecutes_original_attempt ... ok
+test delegated_share::boundaries::an_out_of_band_terminal_edit_cannot_hide_a_live_caller_share ... ok
+test delegated_share::authenticated::lost_authenticated_report_retains_sibling_share_until_original_settlement ... ok
+test delegated_share::boundaries::a_caller_share_also_blocks_ordinary_kernel_dispatch_until_settlement ... ok
+test delegated_share::caller_share_snapshot_is_complete_scoped_and_fenced ... ok
+test delegated_share::boundaries::concurrent_siblings_cannot_oversubscribe_and_denied_claims_do_not_leak ... ok
+test delegated_share::outcome_unknown::an_unknown_caller_outcome_retains_its_share_and_capture_after_restart_and_expiry ... ok
+test delegated_share::pending::a_later_funded_sibling_cannot_displace_an_existing_caller_owner ... ok
+test delegated_share::pending::an_interrupted_funded_caller_is_compensated_without_displacing_a_reserved_owner ... ok
+test delegated_share::restart_preserves_the_delegated_share_of_a_live_caller_reservation ... ok
+test delegated_share::settling_a_durable_caller_reservation_releases_its_delegated_share ... ok
+test delegated_share::two_caller_operations_share_one_child_edge_until_both_settle ... ok
+test dispatch_context::caller_context_survives_interruption_after_capture_before_report_recording ... ok
+test dispatch_context::caller_context_capture_rejects_out_of_band_schema_changes ... ok
+test dispatch_context::caller_report_retains_typed_private_context_with_capture_and_exact_restart_replay ... ok
+test kernel_dispatch_cannot_resume_a_caller_reservation ... ok
+test external_delivery::an_external_effect_with_a_lost_report_cannot_be_refunded_at_nonce_expiry ... ok
+test external_delivery::reservation_only_effect_reproduces_the_original_refund_counterexample ... ok
+test restart_keeps_a_live_caller_reservation ... ok
+
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 51.58s
+

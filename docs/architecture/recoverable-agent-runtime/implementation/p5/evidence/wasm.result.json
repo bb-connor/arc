@@ -1,0 +1,27 @@
+{
+  "id": "wasm",
+  "actual_command": [
+    "cargo",
+    "check",
+    "--offline",
+    "--locked",
+    "--manifest-path",
+    "fixtures/recovery-portable-consumer/Cargo.toml",
+    "--target",
+    "wasm32-unknown-unknown"
+  ],
+  "cwd": ".",
+  "environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2",
+    "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+  },
+  "exit_code": 0,
+  "status": "passed",
+  "started_unix_seconds": 1791161506,
+  "duration_seconds": 0.738,
+  "log": "evidence/wasm.log",
+  "log_sha256": "f2066ca264b9a8598ecd436c70919e1efe1acea4098ad2a13b5d82d67bc049ec",
+  "required_for_local_phase_acceptance": true,
+  "source_binding": "562a3c3556f31e5afedbd7c7a426e542cc5e8cd51c28a7a43d8e9704ba4e9bc4"
+}

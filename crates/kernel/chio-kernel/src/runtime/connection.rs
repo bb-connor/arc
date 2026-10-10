@@ -11,6 +11,11 @@ use crate::KernelError;
 /// an in-process implementation can be used.
 #[async_trait::async_trait]
 pub trait ToolServerConnection: Send + Sync {
+    /// Explicit opt-in to the single-submission support issue contract. A
+    /// generic server cannot acquire recovery finality from its tool name.
+    fn recovery_effect_contract(&self) -> Option<crate::recovery::RecoveryEffectContractV1> {
+        None
+    }
     /// Receive kernel-selected caller binding for native stateful operations.
     /// Existing connectors retain their invocation behavior by default.
     async fn invoke_with_context(

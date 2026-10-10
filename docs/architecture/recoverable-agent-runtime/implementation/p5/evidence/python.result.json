@@ -1,0 +1,22 @@
+{
+  "id": "python",
+  "actual_command": [
+    "/Users/connor/Medica/backbay/standalone/arc/sdks/python/chio-crewai/.venv/bin/python",
+    "-m",
+    "pytest",
+    "-q",
+    "sdks/python/chio-sdk-python/tests"
+  ],
+  "cwd": ".",
+  "environment": {
+    "PYTHONPATH": "sdks/python/chio-sdk-python/src"
+  },
+  "exit_code": 0,
+  "status": "passed",
+  "started_unix_seconds": 1791161510,
+  "duration_seconds": 4.509,
+  "log": "evidence/python.log",
+  "log_sha256": "551afa82290451580fd3c678c0ce36768695db7ac339e9f5160f17ce4eb3c6bd",
+  "required_for_local_phase_acceptance": true,
+  "source_binding": "562a3c3556f31e5afedbd7c7a426e542cc5e8cd51c28a7a43d8e9704ba4e9bc4"
+}

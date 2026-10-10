@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/recovery/effect-contract.schema.json",
+  "title": "Semantic effect contract V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "provider_id",
+    "account_id",
+    "resource_id",
+    "effect_cardinality",
+    "submission_identity",
+    "transport_retry",
+    "deduplication",
+    "lookup_finality",
+    "partial_settlement",
+    "recovery_profile"
+  ],
+  "properties": {
+    "schema": {
+      "const": "chio.semantic.effect-contract.v1"
+    },
+    "version": {
+      "const": 1
+    },
+    "provider_id": {
+      "$ref": "observation.schema.json#/$defs/opaqueId"
+    },
+    "account_id": {
+      "$ref": "observation.schema.json#/$defs/opaqueId"
+    },
+    "resource_id": {
+      "$ref": "observation.schema.json#/$defs/opaqueId"
+    },
+    "effect_cardinality": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 16
+    },
+    "submission_identity": {
+      "const": "original_native_operation"
+    },
+    "transport_retry": {
+      "const": "no_automatic_retries"
+    },
+    "deduplication": {
+      "const": "not_assumed"
+    },
+    "lookup_finality": {
+      "type": "string",
+      "enum": [
+        "unavailable",
+        "exact_operation_authoritative_final"
+      ]
+    },
+    "partial_settlement": {
+      "const": "preserve_spent_identity"
+    },
+    "recovery_profile": {
+      "$ref": "profile-requirements.schema.json"
+    }
+  }
+}

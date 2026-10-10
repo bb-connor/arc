@@ -981,6 +981,10 @@ fn admission_error(error: AdmissionOperationStoreError) -> ChannelLifecycleStore
         AdmissionOperationStoreError::OutcomeUnknown(detail) => {
             ChannelLifecycleStoreError::OutcomeUnknown(detail)
         }
+        AdmissionOperationStoreError::RecoveryAuthorityDenied
+        | AdmissionOperationStoreError::RecoveryMediationRequired => {
+            invalid("recovery preview refusal is outside this store")
+        }
         AdmissionOperationStoreError::Operation(error) => invalid(error.to_string()),
     }
 }

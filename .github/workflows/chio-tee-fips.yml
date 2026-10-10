@@ -3,8 +3,8 @@ name: chio-tee-fips
 on:
   workflow_call:
   pull_request:
-    # Main PRs run through CI's required reusable call.
-    branches-ignore: [main]
+    # PRs to these bases run through CI's required reusable call.
+    branches-ignore: [main, research/openappa-recovery-20261001]
     paths:
       - .github/workflows/chio-tee-fips.yml
       - crates/trust/chio-tee/**
@@ -69,7 +69,7 @@ jobs:
       - name: Install Rust toolchain
         run: |
           set -euo pipefail
-          rustup toolchain install 1.94.1 --profile minimal
+          rustup toolchain install 1.95.0 --profile minimal
           rustup show active-toolchain
           rustc --version --verbose
           cargo --version
@@ -556,7 +556,7 @@ jobs:
       - name: Install Rust toolchain
         run: |
           set -euo pipefail
-          rustup toolchain install 1.94.1 --profile minimal
+          rustup toolchain install 1.95.0 --profile minimal
           rustup show active-toolchain
           rustc --version --verbose
           cargo --version
@@ -668,11 +668,11 @@ jobs:
       - name: Install Rust toolchain
         run: |
           set -euo pipefail
-          rustup toolchain install 1.94.1 --profile minimal --component clippy
+          rustup toolchain install 1.95.0 --profile minimal --component clippy
           rustup show active-toolchain
           rustc --version --verbose
           cargo --version
-          rustup target add --toolchain 1.94.1 wasm32-unknown-unknown
+          rustup target add --toolchain 1.95.0 wasm32-unknown-unknown
 
       - name: Install native build dependencies
         uses: ./.github/actions/apt-install

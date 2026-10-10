@@ -1,0 +1,14 @@
+
+running 9 tests
+test in_memory_total_cost_overflow_keeps_state_and_event_history_unchanged ... ok
+test in_memory_increment_calls_exact_projection ... ok
+test in_memory_charge_calls_exact_projection ... ok
+test sqlite_saturated_counter_calls_exact_projection_without_mutation ... ok
+test sqlite_and_in_memory_share_decisions_and_mutation_shape ... ok
+test sqlite_signed_storage_boundary_keeps_state_and_event_history_unchanged ... ok
+test sqlite_uncapped_saturated_counter_fails_closed_without_mutation ... ok
+test sqlite_charge_calls_exact_projection ... ok
+test sqlite_increment_calls_exact_projection ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.83s
+

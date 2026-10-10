@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: a060591034caf4559f4ff71b3db89ffffb437c236241dbd9e3aa1f7268596384
+// Schema content SHA-256: 0617e948edea85246b570209eca5da3d31c8701202cc1429a511934542baee83
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -704,6 +704,2321 @@ const (
 // Defines values for ReceiptRecordDecision3Verdict.
 const (
 	ReceiptRecordDecision3VerdictIncomplete ReceiptRecordDecision3Verdict = "incomplete"
+)
+
+// Defines values for RecoveryActionIntentSchema.
+const (
+	RecoveryActionIntentSchemaChioRecoveryActionIntentV1 RecoveryActionIntentSchema = "chio.recovery.action-intent.v1"
+)
+
+// Defines values for RecoveryActionIntentVersion.
+const (
+	RecoveryActionIntentVersionN1 RecoveryActionIntentVersion = 1
+)
+
+// Defines values for RecoveryApprovalIntentObligations0Kind.
+const (
+	RecoveryApprovalIntentObligations0KindOwnerRelease RecoveryApprovalIntentObligations0Kind = "owner_release"
+)
+
+// Defines values for RecoveryApprovalIntentObligations1Kind.
+const (
+	RecoveryApprovalIntentObligations1KindCompartmentRelease RecoveryApprovalIntentObligations1Kind = "compartment_release"
+)
+
+// Defines values for RecoveryApprovalIntentObligations2Kind.
+const (
+	RecoveryApprovalIntentObligations2KindUserAcceptance RecoveryApprovalIntentObligations2Kind = "user_acceptance"
+)
+
+// Defines values for RecoveryApprovalIntentObligations3Kind.
+const (
+	RecoveryApprovalIntentObligations3KindIntegrityEndorsement RecoveryApprovalIntentObligations3Kind = "integrity_endorsement"
+)
+
+// Defines values for RecoveryApprovalIntentSchema.
+const (
+	RecoveryApprovalIntentSchemaChioRecoveryApprovalIntentV1 RecoveryApprovalIntentSchema = "chio.recovery.approval-intent.v1"
+)
+
+// Defines values for RecoveryApprovalIntentVersion.
+const (
+	RecoveryApprovalIntentVersionN1 RecoveryApprovalIntentVersion = 1
+)
+
+// Defines values for RecoveryArtifactArchiveManifestDomainVersion.
+const (
+	RecoveryArtifactArchiveManifestDomainVersionN1 RecoveryArtifactArchiveManifestDomainVersion = 1
+)
+
+// Defines values for RecoveryArtifactCertificateDomainVersion.
+const (
+	RecoveryArtifactCertificateDomainVersionN1 RecoveryArtifactCertificateDomainVersion = 1
+)
+
+// Defines values for RecoveryArtifactCertificateKind.
+const (
+	RecoveryArtifactCertificateKindClassification RecoveryArtifactCertificateKind = "classification"
+	RecoveryArtifactCertificateKindProjection     RecoveryArtifactCertificateKind = "projection"
+)
+
+// Defines values for RecoveryArtifactCertificateArtifactProducer0Kind.
+const (
+	RecoveryArtifactCertificateArtifactProducer0KindNativeOperation RecoveryArtifactCertificateArtifactProducer0Kind = "native_operation"
+)
+
+// Defines values for RecoveryArtifactCertificateArtifactProducer1Kind.
+const (
+	RecoveryArtifactCertificateArtifactProducer1KindCheckpoint RecoveryArtifactCertificateArtifactProducer1Kind = "checkpoint"
+)
+
+// Defines values for RecoveryArtifactCertificateArtifactProducer2Kind.
+const (
+	RecoveryArtifactCertificateArtifactProducer2KindDerivation RecoveryArtifactCertificateArtifactProducer2Kind = "derivation"
+)
+
+// Defines values for RecoveryArtifactCertificateArtifactProducer3Kind.
+const (
+	RecoveryArtifactCertificateArtifactProducer3KindAdoption RecoveryArtifactCertificateArtifactProducer3Kind = "adoption"
+)
+
+// Defines values for RecoveryArtifactCertificateArtifactProducer4Kind.
+const (
+	RecoveryArtifactCertificateArtifactProducer4KindImport RecoveryArtifactCertificateArtifactProducer4Kind = "import"
+)
+
+// Defines values for RecoveryArtifactProducer0Kind.
+const (
+	RecoveryArtifactProducer0KindNativeOperation RecoveryArtifactProducer0Kind = "native_operation"
+)
+
+// Defines values for RecoveryArtifactProducer1Kind.
+const (
+	RecoveryArtifactProducer1KindCheckpoint RecoveryArtifactProducer1Kind = "checkpoint"
+)
+
+// Defines values for RecoveryArtifactProducer2Kind.
+const (
+	RecoveryArtifactProducer2KindDerivation RecoveryArtifactProducer2Kind = "derivation"
+)
+
+// Defines values for RecoveryArtifactProducer3Kind.
+const (
+	RecoveryArtifactProducer3KindAdoption RecoveryArtifactProducer3Kind = "adoption"
+)
+
+// Defines values for RecoveryArtifactProducer4Kind.
+const (
+	RecoveryArtifactProducer4KindImport RecoveryArtifactProducer4Kind = "import"
+)
+
+// Defines values for RecoveryArtifactRecipientArtifactSink0Kind.
+const (
+	RecoveryArtifactRecipientArtifactSink0KindAgent RecoveryArtifactRecipientArtifactSink0Kind = "agent"
+)
+
+// Defines values for RecoveryArtifactRecipientArtifactSink1Kind.
+const (
+	RecoveryArtifactRecipientArtifactSink1KindModel RecoveryArtifactRecipientArtifactSink1Kind = "model"
+)
+
+// Defines values for RecoveryArtifactRecipientArtifactSink2Kind.
+const (
+	RecoveryArtifactRecipientArtifactSink2KindArchive RecoveryArtifactRecipientArtifactSink2Kind = "archive"
+)
+
+// Defines values for RecoveryArtifactReleaseIntentDomainVersion.
+const (
+	RecoveryArtifactReleaseIntentDomainVersionN1 RecoveryArtifactReleaseIntentDomainVersion = 1
+)
+
+// Defines values for RecoveryArtifactReleaseIntentKind0Kind.
+const (
+	RecoveryArtifactReleaseIntentKind0KindCapturedOutput RecoveryArtifactReleaseIntentKind0Kind = "captured_output"
+)
+
+// Defines values for RecoveryArtifactReleaseIntentKind1Kind.
+const (
+	RecoveryArtifactReleaseIntentKind1KindIndependentlyAdmitted RecoveryArtifactReleaseIntentKind1Kind = "independently_admitted"
+)
+
+// Defines values for RecoveryArtifactReleaseIntentState.
+const (
+	RecoveryArtifactReleaseIntentStateAdmitted  RecoveryArtifactReleaseIntentState = "admitted"
+	RecoveryArtifactReleaseIntentStateDelivered RecoveryArtifactReleaseIntentState = "delivered"
+	RecoveryArtifactReleaseIntentStateUncertain RecoveryArtifactReleaseIntentState = "uncertain"
+)
+
+// Defines values for RecoveryArtifactReleaseIntentArtifactSink0Kind.
+const (
+	RecoveryArtifactReleaseIntentArtifactSink0KindAgent RecoveryArtifactReleaseIntentArtifactSink0Kind = "agent"
+)
+
+// Defines values for RecoveryArtifactReleaseIntentArtifactSink1Kind.
+const (
+	RecoveryArtifactReleaseIntentArtifactSink1KindModel RecoveryArtifactReleaseIntentArtifactSink1Kind = "model"
+)
+
+// Defines values for RecoveryArtifactReleaseIntentArtifactSink2Kind.
+const (
+	RecoveryArtifactReleaseIntentArtifactSink2KindArchive RecoveryArtifactReleaseIntentArtifactSink2Kind = "archive"
+)
+
+// Defines values for RecoveryArtifactVersionDomainVersion.
+const (
+	RecoveryArtifactVersionDomainVersionN1 RecoveryArtifactVersionDomainVersion = 1
+)
+
+// Defines values for RecoveryArtifactVersionRetention.
+const (
+	RecoveryArtifactVersionRetentionCheckpoint RecoveryArtifactVersionRetention = "checkpoint"
+	RecoveryArtifactVersionRetentionEphemeral  RecoveryArtifactVersionRetention = "ephemeral"
+	RecoveryArtifactVersionRetentionEvidence   RecoveryArtifactVersionRetention = "evidence"
+)
+
+// Defines values for RecoveryArtifactVersionArtifactProducer0Kind.
+const (
+	RecoveryArtifactVersionArtifactProducer0KindNativeOperation RecoveryArtifactVersionArtifactProducer0Kind = "native_operation"
+)
+
+// Defines values for RecoveryArtifactVersionArtifactProducer1Kind.
+const (
+	RecoveryArtifactVersionArtifactProducer1KindCheckpoint RecoveryArtifactVersionArtifactProducer1Kind = "checkpoint"
+)
+
+// Defines values for RecoveryArtifactVersionArtifactProducer2Kind.
+const (
+	RecoveryArtifactVersionArtifactProducer2KindDerivation RecoveryArtifactVersionArtifactProducer2Kind = "derivation"
+)
+
+// Defines values for RecoveryArtifactVersionArtifactProducer3Kind.
+const (
+	RecoveryArtifactVersionArtifactProducer3KindAdoption RecoveryArtifactVersionArtifactProducer3Kind = "adoption"
+)
+
+// Defines values for RecoveryArtifactVersionArtifactProducer4Kind.
+const (
+	RecoveryArtifactVersionArtifactProducer4KindImport RecoveryArtifactVersionArtifactProducer4Kind = "import"
+)
+
+// Defines values for RecoveryAuthorityCoverageObligations0Kind.
+const (
+	RecoveryAuthorityCoverageObligations0KindOwnerRelease RecoveryAuthorityCoverageObligations0Kind = "owner_release"
+)
+
+// Defines values for RecoveryAuthorityCoverageObligations1Kind.
+const (
+	RecoveryAuthorityCoverageObligations1KindCompartmentRelease RecoveryAuthorityCoverageObligations1Kind = "compartment_release"
+)
+
+// Defines values for RecoveryAuthorityCoverageObligations2Kind.
+const (
+	RecoveryAuthorityCoverageObligations2KindUserAcceptance RecoveryAuthorityCoverageObligations2Kind = "user_acceptance"
+)
+
+// Defines values for RecoveryAuthorityCoverageObligations3Kind.
+const (
+	RecoveryAuthorityCoverageObligations3KindIntegrityEndorsement RecoveryAuthorityCoverageObligations3Kind = "integrity_endorsement"
+)
+
+// Defines values for RecoveryAuthorityCoverageSchema.
+const (
+	RecoveryAuthorityCoverageSchemaChioRecoveryAuthorityCoverageV1 RecoveryAuthorityCoverageSchema = "chio.recovery.authority-coverage.v1"
+)
+
+// Defines values for RecoveryAuthorityCoverageVersion.
+const (
+	RecoveryAuthorityCoverageVersionN1 RecoveryAuthorityCoverageVersion = 1
+)
+
+// Defines values for RecoveryAuthorizationRequirementsAttachmentProfile.
+const (
+	RecoveryAuthorizationRequirementsAttachmentProfileOperationOwnedNonce RecoveryAuthorizationRequirementsAttachmentProfile = "operation_owned_nonce"
+	RecoveryAuthorizationRequirementsAttachmentProfileOrdinary            RecoveryAuthorizationRequirementsAttachmentProfile = "ordinary"
+)
+
+// Defines values for RecoveryAuthorizationRequirementsObligations0Kind.
+const (
+	RecoveryAuthorizationRequirementsObligations0KindOwnerRelease RecoveryAuthorizationRequirementsObligations0Kind = "owner_release"
+)
+
+// Defines values for RecoveryAuthorizationRequirementsObligations1Kind.
+const (
+	RecoveryAuthorizationRequirementsObligations1KindCompartmentRelease RecoveryAuthorizationRequirementsObligations1Kind = "compartment_release"
+)
+
+// Defines values for RecoveryAuthorizationRequirementsObligations2Kind.
+const (
+	RecoveryAuthorizationRequirementsObligations2KindUserAcceptance RecoveryAuthorizationRequirementsObligations2Kind = "user_acceptance"
+)
+
+// Defines values for RecoveryAuthorizationRequirementsObligations3Kind.
+const (
+	RecoveryAuthorizationRequirementsObligations3KindIntegrityEndorsement RecoveryAuthorizationRequirementsObligations3Kind = "integrity_endorsement"
+)
+
+// Defines values for RecoveryAuthorizationRequirementsSchema.
+const (
+	RecoveryAuthorizationRequirementsSchemaChioRecoveryAuthorizationRequirementsV1 RecoveryAuthorizationRequirementsSchema = "chio.recovery.authorization-requirements.v1"
+)
+
+// Defines values for RecoveryAuthorizationRequirementsVersion.
+const (
+	RecoveryAuthorizationRequirementsVersionN1 RecoveryAuthorizationRequirementsVersion = 1
+)
+
+// Defines values for RecoveryCommandCommand0Kind.
+const (
+	RecoveryCommandCommand0KindCreateWorkflow RecoveryCommandCommand0Kind = "create_workflow"
+)
+
+// Defines values for RecoveryCommandCommand0Template.
+const (
+	RecoveryCommandCommand0TemplateSupportTicketPublicIssue RecoveryCommandCommand0Template = "support_ticket_public_issue"
+)
+
+// Defines values for RecoveryCommandCommand1Kind.
+const (
+	RecoveryCommandCommand1KindInspectWorkflow RecoveryCommandCommand1Kind = "inspect_workflow"
+)
+
+// Defines values for RecoveryCommandCommand2Kind.
+const (
+	RecoveryCommandCommand2KindSelectOffer RecoveryCommandCommand2Kind = "select_offer"
+)
+
+// Defines values for RecoveryCommandCommand3Kind.
+const (
+	RecoveryCommandCommand3KindSubmitApproval RecoveryCommandCommand3Kind = "submit_approval"
+)
+
+// Defines values for RecoveryCommandCommand4Kind.
+const (
+	RecoveryCommandCommand4KindResumeWorkflow RecoveryCommandCommand4Kind = "resume_workflow"
+)
+
+// Defines values for RecoveryCommandCommand5Kind.
+const (
+	RecoveryCommandCommand5KindCancelWorkflow RecoveryCommandCommand5Kind = "cancel_workflow"
+)
+
+// Defines values for RecoveryCommandCommand6Decision.
+const (
+	RecoveryCommandCommand6DecisionAccepted    RecoveryCommandCommand6Decision = "accepted"
+	RecoveryCommandCommand6DecisionDeclined    RecoveryCommandCommand6Decision = "declined"
+	RecoveryCommandCommand6DecisionNeedsReview RecoveryCommandCommand6Decision = "needs_review"
+)
+
+// Defines values for RecoveryCommandCommand6Kind.
+const (
+	RecoveryCommandCommand6KindReportDecision RecoveryCommandCommand6Kind = "report_decision"
+)
+
+// Defines values for RecoveryCommandSchema.
+const (
+	RecoveryCommandSchemaChioRecoveryCommandV1 RecoveryCommandSchema = "chio.recovery.command.v1"
+)
+
+// Defines values for RecoveryCommandVersion.
+const (
+	RecoveryCommandVersionN1 RecoveryCommandVersion = 1
+)
+
+// Defines values for RecoveryCommandResponseControl.
+const (
+	RecoveryCommandResponseControlActive          RecoveryCommandResponseControl = "active"
+	RecoveryCommandResponseControlCancelRequested RecoveryCommandResponseControl = "cancel_requested"
+	RecoveryCommandResponseControlCancelled       RecoveryCommandResponseControl = "cancelled"
+	RecoveryCommandResponseControlQuarantined     RecoveryCommandResponseControl = "quarantined"
+)
+
+// Defines values for RecoveryCommandResponseRelease0Kind.
+const (
+	RecoveryCommandResponseRelease0KindNotAvailable RecoveryCommandResponseRelease0Kind = "not_available"
+)
+
+// Defines values for RecoveryCommandResponseRelease1Kind.
+const (
+	RecoveryCommandResponseRelease1KindPending RecoveryCommandResponseRelease1Kind = "pending"
+)
+
+// Defines values for RecoveryCommandResponseRelease2Kind.
+const (
+	RecoveryCommandResponseRelease2KindWithheld RecoveryCommandResponseRelease2Kind = "withheld"
+)
+
+// Defines values for RecoveryCommandResponseRelease3Kind.
+const (
+	RecoveryCommandResponseRelease3KindReleased RecoveryCommandResponseRelease3Kind = "released"
+)
+
+// Defines values for RecoveryCommandResponseRelease4Kind.
+const (
+	RecoveryCommandResponseRelease4KindDenied RecoveryCommandResponseRelease4Kind = "denied"
+)
+
+// Defines values for RecoveryCommandResponseRecoveryEffectAdmissionUnresolvedV1Kind.
+const (
+	RecoveryCommandResponseRecoveryEffectAdmissionUnresolvedV1KindAdmissionUnresolved RecoveryCommandResponseRecoveryEffectAdmissionUnresolvedV1Kind = "admission_unresolved"
+)
+
+// Defines values for RecoveryCommandResponseRecoveryEffectAwaitingApprovalV1Kind.
+const (
+	RecoveryCommandResponseRecoveryEffectAwaitingApprovalV1KindAwaitingApproval RecoveryCommandResponseRecoveryEffectAwaitingApprovalV1Kind = "awaiting_approval"
+)
+
+// Defines values for RecoveryCommandResponseRecoveryEffectAwaitingCallerReportV1Kind.
+const (
+	RecoveryCommandResponseRecoveryEffectAwaitingCallerReportV1KindAwaitingCallerReport RecoveryCommandResponseRecoveryEffectAwaitingCallerReportV1Kind = "awaiting_caller_report"
+)
+
+// Defines values for RecoveryCommandResponseRecoveryEffectClosedBeforeEffectV1Kind.
+const (
+	RecoveryCommandResponseRecoveryEffectClosedBeforeEffectV1KindClosedBeforeEffect RecoveryCommandResponseRecoveryEffectClosedBeforeEffectV1Kind = "closed_before_effect"
+)
+
+// Defines values for RecoveryCommandResponseRecoveryEffectCompleteV1Kind.
+const (
+	RecoveryCommandResponseRecoveryEffectCompleteV1KindComplete RecoveryCommandResponseRecoveryEffectCompleteV1Kind = "complete"
+)
+
+// Defines values for RecoveryCommandResponseRecoveryEffectFailedAfterEffectV1Kind.
+const (
+	RecoveryCommandResponseRecoveryEffectFailedAfterEffectV1KindFailedAfterEffect RecoveryCommandResponseRecoveryEffectFailedAfterEffectV1Kind = "failed_after_effect"
+)
+
+// Defines values for RecoveryCommandResponseRecoveryEffectInFlightV1Kind.
+const (
+	RecoveryCommandResponseRecoveryEffectInFlightV1KindInFlight RecoveryCommandResponseRecoveryEffectInFlightV1Kind = "in_flight"
+)
+
+// Defines values for RecoveryCommandResponseRecoveryEffectNeverAdmittedV1Kind.
+const (
+	RecoveryCommandResponseRecoveryEffectNeverAdmittedV1KindNeverAdmitted RecoveryCommandResponseRecoveryEffectNeverAdmittedV1Kind = "never_admitted"
+)
+
+// Defines values for RecoveryCommandResponseRecoveryEffectPartialV1Kind.
+const (
+	RecoveryCommandResponseRecoveryEffectPartialV1KindPartial RecoveryCommandResponseRecoveryEffectPartialV1Kind = "partial"
+)
+
+// Defines values for RecoveryCommandResponseRecoveryEffectUnknownV1Kind.
+const (
+	RecoveryCommandResponseRecoveryEffectUnknownV1KindUnknown RecoveryCommandResponseRecoveryEffectUnknownV1Kind = "unknown"
+)
+
+// Defines values for RecoveryCommandResponseRefusalCode.
+const (
+	RecoveryCommandResponseRefusalCodeAudienceDenied     RecoveryCommandResponseRefusalCode = "audience_denied"
+	RecoveryCommandResponseRefusalCodeBudgetUnavailable  RecoveryCommandResponseRefusalCode = "budget_unavailable"
+	RecoveryCommandResponseRefusalCodeExpired            RecoveryCommandResponseRefusalCode = "expired"
+	RecoveryCommandResponseRefusalCodeInvalidEvidence    RecoveryCommandResponseRefusalCode = "invalid_evidence"
+	RecoveryCommandResponseRefusalCodeResourceExhausted  RecoveryCommandResponseRefusalCode = "resource_exhausted"
+	RecoveryCommandResponseRefusalCodeRevoked            RecoveryCommandResponseRefusalCode = "revoked"
+	RecoveryCommandResponseRefusalCodeStaleBasis         RecoveryCommandResponseRefusalCode = "stale_basis"
+	RecoveryCommandResponseRefusalCodeUnknownEffect      RecoveryCommandResponseRefusalCode = "unknown_effect"
+	RecoveryCommandResponseRefusalCodeUnsupportedProfile RecoveryCommandResponseRefusalCode = "unsupported_profile"
+)
+
+// Defines values for RecoveryCommandResultRecoveryEffectAdmissionUnresolvedV1Kind.
+const (
+	RecoveryCommandResultRecoveryEffectAdmissionUnresolvedV1KindAdmissionUnresolved RecoveryCommandResultRecoveryEffectAdmissionUnresolvedV1Kind = "admission_unresolved"
+)
+
+// Defines values for RecoveryCommandResultRecoveryEffectAwaitingApprovalV1Kind.
+const (
+	RecoveryCommandResultRecoveryEffectAwaitingApprovalV1KindAwaitingApproval RecoveryCommandResultRecoveryEffectAwaitingApprovalV1Kind = "awaiting_approval"
+)
+
+// Defines values for RecoveryCommandResultRecoveryEffectAwaitingCallerReportV1Kind.
+const (
+	RecoveryCommandResultRecoveryEffectAwaitingCallerReportV1KindAwaitingCallerReport RecoveryCommandResultRecoveryEffectAwaitingCallerReportV1Kind = "awaiting_caller_report"
+)
+
+// Defines values for RecoveryCommandResultRecoveryEffectClosedBeforeEffectV1Kind.
+const (
+	RecoveryCommandResultRecoveryEffectClosedBeforeEffectV1KindClosedBeforeEffect RecoveryCommandResultRecoveryEffectClosedBeforeEffectV1Kind = "closed_before_effect"
+)
+
+// Defines values for RecoveryCommandResultRecoveryEffectCompleteV1Kind.
+const (
+	RecoveryCommandResultRecoveryEffectCompleteV1KindComplete RecoveryCommandResultRecoveryEffectCompleteV1Kind = "complete"
+)
+
+// Defines values for RecoveryCommandResultRecoveryEffectFailedAfterEffectV1Kind.
+const (
+	RecoveryCommandResultRecoveryEffectFailedAfterEffectV1KindFailedAfterEffect RecoveryCommandResultRecoveryEffectFailedAfterEffectV1Kind = "failed_after_effect"
+)
+
+// Defines values for RecoveryCommandResultRecoveryEffectInFlightV1Kind.
+const (
+	RecoveryCommandResultRecoveryEffectInFlightV1KindInFlight RecoveryCommandResultRecoveryEffectInFlightV1Kind = "in_flight"
+)
+
+// Defines values for RecoveryCommandResultRecoveryEffectNeverAdmittedV1Kind.
+const (
+	RecoveryCommandResultRecoveryEffectNeverAdmittedV1KindNeverAdmitted RecoveryCommandResultRecoveryEffectNeverAdmittedV1Kind = "never_admitted"
+)
+
+// Defines values for RecoveryCommandResultRecoveryEffectPartialV1Kind.
+const (
+	RecoveryCommandResultRecoveryEffectPartialV1KindPartial RecoveryCommandResultRecoveryEffectPartialV1Kind = "partial"
+)
+
+// Defines values for RecoveryCommandResultRecoveryEffectUnknownV1Kind.
+const (
+	RecoveryCommandResultRecoveryEffectUnknownV1KindUnknown RecoveryCommandResultRecoveryEffectUnknownV1Kind = "unknown"
+)
+
+// Defines values for RecoveryCommandResultRefusalCode.
+const (
+	RecoveryCommandResultRefusalCodeAudienceDenied     RecoveryCommandResultRefusalCode = "audience_denied"
+	RecoveryCommandResultRefusalCodeBudgetUnavailable  RecoveryCommandResultRefusalCode = "budget_unavailable"
+	RecoveryCommandResultRefusalCodeExpired            RecoveryCommandResultRefusalCode = "expired"
+	RecoveryCommandResultRefusalCodeInvalidEvidence    RecoveryCommandResultRefusalCode = "invalid_evidence"
+	RecoveryCommandResultRefusalCodeResourceExhausted  RecoveryCommandResultRefusalCode = "resource_exhausted"
+	RecoveryCommandResultRefusalCodeRevoked            RecoveryCommandResultRefusalCode = "revoked"
+	RecoveryCommandResultRefusalCodeStaleBasis         RecoveryCommandResultRefusalCode = "stale_basis"
+	RecoveryCommandResultRefusalCodeUnknownEffect      RecoveryCommandResultRefusalCode = "unknown_effect"
+	RecoveryCommandResultRefusalCodeUnsupportedProfile RecoveryCommandResultRefusalCode = "unsupported_profile"
+)
+
+// Defines values for RecoveryConfinedExecutionProfileProvider.
+const (
+	RecoveryConfinedExecutionProfileProviderDisabled RecoveryConfinedExecutionProfileProvider = "disabled"
+)
+
+// Defines values for RecoveryConfinedExecutionProfileArtifactSink0Kind.
+const (
+	RecoveryConfinedExecutionProfileArtifactSink0KindAgent RecoveryConfinedExecutionProfileArtifactSink0Kind = "agent"
+)
+
+// Defines values for RecoveryConfinedExecutionProfileArtifactSink1Kind.
+const (
+	RecoveryConfinedExecutionProfileArtifactSink1KindModel RecoveryConfinedExecutionProfileArtifactSink1Kind = "model"
+)
+
+// Defines values for RecoveryConfinedExecutionProfileArtifactSink2Kind.
+const (
+	RecoveryConfinedExecutionProfileArtifactSink2KindArchive RecoveryConfinedExecutionProfileArtifactSink2Kind = "archive"
+)
+
+// Defines values for RecoveryConfinedLimitsLaunches.
+const (
+	RecoveryConfinedLimitsLaunchesN1 RecoveryConfinedLimitsLaunches = 1
+)
+
+// Defines values for RecoveryConfinedLimitsModelCalls.
+const (
+	RecoveryConfinedLimitsModelCallsN0 RecoveryConfinedLimitsModelCalls = 0
+)
+
+// Defines values for RecoveryConfinedLimitsToolCalls.
+const (
+	RecoveryConfinedLimitsToolCallsN0 RecoveryConfinedLimitsToolCalls = 0
+)
+
+// Defines values for RecoveryConfinedLimitsArtifactSink0Kind.
+const (
+	RecoveryConfinedLimitsArtifactSink0KindAgent RecoveryConfinedLimitsArtifactSink0Kind = "agent"
+)
+
+// Defines values for RecoveryConfinedLimitsArtifactSink1Kind.
+const (
+	RecoveryConfinedLimitsArtifactSink1KindModel RecoveryConfinedLimitsArtifactSink1Kind = "model"
+)
+
+// Defines values for RecoveryConfinedLimitsArtifactSink2Kind.
+const (
+	RecoveryConfinedLimitsArtifactSink2KindArchive RecoveryConfinedLimitsArtifactSink2Kind = "archive"
+)
+
+// Defines values for RecoveryConfinedReturnEvidenceDomainVersion.
+const (
+	RecoveryConfinedReturnEvidenceDomainVersionN1 RecoveryConfinedReturnEvidenceDomainVersion = 1
+)
+
+// Defines values for RecoveryConfinedReturnEvidenceArtifactSink0Kind.
+const (
+	RecoveryConfinedReturnEvidenceArtifactSink0KindAgent RecoveryConfinedReturnEvidenceArtifactSink0Kind = "agent"
+)
+
+// Defines values for RecoveryConfinedReturnEvidenceArtifactSink1Kind.
+const (
+	RecoveryConfinedReturnEvidenceArtifactSink1KindModel RecoveryConfinedReturnEvidenceArtifactSink1Kind = "model"
+)
+
+// Defines values for RecoveryConfinedReturnEvidenceArtifactSink2Kind.
+const (
+	RecoveryConfinedReturnEvidenceArtifactSink2KindArchive RecoveryConfinedReturnEvidenceArtifactSink2Kind = "archive"
+)
+
+// Defines values for RecoveryDecisionReportDecision.
+const (
+	RecoveryDecisionReportDecisionAccepted    RecoveryDecisionReportDecision = "accepted"
+	RecoveryDecisionReportDecisionDeclined    RecoveryDecisionReportDecision = "declined"
+	RecoveryDecisionReportDecisionNeedsReview RecoveryDecisionReportDecision = "needs_review"
+)
+
+// Defines values for RecoveryDecisionReportDomainVersion.
+const (
+	RecoveryDecisionReportDomainVersionN1 RecoveryDecisionReportDomainVersion = 1
+)
+
+// Defines values for RecoveryDecisionReportViewDomainVersion.
+const (
+	RecoveryDecisionReportViewDomainVersionN1 RecoveryDecisionReportViewDomainVersion = 1
+)
+
+// Defines values for RecoveryDependencyGraphSchema.
+const (
+	RecoveryDependencyGraphSchemaChioRecoveryDependencyGraphV1 RecoveryDependencyGraphSchema = "chio.recovery.dependency-graph.v1"
+)
+
+// Defines values for RecoveryDependencyGraphVersion.
+const (
+	RecoveryDependencyGraphVersionN1 RecoveryDependencyGraphVersion = 1
+)
+
+// Defines values for RecoveryDisclosureGrant1Kind.
+const (
+	RecoveryDisclosureGrant1KindRecoveryV2 RecoveryDisclosureGrant1Kind = "recovery_v2"
+)
+
+// Defines values for RecoveryEffectContractDeduplication.
+const (
+	RecoveryEffectContractDeduplicationNotAssumed RecoveryEffectContractDeduplication = "not_assumed"
+)
+
+// Defines values for RecoveryEffectContractLookupFinality.
+const (
+	RecoveryEffectContractLookupFinalityExactOperationAuthoritativeFinal RecoveryEffectContractLookupFinality = "exact_operation_authoritative_final"
+	RecoveryEffectContractLookupFinalityUnavailable                      RecoveryEffectContractLookupFinality = "unavailable"
+)
+
+// Defines values for RecoveryEffectContractPartialSettlement.
+const (
+	RecoveryEffectContractPartialSettlementPreserveSpentIdentity RecoveryEffectContractPartialSettlement = "preserve_spent_identity"
+)
+
+// Defines values for RecoveryEffectContractSchema.
+const (
+	RecoveryEffectContractSchemaChioSemanticEffectContractV1 RecoveryEffectContractSchema = "chio.semantic.effect-contract.v1"
+)
+
+// Defines values for RecoveryEffectContractSubmissionIdentity.
+const (
+	RecoveryEffectContractSubmissionIdentityOriginalNativeOperation RecoveryEffectContractSubmissionIdentity = "original_native_operation"
+)
+
+// Defines values for RecoveryEffectContractTransportRetry.
+const (
+	RecoveryEffectContractTransportRetryNoAutomaticRetries RecoveryEffectContractTransportRetry = "no_automatic_retries"
+)
+
+// Defines values for RecoveryEffectContractVersion.
+const (
+	RecoveryEffectContractVersionN1 RecoveryEffectContractVersion = 1
+)
+
+// Defines values for RecoveryExplanationEvaluationAssessment.
+const (
+	RecoveryExplanationEvaluationAssessmentBlockedByCapability    RecoveryExplanationEvaluationAssessment = "blocked_by_capability"
+	RecoveryExplanationEvaluationAssessmentFeasibleUnderSnapshot  RecoveryExplanationEvaluationAssessment = "feasible_under_snapshot"
+	RecoveryExplanationEvaluationAssessmentNeedsFreshEvidence     RecoveryExplanationEvaluationAssessment = "needs_fresh_evidence"
+	RecoveryExplanationEvaluationAssessmentNoRegisteredRemedy     RecoveryExplanationEvaluationAssessment = "no_registered_remedy"
+	RecoveryExplanationEvaluationAssessmentRequiresExactApproval  RecoveryExplanationEvaluationAssessment = "requires_exact_approval"
+	RecoveryExplanationEvaluationAssessmentRequiresPrerequisite   RecoveryExplanationEvaluationAssessment = "requires_prerequisite"
+	RecoveryExplanationEvaluationAssessmentRequiresTransformation RecoveryExplanationEvaluationAssessment = "requires_transformation"
+	RecoveryExplanationEvaluationAssessmentSearchBoundReached     RecoveryExplanationEvaluationAssessment = "search_bound_reached"
+	RecoveryExplanationEvaluationAssessmentUnknownOutcome         RecoveryExplanationEvaluationAssessment = "unknown_outcome"
+)
+
+// Defines values for RecoveryExplanationEvaluationCandidatesAssessment.
+const (
+	RecoveryExplanationEvaluationCandidatesAssessmentBlockedByCapability    RecoveryExplanationEvaluationCandidatesAssessment = "blocked_by_capability"
+	RecoveryExplanationEvaluationCandidatesAssessmentFeasibleUnderSnapshot  RecoveryExplanationEvaluationCandidatesAssessment = "feasible_under_snapshot"
+	RecoveryExplanationEvaluationCandidatesAssessmentNeedsFreshEvidence     RecoveryExplanationEvaluationCandidatesAssessment = "needs_fresh_evidence"
+	RecoveryExplanationEvaluationCandidatesAssessmentNoRegisteredRemedy     RecoveryExplanationEvaluationCandidatesAssessment = "no_registered_remedy"
+	RecoveryExplanationEvaluationCandidatesAssessmentRequiresExactApproval  RecoveryExplanationEvaluationCandidatesAssessment = "requires_exact_approval"
+	RecoveryExplanationEvaluationCandidatesAssessmentRequiresPrerequisite   RecoveryExplanationEvaluationCandidatesAssessment = "requires_prerequisite"
+	RecoveryExplanationEvaluationCandidatesAssessmentRequiresTransformation RecoveryExplanationEvaluationCandidatesAssessment = "requires_transformation"
+	RecoveryExplanationEvaluationCandidatesAssessmentSearchBoundReached     RecoveryExplanationEvaluationCandidatesAssessment = "search_bound_reached"
+	RecoveryExplanationEvaluationCandidatesAssessmentUnknownOutcome         RecoveryExplanationEvaluationCandidatesAssessment = "unknown_outcome"
+)
+
+// Defines values for RecoveryExplanationEvaluationPlannerVersion.
+const (
+	RecoveryExplanationEvaluationPlannerVersionChioRecoveryPlannerV1 RecoveryExplanationEvaluationPlannerVersion = "chio.recovery.planner.v1"
+)
+
+// Defines values for RecoveryExplanationEvaluationRecoveryEffectAdmissionUnresolvedV1Kind.
+const (
+	RecoveryExplanationEvaluationRecoveryEffectAdmissionUnresolvedV1KindAdmissionUnresolved RecoveryExplanationEvaluationRecoveryEffectAdmissionUnresolvedV1Kind = "admission_unresolved"
+)
+
+// Defines values for RecoveryExplanationEvaluationRecoveryEffectAwaitingApprovalV1Kind.
+const (
+	RecoveryExplanationEvaluationRecoveryEffectAwaitingApprovalV1KindAwaitingApproval RecoveryExplanationEvaluationRecoveryEffectAwaitingApprovalV1Kind = "awaiting_approval"
+)
+
+// Defines values for RecoveryExplanationEvaluationRecoveryEffectAwaitingCallerReportV1Kind.
+const (
+	RecoveryExplanationEvaluationRecoveryEffectAwaitingCallerReportV1KindAwaitingCallerReport RecoveryExplanationEvaluationRecoveryEffectAwaitingCallerReportV1Kind = "awaiting_caller_report"
+)
+
+// Defines values for RecoveryExplanationEvaluationRecoveryEffectClosedBeforeEffectV1Kind.
+const (
+	RecoveryExplanationEvaluationRecoveryEffectClosedBeforeEffectV1KindClosedBeforeEffect RecoveryExplanationEvaluationRecoveryEffectClosedBeforeEffectV1Kind = "closed_before_effect"
+)
+
+// Defines values for RecoveryExplanationEvaluationRecoveryEffectCompleteV1Kind.
+const (
+	RecoveryExplanationEvaluationRecoveryEffectCompleteV1KindComplete RecoveryExplanationEvaluationRecoveryEffectCompleteV1Kind = "complete"
+)
+
+// Defines values for RecoveryExplanationEvaluationRecoveryEffectFailedAfterEffectV1Kind.
+const (
+	RecoveryExplanationEvaluationRecoveryEffectFailedAfterEffectV1KindFailedAfterEffect RecoveryExplanationEvaluationRecoveryEffectFailedAfterEffectV1Kind = "failed_after_effect"
+)
+
+// Defines values for RecoveryExplanationEvaluationRecoveryEffectInFlightV1Kind.
+const (
+	RecoveryExplanationEvaluationRecoveryEffectInFlightV1KindInFlight RecoveryExplanationEvaluationRecoveryEffectInFlightV1Kind = "in_flight"
+)
+
+// Defines values for RecoveryExplanationEvaluationRecoveryEffectNeverAdmittedV1Kind.
+const (
+	RecoveryExplanationEvaluationRecoveryEffectNeverAdmittedV1KindNeverAdmitted RecoveryExplanationEvaluationRecoveryEffectNeverAdmittedV1Kind = "never_admitted"
+)
+
+// Defines values for RecoveryExplanationEvaluationRecoveryEffectPartialV1Kind.
+const (
+	RecoveryExplanationEvaluationRecoveryEffectPartialV1KindPartial RecoveryExplanationEvaluationRecoveryEffectPartialV1Kind = "partial"
+)
+
+// Defines values for RecoveryExplanationEvaluationRecoveryEffectUnknownV1Kind.
+const (
+	RecoveryExplanationEvaluationRecoveryEffectUnknownV1KindUnknown RecoveryExplanationEvaluationRecoveryEffectUnknownV1Kind = "unknown"
+)
+
+// Defines values for RecoveryExplanationEvaluationRefusalCode.
+const (
+	RecoveryExplanationEvaluationRefusalCodeAudienceDenied     RecoveryExplanationEvaluationRefusalCode = "audience_denied"
+	RecoveryExplanationEvaluationRefusalCodeBudgetUnavailable  RecoveryExplanationEvaluationRefusalCode = "budget_unavailable"
+	RecoveryExplanationEvaluationRefusalCodeExpired            RecoveryExplanationEvaluationRefusalCode = "expired"
+	RecoveryExplanationEvaluationRefusalCodeInvalidEvidence    RecoveryExplanationEvaluationRefusalCode = "invalid_evidence"
+	RecoveryExplanationEvaluationRefusalCodeResourceExhausted  RecoveryExplanationEvaluationRefusalCode = "resource_exhausted"
+	RecoveryExplanationEvaluationRefusalCodeRevoked            RecoveryExplanationEvaluationRefusalCode = "revoked"
+	RecoveryExplanationEvaluationRefusalCodeStaleBasis         RecoveryExplanationEvaluationRefusalCode = "stale_basis"
+	RecoveryExplanationEvaluationRefusalCodeUnknownEffect      RecoveryExplanationEvaluationRefusalCode = "unknown_effect"
+	RecoveryExplanationEvaluationRefusalCodeUnsupportedProfile RecoveryExplanationEvaluationRefusalCode = "unsupported_profile"
+)
+
+// Defines values for RecoveryExplanationReportPlannerVersion.
+const (
+	RecoveryExplanationReportPlannerVersionChioRecoveryPlannerV1 RecoveryExplanationReportPlannerVersion = "chio.recovery.planner.v1"
+)
+
+// Defines values for RecoveryExplanationReportSchema.
+const (
+	RecoveryExplanationReportSchemaChioRecoveryExplanationReportV1 RecoveryExplanationReportSchema = "chio.recovery.explanation-report.v1"
+)
+
+// Defines values for RecoveryExplanationReportVersion.
+const (
+	RecoveryExplanationReportVersionN1 RecoveryExplanationReportVersion = 1
+)
+
+// Defines values for RecoveryExplanationReportRecoveryEffectAdmissionUnresolvedV1Kind.
+const (
+	RecoveryExplanationReportRecoveryEffectAdmissionUnresolvedV1KindAdmissionUnresolved RecoveryExplanationReportRecoveryEffectAdmissionUnresolvedV1Kind = "admission_unresolved"
+)
+
+// Defines values for RecoveryExplanationReportRecoveryEffectAwaitingApprovalV1Kind.
+const (
+	RecoveryExplanationReportRecoveryEffectAwaitingApprovalV1KindAwaitingApproval RecoveryExplanationReportRecoveryEffectAwaitingApprovalV1Kind = "awaiting_approval"
+)
+
+// Defines values for RecoveryExplanationReportRecoveryEffectAwaitingCallerReportV1Kind.
+const (
+	RecoveryExplanationReportRecoveryEffectAwaitingCallerReportV1KindAwaitingCallerReport RecoveryExplanationReportRecoveryEffectAwaitingCallerReportV1Kind = "awaiting_caller_report"
+)
+
+// Defines values for RecoveryExplanationReportRecoveryEffectClosedBeforeEffectV1Kind.
+const (
+	RecoveryExplanationReportRecoveryEffectClosedBeforeEffectV1KindClosedBeforeEffect RecoveryExplanationReportRecoveryEffectClosedBeforeEffectV1Kind = "closed_before_effect"
+)
+
+// Defines values for RecoveryExplanationReportRecoveryEffectCompleteV1Kind.
+const (
+	RecoveryExplanationReportRecoveryEffectCompleteV1KindComplete RecoveryExplanationReportRecoveryEffectCompleteV1Kind = "complete"
+)
+
+// Defines values for RecoveryExplanationReportRecoveryEffectFailedAfterEffectV1Kind.
+const (
+	RecoveryExplanationReportRecoveryEffectFailedAfterEffectV1KindFailedAfterEffect RecoveryExplanationReportRecoveryEffectFailedAfterEffectV1Kind = "failed_after_effect"
+)
+
+// Defines values for RecoveryExplanationReportRecoveryEffectInFlightV1Kind.
+const (
+	RecoveryExplanationReportRecoveryEffectInFlightV1KindInFlight RecoveryExplanationReportRecoveryEffectInFlightV1Kind = "in_flight"
+)
+
+// Defines values for RecoveryExplanationReportRecoveryEffectNeverAdmittedV1Kind.
+const (
+	RecoveryExplanationReportRecoveryEffectNeverAdmittedV1KindNeverAdmitted RecoveryExplanationReportRecoveryEffectNeverAdmittedV1Kind = "never_admitted"
+)
+
+// Defines values for RecoveryExplanationReportRecoveryEffectPartialV1Kind.
+const (
+	RecoveryExplanationReportRecoveryEffectPartialV1KindPartial RecoveryExplanationReportRecoveryEffectPartialV1Kind = "partial"
+)
+
+// Defines values for RecoveryExplanationReportRecoveryEffectUnknownV1Kind.
+const (
+	RecoveryExplanationReportRecoveryEffectUnknownV1KindUnknown RecoveryExplanationReportRecoveryEffectUnknownV1Kind = "unknown"
+)
+
+// Defines values for RecoveryExplanationReportRefusalCode.
+const (
+	RecoveryExplanationReportRefusalCodeAudienceDenied     RecoveryExplanationReportRefusalCode = "audience_denied"
+	RecoveryExplanationReportRefusalCodeBudgetUnavailable  RecoveryExplanationReportRefusalCode = "budget_unavailable"
+	RecoveryExplanationReportRefusalCodeExpired            RecoveryExplanationReportRefusalCode = "expired"
+	RecoveryExplanationReportRefusalCodeInvalidEvidence    RecoveryExplanationReportRefusalCode = "invalid_evidence"
+	RecoveryExplanationReportRefusalCodeResourceExhausted  RecoveryExplanationReportRefusalCode = "resource_exhausted"
+	RecoveryExplanationReportRefusalCodeRevoked            RecoveryExplanationReportRefusalCode = "revoked"
+	RecoveryExplanationReportRefusalCodeStaleBasis         RecoveryExplanationReportRefusalCode = "stale_basis"
+	RecoveryExplanationReportRefusalCodeUnknownEffect      RecoveryExplanationReportRefusalCode = "unknown_effect"
+	RecoveryExplanationReportRefusalCodeUnsupportedProfile RecoveryExplanationReportRefusalCode = "unsupported_profile"
+)
+
+// Defines values for RecoveryExplanationRequestRecoveryEffectAdmissionUnresolvedV1Kind.
+const (
+	RecoveryExplanationRequestRecoveryEffectAdmissionUnresolvedV1KindAdmissionUnresolved RecoveryExplanationRequestRecoveryEffectAdmissionUnresolvedV1Kind = "admission_unresolved"
+)
+
+// Defines values for RecoveryExplanationRequestRecoveryEffectAwaitingApprovalV1Kind.
+const (
+	RecoveryExplanationRequestRecoveryEffectAwaitingApprovalV1KindAwaitingApproval RecoveryExplanationRequestRecoveryEffectAwaitingApprovalV1Kind = "awaiting_approval"
+)
+
+// Defines values for RecoveryExplanationRequestRecoveryEffectAwaitingCallerReportV1Kind.
+const (
+	RecoveryExplanationRequestRecoveryEffectAwaitingCallerReportV1KindAwaitingCallerReport RecoveryExplanationRequestRecoveryEffectAwaitingCallerReportV1Kind = "awaiting_caller_report"
+)
+
+// Defines values for RecoveryExplanationRequestRecoveryEffectClosedBeforeEffectV1Kind.
+const (
+	RecoveryExplanationRequestRecoveryEffectClosedBeforeEffectV1KindClosedBeforeEffect RecoveryExplanationRequestRecoveryEffectClosedBeforeEffectV1Kind = "closed_before_effect"
+)
+
+// Defines values for RecoveryExplanationRequestRecoveryEffectCompleteV1Kind.
+const (
+	RecoveryExplanationRequestRecoveryEffectCompleteV1KindComplete RecoveryExplanationRequestRecoveryEffectCompleteV1Kind = "complete"
+)
+
+// Defines values for RecoveryExplanationRequestRecoveryEffectFailedAfterEffectV1Kind.
+const (
+	RecoveryExplanationRequestRecoveryEffectFailedAfterEffectV1KindFailedAfterEffect RecoveryExplanationRequestRecoveryEffectFailedAfterEffectV1Kind = "failed_after_effect"
+)
+
+// Defines values for RecoveryExplanationRequestRecoveryEffectInFlightV1Kind.
+const (
+	RecoveryExplanationRequestRecoveryEffectInFlightV1KindInFlight RecoveryExplanationRequestRecoveryEffectInFlightV1Kind = "in_flight"
+)
+
+// Defines values for RecoveryExplanationRequestRecoveryEffectNeverAdmittedV1Kind.
+const (
+	RecoveryExplanationRequestRecoveryEffectNeverAdmittedV1KindNeverAdmitted RecoveryExplanationRequestRecoveryEffectNeverAdmittedV1Kind = "never_admitted"
+)
+
+// Defines values for RecoveryExplanationRequestRecoveryEffectPartialV1Kind.
+const (
+	RecoveryExplanationRequestRecoveryEffectPartialV1KindPartial RecoveryExplanationRequestRecoveryEffectPartialV1Kind = "partial"
+)
+
+// Defines values for RecoveryExplanationRequestRecoveryEffectUnknownV1Kind.
+const (
+	RecoveryExplanationRequestRecoveryEffectUnknownV1KindUnknown RecoveryExplanationRequestRecoveryEffectUnknownV1Kind = "unknown"
+)
+
+// Defines values for RecoveryExplanationRequestRefusalCode.
+const (
+	RecoveryExplanationRequestRefusalCodeAudienceDenied     RecoveryExplanationRequestRefusalCode = "audience_denied"
+	RecoveryExplanationRequestRefusalCodeBudgetUnavailable  RecoveryExplanationRequestRefusalCode = "budget_unavailable"
+	RecoveryExplanationRequestRefusalCodeExpired            RecoveryExplanationRequestRefusalCode = "expired"
+	RecoveryExplanationRequestRefusalCodeInvalidEvidence    RecoveryExplanationRequestRefusalCode = "invalid_evidence"
+	RecoveryExplanationRequestRefusalCodeResourceExhausted  RecoveryExplanationRequestRefusalCode = "resource_exhausted"
+	RecoveryExplanationRequestRefusalCodeRevoked            RecoveryExplanationRequestRefusalCode = "revoked"
+	RecoveryExplanationRequestRefusalCodeStaleBasis         RecoveryExplanationRequestRefusalCode = "stale_basis"
+	RecoveryExplanationRequestRefusalCodeUnknownEffect      RecoveryExplanationRequestRefusalCode = "unknown_effect"
+	RecoveryExplanationRequestRefusalCodeUnsupportedProfile RecoveryExplanationRequestRefusalCode = "unsupported_profile"
+)
+
+// Defines values for RecoveryExplanationSnapshotInfluence0Integrity.
+const (
+	RecoveryExplanationSnapshotInfluence0IntegrityNativeOwned      RecoveryExplanationSnapshotInfluence0Integrity = "native_owned"
+	RecoveryExplanationSnapshotInfluence0IntegrityOperatorVerified RecoveryExplanationSnapshotInfluence0Integrity = "operator_verified"
+	RecoveryExplanationSnapshotInfluence0IntegrityProviderVerified RecoveryExplanationSnapshotInfluence0Integrity = "provider_verified"
+	RecoveryExplanationSnapshotInfluence0IntegrityUnverified       RecoveryExplanationSnapshotInfluence0Integrity = "unverified"
+)
+
+// Defines values for RecoveryExplanationSnapshotInfluence0Kind.
+const (
+	RecoveryExplanationSnapshotInfluence0KindObserved RecoveryExplanationSnapshotInfluence0Kind = "observed"
+)
+
+// Defines values for RecoveryExplanationSnapshotInfluence1Kind.
+const (
+	RecoveryExplanationSnapshotInfluence1KindUnknown RecoveryExplanationSnapshotInfluence1Kind = "unknown"
+)
+
+// Defines values for RecoveryExplanationSnapshotObservationsFact.
+const (
+	RecoveryExplanationSnapshotObservationsFactAuthorityCoverage RecoveryExplanationSnapshotObservationsFact = "authority_coverage"
+	RecoveryExplanationSnapshotObservationsFactCapability        RecoveryExplanationSnapshotObservationsFact = "capability"
+	RecoveryExplanationSnapshotObservationsFactDestinationAcl    RecoveryExplanationSnapshotObservationsFact = "destination_acl"
+	RecoveryExplanationSnapshotObservationsFactPolicy            RecoveryExplanationSnapshotObservationsFact = "policy"
+	RecoveryExplanationSnapshotObservationsFactPrerequisite      RecoveryExplanationSnapshotObservationsFact = "prerequisite"
+	RecoveryExplanationSnapshotObservationsFactTransformation    RecoveryExplanationSnapshotObservationsFact = "transformation"
+)
+
+// Defines values for RecoveryExplanationSnapshotObservationsIntegrity.
+const (
+	RecoveryExplanationSnapshotObservationsIntegrityNativeOwned      RecoveryExplanationSnapshotObservationsIntegrity = "native_owned"
+	RecoveryExplanationSnapshotObservationsIntegrityOperatorVerified RecoveryExplanationSnapshotObservationsIntegrity = "operator_verified"
+	RecoveryExplanationSnapshotObservationsIntegrityProviderVerified RecoveryExplanationSnapshotObservationsIntegrity = "provider_verified"
+	RecoveryExplanationSnapshotObservationsIntegrityUnverified       RecoveryExplanationSnapshotObservationsIntegrity = "unverified"
+)
+
+// Defines values for RecoveryExplanationSnapshotObservationsSource.
+const (
+	RecoveryExplanationSnapshotObservationsSourceNativeAuthority  RecoveryExplanationSnapshotObservationsSource = "native_authority"
+	RecoveryExplanationSnapshotObservationsSourceOperatorRegistry RecoveryExplanationSnapshotObservationsSource = "operator_registry"
+	RecoveryExplanationSnapshotObservationsSourceProcessJournal   RecoveryExplanationSnapshotObservationsSource = "process_journal"
+	RecoveryExplanationSnapshotObservationsSourceProviderAcl      RecoveryExplanationSnapshotObservationsSource = "provider_acl"
+)
+
+// Defines values for RecoveryExplanationSnapshotObservationsState0Kind.
+const (
+	RecoveryExplanationSnapshotObservationsState0KindKnown RecoveryExplanationSnapshotObservationsState0Kind = "known"
+)
+
+// Defines values for RecoveryExplanationSnapshotObservationsState1Kind.
+const (
+	RecoveryExplanationSnapshotObservationsState1KindGap RecoveryExplanationSnapshotObservationsState1Kind = "gap"
+)
+
+// Defines values for RecoveryExplanationSnapshotObservationsState1Reason.
+const (
+	RecoveryExplanationSnapshotObservationsState1ReasonNotConsulted RecoveryExplanationSnapshotObservationsState1Reason = "not_consulted"
+	RecoveryExplanationSnapshotObservationsState1ReasonUnavailable  RecoveryExplanationSnapshotObservationsState1Reason = "unavailable"
+	RecoveryExplanationSnapshotObservationsState1ReasonUnsupported  RecoveryExplanationSnapshotObservationsState1Reason = "unsupported"
+)
+
+// Defines values for RecoveryExplanationSnapshotObservationsState2Kind.
+const (
+	RecoveryExplanationSnapshotObservationsState2KindFreshnessQualified RecoveryExplanationSnapshotObservationsState2Kind = "freshness_qualified"
+)
+
+// Defines values for RecoveryExplanationSnapshotObservationsTarget0Kind.
+const (
+	RecoveryExplanationSnapshotObservationsTarget0KindIntent RecoveryExplanationSnapshotObservationsTarget0Kind = "intent"
+)
+
+// Defines values for RecoveryExplanationSnapshotObservationsTarget1Kind.
+const (
+	RecoveryExplanationSnapshotObservationsTarget1KindDestination RecoveryExplanationSnapshotObservationsTarget1Kind = "destination"
+)
+
+// Defines values for RecoveryExplanationSnapshotObservationsTarget2Kind.
+const (
+	RecoveryExplanationSnapshotObservationsTarget2KindAuthority RecoveryExplanationSnapshotObservationsTarget2Kind = "authority"
+)
+
+// Defines values for RecoveryExplanationSnapshotObservationsTarget3Kind.
+const (
+	RecoveryExplanationSnapshotObservationsTarget3KindTemplate RecoveryExplanationSnapshotObservationsTarget3Kind = "template"
+)
+
+// Defines values for RecoveryExplanationSnapshotSchema.
+const (
+	RecoveryExplanationSnapshotSchemaChioRecoveryExplanationSnapshotV1 RecoveryExplanationSnapshotSchema = "chio.recovery.explanation-snapshot.v1"
+)
+
+// Defines values for RecoveryExplanationSnapshotVersion.
+const (
+	RecoveryExplanationSnapshotVersionN1 RecoveryExplanationSnapshotVersion = 1
+)
+
+// Defines values for RecoveryExplanationSnapshotRecoveryEffectAdmissionUnresolvedV1Kind.
+const (
+	RecoveryExplanationSnapshotRecoveryEffectAdmissionUnresolvedV1KindAdmissionUnresolved RecoveryExplanationSnapshotRecoveryEffectAdmissionUnresolvedV1Kind = "admission_unresolved"
+)
+
+// Defines values for RecoveryExplanationSnapshotRecoveryEffectAwaitingApprovalV1Kind.
+const (
+	RecoveryExplanationSnapshotRecoveryEffectAwaitingApprovalV1KindAwaitingApproval RecoveryExplanationSnapshotRecoveryEffectAwaitingApprovalV1Kind = "awaiting_approval"
+)
+
+// Defines values for RecoveryExplanationSnapshotRecoveryEffectAwaitingCallerReportV1Kind.
+const (
+	RecoveryExplanationSnapshotRecoveryEffectAwaitingCallerReportV1KindAwaitingCallerReport RecoveryExplanationSnapshotRecoveryEffectAwaitingCallerReportV1Kind = "awaiting_caller_report"
+)
+
+// Defines values for RecoveryExplanationSnapshotRecoveryEffectClosedBeforeEffectV1Kind.
+const (
+	RecoveryExplanationSnapshotRecoveryEffectClosedBeforeEffectV1KindClosedBeforeEffect RecoveryExplanationSnapshotRecoveryEffectClosedBeforeEffectV1Kind = "closed_before_effect"
+)
+
+// Defines values for RecoveryExplanationSnapshotRecoveryEffectCompleteV1Kind.
+const (
+	RecoveryExplanationSnapshotRecoveryEffectCompleteV1KindComplete RecoveryExplanationSnapshotRecoveryEffectCompleteV1Kind = "complete"
+)
+
+// Defines values for RecoveryExplanationSnapshotRecoveryEffectFailedAfterEffectV1Kind.
+const (
+	RecoveryExplanationSnapshotRecoveryEffectFailedAfterEffectV1KindFailedAfterEffect RecoveryExplanationSnapshotRecoveryEffectFailedAfterEffectV1Kind = "failed_after_effect"
+)
+
+// Defines values for RecoveryExplanationSnapshotRecoveryEffectInFlightV1Kind.
+const (
+	RecoveryExplanationSnapshotRecoveryEffectInFlightV1KindInFlight RecoveryExplanationSnapshotRecoveryEffectInFlightV1Kind = "in_flight"
+)
+
+// Defines values for RecoveryExplanationSnapshotRecoveryEffectNeverAdmittedV1Kind.
+const (
+	RecoveryExplanationSnapshotRecoveryEffectNeverAdmittedV1KindNeverAdmitted RecoveryExplanationSnapshotRecoveryEffectNeverAdmittedV1Kind = "never_admitted"
+)
+
+// Defines values for RecoveryExplanationSnapshotRecoveryEffectPartialV1Kind.
+const (
+	RecoveryExplanationSnapshotRecoveryEffectPartialV1KindPartial RecoveryExplanationSnapshotRecoveryEffectPartialV1Kind = "partial"
+)
+
+// Defines values for RecoveryExplanationSnapshotRecoveryEffectUnknownV1Kind.
+const (
+	RecoveryExplanationSnapshotRecoveryEffectUnknownV1KindUnknown RecoveryExplanationSnapshotRecoveryEffectUnknownV1Kind = "unknown"
+)
+
+// Defines values for RecoveryExplanationSnapshotRefusalCode.
+const (
+	RecoveryExplanationSnapshotRefusalCodeAudienceDenied     RecoveryExplanationSnapshotRefusalCode = "audience_denied"
+	RecoveryExplanationSnapshotRefusalCodeBudgetUnavailable  RecoveryExplanationSnapshotRefusalCode = "budget_unavailable"
+	RecoveryExplanationSnapshotRefusalCodeExpired            RecoveryExplanationSnapshotRefusalCode = "expired"
+	RecoveryExplanationSnapshotRefusalCodeInvalidEvidence    RecoveryExplanationSnapshotRefusalCode = "invalid_evidence"
+	RecoveryExplanationSnapshotRefusalCodeResourceExhausted  RecoveryExplanationSnapshotRefusalCode = "resource_exhausted"
+	RecoveryExplanationSnapshotRefusalCodeRevoked            RecoveryExplanationSnapshotRefusalCode = "revoked"
+	RecoveryExplanationSnapshotRefusalCodeStaleBasis         RecoveryExplanationSnapshotRefusalCode = "stale_basis"
+	RecoveryExplanationSnapshotRefusalCodeUnknownEffect      RecoveryExplanationSnapshotRefusalCode = "unknown_effect"
+	RecoveryExplanationSnapshotRefusalCodeUnsupportedProfile RecoveryExplanationSnapshotRefusalCode = "unsupported_profile"
+)
+
+// Defines values for RecoveryExplanationViewPlannerVersion.
+const (
+	RecoveryExplanationViewPlannerVersionChioRecoveryPlannerV1 RecoveryExplanationViewPlannerVersion = "chio.recovery.planner.v1"
+)
+
+// Defines values for RecoveryExplanationViewProjectionCandidatesAssessment.
+const (
+	RecoveryExplanationViewProjectionCandidatesAssessmentBlockedByCapability    RecoveryExplanationViewProjectionCandidatesAssessment = "blocked_by_capability"
+	RecoveryExplanationViewProjectionCandidatesAssessmentFeasibleUnderSnapshot  RecoveryExplanationViewProjectionCandidatesAssessment = "feasible_under_snapshot"
+	RecoveryExplanationViewProjectionCandidatesAssessmentNeedsFreshEvidence     RecoveryExplanationViewProjectionCandidatesAssessment = "needs_fresh_evidence"
+	RecoveryExplanationViewProjectionCandidatesAssessmentNoRegisteredRemedy     RecoveryExplanationViewProjectionCandidatesAssessment = "no_registered_remedy"
+	RecoveryExplanationViewProjectionCandidatesAssessmentRequiresExactApproval  RecoveryExplanationViewProjectionCandidatesAssessment = "requires_exact_approval"
+	RecoveryExplanationViewProjectionCandidatesAssessmentRequiresPrerequisite   RecoveryExplanationViewProjectionCandidatesAssessment = "requires_prerequisite"
+	RecoveryExplanationViewProjectionCandidatesAssessmentRequiresTransformation RecoveryExplanationViewProjectionCandidatesAssessment = "requires_transformation"
+	RecoveryExplanationViewProjectionCandidatesAssessmentSearchBoundReached     RecoveryExplanationViewProjectionCandidatesAssessment = "search_bound_reached"
+	RecoveryExplanationViewProjectionCandidatesAssessmentUnknownOutcome         RecoveryExplanationViewProjectionCandidatesAssessment = "unknown_outcome"
+)
+
+// Defines values for RecoveryExplanationViewProjectionSummary.
+const (
+	RecoveryExplanationViewProjectionSummaryAlternativesUnderSnapshot    RecoveryExplanationViewProjectionSummary = "alternatives_under_snapshot"
+	RecoveryExplanationViewProjectionSummaryAuthorizedInspectionRequired RecoveryExplanationViewProjectionSummary = "authorized_inspection_required"
+	RecoveryExplanationViewProjectionSummaryNoDisclosableAdvice          RecoveryExplanationViewProjectionSummary = "no_disclosable_advice"
+	RecoveryExplanationViewProjectionSummarySearchBoundReached           RecoveryExplanationViewProjectionSummary = "search_bound_reached"
+)
+
+// Defines values for RecoveryExplanationViewSchema.
+const (
+	RecoveryExplanationViewSchemaChioRecoveryExplanationViewV1 RecoveryExplanationViewSchema = "chio.recovery.explanation-view.v1"
+)
+
+// Defines values for RecoveryExplanationViewVersion.
+const (
+	RecoveryExplanationViewVersionN1 RecoveryExplanationViewVersion = 1
+)
+
+// Defines values for RecoveryExplanationViewRecoveryEffectAdmissionUnresolvedV1Kind.
+const (
+	RecoveryExplanationViewRecoveryEffectAdmissionUnresolvedV1KindAdmissionUnresolved RecoveryExplanationViewRecoveryEffectAdmissionUnresolvedV1Kind = "admission_unresolved"
+)
+
+// Defines values for RecoveryExplanationViewRecoveryEffectAwaitingApprovalV1Kind.
+const (
+	RecoveryExplanationViewRecoveryEffectAwaitingApprovalV1KindAwaitingApproval RecoveryExplanationViewRecoveryEffectAwaitingApprovalV1Kind = "awaiting_approval"
+)
+
+// Defines values for RecoveryExplanationViewRecoveryEffectAwaitingCallerReportV1Kind.
+const (
+	RecoveryExplanationViewRecoveryEffectAwaitingCallerReportV1KindAwaitingCallerReport RecoveryExplanationViewRecoveryEffectAwaitingCallerReportV1Kind = "awaiting_caller_report"
+)
+
+// Defines values for RecoveryExplanationViewRecoveryEffectClosedBeforeEffectV1Kind.
+const (
+	RecoveryExplanationViewRecoveryEffectClosedBeforeEffectV1KindClosedBeforeEffect RecoveryExplanationViewRecoveryEffectClosedBeforeEffectV1Kind = "closed_before_effect"
+)
+
+// Defines values for RecoveryExplanationViewRecoveryEffectCompleteV1Kind.
+const (
+	RecoveryExplanationViewRecoveryEffectCompleteV1KindComplete RecoveryExplanationViewRecoveryEffectCompleteV1Kind = "complete"
+)
+
+// Defines values for RecoveryExplanationViewRecoveryEffectFailedAfterEffectV1Kind.
+const (
+	RecoveryExplanationViewRecoveryEffectFailedAfterEffectV1KindFailedAfterEffect RecoveryExplanationViewRecoveryEffectFailedAfterEffectV1Kind = "failed_after_effect"
+)
+
+// Defines values for RecoveryExplanationViewRecoveryEffectInFlightV1Kind.
+const (
+	RecoveryExplanationViewRecoveryEffectInFlightV1KindInFlight RecoveryExplanationViewRecoveryEffectInFlightV1Kind = "in_flight"
+)
+
+// Defines values for RecoveryExplanationViewRecoveryEffectNeverAdmittedV1Kind.
+const (
+	RecoveryExplanationViewRecoveryEffectNeverAdmittedV1KindNeverAdmitted RecoveryExplanationViewRecoveryEffectNeverAdmittedV1Kind = "never_admitted"
+)
+
+// Defines values for RecoveryExplanationViewRecoveryEffectPartialV1Kind.
+const (
+	RecoveryExplanationViewRecoveryEffectPartialV1KindPartial RecoveryExplanationViewRecoveryEffectPartialV1Kind = "partial"
+)
+
+// Defines values for RecoveryExplanationViewRecoveryEffectUnknownV1Kind.
+const (
+	RecoveryExplanationViewRecoveryEffectUnknownV1KindUnknown RecoveryExplanationViewRecoveryEffectUnknownV1Kind = "unknown"
+)
+
+// Defines values for RecoveryExplanationViewRefusalCode.
+const (
+	RecoveryExplanationViewRefusalCodeAudienceDenied     RecoveryExplanationViewRefusalCode = "audience_denied"
+	RecoveryExplanationViewRefusalCodeBudgetUnavailable  RecoveryExplanationViewRefusalCode = "budget_unavailable"
+	RecoveryExplanationViewRefusalCodeExpired            RecoveryExplanationViewRefusalCode = "expired"
+	RecoveryExplanationViewRefusalCodeInvalidEvidence    RecoveryExplanationViewRefusalCode = "invalid_evidence"
+	RecoveryExplanationViewRefusalCodeResourceExhausted  RecoveryExplanationViewRefusalCode = "resource_exhausted"
+	RecoveryExplanationViewRefusalCodeRevoked            RecoveryExplanationViewRefusalCode = "revoked"
+	RecoveryExplanationViewRefusalCodeStaleBasis         RecoveryExplanationViewRefusalCode = "stale_basis"
+	RecoveryExplanationViewRefusalCodeUnknownEffect      RecoveryExplanationViewRefusalCode = "unknown_effect"
+	RecoveryExplanationViewRefusalCodeUnsupportedProfile RecoveryExplanationViewRefusalCode = "unsupported_profile"
+)
+
+// Defines values for RecoveryGrantBindingSchema.
+const (
+	RecoveryGrantBindingSchemaChioRecoveryGrantBindingV1 RecoveryGrantBindingSchema = "chio.recovery.grant-binding.v1"
+)
+
+// Defines values for RecoveryGrantBindingVersion.
+const (
+	RecoveryGrantBindingVersionN1 RecoveryGrantBindingVersion = 1
+)
+
+// Defines values for RecoveryIsolationBoundaryDomainVersion.
+const (
+	RecoveryIsolationBoundaryDomainVersionN1 RecoveryIsolationBoundaryDomainVersion = 1
+)
+
+// Defines values for RecoveryIsolationBoundaryArtifactSink0Kind.
+const (
+	RecoveryIsolationBoundaryArtifactSink0KindAgent RecoveryIsolationBoundaryArtifactSink0Kind = "agent"
+)
+
+// Defines values for RecoveryIsolationBoundaryArtifactSink1Kind.
+const (
+	RecoveryIsolationBoundaryArtifactSink1KindModel RecoveryIsolationBoundaryArtifactSink1Kind = "model"
+)
+
+// Defines values for RecoveryIsolationBoundaryArtifactSink2Kind.
+const (
+	RecoveryIsolationBoundaryArtifactSink2KindArchive RecoveryIsolationBoundaryArtifactSink2Kind = "archive"
+)
+
+// Defines values for RecoveryLabeledCheckpointDomainVersion.
+const (
+	RecoveryLabeledCheckpointDomainVersionN1 RecoveryLabeledCheckpointDomainVersion = 1
+)
+
+// Defines values for RecoveryObservationControl.
+const (
+	RecoveryObservationControlActive          RecoveryObservationControl = "active"
+	RecoveryObservationControlCancelRequested RecoveryObservationControl = "cancel_requested"
+	RecoveryObservationControlCancelled       RecoveryObservationControl = "cancelled"
+	RecoveryObservationControlQuarantined     RecoveryObservationControl = "quarantined"
+)
+
+// Defines values for RecoveryObservationRelease0Kind.
+const (
+	RecoveryObservationRelease0KindNotAvailable RecoveryObservationRelease0Kind = "not_available"
+)
+
+// Defines values for RecoveryObservationRelease1Kind.
+const (
+	RecoveryObservationRelease1KindPending RecoveryObservationRelease1Kind = "pending"
+)
+
+// Defines values for RecoveryObservationRelease2Kind.
+const (
+	RecoveryObservationRelease2KindWithheld RecoveryObservationRelease2Kind = "withheld"
+)
+
+// Defines values for RecoveryObservationRelease3Kind.
+const (
+	RecoveryObservationRelease3KindReleased RecoveryObservationRelease3Kind = "released"
+)
+
+// Defines values for RecoveryObservationRelease4Kind.
+const (
+	RecoveryObservationRelease4KindDenied RecoveryObservationRelease4Kind = "denied"
+)
+
+// Defines values for RecoveryObservationSchema.
+const (
+	RecoveryObservationSchemaChioRecoveryObservationV1 RecoveryObservationSchema = "chio.recovery.observation.v1"
+)
+
+// Defines values for RecoveryObservationVersion.
+const (
+	RecoveryObservationVersionN1 RecoveryObservationVersion = 1
+)
+
+// Defines values for RecoveryObservationRecoveryEffectAdmissionUnresolvedV1Kind.
+const (
+	RecoveryObservationRecoveryEffectAdmissionUnresolvedV1KindAdmissionUnresolved RecoveryObservationRecoveryEffectAdmissionUnresolvedV1Kind = "admission_unresolved"
+)
+
+// Defines values for RecoveryObservationRecoveryEffectAwaitingApprovalV1Kind.
+const (
+	RecoveryObservationRecoveryEffectAwaitingApprovalV1KindAwaitingApproval RecoveryObservationRecoveryEffectAwaitingApprovalV1Kind = "awaiting_approval"
+)
+
+// Defines values for RecoveryObservationRecoveryEffectAwaitingCallerReportV1Kind.
+const (
+	RecoveryObservationRecoveryEffectAwaitingCallerReportV1KindAwaitingCallerReport RecoveryObservationRecoveryEffectAwaitingCallerReportV1Kind = "awaiting_caller_report"
+)
+
+// Defines values for RecoveryObservationRecoveryEffectClosedBeforeEffectV1Kind.
+const (
+	RecoveryObservationRecoveryEffectClosedBeforeEffectV1KindClosedBeforeEffect RecoveryObservationRecoveryEffectClosedBeforeEffectV1Kind = "closed_before_effect"
+)
+
+// Defines values for RecoveryObservationRecoveryEffectCompleteV1Kind.
+const (
+	RecoveryObservationRecoveryEffectCompleteV1KindComplete RecoveryObservationRecoveryEffectCompleteV1Kind = "complete"
+)
+
+// Defines values for RecoveryObservationRecoveryEffectFailedAfterEffectV1Kind.
+const (
+	RecoveryObservationRecoveryEffectFailedAfterEffectV1KindFailedAfterEffect RecoveryObservationRecoveryEffectFailedAfterEffectV1Kind = "failed_after_effect"
+)
+
+// Defines values for RecoveryObservationRecoveryEffectInFlightV1Kind.
+const (
+	RecoveryObservationRecoveryEffectInFlightV1KindInFlight RecoveryObservationRecoveryEffectInFlightV1Kind = "in_flight"
+)
+
+// Defines values for RecoveryObservationRecoveryEffectNeverAdmittedV1Kind.
+const (
+	RecoveryObservationRecoveryEffectNeverAdmittedV1KindNeverAdmitted RecoveryObservationRecoveryEffectNeverAdmittedV1Kind = "never_admitted"
+)
+
+// Defines values for RecoveryObservationRecoveryEffectPartialV1Kind.
+const (
+	RecoveryObservationRecoveryEffectPartialV1KindPartial RecoveryObservationRecoveryEffectPartialV1Kind = "partial"
+)
+
+// Defines values for RecoveryObservationRecoveryEffectUnknownV1Kind.
+const (
+	RecoveryObservationRecoveryEffectUnknownV1KindUnknown RecoveryObservationRecoveryEffectUnknownV1Kind = "unknown"
+)
+
+// Defines values for RecoveryObservationRefusalCode.
+const (
+	RecoveryObservationRefusalCodeAudienceDenied     RecoveryObservationRefusalCode = "audience_denied"
+	RecoveryObservationRefusalCodeBudgetUnavailable  RecoveryObservationRefusalCode = "budget_unavailable"
+	RecoveryObservationRefusalCodeExpired            RecoveryObservationRefusalCode = "expired"
+	RecoveryObservationRefusalCodeInvalidEvidence    RecoveryObservationRefusalCode = "invalid_evidence"
+	RecoveryObservationRefusalCodeResourceExhausted  RecoveryObservationRefusalCode = "resource_exhausted"
+	RecoveryObservationRefusalCodeRevoked            RecoveryObservationRefusalCode = "revoked"
+	RecoveryObservationRefusalCodeStaleBasis         RecoveryObservationRefusalCode = "stale_basis"
+	RecoveryObservationRefusalCodeUnknownEffect      RecoveryObservationRefusalCode = "unknown_effect"
+	RecoveryObservationRefusalCodeUnsupportedProfile RecoveryObservationRefusalCode = "unsupported_profile"
+)
+
+// Defines values for RecoveryPolicyDeploymentChangeDomainVersion.
+const (
+	RecoveryPolicyDeploymentChangeDomainVersionN1 RecoveryPolicyDeploymentChangeDomainVersion = 1
+)
+
+// Defines values for RecoveryPolicyMaintenanceProposalDomainVersion.
+const (
+	RecoveryPolicyMaintenanceProposalDomainVersionN1 RecoveryPolicyMaintenanceProposalDomainVersion = 1
+)
+
+// Defines values for RecoveryPolicyMaintenanceViewDomainVersion.
+const (
+	RecoveryPolicyMaintenanceViewDomainVersionN1 RecoveryPolicyMaintenanceViewDomainVersion = 1
+)
+
+// Defines values for RecoveryProviderFinalityAppliedEffects.
+const (
+	RecoveryProviderFinalityAppliedEffectsN1 RecoveryProviderFinalityAppliedEffects = 1
+)
+
+// Defines values for RecoveryProviderFinalityDisposition.
+const (
+	RecoveryProviderFinalityDispositionFailedAfterEffect RecoveryProviderFinalityDisposition = "failed_after_effect"
+	RecoveryProviderFinalityDispositionPartiallyApplied  RecoveryProviderFinalityDisposition = "partially_applied"
+	RecoveryProviderFinalityDispositionSucceeded         RecoveryProviderFinalityDisposition = "succeeded"
+)
+
+// Defines values for RecoveryProviderFinalitySchema.
+const (
+	RecoveryProviderFinalitySchemaChioRecoveryProviderFinalityV1 RecoveryProviderFinalitySchema = "chio.recovery.provider-finality.v1"
+)
+
+// Defines values for RecoveryProviderFinalityVersion.
+const (
+	RecoveryProviderFinalityVersionN1 RecoveryProviderFinalityVersion = 1
+)
+
+// Defines values for RecoveryRecoverySetupProbeDomainVersion.
+const (
+	RecoveryRecoverySetupProbeDomainVersionN1 RecoveryRecoverySetupProbeDomainVersion = 1
+)
+
+// Defines values for RecoveryRecoverySetupReportDomainVersion.
+const (
+	RecoveryRecoverySetupReportDomainVersionN1 RecoveryRecoverySetupReportDomainVersion = 1
+)
+
+// Defines values for RecoveryRemedyRegistrySchema.
+const (
+	RecoveryRemedyRegistrySchemaChioRecoveryRemedyRegistryV1 RecoveryRemedyRegistrySchema = "chio.recovery.remedy-registry.v1"
+)
+
+// Defines values for RecoveryRemedyRegistryTemplatesCostLatency.
+const (
+	RecoveryRemedyRegistryTemplatesCostLatencyLocal       RecoveryRemedyRegistryTemplatesCostLatency = "local"
+	RecoveryRemedyRegistryTemplatesCostLatencyRemote      RecoveryRemedyRegistryTemplatesCostLatency = "remote"
+	RecoveryRemedyRegistryTemplatesCostLatencyUnspecified RecoveryRemedyRegistryTemplatesCostLatency = "unspecified"
+)
+
+// Defines values for RecoveryRemedyRegistryTemplatesKind.
+const (
+	RecoveryRemedyRegistryTemplatesKindExactApproval       RecoveryRemedyRegistryTemplatesKind = "exact_approval"
+	RecoveryRemedyRegistryTemplatesKindExistingDestination RecoveryRemedyRegistryTemplatesKind = "existing_destination"
+	RecoveryRemedyRegistryTemplatesKindPrerequisite        RecoveryRemedyRegistryTemplatesKind = "prerequisite"
+	RecoveryRemedyRegistryTemplatesKindTransformation      RecoveryRemedyRegistryTemplatesKind = "transformation"
+)
+
+// Defines values for RecoveryRemedyRegistryVersion.
+const (
+	RecoveryRemedyRegistryVersionN1 RecoveryRemedyRegistryVersion = 1
+)
+
+// Defines values for RecoveryRemedyRegistryRecoveryEffectAdmissionUnresolvedV1Kind.
+const (
+	RecoveryRemedyRegistryRecoveryEffectAdmissionUnresolvedV1KindAdmissionUnresolved RecoveryRemedyRegistryRecoveryEffectAdmissionUnresolvedV1Kind = "admission_unresolved"
+)
+
+// Defines values for RecoveryRemedyRegistryRecoveryEffectAwaitingApprovalV1Kind.
+const (
+	RecoveryRemedyRegistryRecoveryEffectAwaitingApprovalV1KindAwaitingApproval RecoveryRemedyRegistryRecoveryEffectAwaitingApprovalV1Kind = "awaiting_approval"
+)
+
+// Defines values for RecoveryRemedyRegistryRecoveryEffectAwaitingCallerReportV1Kind.
+const (
+	RecoveryRemedyRegistryRecoveryEffectAwaitingCallerReportV1KindAwaitingCallerReport RecoveryRemedyRegistryRecoveryEffectAwaitingCallerReportV1Kind = "awaiting_caller_report"
+)
+
+// Defines values for RecoveryRemedyRegistryRecoveryEffectClosedBeforeEffectV1Kind.
+const (
+	RecoveryRemedyRegistryRecoveryEffectClosedBeforeEffectV1KindClosedBeforeEffect RecoveryRemedyRegistryRecoveryEffectClosedBeforeEffectV1Kind = "closed_before_effect"
+)
+
+// Defines values for RecoveryRemedyRegistryRecoveryEffectCompleteV1Kind.
+const (
+	RecoveryRemedyRegistryRecoveryEffectCompleteV1KindComplete RecoveryRemedyRegistryRecoveryEffectCompleteV1Kind = "complete"
+)
+
+// Defines values for RecoveryRemedyRegistryRecoveryEffectFailedAfterEffectV1Kind.
+const (
+	RecoveryRemedyRegistryRecoveryEffectFailedAfterEffectV1KindFailedAfterEffect RecoveryRemedyRegistryRecoveryEffectFailedAfterEffectV1Kind = "failed_after_effect"
+)
+
+// Defines values for RecoveryRemedyRegistryRecoveryEffectInFlightV1Kind.
+const (
+	RecoveryRemedyRegistryRecoveryEffectInFlightV1KindInFlight RecoveryRemedyRegistryRecoveryEffectInFlightV1Kind = "in_flight"
+)
+
+// Defines values for RecoveryRemedyRegistryRecoveryEffectNeverAdmittedV1Kind.
+const (
+	RecoveryRemedyRegistryRecoveryEffectNeverAdmittedV1KindNeverAdmitted RecoveryRemedyRegistryRecoveryEffectNeverAdmittedV1Kind = "never_admitted"
+)
+
+// Defines values for RecoveryRemedyRegistryRecoveryEffectPartialV1Kind.
+const (
+	RecoveryRemedyRegistryRecoveryEffectPartialV1KindPartial RecoveryRemedyRegistryRecoveryEffectPartialV1Kind = "partial"
+)
+
+// Defines values for RecoveryRemedyRegistryRecoveryEffectUnknownV1Kind.
+const (
+	RecoveryRemedyRegistryRecoveryEffectUnknownV1KindUnknown RecoveryRemedyRegistryRecoveryEffectUnknownV1Kind = "unknown"
+)
+
+// Defines values for RecoveryRemedyRegistryRefusalCode.
+const (
+	RecoveryRemedyRegistryRefusalCodeAudienceDenied     RecoveryRemedyRegistryRefusalCode = "audience_denied"
+	RecoveryRemedyRegistryRefusalCodeBudgetUnavailable  RecoveryRemedyRegistryRefusalCode = "budget_unavailable"
+	RecoveryRemedyRegistryRefusalCodeExpired            RecoveryRemedyRegistryRefusalCode = "expired"
+	RecoveryRemedyRegistryRefusalCodeInvalidEvidence    RecoveryRemedyRegistryRefusalCode = "invalid_evidence"
+	RecoveryRemedyRegistryRefusalCodeResourceExhausted  RecoveryRemedyRegistryRefusalCode = "resource_exhausted"
+	RecoveryRemedyRegistryRefusalCodeRevoked            RecoveryRemedyRegistryRefusalCode = "revoked"
+	RecoveryRemedyRegistryRefusalCodeStaleBasis         RecoveryRemedyRegistryRefusalCode = "stale_basis"
+	RecoveryRemedyRegistryRefusalCodeUnknownEffect      RecoveryRemedyRegistryRefusalCode = "unknown_effect"
+	RecoveryRemedyRegistryRefusalCodeUnsupportedProfile RecoveryRemedyRegistryRefusalCode = "unsupported_profile"
+)
+
+// Defines values for RecoveryReturnAdmissionDomainVersion.
+const (
+	RecoveryReturnAdmissionDomainVersionN1 RecoveryReturnAdmissionDomainVersion = 1
+)
+
+// Defines values for RecoveryReturnAdmissionArtifactSink0Kind.
+const (
+	RecoveryReturnAdmissionArtifactSink0KindAgent RecoveryReturnAdmissionArtifactSink0Kind = "agent"
+)
+
+// Defines values for RecoveryReturnAdmissionArtifactSink1Kind.
+const (
+	RecoveryReturnAdmissionArtifactSink1KindModel RecoveryReturnAdmissionArtifactSink1Kind = "model"
+)
+
+// Defines values for RecoveryReturnAdmissionArtifactSink2Kind.
+const (
+	RecoveryReturnAdmissionArtifactSink2KindArchive RecoveryReturnAdmissionArtifactSink2Kind = "archive"
+)
+
+// Defines values for RecoveryReturnContractChannels.
+const (
+	RecoveryReturnContractChannelsValue RecoveryReturnContractChannels = "value"
+)
+
+// Defines values for RecoveryReturnContractDomainVersion.
+const (
+	RecoveryReturnContractDomainVersionN1 RecoveryReturnContractDomainVersion = 1
+)
+
+// Defines values for RecoveryReturnContractMaxBytes.
+const (
+	RecoveryReturnContractMaxBytesN8 RecoveryReturnContractMaxBytes = 8
+)
+
+// Defines values for RecoveryReturnContractMaxValues.
+const (
+	RecoveryReturnContractMaxValuesN1 RecoveryReturnContractMaxValues = 1
+)
+
+// Defines values for RecoveryReturnContractArtifactSink0Kind.
+const (
+	RecoveryReturnContractArtifactSink0KindAgent RecoveryReturnContractArtifactSink0Kind = "agent"
+)
+
+// Defines values for RecoveryReturnContractArtifactSink1Kind.
+const (
+	RecoveryReturnContractArtifactSink1KindModel RecoveryReturnContractArtifactSink1Kind = "model"
+)
+
+// Defines values for RecoveryReturnContractArtifactSink2Kind.
+const (
+	RecoveryReturnContractArtifactSink2KindArchive RecoveryReturnContractArtifactSink2Kind = "archive"
+)
+
+// Defines values for RecoveryReviewDocumentRecoveryEffectAdmissionUnresolvedV1Kind.
+const (
+	RecoveryReviewDocumentRecoveryEffectAdmissionUnresolvedV1KindAdmissionUnresolved RecoveryReviewDocumentRecoveryEffectAdmissionUnresolvedV1Kind = "admission_unresolved"
+)
+
+// Defines values for RecoveryReviewDocumentRecoveryEffectAwaitingApprovalV1Kind.
+const (
+	RecoveryReviewDocumentRecoveryEffectAwaitingApprovalV1KindAwaitingApproval RecoveryReviewDocumentRecoveryEffectAwaitingApprovalV1Kind = "awaiting_approval"
+)
+
+// Defines values for RecoveryReviewDocumentRecoveryEffectAwaitingCallerReportV1Kind.
+const (
+	RecoveryReviewDocumentRecoveryEffectAwaitingCallerReportV1KindAwaitingCallerReport RecoveryReviewDocumentRecoveryEffectAwaitingCallerReportV1Kind = "awaiting_caller_report"
+)
+
+// Defines values for RecoveryReviewDocumentRecoveryEffectClosedBeforeEffectV1Kind.
+const (
+	RecoveryReviewDocumentRecoveryEffectClosedBeforeEffectV1KindClosedBeforeEffect RecoveryReviewDocumentRecoveryEffectClosedBeforeEffectV1Kind = "closed_before_effect"
+)
+
+// Defines values for RecoveryReviewDocumentRecoveryEffectCompleteV1Kind.
+const (
+	RecoveryReviewDocumentRecoveryEffectCompleteV1KindComplete RecoveryReviewDocumentRecoveryEffectCompleteV1Kind = "complete"
+)
+
+// Defines values for RecoveryReviewDocumentRecoveryEffectFailedAfterEffectV1Kind.
+const (
+	RecoveryReviewDocumentRecoveryEffectFailedAfterEffectV1KindFailedAfterEffect RecoveryReviewDocumentRecoveryEffectFailedAfterEffectV1Kind = "failed_after_effect"
+)
+
+// Defines values for RecoveryReviewDocumentRecoveryEffectInFlightV1Kind.
+const (
+	RecoveryReviewDocumentRecoveryEffectInFlightV1KindInFlight RecoveryReviewDocumentRecoveryEffectInFlightV1Kind = "in_flight"
+)
+
+// Defines values for RecoveryReviewDocumentRecoveryEffectNeverAdmittedV1Kind.
+const (
+	RecoveryReviewDocumentRecoveryEffectNeverAdmittedV1KindNeverAdmitted RecoveryReviewDocumentRecoveryEffectNeverAdmittedV1Kind = "never_admitted"
+)
+
+// Defines values for RecoveryReviewDocumentRecoveryEffectPartialV1Kind.
+const (
+	RecoveryReviewDocumentRecoveryEffectPartialV1KindPartial RecoveryReviewDocumentRecoveryEffectPartialV1Kind = "partial"
+)
+
+// Defines values for RecoveryReviewDocumentRecoveryEffectUnknownV1Kind.
+const (
+	RecoveryReviewDocumentRecoveryEffectUnknownV1KindUnknown RecoveryReviewDocumentRecoveryEffectUnknownV1Kind = "unknown"
+)
+
+// Defines values for RecoveryReviewDocumentRefusalCode.
+const (
+	RecoveryReviewDocumentRefusalCodeAudienceDenied     RecoveryReviewDocumentRefusalCode = "audience_denied"
+	RecoveryReviewDocumentRefusalCodeBudgetUnavailable  RecoveryReviewDocumentRefusalCode = "budget_unavailable"
+	RecoveryReviewDocumentRefusalCodeExpired            RecoveryReviewDocumentRefusalCode = "expired"
+	RecoveryReviewDocumentRefusalCodeInvalidEvidence    RecoveryReviewDocumentRefusalCode = "invalid_evidence"
+	RecoveryReviewDocumentRefusalCodeResourceExhausted  RecoveryReviewDocumentRefusalCode = "resource_exhausted"
+	RecoveryReviewDocumentRefusalCodeRevoked            RecoveryReviewDocumentRefusalCode = "revoked"
+	RecoveryReviewDocumentRefusalCodeStaleBasis         RecoveryReviewDocumentRefusalCode = "stale_basis"
+	RecoveryReviewDocumentRefusalCodeUnknownEffect      RecoveryReviewDocumentRefusalCode = "unknown_effect"
+	RecoveryReviewDocumentRefusalCodeUnsupportedProfile RecoveryReviewDocumentRefusalCode = "unsupported_profile"
+)
+
+// Defines values for RecoveryReviewRequestRecoveryEffectAdmissionUnresolvedV1Kind.
+const (
+	RecoveryReviewRequestRecoveryEffectAdmissionUnresolvedV1KindAdmissionUnresolved RecoveryReviewRequestRecoveryEffectAdmissionUnresolvedV1Kind = "admission_unresolved"
+)
+
+// Defines values for RecoveryReviewRequestRecoveryEffectAwaitingApprovalV1Kind.
+const (
+	RecoveryReviewRequestRecoveryEffectAwaitingApprovalV1KindAwaitingApproval RecoveryReviewRequestRecoveryEffectAwaitingApprovalV1Kind = "awaiting_approval"
+)
+
+// Defines values for RecoveryReviewRequestRecoveryEffectAwaitingCallerReportV1Kind.
+const (
+	RecoveryReviewRequestRecoveryEffectAwaitingCallerReportV1KindAwaitingCallerReport RecoveryReviewRequestRecoveryEffectAwaitingCallerReportV1Kind = "awaiting_caller_report"
+)
+
+// Defines values for RecoveryReviewRequestRecoveryEffectClosedBeforeEffectV1Kind.
+const (
+	RecoveryReviewRequestRecoveryEffectClosedBeforeEffectV1KindClosedBeforeEffect RecoveryReviewRequestRecoveryEffectClosedBeforeEffectV1Kind = "closed_before_effect"
+)
+
+// Defines values for RecoveryReviewRequestRecoveryEffectCompleteV1Kind.
+const (
+	RecoveryReviewRequestRecoveryEffectCompleteV1KindComplete RecoveryReviewRequestRecoveryEffectCompleteV1Kind = "complete"
+)
+
+// Defines values for RecoveryReviewRequestRecoveryEffectFailedAfterEffectV1Kind.
+const (
+	RecoveryReviewRequestRecoveryEffectFailedAfterEffectV1KindFailedAfterEffect RecoveryReviewRequestRecoveryEffectFailedAfterEffectV1Kind = "failed_after_effect"
+)
+
+// Defines values for RecoveryReviewRequestRecoveryEffectInFlightV1Kind.
+const (
+	RecoveryReviewRequestRecoveryEffectInFlightV1KindInFlight RecoveryReviewRequestRecoveryEffectInFlightV1Kind = "in_flight"
+)
+
+// Defines values for RecoveryReviewRequestRecoveryEffectNeverAdmittedV1Kind.
+const (
+	RecoveryReviewRequestRecoveryEffectNeverAdmittedV1KindNeverAdmitted RecoveryReviewRequestRecoveryEffectNeverAdmittedV1Kind = "never_admitted"
+)
+
+// Defines values for RecoveryReviewRequestRecoveryEffectPartialV1Kind.
+const (
+	RecoveryReviewRequestRecoveryEffectPartialV1KindPartial RecoveryReviewRequestRecoveryEffectPartialV1Kind = "partial"
+)
+
+// Defines values for RecoveryReviewRequestRecoveryEffectUnknownV1Kind.
+const (
+	RecoveryReviewRequestRecoveryEffectUnknownV1KindUnknown RecoveryReviewRequestRecoveryEffectUnknownV1Kind = "unknown"
+)
+
+// Defines values for RecoveryReviewRequestRefusalCode.
+const (
+	RecoveryReviewRequestRefusalCodeAudienceDenied     RecoveryReviewRequestRefusalCode = "audience_denied"
+	RecoveryReviewRequestRefusalCodeBudgetUnavailable  RecoveryReviewRequestRefusalCode = "budget_unavailable"
+	RecoveryReviewRequestRefusalCodeExpired            RecoveryReviewRequestRefusalCode = "expired"
+	RecoveryReviewRequestRefusalCodeInvalidEvidence    RecoveryReviewRequestRefusalCode = "invalid_evidence"
+	RecoveryReviewRequestRefusalCodeResourceExhausted  RecoveryReviewRequestRefusalCode = "resource_exhausted"
+	RecoveryReviewRequestRefusalCodeRevoked            RecoveryReviewRequestRefusalCode = "revoked"
+	RecoveryReviewRequestRefusalCodeStaleBasis         RecoveryReviewRequestRefusalCode = "stale_basis"
+	RecoveryReviewRequestRefusalCodeUnknownEffect      RecoveryReviewRequestRefusalCode = "unknown_effect"
+	RecoveryReviewRequestRefusalCodeUnsupportedProfile RecoveryReviewRequestRefusalCode = "unsupported_profile"
+)
+
+// Defines values for RecoveryScopedEndorsementDomainVersion.
+const (
+	RecoveryScopedEndorsementDomainVersionN1 RecoveryScopedEndorsementDomainVersion = 1
+)
+
+// Defines values for RecoveryScopedEndorsementTarget0Kind.
+const (
+	RecoveryScopedEndorsementTarget0KindExactAction RecoveryScopedEndorsementTarget0Kind = "exact_action"
+)
+
+// Defines values for RecoveryScopedEndorsementTarget1Kind.
+const (
+	RecoveryScopedEndorsementTarget1KindPersistentArtifact RecoveryScopedEndorsementTarget1Kind = "persistent_artifact"
+)
+
+// Defines values for RecoverySemanticActionDomainVersion.
+const (
+	RecoverySemanticActionDomainVersionN1 RecoverySemanticActionDomainVersion = 1
+)
+
+// Defines values for RecoverySemanticActionOutput.
+const (
+	RecoverySemanticActionOutputReturnValue RecoverySemanticActionOutput = "return_value"
+	RecoverySemanticActionOutputWithhold    RecoverySemanticActionOutput = "withhold"
+)
+
+// Defines values for RecoverySemanticAnnotationDomainVersion.
+const (
+	RecoverySemanticAnnotationDomainVersionN1 RecoverySemanticAnnotationDomainVersion = 1
+)
+
+// Defines values for RecoverySemanticAudienceCompleteness.
+const (
+	RecoverySemanticAudienceCompletenessAmbiguous   RecoverySemanticAudienceCompleteness = "ambiguous"
+	RecoverySemanticAudienceCompletenessComplete    RecoverySemanticAudienceCompleteness = "complete"
+	RecoverySemanticAudienceCompletenessOutage      RecoverySemanticAudienceCompleteness = "outage"
+	RecoverySemanticAudienceCompletenessPartial     RecoverySemanticAudienceCompleteness = "partial"
+	RecoverySemanticAudienceCompletenessRateLimited RecoverySemanticAudienceCompleteness = "rate_limited"
+)
+
+// Defines values for RecoverySemanticAudienceDomainVersion.
+const (
+	RecoverySemanticAudienceDomainVersionN1 RecoverySemanticAudienceDomainVersion = 1
+)
+
+// Defines values for RecoverySemanticAudiencePaginationCursor.
+const (
+	RecoverySemanticAudiencePaginationCursorComplete RecoverySemanticAudiencePaginationCursor = "complete"
+	RecoverySemanticAudiencePaginationCursorPending  RecoverySemanticAudiencePaginationCursor = "pending"
+)
+
+// Defines values for RecoverySemanticDeploymentDomainVersion.
+const (
+	RecoverySemanticDeploymentDomainVersionN1 RecoverySemanticDeploymentDomainVersion = 1
+)
+
+// Defines values for RecoverySemanticDeploymentSemanticSelector0Kind.
+const (
+	RecoverySemanticDeploymentSemanticSelector0KindPresent RecoverySemanticDeploymentSemanticSelector0Kind = "present"
+)
+
+// Defines values for RecoverySemanticDeploymentSemanticSelector1Kind.
+const (
+	RecoverySemanticDeploymentSemanticSelector1KindEquals RecoverySemanticDeploymentSemanticSelector1Kind = "equals"
+)
+
+// Defines values for RecoverySemanticDeploymentSemanticSelector2Kind.
+const (
+	RecoverySemanticDeploymentSemanticSelector2KindTextBytesAtMost RecoverySemanticDeploymentSemanticSelector2Kind = "text_bytes_at_most"
+)
+
+// Defines values for RecoverySemanticDeploymentSemanticValue0Kind.
+const (
+	RecoverySemanticDeploymentSemanticValue0KindText RecoverySemanticDeploymentSemanticValue0Kind = "text"
+)
+
+// Defines values for RecoverySemanticDeploymentSemanticValue1Kind.
+const (
+	RecoverySemanticDeploymentSemanticValue1KindInteger RecoverySemanticDeploymentSemanticValue1Kind = "integer"
+)
+
+// Defines values for RecoverySemanticDeploymentSemanticValue2Kind.
+const (
+	RecoverySemanticDeploymentSemanticValue2KindBoolean RecoverySemanticDeploymentSemanticValue2Kind = "boolean"
+)
+
+// Defines values for RecoverySemanticInvocationSchema.
+const (
+	RecoverySemanticInvocationSchemaChioSemanticInvocationV1 RecoverySemanticInvocationSchema = "chio.semantic.invocation.v1"
+)
+
+// Defines values for RecoverySemanticPackageDomainVersion.
+const (
+	RecoverySemanticPackageDomainVersionN1 RecoverySemanticPackageDomainVersion = 1
+)
+
+// Defines values for RecoverySemanticPackageSemanticChannelChannel.
+const (
+	RecoverySemanticPackageSemanticChannelChannelBatch      RecoverySemanticPackageSemanticChannelChannel = "batch"
+	RecoverySemanticPackageSemanticChannelChannelError      RecoverySemanticPackageSemanticChannelChannel = "error"
+	RecoverySemanticPackageSemanticChannelChannelFile       RecoverySemanticPackageSemanticChannelChannel = "file"
+	RecoverySemanticPackageSemanticChannelChannelInput      RecoverySemanticPackageSemanticChannelChannel = "input"
+	RecoverySemanticPackageSemanticChannelChannelLog        RecoverySemanticPackageSemanticChannelChannel = "log"
+	RecoverySemanticPackageSemanticChannelChannelModel      RecoverySemanticPackageSemanticChannelChannel = "model"
+	RecoverySemanticPackageSemanticChannelChannelNested     RecoverySemanticPackageSemanticChannelChannel = "nested"
+	RecoverySemanticPackageSemanticChannelChannelNoValue    RecoverySemanticPackageSemanticChannelChannel = "no_value"
+	RecoverySemanticPackageSemanticChannelChannelPagination RecoverySemanticPackageSemanticChannelChannel = "pagination"
+	RecoverySemanticPackageSemanticChannelChannelRedirect   RecoverySemanticPackageSemanticChannelChannel = "redirect"
+	RecoverySemanticPackageSemanticChannelChannelShell      RecoverySemanticPackageSemanticChannelChannel = "shell"
+	RecoverySemanticPackageSemanticChannelChannelStream     RecoverySemanticPackageSemanticChannelChannel = "stream"
+	RecoverySemanticPackageSemanticChannelChannelSuccess    RecoverySemanticPackageSemanticChannelChannel = "success"
+)
+
+// Defines values for RecoverySemanticPackageSemanticOperationKind.
+const (
+	RecoverySemanticPackageSemanticOperationKindFieldProjection RecoverySemanticPackageSemanticOperationKind = "field_projection"
+	RecoverySemanticPackageSemanticOperationKindIssueWrite      RecoverySemanticPackageSemanticOperationKind = "issue_write"
+	RecoverySemanticPackageSemanticOperationKindSupportRead     RecoverySemanticPackageSemanticOperationKind = "support_read"
+)
+
+// Defines values for RecoverySemanticPackageSemanticPrerequisiteRequirementKind.
+const (
+	RecoverySemanticPackageSemanticPrerequisiteRequirementKindCurrentPredicate RecoverySemanticPackageSemanticPrerequisiteRequirementKind = "current_predicate"
+	RecoverySemanticPackageSemanticPrerequisiteRequirementKindHeldReservation  RecoverySemanticPackageSemanticPrerequisiteRequirementKind = "held_reservation"
+	RecoverySemanticPackageSemanticPrerequisiteRequirementKindHistoricalFact   RecoverySemanticPackageSemanticPrerequisiteRequirementKind = "historical_fact"
+)
+
+// Defines values for RecoverySemanticPackageSemanticSelector0Kind.
+const (
+	RecoverySemanticPackageSemanticSelector0KindPresent RecoverySemanticPackageSemanticSelector0Kind = "present"
+)
+
+// Defines values for RecoverySemanticPackageSemanticSelector1Kind.
+const (
+	RecoverySemanticPackageSemanticSelector1KindEquals RecoverySemanticPackageSemanticSelector1Kind = "equals"
+)
+
+// Defines values for RecoverySemanticPackageSemanticSelector2Kind.
+const (
+	RecoverySemanticPackageSemanticSelector2KindTextBytesAtMost RecoverySemanticPackageSemanticSelector2Kind = "text_bytes_at_most"
+)
+
+// Defines values for RecoverySemanticPackageSemanticValue0Kind.
+const (
+	RecoverySemanticPackageSemanticValue0KindText RecoverySemanticPackageSemanticValue0Kind = "text"
+)
+
+// Defines values for RecoverySemanticPackageSemanticValue1Kind.
+const (
+	RecoverySemanticPackageSemanticValue1KindInteger RecoverySemanticPackageSemanticValue1Kind = "integer"
+)
+
+// Defines values for RecoverySemanticPackageSemanticValue2Kind.
+const (
+	RecoverySemanticPackageSemanticValue2KindBoolean RecoverySemanticPackageSemanticValue2Kind = "boolean"
+)
+
+// Defines values for RecoverySemanticPayloadSemanticValue0Kind.
+const (
+	RecoverySemanticPayloadSemanticValue0KindText RecoverySemanticPayloadSemanticValue0Kind = "text"
+)
+
+// Defines values for RecoverySemanticPayloadSemanticValue1Kind.
+const (
+	RecoverySemanticPayloadSemanticValue1KindInteger RecoverySemanticPayloadSemanticValue1Kind = "integer"
+)
+
+// Defines values for RecoverySemanticPayloadSemanticValue2Kind.
+const (
+	RecoverySemanticPayloadSemanticValue2KindBoolean RecoverySemanticPayloadSemanticValue2Kind = "boolean"
+)
+
+// Defines values for RecoverySemanticPlanDomainVersion.
+const (
+	RecoverySemanticPlanDomainVersionN1 RecoverySemanticPlanDomainVersion = 1
+)
+
+// Defines values for RecoverySemanticPlanSemanticPlanInput0Kind.
+const (
+	RecoverySemanticPlanSemanticPlanInput0KindExact RecoverySemanticPlanSemanticPlanInput0Kind = "exact"
+)
+
+// Defines values for RecoverySemanticPlanSemanticPlanInput1Kind.
+const (
+	RecoverySemanticPlanSemanticPlanInput1KindFutureOutput RecoverySemanticPlanSemanticPlanInput1Kind = "future_output"
+)
+
+// Defines values for RecoverySemanticPlanSemanticPlanStepOutput.
+const (
+	RecoverySemanticPlanSemanticPlanStepOutputReturnValue RecoverySemanticPlanSemanticPlanStepOutput = "return_value"
+	RecoverySemanticPlanSemanticPlanStepOutputWithhold    RecoverySemanticPlanSemanticPlanStepOutput = "withhold"
+)
+
+// Defines values for RecoverySemanticPrerequisiteDomainVersion.
+const (
+	RecoverySemanticPrerequisiteDomainVersionN1 RecoverySemanticPrerequisiteDomainVersion = 1
+)
+
+// Defines values for RecoverySemanticPrerequisiteKind.
+const (
+	RecoverySemanticPrerequisiteKindCurrentPredicate RecoverySemanticPrerequisiteKind = "current_predicate"
+	RecoverySemanticPrerequisiteKindHeldReservation  RecoverySemanticPrerequisiteKind = "held_reservation"
+	RecoverySemanticPrerequisiteKindHistoricalFact   RecoverySemanticPrerequisiteKind = "historical_fact"
+)
+
+// Defines values for RecoverySemanticProviderRequestDomainVersion.
+const (
+	RecoverySemanticProviderRequestDomainVersionN1 RecoverySemanticProviderRequestDomainVersion = 1
+)
+
+// Defines values for RecoverySemanticProviderRequestKind.
+const (
+	RecoverySemanticProviderRequestKindFieldProjection RecoverySemanticProviderRequestKind = "field_projection"
+	RecoverySemanticProviderRequestKindIssueWrite      RecoverySemanticProviderRequestKind = "issue_write"
+	RecoverySemanticProviderRequestKindSupportRead     RecoverySemanticProviderRequestKind = "support_read"
+)
+
+// Defines values for RecoverySemanticTransformationDisposition.
+const (
+	RecoverySemanticTransformationDispositionReturnValue RecoverySemanticTransformationDisposition = "return_value"
+	RecoverySemanticTransformationDispositionWithhold    RecoverySemanticTransformationDisposition = "withhold"
+)
+
+// Defines values for RecoverySemanticTransformationDomainVersion.
+const (
+	RecoverySemanticTransformationDomainVersionN1 RecoverySemanticTransformationDomainVersion = 1
+)
+
+// Defines values for RecoverySignedArtifactArchiveManifestAlgorithm.
+const (
+	RecoverySignedArtifactArchiveManifestAlgorithmEd25519 RecoverySignedArtifactArchiveManifestAlgorithm = "ed25519"
+	RecoverySignedArtifactArchiveManifestAlgorithmHybrid  RecoverySignedArtifactArchiveManifestAlgorithm = "hybrid"
+	RecoverySignedArtifactArchiveManifestAlgorithmP256    RecoverySignedArtifactArchiveManifestAlgorithm = "p256"
+	RecoverySignedArtifactArchiveManifestAlgorithmP384    RecoverySignedArtifactArchiveManifestAlgorithm = "p384"
+)
+
+// Defines values for RecoverySignedArtifactCertificateAlgorithm.
+const (
+	RecoverySignedArtifactCertificateAlgorithmEd25519 RecoverySignedArtifactCertificateAlgorithm = "ed25519"
+	RecoverySignedArtifactCertificateAlgorithmHybrid  RecoverySignedArtifactCertificateAlgorithm = "hybrid"
+	RecoverySignedArtifactCertificateAlgorithmP256    RecoverySignedArtifactCertificateAlgorithm = "p256"
+	RecoverySignedArtifactCertificateAlgorithmP384    RecoverySignedArtifactCertificateAlgorithm = "p384"
+)
+
+// Defines values for RecoverySignedAuthorityCoverageAlgorithm.
+const (
+	RecoverySignedAuthorityCoverageAlgorithmEd25519 RecoverySignedAuthorityCoverageAlgorithm = "ed25519"
+	RecoverySignedAuthorityCoverageAlgorithmHybrid  RecoverySignedAuthorityCoverageAlgorithm = "hybrid"
+	RecoverySignedAuthorityCoverageAlgorithmP256    RecoverySignedAuthorityCoverageAlgorithm = "p256"
+	RecoverySignedAuthorityCoverageAlgorithmP384    RecoverySignedAuthorityCoverageAlgorithm = "p384"
+)
+
+// Defines values for RecoverySignedConfinedDisclosureAlgorithm.
+const (
+	RecoverySignedConfinedDisclosureAlgorithmEd25519 RecoverySignedConfinedDisclosureAlgorithm = "ed25519"
+	RecoverySignedConfinedDisclosureAlgorithmHybrid  RecoverySignedConfinedDisclosureAlgorithm = "hybrid"
+	RecoverySignedConfinedDisclosureAlgorithmP256    RecoverySignedConfinedDisclosureAlgorithm = "p256"
+	RecoverySignedConfinedDisclosureAlgorithmP384    RecoverySignedConfinedDisclosureAlgorithm = "p384"
+)
+
+// Defines values for RecoverySignedConfinedDisclosureArtifactSink0Kind.
+const (
+	RecoverySignedConfinedDisclosureArtifactSink0KindAgent RecoverySignedConfinedDisclosureArtifactSink0Kind = "agent"
+)
+
+// Defines values for RecoverySignedConfinedDisclosureArtifactSink1Kind.
+const (
+	RecoverySignedConfinedDisclosureArtifactSink1KindModel RecoverySignedConfinedDisclosureArtifactSink1Kind = "model"
+)
+
+// Defines values for RecoverySignedConfinedDisclosureArtifactSink2Kind.
+const (
+	RecoverySignedConfinedDisclosureArtifactSink2KindArchive RecoverySignedConfinedDisclosureArtifactSink2Kind = "archive"
+)
+
+// Defines values for RecoverySignedConfinedEndorsementAlgorithm.
+const (
+	RecoverySignedConfinedEndorsementAlgorithmEd25519 RecoverySignedConfinedEndorsementAlgorithm = "ed25519"
+	RecoverySignedConfinedEndorsementAlgorithmHybrid  RecoverySignedConfinedEndorsementAlgorithm = "hybrid"
+	RecoverySignedConfinedEndorsementAlgorithmP256    RecoverySignedConfinedEndorsementAlgorithm = "p256"
+	RecoverySignedConfinedEndorsementAlgorithmP384    RecoverySignedConfinedEndorsementAlgorithm = "p384"
+)
+
+// Defines values for RecoverySignedConfinedEndorsementArtifactSink0Kind.
+const (
+	RecoverySignedConfinedEndorsementArtifactSink0KindAgent RecoverySignedConfinedEndorsementArtifactSink0Kind = "agent"
+)
+
+// Defines values for RecoverySignedConfinedEndorsementArtifactSink1Kind.
+const (
+	RecoverySignedConfinedEndorsementArtifactSink1KindModel RecoverySignedConfinedEndorsementArtifactSink1Kind = "model"
+)
+
+// Defines values for RecoverySignedConfinedEndorsementArtifactSink2Kind.
+const (
+	RecoverySignedConfinedEndorsementArtifactSink2KindArchive RecoverySignedConfinedEndorsementArtifactSink2Kind = "archive"
+)
+
+// Defines values for RecoverySignedExplanationReportAlgorithm.
+const (
+	RecoverySignedExplanationReportAlgorithmEd25519 RecoverySignedExplanationReportAlgorithm = "ed25519"
+	RecoverySignedExplanationReportAlgorithmHybrid  RecoverySignedExplanationReportAlgorithm = "hybrid"
+	RecoverySignedExplanationReportAlgorithmP256    RecoverySignedExplanationReportAlgorithm = "p256"
+	RecoverySignedExplanationReportAlgorithmP384    RecoverySignedExplanationReportAlgorithm = "p384"
+)
+
+// Defines values for RecoverySignedExplanationReportRecoveryEffectAdmissionUnresolvedV1Kind.
+const (
+	RecoverySignedExplanationReportRecoveryEffectAdmissionUnresolvedV1KindAdmissionUnresolved RecoverySignedExplanationReportRecoveryEffectAdmissionUnresolvedV1Kind = "admission_unresolved"
+)
+
+// Defines values for RecoverySignedExplanationReportRecoveryEffectAwaitingApprovalV1Kind.
+const (
+	RecoverySignedExplanationReportRecoveryEffectAwaitingApprovalV1KindAwaitingApproval RecoverySignedExplanationReportRecoveryEffectAwaitingApprovalV1Kind = "awaiting_approval"
+)
+
+// Defines values for RecoverySignedExplanationReportRecoveryEffectAwaitingCallerReportV1Kind.
+const (
+	RecoverySignedExplanationReportRecoveryEffectAwaitingCallerReportV1KindAwaitingCallerReport RecoverySignedExplanationReportRecoveryEffectAwaitingCallerReportV1Kind = "awaiting_caller_report"
+)
+
+// Defines values for RecoverySignedExplanationReportRecoveryEffectClosedBeforeEffectV1Kind.
+const (
+	RecoverySignedExplanationReportRecoveryEffectClosedBeforeEffectV1KindClosedBeforeEffect RecoverySignedExplanationReportRecoveryEffectClosedBeforeEffectV1Kind = "closed_before_effect"
+)
+
+// Defines values for RecoverySignedExplanationReportRecoveryEffectCompleteV1Kind.
+const (
+	RecoverySignedExplanationReportRecoveryEffectCompleteV1KindComplete RecoverySignedExplanationReportRecoveryEffectCompleteV1Kind = "complete"
+)
+
+// Defines values for RecoverySignedExplanationReportRecoveryEffectFailedAfterEffectV1Kind.
+const (
+	RecoverySignedExplanationReportRecoveryEffectFailedAfterEffectV1KindFailedAfterEffect RecoverySignedExplanationReportRecoveryEffectFailedAfterEffectV1Kind = "failed_after_effect"
+)
+
+// Defines values for RecoverySignedExplanationReportRecoveryEffectInFlightV1Kind.
+const (
+	RecoverySignedExplanationReportRecoveryEffectInFlightV1KindInFlight RecoverySignedExplanationReportRecoveryEffectInFlightV1Kind = "in_flight"
+)
+
+// Defines values for RecoverySignedExplanationReportRecoveryEffectNeverAdmittedV1Kind.
+const (
+	RecoverySignedExplanationReportRecoveryEffectNeverAdmittedV1KindNeverAdmitted RecoverySignedExplanationReportRecoveryEffectNeverAdmittedV1Kind = "never_admitted"
+)
+
+// Defines values for RecoverySignedExplanationReportRecoveryEffectPartialV1Kind.
+const (
+	RecoverySignedExplanationReportRecoveryEffectPartialV1KindPartial RecoverySignedExplanationReportRecoveryEffectPartialV1Kind = "partial"
+)
+
+// Defines values for RecoverySignedExplanationReportRecoveryEffectUnknownV1Kind.
+const (
+	RecoverySignedExplanationReportRecoveryEffectUnknownV1KindUnknown RecoverySignedExplanationReportRecoveryEffectUnknownV1Kind = "unknown"
+)
+
+// Defines values for RecoverySignedExplanationReportRefusalCode.
+const (
+	RecoverySignedExplanationReportRefusalCodeAudienceDenied     RecoverySignedExplanationReportRefusalCode = "audience_denied"
+	RecoverySignedExplanationReportRefusalCodeBudgetUnavailable  RecoverySignedExplanationReportRefusalCode = "budget_unavailable"
+	RecoverySignedExplanationReportRefusalCodeExpired            RecoverySignedExplanationReportRefusalCode = "expired"
+	RecoverySignedExplanationReportRefusalCodeInvalidEvidence    RecoverySignedExplanationReportRefusalCode = "invalid_evidence"
+	RecoverySignedExplanationReportRefusalCodeResourceExhausted  RecoverySignedExplanationReportRefusalCode = "resource_exhausted"
+	RecoverySignedExplanationReportRefusalCodeRevoked            RecoverySignedExplanationReportRefusalCode = "revoked"
+	RecoverySignedExplanationReportRefusalCodeStaleBasis         RecoverySignedExplanationReportRefusalCode = "stale_basis"
+	RecoverySignedExplanationReportRefusalCodeUnknownEffect      RecoverySignedExplanationReportRefusalCode = "unknown_effect"
+	RecoverySignedExplanationReportRefusalCodeUnsupportedProfile RecoverySignedExplanationReportRefusalCode = "unsupported_profile"
+)
+
+// Defines values for RecoverySignedExplanationViewAlgorithm.
+const (
+	RecoverySignedExplanationViewAlgorithmEd25519 RecoverySignedExplanationViewAlgorithm = "ed25519"
+	RecoverySignedExplanationViewAlgorithmHybrid  RecoverySignedExplanationViewAlgorithm = "hybrid"
+	RecoverySignedExplanationViewAlgorithmP256    RecoverySignedExplanationViewAlgorithm = "p256"
+	RecoverySignedExplanationViewAlgorithmP384    RecoverySignedExplanationViewAlgorithm = "p384"
+)
+
+// Defines values for RecoverySignedExplanationViewRecoveryEffectAdmissionUnresolvedV1Kind.
+const (
+	RecoverySignedExplanationViewRecoveryEffectAdmissionUnresolvedV1KindAdmissionUnresolved RecoverySignedExplanationViewRecoveryEffectAdmissionUnresolvedV1Kind = "admission_unresolved"
+)
+
+// Defines values for RecoverySignedExplanationViewRecoveryEffectAwaitingApprovalV1Kind.
+const (
+	RecoverySignedExplanationViewRecoveryEffectAwaitingApprovalV1KindAwaitingApproval RecoverySignedExplanationViewRecoveryEffectAwaitingApprovalV1Kind = "awaiting_approval"
+)
+
+// Defines values for RecoverySignedExplanationViewRecoveryEffectAwaitingCallerReportV1Kind.
+const (
+	RecoverySignedExplanationViewRecoveryEffectAwaitingCallerReportV1KindAwaitingCallerReport RecoverySignedExplanationViewRecoveryEffectAwaitingCallerReportV1Kind = "awaiting_caller_report"
+)
+
+// Defines values for RecoverySignedExplanationViewRecoveryEffectClosedBeforeEffectV1Kind.
+const (
+	RecoverySignedExplanationViewRecoveryEffectClosedBeforeEffectV1KindClosedBeforeEffect RecoverySignedExplanationViewRecoveryEffectClosedBeforeEffectV1Kind = "closed_before_effect"
+)
+
+// Defines values for RecoverySignedExplanationViewRecoveryEffectCompleteV1Kind.
+const (
+	RecoverySignedExplanationViewRecoveryEffectCompleteV1KindComplete RecoverySignedExplanationViewRecoveryEffectCompleteV1Kind = "complete"
+)
+
+// Defines values for RecoverySignedExplanationViewRecoveryEffectFailedAfterEffectV1Kind.
+const (
+	RecoverySignedExplanationViewRecoveryEffectFailedAfterEffectV1KindFailedAfterEffect RecoverySignedExplanationViewRecoveryEffectFailedAfterEffectV1Kind = "failed_after_effect"
+)
+
+// Defines values for RecoverySignedExplanationViewRecoveryEffectInFlightV1Kind.
+const (
+	RecoverySignedExplanationViewRecoveryEffectInFlightV1KindInFlight RecoverySignedExplanationViewRecoveryEffectInFlightV1Kind = "in_flight"
+)
+
+// Defines values for RecoverySignedExplanationViewRecoveryEffectNeverAdmittedV1Kind.
+const (
+	RecoverySignedExplanationViewRecoveryEffectNeverAdmittedV1KindNeverAdmitted RecoverySignedExplanationViewRecoveryEffectNeverAdmittedV1Kind = "never_admitted"
+)
+
+// Defines values for RecoverySignedExplanationViewRecoveryEffectPartialV1Kind.
+const (
+	RecoverySignedExplanationViewRecoveryEffectPartialV1KindPartial RecoverySignedExplanationViewRecoveryEffectPartialV1Kind = "partial"
+)
+
+// Defines values for RecoverySignedExplanationViewRecoveryEffectUnknownV1Kind.
+const (
+	RecoverySignedExplanationViewRecoveryEffectUnknownV1KindUnknown RecoverySignedExplanationViewRecoveryEffectUnknownV1Kind = "unknown"
+)
+
+// Defines values for RecoverySignedExplanationViewRefusalCode.
+const (
+	RecoverySignedExplanationViewRefusalCodeAudienceDenied     RecoverySignedExplanationViewRefusalCode = "audience_denied"
+	RecoverySignedExplanationViewRefusalCodeBudgetUnavailable  RecoverySignedExplanationViewRefusalCode = "budget_unavailable"
+	RecoverySignedExplanationViewRefusalCodeExpired            RecoverySignedExplanationViewRefusalCode = "expired"
+	RecoverySignedExplanationViewRefusalCodeInvalidEvidence    RecoverySignedExplanationViewRefusalCode = "invalid_evidence"
+	RecoverySignedExplanationViewRefusalCodeResourceExhausted  RecoverySignedExplanationViewRefusalCode = "resource_exhausted"
+	RecoverySignedExplanationViewRefusalCodeRevoked            RecoverySignedExplanationViewRefusalCode = "revoked"
+	RecoverySignedExplanationViewRefusalCodeStaleBasis         RecoverySignedExplanationViewRefusalCode = "stale_basis"
+	RecoverySignedExplanationViewRefusalCodeUnknownEffect      RecoverySignedExplanationViewRefusalCode = "unknown_effect"
+	RecoverySignedExplanationViewRefusalCodeUnsupportedProfile RecoverySignedExplanationViewRefusalCode = "unsupported_profile"
+)
+
+// Defines values for RecoverySignedGrantV2Algorithm.
+const (
+	RecoverySignedGrantV2AlgorithmEd25519 RecoverySignedGrantV2Algorithm = "ed25519"
+	RecoverySignedGrantV2AlgorithmHybrid  RecoverySignedGrantV2Algorithm = "hybrid"
+	RecoverySignedGrantV2AlgorithmP256    RecoverySignedGrantV2Algorithm = "p256"
+	RecoverySignedGrantV2AlgorithmP384    RecoverySignedGrantV2Algorithm = "p384"
+)
+
+// Defines values for RecoverySignedGrantV2BodyDomainVersion.
+const (
+	RecoverySignedGrantV2BodyDomainVersionN2 RecoverySignedGrantV2BodyDomainVersion = 2
+)
+
+// Defines values for RecoverySignedGrantV2BodySchema.
+const (
+	RecoverySignedGrantV2BodySchemaChioDeclassificationGrantV2 RecoverySignedGrantV2BodySchema = "chio.declassification-grant.v2"
+)
+
+// Defines values for RecoverySignedPolicyDeploymentChangeAlgorithm.
+const (
+	RecoverySignedPolicyDeploymentChangeAlgorithmEd25519 RecoverySignedPolicyDeploymentChangeAlgorithm = "ed25519"
+	RecoverySignedPolicyDeploymentChangeAlgorithmHybrid  RecoverySignedPolicyDeploymentChangeAlgorithm = "hybrid"
+	RecoverySignedPolicyDeploymentChangeAlgorithmP256    RecoverySignedPolicyDeploymentChangeAlgorithm = "p256"
+	RecoverySignedPolicyDeploymentChangeAlgorithmP384    RecoverySignedPolicyDeploymentChangeAlgorithm = "p384"
+)
+
+// Defines values for RecoverySignedProviderFinalityAlgorithm.
+const (
+	RecoverySignedProviderFinalityAlgorithmEd25519 RecoverySignedProviderFinalityAlgorithm = "ed25519"
+	RecoverySignedProviderFinalityAlgorithmHybrid  RecoverySignedProviderFinalityAlgorithm = "hybrid"
+	RecoverySignedProviderFinalityAlgorithmP256    RecoverySignedProviderFinalityAlgorithm = "p256"
+	RecoverySignedProviderFinalityAlgorithmP384    RecoverySignedProviderFinalityAlgorithm = "p384"
+)
+
+// Defines values for RecoverySignedRecoverySetupProbeAlgorithm.
+const (
+	RecoverySignedRecoverySetupProbeAlgorithmEd25519 RecoverySignedRecoverySetupProbeAlgorithm = "ed25519"
+	RecoverySignedRecoverySetupProbeAlgorithmHybrid  RecoverySignedRecoverySetupProbeAlgorithm = "hybrid"
+	RecoverySignedRecoverySetupProbeAlgorithmP256    RecoverySignedRecoverySetupProbeAlgorithm = "p256"
+	RecoverySignedRecoverySetupProbeAlgorithmP384    RecoverySignedRecoverySetupProbeAlgorithm = "p384"
+)
+
+// Defines values for RecoverySignedRecoverySetupReportAlgorithm.
+const (
+	RecoverySignedRecoverySetupReportAlgorithmEd25519 RecoverySignedRecoverySetupReportAlgorithm = "ed25519"
+	RecoverySignedRecoverySetupReportAlgorithmHybrid  RecoverySignedRecoverySetupReportAlgorithm = "hybrid"
+	RecoverySignedRecoverySetupReportAlgorithmP256    RecoverySignedRecoverySetupReportAlgorithm = "p256"
+	RecoverySignedRecoverySetupReportAlgorithmP384    RecoverySignedRecoverySetupReportAlgorithm = "p384"
+)
+
+// Defines values for RecoverySignedScopedEndorsementAlgorithm.
+const (
+	RecoverySignedScopedEndorsementAlgorithmEd25519 RecoverySignedScopedEndorsementAlgorithm = "ed25519"
+	RecoverySignedScopedEndorsementAlgorithmHybrid  RecoverySignedScopedEndorsementAlgorithm = "hybrid"
+	RecoverySignedScopedEndorsementAlgorithmP256    RecoverySignedScopedEndorsementAlgorithm = "p256"
+	RecoverySignedScopedEndorsementAlgorithmP384    RecoverySignedScopedEndorsementAlgorithm = "p384"
+)
+
+// Defines values for RecoverySignedSemanticAnnotationAlgorithm.
+const (
+	RecoverySignedSemanticAnnotationAlgorithmEd25519 RecoverySignedSemanticAnnotationAlgorithm = "ed25519"
+	RecoverySignedSemanticAnnotationAlgorithmHybrid  RecoverySignedSemanticAnnotationAlgorithm = "hybrid"
+	RecoverySignedSemanticAnnotationAlgorithmP256    RecoverySignedSemanticAnnotationAlgorithm = "p256"
+	RecoverySignedSemanticAnnotationAlgorithmP384    RecoverySignedSemanticAnnotationAlgorithm = "p384"
+)
+
+// Defines values for RecoverySignedSemanticAudienceAlgorithm.
+const (
+	RecoverySignedSemanticAudienceAlgorithmEd25519 RecoverySignedSemanticAudienceAlgorithm = "ed25519"
+	RecoverySignedSemanticAudienceAlgorithmHybrid  RecoverySignedSemanticAudienceAlgorithm = "hybrid"
+	RecoverySignedSemanticAudienceAlgorithmP256    RecoverySignedSemanticAudienceAlgorithm = "p256"
+	RecoverySignedSemanticAudienceAlgorithmP384    RecoverySignedSemanticAudienceAlgorithm = "p384"
+)
+
+// Defines values for RecoverySignedSemanticDeploymentAlgorithm.
+const (
+	RecoverySignedSemanticDeploymentAlgorithmEd25519 RecoverySignedSemanticDeploymentAlgorithm = "ed25519"
+	RecoverySignedSemanticDeploymentAlgorithmHybrid  RecoverySignedSemanticDeploymentAlgorithm = "hybrid"
+	RecoverySignedSemanticDeploymentAlgorithmP256    RecoverySignedSemanticDeploymentAlgorithm = "p256"
+	RecoverySignedSemanticDeploymentAlgorithmP384    RecoverySignedSemanticDeploymentAlgorithm = "p384"
+)
+
+// Defines values for RecoverySignedSemanticPackageAlgorithm.
+const (
+	RecoverySignedSemanticPackageAlgorithmEd25519 RecoverySignedSemanticPackageAlgorithm = "ed25519"
+	RecoverySignedSemanticPackageAlgorithmHybrid  RecoverySignedSemanticPackageAlgorithm = "hybrid"
+	RecoverySignedSemanticPackageAlgorithmP256    RecoverySignedSemanticPackageAlgorithm = "p256"
+	RecoverySignedSemanticPackageAlgorithmP384    RecoverySignedSemanticPackageAlgorithm = "p384"
+)
+
+// Defines values for RecoverySignedSemanticPrerequisiteAlgorithm.
+const (
+	RecoverySignedSemanticPrerequisiteAlgorithmEd25519 RecoverySignedSemanticPrerequisiteAlgorithm = "ed25519"
+	RecoverySignedSemanticPrerequisiteAlgorithmHybrid  RecoverySignedSemanticPrerequisiteAlgorithm = "hybrid"
+	RecoverySignedSemanticPrerequisiteAlgorithmP256    RecoverySignedSemanticPrerequisiteAlgorithm = "p256"
+	RecoverySignedSemanticPrerequisiteAlgorithmP384    RecoverySignedSemanticPrerequisiteAlgorithm = "p384"
+)
+
+// Defines values for RecoverySignedSemanticTransformationAlgorithm.
+const (
+	RecoverySignedSemanticTransformationAlgorithmEd25519 RecoverySignedSemanticTransformationAlgorithm = "ed25519"
+	RecoverySignedSemanticTransformationAlgorithmHybrid  RecoverySignedSemanticTransformationAlgorithm = "hybrid"
+	RecoverySignedSemanticTransformationAlgorithmP256    RecoverySignedSemanticTransformationAlgorithm = "p256"
+	RecoverySignedSemanticTransformationAlgorithmP384    RecoverySignedSemanticTransformationAlgorithm = "p384"
+)
+
+// Defines values for RecoverySupportIssueEffectSchema.
+const (
+	RecoverySupportIssueEffectSchemaChioRecoverySupportIssueEffectV1 RecoverySupportIssueEffectSchema = "chio.recovery.support-issue-effect.v1"
+)
+
+// Defines values for RecoverySupportIssueEffectRecoveryEffectAdmissionUnresolvedV1Kind.
+const (
+	RecoverySupportIssueEffectRecoveryEffectAdmissionUnresolvedV1KindAdmissionUnresolved RecoverySupportIssueEffectRecoveryEffectAdmissionUnresolvedV1Kind = "admission_unresolved"
+)
+
+// Defines values for RecoverySupportIssueEffectRecoveryEffectAwaitingApprovalV1Kind.
+const (
+	RecoverySupportIssueEffectRecoveryEffectAwaitingApprovalV1KindAwaitingApproval RecoverySupportIssueEffectRecoveryEffectAwaitingApprovalV1Kind = "awaiting_approval"
+)
+
+// Defines values for RecoverySupportIssueEffectRecoveryEffectAwaitingCallerReportV1Kind.
+const (
+	RecoverySupportIssueEffectRecoveryEffectAwaitingCallerReportV1KindAwaitingCallerReport RecoverySupportIssueEffectRecoveryEffectAwaitingCallerReportV1Kind = "awaiting_caller_report"
+)
+
+// Defines values for RecoverySupportIssueEffectRecoveryEffectClosedBeforeEffectV1Kind.
+const (
+	RecoverySupportIssueEffectRecoveryEffectClosedBeforeEffectV1KindClosedBeforeEffect RecoverySupportIssueEffectRecoveryEffectClosedBeforeEffectV1Kind = "closed_before_effect"
+)
+
+// Defines values for RecoverySupportIssueEffectRecoveryEffectCompleteV1Kind.
+const (
+	RecoverySupportIssueEffectRecoveryEffectCompleteV1KindComplete RecoverySupportIssueEffectRecoveryEffectCompleteV1Kind = "complete"
+)
+
+// Defines values for RecoverySupportIssueEffectRecoveryEffectFailedAfterEffectV1Kind.
+const (
+	RecoverySupportIssueEffectRecoveryEffectFailedAfterEffectV1KindFailedAfterEffect RecoverySupportIssueEffectRecoveryEffectFailedAfterEffectV1Kind = "failed_after_effect"
+)
+
+// Defines values for RecoverySupportIssueEffectRecoveryEffectInFlightV1Kind.
+const (
+	RecoverySupportIssueEffectRecoveryEffectInFlightV1KindInFlight RecoverySupportIssueEffectRecoveryEffectInFlightV1Kind = "in_flight"
+)
+
+// Defines values for RecoverySupportIssueEffectRecoveryEffectNeverAdmittedV1Kind.
+const (
+	RecoverySupportIssueEffectRecoveryEffectNeverAdmittedV1KindNeverAdmitted RecoverySupportIssueEffectRecoveryEffectNeverAdmittedV1Kind = "never_admitted"
+)
+
+// Defines values for RecoverySupportIssueEffectRecoveryEffectPartialV1Kind.
+const (
+	RecoverySupportIssueEffectRecoveryEffectPartialV1KindPartial RecoverySupportIssueEffectRecoveryEffectPartialV1Kind = "partial"
+)
+
+// Defines values for RecoverySupportIssueEffectRecoveryEffectUnknownV1Kind.
+const (
+	RecoverySupportIssueEffectRecoveryEffectUnknownV1KindUnknown RecoverySupportIssueEffectRecoveryEffectUnknownV1Kind = "unknown"
+)
+
+// Defines values for RecoverySupportIssueEffectRefusalCode.
+const (
+	RecoverySupportIssueEffectRefusalCodeAudienceDenied     RecoverySupportIssueEffectRefusalCode = "audience_denied"
+	RecoverySupportIssueEffectRefusalCodeBudgetUnavailable  RecoverySupportIssueEffectRefusalCode = "budget_unavailable"
+	RecoverySupportIssueEffectRefusalCodeExpired            RecoverySupportIssueEffectRefusalCode = "expired"
+	RecoverySupportIssueEffectRefusalCodeInvalidEvidence    RecoverySupportIssueEffectRefusalCode = "invalid_evidence"
+	RecoverySupportIssueEffectRefusalCodeResourceExhausted  RecoverySupportIssueEffectRefusalCode = "resource_exhausted"
+	RecoverySupportIssueEffectRefusalCodeRevoked            RecoverySupportIssueEffectRefusalCode = "revoked"
+	RecoverySupportIssueEffectRefusalCodeStaleBasis         RecoverySupportIssueEffectRefusalCode = "stale_basis"
+	RecoverySupportIssueEffectRefusalCodeUnknownEffect      RecoverySupportIssueEffectRefusalCode = "unknown_effect"
+	RecoverySupportIssueEffectRefusalCodeUnsupportedProfile RecoverySupportIssueEffectRefusalCode = "unsupported_profile"
+)
+
+// Defines values for RecoverySupportIssueInputRecoveryEffectAdmissionUnresolvedV1Kind.
+const (
+	RecoverySupportIssueInputRecoveryEffectAdmissionUnresolvedV1KindAdmissionUnresolved RecoverySupportIssueInputRecoveryEffectAdmissionUnresolvedV1Kind = "admission_unresolved"
+)
+
+// Defines values for RecoverySupportIssueInputRecoveryEffectAwaitingApprovalV1Kind.
+const (
+	RecoverySupportIssueInputRecoveryEffectAwaitingApprovalV1KindAwaitingApproval RecoverySupportIssueInputRecoveryEffectAwaitingApprovalV1Kind = "awaiting_approval"
+)
+
+// Defines values for RecoverySupportIssueInputRecoveryEffectAwaitingCallerReportV1Kind.
+const (
+	RecoverySupportIssueInputRecoveryEffectAwaitingCallerReportV1KindAwaitingCallerReport RecoverySupportIssueInputRecoveryEffectAwaitingCallerReportV1Kind = "awaiting_caller_report"
+)
+
+// Defines values for RecoverySupportIssueInputRecoveryEffectClosedBeforeEffectV1Kind.
+const (
+	RecoverySupportIssueInputRecoveryEffectClosedBeforeEffectV1KindClosedBeforeEffect RecoverySupportIssueInputRecoveryEffectClosedBeforeEffectV1Kind = "closed_before_effect"
+)
+
+// Defines values for RecoverySupportIssueInputRecoveryEffectCompleteV1Kind.
+const (
+	RecoverySupportIssueInputRecoveryEffectCompleteV1KindComplete RecoverySupportIssueInputRecoveryEffectCompleteV1Kind = "complete"
+)
+
+// Defines values for RecoverySupportIssueInputRecoveryEffectFailedAfterEffectV1Kind.
+const (
+	RecoverySupportIssueInputRecoveryEffectFailedAfterEffectV1KindFailedAfterEffect RecoverySupportIssueInputRecoveryEffectFailedAfterEffectV1Kind = "failed_after_effect"
+)
+
+// Defines values for RecoverySupportIssueInputRecoveryEffectInFlightV1Kind.
+const (
+	RecoverySupportIssueInputRecoveryEffectInFlightV1KindInFlight RecoverySupportIssueInputRecoveryEffectInFlightV1Kind = "in_flight"
+)
+
+// Defines values for RecoverySupportIssueInputRecoveryEffectNeverAdmittedV1Kind.
+const (
+	RecoverySupportIssueInputRecoveryEffectNeverAdmittedV1KindNeverAdmitted RecoverySupportIssueInputRecoveryEffectNeverAdmittedV1Kind = "never_admitted"
+)
+
+// Defines values for RecoverySupportIssueInputRecoveryEffectPartialV1Kind.
+const (
+	RecoverySupportIssueInputRecoveryEffectPartialV1KindPartial RecoverySupportIssueInputRecoveryEffectPartialV1Kind = "partial"
+)
+
+// Defines values for RecoverySupportIssueInputRecoveryEffectUnknownV1Kind.
+const (
+	RecoverySupportIssueInputRecoveryEffectUnknownV1KindUnknown RecoverySupportIssueInputRecoveryEffectUnknownV1Kind = "unknown"
+)
+
+// Defines values for RecoverySupportIssueInputRefusalCode.
+const (
+	RecoverySupportIssueInputRefusalCodeAudienceDenied     RecoverySupportIssueInputRefusalCode = "audience_denied"
+	RecoverySupportIssueInputRefusalCodeBudgetUnavailable  RecoverySupportIssueInputRefusalCode = "budget_unavailable"
+	RecoverySupportIssueInputRefusalCodeExpired            RecoverySupportIssueInputRefusalCode = "expired"
+	RecoverySupportIssueInputRefusalCodeInvalidEvidence    RecoverySupportIssueInputRefusalCode = "invalid_evidence"
+	RecoverySupportIssueInputRefusalCodeResourceExhausted  RecoverySupportIssueInputRefusalCode = "resource_exhausted"
+	RecoverySupportIssueInputRefusalCodeRevoked            RecoverySupportIssueInputRefusalCode = "revoked"
+	RecoverySupportIssueInputRefusalCodeStaleBasis         RecoverySupportIssueInputRefusalCode = "stale_basis"
+	RecoverySupportIssueInputRefusalCodeUnknownEffect      RecoverySupportIssueInputRefusalCode = "unknown_effect"
+	RecoverySupportIssueInputRefusalCodeUnsupportedProfile RecoverySupportIssueInputRefusalCode = "unsupported_profile"
+)
+
+// Defines values for RecoveryTrajectorySchema.
+const (
+	RecoveryTrajectorySchemaChioRecoveryTrajectoryV1 RecoveryTrajectorySchema = "chio.recovery.trajectory.v1"
+)
+
+// Defines values for RecoveryTrajectoryVersion.
+const (
+	RecoveryTrajectoryVersionN1 RecoveryTrajectoryVersion = 1
+)
+
+// Defines values for RecoveryTransportRequestRecoveryEffectAdmissionUnresolvedV1Kind.
+const (
+	RecoveryTransportRequestRecoveryEffectAdmissionUnresolvedV1KindAdmissionUnresolved RecoveryTransportRequestRecoveryEffectAdmissionUnresolvedV1Kind = "admission_unresolved"
+)
+
+// Defines values for RecoveryTransportRequestRecoveryEffectAwaitingApprovalV1Kind.
+const (
+	RecoveryTransportRequestRecoveryEffectAwaitingApprovalV1KindAwaitingApproval RecoveryTransportRequestRecoveryEffectAwaitingApprovalV1Kind = "awaiting_approval"
+)
+
+// Defines values for RecoveryTransportRequestRecoveryEffectAwaitingCallerReportV1Kind.
+const (
+	RecoveryTransportRequestRecoveryEffectAwaitingCallerReportV1KindAwaitingCallerReport RecoveryTransportRequestRecoveryEffectAwaitingCallerReportV1Kind = "awaiting_caller_report"
+)
+
+// Defines values for RecoveryTransportRequestRecoveryEffectClosedBeforeEffectV1Kind.
+const (
+	RecoveryTransportRequestRecoveryEffectClosedBeforeEffectV1KindClosedBeforeEffect RecoveryTransportRequestRecoveryEffectClosedBeforeEffectV1Kind = "closed_before_effect"
+)
+
+// Defines values for RecoveryTransportRequestRecoveryEffectCompleteV1Kind.
+const (
+	RecoveryTransportRequestRecoveryEffectCompleteV1KindComplete RecoveryTransportRequestRecoveryEffectCompleteV1Kind = "complete"
+)
+
+// Defines values for RecoveryTransportRequestRecoveryEffectFailedAfterEffectV1Kind.
+const (
+	RecoveryTransportRequestRecoveryEffectFailedAfterEffectV1KindFailedAfterEffect RecoveryTransportRequestRecoveryEffectFailedAfterEffectV1Kind = "failed_after_effect"
+)
+
+// Defines values for RecoveryTransportRequestRecoveryEffectInFlightV1Kind.
+const (
+	RecoveryTransportRequestRecoveryEffectInFlightV1KindInFlight RecoveryTransportRequestRecoveryEffectInFlightV1Kind = "in_flight"
+)
+
+// Defines values for RecoveryTransportRequestRecoveryEffectNeverAdmittedV1Kind.
+const (
+	RecoveryTransportRequestRecoveryEffectNeverAdmittedV1KindNeverAdmitted RecoveryTransportRequestRecoveryEffectNeverAdmittedV1Kind = "never_admitted"
+)
+
+// Defines values for RecoveryTransportRequestRecoveryEffectPartialV1Kind.
+const (
+	RecoveryTransportRequestRecoveryEffectPartialV1KindPartial RecoveryTransportRequestRecoveryEffectPartialV1Kind = "partial"
+)
+
+// Defines values for RecoveryTransportRequestRecoveryEffectUnknownV1Kind.
+const (
+	RecoveryTransportRequestRecoveryEffectUnknownV1KindUnknown RecoveryTransportRequestRecoveryEffectUnknownV1Kind = "unknown"
+)
+
+// Defines values for RecoveryTransportRequestRefusalCode.
+const (
+	RecoveryTransportRequestRefusalCodeAudienceDenied     RecoveryTransportRequestRefusalCode = "audience_denied"
+	RecoveryTransportRequestRefusalCodeBudgetUnavailable  RecoveryTransportRequestRefusalCode = "budget_unavailable"
+	RecoveryTransportRequestRefusalCodeExpired            RecoveryTransportRequestRefusalCode = "expired"
+	RecoveryTransportRequestRefusalCodeInvalidEvidence    RecoveryTransportRequestRefusalCode = "invalid_evidence"
+	RecoveryTransportRequestRefusalCodeResourceExhausted  RecoveryTransportRequestRefusalCode = "resource_exhausted"
+	RecoveryTransportRequestRefusalCodeRevoked            RecoveryTransportRequestRefusalCode = "revoked"
+	RecoveryTransportRequestRefusalCodeStaleBasis         RecoveryTransportRequestRefusalCode = "stale_basis"
+	RecoveryTransportRequestRefusalCodeUnknownEffect      RecoveryTransportRequestRefusalCode = "unknown_effect"
+	RecoveryTransportRequestRefusalCodeUnsupportedProfile RecoveryTransportRequestRefusalCode = "unsupported_profile"
 )
 
 // Defines values for ResultCancelledStatus.
@@ -1599,6 +3914,26 @@ const (
 	SecurityDeclassificationGrantBodyTargetLabel1KindTop SecurityDeclassificationGrantBodyTargetLabel1Kind = "top"
 )
 
+// Defines values for SecurityDeclassificationGrantPointerPropertiesBodyDomainVersion.
+const (
+	SecurityDeclassificationGrantPointerPropertiesBodyDomainVersionN1 SecurityDeclassificationGrantPointerPropertiesBodyDomainVersion = 1
+)
+
+// Defines values for SecurityDeclassificationGrantPointerPropertiesBodyTargetLabelKind.
+const (
+	SecurityDeclassificationGrantPointerPropertiesBodyTargetLabelKindKnown SecurityDeclassificationGrantPointerPropertiesBodyTargetLabelKind = "known"
+)
+
+// Defines values for SecurityDeclassificationGrantPointerPropertiesBodyTargetLabel0Kind.
+const (
+	SecurityDeclassificationGrantPointerPropertiesBodyTargetLabel0KindKnown SecurityDeclassificationGrantPointerPropertiesBodyTargetLabel0Kind = "known"
+)
+
+// Defines values for SecurityDeclassificationGrantPointerPropertiesBodyTargetLabel1Kind.
+const (
+	SecurityDeclassificationGrantPointerPropertiesBodyTargetLabel1KindTop SecurityDeclassificationGrantPointerPropertiesBodyTargetLabel1Kind = "top"
+)
+
 // Defines values for SecurityDeclassificationOutcomeReceiptBodyV1FromState.
 const (
 	SecurityDeclassificationOutcomeReceiptBodyV1FromStateConsumedPendingDispatch SecurityDeclassificationOutcomeReceiptBodyV1FromState = "consumed_pending_dispatch"
@@ -2110,6 +4445,17 @@ const (
 	SecurityResponsePlanV1ApprovalRequirement1ApprovalTypeGoverned SecurityResponsePlanV1ApprovalRequirement1ApprovalType = "governed"
 )
 
+// Defines values for SecurityResponsePlanV1ExecutionBindingMode.
+const (
+	SecurityResponsePlanV1ExecutionBindingModeDryRun SecurityResponsePlanV1ExecutionBindingMode = "dry_run"
+	SecurityResponsePlanV1ExecutionBindingModeLive   SecurityResponsePlanV1ExecutionBindingMode = "live"
+)
+
+// Defines values for SecurityResponsePlanV1ExecutionBindingSchemaVersion.
+const (
+	SecurityResponsePlanV1ExecutionBindingSchemaVersionN1 SecurityResponsePlanV1ExecutionBindingSchemaVersion = 1
+)
+
 // Defines values for SecurityResponseStateTransitionReceiptBodyV1Cause.
 const (
 	SecurityResponseStateTransitionReceiptBodyV1CauseApplyCompleted       SecurityResponseStateTransitionReceiptBodyV1Cause = "apply_completed"
@@ -2397,7 +4743,7 @@ type AnchorBatchBody struct {
 	TreeRoot      string                 `json:"treeRoot"`
 	Witness       AnchorBatchWitness     `json:"witness"`
 
-	// WitnessState W2.3 lifecycle for the public-witness lane. Defaults to {kind: pending} when omitted to preserve wire compatibility for v1 batches that pre-date the state machine.
+	// WitnessState Lifecycle for the public-witness lane. Defaults to {kind: pending} when omitted to preserve wire compatibility for v1 batches that pre-date the state machine.
 	WitnessState *AnchorBatchWitnessState `json:"witnessState,omitempty"`
 }
 
@@ -2435,7 +4781,7 @@ type AnchorBatchWitnessReceipt struct {
 // AnchorBatchWitnessReceiptKind defines model for AnchorBatchWitnessReceipt.Kind.
 type AnchorBatchWitnessReceiptKind string
 
-// AnchorBatchWitnessState W2.3 lifecycle for the public-witness lane. Defaults to {kind: pending} when omitted to preserve wire compatibility for v1 batches that pre-date the state machine.
+// AnchorBatchWitnessState Lifecycle for the public-witness lane. Defaults to {kind: pending} when omitted to preserve wire compatibility for v1 batches that pre-date the state machine.
 type AnchorBatchWitnessState struct {
 	union json.RawMessage
 }
@@ -4087,6 +6433,5909 @@ type ReceiptRecordToolCallAction struct {
 
 	// Parameters The parameters that were passed to the tool (or attempted). Free-form JSON value (mirrors `serde_json::Value`).
 	Parameters interface{} `json:"parameters"`
+}
+
+// RecoveryActionIntent defines model for RecoveryActionIntent.
+type RecoveryActionIntent struct {
+	AuthorityScope            RecoveryActionIntentRecoveryDigest32 `json:"authority_scope"`
+	AuthorizationRequirements RecoveryAuthorizationRequirements    `json:"authorization_requirements"`
+	Basis                     RecoveryActionIntentRecoveryDigest32 `json:"basis"`
+	CapabilityBody            RecoveryActionIntentRecoveryDigest32 `json:"capability_body"`
+	CapabilityId              string                               `json:"capability_id"`
+	ContinuationId            RecoveryActionIntentOpaqueId         `json:"continuation_id"`
+	ContractDigest            RecoveryActionIntentRecoveryDigest32 `json:"contract_digest"`
+	IsolationEpoch            RecoveryActionIntentSafeInteger      `json:"isolation_epoch"`
+	IsolationLineage          RecoveryActionIntentOpaqueId         `json:"isolation_lineage"`
+
+	// Origin Verified original effect-free denial. Historical actions may omit this field; fresh native recovery authorization requires it.
+	Origin *struct {
+		Closure   RecoveryActionIntentOpaqueId `json:"closure"`
+		Operation RecoveryObservationOperation `json:"operation"`
+		RequestId RecoveryActionIntentOpaqueId `json:"request_id"`
+	} `json:"origin,omitempty"`
+	OutputDisposition RecoveryActionIntentRecoveryDigest32 `json:"output_disposition"`
+	PolicyDigest      RecoveryActionIntentRecoveryDigest32 `json:"policy_digest"`
+	RequestId         RecoveryActionIntentOpaqueId         `json:"request_id"`
+	RequestNamespace  RecoveryActionIntentRecoveryDigest32 `json:"request_namespace"`
+	Schema            RecoveryActionIntentSchema           `json:"schema"`
+	Scope             RecoveryActionIntentScope            `json:"scope"`
+	SemanticRequest   RecoveryActionIntentRecoveryDigest32 `json:"semantic_request"`
+	SourceGeneration  RecoveryActionIntentSafeInteger      `json:"source_generation"`
+	StepId            RecoveryActionIntentOpaqueId         `json:"step_id"`
+	Version           RecoveryActionIntentVersion          `json:"version"`
+	WorkflowId        RecoveryActionIntentOpaqueId         `json:"workflow_id"`
+}
+
+// RecoveryActionIntentSchema defines model for RecoveryActionIntent.Schema.
+type RecoveryActionIntentSchema string
+
+// RecoveryActionIntentVersion defines model for RecoveryActionIntent.Version.
+type RecoveryActionIntentVersion int64
+
+// RecoveryActionIntentOpaqueId defines model for RecoveryActionIntentOpaqueId.
+type RecoveryActionIntentOpaqueId = string
+
+// RecoveryActionIntentRecoveryDigest32 defines model for RecoveryActionIntentRecoveryDigest32.
+type RecoveryActionIntentRecoveryDigest32 = []int64
+
+// RecoveryActionIntentSafeInteger defines model for RecoveryActionIntentSafeInteger.
+type RecoveryActionIntentSafeInteger = int64
+
+// RecoveryActionIntentScope defines model for RecoveryActionIntentScope.
+type RecoveryActionIntentScope struct {
+	AuthorityDomain RecoveryActionIntentOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryActionIntentOpaqueId `json:"process_id"`
+	TenantId        RecoveryActionIntentOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryApprovalIntent defines model for RecoveryApprovalIntent.
+type RecoveryApprovalIntent struct {
+	ActionIntent              RecoveryApprovalIntentRecoveryDigest32    `json:"action_intent"`
+	ApprovalIntent            RecoveryApprovalIntentOpaqueId            `json:"approval_intent"`
+	AuthorizationRequirements RecoveryApprovalIntentRecoveryDigest32    `json:"authorization_requirements"`
+	Challenge                 RecoveryApprovalIntentOpaqueId            `json:"challenge"`
+	ExpiresAtUnixMs           RecoveryApprovalIntentSafeInteger         `json:"expires_at_unix_ms"`
+	IssuedAtUnixMs            RecoveryApprovalIntentSafeInteger         `json:"issued_at_unix_ms"`
+	Obligations               []RecoveryApprovalIntent_Obligations_Item `json:"obligations"`
+	Offer                     RecoveryApprovalIntentRecoveryDigest32    `json:"offer"`
+	Plan                      RecoveryApprovalIntentRecoveryDigest32    `json:"plan"`
+	Preview                   RecoveryApprovalIntentRecoveryDigest32    `json:"preview"`
+	Purpose                   string                                    `json:"purpose"`
+	Recipient                 string                                    `json:"recipient"`
+	Reviewer                  string                                    `json:"reviewer"`
+	Schema                    RecoveryApprovalIntentSchema              `json:"schema"`
+	Scope                     RecoveryApprovalIntentScope               `json:"scope"`
+	Version                   RecoveryApprovalIntentVersion             `json:"version"`
+}
+
+// RecoveryApprovalIntentObligations0 defines model for .
+type RecoveryApprovalIntentObligations0 struct {
+	Kind  RecoveryApprovalIntentObligations0Kind `json:"kind"`
+	Owner string                                 `json:"owner"`
+}
+
+// RecoveryApprovalIntentObligations0Kind defines model for RecoveryApprovalIntent.Obligations.0.Kind.
+type RecoveryApprovalIntentObligations0Kind string
+
+// RecoveryApprovalIntentObligations1 defines model for .
+type RecoveryApprovalIntentObligations1 struct {
+	Compartment string                                 `json:"compartment"`
+	Kind        RecoveryApprovalIntentObligations1Kind `json:"kind"`
+}
+
+// RecoveryApprovalIntentObligations1Kind defines model for RecoveryApprovalIntent.Obligations.1.Kind.
+type RecoveryApprovalIntentObligations1Kind string
+
+// RecoveryApprovalIntentObligations2 defines model for .
+type RecoveryApprovalIntentObligations2 struct {
+	Kind      RecoveryApprovalIntentObligations2Kind `json:"kind"`
+	Principal string                                 `json:"principal"`
+}
+
+// RecoveryApprovalIntentObligations2Kind defines model for RecoveryApprovalIntent.Obligations.2.Kind.
+type RecoveryApprovalIntentObligations2Kind string
+
+// RecoveryApprovalIntentObligations3 defines model for .
+type RecoveryApprovalIntentObligations3 struct {
+	Kind      RecoveryApprovalIntentObligations3Kind `json:"kind"`
+	Principal string                                 `json:"principal"`
+}
+
+// RecoveryApprovalIntentObligations3Kind defines model for RecoveryApprovalIntent.Obligations.3.Kind.
+type RecoveryApprovalIntentObligations3Kind string
+
+// RecoveryApprovalIntent_Obligations_Item defines model for RecoveryApprovalIntent.obligations.Item.
+type RecoveryApprovalIntent_Obligations_Item struct {
+	union json.RawMessage
+}
+
+// RecoveryApprovalIntentSchema defines model for RecoveryApprovalIntent.Schema.
+type RecoveryApprovalIntentSchema string
+
+// RecoveryApprovalIntentVersion defines model for RecoveryApprovalIntent.Version.
+type RecoveryApprovalIntentVersion int64
+
+// RecoveryApprovalIntentOpaqueId defines model for RecoveryApprovalIntentOpaqueId.
+type RecoveryApprovalIntentOpaqueId = string
+
+// RecoveryApprovalIntentRecoveryDigest32 defines model for RecoveryApprovalIntentRecoveryDigest32.
+type RecoveryApprovalIntentRecoveryDigest32 = []int64
+
+// RecoveryApprovalIntentSafeInteger defines model for RecoveryApprovalIntentSafeInteger.
+type RecoveryApprovalIntentSafeInteger = int64
+
+// RecoveryApprovalIntentScope defines model for RecoveryApprovalIntentScope.
+type RecoveryApprovalIntentScope struct {
+	AuthorityDomain RecoveryApprovalIntentOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryApprovalIntentOpaqueId `json:"process_id"`
+	TenantId        RecoveryApprovalIntentOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryApprovalSubmission defines model for RecoveryApprovalSubmission.
+type RecoveryApprovalSubmission struct {
+	Coverage []RecoverySignedAuthorityCoverage `json:"coverage"`
+	Intent   RecoveryApprovalIntent            `json:"intent"`
+}
+
+// RecoveryApprovalSubmissionOpaqueId defines model for RecoveryApprovalSubmissionOpaqueId.
+type RecoveryApprovalSubmissionOpaqueId = string
+
+// RecoveryApprovalSubmissionRecoveryDigest32 defines model for RecoveryApprovalSubmissionRecoveryDigest32.
+type RecoveryApprovalSubmissionRecoveryDigest32 = []int64
+
+// RecoveryApprovalSubmissionSafeInteger defines model for RecoveryApprovalSubmissionSafeInteger.
+type RecoveryApprovalSubmissionSafeInteger = int64
+
+// RecoveryApprovalSubmissionScope defines model for RecoveryApprovalSubmissionScope.
+type RecoveryApprovalSubmissionScope struct {
+	AuthorityDomain RecoveryApprovalSubmissionOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryApprovalSubmissionOpaqueId `json:"process_id"`
+	TenantId        RecoveryApprovalSubmissionOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryArtifactArchiveManifest defines model for RecoveryArtifactArchiveManifest.
+type RecoveryArtifactArchiveManifest struct {
+	DomainVersion RecoveryArtifactArchiveManifestDomainVersion     `json:"domain_version"`
+	Root          RecoveryArtifactArchiveManifestArtifactReference `json:"root"`
+	Scope         RecoveryArtifactArchiveManifestScope             `json:"scope"`
+	TotalBytes    int64                                            `json:"total_bytes"`
+	Versions      []RecoveryArtifactVersion                        `json:"versions"`
+}
+
+// RecoveryArtifactArchiveManifestDomainVersion defines model for RecoveryArtifactArchiveManifest.DomainVersion.
+type RecoveryArtifactArchiveManifestDomainVersion int64
+
+// RecoveryArtifactArchiveManifestArtifactReference defines model for RecoveryArtifactArchiveManifestArtifactReference.
+type RecoveryArtifactArchiveManifestArtifactReference struct {
+	Artifact   RecoveryArtifactArchiveManifestOpaqueId         `json:"artifact"`
+	Provenance RecoveryArtifactArchiveManifestRecoveryDigest32 `json:"provenance"`
+	Scope      RecoveryArtifactArchiveManifestScope            `json:"scope"`
+	Version    RecoveryArtifactArchiveManifestOpaqueId         `json:"version"`
+}
+
+// RecoveryArtifactArchiveManifestOpaqueId defines model for RecoveryArtifactArchiveManifestOpaqueId.
+type RecoveryArtifactArchiveManifestOpaqueId = string
+
+// RecoveryArtifactArchiveManifestRecoveryDigest32 defines model for RecoveryArtifactArchiveManifestRecoveryDigest32.
+type RecoveryArtifactArchiveManifestRecoveryDigest32 = []int64
+
+// RecoveryArtifactArchiveManifestScope defines model for RecoveryArtifactArchiveManifestScope.
+type RecoveryArtifactArchiveManifestScope struct {
+	AuthorityDomain RecoveryArtifactArchiveManifestOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryArtifactArchiveManifestOpaqueId `json:"process_id"`
+	TenantId        RecoveryArtifactArchiveManifestOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryArtifactCertificate defines model for RecoveryArtifactCertificate.
+type RecoveryArtifactCertificate struct {
+	Artifact       RecoveryArtifactCertificateOpaqueId            `json:"artifact"`
+	Configuration  RecoveryArtifactCertificateRecoveryDigest32    `json:"configuration"`
+	Content        RecoveryArtifactCertificateRecoveryDigest32    `json:"content"`
+	Dependencies   []RecoveryArtifactCertificateArtifactReference `json:"dependencies"`
+	DomainVersion  RecoveryArtifactCertificateDomainVersion       `json:"domain_version"`
+	Evidence       RecoveryArtifactCertificateOpaqueId            `json:"evidence"`
+	Implementation RecoveryArtifactCertificateRecoveryDigest32    `json:"implementation"`
+	Influence      RecoveryArtifactCertificateArtifactInfluence   `json:"influence"`
+	IssuedAtUnixMs RecoveryArtifactCertificateSafeInteger         `json:"issued_at_unix_ms"`
+	Kind           RecoveryArtifactCertificateKind                `json:"kind"`
+
+	// OutputLabel Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	OutputLabel      SecurityInformationLabel                    `json:"output_label"`
+	Producer         RecoveryArtifactCertificateArtifactProducer `json:"producer"`
+	Schema           RecoveryArtifactCertificateRecoveryDigest32 `json:"schema"`
+	Scope            RecoveryArtifactCertificateScope            `json:"scope"`
+	SizeBytes        int64                                       `json:"size_bytes"`
+	ValidUntilUnixMs RecoveryArtifactCertificateSafeInteger      `json:"valid_until_unix_ms"`
+	Version          RecoveryArtifactCertificateOpaqueId         `json:"version"`
+}
+
+// RecoveryArtifactCertificateDomainVersion defines model for RecoveryArtifactCertificate.DomainVersion.
+type RecoveryArtifactCertificateDomainVersion int64
+
+// RecoveryArtifactCertificateKind defines model for RecoveryArtifactCertificate.Kind.
+type RecoveryArtifactCertificateKind string
+
+// RecoveryArtifactCertificateArtifactInfluence defines model for RecoveryArtifactCertificateArtifactInfluence.
+type RecoveryArtifactCertificateArtifactInfluence struct {
+	Commitment           RecoveryArtifactCertificateRecoveryDigest32 `json:"commitment"`
+	ExternallyInfluenced bool                                        `json:"externally_influenced"`
+	Unknown              bool                                        `json:"unknown"`
+}
+
+// RecoveryArtifactCertificateArtifactProducer defines model for RecoveryArtifactCertificateArtifactProducer.
+type RecoveryArtifactCertificateArtifactProducer struct {
+	union json.RawMessage
+}
+
+// RecoveryArtifactCertificateArtifactProducer0 defines model for .
+type RecoveryArtifactCertificateArtifactProducer0 struct {
+	Kind      RecoveryArtifactCertificateArtifactProducer0Kind `json:"kind"`
+	Operation RecoveryArtifactCertificateOpaqueId              `json:"operation"`
+}
+
+// RecoveryArtifactCertificateArtifactProducer0Kind defines model for RecoveryArtifactCertificateArtifactProducer.0.Kind.
+type RecoveryArtifactCertificateArtifactProducer0Kind string
+
+// RecoveryArtifactCertificateArtifactProducer1 defines model for .
+type RecoveryArtifactCertificateArtifactProducer1 struct {
+	Checkpoint RecoveryArtifactCertificateOpaqueId              `json:"checkpoint"`
+	Kind       RecoveryArtifactCertificateArtifactProducer1Kind `json:"kind"`
+}
+
+// RecoveryArtifactCertificateArtifactProducer1Kind defines model for RecoveryArtifactCertificateArtifactProducer.1.Kind.
+type RecoveryArtifactCertificateArtifactProducer1Kind string
+
+// RecoveryArtifactCertificateArtifactProducer2 defines model for .
+type RecoveryArtifactCertificateArtifactProducer2 struct {
+	Kind      RecoveryArtifactCertificateArtifactProducer2Kind `json:"kind"`
+	Operation RecoveryArtifactCertificateOpaqueId              `json:"operation"`
+}
+
+// RecoveryArtifactCertificateArtifactProducer2Kind defines model for RecoveryArtifactCertificateArtifactProducer.2.Kind.
+type RecoveryArtifactCertificateArtifactProducer2Kind string
+
+// RecoveryArtifactCertificateArtifactProducer3 defines model for .
+type RecoveryArtifactCertificateArtifactProducer3 struct {
+	Evidence RecoveryArtifactCertificateOpaqueId              `json:"evidence"`
+	Kind     RecoveryArtifactCertificateArtifactProducer3Kind `json:"kind"`
+}
+
+// RecoveryArtifactCertificateArtifactProducer3Kind defines model for RecoveryArtifactCertificateArtifactProducer.3.Kind.
+type RecoveryArtifactCertificateArtifactProducer3Kind string
+
+// RecoveryArtifactCertificateArtifactProducer4 defines model for .
+type RecoveryArtifactCertificateArtifactProducer4 struct {
+	Kind     RecoveryArtifactCertificateArtifactProducer4Kind `json:"kind"`
+	Manifest RecoveryArtifactCertificateRecoveryDigest32      `json:"manifest"`
+	Origin   RecoveryArtifactCertificateArtifactReference     `json:"origin"`
+}
+
+// RecoveryArtifactCertificateArtifactProducer4Kind defines model for RecoveryArtifactCertificateArtifactProducer.4.Kind.
+type RecoveryArtifactCertificateArtifactProducer4Kind string
+
+// RecoveryArtifactCertificateArtifactReference defines model for RecoveryArtifactCertificateArtifactReference.
+type RecoveryArtifactCertificateArtifactReference struct {
+	Artifact   RecoveryArtifactCertificateOpaqueId         `json:"artifact"`
+	Provenance RecoveryArtifactCertificateRecoveryDigest32 `json:"provenance"`
+	Scope      RecoveryArtifactCertificateScope            `json:"scope"`
+	Version    RecoveryArtifactCertificateOpaqueId         `json:"version"`
+}
+
+// RecoveryArtifactCertificateOpaqueId defines model for RecoveryArtifactCertificateOpaqueId.
+type RecoveryArtifactCertificateOpaqueId = string
+
+// RecoveryArtifactCertificateRecoveryDigest32 defines model for RecoveryArtifactCertificateRecoveryDigest32.
+type RecoveryArtifactCertificateRecoveryDigest32 = []int64
+
+// RecoveryArtifactCertificateSafeInteger defines model for RecoveryArtifactCertificateSafeInteger.
+type RecoveryArtifactCertificateSafeInteger = int64
+
+// RecoveryArtifactCertificateScope defines model for RecoveryArtifactCertificateScope.
+type RecoveryArtifactCertificateScope struct {
+	AuthorityDomain RecoveryArtifactCertificateOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryArtifactCertificateOpaqueId `json:"process_id"`
+	TenantId        RecoveryArtifactCertificateOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryArtifactHandle defines model for RecoveryArtifactHandle.
+type RecoveryArtifactHandle struct {
+	Handle    RecoveryArtifactHandleOpaqueId `json:"handle"`
+	Recipient RecoveryArtifactHandleOpaqueId `json:"recipient"`
+}
+
+// RecoveryArtifactHandleOpaqueId defines model for RecoveryArtifactHandleOpaqueId.
+type RecoveryArtifactHandleOpaqueId = string
+
+// RecoveryArtifactInfluence defines model for RecoveryArtifactInfluence.
+type RecoveryArtifactInfluence struct {
+	Commitment           RecoveryArtifactInfluenceRecoveryDigest32 `json:"commitment"`
+	ExternallyInfluenced bool                                      `json:"externally_influenced"`
+	Unknown              bool                                      `json:"unknown"`
+}
+
+// RecoveryArtifactInfluenceRecoveryDigest32 defines model for RecoveryArtifactInfluenceRecoveryDigest32.
+type RecoveryArtifactInfluenceRecoveryDigest32 = []int64
+
+// RecoveryArtifactProducer defines model for RecoveryArtifactProducer.
+type RecoveryArtifactProducer struct {
+	union json.RawMessage
+}
+
+// RecoveryArtifactProducer0 defines model for .
+type RecoveryArtifactProducer0 struct {
+	Kind      RecoveryArtifactProducer0Kind    `json:"kind"`
+	Operation RecoveryArtifactProducerOpaqueId `json:"operation"`
+}
+
+// RecoveryArtifactProducer0Kind defines model for RecoveryArtifactProducer.0.Kind.
+type RecoveryArtifactProducer0Kind string
+
+// RecoveryArtifactProducer1 defines model for .
+type RecoveryArtifactProducer1 struct {
+	Checkpoint RecoveryArtifactProducerOpaqueId `json:"checkpoint"`
+	Kind       RecoveryArtifactProducer1Kind    `json:"kind"`
+}
+
+// RecoveryArtifactProducer1Kind defines model for RecoveryArtifactProducer.1.Kind.
+type RecoveryArtifactProducer1Kind string
+
+// RecoveryArtifactProducer2 defines model for .
+type RecoveryArtifactProducer2 struct {
+	Kind      RecoveryArtifactProducer2Kind    `json:"kind"`
+	Operation RecoveryArtifactProducerOpaqueId `json:"operation"`
+}
+
+// RecoveryArtifactProducer2Kind defines model for RecoveryArtifactProducer.2.Kind.
+type RecoveryArtifactProducer2Kind string
+
+// RecoveryArtifactProducer3 defines model for .
+type RecoveryArtifactProducer3 struct {
+	Evidence RecoveryArtifactProducerOpaqueId `json:"evidence"`
+	Kind     RecoveryArtifactProducer3Kind    `json:"kind"`
+}
+
+// RecoveryArtifactProducer3Kind defines model for RecoveryArtifactProducer.3.Kind.
+type RecoveryArtifactProducer3Kind string
+
+// RecoveryArtifactProducer4 defines model for .
+type RecoveryArtifactProducer4 struct {
+	Kind     RecoveryArtifactProducer4Kind             `json:"kind"`
+	Manifest RecoveryArtifactProducerRecoveryDigest32  `json:"manifest"`
+	Origin   RecoveryArtifactProducerArtifactReference `json:"origin"`
+}
+
+// RecoveryArtifactProducer4Kind defines model for RecoveryArtifactProducer.4.Kind.
+type RecoveryArtifactProducer4Kind string
+
+// RecoveryArtifactProducerArtifactReference defines model for RecoveryArtifactProducerArtifactReference.
+type RecoveryArtifactProducerArtifactReference struct {
+	Artifact   RecoveryArtifactProducerOpaqueId         `json:"artifact"`
+	Provenance RecoveryArtifactProducerRecoveryDigest32 `json:"provenance"`
+	Scope      RecoveryArtifactProducerScope            `json:"scope"`
+	Version    RecoveryArtifactProducerOpaqueId         `json:"version"`
+}
+
+// RecoveryArtifactProducerOpaqueId defines model for RecoveryArtifactProducerOpaqueId.
+type RecoveryArtifactProducerOpaqueId = string
+
+// RecoveryArtifactProducerRecoveryDigest32 defines model for RecoveryArtifactProducerRecoveryDigest32.
+type RecoveryArtifactProducerRecoveryDigest32 = []int64
+
+// RecoveryArtifactProducerScope defines model for RecoveryArtifactProducerScope.
+type RecoveryArtifactProducerScope struct {
+	AuthorityDomain RecoveryArtifactProducerOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryArtifactProducerOpaqueId `json:"process_id"`
+	TenantId        RecoveryArtifactProducerOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryArtifactRecipient defines model for RecoveryArtifactRecipient.
+type RecoveryArtifactRecipient struct {
+	// Clearance Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	Clearance         SecurityInformationLabel              `json:"clearance"`
+	ContextGeneration RecoveryArtifactRecipientSafeInteger  `json:"context_generation"`
+	IsolationEpoch    string                                `json:"isolation_epoch"`
+	Lineage           RecoveryArtifactRecipientOpaqueId     `json:"lineage"`
+	Principal         string                                `json:"principal"`
+	Recipient         RecoveryArtifactRecipientOpaqueId     `json:"recipient"`
+	Runtime           string                                `json:"runtime"`
+	Scope             RecoveryArtifactRecipientScope        `json:"scope"`
+	Sink              RecoveryArtifactRecipientArtifactSink `json:"sink"`
+}
+
+// RecoveryArtifactRecipientArtifactReference defines model for RecoveryArtifactRecipientArtifactReference.
+type RecoveryArtifactRecipientArtifactReference struct {
+	Artifact   RecoveryArtifactRecipientOpaqueId         `json:"artifact"`
+	Provenance RecoveryArtifactRecipientRecoveryDigest32 `json:"provenance"`
+	Scope      RecoveryArtifactRecipientScope            `json:"scope"`
+	Version    RecoveryArtifactRecipientOpaqueId         `json:"version"`
+}
+
+// RecoveryArtifactRecipientArtifactSink defines model for RecoveryArtifactRecipientArtifactSink.
+type RecoveryArtifactRecipientArtifactSink struct {
+	union json.RawMessage
+}
+
+// RecoveryArtifactRecipientArtifactSink0 defines model for .
+type RecoveryArtifactRecipientArtifactSink0 struct {
+	Kind RecoveryArtifactRecipientArtifactSink0Kind `json:"kind"`
+}
+
+// RecoveryArtifactRecipientArtifactSink0Kind defines model for RecoveryArtifactRecipientArtifactSink.0.Kind.
+type RecoveryArtifactRecipientArtifactSink0Kind string
+
+// RecoveryArtifactRecipientArtifactSink1 defines model for .
+type RecoveryArtifactRecipientArtifactSink1 struct {
+	Context RecoveryArtifactRecipientModelContext      `json:"context"`
+	Kind    RecoveryArtifactRecipientArtifactSink1Kind `json:"kind"`
+}
+
+// RecoveryArtifactRecipientArtifactSink1Kind defines model for RecoveryArtifactRecipientArtifactSink.1.Kind.
+type RecoveryArtifactRecipientArtifactSink1Kind string
+
+// RecoveryArtifactRecipientArtifactSink2 defines model for .
+type RecoveryArtifactRecipientArtifactSink2 struct {
+	Kind RecoveryArtifactRecipientArtifactSink2Kind `json:"kind"`
+}
+
+// RecoveryArtifactRecipientArtifactSink2Kind defines model for RecoveryArtifactRecipientArtifactSink.2.Kind.
+type RecoveryArtifactRecipientArtifactSink2Kind string
+
+// RecoveryArtifactRecipientModelContext defines model for RecoveryArtifactRecipientModelContext.
+type RecoveryArtifactRecipientModelContext struct {
+	Account      RecoveryArtifactRecipientOpaqueId            `json:"account"`
+	Cache        string                                       `json:"cache"`
+	Context      RecoveryArtifactRecipientOpaqueId            `json:"context"`
+	Contract     RecoveryArtifactRecipientRecoveryDigest32    `json:"contract"`
+	Conversation string                                       `json:"conversation"`
+	Provider     RecoveryArtifactRecipientOpaqueId            `json:"provider"`
+	SideFiles    []RecoveryArtifactRecipientArtifactReference `json:"side_files"`
+}
+
+// RecoveryArtifactRecipientOpaqueId defines model for RecoveryArtifactRecipientOpaqueId.
+type RecoveryArtifactRecipientOpaqueId = string
+
+// RecoveryArtifactRecipientRecoveryDigest32 defines model for RecoveryArtifactRecipientRecoveryDigest32.
+type RecoveryArtifactRecipientRecoveryDigest32 = []int64
+
+// RecoveryArtifactRecipientSafeInteger defines model for RecoveryArtifactRecipientSafeInteger.
+type RecoveryArtifactRecipientSafeInteger = int64
+
+// RecoveryArtifactRecipientScope defines model for RecoveryArtifactRecipientScope.
+type RecoveryArtifactRecipientScope struct {
+	AuthorityDomain RecoveryArtifactRecipientOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryArtifactRecipientOpaqueId `json:"process_id"`
+	TenantId        RecoveryArtifactRecipientOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryArtifactReference defines model for RecoveryArtifactReference.
+type RecoveryArtifactReference struct {
+	Artifact   RecoveryArtifactReferenceOpaqueId         `json:"artifact"`
+	Provenance RecoveryArtifactReferenceRecoveryDigest32 `json:"provenance"`
+	Scope      RecoveryArtifactReferenceScope            `json:"scope"`
+	Version    RecoveryArtifactReferenceOpaqueId         `json:"version"`
+}
+
+// RecoveryArtifactReferenceOpaqueId defines model for RecoveryArtifactReferenceOpaqueId.
+type RecoveryArtifactReferenceOpaqueId = string
+
+// RecoveryArtifactReferenceRecoveryDigest32 defines model for RecoveryArtifactReferenceRecoveryDigest32.
+type RecoveryArtifactReferenceRecoveryDigest32 = []int64
+
+// RecoveryArtifactReferenceScope defines model for RecoveryArtifactReferenceScope.
+type RecoveryArtifactReferenceScope struct {
+	AuthorityDomain RecoveryArtifactReferenceOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryArtifactReferenceOpaqueId `json:"process_id"`
+	TenantId        RecoveryArtifactReferenceOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryArtifactReleaseIntent defines model for RecoveryArtifactReleaseIntent.
+type RecoveryArtifactReleaseIntent struct {
+	// AdmittedLabel Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	AdmittedLabel         SecurityInformationLabel                       `json:"admitted_label"`
+	Artifact              RecoveryArtifactReleaseIntentArtifactReference `json:"artifact"`
+	Authorization         RecoveryArtifactReleaseIntentRecoveryDigest32  `json:"authorization"`
+	DomainVersion         RecoveryArtifactReleaseIntentDomainVersion     `json:"domain_version"`
+	Influence             RecoveryArtifactReleaseIntentArtifactInfluence `json:"influence"`
+	Kind                  RecoveryArtifactReleaseIntent_Kind             `json:"kind"`
+	ObservationGeneration RecoveryArtifactReleaseIntentSafeInteger       `json:"observation_generation"`
+	ObservationTransition RecoveryArtifactReleaseIntentOpaqueId          `json:"observation_transition"`
+	Policy                RecoveryArtifactReleaseIntentRecoveryDigest32  `json:"policy"`
+	Recipient             RecoveryArtifactReleaseIntentArtifactRecipient `json:"recipient"`
+	Release               RecoveryArtifactReleaseIntentOpaqueId          `json:"release"`
+
+	// SourceLabel Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	SourceLabel SecurityInformationLabel           `json:"source_label"`
+	State       RecoveryArtifactReleaseIntentState `json:"state"`
+}
+
+// RecoveryArtifactReleaseIntentDomainVersion defines model for RecoveryArtifactReleaseIntent.DomainVersion.
+type RecoveryArtifactReleaseIntentDomainVersion int64
+
+// RecoveryArtifactReleaseIntentKind0 defines model for .
+type RecoveryArtifactReleaseIntentKind0 struct {
+	Kind      RecoveryArtifactReleaseIntentKind0Kind `json:"kind"`
+	Operation RecoveryArtifactReleaseIntentOpaqueId  `json:"operation"`
+}
+
+// RecoveryArtifactReleaseIntentKind0Kind defines model for RecoveryArtifactReleaseIntent.Kind.0.Kind.
+type RecoveryArtifactReleaseIntentKind0Kind string
+
+// RecoveryArtifactReleaseIntentKind1 defines model for .
+type RecoveryArtifactReleaseIntentKind1 struct {
+	Kind    RecoveryArtifactReleaseIntentKind1Kind `json:"kind"`
+	Request RecoveryArtifactReleaseIntentOpaqueId  `json:"request"`
+}
+
+// RecoveryArtifactReleaseIntentKind1Kind defines model for RecoveryArtifactReleaseIntent.Kind.1.Kind.
+type RecoveryArtifactReleaseIntentKind1Kind string
+
+// RecoveryArtifactReleaseIntent_Kind defines model for RecoveryArtifactReleaseIntent.Kind.
+type RecoveryArtifactReleaseIntent_Kind struct {
+	union json.RawMessage
+}
+
+// RecoveryArtifactReleaseIntentState defines model for RecoveryArtifactReleaseIntent.State.
+type RecoveryArtifactReleaseIntentState string
+
+// RecoveryArtifactReleaseIntentArtifactInfluence defines model for RecoveryArtifactReleaseIntentArtifactInfluence.
+type RecoveryArtifactReleaseIntentArtifactInfluence struct {
+	Commitment           RecoveryArtifactReleaseIntentRecoveryDigest32 `json:"commitment"`
+	ExternallyInfluenced bool                                          `json:"externally_influenced"`
+	Unknown              bool                                          `json:"unknown"`
+}
+
+// RecoveryArtifactReleaseIntentArtifactRecipient defines model for RecoveryArtifactReleaseIntentArtifactRecipient.
+type RecoveryArtifactReleaseIntentArtifactRecipient struct {
+	// Clearance Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	Clearance         SecurityInformationLabel                  `json:"clearance"`
+	ContextGeneration RecoveryArtifactReleaseIntentSafeInteger  `json:"context_generation"`
+	IsolationEpoch    string                                    `json:"isolation_epoch"`
+	Lineage           RecoveryArtifactReleaseIntentOpaqueId     `json:"lineage"`
+	Principal         string                                    `json:"principal"`
+	Recipient         RecoveryArtifactReleaseIntentOpaqueId     `json:"recipient"`
+	Runtime           string                                    `json:"runtime"`
+	Scope             RecoveryArtifactReleaseIntentScope        `json:"scope"`
+	Sink              RecoveryArtifactReleaseIntentArtifactSink `json:"sink"`
+}
+
+// RecoveryArtifactReleaseIntentArtifactReference defines model for RecoveryArtifactReleaseIntentArtifactReference.
+type RecoveryArtifactReleaseIntentArtifactReference struct {
+	Artifact   RecoveryArtifactReleaseIntentOpaqueId         `json:"artifact"`
+	Provenance RecoveryArtifactReleaseIntentRecoveryDigest32 `json:"provenance"`
+	Scope      RecoveryArtifactReleaseIntentScope            `json:"scope"`
+	Version    RecoveryArtifactReleaseIntentOpaqueId         `json:"version"`
+}
+
+// RecoveryArtifactReleaseIntentArtifactSink defines model for RecoveryArtifactReleaseIntentArtifactSink.
+type RecoveryArtifactReleaseIntentArtifactSink struct {
+	union json.RawMessage
+}
+
+// RecoveryArtifactReleaseIntentArtifactSink0 defines model for .
+type RecoveryArtifactReleaseIntentArtifactSink0 struct {
+	Kind RecoveryArtifactReleaseIntentArtifactSink0Kind `json:"kind"`
+}
+
+// RecoveryArtifactReleaseIntentArtifactSink0Kind defines model for RecoveryArtifactReleaseIntentArtifactSink.0.Kind.
+type RecoveryArtifactReleaseIntentArtifactSink0Kind string
+
+// RecoveryArtifactReleaseIntentArtifactSink1 defines model for .
+type RecoveryArtifactReleaseIntentArtifactSink1 struct {
+	Context RecoveryArtifactReleaseIntentModelContext      `json:"context"`
+	Kind    RecoveryArtifactReleaseIntentArtifactSink1Kind `json:"kind"`
+}
+
+// RecoveryArtifactReleaseIntentArtifactSink1Kind defines model for RecoveryArtifactReleaseIntentArtifactSink.1.Kind.
+type RecoveryArtifactReleaseIntentArtifactSink1Kind string
+
+// RecoveryArtifactReleaseIntentArtifactSink2 defines model for .
+type RecoveryArtifactReleaseIntentArtifactSink2 struct {
+	Kind RecoveryArtifactReleaseIntentArtifactSink2Kind `json:"kind"`
+}
+
+// RecoveryArtifactReleaseIntentArtifactSink2Kind defines model for RecoveryArtifactReleaseIntentArtifactSink.2.Kind.
+type RecoveryArtifactReleaseIntentArtifactSink2Kind string
+
+// RecoveryArtifactReleaseIntentModelContext defines model for RecoveryArtifactReleaseIntentModelContext.
+type RecoveryArtifactReleaseIntentModelContext struct {
+	Account      RecoveryArtifactReleaseIntentOpaqueId            `json:"account"`
+	Cache        string                                           `json:"cache"`
+	Context      RecoveryArtifactReleaseIntentOpaqueId            `json:"context"`
+	Contract     RecoveryArtifactReleaseIntentRecoveryDigest32    `json:"contract"`
+	Conversation string                                           `json:"conversation"`
+	Provider     RecoveryArtifactReleaseIntentOpaqueId            `json:"provider"`
+	SideFiles    []RecoveryArtifactReleaseIntentArtifactReference `json:"side_files"`
+}
+
+// RecoveryArtifactReleaseIntentOpaqueId defines model for RecoveryArtifactReleaseIntentOpaqueId.
+type RecoveryArtifactReleaseIntentOpaqueId = string
+
+// RecoveryArtifactReleaseIntentRecoveryDigest32 defines model for RecoveryArtifactReleaseIntentRecoveryDigest32.
+type RecoveryArtifactReleaseIntentRecoveryDigest32 = []int64
+
+// RecoveryArtifactReleaseIntentSafeInteger defines model for RecoveryArtifactReleaseIntentSafeInteger.
+type RecoveryArtifactReleaseIntentSafeInteger = int64
+
+// RecoveryArtifactReleaseIntentScope defines model for RecoveryArtifactReleaseIntentScope.
+type RecoveryArtifactReleaseIntentScope struct {
+	AuthorityDomain RecoveryArtifactReleaseIntentOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryArtifactReleaseIntentOpaqueId `json:"process_id"`
+	TenantId        RecoveryArtifactReleaseIntentOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryArtifactVersion defines model for RecoveryArtifactVersion.
+type RecoveryArtifactVersion struct {
+	Artifact         RecoveryArtifactVersionOpaqueId            `json:"artifact"`
+	Content          RecoveryArtifactVersionRecoveryDigest32    `json:"content"`
+	Contract         RecoveryArtifactVersionRecoveryDigest32    `json:"contract"`
+	CreationSequence int64                                      `json:"creation_sequence"`
+	Dependencies     []RecoveryArtifactVersionArtifactReference `json:"dependencies"`
+	DomainVersion    RecoveryArtifactVersionDomainVersion       `json:"domain_version"`
+	Evidence         []RecoveryArtifactVersionOpaqueId          `json:"evidence"`
+	Influence        RecoveryArtifactVersionArtifactInfluence   `json:"influence"`
+	IsolationEpoch   string                                     `json:"isolation_epoch"`
+
+	// Label Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	Label     SecurityInformationLabel                `json:"label"`
+	Lineage   RecoveryArtifactVersionOpaqueId         `json:"lineage"`
+	MediaType string                                  `json:"media_type"`
+	Policy    RecoveryArtifactVersionRecoveryDigest32 `json:"policy"`
+	Producer  RecoveryArtifactVersionArtifactProducer `json:"producer"`
+	Retention RecoveryArtifactVersionRetention        `json:"retention"`
+	Schema    RecoveryArtifactVersionRecoveryDigest32 `json:"schema"`
+	Scope     RecoveryArtifactVersionScope            `json:"scope"`
+	SizeBytes int64                                   `json:"size_bytes"`
+	Version   RecoveryArtifactVersionOpaqueId         `json:"version"`
+}
+
+// RecoveryArtifactVersionDomainVersion defines model for RecoveryArtifactVersion.DomainVersion.
+type RecoveryArtifactVersionDomainVersion int64
+
+// RecoveryArtifactVersionRetention defines model for RecoveryArtifactVersion.Retention.
+type RecoveryArtifactVersionRetention string
+
+// RecoveryArtifactVersionArtifactInfluence defines model for RecoveryArtifactVersionArtifactInfluence.
+type RecoveryArtifactVersionArtifactInfluence struct {
+	Commitment           RecoveryArtifactVersionRecoveryDigest32 `json:"commitment"`
+	ExternallyInfluenced bool                                    `json:"externally_influenced"`
+	Unknown              bool                                    `json:"unknown"`
+}
+
+// RecoveryArtifactVersionArtifactProducer defines model for RecoveryArtifactVersionArtifactProducer.
+type RecoveryArtifactVersionArtifactProducer struct {
+	union json.RawMessage
+}
+
+// RecoveryArtifactVersionArtifactProducer0 defines model for .
+type RecoveryArtifactVersionArtifactProducer0 struct {
+	Kind      RecoveryArtifactVersionArtifactProducer0Kind `json:"kind"`
+	Operation RecoveryArtifactVersionOpaqueId              `json:"operation"`
+}
+
+// RecoveryArtifactVersionArtifactProducer0Kind defines model for RecoveryArtifactVersionArtifactProducer.0.Kind.
+type RecoveryArtifactVersionArtifactProducer0Kind string
+
+// RecoveryArtifactVersionArtifactProducer1 defines model for .
+type RecoveryArtifactVersionArtifactProducer1 struct {
+	Checkpoint RecoveryArtifactVersionOpaqueId              `json:"checkpoint"`
+	Kind       RecoveryArtifactVersionArtifactProducer1Kind `json:"kind"`
+}
+
+// RecoveryArtifactVersionArtifactProducer1Kind defines model for RecoveryArtifactVersionArtifactProducer.1.Kind.
+type RecoveryArtifactVersionArtifactProducer1Kind string
+
+// RecoveryArtifactVersionArtifactProducer2 defines model for .
+type RecoveryArtifactVersionArtifactProducer2 struct {
+	Kind      RecoveryArtifactVersionArtifactProducer2Kind `json:"kind"`
+	Operation RecoveryArtifactVersionOpaqueId              `json:"operation"`
+}
+
+// RecoveryArtifactVersionArtifactProducer2Kind defines model for RecoveryArtifactVersionArtifactProducer.2.Kind.
+type RecoveryArtifactVersionArtifactProducer2Kind string
+
+// RecoveryArtifactVersionArtifactProducer3 defines model for .
+type RecoveryArtifactVersionArtifactProducer3 struct {
+	Evidence RecoveryArtifactVersionOpaqueId              `json:"evidence"`
+	Kind     RecoveryArtifactVersionArtifactProducer3Kind `json:"kind"`
+}
+
+// RecoveryArtifactVersionArtifactProducer3Kind defines model for RecoveryArtifactVersionArtifactProducer.3.Kind.
+type RecoveryArtifactVersionArtifactProducer3Kind string
+
+// RecoveryArtifactVersionArtifactProducer4 defines model for .
+type RecoveryArtifactVersionArtifactProducer4 struct {
+	Kind     RecoveryArtifactVersionArtifactProducer4Kind `json:"kind"`
+	Manifest RecoveryArtifactVersionRecoveryDigest32      `json:"manifest"`
+	Origin   RecoveryArtifactVersionArtifactReference     `json:"origin"`
+}
+
+// RecoveryArtifactVersionArtifactProducer4Kind defines model for RecoveryArtifactVersionArtifactProducer.4.Kind.
+type RecoveryArtifactVersionArtifactProducer4Kind string
+
+// RecoveryArtifactVersionArtifactReference defines model for RecoveryArtifactVersionArtifactReference.
+type RecoveryArtifactVersionArtifactReference struct {
+	Artifact   RecoveryArtifactVersionOpaqueId         `json:"artifact"`
+	Provenance RecoveryArtifactVersionRecoveryDigest32 `json:"provenance"`
+	Scope      RecoveryArtifactVersionScope            `json:"scope"`
+	Version    RecoveryArtifactVersionOpaqueId         `json:"version"`
+}
+
+// RecoveryArtifactVersionOpaqueId defines model for RecoveryArtifactVersionOpaqueId.
+type RecoveryArtifactVersionOpaqueId = string
+
+// RecoveryArtifactVersionRecoveryDigest32 defines model for RecoveryArtifactVersionRecoveryDigest32.
+type RecoveryArtifactVersionRecoveryDigest32 = []int64
+
+// RecoveryArtifactVersionScope defines model for RecoveryArtifactVersionScope.
+type RecoveryArtifactVersionScope struct {
+	AuthorityDomain RecoveryArtifactVersionOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryArtifactVersionOpaqueId `json:"process_id"`
+	TenantId        RecoveryArtifactVersionOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryAuthorityCoverage defines model for RecoveryAuthorityCoverage.
+type RecoveryAuthorityCoverage struct {
+	ActionIntent              RecoveryAuthorityCoverageRecoveryDigest32    `json:"action_intent"`
+	ApprovalIntent            RecoveryAuthorityCoverageOpaqueId            `json:"approval_intent"`
+	AuthorizationRequirements RecoveryAuthorityCoverageRecoveryDigest32    `json:"authorization_requirements"`
+	Challenge                 RecoveryAuthorityCoverageOpaqueId            `json:"challenge"`
+	ExpiresAtUnixMs           RecoveryAuthorityCoverageSafeInteger         `json:"expires_at_unix_ms"`
+	IssuedAtUnixMs            RecoveryAuthorityCoverageSafeInteger         `json:"issued_at_unix_ms"`
+	IssuerId                  RecoveryAuthorityCoverageOpaqueId            `json:"issuer_id"`
+	Obligations               []RecoveryAuthorityCoverage_Obligations_Item `json:"obligations"`
+	Principal                 string                                       `json:"principal"`
+	Schema                    RecoveryAuthorityCoverageSchema              `json:"schema"`
+	Scope                     RecoveryAuthorityCoverageScope               `json:"scope"`
+	SourceBasis               RecoveryAuthorityCoverageRecoveryDigest32    `json:"source_basis"`
+	Version                   RecoveryAuthorityCoverageVersion             `json:"version"`
+}
+
+// RecoveryAuthorityCoverageObligations0 defines model for .
+type RecoveryAuthorityCoverageObligations0 struct {
+	Kind  RecoveryAuthorityCoverageObligations0Kind `json:"kind"`
+	Owner string                                    `json:"owner"`
+}
+
+// RecoveryAuthorityCoverageObligations0Kind defines model for RecoveryAuthorityCoverage.Obligations.0.Kind.
+type RecoveryAuthorityCoverageObligations0Kind string
+
+// RecoveryAuthorityCoverageObligations1 defines model for .
+type RecoveryAuthorityCoverageObligations1 struct {
+	Compartment string                                    `json:"compartment"`
+	Kind        RecoveryAuthorityCoverageObligations1Kind `json:"kind"`
+}
+
+// RecoveryAuthorityCoverageObligations1Kind defines model for RecoveryAuthorityCoverage.Obligations.1.Kind.
+type RecoveryAuthorityCoverageObligations1Kind string
+
+// RecoveryAuthorityCoverageObligations2 defines model for .
+type RecoveryAuthorityCoverageObligations2 struct {
+	Kind      RecoveryAuthorityCoverageObligations2Kind `json:"kind"`
+	Principal string                                    `json:"principal"`
+}
+
+// RecoveryAuthorityCoverageObligations2Kind defines model for RecoveryAuthorityCoverage.Obligations.2.Kind.
+type RecoveryAuthorityCoverageObligations2Kind string
+
+// RecoveryAuthorityCoverageObligations3 defines model for .
+type RecoveryAuthorityCoverageObligations3 struct {
+	Kind      RecoveryAuthorityCoverageObligations3Kind `json:"kind"`
+	Principal string                                    `json:"principal"`
+}
+
+// RecoveryAuthorityCoverageObligations3Kind defines model for RecoveryAuthorityCoverage.Obligations.3.Kind.
+type RecoveryAuthorityCoverageObligations3Kind string
+
+// RecoveryAuthorityCoverage_Obligations_Item defines model for RecoveryAuthorityCoverage.obligations.Item.
+type RecoveryAuthorityCoverage_Obligations_Item struct {
+	union json.RawMessage
+}
+
+// RecoveryAuthorityCoverageSchema defines model for RecoveryAuthorityCoverage.Schema.
+type RecoveryAuthorityCoverageSchema string
+
+// RecoveryAuthorityCoverageVersion defines model for RecoveryAuthorityCoverage.Version.
+type RecoveryAuthorityCoverageVersion int64
+
+// RecoveryAuthorityCoverageOpaqueId defines model for RecoveryAuthorityCoverageOpaqueId.
+type RecoveryAuthorityCoverageOpaqueId = string
+
+// RecoveryAuthorityCoverageRecoveryDigest32 defines model for RecoveryAuthorityCoverageRecoveryDigest32.
+type RecoveryAuthorityCoverageRecoveryDigest32 = []int64
+
+// RecoveryAuthorityCoverageSafeInteger defines model for RecoveryAuthorityCoverageSafeInteger.
+type RecoveryAuthorityCoverageSafeInteger = int64
+
+// RecoveryAuthorityCoverageScope defines model for RecoveryAuthorityCoverageScope.
+type RecoveryAuthorityCoverageScope struct {
+	AuthorityDomain RecoveryAuthorityCoverageOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryAuthorityCoverageOpaqueId `json:"process_id"`
+	TenantId        RecoveryAuthorityCoverageOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryAuthorizationRequirements defines model for RecoveryAuthorizationRequirements.
+type RecoveryAuthorizationRequirements struct {
+	// AdmittedTarget Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	AdmittedTarget    SecurityInformationLabel                             `json:"admitted_target"`
+	AttachmentProfile RecoveryAuthorizationRequirementsAttachmentProfile   `json:"attachment_profile"`
+	InfluenceBasis    RecoveryAuthorizationRequirementsRecoveryDigest32    `json:"influence_basis"`
+	IssuerScope       RecoveryAuthorizationRequirementsRecoveryDigest32    `json:"issuer_scope"`
+	Obligations       []RecoveryAuthorizationRequirements_Obligations_Item `json:"obligations"`
+	Purpose           string                                               `json:"purpose"`
+	Recipient         string                                               `json:"recipient"`
+	Schema            RecoveryAuthorizationRequirementsSchema              `json:"schema"`
+	Scope             RecoveryAuthorizationRequirementsScope               `json:"scope"`
+	SourceJoin        RecoveryAuthorizationRequirementsRecoveryDigest32    `json:"source_join"`
+
+	// SourceLabel Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	SourceLabel           SecurityInformationLabel                     `json:"source_label"`
+	ValidityCeilingUnixMs RecoveryAuthorizationRequirementsSafeInteger `json:"validity_ceiling_unix_ms"`
+	Version               RecoveryAuthorizationRequirementsVersion     `json:"version"`
+}
+
+// RecoveryAuthorizationRequirementsAttachmentProfile defines model for RecoveryAuthorizationRequirements.AttachmentProfile.
+type RecoveryAuthorizationRequirementsAttachmentProfile string
+
+// RecoveryAuthorizationRequirementsObligations0 defines model for .
+type RecoveryAuthorizationRequirementsObligations0 struct {
+	Kind  RecoveryAuthorizationRequirementsObligations0Kind `json:"kind"`
+	Owner string                                            `json:"owner"`
+}
+
+// RecoveryAuthorizationRequirementsObligations0Kind defines model for RecoveryAuthorizationRequirements.Obligations.0.Kind.
+type RecoveryAuthorizationRequirementsObligations0Kind string
+
+// RecoveryAuthorizationRequirementsObligations1 defines model for .
+type RecoveryAuthorizationRequirementsObligations1 struct {
+	Compartment string                                            `json:"compartment"`
+	Kind        RecoveryAuthorizationRequirementsObligations1Kind `json:"kind"`
+}
+
+// RecoveryAuthorizationRequirementsObligations1Kind defines model for RecoveryAuthorizationRequirements.Obligations.1.Kind.
+type RecoveryAuthorizationRequirementsObligations1Kind string
+
+// RecoveryAuthorizationRequirementsObligations2 defines model for .
+type RecoveryAuthorizationRequirementsObligations2 struct {
+	Kind      RecoveryAuthorizationRequirementsObligations2Kind `json:"kind"`
+	Principal string                                            `json:"principal"`
+}
+
+// RecoveryAuthorizationRequirementsObligations2Kind defines model for RecoveryAuthorizationRequirements.Obligations.2.Kind.
+type RecoveryAuthorizationRequirementsObligations2Kind string
+
+// RecoveryAuthorizationRequirementsObligations3 defines model for .
+type RecoveryAuthorizationRequirementsObligations3 struct {
+	Kind      RecoveryAuthorizationRequirementsObligations3Kind `json:"kind"`
+	Principal string                                            `json:"principal"`
+}
+
+// RecoveryAuthorizationRequirementsObligations3Kind defines model for RecoveryAuthorizationRequirements.Obligations.3.Kind.
+type RecoveryAuthorizationRequirementsObligations3Kind string
+
+// RecoveryAuthorizationRequirements_Obligations_Item defines model for RecoveryAuthorizationRequirements.obligations.Item.
+type RecoveryAuthorizationRequirements_Obligations_Item struct {
+	union json.RawMessage
+}
+
+// RecoveryAuthorizationRequirementsSchema defines model for RecoveryAuthorizationRequirements.Schema.
+type RecoveryAuthorizationRequirementsSchema string
+
+// RecoveryAuthorizationRequirementsVersion defines model for RecoveryAuthorizationRequirements.Version.
+type RecoveryAuthorizationRequirementsVersion int64
+
+// RecoveryAuthorizationRequirementsOpaqueId defines model for RecoveryAuthorizationRequirementsOpaqueId.
+type RecoveryAuthorizationRequirementsOpaqueId = string
+
+// RecoveryAuthorizationRequirementsRecoveryDigest32 defines model for RecoveryAuthorizationRequirementsRecoveryDigest32.
+type RecoveryAuthorizationRequirementsRecoveryDigest32 = []int64
+
+// RecoveryAuthorizationRequirementsSafeInteger defines model for RecoveryAuthorizationRequirementsSafeInteger.
+type RecoveryAuthorizationRequirementsSafeInteger = int64
+
+// RecoveryAuthorizationRequirementsScope defines model for RecoveryAuthorizationRequirementsScope.
+type RecoveryAuthorizationRequirementsScope struct {
+	AuthorityDomain RecoveryAuthorizationRequirementsOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryAuthorizationRequirementsOpaqueId `json:"process_id"`
+	TenantId        RecoveryAuthorizationRequirementsOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryCommand defines model for RecoveryCommand.
+type RecoveryCommand struct {
+	Command   RecoveryCommand_Command `json:"command"`
+	CommandId RecoveryCommandOpaqueId `json:"command_id"`
+	Schema    RecoveryCommandSchema   `json:"schema"`
+	Version   RecoveryCommandVersion  `json:"version"`
+}
+
+// RecoveryCommandCommand0 defines model for .
+type RecoveryCommandCommand0 struct {
+	CreationKey RecoveryCommandOpaqueId         `json:"creation_key"`
+	Kind        RecoveryCommandCommand0Kind     `json:"kind"`
+	RequestSeed string                          `json:"request_seed"`
+	Template    RecoveryCommandCommand0Template `json:"template"`
+}
+
+// RecoveryCommandCommand0Kind defines model for RecoveryCommand.Command.0.Kind.
+type RecoveryCommandCommand0Kind string
+
+// RecoveryCommandCommand0Template defines model for RecoveryCommand.Command.0.Template.
+type RecoveryCommandCommand0Template string
+
+// RecoveryCommandCommand1 defines model for .
+type RecoveryCommandCommand1 struct {
+	Kind       RecoveryCommandCommand1Kind `json:"kind"`
+	WorkflowId RecoveryCommandOpaqueId     `json:"workflow_id"`
+}
+
+// RecoveryCommandCommand1Kind defines model for RecoveryCommand.Command.1.Kind.
+type RecoveryCommandCommand1Kind string
+
+// RecoveryCommandCommand2 defines model for .
+type RecoveryCommandCommand2 struct {
+	ExpectedRevision RecoveryCommandSafeInteger  `json:"expected_revision"`
+	Kind             RecoveryCommandCommand2Kind `json:"kind"`
+	OfferId          RecoveryCommandOpaqueId     `json:"offer_id"`
+	WorkflowId       RecoveryCommandOpaqueId     `json:"workflow_id"`
+}
+
+// RecoveryCommandCommand2Kind defines model for RecoveryCommand.Command.2.Kind.
+type RecoveryCommandCommand2Kind string
+
+// RecoveryCommandCommand3 defines model for .
+type RecoveryCommandCommand3 struct {
+	Approval         string                      `json:"approval"`
+	ExpectedRevision RecoveryCommandSafeInteger  `json:"expected_revision"`
+	Kind             RecoveryCommandCommand3Kind `json:"kind"`
+	WorkflowId       RecoveryCommandOpaqueId     `json:"workflow_id"`
+}
+
+// RecoveryCommandCommand3Kind defines model for RecoveryCommand.Command.3.Kind.
+type RecoveryCommandCommand3Kind string
+
+// RecoveryCommandCommand4 defines model for .
+type RecoveryCommandCommand4 struct {
+	ExpectedRevision RecoveryCommandSafeInteger  `json:"expected_revision"`
+	Kind             RecoveryCommandCommand4Kind `json:"kind"`
+	WorkflowId       RecoveryCommandOpaqueId     `json:"workflow_id"`
+}
+
+// RecoveryCommandCommand4Kind defines model for RecoveryCommand.Command.4.Kind.
+type RecoveryCommandCommand4Kind string
+
+// RecoveryCommandCommand5 defines model for .
+type RecoveryCommandCommand5 struct {
+	ExpectedRevision RecoveryCommandSafeInteger  `json:"expected_revision"`
+	Kind             RecoveryCommandCommand5Kind `json:"kind"`
+	WorkflowId       RecoveryCommandOpaqueId     `json:"workflow_id"`
+}
+
+// RecoveryCommandCommand5Kind defines model for RecoveryCommand.Command.5.Kind.
+type RecoveryCommandCommand5Kind string
+
+// RecoveryCommandCommand6 defines model for .
+type RecoveryCommandCommand6 struct {
+	Decision         RecoveryCommandCommand6Decision `json:"decision"`
+	ExpectedRevision RecoveryCommandSafeInteger      `json:"expected_revision"`
+	Kind             RecoveryCommandCommand6Kind     `json:"kind"`
+	WorkflowId       RecoveryCommandOpaqueId         `json:"workflow_id"`
+}
+
+// RecoveryCommandCommand6Decision defines model for RecoveryCommand.Command.6.Decision.
+type RecoveryCommandCommand6Decision string
+
+// RecoveryCommandCommand6Kind defines model for RecoveryCommand.Command.6.Kind.
+type RecoveryCommandCommand6Kind string
+
+// RecoveryCommand_Command defines model for RecoveryCommand.Command.
+type RecoveryCommand_Command struct {
+	union json.RawMessage
+}
+
+// RecoveryCommandSchema defines model for RecoveryCommand.Schema.
+type RecoveryCommandSchema string
+
+// RecoveryCommandVersion defines model for RecoveryCommand.Version.
+type RecoveryCommandVersion int64
+
+// RecoveryCommandOpaqueId defines model for RecoveryCommandOpaqueId.
+type RecoveryCommandOpaqueId = string
+
+// RecoveryCommandRecoveryDigest32 defines model for RecoveryCommandRecoveryDigest32.
+type RecoveryCommandRecoveryDigest32 = []int64
+
+// RecoveryCommandResponse defines model for RecoveryCommandResponse.
+type RecoveryCommandResponse struct {
+	CommandId  RecoveryCommandResponseOpaqueId    `json:"command_id"`
+	Control    RecoveryCommandResponseControl     `json:"control"`
+	Effect     RecoveryCommandResponse_Effect     `json:"effect"`
+	Release    RecoveryCommandResponse_Release    `json:"release"`
+	Revision   RecoveryCommandResponseSafeInteger `json:"revision"`
+	WorkflowId RecoveryCommandResponseOpaqueId    `json:"workflow_id"`
+}
+
+// RecoveryCommandResponseControl defines model for RecoveryCommandResponse.Control.
+type RecoveryCommandResponseControl string
+
+// RecoveryCommandResponse_Effect defines model for RecoveryCommandResponse.Effect.
+type RecoveryCommandResponse_Effect struct {
+	union json.RawMessage
+}
+
+// RecoveryCommandResponseRelease0 defines model for .
+type RecoveryCommandResponseRelease0 struct {
+	Kind RecoveryCommandResponseRelease0Kind `json:"kind"`
+}
+
+// RecoveryCommandResponseRelease0Kind defines model for RecoveryCommandResponse.Release.0.Kind.
+type RecoveryCommandResponseRelease0Kind string
+
+// RecoveryCommandResponseRelease1 defines model for .
+type RecoveryCommandResponseRelease1 struct {
+	Kind      RecoveryCommandResponseRelease1Kind `json:"kind"`
+	ReleaseId RecoveryCommandResponseOpaqueId     `json:"release_id"`
+}
+
+// RecoveryCommandResponseRelease1Kind defines model for RecoveryCommandResponse.Release.1.Kind.
+type RecoveryCommandResponseRelease1Kind string
+
+// RecoveryCommandResponseRelease2 defines model for .
+type RecoveryCommandResponseRelease2 struct {
+	Evidence RecoveryCommandResponseOpaqueId     `json:"evidence"`
+	Kind     RecoveryCommandResponseRelease2Kind `json:"kind"`
+}
+
+// RecoveryCommandResponseRelease2Kind defines model for RecoveryCommandResponse.Release.2.Kind.
+type RecoveryCommandResponseRelease2Kind string
+
+// RecoveryCommandResponseRelease3 defines model for .
+type RecoveryCommandResponseRelease3 struct {
+	Kind      RecoveryCommandResponseRelease3Kind `json:"kind"`
+	ReleaseId RecoveryCommandResponseOpaqueId     `json:"release_id"`
+}
+
+// RecoveryCommandResponseRelease3Kind defines model for RecoveryCommandResponse.Release.3.Kind.
+type RecoveryCommandResponseRelease3Kind string
+
+// RecoveryCommandResponseRelease4 defines model for .
+type RecoveryCommandResponseRelease4 struct {
+	Kind   RecoveryCommandResponseRelease4Kind `json:"kind"`
+	Reason RecoveryCommandResponseRefusalCode  `json:"reason"`
+}
+
+// RecoveryCommandResponseRelease4Kind defines model for RecoveryCommandResponse.Release.4.Kind.
+type RecoveryCommandResponseRelease4Kind string
+
+// RecoveryCommandResponse_Release defines model for RecoveryCommandResponse.Release.
+type RecoveryCommandResponse_Release struct {
+	union json.RawMessage
+}
+
+// RecoveryCommandResponseOpaqueId defines model for RecoveryCommandResponseOpaqueId.
+type RecoveryCommandResponseOpaqueId = string
+
+// RecoveryCommandResponseOperation defines model for RecoveryCommandResponseOperation.
+type RecoveryCommandResponseOperation struct {
+	NativeAdmissionDigest RecoveryCommandResponseRecoveryDigest32 `json:"native_admission_digest"`
+	OperationId           RecoveryCommandResponseOpaqueId         `json:"operation_id"`
+	OperationVersion      int64                                   `json:"operation_version"`
+}
+
+// RecoveryCommandResponseRecoveryDigest32 defines model for RecoveryCommandResponseRecoveryDigest32.
+type RecoveryCommandResponseRecoveryDigest32 = []int64
+
+// RecoveryCommandResponseRecoveryEffectAdmissionUnresolvedV1 defines model for RecoveryCommandResponseRecoveryEffectAdmissionUnresolvedV1.
+type RecoveryCommandResponseRecoveryEffectAdmissionUnresolvedV1 struct {
+	AdmissionIntent RecoveryCommandResponseOpaqueId                                `json:"admission_intent"`
+	Kind            RecoveryCommandResponseRecoveryEffectAdmissionUnresolvedV1Kind `json:"kind"`
+}
+
+// RecoveryCommandResponseRecoveryEffectAdmissionUnresolvedV1Kind defines model for RecoveryCommandResponseRecoveryEffectAdmissionUnresolvedV1.Kind.
+type RecoveryCommandResponseRecoveryEffectAdmissionUnresolvedV1Kind string
+
+// RecoveryCommandResponseRecoveryEffectAwaitingApprovalV1 defines model for RecoveryCommandResponseRecoveryEffectAwaitingApprovalV1.
+type RecoveryCommandResponseRecoveryEffectAwaitingApprovalV1 struct {
+	Kind      RecoveryCommandResponseRecoveryEffectAwaitingApprovalV1Kind `json:"kind"`
+	Operation RecoveryCommandResponseOperation                            `json:"operation"`
+}
+
+// RecoveryCommandResponseRecoveryEffectAwaitingApprovalV1Kind defines model for RecoveryCommandResponseRecoveryEffectAwaitingApprovalV1.Kind.
+type RecoveryCommandResponseRecoveryEffectAwaitingApprovalV1Kind string
+
+// RecoveryCommandResponseRecoveryEffectAwaitingCallerReportV1 defines model for RecoveryCommandResponseRecoveryEffectAwaitingCallerReportV1.
+type RecoveryCommandResponseRecoveryEffectAwaitingCallerReportV1 struct {
+	Kind      RecoveryCommandResponseRecoveryEffectAwaitingCallerReportV1Kind `json:"kind"`
+	Operation RecoveryCommandResponseOperation                                `json:"operation"`
+}
+
+// RecoveryCommandResponseRecoveryEffectAwaitingCallerReportV1Kind defines model for RecoveryCommandResponseRecoveryEffectAwaitingCallerReportV1.Kind.
+type RecoveryCommandResponseRecoveryEffectAwaitingCallerReportV1Kind string
+
+// RecoveryCommandResponseRecoveryEffectClosedBeforeEffectV1 defines model for RecoveryCommandResponseRecoveryEffectClosedBeforeEffectV1.
+type RecoveryCommandResponseRecoveryEffectClosedBeforeEffectV1 struct {
+	Closure   RecoveryCommandResponseOpaqueId                               `json:"closure"`
+	Kind      RecoveryCommandResponseRecoveryEffectClosedBeforeEffectV1Kind `json:"kind"`
+	Operation RecoveryCommandResponseOperation                              `json:"operation"`
+}
+
+// RecoveryCommandResponseRecoveryEffectClosedBeforeEffectV1Kind defines model for RecoveryCommandResponseRecoveryEffectClosedBeforeEffectV1.Kind.
+type RecoveryCommandResponseRecoveryEffectClosedBeforeEffectV1Kind string
+
+// RecoveryCommandResponseRecoveryEffectCompleteV1 defines model for RecoveryCommandResponseRecoveryEffectCompleteV1.
+type RecoveryCommandResponseRecoveryEffectCompleteV1 struct {
+	EffectCount RecoveryCommandResponseSafeInteger                  `json:"effect_count"`
+	Kind        RecoveryCommandResponseRecoveryEffectCompleteV1Kind `json:"kind"`
+	Operation   RecoveryCommandResponseOperation                    `json:"operation"`
+}
+
+// RecoveryCommandResponseRecoveryEffectCompleteV1Kind defines model for RecoveryCommandResponseRecoveryEffectCompleteV1.Kind.
+type RecoveryCommandResponseRecoveryEffectCompleteV1Kind string
+
+// RecoveryCommandResponseRecoveryEffectFailedAfterEffectV1 defines model for RecoveryCommandResponseRecoveryEffectFailedAfterEffectV1.
+type RecoveryCommandResponseRecoveryEffectFailedAfterEffectV1 struct {
+	AppliedEffects int64                                                        `json:"applied_effects"`
+	Kind           RecoveryCommandResponseRecoveryEffectFailedAfterEffectV1Kind `json:"kind"`
+	Operation      RecoveryCommandResponseOperation                             `json:"operation"`
+}
+
+// RecoveryCommandResponseRecoveryEffectFailedAfterEffectV1Kind defines model for RecoveryCommandResponseRecoveryEffectFailedAfterEffectV1.Kind.
+type RecoveryCommandResponseRecoveryEffectFailedAfterEffectV1Kind string
+
+// RecoveryCommandResponseRecoveryEffectInFlightV1 defines model for RecoveryCommandResponseRecoveryEffectInFlightV1.
+type RecoveryCommandResponseRecoveryEffectInFlightV1 struct {
+	Kind      RecoveryCommandResponseRecoveryEffectInFlightV1Kind `json:"kind"`
+	Operation RecoveryCommandResponseOperation                    `json:"operation"`
+}
+
+// RecoveryCommandResponseRecoveryEffectInFlightV1Kind defines model for RecoveryCommandResponseRecoveryEffectInFlightV1.Kind.
+type RecoveryCommandResponseRecoveryEffectInFlightV1Kind string
+
+// RecoveryCommandResponseRecoveryEffectNeverAdmittedV1 defines model for RecoveryCommandResponseRecoveryEffectNeverAdmittedV1.
+type RecoveryCommandResponseRecoveryEffectNeverAdmittedV1 struct {
+	Kind RecoveryCommandResponseRecoveryEffectNeverAdmittedV1Kind `json:"kind"`
+}
+
+// RecoveryCommandResponseRecoveryEffectNeverAdmittedV1Kind defines model for RecoveryCommandResponseRecoveryEffectNeverAdmittedV1.Kind.
+type RecoveryCommandResponseRecoveryEffectNeverAdmittedV1Kind string
+
+// RecoveryCommandResponseRecoveryEffectPartialV1 defines model for RecoveryCommandResponseRecoveryEffectPartialV1.
+type RecoveryCommandResponseRecoveryEffectPartialV1 struct {
+	AppliedEffects int64                                              `json:"applied_effects"`
+	Kind           RecoveryCommandResponseRecoveryEffectPartialV1Kind `json:"kind"`
+	Operation      RecoveryCommandResponseOperation                   `json:"operation"`
+}
+
+// RecoveryCommandResponseRecoveryEffectPartialV1Kind defines model for RecoveryCommandResponseRecoveryEffectPartialV1.Kind.
+type RecoveryCommandResponseRecoveryEffectPartialV1Kind string
+
+// RecoveryCommandResponseRecoveryEffectUnknownV1 defines model for RecoveryCommandResponseRecoveryEffectUnknownV1.
+type RecoveryCommandResponseRecoveryEffectUnknownV1 struct {
+	Kind      RecoveryCommandResponseRecoveryEffectUnknownV1Kind `json:"kind"`
+	Operation RecoveryCommandResponseOperation                   `json:"operation"`
+}
+
+// RecoveryCommandResponseRecoveryEffectUnknownV1Kind defines model for RecoveryCommandResponseRecoveryEffectUnknownV1.Kind.
+type RecoveryCommandResponseRecoveryEffectUnknownV1Kind string
+
+// RecoveryCommandResponseRefusalCode defines model for RecoveryCommandResponseRefusalCode.
+type RecoveryCommandResponseRefusalCode string
+
+// RecoveryCommandResponseSafeInteger defines model for RecoveryCommandResponseSafeInteger.
+type RecoveryCommandResponseSafeInteger = int64
+
+// RecoveryCommandResponseScope defines model for RecoveryCommandResponseScope.
+type RecoveryCommandResponseScope struct {
+	AuthorityDomain RecoveryCommandResponseOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryCommandResponseOpaqueId `json:"process_id"`
+	TenantId        RecoveryCommandResponseOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryCommandResult defines model for RecoveryCommandResult.
+type RecoveryCommandResult struct {
+	OriginalResponse *struct {
+		// Receipt A signed Chio receipt: proof that a tool call was evaluated by the Kernel. The receipt id is the authoritative content-addressed SHA-256 hash over the canonical ChioReceiptIdInput.
+		Receipt ReceiptRecord `json:"receipt"`
+		Result  interface{}   `json:"result"`
+	} `json:"original_response,omitempty"`
+	Status RecoveryCommandResponse `json:"status"`
+}
+
+// RecoveryCommandResultOpaqueId defines model for RecoveryCommandResultOpaqueId.
+type RecoveryCommandResultOpaqueId = string
+
+// RecoveryCommandResultOperation defines model for RecoveryCommandResultOperation.
+type RecoveryCommandResultOperation struct {
+	NativeAdmissionDigest RecoveryCommandResultRecoveryDigest32 `json:"native_admission_digest"`
+	OperationId           RecoveryCommandResultOpaqueId         `json:"operation_id"`
+	OperationVersion      int64                                 `json:"operation_version"`
+}
+
+// RecoveryCommandResultRecoveryDigest32 defines model for RecoveryCommandResultRecoveryDigest32.
+type RecoveryCommandResultRecoveryDigest32 = []int64
+
+// RecoveryCommandResultRecoveryEffectAdmissionUnresolvedV1 defines model for RecoveryCommandResultRecoveryEffectAdmissionUnresolvedV1.
+type RecoveryCommandResultRecoveryEffectAdmissionUnresolvedV1 struct {
+	AdmissionIntent RecoveryCommandResultOpaqueId                                `json:"admission_intent"`
+	Kind            RecoveryCommandResultRecoveryEffectAdmissionUnresolvedV1Kind `json:"kind"`
+}
+
+// RecoveryCommandResultRecoveryEffectAdmissionUnresolvedV1Kind defines model for RecoveryCommandResultRecoveryEffectAdmissionUnresolvedV1.Kind.
+type RecoveryCommandResultRecoveryEffectAdmissionUnresolvedV1Kind string
+
+// RecoveryCommandResultRecoveryEffectAwaitingApprovalV1 defines model for RecoveryCommandResultRecoveryEffectAwaitingApprovalV1.
+type RecoveryCommandResultRecoveryEffectAwaitingApprovalV1 struct {
+	Kind      RecoveryCommandResultRecoveryEffectAwaitingApprovalV1Kind `json:"kind"`
+	Operation RecoveryCommandResultOperation                            `json:"operation"`
+}
+
+// RecoveryCommandResultRecoveryEffectAwaitingApprovalV1Kind defines model for RecoveryCommandResultRecoveryEffectAwaitingApprovalV1.Kind.
+type RecoveryCommandResultRecoveryEffectAwaitingApprovalV1Kind string
+
+// RecoveryCommandResultRecoveryEffectAwaitingCallerReportV1 defines model for RecoveryCommandResultRecoveryEffectAwaitingCallerReportV1.
+type RecoveryCommandResultRecoveryEffectAwaitingCallerReportV1 struct {
+	Kind      RecoveryCommandResultRecoveryEffectAwaitingCallerReportV1Kind `json:"kind"`
+	Operation RecoveryCommandResultOperation                                `json:"operation"`
+}
+
+// RecoveryCommandResultRecoveryEffectAwaitingCallerReportV1Kind defines model for RecoveryCommandResultRecoveryEffectAwaitingCallerReportV1.Kind.
+type RecoveryCommandResultRecoveryEffectAwaitingCallerReportV1Kind string
+
+// RecoveryCommandResultRecoveryEffectClosedBeforeEffectV1 defines model for RecoveryCommandResultRecoveryEffectClosedBeforeEffectV1.
+type RecoveryCommandResultRecoveryEffectClosedBeforeEffectV1 struct {
+	Closure   RecoveryCommandResultOpaqueId                               `json:"closure"`
+	Kind      RecoveryCommandResultRecoveryEffectClosedBeforeEffectV1Kind `json:"kind"`
+	Operation RecoveryCommandResultOperation                              `json:"operation"`
+}
+
+// RecoveryCommandResultRecoveryEffectClosedBeforeEffectV1Kind defines model for RecoveryCommandResultRecoveryEffectClosedBeforeEffectV1.Kind.
+type RecoveryCommandResultRecoveryEffectClosedBeforeEffectV1Kind string
+
+// RecoveryCommandResultRecoveryEffectCompleteV1 defines model for RecoveryCommandResultRecoveryEffectCompleteV1.
+type RecoveryCommandResultRecoveryEffectCompleteV1 struct {
+	EffectCount RecoveryCommandResultSafeInteger                  `json:"effect_count"`
+	Kind        RecoveryCommandResultRecoveryEffectCompleteV1Kind `json:"kind"`
+	Operation   RecoveryCommandResultOperation                    `json:"operation"`
+}
+
+// RecoveryCommandResultRecoveryEffectCompleteV1Kind defines model for RecoveryCommandResultRecoveryEffectCompleteV1.Kind.
+type RecoveryCommandResultRecoveryEffectCompleteV1Kind string
+
+// RecoveryCommandResultRecoveryEffectFailedAfterEffectV1 defines model for RecoveryCommandResultRecoveryEffectFailedAfterEffectV1.
+type RecoveryCommandResultRecoveryEffectFailedAfterEffectV1 struct {
+	AppliedEffects int64                                                      `json:"applied_effects"`
+	Kind           RecoveryCommandResultRecoveryEffectFailedAfterEffectV1Kind `json:"kind"`
+	Operation      RecoveryCommandResultOperation                             `json:"operation"`
+}
+
+// RecoveryCommandResultRecoveryEffectFailedAfterEffectV1Kind defines model for RecoveryCommandResultRecoveryEffectFailedAfterEffectV1.Kind.
+type RecoveryCommandResultRecoveryEffectFailedAfterEffectV1Kind string
+
+// RecoveryCommandResultRecoveryEffectInFlightV1 defines model for RecoveryCommandResultRecoveryEffectInFlightV1.
+type RecoveryCommandResultRecoveryEffectInFlightV1 struct {
+	Kind      RecoveryCommandResultRecoveryEffectInFlightV1Kind `json:"kind"`
+	Operation RecoveryCommandResultOperation                    `json:"operation"`
+}
+
+// RecoveryCommandResultRecoveryEffectInFlightV1Kind defines model for RecoveryCommandResultRecoveryEffectInFlightV1.Kind.
+type RecoveryCommandResultRecoveryEffectInFlightV1Kind string
+
+// RecoveryCommandResultRecoveryEffectNeverAdmittedV1 defines model for RecoveryCommandResultRecoveryEffectNeverAdmittedV1.
+type RecoveryCommandResultRecoveryEffectNeverAdmittedV1 struct {
+	Kind RecoveryCommandResultRecoveryEffectNeverAdmittedV1Kind `json:"kind"`
+}
+
+// RecoveryCommandResultRecoveryEffectNeverAdmittedV1Kind defines model for RecoveryCommandResultRecoveryEffectNeverAdmittedV1.Kind.
+type RecoveryCommandResultRecoveryEffectNeverAdmittedV1Kind string
+
+// RecoveryCommandResultRecoveryEffectPartialV1 defines model for RecoveryCommandResultRecoveryEffectPartialV1.
+type RecoveryCommandResultRecoveryEffectPartialV1 struct {
+	AppliedEffects int64                                            `json:"applied_effects"`
+	Kind           RecoveryCommandResultRecoveryEffectPartialV1Kind `json:"kind"`
+	Operation      RecoveryCommandResultOperation                   `json:"operation"`
+}
+
+// RecoveryCommandResultRecoveryEffectPartialV1Kind defines model for RecoveryCommandResultRecoveryEffectPartialV1.Kind.
+type RecoveryCommandResultRecoveryEffectPartialV1Kind string
+
+// RecoveryCommandResultRecoveryEffectUnknownV1 defines model for RecoveryCommandResultRecoveryEffectUnknownV1.
+type RecoveryCommandResultRecoveryEffectUnknownV1 struct {
+	Kind      RecoveryCommandResultRecoveryEffectUnknownV1Kind `json:"kind"`
+	Operation RecoveryCommandResultOperation                   `json:"operation"`
+}
+
+// RecoveryCommandResultRecoveryEffectUnknownV1Kind defines model for RecoveryCommandResultRecoveryEffectUnknownV1.Kind.
+type RecoveryCommandResultRecoveryEffectUnknownV1Kind string
+
+// RecoveryCommandResultRefusalCode defines model for RecoveryCommandResultRefusalCode.
+type RecoveryCommandResultRefusalCode string
+
+// RecoveryCommandResultSafeInteger defines model for RecoveryCommandResultSafeInteger.
+type RecoveryCommandResultSafeInteger = int64
+
+// RecoveryCommandResultScope defines model for RecoveryCommandResultScope.
+type RecoveryCommandResultScope struct {
+	AuthorityDomain RecoveryCommandResultOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryCommandResultOpaqueId `json:"process_id"`
+	TenantId        RecoveryCommandResultOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryCommandSafeInteger defines model for RecoveryCommandSafeInteger.
+type RecoveryCommandSafeInteger = int64
+
+// RecoveryCommandScope defines model for RecoveryCommandScope.
+type RecoveryCommandScope struct {
+	AuthorityDomain RecoveryCommandOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryCommandOpaqueId `json:"process_id"`
+	TenantId        RecoveryCommandOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryConfinedExecutionProfile defines model for RecoveryConfinedExecutionProfile.
+type RecoveryConfinedExecutionProfile struct {
+	Configuration RecoveryConfinedExecutionProfileRecoveryDigest32 `json:"configuration"`
+	Helper        RecoveryConfinedExecutionProfileRecoveryDigest32 `json:"helper"`
+	Image         RecoveryConfinedExecutionProfileRecoveryDigest32 `json:"image"`
+	Manifest      RecoveryConfinedExecutionProfileRecoveryDigest32 `json:"manifest"`
+	Profile       RecoveryConfinedExecutionProfileRecoveryDigest32 `json:"profile"`
+	Provider      RecoveryConfinedExecutionProfileProvider         `json:"provider"`
+}
+
+// RecoveryConfinedExecutionProfileProvider defines model for RecoveryConfinedExecutionProfile.Provider.
+type RecoveryConfinedExecutionProfileProvider string
+
+// RecoveryConfinedExecutionProfileArtifactInfluence defines model for RecoveryConfinedExecutionProfileArtifactInfluence.
+type RecoveryConfinedExecutionProfileArtifactInfluence struct {
+	Commitment           RecoveryConfinedExecutionProfileRecoveryDigest32 `json:"commitment"`
+	ExternallyInfluenced bool                                             `json:"externally_influenced"`
+	Unknown              bool                                             `json:"unknown"`
+}
+
+// RecoveryConfinedExecutionProfileArtifactRecipient defines model for RecoveryConfinedExecutionProfileArtifactRecipient.
+type RecoveryConfinedExecutionProfileArtifactRecipient struct {
+	// Clearance Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	Clearance         SecurityInformationLabel                     `json:"clearance"`
+	ContextGeneration RecoveryConfinedExecutionProfileSafeInteger  `json:"context_generation"`
+	IsolationEpoch    string                                       `json:"isolation_epoch"`
+	Lineage           RecoveryConfinedExecutionProfileOpaqueId     `json:"lineage"`
+	Principal         string                                       `json:"principal"`
+	Recipient         RecoveryConfinedExecutionProfileOpaqueId     `json:"recipient"`
+	Runtime           string                                       `json:"runtime"`
+	Scope             RecoveryConfinedExecutionProfileScope        `json:"scope"`
+	Sink              RecoveryConfinedExecutionProfileArtifactSink `json:"sink"`
+}
+
+// RecoveryConfinedExecutionProfileArtifactReference defines model for RecoveryConfinedExecutionProfileArtifactReference.
+type RecoveryConfinedExecutionProfileArtifactReference struct {
+	Artifact   RecoveryConfinedExecutionProfileOpaqueId         `json:"artifact"`
+	Provenance RecoveryConfinedExecutionProfileRecoveryDigest32 `json:"provenance"`
+	Scope      RecoveryConfinedExecutionProfileScope            `json:"scope"`
+	Version    RecoveryConfinedExecutionProfileOpaqueId         `json:"version"`
+}
+
+// RecoveryConfinedExecutionProfileArtifactSink defines model for RecoveryConfinedExecutionProfileArtifactSink.
+type RecoveryConfinedExecutionProfileArtifactSink struct {
+	union json.RawMessage
+}
+
+// RecoveryConfinedExecutionProfileArtifactSink0 defines model for .
+type RecoveryConfinedExecutionProfileArtifactSink0 struct {
+	Kind RecoveryConfinedExecutionProfileArtifactSink0Kind `json:"kind"`
+}
+
+// RecoveryConfinedExecutionProfileArtifactSink0Kind defines model for RecoveryConfinedExecutionProfileArtifactSink.0.Kind.
+type RecoveryConfinedExecutionProfileArtifactSink0Kind string
+
+// RecoveryConfinedExecutionProfileArtifactSink1 defines model for .
+type RecoveryConfinedExecutionProfileArtifactSink1 struct {
+	Context RecoveryConfinedExecutionProfileModelContext      `json:"context"`
+	Kind    RecoveryConfinedExecutionProfileArtifactSink1Kind `json:"kind"`
+}
+
+// RecoveryConfinedExecutionProfileArtifactSink1Kind defines model for RecoveryConfinedExecutionProfileArtifactSink.1.Kind.
+type RecoveryConfinedExecutionProfileArtifactSink1Kind string
+
+// RecoveryConfinedExecutionProfileArtifactSink2 defines model for .
+type RecoveryConfinedExecutionProfileArtifactSink2 struct {
+	Kind RecoveryConfinedExecutionProfileArtifactSink2Kind `json:"kind"`
+}
+
+// RecoveryConfinedExecutionProfileArtifactSink2Kind defines model for RecoveryConfinedExecutionProfileArtifactSink.2.Kind.
+type RecoveryConfinedExecutionProfileArtifactSink2Kind string
+
+// RecoveryConfinedExecutionProfileModelContext defines model for RecoveryConfinedExecutionProfileModelContext.
+type RecoveryConfinedExecutionProfileModelContext struct {
+	Account      RecoveryConfinedExecutionProfileOpaqueId            `json:"account"`
+	Cache        string                                              `json:"cache"`
+	Context      RecoveryConfinedExecutionProfileOpaqueId            `json:"context"`
+	Contract     RecoveryConfinedExecutionProfileRecoveryDigest32    `json:"contract"`
+	Conversation string                                              `json:"conversation"`
+	Provider     RecoveryConfinedExecutionProfileOpaqueId            `json:"provider"`
+	SideFiles    []RecoveryConfinedExecutionProfileArtifactReference `json:"side_files"`
+}
+
+// RecoveryConfinedExecutionProfileOpaqueId defines model for RecoveryConfinedExecutionProfileOpaqueId.
+type RecoveryConfinedExecutionProfileOpaqueId = string
+
+// RecoveryConfinedExecutionProfileRecoveryDigest32 defines model for RecoveryConfinedExecutionProfileRecoveryDigest32.
+type RecoveryConfinedExecutionProfileRecoveryDigest32 = []int64
+
+// RecoveryConfinedExecutionProfileSafeInteger defines model for RecoveryConfinedExecutionProfileSafeInteger.
+type RecoveryConfinedExecutionProfileSafeInteger = int64
+
+// RecoveryConfinedExecutionProfileScope defines model for RecoveryConfinedExecutionProfileScope.
+type RecoveryConfinedExecutionProfileScope struct {
+	AuthorityDomain RecoveryConfinedExecutionProfileOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryConfinedExecutionProfileOpaqueId `json:"process_id"`
+	TenantId        RecoveryConfinedExecutionProfileOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryConfinedLimits defines model for RecoveryConfinedLimits.
+type RecoveryConfinedLimits struct {
+	Children        int64                            `json:"children"`
+	Depth           int64                            `json:"depth"`
+	DiagnosticBytes int64                            `json:"diagnostic_bytes"`
+	InputBytes      int64                            `json:"input_bytes"`
+	Launches        RecoveryConfinedLimitsLaunches   `json:"launches"`
+	ModelCalls      RecoveryConfinedLimitsModelCalls `json:"model_calls"`
+	ToolCalls       RecoveryConfinedLimitsToolCalls  `json:"tool_calls"`
+	WallClockMs     int64                            `json:"wall_clock_ms"`
+}
+
+// RecoveryConfinedLimitsLaunches defines model for RecoveryConfinedLimits.Launches.
+type RecoveryConfinedLimitsLaunches int64
+
+// RecoveryConfinedLimitsModelCalls defines model for RecoveryConfinedLimits.ModelCalls.
+type RecoveryConfinedLimitsModelCalls int64
+
+// RecoveryConfinedLimitsToolCalls defines model for RecoveryConfinedLimits.ToolCalls.
+type RecoveryConfinedLimitsToolCalls int64
+
+// RecoveryConfinedLimitsArtifactInfluence defines model for RecoveryConfinedLimitsArtifactInfluence.
+type RecoveryConfinedLimitsArtifactInfluence struct {
+	Commitment           RecoveryConfinedLimitsRecoveryDigest32 `json:"commitment"`
+	ExternallyInfluenced bool                                   `json:"externally_influenced"`
+	Unknown              bool                                   `json:"unknown"`
+}
+
+// RecoveryConfinedLimitsArtifactRecipient defines model for RecoveryConfinedLimitsArtifactRecipient.
+type RecoveryConfinedLimitsArtifactRecipient struct {
+	// Clearance Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	Clearance         SecurityInformationLabel           `json:"clearance"`
+	ContextGeneration RecoveryConfinedLimitsSafeInteger  `json:"context_generation"`
+	IsolationEpoch    string                             `json:"isolation_epoch"`
+	Lineage           RecoveryConfinedLimitsOpaqueId     `json:"lineage"`
+	Principal         string                             `json:"principal"`
+	Recipient         RecoveryConfinedLimitsOpaqueId     `json:"recipient"`
+	Runtime           string                             `json:"runtime"`
+	Scope             RecoveryConfinedLimitsScope        `json:"scope"`
+	Sink              RecoveryConfinedLimitsArtifactSink `json:"sink"`
+}
+
+// RecoveryConfinedLimitsArtifactReference defines model for RecoveryConfinedLimitsArtifactReference.
+type RecoveryConfinedLimitsArtifactReference struct {
+	Artifact   RecoveryConfinedLimitsOpaqueId         `json:"artifact"`
+	Provenance RecoveryConfinedLimitsRecoveryDigest32 `json:"provenance"`
+	Scope      RecoveryConfinedLimitsScope            `json:"scope"`
+	Version    RecoveryConfinedLimitsOpaqueId         `json:"version"`
+}
+
+// RecoveryConfinedLimitsArtifactSink defines model for RecoveryConfinedLimitsArtifactSink.
+type RecoveryConfinedLimitsArtifactSink struct {
+	union json.RawMessage
+}
+
+// RecoveryConfinedLimitsArtifactSink0 defines model for .
+type RecoveryConfinedLimitsArtifactSink0 struct {
+	Kind RecoveryConfinedLimitsArtifactSink0Kind `json:"kind"`
+}
+
+// RecoveryConfinedLimitsArtifactSink0Kind defines model for RecoveryConfinedLimitsArtifactSink.0.Kind.
+type RecoveryConfinedLimitsArtifactSink0Kind string
+
+// RecoveryConfinedLimitsArtifactSink1 defines model for .
+type RecoveryConfinedLimitsArtifactSink1 struct {
+	Context RecoveryConfinedLimitsModelContext      `json:"context"`
+	Kind    RecoveryConfinedLimitsArtifactSink1Kind `json:"kind"`
+}
+
+// RecoveryConfinedLimitsArtifactSink1Kind defines model for RecoveryConfinedLimitsArtifactSink.1.Kind.
+type RecoveryConfinedLimitsArtifactSink1Kind string
+
+// RecoveryConfinedLimitsArtifactSink2 defines model for .
+type RecoveryConfinedLimitsArtifactSink2 struct {
+	Kind RecoveryConfinedLimitsArtifactSink2Kind `json:"kind"`
+}
+
+// RecoveryConfinedLimitsArtifactSink2Kind defines model for RecoveryConfinedLimitsArtifactSink.2.Kind.
+type RecoveryConfinedLimitsArtifactSink2Kind string
+
+// RecoveryConfinedLimitsModelContext defines model for RecoveryConfinedLimitsModelContext.
+type RecoveryConfinedLimitsModelContext struct {
+	Account      RecoveryConfinedLimitsOpaqueId            `json:"account"`
+	Cache        string                                    `json:"cache"`
+	Context      RecoveryConfinedLimitsOpaqueId            `json:"context"`
+	Contract     RecoveryConfinedLimitsRecoveryDigest32    `json:"contract"`
+	Conversation string                                    `json:"conversation"`
+	Provider     RecoveryConfinedLimitsOpaqueId            `json:"provider"`
+	SideFiles    []RecoveryConfinedLimitsArtifactReference `json:"side_files"`
+}
+
+// RecoveryConfinedLimitsOpaqueId defines model for RecoveryConfinedLimitsOpaqueId.
+type RecoveryConfinedLimitsOpaqueId = string
+
+// RecoveryConfinedLimitsRecoveryDigest32 defines model for RecoveryConfinedLimitsRecoveryDigest32.
+type RecoveryConfinedLimitsRecoveryDigest32 = []int64
+
+// RecoveryConfinedLimitsSafeInteger defines model for RecoveryConfinedLimitsSafeInteger.
+type RecoveryConfinedLimitsSafeInteger = int64
+
+// RecoveryConfinedLimitsScope defines model for RecoveryConfinedLimitsScope.
+type RecoveryConfinedLimitsScope struct {
+	AuthorityDomain RecoveryConfinedLimitsOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryConfinedLimitsOpaqueId `json:"process_id"`
+	TenantId        RecoveryConfinedLimitsOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryConfinedReturnEvidence defines model for RecoveryConfinedReturnEvidence.
+type RecoveryConfinedReturnEvidence struct {
+	Artifact        RecoveryConfinedReturnEvidenceArtifactReference `json:"artifact"`
+	Boundary        RecoveryConfinedReturnEvidenceRecoveryDigest32  `json:"boundary"`
+	Content         RecoveryConfinedReturnEvidenceRecoveryDigest32  `json:"content"`
+	Contract        RecoveryConfinedReturnEvidenceRecoveryDigest32  `json:"contract"`
+	DomainVersion   RecoveryConfinedReturnEvidenceDomainVersion     `json:"domain_version"`
+	Evidence        RecoveryConfinedReturnEvidenceOpaqueId          `json:"evidence"`
+	ExpiresAtUnixMs int64                                           `json:"expires_at_unix_ms"`
+	Implementation  RecoveryConfinedReturnEvidenceRecoveryDigest32  `json:"implementation"`
+	Influence       RecoveryConfinedReturnEvidenceArtifactInfluence `json:"influence"`
+	IssuedAtUnixMs  int64                                           `json:"issued_at_unix_ms"`
+	Launch          RecoveryConfinedReturnEvidenceRecoveryDigest32  `json:"launch"`
+	Observation     RecoveryConfinedReturnEvidenceArtifactReference `json:"observation"`
+	Parent          RecoveryConfinedReturnEvidenceArtifactRecipient `json:"parent"`
+	Policy          RecoveryConfinedReturnEvidenceRecoveryDigest32  `json:"policy"`
+	SizeBytes       int64                                           `json:"size_bytes"`
+
+	// Source Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	Source SecurityInformationLabel `json:"source"`
+
+	// Target Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	Target SecurityInformationLabel `json:"target"`
+}
+
+// RecoveryConfinedReturnEvidenceDomainVersion defines model for RecoveryConfinedReturnEvidence.DomainVersion.
+type RecoveryConfinedReturnEvidenceDomainVersion int64
+
+// RecoveryConfinedReturnEvidenceArtifactInfluence defines model for RecoveryConfinedReturnEvidenceArtifactInfluence.
+type RecoveryConfinedReturnEvidenceArtifactInfluence struct {
+	Commitment           RecoveryConfinedReturnEvidenceRecoveryDigest32 `json:"commitment"`
+	ExternallyInfluenced bool                                           `json:"externally_influenced"`
+	Unknown              bool                                           `json:"unknown"`
+}
+
+// RecoveryConfinedReturnEvidenceArtifactRecipient defines model for RecoveryConfinedReturnEvidenceArtifactRecipient.
+type RecoveryConfinedReturnEvidenceArtifactRecipient struct {
+	// Clearance Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	Clearance         SecurityInformationLabel                   `json:"clearance"`
+	ContextGeneration RecoveryConfinedReturnEvidenceSafeInteger  `json:"context_generation"`
+	IsolationEpoch    string                                     `json:"isolation_epoch"`
+	Lineage           RecoveryConfinedReturnEvidenceOpaqueId     `json:"lineage"`
+	Principal         string                                     `json:"principal"`
+	Recipient         RecoveryConfinedReturnEvidenceOpaqueId     `json:"recipient"`
+	Runtime           string                                     `json:"runtime"`
+	Scope             RecoveryConfinedReturnEvidenceScope        `json:"scope"`
+	Sink              RecoveryConfinedReturnEvidenceArtifactSink `json:"sink"`
+}
+
+// RecoveryConfinedReturnEvidenceArtifactReference defines model for RecoveryConfinedReturnEvidenceArtifactReference.
+type RecoveryConfinedReturnEvidenceArtifactReference struct {
+	Artifact   RecoveryConfinedReturnEvidenceOpaqueId         `json:"artifact"`
+	Provenance RecoveryConfinedReturnEvidenceRecoveryDigest32 `json:"provenance"`
+	Scope      RecoveryConfinedReturnEvidenceScope            `json:"scope"`
+	Version    RecoveryConfinedReturnEvidenceOpaqueId         `json:"version"`
+}
+
+// RecoveryConfinedReturnEvidenceArtifactSink defines model for RecoveryConfinedReturnEvidenceArtifactSink.
+type RecoveryConfinedReturnEvidenceArtifactSink struct {
+	union json.RawMessage
+}
+
+// RecoveryConfinedReturnEvidenceArtifactSink0 defines model for .
+type RecoveryConfinedReturnEvidenceArtifactSink0 struct {
+	Kind RecoveryConfinedReturnEvidenceArtifactSink0Kind `json:"kind"`
+}
+
+// RecoveryConfinedReturnEvidenceArtifactSink0Kind defines model for RecoveryConfinedReturnEvidenceArtifactSink.0.Kind.
+type RecoveryConfinedReturnEvidenceArtifactSink0Kind string
+
+// RecoveryConfinedReturnEvidenceArtifactSink1 defines model for .
+type RecoveryConfinedReturnEvidenceArtifactSink1 struct {
+	Context RecoveryConfinedReturnEvidenceModelContext      `json:"context"`
+	Kind    RecoveryConfinedReturnEvidenceArtifactSink1Kind `json:"kind"`
+}
+
+// RecoveryConfinedReturnEvidenceArtifactSink1Kind defines model for RecoveryConfinedReturnEvidenceArtifactSink.1.Kind.
+type RecoveryConfinedReturnEvidenceArtifactSink1Kind string
+
+// RecoveryConfinedReturnEvidenceArtifactSink2 defines model for .
+type RecoveryConfinedReturnEvidenceArtifactSink2 struct {
+	Kind RecoveryConfinedReturnEvidenceArtifactSink2Kind `json:"kind"`
+}
+
+// RecoveryConfinedReturnEvidenceArtifactSink2Kind defines model for RecoveryConfinedReturnEvidenceArtifactSink.2.Kind.
+type RecoveryConfinedReturnEvidenceArtifactSink2Kind string
+
+// RecoveryConfinedReturnEvidenceModelContext defines model for RecoveryConfinedReturnEvidenceModelContext.
+type RecoveryConfinedReturnEvidenceModelContext struct {
+	Account      RecoveryConfinedReturnEvidenceOpaqueId            `json:"account"`
+	Cache        string                                            `json:"cache"`
+	Context      RecoveryConfinedReturnEvidenceOpaqueId            `json:"context"`
+	Contract     RecoveryConfinedReturnEvidenceRecoveryDigest32    `json:"contract"`
+	Conversation string                                            `json:"conversation"`
+	Provider     RecoveryConfinedReturnEvidenceOpaqueId            `json:"provider"`
+	SideFiles    []RecoveryConfinedReturnEvidenceArtifactReference `json:"side_files"`
+}
+
+// RecoveryConfinedReturnEvidenceOpaqueId defines model for RecoveryConfinedReturnEvidenceOpaqueId.
+type RecoveryConfinedReturnEvidenceOpaqueId = string
+
+// RecoveryConfinedReturnEvidenceRecoveryDigest32 defines model for RecoveryConfinedReturnEvidenceRecoveryDigest32.
+type RecoveryConfinedReturnEvidenceRecoveryDigest32 = []int64
+
+// RecoveryConfinedReturnEvidenceSafeInteger defines model for RecoveryConfinedReturnEvidenceSafeInteger.
+type RecoveryConfinedReturnEvidenceSafeInteger = int64
+
+// RecoveryConfinedReturnEvidenceScope defines model for RecoveryConfinedReturnEvidenceScope.
+type RecoveryConfinedReturnEvidenceScope struct {
+	AuthorityDomain RecoveryConfinedReturnEvidenceOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryConfinedReturnEvidenceOpaqueId `json:"process_id"`
+	TenantId        RecoveryConfinedReturnEvidenceOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryDecisionReport defines model for RecoveryDecisionReport.
+type RecoveryDecisionReport struct {
+	Attachments      []RecoveryArtifactReference         `json:"attachments"`
+	Decision         RecoveryDecisionReportDecision      `json:"decision"`
+	DesiredOutcome   string                              `json:"desired_outcome"`
+	DomainVersion    RecoveryDecisionReportDomainVersion `json:"domain_version"`
+	ExpectedRevision int64                               `json:"expected_revision"`
+	ReporterText     string                              `json:"reporter_text"`
+	Scope            RecoveryDecisionReportScope         `json:"scope"`
+	WorkflowId       RecoveryDecisionReportOpaqueId      `json:"workflow_id"`
+}
+
+// RecoveryDecisionReportDecision defines model for RecoveryDecisionReport.Decision.
+type RecoveryDecisionReportDecision string
+
+// RecoveryDecisionReportDomainVersion defines model for RecoveryDecisionReport.DomainVersion.
+type RecoveryDecisionReportDomainVersion int64
+
+// RecoveryDecisionReportOpaqueId defines model for RecoveryDecisionReportOpaqueId.
+type RecoveryDecisionReportOpaqueId = string
+
+// RecoveryDecisionReportRecoveryDigest32 defines model for RecoveryDecisionReportRecoveryDigest32.
+type RecoveryDecisionReportRecoveryDigest32 = []int64
+
+// RecoveryDecisionReportSafeInteger defines model for RecoveryDecisionReportSafeInteger.
+type RecoveryDecisionReportSafeInteger = int64
+
+// RecoveryDecisionReportScope defines model for RecoveryDecisionReportScope.
+type RecoveryDecisionReportScope struct {
+	AuthorityDomain RecoveryDecisionReportOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryDecisionReportOpaqueId `json:"process_id"`
+	TenantId        RecoveryDecisionReportOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryDecisionReportView defines model for RecoveryDecisionReportView.
+type RecoveryDecisionReportView struct {
+	Digest        RecoveryDecisionReportViewRecoveryDigest32 `json:"digest"`
+	DomainVersion RecoveryDecisionReportViewDomainVersion    `json:"domain_version"`
+	Id            RecoveryDecisionReportViewOpaqueId         `json:"id"`
+	Influence     RecoveryArtifactInfluence                  `json:"influence"`
+
+	// Label Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	Label  SecurityInformationLabel `json:"label"`
+	Report RecoveryDecisionReport   `json:"report"`
+}
+
+// RecoveryDecisionReportViewDomainVersion defines model for RecoveryDecisionReportView.DomainVersion.
+type RecoveryDecisionReportViewDomainVersion int64
+
+// RecoveryDecisionReportViewOpaqueId defines model for RecoveryDecisionReportViewOpaqueId.
+type RecoveryDecisionReportViewOpaqueId = string
+
+// RecoveryDecisionReportViewRecoveryDigest32 defines model for RecoveryDecisionReportViewRecoveryDigest32.
+type RecoveryDecisionReportViewRecoveryDigest32 = []int64
+
+// RecoveryDecisionReportViewSafeInteger defines model for RecoveryDecisionReportViewSafeInteger.
+type RecoveryDecisionReportViewSafeInteger = int64
+
+// RecoveryDecisionReportViewScope defines model for RecoveryDecisionReportViewScope.
+type RecoveryDecisionReportViewScope struct {
+	AuthorityDomain RecoveryDecisionReportViewOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryDecisionReportViewOpaqueId `json:"process_id"`
+	TenantId        RecoveryDecisionReportViewOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryDependencyGraph Symbolic graph only. Rust verifies canonical dependency order, unique steps, dependency closure, cycles, cost and shared work budget.
+type RecoveryDependencyGraph struct {
+	Nodes []struct {
+		Dependencies       []RecoveryObservationOpaqueId  `json:"dependencies"`
+		EstimatedCostUnits RecoveryObservationSafeInteger `json:"estimated_cost_units"`
+		StepId             RecoveryObservationOpaqueId    `json:"step_id"`
+		TemplateId         RecoveryObservationOpaqueId    `json:"template_id"`
+	} `json:"nodes"`
+	Schema  RecoveryDependencyGraphSchema  `json:"schema"`
+	Version RecoveryDependencyGraphVersion `json:"version"`
+}
+
+// RecoveryDependencyGraphSchema defines model for RecoveryDependencyGraph.Schema.
+type RecoveryDependencyGraphSchema string
+
+// RecoveryDependencyGraphVersion defines model for RecoveryDependencyGraph.Version.
+type RecoveryDependencyGraphVersion int64
+
+// RecoveryDisclosureGrant defines model for RecoveryDisclosureGrant.
+type RecoveryDisclosureGrant struct {
+	union json.RawMessage
+}
+
+// RecoveryDisclosureGrant1 defines model for .
+type RecoveryDisclosureGrant1 struct {
+	Grant RecoverySignedGrantV2        `json:"grant"`
+	Kind  RecoveryDisclosureGrant1Kind `json:"kind"`
+}
+
+// RecoveryDisclosureGrant1Kind defines model for RecoveryDisclosureGrant.1.Kind.
+type RecoveryDisclosureGrant1Kind string
+
+// RecoveryEffectContract defines model for RecoveryEffectContract.
+type RecoveryEffectContract struct {
+	AccountId         RecoveryObservationOpaqueId             `json:"account_id"`
+	Deduplication     RecoveryEffectContractDeduplication     `json:"deduplication"`
+	EffectCardinality int64                                   `json:"effect_cardinality"`
+	LookupFinality    RecoveryEffectContractLookupFinality    `json:"lookup_finality"`
+	PartialSettlement RecoveryEffectContractPartialSettlement `json:"partial_settlement"`
+	ProviderId        RecoveryObservationOpaqueId             `json:"provider_id"`
+
+	// RecoveryProfile Operator requirements. Canonical feature order follows the listed vocabulary and is checked by Rust. A matching inventory is not live enforcement qualification.
+	RecoveryProfile    RecoveryProfileRequirements              `json:"recovery_profile"`
+	ResourceId         RecoveryObservationOpaqueId              `json:"resource_id"`
+	Schema             RecoveryEffectContractSchema             `json:"schema"`
+	SubmissionIdentity RecoveryEffectContractSubmissionIdentity `json:"submission_identity"`
+	TransportRetry     RecoveryEffectContractTransportRetry     `json:"transport_retry"`
+	Version            RecoveryEffectContractVersion            `json:"version"`
+}
+
+// RecoveryEffectContractDeduplication defines model for RecoveryEffectContract.Deduplication.
+type RecoveryEffectContractDeduplication string
+
+// RecoveryEffectContractLookupFinality defines model for RecoveryEffectContract.LookupFinality.
+type RecoveryEffectContractLookupFinality string
+
+// RecoveryEffectContractPartialSettlement defines model for RecoveryEffectContract.PartialSettlement.
+type RecoveryEffectContractPartialSettlement string
+
+// RecoveryEffectContractSchema defines model for RecoveryEffectContract.Schema.
+type RecoveryEffectContractSchema string
+
+// RecoveryEffectContractSubmissionIdentity defines model for RecoveryEffectContract.SubmissionIdentity.
+type RecoveryEffectContractSubmissionIdentity string
+
+// RecoveryEffectContractTransportRetry defines model for RecoveryEffectContract.TransportRetry.
+type RecoveryEffectContractTransportRetry string
+
+// RecoveryEffectContractVersion defines model for RecoveryEffectContract.Version.
+type RecoveryEffectContractVersion int64
+
+// RecoveryExplanationEvaluation defines model for RecoveryExplanationEvaluation.
+type RecoveryExplanationEvaluation struct {
+	Assessment RecoveryExplanationEvaluationAssessment `json:"assessment"`
+	Candidates []struct {
+		Assessment RecoveryExplanationEvaluationCandidatesAssessment `json:"assessment"`
+		TemplateId RecoveryExplanationEvaluationOpaqueId             `json:"template_id"`
+	} `json:"candidates"`
+
+	// Classification Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	Classification SecurityInformationLabel                    `json:"classification"`
+	Complete       bool                                        `json:"complete"`
+	PlannerVersion RecoveryExplanationEvaluationPlannerVersion `json:"planner_version"`
+	WorkUsed       int64                                       `json:"work_used"`
+}
+
+// RecoveryExplanationEvaluationAssessment defines model for RecoveryExplanationEvaluation.Assessment.
+type RecoveryExplanationEvaluationAssessment string
+
+// RecoveryExplanationEvaluationCandidatesAssessment defines model for RecoveryExplanationEvaluation.Candidates.Assessment.
+type RecoveryExplanationEvaluationCandidatesAssessment string
+
+// RecoveryExplanationEvaluationPlannerVersion defines model for RecoveryExplanationEvaluation.PlannerVersion.
+type RecoveryExplanationEvaluationPlannerVersion string
+
+// RecoveryExplanationEvaluationDestinationId defines model for RecoveryExplanationEvaluationDestinationId.
+type RecoveryExplanationEvaluationDestinationId = string
+
+// RecoveryExplanationEvaluationOpaqueId defines model for RecoveryExplanationEvaluationOpaqueId.
+type RecoveryExplanationEvaluationOpaqueId = string
+
+// RecoveryExplanationEvaluationOperation defines model for RecoveryExplanationEvaluationOperation.
+type RecoveryExplanationEvaluationOperation struct {
+	NativeAdmissionDigest RecoveryExplanationEvaluationRecoveryDigest32 `json:"native_admission_digest"`
+	OperationId           RecoveryExplanationEvaluationOpaqueId         `json:"operation_id"`
+	OperationVersion      int64                                         `json:"operation_version"`
+}
+
+// RecoveryExplanationEvaluationRecoveryDigest32 defines model for RecoveryExplanationEvaluationRecoveryDigest32.
+type RecoveryExplanationEvaluationRecoveryDigest32 = []int64
+
+// RecoveryExplanationEvaluationRecoveryEffectAdmissionUnresolvedV1 defines model for RecoveryExplanationEvaluationRecoveryEffectAdmissionUnresolvedV1.
+type RecoveryExplanationEvaluationRecoveryEffectAdmissionUnresolvedV1 struct {
+	AdmissionIntent RecoveryExplanationEvaluationOpaqueId                                `json:"admission_intent"`
+	Kind            RecoveryExplanationEvaluationRecoveryEffectAdmissionUnresolvedV1Kind `json:"kind"`
+}
+
+// RecoveryExplanationEvaluationRecoveryEffectAdmissionUnresolvedV1Kind defines model for RecoveryExplanationEvaluationRecoveryEffectAdmissionUnresolvedV1.Kind.
+type RecoveryExplanationEvaluationRecoveryEffectAdmissionUnresolvedV1Kind string
+
+// RecoveryExplanationEvaluationRecoveryEffectAwaitingApprovalV1 defines model for RecoveryExplanationEvaluationRecoveryEffectAwaitingApprovalV1.
+type RecoveryExplanationEvaluationRecoveryEffectAwaitingApprovalV1 struct {
+	Kind      RecoveryExplanationEvaluationRecoveryEffectAwaitingApprovalV1Kind `json:"kind"`
+	Operation RecoveryExplanationEvaluationOperation                            `json:"operation"`
+}
+
+// RecoveryExplanationEvaluationRecoveryEffectAwaitingApprovalV1Kind defines model for RecoveryExplanationEvaluationRecoveryEffectAwaitingApprovalV1.Kind.
+type RecoveryExplanationEvaluationRecoveryEffectAwaitingApprovalV1Kind string
+
+// RecoveryExplanationEvaluationRecoveryEffectAwaitingCallerReportV1 defines model for RecoveryExplanationEvaluationRecoveryEffectAwaitingCallerReportV1.
+type RecoveryExplanationEvaluationRecoveryEffectAwaitingCallerReportV1 struct {
+	Kind      RecoveryExplanationEvaluationRecoveryEffectAwaitingCallerReportV1Kind `json:"kind"`
+	Operation RecoveryExplanationEvaluationOperation                                `json:"operation"`
+}
+
+// RecoveryExplanationEvaluationRecoveryEffectAwaitingCallerReportV1Kind defines model for RecoveryExplanationEvaluationRecoveryEffectAwaitingCallerReportV1.Kind.
+type RecoveryExplanationEvaluationRecoveryEffectAwaitingCallerReportV1Kind string
+
+// RecoveryExplanationEvaluationRecoveryEffectClosedBeforeEffectV1 defines model for RecoveryExplanationEvaluationRecoveryEffectClosedBeforeEffectV1.
+type RecoveryExplanationEvaluationRecoveryEffectClosedBeforeEffectV1 struct {
+	Closure   RecoveryExplanationEvaluationOpaqueId                               `json:"closure"`
+	Kind      RecoveryExplanationEvaluationRecoveryEffectClosedBeforeEffectV1Kind `json:"kind"`
+	Operation RecoveryExplanationEvaluationOperation                              `json:"operation"`
+}
+
+// RecoveryExplanationEvaluationRecoveryEffectClosedBeforeEffectV1Kind defines model for RecoveryExplanationEvaluationRecoveryEffectClosedBeforeEffectV1.Kind.
+type RecoveryExplanationEvaluationRecoveryEffectClosedBeforeEffectV1Kind string
+
+// RecoveryExplanationEvaluationRecoveryEffectCompleteV1 defines model for RecoveryExplanationEvaluationRecoveryEffectCompleteV1.
+type RecoveryExplanationEvaluationRecoveryEffectCompleteV1 struct {
+	EffectCount RecoveryExplanationEvaluationSafeInteger                  `json:"effect_count"`
+	Kind        RecoveryExplanationEvaluationRecoveryEffectCompleteV1Kind `json:"kind"`
+	Operation   RecoveryExplanationEvaluationOperation                    `json:"operation"`
+}
+
+// RecoveryExplanationEvaluationRecoveryEffectCompleteV1Kind defines model for RecoveryExplanationEvaluationRecoveryEffectCompleteV1.Kind.
+type RecoveryExplanationEvaluationRecoveryEffectCompleteV1Kind string
+
+// RecoveryExplanationEvaluationRecoveryEffectFailedAfterEffectV1 defines model for RecoveryExplanationEvaluationRecoveryEffectFailedAfterEffectV1.
+type RecoveryExplanationEvaluationRecoveryEffectFailedAfterEffectV1 struct {
+	AppliedEffects int64                                                              `json:"applied_effects"`
+	Kind           RecoveryExplanationEvaluationRecoveryEffectFailedAfterEffectV1Kind `json:"kind"`
+	Operation      RecoveryExplanationEvaluationOperation                             `json:"operation"`
+}
+
+// RecoveryExplanationEvaluationRecoveryEffectFailedAfterEffectV1Kind defines model for RecoveryExplanationEvaluationRecoveryEffectFailedAfterEffectV1.Kind.
+type RecoveryExplanationEvaluationRecoveryEffectFailedAfterEffectV1Kind string
+
+// RecoveryExplanationEvaluationRecoveryEffectInFlightV1 defines model for RecoveryExplanationEvaluationRecoveryEffectInFlightV1.
+type RecoveryExplanationEvaluationRecoveryEffectInFlightV1 struct {
+	Kind      RecoveryExplanationEvaluationRecoveryEffectInFlightV1Kind `json:"kind"`
+	Operation RecoveryExplanationEvaluationOperation                    `json:"operation"`
+}
+
+// RecoveryExplanationEvaluationRecoveryEffectInFlightV1Kind defines model for RecoveryExplanationEvaluationRecoveryEffectInFlightV1.Kind.
+type RecoveryExplanationEvaluationRecoveryEffectInFlightV1Kind string
+
+// RecoveryExplanationEvaluationRecoveryEffectNeverAdmittedV1 defines model for RecoveryExplanationEvaluationRecoveryEffectNeverAdmittedV1.
+type RecoveryExplanationEvaluationRecoveryEffectNeverAdmittedV1 struct {
+	Kind RecoveryExplanationEvaluationRecoveryEffectNeverAdmittedV1Kind `json:"kind"`
+}
+
+// RecoveryExplanationEvaluationRecoveryEffectNeverAdmittedV1Kind defines model for RecoveryExplanationEvaluationRecoveryEffectNeverAdmittedV1.Kind.
+type RecoveryExplanationEvaluationRecoveryEffectNeverAdmittedV1Kind string
+
+// RecoveryExplanationEvaluationRecoveryEffectPartialV1 defines model for RecoveryExplanationEvaluationRecoveryEffectPartialV1.
+type RecoveryExplanationEvaluationRecoveryEffectPartialV1 struct {
+	AppliedEffects int64                                                    `json:"applied_effects"`
+	Kind           RecoveryExplanationEvaluationRecoveryEffectPartialV1Kind `json:"kind"`
+	Operation      RecoveryExplanationEvaluationOperation                   `json:"operation"`
+}
+
+// RecoveryExplanationEvaluationRecoveryEffectPartialV1Kind defines model for RecoveryExplanationEvaluationRecoveryEffectPartialV1.Kind.
+type RecoveryExplanationEvaluationRecoveryEffectPartialV1Kind string
+
+// RecoveryExplanationEvaluationRecoveryEffectUnknownV1 defines model for RecoveryExplanationEvaluationRecoveryEffectUnknownV1.
+type RecoveryExplanationEvaluationRecoveryEffectUnknownV1 struct {
+	Kind      RecoveryExplanationEvaluationRecoveryEffectUnknownV1Kind `json:"kind"`
+	Operation RecoveryExplanationEvaluationOperation                   `json:"operation"`
+}
+
+// RecoveryExplanationEvaluationRecoveryEffectUnknownV1Kind defines model for RecoveryExplanationEvaluationRecoveryEffectUnknownV1.Kind.
+type RecoveryExplanationEvaluationRecoveryEffectUnknownV1Kind string
+
+// RecoveryExplanationEvaluationRefusalCode defines model for RecoveryExplanationEvaluationRefusalCode.
+type RecoveryExplanationEvaluationRefusalCode string
+
+// RecoveryExplanationEvaluationSafeInteger defines model for RecoveryExplanationEvaluationSafeInteger.
+type RecoveryExplanationEvaluationSafeInteger = int64
+
+// RecoveryExplanationEvaluationScope defines model for RecoveryExplanationEvaluationScope.
+type RecoveryExplanationEvaluationScope struct {
+	AuthorityDomain RecoveryExplanationEvaluationOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryExplanationEvaluationOpaqueId `json:"process_id"`
+	TenantId        RecoveryExplanationEvaluationOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryExplanationReport defines model for RecoveryExplanationReport.
+type RecoveryExplanationReport struct {
+	ContractDigest   RecoveryExplanationReportRecoveryDigest32 `json:"contract_digest"`
+	DeploymentDigest RecoveryExplanationReportRecoveryDigest32 `json:"deployment_digest"`
+	EvaluationDigest RecoveryExplanationReportRecoveryDigest32 `json:"evaluation_digest"`
+	ExpiresAtUnixMs  RecoveryExplanationReportSafeInteger      `json:"expires_at_unix_ms"`
+	IntentDigest     RecoveryExplanationReportRecoveryDigest32 `json:"intent_digest"`
+	IssuedAtUnixMs   RecoveryExplanationReportSafeInteger      `json:"issued_at_unix_ms"`
+	Issuer           RecoveryExplanationReportOpaqueId         `json:"issuer"`
+	Limits           struct {
+		Offers int64 `json:"offers"`
+		Work   int64 `json:"work"`
+	} `json:"limits"`
+	PlannerVersion    RecoveryExplanationReportPlannerVersion   `json:"planner_version"`
+	PolicyDigest      RecoveryExplanationReportRecoveryDigest32 `json:"policy_digest"`
+	ProjectionDigest  RecoveryExplanationReportRecoveryDigest32 `json:"projection_digest"`
+	ProtectedGraphRef RecoveryExplanationReportOpaqueId         `json:"protected_graph_ref"`
+	Recipient         RecoveryExplanationReportOpaqueId         `json:"recipient"`
+	RegistryDigest    RecoveryExplanationReportRecoveryDigest32 `json:"registry_digest"`
+	Schema            RecoveryExplanationReportSchema           `json:"schema"`
+	Scope             RecoveryExplanationReportScope            `json:"scope"`
+	SnapshotDigest    RecoveryExplanationReportRecoveryDigest32 `json:"snapshot_digest"`
+	TrustDomain       RecoveryExplanationReportOpaqueId         `json:"trust_domain"`
+	Version           RecoveryExplanationReportVersion          `json:"version"`
+}
+
+// RecoveryExplanationReportPlannerVersion defines model for RecoveryExplanationReport.PlannerVersion.
+type RecoveryExplanationReportPlannerVersion string
+
+// RecoveryExplanationReportSchema defines model for RecoveryExplanationReport.Schema.
+type RecoveryExplanationReportSchema string
+
+// RecoveryExplanationReportVersion defines model for RecoveryExplanationReport.Version.
+type RecoveryExplanationReportVersion int64
+
+// RecoveryExplanationReportDestinationId defines model for RecoveryExplanationReportDestinationId.
+type RecoveryExplanationReportDestinationId = string
+
+// RecoveryExplanationReportOpaqueId defines model for RecoveryExplanationReportOpaqueId.
+type RecoveryExplanationReportOpaqueId = string
+
+// RecoveryExplanationReportOperation defines model for RecoveryExplanationReportOperation.
+type RecoveryExplanationReportOperation struct {
+	NativeAdmissionDigest RecoveryExplanationReportRecoveryDigest32 `json:"native_admission_digest"`
+	OperationId           RecoveryExplanationReportOpaqueId         `json:"operation_id"`
+	OperationVersion      int64                                     `json:"operation_version"`
+}
+
+// RecoveryExplanationReportRecoveryDigest32 defines model for RecoveryExplanationReportRecoveryDigest32.
+type RecoveryExplanationReportRecoveryDigest32 = []int64
+
+// RecoveryExplanationReportRecoveryEffectAdmissionUnresolvedV1 defines model for RecoveryExplanationReportRecoveryEffectAdmissionUnresolvedV1.
+type RecoveryExplanationReportRecoveryEffectAdmissionUnresolvedV1 struct {
+	AdmissionIntent RecoveryExplanationReportOpaqueId                                `json:"admission_intent"`
+	Kind            RecoveryExplanationReportRecoveryEffectAdmissionUnresolvedV1Kind `json:"kind"`
+}
+
+// RecoveryExplanationReportRecoveryEffectAdmissionUnresolvedV1Kind defines model for RecoveryExplanationReportRecoveryEffectAdmissionUnresolvedV1.Kind.
+type RecoveryExplanationReportRecoveryEffectAdmissionUnresolvedV1Kind string
+
+// RecoveryExplanationReportRecoveryEffectAwaitingApprovalV1 defines model for RecoveryExplanationReportRecoveryEffectAwaitingApprovalV1.
+type RecoveryExplanationReportRecoveryEffectAwaitingApprovalV1 struct {
+	Kind      RecoveryExplanationReportRecoveryEffectAwaitingApprovalV1Kind `json:"kind"`
+	Operation RecoveryExplanationReportOperation                            `json:"operation"`
+}
+
+// RecoveryExplanationReportRecoveryEffectAwaitingApprovalV1Kind defines model for RecoveryExplanationReportRecoveryEffectAwaitingApprovalV1.Kind.
+type RecoveryExplanationReportRecoveryEffectAwaitingApprovalV1Kind string
+
+// RecoveryExplanationReportRecoveryEffectAwaitingCallerReportV1 defines model for RecoveryExplanationReportRecoveryEffectAwaitingCallerReportV1.
+type RecoveryExplanationReportRecoveryEffectAwaitingCallerReportV1 struct {
+	Kind      RecoveryExplanationReportRecoveryEffectAwaitingCallerReportV1Kind `json:"kind"`
+	Operation RecoveryExplanationReportOperation                                `json:"operation"`
+}
+
+// RecoveryExplanationReportRecoveryEffectAwaitingCallerReportV1Kind defines model for RecoveryExplanationReportRecoveryEffectAwaitingCallerReportV1.Kind.
+type RecoveryExplanationReportRecoveryEffectAwaitingCallerReportV1Kind string
+
+// RecoveryExplanationReportRecoveryEffectClosedBeforeEffectV1 defines model for RecoveryExplanationReportRecoveryEffectClosedBeforeEffectV1.
+type RecoveryExplanationReportRecoveryEffectClosedBeforeEffectV1 struct {
+	Closure   RecoveryExplanationReportOpaqueId                               `json:"closure"`
+	Kind      RecoveryExplanationReportRecoveryEffectClosedBeforeEffectV1Kind `json:"kind"`
+	Operation RecoveryExplanationReportOperation                              `json:"operation"`
+}
+
+// RecoveryExplanationReportRecoveryEffectClosedBeforeEffectV1Kind defines model for RecoveryExplanationReportRecoveryEffectClosedBeforeEffectV1.Kind.
+type RecoveryExplanationReportRecoveryEffectClosedBeforeEffectV1Kind string
+
+// RecoveryExplanationReportRecoveryEffectCompleteV1 defines model for RecoveryExplanationReportRecoveryEffectCompleteV1.
+type RecoveryExplanationReportRecoveryEffectCompleteV1 struct {
+	EffectCount RecoveryExplanationReportSafeInteger                  `json:"effect_count"`
+	Kind        RecoveryExplanationReportRecoveryEffectCompleteV1Kind `json:"kind"`
+	Operation   RecoveryExplanationReportOperation                    `json:"operation"`
+}
+
+// RecoveryExplanationReportRecoveryEffectCompleteV1Kind defines model for RecoveryExplanationReportRecoveryEffectCompleteV1.Kind.
+type RecoveryExplanationReportRecoveryEffectCompleteV1Kind string
+
+// RecoveryExplanationReportRecoveryEffectFailedAfterEffectV1 defines model for RecoveryExplanationReportRecoveryEffectFailedAfterEffectV1.
+type RecoveryExplanationReportRecoveryEffectFailedAfterEffectV1 struct {
+	AppliedEffects int64                                                          `json:"applied_effects"`
+	Kind           RecoveryExplanationReportRecoveryEffectFailedAfterEffectV1Kind `json:"kind"`
+	Operation      RecoveryExplanationReportOperation                             `json:"operation"`
+}
+
+// RecoveryExplanationReportRecoveryEffectFailedAfterEffectV1Kind defines model for RecoveryExplanationReportRecoveryEffectFailedAfterEffectV1.Kind.
+type RecoveryExplanationReportRecoveryEffectFailedAfterEffectV1Kind string
+
+// RecoveryExplanationReportRecoveryEffectInFlightV1 defines model for RecoveryExplanationReportRecoveryEffectInFlightV1.
+type RecoveryExplanationReportRecoveryEffectInFlightV1 struct {
+	Kind      RecoveryExplanationReportRecoveryEffectInFlightV1Kind `json:"kind"`
+	Operation RecoveryExplanationReportOperation                    `json:"operation"`
+}
+
+// RecoveryExplanationReportRecoveryEffectInFlightV1Kind defines model for RecoveryExplanationReportRecoveryEffectInFlightV1.Kind.
+type RecoveryExplanationReportRecoveryEffectInFlightV1Kind string
+
+// RecoveryExplanationReportRecoveryEffectNeverAdmittedV1 defines model for RecoveryExplanationReportRecoveryEffectNeverAdmittedV1.
+type RecoveryExplanationReportRecoveryEffectNeverAdmittedV1 struct {
+	Kind RecoveryExplanationReportRecoveryEffectNeverAdmittedV1Kind `json:"kind"`
+}
+
+// RecoveryExplanationReportRecoveryEffectNeverAdmittedV1Kind defines model for RecoveryExplanationReportRecoveryEffectNeverAdmittedV1.Kind.
+type RecoveryExplanationReportRecoveryEffectNeverAdmittedV1Kind string
+
+// RecoveryExplanationReportRecoveryEffectPartialV1 defines model for RecoveryExplanationReportRecoveryEffectPartialV1.
+type RecoveryExplanationReportRecoveryEffectPartialV1 struct {
+	AppliedEffects int64                                                `json:"applied_effects"`
+	Kind           RecoveryExplanationReportRecoveryEffectPartialV1Kind `json:"kind"`
+	Operation      RecoveryExplanationReportOperation                   `json:"operation"`
+}
+
+// RecoveryExplanationReportRecoveryEffectPartialV1Kind defines model for RecoveryExplanationReportRecoveryEffectPartialV1.Kind.
+type RecoveryExplanationReportRecoveryEffectPartialV1Kind string
+
+// RecoveryExplanationReportRecoveryEffectUnknownV1 defines model for RecoveryExplanationReportRecoveryEffectUnknownV1.
+type RecoveryExplanationReportRecoveryEffectUnknownV1 struct {
+	Kind      RecoveryExplanationReportRecoveryEffectUnknownV1Kind `json:"kind"`
+	Operation RecoveryExplanationReportOperation                   `json:"operation"`
+}
+
+// RecoveryExplanationReportRecoveryEffectUnknownV1Kind defines model for RecoveryExplanationReportRecoveryEffectUnknownV1.Kind.
+type RecoveryExplanationReportRecoveryEffectUnknownV1Kind string
+
+// RecoveryExplanationReportRefusalCode defines model for RecoveryExplanationReportRefusalCode.
+type RecoveryExplanationReportRefusalCode string
+
+// RecoveryExplanationReportSafeInteger defines model for RecoveryExplanationReportSafeInteger.
+type RecoveryExplanationReportSafeInteger = int64
+
+// RecoveryExplanationReportScope defines model for RecoveryExplanationReportScope.
+type RecoveryExplanationReportScope struct {
+	AuthorityDomain RecoveryExplanationReportOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryExplanationReportOpaqueId `json:"process_id"`
+	TenantId        RecoveryExplanationReportOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryExplanationRequest defines model for RecoveryExplanationRequest.
+type RecoveryExplanationRequest struct {
+	Capability string                             `json:"capability"`
+	WorkflowId RecoveryExplanationRequestOpaqueId `json:"workflow_id"`
+}
+
+// RecoveryExplanationRequestDestinationId defines model for RecoveryExplanationRequestDestinationId.
+type RecoveryExplanationRequestDestinationId = string
+
+// RecoveryExplanationRequestOpaqueId defines model for RecoveryExplanationRequestOpaqueId.
+type RecoveryExplanationRequestOpaqueId = string
+
+// RecoveryExplanationRequestOperation defines model for RecoveryExplanationRequestOperation.
+type RecoveryExplanationRequestOperation struct {
+	NativeAdmissionDigest RecoveryExplanationRequestRecoveryDigest32 `json:"native_admission_digest"`
+	OperationId           RecoveryExplanationRequestOpaqueId         `json:"operation_id"`
+	OperationVersion      int64                                      `json:"operation_version"`
+}
+
+// RecoveryExplanationRequestRecoveryDigest32 defines model for RecoveryExplanationRequestRecoveryDigest32.
+type RecoveryExplanationRequestRecoveryDigest32 = []int64
+
+// RecoveryExplanationRequestRecoveryEffectAdmissionUnresolvedV1 defines model for RecoveryExplanationRequestRecoveryEffectAdmissionUnresolvedV1.
+type RecoveryExplanationRequestRecoveryEffectAdmissionUnresolvedV1 struct {
+	AdmissionIntent RecoveryExplanationRequestOpaqueId                                `json:"admission_intent"`
+	Kind            RecoveryExplanationRequestRecoveryEffectAdmissionUnresolvedV1Kind `json:"kind"`
+}
+
+// RecoveryExplanationRequestRecoveryEffectAdmissionUnresolvedV1Kind defines model for RecoveryExplanationRequestRecoveryEffectAdmissionUnresolvedV1.Kind.
+type RecoveryExplanationRequestRecoveryEffectAdmissionUnresolvedV1Kind string
+
+// RecoveryExplanationRequestRecoveryEffectAwaitingApprovalV1 defines model for RecoveryExplanationRequestRecoveryEffectAwaitingApprovalV1.
+type RecoveryExplanationRequestRecoveryEffectAwaitingApprovalV1 struct {
+	Kind      RecoveryExplanationRequestRecoveryEffectAwaitingApprovalV1Kind `json:"kind"`
+	Operation RecoveryExplanationRequestOperation                            `json:"operation"`
+}
+
+// RecoveryExplanationRequestRecoveryEffectAwaitingApprovalV1Kind defines model for RecoveryExplanationRequestRecoveryEffectAwaitingApprovalV1.Kind.
+type RecoveryExplanationRequestRecoveryEffectAwaitingApprovalV1Kind string
+
+// RecoveryExplanationRequestRecoveryEffectAwaitingCallerReportV1 defines model for RecoveryExplanationRequestRecoveryEffectAwaitingCallerReportV1.
+type RecoveryExplanationRequestRecoveryEffectAwaitingCallerReportV1 struct {
+	Kind      RecoveryExplanationRequestRecoveryEffectAwaitingCallerReportV1Kind `json:"kind"`
+	Operation RecoveryExplanationRequestOperation                                `json:"operation"`
+}
+
+// RecoveryExplanationRequestRecoveryEffectAwaitingCallerReportV1Kind defines model for RecoveryExplanationRequestRecoveryEffectAwaitingCallerReportV1.Kind.
+type RecoveryExplanationRequestRecoveryEffectAwaitingCallerReportV1Kind string
+
+// RecoveryExplanationRequestRecoveryEffectClosedBeforeEffectV1 defines model for RecoveryExplanationRequestRecoveryEffectClosedBeforeEffectV1.
+type RecoveryExplanationRequestRecoveryEffectClosedBeforeEffectV1 struct {
+	Closure   RecoveryExplanationRequestOpaqueId                               `json:"closure"`
+	Kind      RecoveryExplanationRequestRecoveryEffectClosedBeforeEffectV1Kind `json:"kind"`
+	Operation RecoveryExplanationRequestOperation                              `json:"operation"`
+}
+
+// RecoveryExplanationRequestRecoveryEffectClosedBeforeEffectV1Kind defines model for RecoveryExplanationRequestRecoveryEffectClosedBeforeEffectV1.Kind.
+type RecoveryExplanationRequestRecoveryEffectClosedBeforeEffectV1Kind string
+
+// RecoveryExplanationRequestRecoveryEffectCompleteV1 defines model for RecoveryExplanationRequestRecoveryEffectCompleteV1.
+type RecoveryExplanationRequestRecoveryEffectCompleteV1 struct {
+	EffectCount RecoveryExplanationRequestSafeInteger                  `json:"effect_count"`
+	Kind        RecoveryExplanationRequestRecoveryEffectCompleteV1Kind `json:"kind"`
+	Operation   RecoveryExplanationRequestOperation                    `json:"operation"`
+}
+
+// RecoveryExplanationRequestRecoveryEffectCompleteV1Kind defines model for RecoveryExplanationRequestRecoveryEffectCompleteV1.Kind.
+type RecoveryExplanationRequestRecoveryEffectCompleteV1Kind string
+
+// RecoveryExplanationRequestRecoveryEffectFailedAfterEffectV1 defines model for RecoveryExplanationRequestRecoveryEffectFailedAfterEffectV1.
+type RecoveryExplanationRequestRecoveryEffectFailedAfterEffectV1 struct {
+	AppliedEffects int64                                                           `json:"applied_effects"`
+	Kind           RecoveryExplanationRequestRecoveryEffectFailedAfterEffectV1Kind `json:"kind"`
+	Operation      RecoveryExplanationRequestOperation                             `json:"operation"`
+}
+
+// RecoveryExplanationRequestRecoveryEffectFailedAfterEffectV1Kind defines model for RecoveryExplanationRequestRecoveryEffectFailedAfterEffectV1.Kind.
+type RecoveryExplanationRequestRecoveryEffectFailedAfterEffectV1Kind string
+
+// RecoveryExplanationRequestRecoveryEffectInFlightV1 defines model for RecoveryExplanationRequestRecoveryEffectInFlightV1.
+type RecoveryExplanationRequestRecoveryEffectInFlightV1 struct {
+	Kind      RecoveryExplanationRequestRecoveryEffectInFlightV1Kind `json:"kind"`
+	Operation RecoveryExplanationRequestOperation                    `json:"operation"`
+}
+
+// RecoveryExplanationRequestRecoveryEffectInFlightV1Kind defines model for RecoveryExplanationRequestRecoveryEffectInFlightV1.Kind.
+type RecoveryExplanationRequestRecoveryEffectInFlightV1Kind string
+
+// RecoveryExplanationRequestRecoveryEffectNeverAdmittedV1 defines model for RecoveryExplanationRequestRecoveryEffectNeverAdmittedV1.
+type RecoveryExplanationRequestRecoveryEffectNeverAdmittedV1 struct {
+	Kind RecoveryExplanationRequestRecoveryEffectNeverAdmittedV1Kind `json:"kind"`
+}
+
+// RecoveryExplanationRequestRecoveryEffectNeverAdmittedV1Kind defines model for RecoveryExplanationRequestRecoveryEffectNeverAdmittedV1.Kind.
+type RecoveryExplanationRequestRecoveryEffectNeverAdmittedV1Kind string
+
+// RecoveryExplanationRequestRecoveryEffectPartialV1 defines model for RecoveryExplanationRequestRecoveryEffectPartialV1.
+type RecoveryExplanationRequestRecoveryEffectPartialV1 struct {
+	AppliedEffects int64                                                 `json:"applied_effects"`
+	Kind           RecoveryExplanationRequestRecoveryEffectPartialV1Kind `json:"kind"`
+	Operation      RecoveryExplanationRequestOperation                   `json:"operation"`
+}
+
+// RecoveryExplanationRequestRecoveryEffectPartialV1Kind defines model for RecoveryExplanationRequestRecoveryEffectPartialV1.Kind.
+type RecoveryExplanationRequestRecoveryEffectPartialV1Kind string
+
+// RecoveryExplanationRequestRecoveryEffectUnknownV1 defines model for RecoveryExplanationRequestRecoveryEffectUnknownV1.
+type RecoveryExplanationRequestRecoveryEffectUnknownV1 struct {
+	Kind      RecoveryExplanationRequestRecoveryEffectUnknownV1Kind `json:"kind"`
+	Operation RecoveryExplanationRequestOperation                   `json:"operation"`
+}
+
+// RecoveryExplanationRequestRecoveryEffectUnknownV1Kind defines model for RecoveryExplanationRequestRecoveryEffectUnknownV1.Kind.
+type RecoveryExplanationRequestRecoveryEffectUnknownV1Kind string
+
+// RecoveryExplanationRequestRefusalCode defines model for RecoveryExplanationRequestRefusalCode.
+type RecoveryExplanationRequestRefusalCode string
+
+// RecoveryExplanationRequestSafeInteger defines model for RecoveryExplanationRequestSafeInteger.
+type RecoveryExplanationRequestSafeInteger = int64
+
+// RecoveryExplanationRequestScope defines model for RecoveryExplanationRequestScope.
+type RecoveryExplanationRequestScope struct {
+	AuthorityDomain RecoveryExplanationRequestOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryExplanationRequestOpaqueId `json:"process_id"`
+	TenantId        RecoveryExplanationRequestOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryExplanationSnapshot defines model for RecoveryExplanationSnapshot.
+type RecoveryExplanationSnapshot struct {
+	// ContextLabel Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	ContextLabel     SecurityInformationLabel                    `json:"context_label"`
+	ContractDigest   RecoveryExplanationSnapshotRecoveryDigest32 `json:"contract_digest"`
+	DeploymentDigest RecoveryExplanationSnapshotRecoveryDigest32 `json:"deployment_digest"`
+	Effect           RecoveryExplanationSnapshot_Effect          `json:"effect"`
+	ExpiresAtUnixMs  RecoveryExplanationSnapshotSafeInteger      `json:"expires_at_unix_ms"`
+	Influence        RecoveryExplanationSnapshot_Influence       `json:"influence"`
+	IntentDigest     RecoveryExplanationSnapshotRecoveryDigest32 `json:"intent_digest"`
+	Observations     []struct {
+		ExpiresAtUnixMs RecoveryExplanationSnapshotSafeInteger           `json:"expires_at_unix_ms"`
+		Fact            RecoveryExplanationSnapshotObservationsFact      `json:"fact"`
+		Id              RecoveryExplanationSnapshotOpaqueId              `json:"id"`
+		Integrity       RecoveryExplanationSnapshotObservationsIntegrity `json:"integrity"`
+
+		// Label Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+		Label            SecurityInformationLabel                        `json:"label"`
+		Object           RecoveryExplanationSnapshotOpaqueId             `json:"object"`
+		ObservedAtUnixMs RecoveryExplanationSnapshotSafeInteger          `json:"observed_at_unix_ms"`
+		Scope            RecoveryExplanationSnapshotScope                `json:"scope"`
+		Source           RecoveryExplanationSnapshotObservationsSource   `json:"source"`
+		State            RecoveryExplanationSnapshot_Observations_State  `json:"state"`
+		Target           RecoveryExplanationSnapshot_Observations_Target `json:"target"`
+	} `json:"observations"`
+	ObservedAtUnixMs RecoveryExplanationSnapshotSafeInteger      `json:"observed_at_unix_ms"`
+	PolicyDigest     RecoveryExplanationSnapshotRecoveryDigest32 `json:"policy_digest"`
+	Schema           RecoveryExplanationSnapshotSchema           `json:"schema"`
+	Scope            RecoveryExplanationSnapshotScope            `json:"scope"`
+	Version          RecoveryExplanationSnapshotVersion          `json:"version"`
+}
+
+// RecoveryExplanationSnapshot_Effect defines model for RecoveryExplanationSnapshot.Effect.
+type RecoveryExplanationSnapshot_Effect struct {
+	union json.RawMessage
+}
+
+// RecoveryExplanationSnapshotInfluence0 defines model for .
+type RecoveryExplanationSnapshotInfluence0 struct {
+	Basis     RecoveryExplanationSnapshotRecoveryDigest32    `json:"basis"`
+	Integrity RecoveryExplanationSnapshotInfluence0Integrity `json:"integrity"`
+	Kind      RecoveryExplanationSnapshotInfluence0Kind      `json:"kind"`
+}
+
+// RecoveryExplanationSnapshotInfluence0Integrity defines model for RecoveryExplanationSnapshot.Influence.0.Integrity.
+type RecoveryExplanationSnapshotInfluence0Integrity string
+
+// RecoveryExplanationSnapshotInfluence0Kind defines model for RecoveryExplanationSnapshot.Influence.0.Kind.
+type RecoveryExplanationSnapshotInfluence0Kind string
+
+// RecoveryExplanationSnapshotInfluence1 defines model for .
+type RecoveryExplanationSnapshotInfluence1 struct {
+	Kind RecoveryExplanationSnapshotInfluence1Kind `json:"kind"`
+}
+
+// RecoveryExplanationSnapshotInfluence1Kind defines model for RecoveryExplanationSnapshot.Influence.1.Kind.
+type RecoveryExplanationSnapshotInfluence1Kind string
+
+// RecoveryExplanationSnapshot_Influence defines model for RecoveryExplanationSnapshot.Influence.
+type RecoveryExplanationSnapshot_Influence struct {
+	union json.RawMessage
+}
+
+// RecoveryExplanationSnapshotObservationsFact defines model for RecoveryExplanationSnapshot.Observations.Fact.
+type RecoveryExplanationSnapshotObservationsFact string
+
+// RecoveryExplanationSnapshotObservationsIntegrity defines model for RecoveryExplanationSnapshot.Observations.Integrity.
+type RecoveryExplanationSnapshotObservationsIntegrity string
+
+// RecoveryExplanationSnapshotObservationsSource defines model for RecoveryExplanationSnapshot.Observations.Source.
+type RecoveryExplanationSnapshotObservationsSource string
+
+// RecoveryExplanationSnapshotObservationsState0 defines model for .
+type RecoveryExplanationSnapshotObservationsState0 struct {
+	Evidence  RecoveryExplanationSnapshotOpaqueId               `json:"evidence"`
+	Kind      RecoveryExplanationSnapshotObservationsState0Kind `json:"kind"`
+	Satisfied bool                                              `json:"satisfied"`
+	Version   int64                                             `json:"version"`
+}
+
+// RecoveryExplanationSnapshotObservationsState0Kind defines model for RecoveryExplanationSnapshot.Observations.State.0.Kind.
+type RecoveryExplanationSnapshotObservationsState0Kind string
+
+// RecoveryExplanationSnapshotObservationsState1 defines model for .
+type RecoveryExplanationSnapshotObservationsState1 struct {
+	Kind   RecoveryExplanationSnapshotObservationsState1Kind   `json:"kind"`
+	Reason RecoveryExplanationSnapshotObservationsState1Reason `json:"reason"`
+}
+
+// RecoveryExplanationSnapshotObservationsState1Kind defines model for RecoveryExplanationSnapshot.Observations.State.1.Kind.
+type RecoveryExplanationSnapshotObservationsState1Kind string
+
+// RecoveryExplanationSnapshotObservationsState1Reason defines model for RecoveryExplanationSnapshot.Observations.State.1.Reason.
+type RecoveryExplanationSnapshotObservationsState1Reason string
+
+// RecoveryExplanationSnapshotObservationsState2 defines model for .
+type RecoveryExplanationSnapshotObservationsState2 struct {
+	Evidence  RecoveryExplanationSnapshotOpaqueId               `json:"evidence"`
+	Kind      RecoveryExplanationSnapshotObservationsState2Kind `json:"kind"`
+	Satisfied bool                                              `json:"satisfied"`
+}
+
+// RecoveryExplanationSnapshotObservationsState2Kind defines model for RecoveryExplanationSnapshot.Observations.State.2.Kind.
+type RecoveryExplanationSnapshotObservationsState2Kind string
+
+// RecoveryExplanationSnapshot_Observations_State defines model for RecoveryExplanationSnapshot.Observations.State.
+type RecoveryExplanationSnapshot_Observations_State struct {
+	union json.RawMessage
+}
+
+// RecoveryExplanationSnapshotObservationsTarget0 defines model for .
+type RecoveryExplanationSnapshotObservationsTarget0 struct {
+	Intent RecoveryExplanationSnapshotRecoveryDigest32        `json:"intent"`
+	Kind   RecoveryExplanationSnapshotObservationsTarget0Kind `json:"kind"`
+}
+
+// RecoveryExplanationSnapshotObservationsTarget0Kind defines model for RecoveryExplanationSnapshot.Observations.Target.0.Kind.
+type RecoveryExplanationSnapshotObservationsTarget0Kind string
+
+// RecoveryExplanationSnapshotObservationsTarget1 defines model for .
+type RecoveryExplanationSnapshotObservationsTarget1 struct {
+	Destination RecoveryExplanationSnapshotDestinationId           `json:"destination"`
+	Kind        RecoveryExplanationSnapshotObservationsTarget1Kind `json:"kind"`
+}
+
+// RecoveryExplanationSnapshotObservationsTarget1Kind defines model for RecoveryExplanationSnapshot.Observations.Target.1.Kind.
+type RecoveryExplanationSnapshotObservationsTarget1Kind string
+
+// RecoveryExplanationSnapshotObservationsTarget2 defines model for .
+type RecoveryExplanationSnapshotObservationsTarget2 struct {
+	Kind  RecoveryExplanationSnapshotObservationsTarget2Kind `json:"kind"`
+	Scope RecoveryExplanationSnapshotRecoveryDigest32        `json:"scope"`
+}
+
+// RecoveryExplanationSnapshotObservationsTarget2Kind defines model for RecoveryExplanationSnapshot.Observations.Target.2.Kind.
+type RecoveryExplanationSnapshotObservationsTarget2Kind string
+
+// RecoveryExplanationSnapshotObservationsTarget3 defines model for .
+type RecoveryExplanationSnapshotObservationsTarget3 struct {
+	Kind     RecoveryExplanationSnapshotObservationsTarget3Kind `json:"kind"`
+	Template RecoveryExplanationSnapshotOpaqueId                `json:"template"`
+}
+
+// RecoveryExplanationSnapshotObservationsTarget3Kind defines model for RecoveryExplanationSnapshot.Observations.Target.3.Kind.
+type RecoveryExplanationSnapshotObservationsTarget3Kind string
+
+// RecoveryExplanationSnapshot_Observations_Target defines model for RecoveryExplanationSnapshot.Observations.Target.
+type RecoveryExplanationSnapshot_Observations_Target struct {
+	union json.RawMessage
+}
+
+// RecoveryExplanationSnapshotSchema defines model for RecoveryExplanationSnapshot.Schema.
+type RecoveryExplanationSnapshotSchema string
+
+// RecoveryExplanationSnapshotVersion defines model for RecoveryExplanationSnapshot.Version.
+type RecoveryExplanationSnapshotVersion int64
+
+// RecoveryExplanationSnapshotDestinationId defines model for RecoveryExplanationSnapshotDestinationId.
+type RecoveryExplanationSnapshotDestinationId = string
+
+// RecoveryExplanationSnapshotOpaqueId defines model for RecoveryExplanationSnapshotOpaqueId.
+type RecoveryExplanationSnapshotOpaqueId = string
+
+// RecoveryExplanationSnapshotOperation defines model for RecoveryExplanationSnapshotOperation.
+type RecoveryExplanationSnapshotOperation struct {
+	NativeAdmissionDigest RecoveryExplanationSnapshotRecoveryDigest32 `json:"native_admission_digest"`
+	OperationId           RecoveryExplanationSnapshotOpaqueId         `json:"operation_id"`
+	OperationVersion      int64                                       `json:"operation_version"`
+}
+
+// RecoveryExplanationSnapshotRecoveryDigest32 defines model for RecoveryExplanationSnapshotRecoveryDigest32.
+type RecoveryExplanationSnapshotRecoveryDigest32 = []int64
+
+// RecoveryExplanationSnapshotRecoveryEffectAdmissionUnresolvedV1 defines model for RecoveryExplanationSnapshotRecoveryEffectAdmissionUnresolvedV1.
+type RecoveryExplanationSnapshotRecoveryEffectAdmissionUnresolvedV1 struct {
+	AdmissionIntent RecoveryExplanationSnapshotOpaqueId                                `json:"admission_intent"`
+	Kind            RecoveryExplanationSnapshotRecoveryEffectAdmissionUnresolvedV1Kind `json:"kind"`
+}
+
+// RecoveryExplanationSnapshotRecoveryEffectAdmissionUnresolvedV1Kind defines model for RecoveryExplanationSnapshotRecoveryEffectAdmissionUnresolvedV1.Kind.
+type RecoveryExplanationSnapshotRecoveryEffectAdmissionUnresolvedV1Kind string
+
+// RecoveryExplanationSnapshotRecoveryEffectAwaitingApprovalV1 defines model for RecoveryExplanationSnapshotRecoveryEffectAwaitingApprovalV1.
+type RecoveryExplanationSnapshotRecoveryEffectAwaitingApprovalV1 struct {
+	Kind      RecoveryExplanationSnapshotRecoveryEffectAwaitingApprovalV1Kind `json:"kind"`
+	Operation RecoveryExplanationSnapshotOperation                            `json:"operation"`
+}
+
+// RecoveryExplanationSnapshotRecoveryEffectAwaitingApprovalV1Kind defines model for RecoveryExplanationSnapshotRecoveryEffectAwaitingApprovalV1.Kind.
+type RecoveryExplanationSnapshotRecoveryEffectAwaitingApprovalV1Kind string
+
+// RecoveryExplanationSnapshotRecoveryEffectAwaitingCallerReportV1 defines model for RecoveryExplanationSnapshotRecoveryEffectAwaitingCallerReportV1.
+type RecoveryExplanationSnapshotRecoveryEffectAwaitingCallerReportV1 struct {
+	Kind      RecoveryExplanationSnapshotRecoveryEffectAwaitingCallerReportV1Kind `json:"kind"`
+	Operation RecoveryExplanationSnapshotOperation                                `json:"operation"`
+}
+
+// RecoveryExplanationSnapshotRecoveryEffectAwaitingCallerReportV1Kind defines model for RecoveryExplanationSnapshotRecoveryEffectAwaitingCallerReportV1.Kind.
+type RecoveryExplanationSnapshotRecoveryEffectAwaitingCallerReportV1Kind string
+
+// RecoveryExplanationSnapshotRecoveryEffectClosedBeforeEffectV1 defines model for RecoveryExplanationSnapshotRecoveryEffectClosedBeforeEffectV1.
+type RecoveryExplanationSnapshotRecoveryEffectClosedBeforeEffectV1 struct {
+	Closure   RecoveryExplanationSnapshotOpaqueId                               `json:"closure"`
+	Kind      RecoveryExplanationSnapshotRecoveryEffectClosedBeforeEffectV1Kind `json:"kind"`
+	Operation RecoveryExplanationSnapshotOperation                              `json:"operation"`
+}
+
+// RecoveryExplanationSnapshotRecoveryEffectClosedBeforeEffectV1Kind defines model for RecoveryExplanationSnapshotRecoveryEffectClosedBeforeEffectV1.Kind.
+type RecoveryExplanationSnapshotRecoveryEffectClosedBeforeEffectV1Kind string
+
+// RecoveryExplanationSnapshotRecoveryEffectCompleteV1 defines model for RecoveryExplanationSnapshotRecoveryEffectCompleteV1.
+type RecoveryExplanationSnapshotRecoveryEffectCompleteV1 struct {
+	EffectCount RecoveryExplanationSnapshotSafeInteger                  `json:"effect_count"`
+	Kind        RecoveryExplanationSnapshotRecoveryEffectCompleteV1Kind `json:"kind"`
+	Operation   RecoveryExplanationSnapshotOperation                    `json:"operation"`
+}
+
+// RecoveryExplanationSnapshotRecoveryEffectCompleteV1Kind defines model for RecoveryExplanationSnapshotRecoveryEffectCompleteV1.Kind.
+type RecoveryExplanationSnapshotRecoveryEffectCompleteV1Kind string
+
+// RecoveryExplanationSnapshotRecoveryEffectFailedAfterEffectV1 defines model for RecoveryExplanationSnapshotRecoveryEffectFailedAfterEffectV1.
+type RecoveryExplanationSnapshotRecoveryEffectFailedAfterEffectV1 struct {
+	AppliedEffects int64                                                            `json:"applied_effects"`
+	Kind           RecoveryExplanationSnapshotRecoveryEffectFailedAfterEffectV1Kind `json:"kind"`
+	Operation      RecoveryExplanationSnapshotOperation                             `json:"operation"`
+}
+
+// RecoveryExplanationSnapshotRecoveryEffectFailedAfterEffectV1Kind defines model for RecoveryExplanationSnapshotRecoveryEffectFailedAfterEffectV1.Kind.
+type RecoveryExplanationSnapshotRecoveryEffectFailedAfterEffectV1Kind string
+
+// RecoveryExplanationSnapshotRecoveryEffectInFlightV1 defines model for RecoveryExplanationSnapshotRecoveryEffectInFlightV1.
+type RecoveryExplanationSnapshotRecoveryEffectInFlightV1 struct {
+	Kind      RecoveryExplanationSnapshotRecoveryEffectInFlightV1Kind `json:"kind"`
+	Operation RecoveryExplanationSnapshotOperation                    `json:"operation"`
+}
+
+// RecoveryExplanationSnapshotRecoveryEffectInFlightV1Kind defines model for RecoveryExplanationSnapshotRecoveryEffectInFlightV1.Kind.
+type RecoveryExplanationSnapshotRecoveryEffectInFlightV1Kind string
+
+// RecoveryExplanationSnapshotRecoveryEffectNeverAdmittedV1 defines model for RecoveryExplanationSnapshotRecoveryEffectNeverAdmittedV1.
+type RecoveryExplanationSnapshotRecoveryEffectNeverAdmittedV1 struct {
+	Kind RecoveryExplanationSnapshotRecoveryEffectNeverAdmittedV1Kind `json:"kind"`
+}
+
+// RecoveryExplanationSnapshotRecoveryEffectNeverAdmittedV1Kind defines model for RecoveryExplanationSnapshotRecoveryEffectNeverAdmittedV1.Kind.
+type RecoveryExplanationSnapshotRecoveryEffectNeverAdmittedV1Kind string
+
+// RecoveryExplanationSnapshotRecoveryEffectPartialV1 defines model for RecoveryExplanationSnapshotRecoveryEffectPartialV1.
+type RecoveryExplanationSnapshotRecoveryEffectPartialV1 struct {
+	AppliedEffects int64                                                  `json:"applied_effects"`
+	Kind           RecoveryExplanationSnapshotRecoveryEffectPartialV1Kind `json:"kind"`
+	Operation      RecoveryExplanationSnapshotOperation                   `json:"operation"`
+}
+
+// RecoveryExplanationSnapshotRecoveryEffectPartialV1Kind defines model for RecoveryExplanationSnapshotRecoveryEffectPartialV1.Kind.
+type RecoveryExplanationSnapshotRecoveryEffectPartialV1Kind string
+
+// RecoveryExplanationSnapshotRecoveryEffectUnknownV1 defines model for RecoveryExplanationSnapshotRecoveryEffectUnknownV1.
+type RecoveryExplanationSnapshotRecoveryEffectUnknownV1 struct {
+	Kind      RecoveryExplanationSnapshotRecoveryEffectUnknownV1Kind `json:"kind"`
+	Operation RecoveryExplanationSnapshotOperation                   `json:"operation"`
+}
+
+// RecoveryExplanationSnapshotRecoveryEffectUnknownV1Kind defines model for RecoveryExplanationSnapshotRecoveryEffectUnknownV1.Kind.
+type RecoveryExplanationSnapshotRecoveryEffectUnknownV1Kind string
+
+// RecoveryExplanationSnapshotRefusalCode defines model for RecoveryExplanationSnapshotRefusalCode.
+type RecoveryExplanationSnapshotRefusalCode string
+
+// RecoveryExplanationSnapshotSafeInteger defines model for RecoveryExplanationSnapshotSafeInteger.
+type RecoveryExplanationSnapshotSafeInteger = int64
+
+// RecoveryExplanationSnapshotScope defines model for RecoveryExplanationSnapshotScope.
+type RecoveryExplanationSnapshotScope struct {
+	AuthorityDomain RecoveryExplanationSnapshotOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryExplanationSnapshotOpaqueId `json:"process_id"`
+	TenantId        RecoveryExplanationSnapshotOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryExplanationView defines model for RecoveryExplanationView.
+type RecoveryExplanationView struct {
+	ExpiresAtUnixMs RecoveryExplanationViewSafeInteger    `json:"expires_at_unix_ms"`
+	IssuedAtUnixMs  RecoveryExplanationViewSafeInteger    `json:"issued_at_unix_ms"`
+	Issuer          RecoveryExplanationViewOpaqueId       `json:"issuer"`
+	PlannerVersion  RecoveryExplanationViewPlannerVersion `json:"planner_version"`
+	Projection      struct {
+		Candidates []struct {
+			Assessment RecoveryExplanationViewProjectionCandidatesAssessment `json:"assessment"`
+			TemplateId RecoveryExplanationViewOpaqueId                       `json:"template_id"`
+		} `json:"candidates"`
+		Summary RecoveryExplanationViewProjectionSummary `json:"summary"`
+	} `json:"projection"`
+	Recipient   RecoveryExplanationViewOpaqueId `json:"recipient"`
+	ReportRef   RecoveryExplanationViewOpaqueId `json:"report_ref"`
+	Schema      RecoveryExplanationViewSchema   `json:"schema"`
+	TrustDomain RecoveryExplanationViewOpaqueId `json:"trust_domain"`
+	Version     RecoveryExplanationViewVersion  `json:"version"`
+}
+
+// RecoveryExplanationViewPlannerVersion defines model for RecoveryExplanationView.PlannerVersion.
+type RecoveryExplanationViewPlannerVersion string
+
+// RecoveryExplanationViewProjectionCandidatesAssessment defines model for RecoveryExplanationView.Projection.Candidates.Assessment.
+type RecoveryExplanationViewProjectionCandidatesAssessment string
+
+// RecoveryExplanationViewProjectionSummary defines model for RecoveryExplanationView.Projection.Summary.
+type RecoveryExplanationViewProjectionSummary string
+
+// RecoveryExplanationViewSchema defines model for RecoveryExplanationView.Schema.
+type RecoveryExplanationViewSchema string
+
+// RecoveryExplanationViewVersion defines model for RecoveryExplanationView.Version.
+type RecoveryExplanationViewVersion int64
+
+// RecoveryExplanationViewDestinationId defines model for RecoveryExplanationViewDestinationId.
+type RecoveryExplanationViewDestinationId = string
+
+// RecoveryExplanationViewOpaqueId defines model for RecoveryExplanationViewOpaqueId.
+type RecoveryExplanationViewOpaqueId = string
+
+// RecoveryExplanationViewOperation defines model for RecoveryExplanationViewOperation.
+type RecoveryExplanationViewOperation struct {
+	NativeAdmissionDigest RecoveryExplanationViewRecoveryDigest32 `json:"native_admission_digest"`
+	OperationId           RecoveryExplanationViewOpaqueId         `json:"operation_id"`
+	OperationVersion      int64                                   `json:"operation_version"`
+}
+
+// RecoveryExplanationViewRecoveryDigest32 defines model for RecoveryExplanationViewRecoveryDigest32.
+type RecoveryExplanationViewRecoveryDigest32 = []int64
+
+// RecoveryExplanationViewRecoveryEffectAdmissionUnresolvedV1 defines model for RecoveryExplanationViewRecoveryEffectAdmissionUnresolvedV1.
+type RecoveryExplanationViewRecoveryEffectAdmissionUnresolvedV1 struct {
+	AdmissionIntent RecoveryExplanationViewOpaqueId                                `json:"admission_intent"`
+	Kind            RecoveryExplanationViewRecoveryEffectAdmissionUnresolvedV1Kind `json:"kind"`
+}
+
+// RecoveryExplanationViewRecoveryEffectAdmissionUnresolvedV1Kind defines model for RecoveryExplanationViewRecoveryEffectAdmissionUnresolvedV1.Kind.
+type RecoveryExplanationViewRecoveryEffectAdmissionUnresolvedV1Kind string
+
+// RecoveryExplanationViewRecoveryEffectAwaitingApprovalV1 defines model for RecoveryExplanationViewRecoveryEffectAwaitingApprovalV1.
+type RecoveryExplanationViewRecoveryEffectAwaitingApprovalV1 struct {
+	Kind      RecoveryExplanationViewRecoveryEffectAwaitingApprovalV1Kind `json:"kind"`
+	Operation RecoveryExplanationViewOperation                            `json:"operation"`
+}
+
+// RecoveryExplanationViewRecoveryEffectAwaitingApprovalV1Kind defines model for RecoveryExplanationViewRecoveryEffectAwaitingApprovalV1.Kind.
+type RecoveryExplanationViewRecoveryEffectAwaitingApprovalV1Kind string
+
+// RecoveryExplanationViewRecoveryEffectAwaitingCallerReportV1 defines model for RecoveryExplanationViewRecoveryEffectAwaitingCallerReportV1.
+type RecoveryExplanationViewRecoveryEffectAwaitingCallerReportV1 struct {
+	Kind      RecoveryExplanationViewRecoveryEffectAwaitingCallerReportV1Kind `json:"kind"`
+	Operation RecoveryExplanationViewOperation                                `json:"operation"`
+}
+
+// RecoveryExplanationViewRecoveryEffectAwaitingCallerReportV1Kind defines model for RecoveryExplanationViewRecoveryEffectAwaitingCallerReportV1.Kind.
+type RecoveryExplanationViewRecoveryEffectAwaitingCallerReportV1Kind string
+
+// RecoveryExplanationViewRecoveryEffectClosedBeforeEffectV1 defines model for RecoveryExplanationViewRecoveryEffectClosedBeforeEffectV1.
+type RecoveryExplanationViewRecoveryEffectClosedBeforeEffectV1 struct {
+	Closure   RecoveryExplanationViewOpaqueId                               `json:"closure"`
+	Kind      RecoveryExplanationViewRecoveryEffectClosedBeforeEffectV1Kind `json:"kind"`
+	Operation RecoveryExplanationViewOperation                              `json:"operation"`
+}
+
+// RecoveryExplanationViewRecoveryEffectClosedBeforeEffectV1Kind defines model for RecoveryExplanationViewRecoveryEffectClosedBeforeEffectV1.Kind.
+type RecoveryExplanationViewRecoveryEffectClosedBeforeEffectV1Kind string
+
+// RecoveryExplanationViewRecoveryEffectCompleteV1 defines model for RecoveryExplanationViewRecoveryEffectCompleteV1.
+type RecoveryExplanationViewRecoveryEffectCompleteV1 struct {
+	EffectCount RecoveryExplanationViewSafeInteger                  `json:"effect_count"`
+	Kind        RecoveryExplanationViewRecoveryEffectCompleteV1Kind `json:"kind"`
+	Operation   RecoveryExplanationViewOperation                    `json:"operation"`
+}
+
+// RecoveryExplanationViewRecoveryEffectCompleteV1Kind defines model for RecoveryExplanationViewRecoveryEffectCompleteV1.Kind.
+type RecoveryExplanationViewRecoveryEffectCompleteV1Kind string
+
+// RecoveryExplanationViewRecoveryEffectFailedAfterEffectV1 defines model for RecoveryExplanationViewRecoveryEffectFailedAfterEffectV1.
+type RecoveryExplanationViewRecoveryEffectFailedAfterEffectV1 struct {
+	AppliedEffects int64                                                        `json:"applied_effects"`
+	Kind           RecoveryExplanationViewRecoveryEffectFailedAfterEffectV1Kind `json:"kind"`
+	Operation      RecoveryExplanationViewOperation                             `json:"operation"`
+}
+
+// RecoveryExplanationViewRecoveryEffectFailedAfterEffectV1Kind defines model for RecoveryExplanationViewRecoveryEffectFailedAfterEffectV1.Kind.
+type RecoveryExplanationViewRecoveryEffectFailedAfterEffectV1Kind string
+
+// RecoveryExplanationViewRecoveryEffectInFlightV1 defines model for RecoveryExplanationViewRecoveryEffectInFlightV1.
+type RecoveryExplanationViewRecoveryEffectInFlightV1 struct {
+	Kind      RecoveryExplanationViewRecoveryEffectInFlightV1Kind `json:"kind"`
+	Operation RecoveryExplanationViewOperation                    `json:"operation"`
+}
+
+// RecoveryExplanationViewRecoveryEffectInFlightV1Kind defines model for RecoveryExplanationViewRecoveryEffectInFlightV1.Kind.
+type RecoveryExplanationViewRecoveryEffectInFlightV1Kind string
+
+// RecoveryExplanationViewRecoveryEffectNeverAdmittedV1 defines model for RecoveryExplanationViewRecoveryEffectNeverAdmittedV1.
+type RecoveryExplanationViewRecoveryEffectNeverAdmittedV1 struct {
+	Kind RecoveryExplanationViewRecoveryEffectNeverAdmittedV1Kind `json:"kind"`
+}
+
+// RecoveryExplanationViewRecoveryEffectNeverAdmittedV1Kind defines model for RecoveryExplanationViewRecoveryEffectNeverAdmittedV1.Kind.
+type RecoveryExplanationViewRecoveryEffectNeverAdmittedV1Kind string
+
+// RecoveryExplanationViewRecoveryEffectPartialV1 defines model for RecoveryExplanationViewRecoveryEffectPartialV1.
+type RecoveryExplanationViewRecoveryEffectPartialV1 struct {
+	AppliedEffects int64                                              `json:"applied_effects"`
+	Kind           RecoveryExplanationViewRecoveryEffectPartialV1Kind `json:"kind"`
+	Operation      RecoveryExplanationViewOperation                   `json:"operation"`
+}
+
+// RecoveryExplanationViewRecoveryEffectPartialV1Kind defines model for RecoveryExplanationViewRecoveryEffectPartialV1.Kind.
+type RecoveryExplanationViewRecoveryEffectPartialV1Kind string
+
+// RecoveryExplanationViewRecoveryEffectUnknownV1 defines model for RecoveryExplanationViewRecoveryEffectUnknownV1.
+type RecoveryExplanationViewRecoveryEffectUnknownV1 struct {
+	Kind      RecoveryExplanationViewRecoveryEffectUnknownV1Kind `json:"kind"`
+	Operation RecoveryExplanationViewOperation                   `json:"operation"`
+}
+
+// RecoveryExplanationViewRecoveryEffectUnknownV1Kind defines model for RecoveryExplanationViewRecoveryEffectUnknownV1.Kind.
+type RecoveryExplanationViewRecoveryEffectUnknownV1Kind string
+
+// RecoveryExplanationViewRefusalCode defines model for RecoveryExplanationViewRefusalCode.
+type RecoveryExplanationViewRefusalCode string
+
+// RecoveryExplanationViewSafeInteger defines model for RecoveryExplanationViewSafeInteger.
+type RecoveryExplanationViewSafeInteger = int64
+
+// RecoveryExplanationViewScope defines model for RecoveryExplanationViewScope.
+type RecoveryExplanationViewScope struct {
+	AuthorityDomain RecoveryExplanationViewOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryExplanationViewOpaqueId `json:"process_id"`
+	TenantId        RecoveryExplanationViewOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryGrantBinding defines model for RecoveryGrantBinding.
+type RecoveryGrantBinding struct {
+	ActionIntent              RecoveryGrantBindingRecoveryDigest32 `json:"action_intent"`
+	ApprovalIntent            RecoveryGrantBindingOpaqueId         `json:"approval_intent"`
+	ApprovedPlan              RecoveryGrantBindingRecoveryDigest32 `json:"approved_plan"`
+	AuthorityDomain           RecoveryGrantBindingOpaqueId         `json:"authority_domain"`
+	AuthorityScope            RecoveryGrantBindingRecoveryDigest32 `json:"authority_scope"`
+	AuthorizationRequirements RecoveryGrantBindingRecoveryDigest32 `json:"authorization_requirements"`
+	Challenge                 RecoveryGrantBindingOpaqueId         `json:"challenge"`
+	ContinuationId            RecoveryGrantBindingOpaqueId         `json:"continuation_id"`
+	ContractDigest            RecoveryGrantBindingRecoveryDigest32 `json:"contract_digest"`
+	CoverageDigest            RecoveryGrantBindingRecoveryDigest32 `json:"coverage_digest"`
+	IsolationEpoch            int64                                `json:"isolation_epoch"`
+	IsolationLineage          RecoveryGrantBindingOpaqueId         `json:"isolation_lineage"`
+	OutputDisposition         RecoveryGrantBindingRecoveryDigest32 `json:"output_disposition"`
+	PolicyDigest              RecoveryGrantBindingRecoveryDigest32 `json:"policy_digest"`
+	ProcessId                 RecoveryGrantBindingOpaqueId         `json:"process_id"`
+	RequestId                 RecoveryGrantBindingOpaqueId         `json:"request_id"`
+	RequestNamespace          RecoveryGrantBindingRecoveryDigest32 `json:"request_namespace"`
+	Schema                    RecoveryGrantBindingSchema           `json:"schema"`
+	SelectedOffer             RecoveryGrantBindingRecoveryDigest32 `json:"selected_offer"`
+	StepId                    RecoveryGrantBindingOpaqueId         `json:"step_id"`
+	Version                   RecoveryGrantBindingVersion          `json:"version"`
+	WorkflowId                RecoveryGrantBindingOpaqueId         `json:"workflow_id"`
+}
+
+// RecoveryGrantBindingSchema defines model for RecoveryGrantBinding.Schema.
+type RecoveryGrantBindingSchema string
+
+// RecoveryGrantBindingVersion defines model for RecoveryGrantBinding.Version.
+type RecoveryGrantBindingVersion int64
+
+// RecoveryGrantBindingOpaqueId defines model for RecoveryGrantBindingOpaqueId.
+type RecoveryGrantBindingOpaqueId = string
+
+// RecoveryGrantBindingRecoveryDigest32 defines model for RecoveryGrantBindingRecoveryDigest32.
+type RecoveryGrantBindingRecoveryDigest32 = []int64
+
+// RecoveryGrantBindingSafeInteger defines model for RecoveryGrantBindingSafeInteger.
+type RecoveryGrantBindingSafeInteger = int64
+
+// RecoveryGrantBindingScope defines model for RecoveryGrantBindingScope.
+type RecoveryGrantBindingScope struct {
+	AuthorityDomain RecoveryGrantBindingOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryGrantBindingOpaqueId `json:"process_id"`
+	TenantId        RecoveryGrantBindingOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryIsolationBoundary defines model for RecoveryIsolationBoundary.
+type RecoveryIsolationBoundary struct {
+	Ancestry         []RecoveryIsolationBoundaryOpaqueId          `json:"ancestry"`
+	Boundary         RecoveryIsolationBoundaryOpaqueId            `json:"boundary"`
+	Child            RecoveryIsolationBoundaryOpaqueId            `json:"child"`
+	ChildCapability  RecoveryIsolationBoundaryRecoveryDigest32    `json:"child_capability"`
+	ChildPrincipal   string                                       `json:"child_principal"`
+	DeadlineUnixMs   int64                                        `json:"deadline_unix_ms"`
+	DomainVersion    RecoveryIsolationBoundaryDomainVersion       `json:"domain_version"`
+	Execution        RecoveryConfinedExecutionProfile             `json:"execution"`
+	IsolationEpoch   string                                       `json:"isolation_epoch"`
+	Limits           RecoveryConfinedLimits                       `json:"limits"`
+	Lineage          RecoveryIsolationBoundaryOpaqueId            `json:"lineage"`
+	Observation      RecoveryIsolationBoundaryArtifactReference   `json:"observation"`
+	Parent           RecoveryIsolationBoundaryArtifactRecipient   `json:"parent"`
+	ParentCapability RecoveryIsolationBoundaryRecoveryDigest32    `json:"parent_capability"`
+	ParentControl    RecoveryIsolationBoundaryRecoveryDigest32    `json:"parent_control"`
+	Policy           RecoveryIsolationBoundaryRecoveryDigest32    `json:"policy"`
+	Request          RecoveryIsolationBoundaryOpaqueId            `json:"request"`
+	ReturnContract   RecoveryIsolationBoundaryRecoveryDigest32    `json:"return_contract"`
+	Scope            RecoveryIsolationBoundaryScope               `json:"scope"`
+	SeedArtifacts    []RecoveryIsolationBoundaryArtifactReference `json:"seed_artifacts"`
+	SeedInfluence    RecoveryIsolationBoundaryArtifactInfluence   `json:"seed_influence"`
+
+	// SeedLabel Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	SeedLabel SecurityInformationLabel `json:"seed_label"`
+}
+
+// RecoveryIsolationBoundaryDomainVersion defines model for RecoveryIsolationBoundary.DomainVersion.
+type RecoveryIsolationBoundaryDomainVersion int64
+
+// RecoveryIsolationBoundaryArtifactInfluence defines model for RecoveryIsolationBoundaryArtifactInfluence.
+type RecoveryIsolationBoundaryArtifactInfluence struct {
+	Commitment           RecoveryIsolationBoundaryRecoveryDigest32 `json:"commitment"`
+	ExternallyInfluenced bool                                      `json:"externally_influenced"`
+	Unknown              bool                                      `json:"unknown"`
+}
+
+// RecoveryIsolationBoundaryArtifactRecipient defines model for RecoveryIsolationBoundaryArtifactRecipient.
+type RecoveryIsolationBoundaryArtifactRecipient struct {
+	// Clearance Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	Clearance         SecurityInformationLabel              `json:"clearance"`
+	ContextGeneration RecoveryIsolationBoundarySafeInteger  `json:"context_generation"`
+	IsolationEpoch    string                                `json:"isolation_epoch"`
+	Lineage           RecoveryIsolationBoundaryOpaqueId     `json:"lineage"`
+	Principal         string                                `json:"principal"`
+	Recipient         RecoveryIsolationBoundaryOpaqueId     `json:"recipient"`
+	Runtime           string                                `json:"runtime"`
+	Scope             RecoveryIsolationBoundaryScope        `json:"scope"`
+	Sink              RecoveryIsolationBoundaryArtifactSink `json:"sink"`
+}
+
+// RecoveryIsolationBoundaryArtifactReference defines model for RecoveryIsolationBoundaryArtifactReference.
+type RecoveryIsolationBoundaryArtifactReference struct {
+	Artifact   RecoveryIsolationBoundaryOpaqueId         `json:"artifact"`
+	Provenance RecoveryIsolationBoundaryRecoveryDigest32 `json:"provenance"`
+	Scope      RecoveryIsolationBoundaryScope            `json:"scope"`
+	Version    RecoveryIsolationBoundaryOpaqueId         `json:"version"`
+}
+
+// RecoveryIsolationBoundaryArtifactSink defines model for RecoveryIsolationBoundaryArtifactSink.
+type RecoveryIsolationBoundaryArtifactSink struct {
+	union json.RawMessage
+}
+
+// RecoveryIsolationBoundaryArtifactSink0 defines model for .
+type RecoveryIsolationBoundaryArtifactSink0 struct {
+	Kind RecoveryIsolationBoundaryArtifactSink0Kind `json:"kind"`
+}
+
+// RecoveryIsolationBoundaryArtifactSink0Kind defines model for RecoveryIsolationBoundaryArtifactSink.0.Kind.
+type RecoveryIsolationBoundaryArtifactSink0Kind string
+
+// RecoveryIsolationBoundaryArtifactSink1 defines model for .
+type RecoveryIsolationBoundaryArtifactSink1 struct {
+	Context RecoveryIsolationBoundaryModelContext      `json:"context"`
+	Kind    RecoveryIsolationBoundaryArtifactSink1Kind `json:"kind"`
+}
+
+// RecoveryIsolationBoundaryArtifactSink1Kind defines model for RecoveryIsolationBoundaryArtifactSink.1.Kind.
+type RecoveryIsolationBoundaryArtifactSink1Kind string
+
+// RecoveryIsolationBoundaryArtifactSink2 defines model for .
+type RecoveryIsolationBoundaryArtifactSink2 struct {
+	Kind RecoveryIsolationBoundaryArtifactSink2Kind `json:"kind"`
+}
+
+// RecoveryIsolationBoundaryArtifactSink2Kind defines model for RecoveryIsolationBoundaryArtifactSink.2.Kind.
+type RecoveryIsolationBoundaryArtifactSink2Kind string
+
+// RecoveryIsolationBoundaryModelContext defines model for RecoveryIsolationBoundaryModelContext.
+type RecoveryIsolationBoundaryModelContext struct {
+	Account      RecoveryIsolationBoundaryOpaqueId            `json:"account"`
+	Cache        string                                       `json:"cache"`
+	Context      RecoveryIsolationBoundaryOpaqueId            `json:"context"`
+	Contract     RecoveryIsolationBoundaryRecoveryDigest32    `json:"contract"`
+	Conversation string                                       `json:"conversation"`
+	Provider     RecoveryIsolationBoundaryOpaqueId            `json:"provider"`
+	SideFiles    []RecoveryIsolationBoundaryArtifactReference `json:"side_files"`
+}
+
+// RecoveryIsolationBoundaryOpaqueId defines model for RecoveryIsolationBoundaryOpaqueId.
+type RecoveryIsolationBoundaryOpaqueId = string
+
+// RecoveryIsolationBoundaryRecoveryDigest32 defines model for RecoveryIsolationBoundaryRecoveryDigest32.
+type RecoveryIsolationBoundaryRecoveryDigest32 = []int64
+
+// RecoveryIsolationBoundarySafeInteger defines model for RecoveryIsolationBoundarySafeInteger.
+type RecoveryIsolationBoundarySafeInteger = int64
+
+// RecoveryIsolationBoundaryScope defines model for RecoveryIsolationBoundaryScope.
+type RecoveryIsolationBoundaryScope struct {
+	AuthorityDomain RecoveryIsolationBoundaryOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryIsolationBoundaryOpaqueId `json:"process_id"`
+	TenantId        RecoveryIsolationBoundaryOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryLabeledCheckpoint defines model for RecoveryLabeledCheckpoint.
+type RecoveryLabeledCheckpoint struct {
+	Artifacts      []RecoveryLabeledCheckpointArtifactReference `json:"artifacts"`
+	Checkpoint     RecoveryLabeledCheckpointOpaqueId            `json:"checkpoint"`
+	DomainVersion  RecoveryLabeledCheckpointDomainVersion       `json:"domain_version"`
+	Influence      RecoveryLabeledCheckpointArtifactInfluence   `json:"influence"`
+	IsolationEpoch string                                       `json:"isolation_epoch"`
+
+	// Label Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	Label                  SecurityInformationLabel                  `json:"label"`
+	Lineage                RecoveryLabeledCheckpointOpaqueId         `json:"lineage"`
+	ModelContexts          []RecoveryLabeledCheckpointModelContext   `json:"model_contexts"`
+	NativeEvidenceSequence int64                                     `json:"native_evidence_sequence"`
+	Policy                 RecoveryLabeledCheckpointRecoveryDigest32 `json:"policy"`
+	Revision               int64                                     `json:"revision"`
+	Runtime                string                                    `json:"runtime"`
+	Scope                  RecoveryLabeledCheckpointScope            `json:"scope"`
+}
+
+// RecoveryLabeledCheckpointDomainVersion defines model for RecoveryLabeledCheckpoint.DomainVersion.
+type RecoveryLabeledCheckpointDomainVersion int64
+
+// RecoveryLabeledCheckpointArtifactInfluence defines model for RecoveryLabeledCheckpointArtifactInfluence.
+type RecoveryLabeledCheckpointArtifactInfluence struct {
+	Commitment           RecoveryLabeledCheckpointRecoveryDigest32 `json:"commitment"`
+	ExternallyInfluenced bool                                      `json:"externally_influenced"`
+	Unknown              bool                                      `json:"unknown"`
+}
+
+// RecoveryLabeledCheckpointArtifactReference defines model for RecoveryLabeledCheckpointArtifactReference.
+type RecoveryLabeledCheckpointArtifactReference struct {
+	Artifact   RecoveryLabeledCheckpointOpaqueId         `json:"artifact"`
+	Provenance RecoveryLabeledCheckpointRecoveryDigest32 `json:"provenance"`
+	Scope      RecoveryLabeledCheckpointScope            `json:"scope"`
+	Version    RecoveryLabeledCheckpointOpaqueId         `json:"version"`
+}
+
+// RecoveryLabeledCheckpointModelContext defines model for RecoveryLabeledCheckpointModelContext.
+type RecoveryLabeledCheckpointModelContext struct {
+	Account      RecoveryLabeledCheckpointOpaqueId            `json:"account"`
+	Cache        string                                       `json:"cache"`
+	Context      RecoveryLabeledCheckpointOpaqueId            `json:"context"`
+	Contract     RecoveryLabeledCheckpointRecoveryDigest32    `json:"contract"`
+	Conversation string                                       `json:"conversation"`
+	Provider     RecoveryLabeledCheckpointOpaqueId            `json:"provider"`
+	SideFiles    []RecoveryLabeledCheckpointArtifactReference `json:"side_files"`
+}
+
+// RecoveryLabeledCheckpointOpaqueId defines model for RecoveryLabeledCheckpointOpaqueId.
+type RecoveryLabeledCheckpointOpaqueId = string
+
+// RecoveryLabeledCheckpointRecoveryDigest32 defines model for RecoveryLabeledCheckpointRecoveryDigest32.
+type RecoveryLabeledCheckpointRecoveryDigest32 = []int64
+
+// RecoveryLabeledCheckpointScope defines model for RecoveryLabeledCheckpointScope.
+type RecoveryLabeledCheckpointScope struct {
+	AuthorityDomain RecoveryLabeledCheckpointOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryLabeledCheckpointOpaqueId `json:"process_id"`
+	TenantId        RecoveryLabeledCheckpointOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryModelContext defines model for RecoveryModelContext.
+type RecoveryModelContext struct {
+	Account      RecoveryModelContextOpaqueId            `json:"account"`
+	Cache        string                                  `json:"cache"`
+	Context      RecoveryModelContextOpaqueId            `json:"context"`
+	Contract     RecoveryModelContextRecoveryDigest32    `json:"contract"`
+	Conversation string                                  `json:"conversation"`
+	Provider     RecoveryModelContextOpaqueId            `json:"provider"`
+	SideFiles    []RecoveryModelContextArtifactReference `json:"side_files"`
+}
+
+// RecoveryModelContextArtifactReference defines model for RecoveryModelContextArtifactReference.
+type RecoveryModelContextArtifactReference struct {
+	Artifact   RecoveryModelContextOpaqueId         `json:"artifact"`
+	Provenance RecoveryModelContextRecoveryDigest32 `json:"provenance"`
+	Scope      RecoveryModelContextScope            `json:"scope"`
+	Version    RecoveryModelContextOpaqueId         `json:"version"`
+}
+
+// RecoveryModelContextOpaqueId defines model for RecoveryModelContextOpaqueId.
+type RecoveryModelContextOpaqueId = string
+
+// RecoveryModelContextRecoveryDigest32 defines model for RecoveryModelContextRecoveryDigest32.
+type RecoveryModelContextRecoveryDigest32 = []int64
+
+// RecoveryModelContextScope defines model for RecoveryModelContextScope.
+type RecoveryModelContextScope struct {
+	AuthorityDomain RecoveryModelContextOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryModelContextOpaqueId `json:"process_id"`
+	TenantId        RecoveryModelContextOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryObservation defines model for RecoveryObservation.
+type RecoveryObservation struct {
+	ContinuationId  RecoveryObservationOpaqueId         `json:"continuation_id"`
+	Control         RecoveryObservationControl          `json:"control"`
+	Effect          RecoveryObservation_Effect          `json:"effect"`
+	KnowledgeDigest RecoveryObservationRecoveryDigest32 `json:"knowledge_digest"`
+	Release         RecoveryObservation_Release         `json:"release"`
+	Revision        RecoveryObservationSafeInteger      `json:"revision"`
+	Schema          RecoveryObservationSchema           `json:"schema"`
+	Scope           RecoveryObservationScope            `json:"scope"`
+	StepId          RecoveryObservationOpaqueId         `json:"step_id"`
+	Version         RecoveryObservationVersion          `json:"version"`
+	WorkflowId      RecoveryObservationOpaqueId         `json:"workflow_id"`
+}
+
+// RecoveryObservationControl defines model for RecoveryObservation.Control.
+type RecoveryObservationControl string
+
+// RecoveryObservation_Effect defines model for RecoveryObservation.Effect.
+type RecoveryObservation_Effect struct {
+	union json.RawMessage
+}
+
+// RecoveryObservationRelease0 defines model for .
+type RecoveryObservationRelease0 struct {
+	Kind RecoveryObservationRelease0Kind `json:"kind"`
+}
+
+// RecoveryObservationRelease0Kind defines model for RecoveryObservation.Release.0.Kind.
+type RecoveryObservationRelease0Kind string
+
+// RecoveryObservationRelease1 defines model for .
+type RecoveryObservationRelease1 struct {
+	Kind      RecoveryObservationRelease1Kind `json:"kind"`
+	ReleaseId RecoveryObservationOpaqueId     `json:"release_id"`
+}
+
+// RecoveryObservationRelease1Kind defines model for RecoveryObservation.Release.1.Kind.
+type RecoveryObservationRelease1Kind string
+
+// RecoveryObservationRelease2 defines model for .
+type RecoveryObservationRelease2 struct {
+	Evidence RecoveryObservationOpaqueId     `json:"evidence"`
+	Kind     RecoveryObservationRelease2Kind `json:"kind"`
+}
+
+// RecoveryObservationRelease2Kind defines model for RecoveryObservation.Release.2.Kind.
+type RecoveryObservationRelease2Kind string
+
+// RecoveryObservationRelease3 defines model for .
+type RecoveryObservationRelease3 struct {
+	Kind      RecoveryObservationRelease3Kind `json:"kind"`
+	ReleaseId RecoveryObservationOpaqueId     `json:"release_id"`
+}
+
+// RecoveryObservationRelease3Kind defines model for RecoveryObservation.Release.3.Kind.
+type RecoveryObservationRelease3Kind string
+
+// RecoveryObservationRelease4 defines model for .
+type RecoveryObservationRelease4 struct {
+	Kind   RecoveryObservationRelease4Kind `json:"kind"`
+	Reason RecoveryObservationRefusalCode  `json:"reason"`
+}
+
+// RecoveryObservationRelease4Kind defines model for RecoveryObservation.Release.4.Kind.
+type RecoveryObservationRelease4Kind string
+
+// RecoveryObservation_Release defines model for RecoveryObservation.Release.
+type RecoveryObservation_Release struct {
+	union json.RawMessage
+}
+
+// RecoveryObservationSchema defines model for RecoveryObservation.Schema.
+type RecoveryObservationSchema string
+
+// RecoveryObservationVersion defines model for RecoveryObservation.Version.
+type RecoveryObservationVersion int64
+
+// RecoveryObservationOpaqueId defines model for RecoveryObservationOpaqueId.
+type RecoveryObservationOpaqueId = string
+
+// RecoveryObservationOperation defines model for RecoveryObservationOperation.
+type RecoveryObservationOperation struct {
+	NativeAdmissionDigest RecoveryObservationRecoveryDigest32 `json:"native_admission_digest"`
+	OperationId           RecoveryObservationOpaqueId         `json:"operation_id"`
+	OperationVersion      int64                               `json:"operation_version"`
+}
+
+// RecoveryObservationRecoveryDigest32 defines model for RecoveryObservationRecoveryDigest32.
+type RecoveryObservationRecoveryDigest32 = []int64
+
+// RecoveryObservationRecoveryEffectAdmissionUnresolvedV1 defines model for RecoveryObservationRecoveryEffectAdmissionUnresolvedV1.
+type RecoveryObservationRecoveryEffectAdmissionUnresolvedV1 struct {
+	AdmissionIntent RecoveryObservationOpaqueId                                `json:"admission_intent"`
+	Kind            RecoveryObservationRecoveryEffectAdmissionUnresolvedV1Kind `json:"kind"`
+}
+
+// RecoveryObservationRecoveryEffectAdmissionUnresolvedV1Kind defines model for RecoveryObservationRecoveryEffectAdmissionUnresolvedV1.Kind.
+type RecoveryObservationRecoveryEffectAdmissionUnresolvedV1Kind string
+
+// RecoveryObservationRecoveryEffectAwaitingApprovalV1 defines model for RecoveryObservationRecoveryEffectAwaitingApprovalV1.
+type RecoveryObservationRecoveryEffectAwaitingApprovalV1 struct {
+	Kind      RecoveryObservationRecoveryEffectAwaitingApprovalV1Kind `json:"kind"`
+	Operation RecoveryObservationOperation                            `json:"operation"`
+}
+
+// RecoveryObservationRecoveryEffectAwaitingApprovalV1Kind defines model for RecoveryObservationRecoveryEffectAwaitingApprovalV1.Kind.
+type RecoveryObservationRecoveryEffectAwaitingApprovalV1Kind string
+
+// RecoveryObservationRecoveryEffectAwaitingCallerReportV1 defines model for RecoveryObservationRecoveryEffectAwaitingCallerReportV1.
+type RecoveryObservationRecoveryEffectAwaitingCallerReportV1 struct {
+	Kind      RecoveryObservationRecoveryEffectAwaitingCallerReportV1Kind `json:"kind"`
+	Operation RecoveryObservationOperation                                `json:"operation"`
+}
+
+// RecoveryObservationRecoveryEffectAwaitingCallerReportV1Kind defines model for RecoveryObservationRecoveryEffectAwaitingCallerReportV1.Kind.
+type RecoveryObservationRecoveryEffectAwaitingCallerReportV1Kind string
+
+// RecoveryObservationRecoveryEffectClosedBeforeEffectV1 defines model for RecoveryObservationRecoveryEffectClosedBeforeEffectV1.
+type RecoveryObservationRecoveryEffectClosedBeforeEffectV1 struct {
+	Closure   RecoveryObservationOpaqueId                               `json:"closure"`
+	Kind      RecoveryObservationRecoveryEffectClosedBeforeEffectV1Kind `json:"kind"`
+	Operation RecoveryObservationOperation                              `json:"operation"`
+}
+
+// RecoveryObservationRecoveryEffectClosedBeforeEffectV1Kind defines model for RecoveryObservationRecoveryEffectClosedBeforeEffectV1.Kind.
+type RecoveryObservationRecoveryEffectClosedBeforeEffectV1Kind string
+
+// RecoveryObservationRecoveryEffectCompleteV1 defines model for RecoveryObservationRecoveryEffectCompleteV1.
+type RecoveryObservationRecoveryEffectCompleteV1 struct {
+	EffectCount RecoveryObservationSafeInteger                  `json:"effect_count"`
+	Kind        RecoveryObservationRecoveryEffectCompleteV1Kind `json:"kind"`
+	Operation   RecoveryObservationOperation                    `json:"operation"`
+}
+
+// RecoveryObservationRecoveryEffectCompleteV1Kind defines model for RecoveryObservationRecoveryEffectCompleteV1.Kind.
+type RecoveryObservationRecoveryEffectCompleteV1Kind string
+
+// RecoveryObservationRecoveryEffectFailedAfterEffectV1 defines model for RecoveryObservationRecoveryEffectFailedAfterEffectV1.
+type RecoveryObservationRecoveryEffectFailedAfterEffectV1 struct {
+	AppliedEffects int64                                                    `json:"applied_effects"`
+	Kind           RecoveryObservationRecoveryEffectFailedAfterEffectV1Kind `json:"kind"`
+	Operation      RecoveryObservationOperation                             `json:"operation"`
+}
+
+// RecoveryObservationRecoveryEffectFailedAfterEffectV1Kind defines model for RecoveryObservationRecoveryEffectFailedAfterEffectV1.Kind.
+type RecoveryObservationRecoveryEffectFailedAfterEffectV1Kind string
+
+// RecoveryObservationRecoveryEffectInFlightV1 defines model for RecoveryObservationRecoveryEffectInFlightV1.
+type RecoveryObservationRecoveryEffectInFlightV1 struct {
+	Kind      RecoveryObservationRecoveryEffectInFlightV1Kind `json:"kind"`
+	Operation RecoveryObservationOperation                    `json:"operation"`
+}
+
+// RecoveryObservationRecoveryEffectInFlightV1Kind defines model for RecoveryObservationRecoveryEffectInFlightV1.Kind.
+type RecoveryObservationRecoveryEffectInFlightV1Kind string
+
+// RecoveryObservationRecoveryEffectNeverAdmittedV1 defines model for RecoveryObservationRecoveryEffectNeverAdmittedV1.
+type RecoveryObservationRecoveryEffectNeverAdmittedV1 struct {
+	Kind RecoveryObservationRecoveryEffectNeverAdmittedV1Kind `json:"kind"`
+}
+
+// RecoveryObservationRecoveryEffectNeverAdmittedV1Kind defines model for RecoveryObservationRecoveryEffectNeverAdmittedV1.Kind.
+type RecoveryObservationRecoveryEffectNeverAdmittedV1Kind string
+
+// RecoveryObservationRecoveryEffectPartialV1 defines model for RecoveryObservationRecoveryEffectPartialV1.
+type RecoveryObservationRecoveryEffectPartialV1 struct {
+	AppliedEffects int64                                          `json:"applied_effects"`
+	Kind           RecoveryObservationRecoveryEffectPartialV1Kind `json:"kind"`
+	Operation      RecoveryObservationOperation                   `json:"operation"`
+}
+
+// RecoveryObservationRecoveryEffectPartialV1Kind defines model for RecoveryObservationRecoveryEffectPartialV1.Kind.
+type RecoveryObservationRecoveryEffectPartialV1Kind string
+
+// RecoveryObservationRecoveryEffectUnknownV1 defines model for RecoveryObservationRecoveryEffectUnknownV1.
+type RecoveryObservationRecoveryEffectUnknownV1 struct {
+	Kind      RecoveryObservationRecoveryEffectUnknownV1Kind `json:"kind"`
+	Operation RecoveryObservationOperation                   `json:"operation"`
+}
+
+// RecoveryObservationRecoveryEffectUnknownV1Kind defines model for RecoveryObservationRecoveryEffectUnknownV1.Kind.
+type RecoveryObservationRecoveryEffectUnknownV1Kind string
+
+// RecoveryObservationRefusalCode defines model for RecoveryObservationRefusalCode.
+type RecoveryObservationRefusalCode string
+
+// RecoveryObservationSafeInteger defines model for RecoveryObservationSafeInteger.
+type RecoveryObservationSafeInteger = int64
+
+// RecoveryObservationScope defines model for RecoveryObservationScope.
+type RecoveryObservationScope struct {
+	AuthorityDomain RecoveryObservationOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryObservationOpaqueId `json:"process_id"`
+	TenantId        RecoveryObservationOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryPolicyDeploymentChange defines model for RecoveryPolicyDeploymentChange.
+type RecoveryPolicyDeploymentChange struct {
+	BaseDeployment   RecoveryPolicyDeploymentChangeRecoveryDigest32 `json:"base_deployment"`
+	BaseGeneration   int64                                          `json:"base_generation"`
+	BasePolicy       RecoveryPolicyDeploymentChangeRecoveryDigest32 `json:"base_policy"`
+	DomainVersion    RecoveryPolicyDeploymentChangeDomainVersion    `json:"domain_version"`
+	ProposalDigest   RecoveryPolicyDeploymentChangeRecoveryDigest32 `json:"proposal_digest"`
+	ProposalId       RecoveryPolicyDeploymentChangeOpaqueId         `json:"proposal_id"`
+	Scope            RecoveryPolicyDeploymentChangeScope            `json:"scope"`
+	TargetDeployment RecoveryPolicyDeploymentChangeRecoveryDigest32 `json:"target_deployment"`
+	TargetGeneration int64                                          `json:"target_generation"`
+	TargetPolicy     RecoveryPolicyDeploymentChangeRecoveryDigest32 `json:"target_policy"`
+	WriterFence      RecoveryPolicyDeploymentChangeRecoveryDigest32 `json:"writer_fence"`
+}
+
+// RecoveryPolicyDeploymentChangeDomainVersion defines model for RecoveryPolicyDeploymentChange.DomainVersion.
+type RecoveryPolicyDeploymentChangeDomainVersion int64
+
+// RecoveryPolicyDeploymentChangeOpaqueId defines model for RecoveryPolicyDeploymentChangeOpaqueId.
+type RecoveryPolicyDeploymentChangeOpaqueId = string
+
+// RecoveryPolicyDeploymentChangeRecoveryDigest32 defines model for RecoveryPolicyDeploymentChangeRecoveryDigest32.
+type RecoveryPolicyDeploymentChangeRecoveryDigest32 = []int64
+
+// RecoveryPolicyDeploymentChangeSafeInteger defines model for RecoveryPolicyDeploymentChangeSafeInteger.
+type RecoveryPolicyDeploymentChangeSafeInteger = int64
+
+// RecoveryPolicyDeploymentChangeScope defines model for RecoveryPolicyDeploymentChangeScope.
+type RecoveryPolicyDeploymentChangeScope struct {
+	AuthorityDomain RecoveryPolicyDeploymentChangeOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryPolicyDeploymentChangeOpaqueId `json:"process_id"`
+	TenantId        RecoveryPolicyDeploymentChangeOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryPolicyMaintenanceProposal defines model for RecoveryPolicyMaintenanceProposal.
+type RecoveryPolicyMaintenanceProposal struct {
+	AdversarialTrajectories []RecoveryPolicyTrajectoryRef                       `json:"adversarial_trajectories"`
+	AffectedContracts       []RecoveryPolicyMaintenanceProposalRecoveryDigest32 `json:"affected_contracts"`
+	BaseDeployment          RecoveryPolicyMaintenanceProposalRecoveryDigest32   `json:"base_deployment"`
+	BasePolicy              RecoveryPolicyMaintenanceProposalRecoveryDigest32   `json:"base_policy"`
+	BenignTrajectories      []RecoveryPolicyTrajectoryRef                       `json:"benign_trajectories"`
+	DomainVersion           RecoveryPolicyMaintenanceProposalDomainVersion      `json:"domain_version"`
+	ExpectedEffects         string                                              `json:"expected_effects"`
+	ProposalId              RecoveryPolicyMaintenanceProposalOpaqueId           `json:"proposal_id"`
+	Rationale               string                                              `json:"rationale"`
+	ReportId                RecoveryPolicyMaintenanceProposalOpaqueId           `json:"report_id"`
+	RollbackPlan            string                                              `json:"rollback_plan"`
+	RollbackPolicy          RecoveryPolicyMaintenanceProposalRecoveryDigest32   `json:"rollback_policy"`
+	Scope                   RecoveryPolicyMaintenanceProposalScope              `json:"scope"`
+	TargetPolicy            RecoveryPolicyMaintenanceProposalRecoveryDigest32   `json:"target_policy"`
+}
+
+// RecoveryPolicyMaintenanceProposalDomainVersion defines model for RecoveryPolicyMaintenanceProposal.DomainVersion.
+type RecoveryPolicyMaintenanceProposalDomainVersion int64
+
+// RecoveryPolicyMaintenanceProposalOpaqueId defines model for RecoveryPolicyMaintenanceProposalOpaqueId.
+type RecoveryPolicyMaintenanceProposalOpaqueId = string
+
+// RecoveryPolicyMaintenanceProposalRecoveryDigest32 defines model for RecoveryPolicyMaintenanceProposalRecoveryDigest32.
+type RecoveryPolicyMaintenanceProposalRecoveryDigest32 = []int64
+
+// RecoveryPolicyMaintenanceProposalSafeInteger defines model for RecoveryPolicyMaintenanceProposalSafeInteger.
+type RecoveryPolicyMaintenanceProposalSafeInteger = int64
+
+// RecoveryPolicyMaintenanceProposalScope defines model for RecoveryPolicyMaintenanceProposalScope.
+type RecoveryPolicyMaintenanceProposalScope struct {
+	AuthorityDomain RecoveryPolicyMaintenanceProposalOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryPolicyMaintenanceProposalOpaqueId `json:"process_id"`
+	TenantId        RecoveryPolicyMaintenanceProposalOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryPolicyMaintenanceView defines model for RecoveryPolicyMaintenanceView.
+type RecoveryPolicyMaintenanceView struct {
+	Digest        RecoveryPolicyMaintenanceViewRecoveryDigest32 `json:"digest"`
+	DomainVersion RecoveryPolicyMaintenanceViewDomainVersion    `json:"domain_version"`
+	Influence     RecoveryArtifactInfluence                     `json:"influence"`
+
+	// Label Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	Label    SecurityInformationLabel          `json:"label"`
+	Proposal RecoveryPolicyMaintenanceProposal `json:"proposal"`
+}
+
+// RecoveryPolicyMaintenanceViewDomainVersion defines model for RecoveryPolicyMaintenanceView.DomainVersion.
+type RecoveryPolicyMaintenanceViewDomainVersion int64
+
+// RecoveryPolicyMaintenanceViewOpaqueId defines model for RecoveryPolicyMaintenanceViewOpaqueId.
+type RecoveryPolicyMaintenanceViewOpaqueId = string
+
+// RecoveryPolicyMaintenanceViewRecoveryDigest32 defines model for RecoveryPolicyMaintenanceViewRecoveryDigest32.
+type RecoveryPolicyMaintenanceViewRecoveryDigest32 = []int64
+
+// RecoveryPolicyMaintenanceViewSafeInteger defines model for RecoveryPolicyMaintenanceViewSafeInteger.
+type RecoveryPolicyMaintenanceViewSafeInteger = int64
+
+// RecoveryPolicyMaintenanceViewScope defines model for RecoveryPolicyMaintenanceViewScope.
+type RecoveryPolicyMaintenanceViewScope struct {
+	AuthorityDomain RecoveryPolicyMaintenanceViewOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryPolicyMaintenanceViewOpaqueId `json:"process_id"`
+	TenantId        RecoveryPolicyMaintenanceViewOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryPolicyTrajectoryRef defines model for RecoveryPolicyTrajectoryRef.
+type RecoveryPolicyTrajectoryRef struct {
+	Artifact RecoveryArtifactReference           `json:"artifact"`
+	CaseId   RecoveryPolicyTrajectoryRefOpaqueId `json:"case_id"`
+}
+
+// RecoveryPolicyTrajectoryRefOpaqueId defines model for RecoveryPolicyTrajectoryRefOpaqueId.
+type RecoveryPolicyTrajectoryRefOpaqueId = string
+
+// RecoveryPolicyTrajectoryRefRecoveryDigest32 defines model for RecoveryPolicyTrajectoryRefRecoveryDigest32.
+type RecoveryPolicyTrajectoryRefRecoveryDigest32 = []int64
+
+// RecoveryPolicyTrajectoryRefSafeInteger defines model for RecoveryPolicyTrajectoryRefSafeInteger.
+type RecoveryPolicyTrajectoryRefSafeInteger = int64
+
+// RecoveryPolicyTrajectoryRefScope defines model for RecoveryPolicyTrajectoryRefScope.
+type RecoveryPolicyTrajectoryRefScope struct {
+	AuthorityDomain RecoveryPolicyTrajectoryRefOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryPolicyTrajectoryRefOpaqueId `json:"process_id"`
+	TenantId        RecoveryPolicyTrajectoryRefOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryProfileRequirements defines model for RecoveryProfileRequirements.
+type RecoveryProfileRequirements struct {
+	RequiredFeatures *interface{} `json:"required_features,omitempty"`
+}
+
+// RecoveryProviderFinality defines model for RecoveryProviderFinality.
+type RecoveryProviderFinality struct {
+	Account               string                                   `json:"account"`
+	AppliedEffects        RecoveryProviderFinalityAppliedEffects   `json:"applied_effects"`
+	AttemptId             RecoveryProviderFinalityOpaqueId         `json:"attempt_id"`
+	ContinuationId        RecoveryProviderFinalityOpaqueId         `json:"continuation_id"`
+	ContractDigest        RecoveryProviderFinalityRecoveryDigest32 `json:"contract_digest"`
+	Disposition           RecoveryProviderFinalityDisposition      `json:"disposition"`
+	ExpiresAtUnixMs       RecoveryProviderFinalitySafeInteger      `json:"expires_at_unix_ms"`
+	NativeAdmissionDigest RecoveryProviderFinalityRecoveryDigest32 `json:"native_admission_digest"`
+	ObservedAtUnixMs      RecoveryProviderFinalitySafeInteger      `json:"observed_at_unix_ms"`
+	OperationId           RecoveryProviderFinalityOpaqueId         `json:"operation_id"`
+	Provider              string                                   `json:"provider"`
+	ResourceDigest        RecoveryProviderFinalityRecoveryDigest32 `json:"resource_digest"`
+	Schema                RecoveryProviderFinalitySchema           `json:"schema"`
+	Scope                 RecoveryProviderFinalityScope            `json:"scope"`
+	Version               RecoveryProviderFinalityVersion          `json:"version"`
+	WorkflowId            RecoveryProviderFinalityOpaqueId         `json:"workflow_id"`
+}
+
+// RecoveryProviderFinalityAppliedEffects defines model for RecoveryProviderFinality.AppliedEffects.
+type RecoveryProviderFinalityAppliedEffects int64
+
+// RecoveryProviderFinalityDisposition defines model for RecoveryProviderFinality.Disposition.
+type RecoveryProviderFinalityDisposition string
+
+// RecoveryProviderFinalitySchema defines model for RecoveryProviderFinality.Schema.
+type RecoveryProviderFinalitySchema string
+
+// RecoveryProviderFinalityVersion defines model for RecoveryProviderFinality.Version.
+type RecoveryProviderFinalityVersion int64
+
+// RecoveryProviderFinalityOpaqueId defines model for RecoveryProviderFinalityOpaqueId.
+type RecoveryProviderFinalityOpaqueId = string
+
+// RecoveryProviderFinalityRecoveryDigest32 defines model for RecoveryProviderFinalityRecoveryDigest32.
+type RecoveryProviderFinalityRecoveryDigest32 = []int64
+
+// RecoveryProviderFinalitySafeInteger defines model for RecoveryProviderFinalitySafeInteger.
+type RecoveryProviderFinalitySafeInteger = int64
+
+// RecoveryProviderFinalityScope defines model for RecoveryProviderFinalityScope.
+type RecoveryProviderFinalityScope struct {
+	AuthorityDomain RecoveryProviderFinalityOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryProviderFinalityOpaqueId `json:"process_id"`
+	TenantId        RecoveryProviderFinalityOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryRecoverySetupProbe defines model for RecoveryRecoverySetupProbe.
+type RecoveryRecoverySetupProbe struct {
+	BenignWorkflow   RecoveryRecoverySetupProbeOpaqueId         `json:"benign_workflow"`
+	DeniedCommand    RecoveryRecoverySetupProbeOpaqueId         `json:"denied_command"`
+	Deployment       RecoveryRecoverySetupProbeRecoveryDigest32 `json:"deployment"`
+	DomainVersion    RecoveryRecoverySetupProbeDomainVersion    `json:"domain_version"`
+	ExpiresAtUnixMs  RecoveryRecoverySetupProbeSafeInteger      `json:"expires_at_unix_ms"`
+	IssuedAtUnixMs   RecoveryRecoverySetupProbeSafeInteger      `json:"issued_at_unix_ms"`
+	NativeAuthority  RecoveryRecoverySetupProbeRecoveryDigest32 `json:"native_authority"`
+	ProbeId          RecoveryRecoverySetupProbeOpaqueId         `json:"probe_id"`
+	RequiredCoverage RecoveryRecoverySetupProbeRecoveryDigest32 `json:"required_coverage"`
+	Scope            RecoveryRecoverySetupProbeScope            `json:"scope"`
+	SourceProfile    RecoveryRecoverySetupProbeRecoveryDigest32 `json:"source_profile"`
+}
+
+// RecoveryRecoverySetupProbeDomainVersion defines model for RecoveryRecoverySetupProbe.DomainVersion.
+type RecoveryRecoverySetupProbeDomainVersion int64
+
+// RecoveryRecoverySetupProbeOpaqueId defines model for RecoveryRecoverySetupProbeOpaqueId.
+type RecoveryRecoverySetupProbeOpaqueId = string
+
+// RecoveryRecoverySetupProbeRecoveryDigest32 defines model for RecoveryRecoverySetupProbeRecoveryDigest32.
+type RecoveryRecoverySetupProbeRecoveryDigest32 = []int64
+
+// RecoveryRecoverySetupProbeSafeInteger defines model for RecoveryRecoverySetupProbeSafeInteger.
+type RecoveryRecoverySetupProbeSafeInteger = int64
+
+// RecoveryRecoverySetupProbeScope defines model for RecoveryRecoverySetupProbeScope.
+type RecoveryRecoverySetupProbeScope struct {
+	AuthorityDomain RecoveryRecoverySetupProbeOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryRecoverySetupProbeOpaqueId `json:"process_id"`
+	TenantId        RecoveryRecoverySetupProbeOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryRecoverySetupReport defines model for RecoveryRecoverySetupReport.
+type RecoveryRecoverySetupReport struct {
+	BenignOperation      RecoveryRecoverySetupReportOpaqueId         `json:"benign_operation"`
+	BenignReceipt        RecoveryRecoverySetupReportRecoveryDigest32 `json:"benign_receipt"`
+	CurrentServingFence  RecoveryRecoverySetupReportRecoveryDigest32 `json:"current_serving_fence"`
+	DeniedCommandDigest  RecoveryRecoverySetupReportRecoveryDigest32 `json:"denied_command_digest"`
+	DomainVersion        RecoveryRecoverySetupReportDomainVersion    `json:"domain_version"`
+	PreviousServingFence RecoveryRecoverySetupReportRecoveryDigest32 `json:"previous_serving_fence"`
+	Probe                RecoveryRecoverySetupProbe                  `json:"probe"`
+	QualifiedAtUnixMs    RecoveryRecoverySetupReportSafeInteger      `json:"qualified_at_unix_ms"`
+}
+
+// RecoveryRecoverySetupReportDomainVersion defines model for RecoveryRecoverySetupReport.DomainVersion.
+type RecoveryRecoverySetupReportDomainVersion int64
+
+// RecoveryRecoverySetupReportOpaqueId defines model for RecoveryRecoverySetupReportOpaqueId.
+type RecoveryRecoverySetupReportOpaqueId = string
+
+// RecoveryRecoverySetupReportRecoveryDigest32 defines model for RecoveryRecoverySetupReportRecoveryDigest32.
+type RecoveryRecoverySetupReportRecoveryDigest32 = []int64
+
+// RecoveryRecoverySetupReportSafeInteger defines model for RecoveryRecoverySetupReportSafeInteger.
+type RecoveryRecoverySetupReportSafeInteger = int64
+
+// RecoveryRecoverySetupReportScope defines model for RecoveryRecoverySetupReportScope.
+type RecoveryRecoverySetupReportScope struct {
+	AuthorityDomain RecoveryRecoverySetupReportOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryRecoverySetupReportOpaqueId `json:"process_id"`
+	TenantId        RecoveryRecoverySetupReportOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryRemedyRegistry defines model for RecoveryRemedyRegistry.
+type RecoveryRemedyRegistry struct {
+	// Classification Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	Classification   SecurityInformationLabel               `json:"classification"`
+	ContractDigest   RecoveryRemedyRegistryRecoveryDigest32 `json:"contract_digest"`
+	DeploymentDigest RecoveryRemedyRegistryRecoveryDigest32 `json:"deployment_digest"`
+	PolicyDigest     RecoveryRemedyRegistryRecoveryDigest32 `json:"policy_digest"`
+	Schema           RecoveryRemedyRegistrySchema           `json:"schema"`
+	Scope            RecoveryRemedyRegistryScope            `json:"scope"`
+	Templates        []struct {
+		AuthorityScope RecoveryRemedyRegistryRecoveryDigest32 `json:"authority_scope"`
+
+		// Classification Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+		Classification SecurityInformationLabel `json:"classification"`
+		Cost           struct {
+			Approvals           int64                                      `json:"approvals"`
+			BudgetUnits         RecoveryRemedyRegistrySafeInteger          `json:"budget_units"`
+			Evidence            RecoveryRemedyRegistryOpaqueId             `json:"evidence"`
+			IrreversibleEffects int64                                      `json:"irreversible_effects"`
+			Latency             RecoveryRemedyRegistryTemplatesCostLatency `json:"latency"`
+		} `json:"cost"`
+		Destination RecoveryRemedyRegistryDestinationId `json:"destination"`
+
+		// DisclosureLabel Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+		DisclosureLabel   SecurityInformationLabel               `json:"disclosure_label"`
+		Family            RecoveryRemedyRegistryRecoveryDigest32 `json:"family"`
+		Kind              RecoveryRemedyRegistryTemplatesKind    `json:"kind"`
+		Requirements      []RecoveryRemedyRegistryOpaqueId       `json:"requirements"`
+		RequiresIntegrity bool                                   `json:"requires_integrity"`
+		SatisfiesTask     bool                                   `json:"satisfies_task"`
+		TemplateId        RecoveryRemedyRegistryOpaqueId         `json:"template_id"`
+	} `json:"templates"`
+	Version RecoveryRemedyRegistryVersion `json:"version"`
+}
+
+// RecoveryRemedyRegistrySchema defines model for RecoveryRemedyRegistry.Schema.
+type RecoveryRemedyRegistrySchema string
+
+// RecoveryRemedyRegistryTemplatesCostLatency defines model for RecoveryRemedyRegistry.Templates.Cost.Latency.
+type RecoveryRemedyRegistryTemplatesCostLatency string
+
+// RecoveryRemedyRegistryTemplatesKind defines model for RecoveryRemedyRegistry.Templates.Kind.
+type RecoveryRemedyRegistryTemplatesKind string
+
+// RecoveryRemedyRegistryVersion defines model for RecoveryRemedyRegistry.Version.
+type RecoveryRemedyRegistryVersion int64
+
+// RecoveryRemedyRegistryDestinationId defines model for RecoveryRemedyRegistryDestinationId.
+type RecoveryRemedyRegistryDestinationId = string
+
+// RecoveryRemedyRegistryOpaqueId defines model for RecoveryRemedyRegistryOpaqueId.
+type RecoveryRemedyRegistryOpaqueId = string
+
+// RecoveryRemedyRegistryOperation defines model for RecoveryRemedyRegistryOperation.
+type RecoveryRemedyRegistryOperation struct {
+	NativeAdmissionDigest RecoveryRemedyRegistryRecoveryDigest32 `json:"native_admission_digest"`
+	OperationId           RecoveryRemedyRegistryOpaqueId         `json:"operation_id"`
+	OperationVersion      int64                                  `json:"operation_version"`
+}
+
+// RecoveryRemedyRegistryRecoveryDigest32 defines model for RecoveryRemedyRegistryRecoveryDigest32.
+type RecoveryRemedyRegistryRecoveryDigest32 = []int64
+
+// RecoveryRemedyRegistryRecoveryEffectAdmissionUnresolvedV1 defines model for RecoveryRemedyRegistryRecoveryEffectAdmissionUnresolvedV1.
+type RecoveryRemedyRegistryRecoveryEffectAdmissionUnresolvedV1 struct {
+	AdmissionIntent RecoveryRemedyRegistryOpaqueId                                `json:"admission_intent"`
+	Kind            RecoveryRemedyRegistryRecoveryEffectAdmissionUnresolvedV1Kind `json:"kind"`
+}
+
+// RecoveryRemedyRegistryRecoveryEffectAdmissionUnresolvedV1Kind defines model for RecoveryRemedyRegistryRecoveryEffectAdmissionUnresolvedV1.Kind.
+type RecoveryRemedyRegistryRecoveryEffectAdmissionUnresolvedV1Kind string
+
+// RecoveryRemedyRegistryRecoveryEffectAwaitingApprovalV1 defines model for RecoveryRemedyRegistryRecoveryEffectAwaitingApprovalV1.
+type RecoveryRemedyRegistryRecoveryEffectAwaitingApprovalV1 struct {
+	Kind      RecoveryRemedyRegistryRecoveryEffectAwaitingApprovalV1Kind `json:"kind"`
+	Operation RecoveryRemedyRegistryOperation                            `json:"operation"`
+}
+
+// RecoveryRemedyRegistryRecoveryEffectAwaitingApprovalV1Kind defines model for RecoveryRemedyRegistryRecoveryEffectAwaitingApprovalV1.Kind.
+type RecoveryRemedyRegistryRecoveryEffectAwaitingApprovalV1Kind string
+
+// RecoveryRemedyRegistryRecoveryEffectAwaitingCallerReportV1 defines model for RecoveryRemedyRegistryRecoveryEffectAwaitingCallerReportV1.
+type RecoveryRemedyRegistryRecoveryEffectAwaitingCallerReportV1 struct {
+	Kind      RecoveryRemedyRegistryRecoveryEffectAwaitingCallerReportV1Kind `json:"kind"`
+	Operation RecoveryRemedyRegistryOperation                                `json:"operation"`
+}
+
+// RecoveryRemedyRegistryRecoveryEffectAwaitingCallerReportV1Kind defines model for RecoveryRemedyRegistryRecoveryEffectAwaitingCallerReportV1.Kind.
+type RecoveryRemedyRegistryRecoveryEffectAwaitingCallerReportV1Kind string
+
+// RecoveryRemedyRegistryRecoveryEffectClosedBeforeEffectV1 defines model for RecoveryRemedyRegistryRecoveryEffectClosedBeforeEffectV1.
+type RecoveryRemedyRegistryRecoveryEffectClosedBeforeEffectV1 struct {
+	Closure   RecoveryRemedyRegistryOpaqueId                               `json:"closure"`
+	Kind      RecoveryRemedyRegistryRecoveryEffectClosedBeforeEffectV1Kind `json:"kind"`
+	Operation RecoveryRemedyRegistryOperation                              `json:"operation"`
+}
+
+// RecoveryRemedyRegistryRecoveryEffectClosedBeforeEffectV1Kind defines model for RecoveryRemedyRegistryRecoveryEffectClosedBeforeEffectV1.Kind.
+type RecoveryRemedyRegistryRecoveryEffectClosedBeforeEffectV1Kind string
+
+// RecoveryRemedyRegistryRecoveryEffectCompleteV1 defines model for RecoveryRemedyRegistryRecoveryEffectCompleteV1.
+type RecoveryRemedyRegistryRecoveryEffectCompleteV1 struct {
+	EffectCount RecoveryRemedyRegistrySafeInteger                  `json:"effect_count"`
+	Kind        RecoveryRemedyRegistryRecoveryEffectCompleteV1Kind `json:"kind"`
+	Operation   RecoveryRemedyRegistryOperation                    `json:"operation"`
+}
+
+// RecoveryRemedyRegistryRecoveryEffectCompleteV1Kind defines model for RecoveryRemedyRegistryRecoveryEffectCompleteV1.Kind.
+type RecoveryRemedyRegistryRecoveryEffectCompleteV1Kind string
+
+// RecoveryRemedyRegistryRecoveryEffectFailedAfterEffectV1 defines model for RecoveryRemedyRegistryRecoveryEffectFailedAfterEffectV1.
+type RecoveryRemedyRegistryRecoveryEffectFailedAfterEffectV1 struct {
+	AppliedEffects int64                                                       `json:"applied_effects"`
+	Kind           RecoveryRemedyRegistryRecoveryEffectFailedAfterEffectV1Kind `json:"kind"`
+	Operation      RecoveryRemedyRegistryOperation                             `json:"operation"`
+}
+
+// RecoveryRemedyRegistryRecoveryEffectFailedAfterEffectV1Kind defines model for RecoveryRemedyRegistryRecoveryEffectFailedAfterEffectV1.Kind.
+type RecoveryRemedyRegistryRecoveryEffectFailedAfterEffectV1Kind string
+
+// RecoveryRemedyRegistryRecoveryEffectInFlightV1 defines model for RecoveryRemedyRegistryRecoveryEffectInFlightV1.
+type RecoveryRemedyRegistryRecoveryEffectInFlightV1 struct {
+	Kind      RecoveryRemedyRegistryRecoveryEffectInFlightV1Kind `json:"kind"`
+	Operation RecoveryRemedyRegistryOperation                    `json:"operation"`
+}
+
+// RecoveryRemedyRegistryRecoveryEffectInFlightV1Kind defines model for RecoveryRemedyRegistryRecoveryEffectInFlightV1.Kind.
+type RecoveryRemedyRegistryRecoveryEffectInFlightV1Kind string
+
+// RecoveryRemedyRegistryRecoveryEffectNeverAdmittedV1 defines model for RecoveryRemedyRegistryRecoveryEffectNeverAdmittedV1.
+type RecoveryRemedyRegistryRecoveryEffectNeverAdmittedV1 struct {
+	Kind RecoveryRemedyRegistryRecoveryEffectNeverAdmittedV1Kind `json:"kind"`
+}
+
+// RecoveryRemedyRegistryRecoveryEffectNeverAdmittedV1Kind defines model for RecoveryRemedyRegistryRecoveryEffectNeverAdmittedV1.Kind.
+type RecoveryRemedyRegistryRecoveryEffectNeverAdmittedV1Kind string
+
+// RecoveryRemedyRegistryRecoveryEffectPartialV1 defines model for RecoveryRemedyRegistryRecoveryEffectPartialV1.
+type RecoveryRemedyRegistryRecoveryEffectPartialV1 struct {
+	AppliedEffects int64                                             `json:"applied_effects"`
+	Kind           RecoveryRemedyRegistryRecoveryEffectPartialV1Kind `json:"kind"`
+	Operation      RecoveryRemedyRegistryOperation                   `json:"operation"`
+}
+
+// RecoveryRemedyRegistryRecoveryEffectPartialV1Kind defines model for RecoveryRemedyRegistryRecoveryEffectPartialV1.Kind.
+type RecoveryRemedyRegistryRecoveryEffectPartialV1Kind string
+
+// RecoveryRemedyRegistryRecoveryEffectUnknownV1 defines model for RecoveryRemedyRegistryRecoveryEffectUnknownV1.
+type RecoveryRemedyRegistryRecoveryEffectUnknownV1 struct {
+	Kind      RecoveryRemedyRegistryRecoveryEffectUnknownV1Kind `json:"kind"`
+	Operation RecoveryRemedyRegistryOperation                   `json:"operation"`
+}
+
+// RecoveryRemedyRegistryRecoveryEffectUnknownV1Kind defines model for RecoveryRemedyRegistryRecoveryEffectUnknownV1.Kind.
+type RecoveryRemedyRegistryRecoveryEffectUnknownV1Kind string
+
+// RecoveryRemedyRegistryRefusalCode defines model for RecoveryRemedyRegistryRefusalCode.
+type RecoveryRemedyRegistryRefusalCode string
+
+// RecoveryRemedyRegistrySafeInteger defines model for RecoveryRemedyRegistrySafeInteger.
+type RecoveryRemedyRegistrySafeInteger = int64
+
+// RecoveryRemedyRegistryScope defines model for RecoveryRemedyRegistryScope.
+type RecoveryRemedyRegistryScope struct {
+	AuthorityDomain RecoveryRemedyRegistryOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryRemedyRegistryOpaqueId `json:"process_id"`
+	TenantId        RecoveryRemedyRegistryOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryReturnAdmission defines model for RecoveryReturnAdmission.
+type RecoveryReturnAdmission struct {
+	Admitted      RecoveryArtifactReleaseIntent            `json:"admitted"`
+	Artifact      RecoveryReturnAdmissionArtifactReference `json:"artifact"`
+	Boundary      RecoveryReturnAdmissionOpaqueId          `json:"boundary"`
+	Child         RecoveryReturnAdmissionOpaqueId          `json:"child"`
+	Contract      RecoveryReturnAdmissionRecoveryDigest32  `json:"contract"`
+	Disclosure    RecoveryReturnAdmission_Disclosure       `json:"disclosure"`
+	DomainVersion RecoveryReturnAdmissionDomainVersion     `json:"domain_version"`
+	Endorsement   RecoveryReturnAdmission_Endorsement      `json:"endorsement"`
+	Launch        RecoveryReturnAdmissionRecoveryDigest32  `json:"launch"`
+
+	// ObservedSource Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	ObservedSource SecurityInformationLabel `json:"observed_source"`
+}
+
+// RecoveryReturnAdmissionDisclosure1 defines model for .
+type RecoveryReturnAdmissionDisclosure1 = interface{}
+
+// RecoveryReturnAdmission_Disclosure defines model for RecoveryReturnAdmission.Disclosure.
+type RecoveryReturnAdmission_Disclosure struct {
+	union json.RawMessage
+}
+
+// RecoveryReturnAdmissionDomainVersion defines model for RecoveryReturnAdmission.DomainVersion.
+type RecoveryReturnAdmissionDomainVersion int64
+
+// RecoveryReturnAdmissionEndorsement1 defines model for .
+type RecoveryReturnAdmissionEndorsement1 = interface{}
+
+// RecoveryReturnAdmission_Endorsement defines model for RecoveryReturnAdmission.Endorsement.
+type RecoveryReturnAdmission_Endorsement struct {
+	union json.RawMessage
+}
+
+// RecoveryReturnAdmissionArtifactInfluence defines model for RecoveryReturnAdmissionArtifactInfluence.
+type RecoveryReturnAdmissionArtifactInfluence struct {
+	Commitment           RecoveryReturnAdmissionRecoveryDigest32 `json:"commitment"`
+	ExternallyInfluenced bool                                    `json:"externally_influenced"`
+	Unknown              bool                                    `json:"unknown"`
+}
+
+// RecoveryReturnAdmissionArtifactRecipient defines model for RecoveryReturnAdmissionArtifactRecipient.
+type RecoveryReturnAdmissionArtifactRecipient struct {
+	// Clearance Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	Clearance         SecurityInformationLabel            `json:"clearance"`
+	ContextGeneration RecoveryReturnAdmissionSafeInteger  `json:"context_generation"`
+	IsolationEpoch    string                              `json:"isolation_epoch"`
+	Lineage           RecoveryReturnAdmissionOpaqueId     `json:"lineage"`
+	Principal         string                              `json:"principal"`
+	Recipient         RecoveryReturnAdmissionOpaqueId     `json:"recipient"`
+	Runtime           string                              `json:"runtime"`
+	Scope             RecoveryReturnAdmissionScope        `json:"scope"`
+	Sink              RecoveryReturnAdmissionArtifactSink `json:"sink"`
+}
+
+// RecoveryReturnAdmissionArtifactReference defines model for RecoveryReturnAdmissionArtifactReference.
+type RecoveryReturnAdmissionArtifactReference struct {
+	Artifact   RecoveryReturnAdmissionOpaqueId         `json:"artifact"`
+	Provenance RecoveryReturnAdmissionRecoveryDigest32 `json:"provenance"`
+	Scope      RecoveryReturnAdmissionScope            `json:"scope"`
+	Version    RecoveryReturnAdmissionOpaqueId         `json:"version"`
+}
+
+// RecoveryReturnAdmissionArtifactSink defines model for RecoveryReturnAdmissionArtifactSink.
+type RecoveryReturnAdmissionArtifactSink struct {
+	union json.RawMessage
+}
+
+// RecoveryReturnAdmissionArtifactSink0 defines model for .
+type RecoveryReturnAdmissionArtifactSink0 struct {
+	Kind RecoveryReturnAdmissionArtifactSink0Kind `json:"kind"`
+}
+
+// RecoveryReturnAdmissionArtifactSink0Kind defines model for RecoveryReturnAdmissionArtifactSink.0.Kind.
+type RecoveryReturnAdmissionArtifactSink0Kind string
+
+// RecoveryReturnAdmissionArtifactSink1 defines model for .
+type RecoveryReturnAdmissionArtifactSink1 struct {
+	Context RecoveryReturnAdmissionModelContext      `json:"context"`
+	Kind    RecoveryReturnAdmissionArtifactSink1Kind `json:"kind"`
+}
+
+// RecoveryReturnAdmissionArtifactSink1Kind defines model for RecoveryReturnAdmissionArtifactSink.1.Kind.
+type RecoveryReturnAdmissionArtifactSink1Kind string
+
+// RecoveryReturnAdmissionArtifactSink2 defines model for .
+type RecoveryReturnAdmissionArtifactSink2 struct {
+	Kind RecoveryReturnAdmissionArtifactSink2Kind `json:"kind"`
+}
+
+// RecoveryReturnAdmissionArtifactSink2Kind defines model for RecoveryReturnAdmissionArtifactSink.2.Kind.
+type RecoveryReturnAdmissionArtifactSink2Kind string
+
+// RecoveryReturnAdmissionModelContext defines model for RecoveryReturnAdmissionModelContext.
+type RecoveryReturnAdmissionModelContext struct {
+	Account      RecoveryReturnAdmissionOpaqueId            `json:"account"`
+	Cache        string                                     `json:"cache"`
+	Context      RecoveryReturnAdmissionOpaqueId            `json:"context"`
+	Contract     RecoveryReturnAdmissionRecoveryDigest32    `json:"contract"`
+	Conversation string                                     `json:"conversation"`
+	Provider     RecoveryReturnAdmissionOpaqueId            `json:"provider"`
+	SideFiles    []RecoveryReturnAdmissionArtifactReference `json:"side_files"`
+}
+
+// RecoveryReturnAdmissionOpaqueId defines model for RecoveryReturnAdmissionOpaqueId.
+type RecoveryReturnAdmissionOpaqueId = string
+
+// RecoveryReturnAdmissionRecoveryDigest32 defines model for RecoveryReturnAdmissionRecoveryDigest32.
+type RecoveryReturnAdmissionRecoveryDigest32 = []int64
+
+// RecoveryReturnAdmissionSafeInteger defines model for RecoveryReturnAdmissionSafeInteger.
+type RecoveryReturnAdmissionSafeInteger = int64
+
+// RecoveryReturnAdmissionScope defines model for RecoveryReturnAdmissionScope.
+type RecoveryReturnAdmissionScope struct {
+	AuthorityDomain RecoveryReturnAdmissionOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryReturnAdmissionOpaqueId `json:"process_id"`
+	TenantId        RecoveryReturnAdmissionOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryReturnContract defines model for RecoveryReturnContract.
+type RecoveryReturnContract struct {
+	Channels         []RecoveryReturnContractChannels        `json:"channels"`
+	Contract         RecoveryReturnContractRecoveryDigest32  `json:"contract"`
+	DomainVersion    RecoveryReturnContractDomainVersion     `json:"domain_version"`
+	ExpiresAtUnixMs  int64                                   `json:"expires_at_unix_ms"`
+	Field            string                                  `json:"field"`
+	Implementation   RecoveryReturnContractRecoveryDigest32  `json:"implementation"`
+	MaxBytes         RecoveryReturnContractMaxBytes          `json:"max_bytes"`
+	MaxValues        RecoveryReturnContractMaxValues         `json:"max_values"`
+	Parent           RecoveryReturnContractArtifactRecipient `json:"parent"`
+	Policy           RecoveryReturnContractRecoveryDigest32  `json:"policy"`
+	RequireIntegrity bool                                    `json:"require_integrity"`
+	Schema           RecoveryReturnContractRecoveryDigest32  `json:"schema"`
+
+	// SourceCeiling Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	SourceCeiling SecurityInformationLabel `json:"source_ceiling"`
+
+	// Target Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	Target SecurityInformationLabel `json:"target"`
+}
+
+// RecoveryReturnContractChannels defines model for RecoveryReturnContract.Channels.
+type RecoveryReturnContractChannels string
+
+// RecoveryReturnContractDomainVersion defines model for RecoveryReturnContract.DomainVersion.
+type RecoveryReturnContractDomainVersion int64
+
+// RecoveryReturnContractMaxBytes defines model for RecoveryReturnContract.MaxBytes.
+type RecoveryReturnContractMaxBytes int64
+
+// RecoveryReturnContractMaxValues defines model for RecoveryReturnContract.MaxValues.
+type RecoveryReturnContractMaxValues int64
+
+// RecoveryReturnContractArtifactInfluence defines model for RecoveryReturnContractArtifactInfluence.
+type RecoveryReturnContractArtifactInfluence struct {
+	Commitment           RecoveryReturnContractRecoveryDigest32 `json:"commitment"`
+	ExternallyInfluenced bool                                   `json:"externally_influenced"`
+	Unknown              bool                                   `json:"unknown"`
+}
+
+// RecoveryReturnContractArtifactRecipient defines model for RecoveryReturnContractArtifactRecipient.
+type RecoveryReturnContractArtifactRecipient struct {
+	// Clearance Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	Clearance         SecurityInformationLabel           `json:"clearance"`
+	ContextGeneration RecoveryReturnContractSafeInteger  `json:"context_generation"`
+	IsolationEpoch    string                             `json:"isolation_epoch"`
+	Lineage           RecoveryReturnContractOpaqueId     `json:"lineage"`
+	Principal         string                             `json:"principal"`
+	Recipient         RecoveryReturnContractOpaqueId     `json:"recipient"`
+	Runtime           string                             `json:"runtime"`
+	Scope             RecoveryReturnContractScope        `json:"scope"`
+	Sink              RecoveryReturnContractArtifactSink `json:"sink"`
+}
+
+// RecoveryReturnContractArtifactReference defines model for RecoveryReturnContractArtifactReference.
+type RecoveryReturnContractArtifactReference struct {
+	Artifact   RecoveryReturnContractOpaqueId         `json:"artifact"`
+	Provenance RecoveryReturnContractRecoveryDigest32 `json:"provenance"`
+	Scope      RecoveryReturnContractScope            `json:"scope"`
+	Version    RecoveryReturnContractOpaqueId         `json:"version"`
+}
+
+// RecoveryReturnContractArtifactSink defines model for RecoveryReturnContractArtifactSink.
+type RecoveryReturnContractArtifactSink struct {
+	union json.RawMessage
+}
+
+// RecoveryReturnContractArtifactSink0 defines model for .
+type RecoveryReturnContractArtifactSink0 struct {
+	Kind RecoveryReturnContractArtifactSink0Kind `json:"kind"`
+}
+
+// RecoveryReturnContractArtifactSink0Kind defines model for RecoveryReturnContractArtifactSink.0.Kind.
+type RecoveryReturnContractArtifactSink0Kind string
+
+// RecoveryReturnContractArtifactSink1 defines model for .
+type RecoveryReturnContractArtifactSink1 struct {
+	Context RecoveryReturnContractModelContext      `json:"context"`
+	Kind    RecoveryReturnContractArtifactSink1Kind `json:"kind"`
+}
+
+// RecoveryReturnContractArtifactSink1Kind defines model for RecoveryReturnContractArtifactSink.1.Kind.
+type RecoveryReturnContractArtifactSink1Kind string
+
+// RecoveryReturnContractArtifactSink2 defines model for .
+type RecoveryReturnContractArtifactSink2 struct {
+	Kind RecoveryReturnContractArtifactSink2Kind `json:"kind"`
+}
+
+// RecoveryReturnContractArtifactSink2Kind defines model for RecoveryReturnContractArtifactSink.2.Kind.
+type RecoveryReturnContractArtifactSink2Kind string
+
+// RecoveryReturnContractModelContext defines model for RecoveryReturnContractModelContext.
+type RecoveryReturnContractModelContext struct {
+	Account      RecoveryReturnContractOpaqueId            `json:"account"`
+	Cache        string                                    `json:"cache"`
+	Context      RecoveryReturnContractOpaqueId            `json:"context"`
+	Contract     RecoveryReturnContractRecoveryDigest32    `json:"contract"`
+	Conversation string                                    `json:"conversation"`
+	Provider     RecoveryReturnContractOpaqueId            `json:"provider"`
+	SideFiles    []RecoveryReturnContractArtifactReference `json:"side_files"`
+}
+
+// RecoveryReturnContractOpaqueId defines model for RecoveryReturnContractOpaqueId.
+type RecoveryReturnContractOpaqueId = string
+
+// RecoveryReturnContractRecoveryDigest32 defines model for RecoveryReturnContractRecoveryDigest32.
+type RecoveryReturnContractRecoveryDigest32 = []int64
+
+// RecoveryReturnContractSafeInteger defines model for RecoveryReturnContractSafeInteger.
+type RecoveryReturnContractSafeInteger = int64
+
+// RecoveryReturnContractScope defines model for RecoveryReturnContractScope.
+type RecoveryReturnContractScope struct {
+	AuthorityDomain RecoveryReturnContractOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryReturnContractOpaqueId `json:"process_id"`
+	TenantId        RecoveryReturnContractOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryReviewDocument defines model for RecoveryReviewDocument.
+type RecoveryReviewDocument struct {
+	CanonicalPreview string                 `json:"canonical_preview"`
+	Intent           RecoveryApprovalIntent `json:"intent"`
+}
+
+// RecoveryReviewDocumentOpaqueId defines model for RecoveryReviewDocumentOpaqueId.
+type RecoveryReviewDocumentOpaqueId = string
+
+// RecoveryReviewDocumentOperation defines model for RecoveryReviewDocumentOperation.
+type RecoveryReviewDocumentOperation struct {
+	NativeAdmissionDigest RecoveryReviewDocumentRecoveryDigest32 `json:"native_admission_digest"`
+	OperationId           RecoveryReviewDocumentOpaqueId         `json:"operation_id"`
+	OperationVersion      int64                                  `json:"operation_version"`
+}
+
+// RecoveryReviewDocumentRecoveryDigest32 defines model for RecoveryReviewDocumentRecoveryDigest32.
+type RecoveryReviewDocumentRecoveryDigest32 = []int64
+
+// RecoveryReviewDocumentRecoveryEffectAdmissionUnresolvedV1 defines model for RecoveryReviewDocumentRecoveryEffectAdmissionUnresolvedV1.
+type RecoveryReviewDocumentRecoveryEffectAdmissionUnresolvedV1 struct {
+	AdmissionIntent RecoveryReviewDocumentOpaqueId                                `json:"admission_intent"`
+	Kind            RecoveryReviewDocumentRecoveryEffectAdmissionUnresolvedV1Kind `json:"kind"`
+}
+
+// RecoveryReviewDocumentRecoveryEffectAdmissionUnresolvedV1Kind defines model for RecoveryReviewDocumentRecoveryEffectAdmissionUnresolvedV1.Kind.
+type RecoveryReviewDocumentRecoveryEffectAdmissionUnresolvedV1Kind string
+
+// RecoveryReviewDocumentRecoveryEffectAwaitingApprovalV1 defines model for RecoveryReviewDocumentRecoveryEffectAwaitingApprovalV1.
+type RecoveryReviewDocumentRecoveryEffectAwaitingApprovalV1 struct {
+	Kind      RecoveryReviewDocumentRecoveryEffectAwaitingApprovalV1Kind `json:"kind"`
+	Operation RecoveryReviewDocumentOperation                            `json:"operation"`
+}
+
+// RecoveryReviewDocumentRecoveryEffectAwaitingApprovalV1Kind defines model for RecoveryReviewDocumentRecoveryEffectAwaitingApprovalV1.Kind.
+type RecoveryReviewDocumentRecoveryEffectAwaitingApprovalV1Kind string
+
+// RecoveryReviewDocumentRecoveryEffectAwaitingCallerReportV1 defines model for RecoveryReviewDocumentRecoveryEffectAwaitingCallerReportV1.
+type RecoveryReviewDocumentRecoveryEffectAwaitingCallerReportV1 struct {
+	Kind      RecoveryReviewDocumentRecoveryEffectAwaitingCallerReportV1Kind `json:"kind"`
+	Operation RecoveryReviewDocumentOperation                                `json:"operation"`
+}
+
+// RecoveryReviewDocumentRecoveryEffectAwaitingCallerReportV1Kind defines model for RecoveryReviewDocumentRecoveryEffectAwaitingCallerReportV1.Kind.
+type RecoveryReviewDocumentRecoveryEffectAwaitingCallerReportV1Kind string
+
+// RecoveryReviewDocumentRecoveryEffectClosedBeforeEffectV1 defines model for RecoveryReviewDocumentRecoveryEffectClosedBeforeEffectV1.
+type RecoveryReviewDocumentRecoveryEffectClosedBeforeEffectV1 struct {
+	Closure   RecoveryReviewDocumentOpaqueId                               `json:"closure"`
+	Kind      RecoveryReviewDocumentRecoveryEffectClosedBeforeEffectV1Kind `json:"kind"`
+	Operation RecoveryReviewDocumentOperation                              `json:"operation"`
+}
+
+// RecoveryReviewDocumentRecoveryEffectClosedBeforeEffectV1Kind defines model for RecoveryReviewDocumentRecoveryEffectClosedBeforeEffectV1.Kind.
+type RecoveryReviewDocumentRecoveryEffectClosedBeforeEffectV1Kind string
+
+// RecoveryReviewDocumentRecoveryEffectCompleteV1 defines model for RecoveryReviewDocumentRecoveryEffectCompleteV1.
+type RecoveryReviewDocumentRecoveryEffectCompleteV1 struct {
+	EffectCount RecoveryReviewDocumentSafeInteger                  `json:"effect_count"`
+	Kind        RecoveryReviewDocumentRecoveryEffectCompleteV1Kind `json:"kind"`
+	Operation   RecoveryReviewDocumentOperation                    `json:"operation"`
+}
+
+// RecoveryReviewDocumentRecoveryEffectCompleteV1Kind defines model for RecoveryReviewDocumentRecoveryEffectCompleteV1.Kind.
+type RecoveryReviewDocumentRecoveryEffectCompleteV1Kind string
+
+// RecoveryReviewDocumentRecoveryEffectFailedAfterEffectV1 defines model for RecoveryReviewDocumentRecoveryEffectFailedAfterEffectV1.
+type RecoveryReviewDocumentRecoveryEffectFailedAfterEffectV1 struct {
+	AppliedEffects int64                                                       `json:"applied_effects"`
+	Kind           RecoveryReviewDocumentRecoveryEffectFailedAfterEffectV1Kind `json:"kind"`
+	Operation      RecoveryReviewDocumentOperation                             `json:"operation"`
+}
+
+// RecoveryReviewDocumentRecoveryEffectFailedAfterEffectV1Kind defines model for RecoveryReviewDocumentRecoveryEffectFailedAfterEffectV1.Kind.
+type RecoveryReviewDocumentRecoveryEffectFailedAfterEffectV1Kind string
+
+// RecoveryReviewDocumentRecoveryEffectInFlightV1 defines model for RecoveryReviewDocumentRecoveryEffectInFlightV1.
+type RecoveryReviewDocumentRecoveryEffectInFlightV1 struct {
+	Kind      RecoveryReviewDocumentRecoveryEffectInFlightV1Kind `json:"kind"`
+	Operation RecoveryReviewDocumentOperation                    `json:"operation"`
+}
+
+// RecoveryReviewDocumentRecoveryEffectInFlightV1Kind defines model for RecoveryReviewDocumentRecoveryEffectInFlightV1.Kind.
+type RecoveryReviewDocumentRecoveryEffectInFlightV1Kind string
+
+// RecoveryReviewDocumentRecoveryEffectNeverAdmittedV1 defines model for RecoveryReviewDocumentRecoveryEffectNeverAdmittedV1.
+type RecoveryReviewDocumentRecoveryEffectNeverAdmittedV1 struct {
+	Kind RecoveryReviewDocumentRecoveryEffectNeverAdmittedV1Kind `json:"kind"`
+}
+
+// RecoveryReviewDocumentRecoveryEffectNeverAdmittedV1Kind defines model for RecoveryReviewDocumentRecoveryEffectNeverAdmittedV1.Kind.
+type RecoveryReviewDocumentRecoveryEffectNeverAdmittedV1Kind string
+
+// RecoveryReviewDocumentRecoveryEffectPartialV1 defines model for RecoveryReviewDocumentRecoveryEffectPartialV1.
+type RecoveryReviewDocumentRecoveryEffectPartialV1 struct {
+	AppliedEffects int64                                             `json:"applied_effects"`
+	Kind           RecoveryReviewDocumentRecoveryEffectPartialV1Kind `json:"kind"`
+	Operation      RecoveryReviewDocumentOperation                   `json:"operation"`
+}
+
+// RecoveryReviewDocumentRecoveryEffectPartialV1Kind defines model for RecoveryReviewDocumentRecoveryEffectPartialV1.Kind.
+type RecoveryReviewDocumentRecoveryEffectPartialV1Kind string
+
+// RecoveryReviewDocumentRecoveryEffectUnknownV1 defines model for RecoveryReviewDocumentRecoveryEffectUnknownV1.
+type RecoveryReviewDocumentRecoveryEffectUnknownV1 struct {
+	Kind      RecoveryReviewDocumentRecoveryEffectUnknownV1Kind `json:"kind"`
+	Operation RecoveryReviewDocumentOperation                   `json:"operation"`
+}
+
+// RecoveryReviewDocumentRecoveryEffectUnknownV1Kind defines model for RecoveryReviewDocumentRecoveryEffectUnknownV1.Kind.
+type RecoveryReviewDocumentRecoveryEffectUnknownV1Kind string
+
+// RecoveryReviewDocumentRefusalCode defines model for RecoveryReviewDocumentRefusalCode.
+type RecoveryReviewDocumentRefusalCode string
+
+// RecoveryReviewDocumentSafeInteger defines model for RecoveryReviewDocumentSafeInteger.
+type RecoveryReviewDocumentSafeInteger = int64
+
+// RecoveryReviewDocumentScope defines model for RecoveryReviewDocumentScope.
+type RecoveryReviewDocumentScope struct {
+	AuthorityDomain RecoveryReviewDocumentOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryReviewDocumentOpaqueId `json:"process_id"`
+	TenantId        RecoveryReviewDocumentOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryReviewRequest defines model for RecoveryReviewRequest.
+type RecoveryReviewRequest struct {
+	Capability string                        `json:"capability"`
+	WorkflowId RecoveryReviewRequestOpaqueId `json:"workflow_id"`
+}
+
+// RecoveryReviewRequestOpaqueId defines model for RecoveryReviewRequestOpaqueId.
+type RecoveryReviewRequestOpaqueId = string
+
+// RecoveryReviewRequestOperation defines model for RecoveryReviewRequestOperation.
+type RecoveryReviewRequestOperation struct {
+	NativeAdmissionDigest RecoveryReviewRequestRecoveryDigest32 `json:"native_admission_digest"`
+	OperationId           RecoveryReviewRequestOpaqueId         `json:"operation_id"`
+	OperationVersion      int64                                 `json:"operation_version"`
+}
+
+// RecoveryReviewRequestRecoveryDigest32 defines model for RecoveryReviewRequestRecoveryDigest32.
+type RecoveryReviewRequestRecoveryDigest32 = []int64
+
+// RecoveryReviewRequestRecoveryEffectAdmissionUnresolvedV1 defines model for RecoveryReviewRequestRecoveryEffectAdmissionUnresolvedV1.
+type RecoveryReviewRequestRecoveryEffectAdmissionUnresolvedV1 struct {
+	AdmissionIntent RecoveryReviewRequestOpaqueId                                `json:"admission_intent"`
+	Kind            RecoveryReviewRequestRecoveryEffectAdmissionUnresolvedV1Kind `json:"kind"`
+}
+
+// RecoveryReviewRequestRecoveryEffectAdmissionUnresolvedV1Kind defines model for RecoveryReviewRequestRecoveryEffectAdmissionUnresolvedV1.Kind.
+type RecoveryReviewRequestRecoveryEffectAdmissionUnresolvedV1Kind string
+
+// RecoveryReviewRequestRecoveryEffectAwaitingApprovalV1 defines model for RecoveryReviewRequestRecoveryEffectAwaitingApprovalV1.
+type RecoveryReviewRequestRecoveryEffectAwaitingApprovalV1 struct {
+	Kind      RecoveryReviewRequestRecoveryEffectAwaitingApprovalV1Kind `json:"kind"`
+	Operation RecoveryReviewRequestOperation                            `json:"operation"`
+}
+
+// RecoveryReviewRequestRecoveryEffectAwaitingApprovalV1Kind defines model for RecoveryReviewRequestRecoveryEffectAwaitingApprovalV1.Kind.
+type RecoveryReviewRequestRecoveryEffectAwaitingApprovalV1Kind string
+
+// RecoveryReviewRequestRecoveryEffectAwaitingCallerReportV1 defines model for RecoveryReviewRequestRecoveryEffectAwaitingCallerReportV1.
+type RecoveryReviewRequestRecoveryEffectAwaitingCallerReportV1 struct {
+	Kind      RecoveryReviewRequestRecoveryEffectAwaitingCallerReportV1Kind `json:"kind"`
+	Operation RecoveryReviewRequestOperation                                `json:"operation"`
+}
+
+// RecoveryReviewRequestRecoveryEffectAwaitingCallerReportV1Kind defines model for RecoveryReviewRequestRecoveryEffectAwaitingCallerReportV1.Kind.
+type RecoveryReviewRequestRecoveryEffectAwaitingCallerReportV1Kind string
+
+// RecoveryReviewRequestRecoveryEffectClosedBeforeEffectV1 defines model for RecoveryReviewRequestRecoveryEffectClosedBeforeEffectV1.
+type RecoveryReviewRequestRecoveryEffectClosedBeforeEffectV1 struct {
+	Closure   RecoveryReviewRequestOpaqueId                               `json:"closure"`
+	Kind      RecoveryReviewRequestRecoveryEffectClosedBeforeEffectV1Kind `json:"kind"`
+	Operation RecoveryReviewRequestOperation                              `json:"operation"`
+}
+
+// RecoveryReviewRequestRecoveryEffectClosedBeforeEffectV1Kind defines model for RecoveryReviewRequestRecoveryEffectClosedBeforeEffectV1.Kind.
+type RecoveryReviewRequestRecoveryEffectClosedBeforeEffectV1Kind string
+
+// RecoveryReviewRequestRecoveryEffectCompleteV1 defines model for RecoveryReviewRequestRecoveryEffectCompleteV1.
+type RecoveryReviewRequestRecoveryEffectCompleteV1 struct {
+	EffectCount RecoveryReviewRequestSafeInteger                  `json:"effect_count"`
+	Kind        RecoveryReviewRequestRecoveryEffectCompleteV1Kind `json:"kind"`
+	Operation   RecoveryReviewRequestOperation                    `json:"operation"`
+}
+
+// RecoveryReviewRequestRecoveryEffectCompleteV1Kind defines model for RecoveryReviewRequestRecoveryEffectCompleteV1.Kind.
+type RecoveryReviewRequestRecoveryEffectCompleteV1Kind string
+
+// RecoveryReviewRequestRecoveryEffectFailedAfterEffectV1 defines model for RecoveryReviewRequestRecoveryEffectFailedAfterEffectV1.
+type RecoveryReviewRequestRecoveryEffectFailedAfterEffectV1 struct {
+	AppliedEffects int64                                                      `json:"applied_effects"`
+	Kind           RecoveryReviewRequestRecoveryEffectFailedAfterEffectV1Kind `json:"kind"`
+	Operation      RecoveryReviewRequestOperation                             `json:"operation"`
+}
+
+// RecoveryReviewRequestRecoveryEffectFailedAfterEffectV1Kind defines model for RecoveryReviewRequestRecoveryEffectFailedAfterEffectV1.Kind.
+type RecoveryReviewRequestRecoveryEffectFailedAfterEffectV1Kind string
+
+// RecoveryReviewRequestRecoveryEffectInFlightV1 defines model for RecoveryReviewRequestRecoveryEffectInFlightV1.
+type RecoveryReviewRequestRecoveryEffectInFlightV1 struct {
+	Kind      RecoveryReviewRequestRecoveryEffectInFlightV1Kind `json:"kind"`
+	Operation RecoveryReviewRequestOperation                    `json:"operation"`
+}
+
+// RecoveryReviewRequestRecoveryEffectInFlightV1Kind defines model for RecoveryReviewRequestRecoveryEffectInFlightV1.Kind.
+type RecoveryReviewRequestRecoveryEffectInFlightV1Kind string
+
+// RecoveryReviewRequestRecoveryEffectNeverAdmittedV1 defines model for RecoveryReviewRequestRecoveryEffectNeverAdmittedV1.
+type RecoveryReviewRequestRecoveryEffectNeverAdmittedV1 struct {
+	Kind RecoveryReviewRequestRecoveryEffectNeverAdmittedV1Kind `json:"kind"`
+}
+
+// RecoveryReviewRequestRecoveryEffectNeverAdmittedV1Kind defines model for RecoveryReviewRequestRecoveryEffectNeverAdmittedV1.Kind.
+type RecoveryReviewRequestRecoveryEffectNeverAdmittedV1Kind string
+
+// RecoveryReviewRequestRecoveryEffectPartialV1 defines model for RecoveryReviewRequestRecoveryEffectPartialV1.
+type RecoveryReviewRequestRecoveryEffectPartialV1 struct {
+	AppliedEffects int64                                            `json:"applied_effects"`
+	Kind           RecoveryReviewRequestRecoveryEffectPartialV1Kind `json:"kind"`
+	Operation      RecoveryReviewRequestOperation                   `json:"operation"`
+}
+
+// RecoveryReviewRequestRecoveryEffectPartialV1Kind defines model for RecoveryReviewRequestRecoveryEffectPartialV1.Kind.
+type RecoveryReviewRequestRecoveryEffectPartialV1Kind string
+
+// RecoveryReviewRequestRecoveryEffectUnknownV1 defines model for RecoveryReviewRequestRecoveryEffectUnknownV1.
+type RecoveryReviewRequestRecoveryEffectUnknownV1 struct {
+	Kind      RecoveryReviewRequestRecoveryEffectUnknownV1Kind `json:"kind"`
+	Operation RecoveryReviewRequestOperation                   `json:"operation"`
+}
+
+// RecoveryReviewRequestRecoveryEffectUnknownV1Kind defines model for RecoveryReviewRequestRecoveryEffectUnknownV1.Kind.
+type RecoveryReviewRequestRecoveryEffectUnknownV1Kind string
+
+// RecoveryReviewRequestRefusalCode defines model for RecoveryReviewRequestRefusalCode.
+type RecoveryReviewRequestRefusalCode string
+
+// RecoveryReviewRequestSafeInteger defines model for RecoveryReviewRequestSafeInteger.
+type RecoveryReviewRequestSafeInteger = int64
+
+// RecoveryReviewRequestScope defines model for RecoveryReviewRequestScope.
+type RecoveryReviewRequestScope struct {
+	AuthorityDomain RecoveryReviewRequestOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryReviewRequestOpaqueId `json:"process_id"`
+	TenantId        RecoveryReviewRequestOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryScopedEndorsement defines model for RecoveryScopedEndorsement.
+type RecoveryScopedEndorsement struct {
+	Assertions       []RecoveryScopedEndorsementOpaqueId       `json:"assertions"`
+	Destination      RecoveryScopedEndorsementOpaqueId         `json:"destination"`
+	DomainVersion    RecoveryScopedEndorsementDomainVersion    `json:"domain_version"`
+	Evidence         RecoveryScopedEndorsementOpaqueId         `json:"evidence"`
+	Influence        RecoveryScopedEndorsementRecoveryDigest32 `json:"influence"`
+	IssuedAtUnixMs   RecoveryScopedEndorsementSafeInteger      `json:"issued_at_unix_ms"`
+	Purpose          string                                    `json:"purpose"`
+	Scope            RecoveryScopedEndorsementScope            `json:"scope"`
+	Target           RecoveryScopedEndorsement_Target          `json:"target"`
+	ValidUntilUnixMs RecoveryScopedEndorsementSafeInteger      `json:"valid_until_unix_ms"`
+}
+
+// RecoveryScopedEndorsementDomainVersion defines model for RecoveryScopedEndorsement.DomainVersion.
+type RecoveryScopedEndorsementDomainVersion int64
+
+// RecoveryScopedEndorsementTarget0 defines model for .
+type RecoveryScopedEndorsementTarget0 struct {
+	Action RecoveryScopedEndorsementRecoveryDigest32 `json:"action"`
+	Kind   RecoveryScopedEndorsementTarget0Kind      `json:"kind"`
+}
+
+// RecoveryScopedEndorsementTarget0Kind defines model for RecoveryScopedEndorsement.Target.0.Kind.
+type RecoveryScopedEndorsementTarget0Kind string
+
+// RecoveryScopedEndorsementTarget1 defines model for .
+type RecoveryScopedEndorsementTarget1 struct {
+	Artifact RecoveryScopedEndorsementRecoveryDigest32 `json:"artifact"`
+	Kind     RecoveryScopedEndorsementTarget1Kind      `json:"kind"`
+}
+
+// RecoveryScopedEndorsementTarget1Kind defines model for RecoveryScopedEndorsement.Target.1.Kind.
+type RecoveryScopedEndorsementTarget1Kind string
+
+// RecoveryScopedEndorsement_Target defines model for RecoveryScopedEndorsement.Target.
+type RecoveryScopedEndorsement_Target struct {
+	union json.RawMessage
+}
+
+// RecoveryScopedEndorsementOpaqueId defines model for RecoveryScopedEndorsementOpaqueId.
+type RecoveryScopedEndorsementOpaqueId = string
+
+// RecoveryScopedEndorsementRecoveryDigest32 defines model for RecoveryScopedEndorsementRecoveryDigest32.
+type RecoveryScopedEndorsementRecoveryDigest32 = []int64
+
+// RecoveryScopedEndorsementSafeInteger defines model for RecoveryScopedEndorsementSafeInteger.
+type RecoveryScopedEndorsementSafeInteger = int64
+
+// RecoveryScopedEndorsementScope defines model for RecoveryScopedEndorsementScope.
+type RecoveryScopedEndorsementScope struct {
+	AuthorityDomain RecoveryScopedEndorsementOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryScopedEndorsementOpaqueId `json:"process_id"`
+	TenantId        RecoveryScopedEndorsementOpaqueId `json:"tenant_id"`
+}
+
+// RecoverySemanticAction defines model for RecoverySemanticAction.
+type RecoverySemanticAction struct {
+	Capability           RecoverySemanticActionRecoveryDigest32       `json:"capability"`
+	Destination          RecoverySemanticActionOpaqueId               `json:"destination"`
+	DomainVersion        RecoverySemanticActionDomainVersion          `json:"domain_version"`
+	ExternallyInfluenced bool                                         `json:"externally_influenced"`
+	Generation           RecoverySemanticActionSafeInteger            `json:"generation"`
+	Influence            RecoverySemanticActionRecoveryDigest32       `json:"influence"`
+	Inputs               []RecoverySemanticActionSemanticInputVersion `json:"inputs"`
+	IssuedAtUnixMs       RecoverySemanticActionSafeInteger            `json:"issued_at_unix_ms"`
+	NativeSource         RecoverySemanticActionSemanticNativeSource   `json:"native_source"`
+	Operation            RecoverySemanticActionOpaqueId               `json:"operation"`
+	Output               RecoverySemanticActionOutput                 `json:"output"`
+	Payload              RecoverySemanticActionRecoveryDigest32       `json:"payload"`
+	Plan                 RecoverySemanticActionRecoveryDigest32       `json:"plan"`
+	Registry             RecoverySemanticActionRecoveryDigest32       `json:"registry"`
+	RequestId            RecoverySemanticActionOpaqueId               `json:"request_id"`
+	RequestNamespace     RecoverySemanticActionRecoveryDigest32       `json:"request_namespace"`
+	RequestSemantics     RecoverySemanticActionRecoveryDigest32       `json:"request_semantics"`
+	Scope                RecoverySemanticActionScope                  `json:"scope"`
+
+	// SourceLabel Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	SourceLabel      SecurityInformationLabel          `json:"source_label"`
+	Step             RecoverySemanticActionOpaqueId    `json:"step"`
+	ValidUntilUnixMs RecoverySemanticActionSafeInteger `json:"valid_until_unix_ms"`
+}
+
+// RecoverySemanticActionDomainVersion defines model for RecoverySemanticAction.DomainVersion.
+type RecoverySemanticActionDomainVersion int64
+
+// RecoverySemanticActionOutput defines model for RecoverySemanticAction.Output.
+type RecoverySemanticActionOutput string
+
+// RecoverySemanticActionOpaqueId defines model for RecoverySemanticActionOpaqueId.
+type RecoverySemanticActionOpaqueId = string
+
+// RecoverySemanticActionRecoveryDigest32 defines model for RecoverySemanticActionRecoveryDigest32.
+type RecoverySemanticActionRecoveryDigest32 = []int64
+
+// RecoverySemanticActionSafeInteger defines model for RecoverySemanticActionSafeInteger.
+type RecoverySemanticActionSafeInteger = int64
+
+// RecoverySemanticActionScope defines model for RecoverySemanticActionScope.
+type RecoverySemanticActionScope struct {
+	AuthorityDomain RecoverySemanticActionOpaqueId `json:"authority_domain"`
+	ProcessId       RecoverySemanticActionOpaqueId `json:"process_id"`
+	TenantId        RecoverySemanticActionOpaqueId `json:"tenant_id"`
+}
+
+// RecoverySemanticActionSemanticInputVersion defines model for RecoverySemanticActionSemanticInputVersion.
+type RecoverySemanticActionSemanticInputVersion struct {
+	Content  RecoverySemanticActionRecoveryDigest32 `json:"content"`
+	Resource RecoverySemanticActionOpaqueId         `json:"resource"`
+	Version  RecoverySemanticActionRecoveryDigest32 `json:"version"`
+}
+
+// RecoverySemanticActionSemanticNativeSource defines model for RecoverySemanticActionSemanticNativeSource.
+type RecoverySemanticActionSemanticNativeSource struct {
+	Generation RecoverySemanticActionSafeInteger      `json:"generation"`
+	Key        RecoverySemanticActionRecoveryDigest32 `json:"key"`
+
+	// LineageLabel Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	LineageLabel SecurityInformationLabel `json:"lineage_label"`
+
+	// PrincipalLabel Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	PrincipalLabel SecurityInformationLabel `json:"principal_label"`
+
+	// SessionLabel Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	SessionLabel SecurityInformationLabel `json:"session_label"`
+}
+
+// RecoverySemanticAnnotation defines model for RecoverySemanticAnnotation.
+type RecoverySemanticAnnotation struct {
+	ConfidenceBasisPoints int64                                          `json:"confidence_basis_points"`
+	DomainVersion         RecoverySemanticAnnotationDomainVersion        `json:"domain_version"`
+	ExternallyInfluenced  bool                                           `json:"externally_influenced"`
+	Facts                 []RecoverySemanticAnnotationOpaqueId           `json:"facts"`
+	Input                 RecoverySemanticAnnotationSemanticInputVersion `json:"input"`
+	IssuedAtUnixMs        RecoverySemanticAnnotationSafeInteger          `json:"issued_at_unix_ms"`
+
+	// Restrictions Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	Restrictions     SecurityInformationLabel              `json:"restrictions"`
+	Scope            RecoverySemanticAnnotationScope       `json:"scope"`
+	ValidUntilUnixMs RecoverySemanticAnnotationSafeInteger `json:"valid_until_unix_ms"`
+}
+
+// RecoverySemanticAnnotationDomainVersion defines model for RecoverySemanticAnnotation.DomainVersion.
+type RecoverySemanticAnnotationDomainVersion int64
+
+// RecoverySemanticAnnotationOpaqueId defines model for RecoverySemanticAnnotationOpaqueId.
+type RecoverySemanticAnnotationOpaqueId = string
+
+// RecoverySemanticAnnotationRecoveryDigest32 defines model for RecoverySemanticAnnotationRecoveryDigest32.
+type RecoverySemanticAnnotationRecoveryDigest32 = []int64
+
+// RecoverySemanticAnnotationSafeInteger defines model for RecoverySemanticAnnotationSafeInteger.
+type RecoverySemanticAnnotationSafeInteger = int64
+
+// RecoverySemanticAnnotationScope defines model for RecoverySemanticAnnotationScope.
+type RecoverySemanticAnnotationScope struct {
+	AuthorityDomain RecoverySemanticAnnotationOpaqueId `json:"authority_domain"`
+	ProcessId       RecoverySemanticAnnotationOpaqueId `json:"process_id"`
+	TenantId        RecoverySemanticAnnotationOpaqueId `json:"tenant_id"`
+}
+
+// RecoverySemanticAnnotationSemanticInputVersion defines model for RecoverySemanticAnnotationSemanticInputVersion.
+type RecoverySemanticAnnotationSemanticInputVersion struct {
+	Content  RecoverySemanticAnnotationRecoveryDigest32 `json:"content"`
+	Resource RecoverySemanticAnnotationOpaqueId         `json:"resource"`
+	Version  RecoverySemanticAnnotationRecoveryDigest32 `json:"version"`
+}
+
+// RecoverySemanticAudience defines model for RecoverySemanticAudience.
+type RecoverySemanticAudience struct {
+	Account RecoverySemanticAudienceOpaqueId `json:"account"`
+
+	// Audience Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	Audience         SecurityInformationLabel              `json:"audience"`
+	Completeness     RecoverySemanticAudienceCompleteness  `json:"completeness"`
+	DomainVersion    RecoverySemanticAudienceDomainVersion `json:"domain_version"`
+	ObservedAtUnixMs RecoverySemanticAudienceSafeInteger   `json:"observed_at_unix_ms"`
+	Pagination       struct {
+		Cursor        RecoverySemanticAudiencePaginationCursor `json:"cursor"`
+		PagesExpected RecoverySemanticAudienceSafeInteger      `json:"pages_expected"`
+		PagesObserved RecoverySemanticAudienceSafeInteger      `json:"pages_observed"`
+	} `json:"pagination"`
+	Provider         RecoverySemanticAudienceOpaqueId         `json:"provider"`
+	ProviderVersion  string                                   `json:"provider_version"`
+	Query            RecoverySemanticAudienceRecoveryDigest32 `json:"query"`
+	Resource         RecoverySemanticAudienceOpaqueId         `json:"resource"`
+	Scope            RecoverySemanticAudienceScope            `json:"scope"`
+	SubjectMapping   RecoverySemanticAudienceRecoveryDigest32 `json:"subject_mapping"`
+	ValidUntilUnixMs RecoverySemanticAudienceSafeInteger      `json:"valid_until_unix_ms"`
+}
+
+// RecoverySemanticAudienceCompleteness defines model for RecoverySemanticAudience.Completeness.
+type RecoverySemanticAudienceCompleteness string
+
+// RecoverySemanticAudienceDomainVersion defines model for RecoverySemanticAudience.DomainVersion.
+type RecoverySemanticAudienceDomainVersion int64
+
+// RecoverySemanticAudiencePaginationCursor defines model for RecoverySemanticAudience.Pagination.Cursor.
+type RecoverySemanticAudiencePaginationCursor string
+
+// RecoverySemanticAudienceOpaqueId defines model for RecoverySemanticAudienceOpaqueId.
+type RecoverySemanticAudienceOpaqueId = string
+
+// RecoverySemanticAudienceRecoveryDigest32 defines model for RecoverySemanticAudienceRecoveryDigest32.
+type RecoverySemanticAudienceRecoveryDigest32 = []int64
+
+// RecoverySemanticAudienceSafeInteger defines model for RecoverySemanticAudienceSafeInteger.
+type RecoverySemanticAudienceSafeInteger = int64
+
+// RecoverySemanticAudienceScope defines model for RecoverySemanticAudienceScope.
+type RecoverySemanticAudienceScope struct {
+	AuthorityDomain RecoverySemanticAudienceOpaqueId `json:"authority_domain"`
+	ProcessId       RecoverySemanticAudienceOpaqueId `json:"process_id"`
+	TenantId        RecoverySemanticAudienceOpaqueId `json:"tenant_id"`
+}
+
+// RecoverySemanticDeployment defines model for RecoverySemanticDeployment.
+type RecoverySemanticDeployment struct {
+	ContextBinding  RecoverySemanticDeploymentRecoveryDigest32   `json:"context_binding"`
+	DomainVersion   RecoverySemanticDeploymentDomainVersion      `json:"domain_version"`
+	ExposureBinding RecoverySemanticDeploymentRecoveryDigest32   `json:"exposure_binding"`
+	Generation      int64                                        `json:"generation"`
+	NativeBinding   RecoverySemanticDeploymentRecoveryDigest32   `json:"native_binding"`
+	Packages        []RecoverySemanticDeploymentRecoveryDigest32 `json:"packages"`
+	Routes          []RecoverySemanticDeploymentSemanticRoute    `json:"routes"`
+	Scope           RecoverySemanticDeploymentScope              `json:"scope"`
+}
+
+// RecoverySemanticDeploymentDomainVersion defines model for RecoverySemanticDeployment.DomainVersion.
+type RecoverySemanticDeploymentDomainVersion int64
+
+// RecoverySemanticDeploymentOpaqueId defines model for RecoverySemanticDeploymentOpaqueId.
+type RecoverySemanticDeploymentOpaqueId = string
+
+// RecoverySemanticDeploymentRecoveryDigest32 defines model for RecoverySemanticDeploymentRecoveryDigest32.
+type RecoverySemanticDeploymentRecoveryDigest32 = []int64
+
+// RecoverySemanticDeploymentSafeInteger defines model for RecoverySemanticDeploymentSafeInteger.
+type RecoverySemanticDeploymentSafeInteger = int64
+
+// RecoverySemanticDeploymentScope defines model for RecoverySemanticDeploymentScope.
+type RecoverySemanticDeploymentScope struct {
+	AuthorityDomain RecoverySemanticDeploymentOpaqueId `json:"authority_domain"`
+	ProcessId       RecoverySemanticDeploymentOpaqueId `json:"process_id"`
+	TenantId        RecoverySemanticDeploymentOpaqueId `json:"tenant_id"`
+}
+
+// RecoverySemanticDeploymentSemanticAnnotator defines model for RecoverySemanticDeploymentSemanticAnnotator.
+type RecoverySemanticDeploymentSemanticAnnotator struct {
+	Facts          []RecoverySemanticDeploymentOpaqueId       `json:"facts"`
+	Key            RecoverySemanticDeploymentRecoveryDigest32 `json:"key"`
+	MayAttestFacts bool                                       `json:"may_attest_facts"`
+}
+
+// RecoverySemanticDeploymentSemanticDestination defines model for RecoverySemanticDeploymentSemanticDestination.
+type RecoverySemanticDeploymentSemanticDestination struct {
+	Account  RecoverySemanticDeploymentOpaqueId         `json:"account"`
+	AclQuery RecoverySemanticDeploymentRecoveryDigest32 `json:"acl_query"`
+
+	// Audience Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	Audience                    SecurityInformationLabel                   `json:"audience"`
+	Destination                 RecoverySemanticDeploymentOpaqueId         `json:"destination"`
+	Endpoint                    string                                     `json:"endpoint"`
+	Provider                    RecoverySemanticDeploymentOpaqueId         `json:"provider"`
+	Purpose                     string                                     `json:"purpose"`
+	RequireProviderPrecondition bool                                       `json:"require_provider_precondition"`
+	Resource                    RecoverySemanticDeploymentOpaqueId         `json:"resource"`
+	SubjectMapping              RecoverySemanticDeploymentRecoveryDigest32 `json:"subject_mapping"`
+}
+
+// RecoverySemanticDeploymentSemanticOverride defines model for RecoverySemanticDeploymentSemanticOverride.
+type RecoverySemanticDeploymentSemanticOverride struct {
+	FixtureDigests []RecoverySemanticDeploymentRecoveryDigest32 `json:"fixture_digests"`
+	Reason         string                                       `json:"reason"`
+	SelectorIndex  RecoverySemanticDeploymentSafeInteger        `json:"selector_index"`
+}
+
+// RecoverySemanticDeploymentSemanticRoute defines model for RecoverySemanticDeploymentSemanticRoute.
+type RecoverySemanticDeploymentSemanticRoute struct {
+	Annotators        []RecoverySemanticDeploymentSemanticAnnotator   `json:"annotators"`
+	Destinations      []RecoverySemanticDeploymentSemanticDestination `json:"destinations"`
+	EndorsementKey    RecoverySemanticDeploymentRecoveryDigest32      `json:"endorsement_key"`
+	Implementation    RecoverySemanticDeploymentRecoveryDigest32      `json:"implementation"`
+	InputSchema       RecoverySemanticDeploymentRecoveryDigest32      `json:"input_schema"`
+	Operation         RecoverySemanticDeploymentOpaqueId              `json:"operation"`
+	OperatorSelectors []RecoverySemanticDeploymentSemanticSelector    `json:"operator_selectors"`
+	OutputSchema      RecoverySemanticDeploymentRecoveryDigest32      `json:"output_schema"`
+	Package           RecoverySemanticDeploymentRecoveryDigest32      `json:"package"`
+	PrerequisiteKey   RecoverySemanticDeploymentRecoveryDigest32      `json:"prerequisite_key"`
+	ResolverKey       RecoverySemanticDeploymentRecoveryDigest32      `json:"resolver_key"`
+	ReviewedOverrides []RecoverySemanticDeploymentSemanticOverride    `json:"reviewed_overrides"`
+	Server            string                                          `json:"server"`
+	Tool              string                                          `json:"tool"`
+	TransformationKey RecoverySemanticDeploymentRecoveryDigest32      `json:"transformation_key"`
+}
+
+// RecoverySemanticDeploymentSemanticSelector defines model for RecoverySemanticDeploymentSemanticSelector.
+type RecoverySemanticDeploymentSemanticSelector struct {
+	union json.RawMessage
+}
+
+// RecoverySemanticDeploymentSemanticSelector0 defines model for .
+type RecoverySemanticDeploymentSemanticSelector0 struct {
+	Field RecoverySemanticDeploymentOpaqueId              `json:"field"`
+	Kind  RecoverySemanticDeploymentSemanticSelector0Kind `json:"kind"`
+}
+
+// RecoverySemanticDeploymentSemanticSelector0Kind defines model for RecoverySemanticDeploymentSemanticSelector.0.Kind.
+type RecoverySemanticDeploymentSemanticSelector0Kind string
+
+// RecoverySemanticDeploymentSemanticSelector1 defines model for .
+type RecoverySemanticDeploymentSemanticSelector1 struct {
+	Field RecoverySemanticDeploymentOpaqueId              `json:"field"`
+	Kind  RecoverySemanticDeploymentSemanticSelector1Kind `json:"kind"`
+	Value RecoverySemanticDeploymentSemanticValue         `json:"value"`
+}
+
+// RecoverySemanticDeploymentSemanticSelector1Kind defines model for RecoverySemanticDeploymentSemanticSelector.1.Kind.
+type RecoverySemanticDeploymentSemanticSelector1Kind string
+
+// RecoverySemanticDeploymentSemanticSelector2 defines model for .
+type RecoverySemanticDeploymentSemanticSelector2 struct {
+	Bytes RecoverySemanticDeploymentSafeInteger           `json:"bytes"`
+	Field RecoverySemanticDeploymentOpaqueId              `json:"field"`
+	Kind  RecoverySemanticDeploymentSemanticSelector2Kind `json:"kind"`
+}
+
+// RecoverySemanticDeploymentSemanticSelector2Kind defines model for RecoverySemanticDeploymentSemanticSelector.2.Kind.
+type RecoverySemanticDeploymentSemanticSelector2Kind string
+
+// RecoverySemanticDeploymentSemanticValue defines model for RecoverySemanticDeploymentSemanticValue.
+type RecoverySemanticDeploymentSemanticValue struct {
+	union json.RawMessage
+}
+
+// RecoverySemanticDeploymentSemanticValue0 defines model for .
+type RecoverySemanticDeploymentSemanticValue0 struct {
+	Kind  RecoverySemanticDeploymentSemanticValue0Kind `json:"kind"`
+	Value string                                       `json:"value"`
+}
+
+// RecoverySemanticDeploymentSemanticValue0Kind defines model for RecoverySemanticDeploymentSemanticValue.0.Kind.
+type RecoverySemanticDeploymentSemanticValue0Kind string
+
+// RecoverySemanticDeploymentSemanticValue1 defines model for .
+type RecoverySemanticDeploymentSemanticValue1 struct {
+	Kind  RecoverySemanticDeploymentSemanticValue1Kind `json:"kind"`
+	Value RecoverySemanticDeploymentSafeInteger        `json:"value"`
+}
+
+// RecoverySemanticDeploymentSemanticValue1Kind defines model for RecoverySemanticDeploymentSemanticValue.1.Kind.
+type RecoverySemanticDeploymentSemanticValue1Kind string
+
+// RecoverySemanticDeploymentSemanticValue2 defines model for .
+type RecoverySemanticDeploymentSemanticValue2 struct {
+	Kind  RecoverySemanticDeploymentSemanticValue2Kind `json:"kind"`
+	Value bool                                         `json:"value"`
+}
+
+// RecoverySemanticDeploymentSemanticValue2Kind defines model for RecoverySemanticDeploymentSemanticValue.2.Kind.
+type RecoverySemanticDeploymentSemanticValue2Kind string
+
+// RecoverySemanticInvocation defines model for RecoverySemanticInvocation.
+type RecoverySemanticInvocation struct {
+	Action         RecoverySemanticAction               `json:"action"`
+	Annotations    []RecoverySignedSemanticAnnotation   `json:"annotations"`
+	Audience       RecoverySignedSemanticAudience       `json:"audience"`
+	Endorsements   []RecoverySignedScopedEndorsement    `json:"endorsements"`
+	Payload        RecoverySemanticPayload              `json:"payload"`
+	Prerequisites  []RecoverySignedSemanticPrerequisite `json:"prerequisites"`
+	Schema         RecoverySemanticInvocationSchema     `json:"schema"`
+	Transformation RecoverySignedSemanticTransformation `json:"transformation"`
+}
+
+// RecoverySemanticInvocationSchema defines model for RecoverySemanticInvocation.Schema.
+type RecoverySemanticInvocationSchema string
+
+// RecoverySemanticPackage defines model for RecoverySemanticPackage.
+type RecoverySemanticPackage struct {
+	Dependencies  []RecoverySemanticPackageRecoveryDigest32  `json:"dependencies"`
+	DomainVersion RecoverySemanticPackageDomainVersion       `json:"domain_version"`
+	Operations    []RecoverySemanticPackageSemanticOperation `json:"operations"`
+	Package       RecoverySemanticPackageOpaqueId            `json:"package"`
+}
+
+// RecoverySemanticPackageDomainVersion defines model for RecoverySemanticPackage.DomainVersion.
+type RecoverySemanticPackageDomainVersion int64
+
+// RecoverySemanticPackageOpaqueId defines model for RecoverySemanticPackageOpaqueId.
+type RecoverySemanticPackageOpaqueId = string
+
+// RecoverySemanticPackageRecoveryDigest32 defines model for RecoverySemanticPackageRecoveryDigest32.
+type RecoverySemanticPackageRecoveryDigest32 = []int64
+
+// RecoverySemanticPackageSafeInteger defines model for RecoverySemanticPackageSafeInteger.
+type RecoverySemanticPackageSafeInteger = int64
+
+// RecoverySemanticPackageSemanticChannel defines model for RecoverySemanticPackageSemanticChannel.
+type RecoverySemanticPackageSemanticChannel struct {
+	Channel RecoverySemanticPackageSemanticChannelChannel `json:"channel"`
+	Enabled bool                                          `json:"enabled"`
+}
+
+// RecoverySemanticPackageSemanticChannelChannel defines model for RecoverySemanticPackageSemanticChannel.Channel.
+type RecoverySemanticPackageSemanticChannelChannel string
+
+// RecoverySemanticPackageSemanticOperation defines model for RecoverySemanticPackageSemanticOperation.
+type RecoverySemanticPackageSemanticOperation struct {
+	Channels           []RecoverySemanticPackageSemanticChannel                 `json:"channels"`
+	ExternalInfluence  bool                                                     `json:"external_influence"`
+	Implementation     RecoverySemanticPackageRecoveryDigest32                  `json:"implementation"`
+	InputFields        []RecoverySemanticPackageOpaqueId                        `json:"input_fields"`
+	InputSchema        RecoverySemanticPackageRecoveryDigest32                  `json:"input_schema"`
+	Kind               RecoverySemanticPackageSemanticOperationKind             `json:"kind"`
+	Operation          RecoverySemanticPackageOpaqueId                          `json:"operation"`
+	OutputSchema       RecoverySemanticPackageRecoveryDigest32                  `json:"output_schema"`
+	Prerequisites      []RecoverySemanticPackageSemanticPrerequisiteRequirement `json:"prerequisites"`
+	ProjectionFields   []RecoverySemanticPackageOpaqueId                        `json:"projection_fields"`
+	RequiredAssertions []RecoverySemanticPackageOpaqueId                        `json:"required_assertions"`
+	Selectors          []RecoverySemanticPackageSemanticSelector                `json:"selectors"`
+
+	// SourceLabel Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	SourceLabel    SecurityInformationLabel                       `json:"source_label"`
+	WithheldStatus *RecoverySemanticPackageSemanticWithheldStatus `json:"withheld_status,omitempty"`
+}
+
+// RecoverySemanticPackageSemanticOperationKind defines model for RecoverySemanticPackageSemanticOperation.Kind.
+type RecoverySemanticPackageSemanticOperationKind string
+
+// RecoverySemanticPackageSemanticPrerequisiteRequirement defines model for RecoverySemanticPackageSemanticPrerequisiteRequirement.
+type RecoverySemanticPackageSemanticPrerequisiteRequirement struct {
+	Fact     RecoverySemanticPackageOpaqueId                            `json:"fact"`
+	Kind     RecoverySemanticPackageSemanticPrerequisiteRequirementKind `json:"kind"`
+	Resource RecoverySemanticPackageOpaqueId                            `json:"resource"`
+}
+
+// RecoverySemanticPackageSemanticPrerequisiteRequirementKind defines model for RecoverySemanticPackageSemanticPrerequisiteRequirement.Kind.
+type RecoverySemanticPackageSemanticPrerequisiteRequirementKind string
+
+// RecoverySemanticPackageSemanticSelector defines model for RecoverySemanticPackageSemanticSelector.
+type RecoverySemanticPackageSemanticSelector struct {
+	union json.RawMessage
+}
+
+// RecoverySemanticPackageSemanticSelector0 defines model for .
+type RecoverySemanticPackageSemanticSelector0 struct {
+	Field RecoverySemanticPackageOpaqueId              `json:"field"`
+	Kind  RecoverySemanticPackageSemanticSelector0Kind `json:"kind"`
+}
+
+// RecoverySemanticPackageSemanticSelector0Kind defines model for RecoverySemanticPackageSemanticSelector.0.Kind.
+type RecoverySemanticPackageSemanticSelector0Kind string
+
+// RecoverySemanticPackageSemanticSelector1 defines model for .
+type RecoverySemanticPackageSemanticSelector1 struct {
+	Field RecoverySemanticPackageOpaqueId              `json:"field"`
+	Kind  RecoverySemanticPackageSemanticSelector1Kind `json:"kind"`
+	Value RecoverySemanticPackageSemanticValue         `json:"value"`
+}
+
+// RecoverySemanticPackageSemanticSelector1Kind defines model for RecoverySemanticPackageSemanticSelector.1.Kind.
+type RecoverySemanticPackageSemanticSelector1Kind string
+
+// RecoverySemanticPackageSemanticSelector2 defines model for .
+type RecoverySemanticPackageSemanticSelector2 struct {
+	Bytes RecoverySemanticPackageSafeInteger           `json:"bytes"`
+	Field RecoverySemanticPackageOpaqueId              `json:"field"`
+	Kind  RecoverySemanticPackageSemanticSelector2Kind `json:"kind"`
+}
+
+// RecoverySemanticPackageSemanticSelector2Kind defines model for RecoverySemanticPackageSemanticSelector.2.Kind.
+type RecoverySemanticPackageSemanticSelector2Kind string
+
+// RecoverySemanticPackageSemanticValue defines model for RecoverySemanticPackageSemanticValue.
+type RecoverySemanticPackageSemanticValue struct {
+	union json.RawMessage
+}
+
+// RecoverySemanticPackageSemanticValue0 defines model for .
+type RecoverySemanticPackageSemanticValue0 struct {
+	Kind  RecoverySemanticPackageSemanticValue0Kind `json:"kind"`
+	Value string                                    `json:"value"`
+}
+
+// RecoverySemanticPackageSemanticValue0Kind defines model for RecoverySemanticPackageSemanticValue.0.Kind.
+type RecoverySemanticPackageSemanticValue0Kind string
+
+// RecoverySemanticPackageSemanticValue1 defines model for .
+type RecoverySemanticPackageSemanticValue1 struct {
+	Kind  RecoverySemanticPackageSemanticValue1Kind `json:"kind"`
+	Value RecoverySemanticPackageSafeInteger        `json:"value"`
+}
+
+// RecoverySemanticPackageSemanticValue1Kind defines model for RecoverySemanticPackageSemanticValue.1.Kind.
+type RecoverySemanticPackageSemanticValue1Kind string
+
+// RecoverySemanticPackageSemanticValue2 defines model for .
+type RecoverySemanticPackageSemanticValue2 struct {
+	Kind  RecoverySemanticPackageSemanticValue2Kind `json:"kind"`
+	Value bool                                      `json:"value"`
+}
+
+// RecoverySemanticPackageSemanticValue2Kind defines model for RecoverySemanticPackageSemanticValue.2.Kind.
+type RecoverySemanticPackageSemanticValue2Kind string
+
+// RecoverySemanticPackageSemanticWithheldStatus defines model for RecoverySemanticPackageSemanticWithheldStatus.
+type RecoverySemanticPackageSemanticWithheldStatus struct {
+	// Audience Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	Audience SecurityInformationLabel `json:"audience"`
+}
+
+// RecoverySemanticPayload defines model for RecoverySemanticPayload.
+type RecoverySemanticPayload struct {
+	Fields []RecoverySemanticPayloadSemanticField `json:"fields"`
+}
+
+// RecoverySemanticPayloadOpaqueId defines model for RecoverySemanticPayloadOpaqueId.
+type RecoverySemanticPayloadOpaqueId = string
+
+// RecoverySemanticPayloadSafeInteger defines model for RecoverySemanticPayloadSafeInteger.
+type RecoverySemanticPayloadSafeInteger = int64
+
+// RecoverySemanticPayloadSemanticField defines model for RecoverySemanticPayloadSemanticField.
+type RecoverySemanticPayloadSemanticField struct {
+	Field RecoverySemanticPayloadOpaqueId      `json:"field"`
+	Value RecoverySemanticPayloadSemanticValue `json:"value"`
+}
+
+// RecoverySemanticPayloadSemanticValue defines model for RecoverySemanticPayloadSemanticValue.
+type RecoverySemanticPayloadSemanticValue struct {
+	union json.RawMessage
+}
+
+// RecoverySemanticPayloadSemanticValue0 defines model for .
+type RecoverySemanticPayloadSemanticValue0 struct {
+	Kind  RecoverySemanticPayloadSemanticValue0Kind `json:"kind"`
+	Value string                                    `json:"value"`
+}
+
+// RecoverySemanticPayloadSemanticValue0Kind defines model for RecoverySemanticPayloadSemanticValue.0.Kind.
+type RecoverySemanticPayloadSemanticValue0Kind string
+
+// RecoverySemanticPayloadSemanticValue1 defines model for .
+type RecoverySemanticPayloadSemanticValue1 struct {
+	Kind  RecoverySemanticPayloadSemanticValue1Kind `json:"kind"`
+	Value RecoverySemanticPayloadSafeInteger        `json:"value"`
+}
+
+// RecoverySemanticPayloadSemanticValue1Kind defines model for RecoverySemanticPayloadSemanticValue.1.Kind.
+type RecoverySemanticPayloadSemanticValue1Kind string
+
+// RecoverySemanticPayloadSemanticValue2 defines model for .
+type RecoverySemanticPayloadSemanticValue2 struct {
+	Kind  RecoverySemanticPayloadSemanticValue2Kind `json:"kind"`
+	Value bool                                      `json:"value"`
+}
+
+// RecoverySemanticPayloadSemanticValue2Kind defines model for RecoverySemanticPayloadSemanticValue.2.Kind.
+type RecoverySemanticPayloadSemanticValue2Kind string
+
+// RecoverySemanticPlan defines model for RecoverySemanticPlan.
+type RecoverySemanticPlan struct {
+	DomainVersion RecoverySemanticPlanDomainVersion      `json:"domain_version"`
+	Registry      RecoverySemanticPlanRecoveryDigest32   `json:"registry"`
+	Scope         RecoverySemanticPlanScope              `json:"scope"`
+	Steps         []RecoverySemanticPlanSemanticPlanStep `json:"steps"`
+}
+
+// RecoverySemanticPlanDomainVersion defines model for RecoverySemanticPlan.DomainVersion.
+type RecoverySemanticPlanDomainVersion int64
+
+// RecoverySemanticPlanOpaqueId defines model for RecoverySemanticPlanOpaqueId.
+type RecoverySemanticPlanOpaqueId = string
+
+// RecoverySemanticPlanRecoveryDigest32 defines model for RecoverySemanticPlanRecoveryDigest32.
+type RecoverySemanticPlanRecoveryDigest32 = []int64
+
+// RecoverySemanticPlanScope defines model for RecoverySemanticPlanScope.
+type RecoverySemanticPlanScope struct {
+	AuthorityDomain RecoverySemanticPlanOpaqueId `json:"authority_domain"`
+	ProcessId       RecoverySemanticPlanOpaqueId `json:"process_id"`
+	TenantId        RecoverySemanticPlanOpaqueId `json:"tenant_id"`
+}
+
+// RecoverySemanticPlanSemanticPlanInput defines model for RecoverySemanticPlanSemanticPlanInput.
+type RecoverySemanticPlanSemanticPlanInput struct {
+	union json.RawMessage
+}
+
+// RecoverySemanticPlanSemanticPlanInput0 defines model for .
+type RecoverySemanticPlanSemanticPlanInput0 struct {
+	Kind     RecoverySemanticPlanSemanticPlanInput0Kind `json:"kind"`
+	Material RecoverySemanticPlanRecoveryDigest32       `json:"material"`
+	Resource RecoverySemanticPlanOpaqueId               `json:"resource"`
+	Version  RecoverySemanticPlanRecoveryDigest32       `json:"version"`
+}
+
+// RecoverySemanticPlanSemanticPlanInput0Kind defines model for RecoverySemanticPlanSemanticPlanInput.0.Kind.
+type RecoverySemanticPlanSemanticPlanInput0Kind string
+
+// RecoverySemanticPlanSemanticPlanInput1 defines model for .
+type RecoverySemanticPlanSemanticPlanInput1 struct {
+	Kind RecoverySemanticPlanSemanticPlanInput1Kind `json:"kind"`
+	Step RecoverySemanticPlanOpaqueId               `json:"step"`
+}
+
+// RecoverySemanticPlanSemanticPlanInput1Kind defines model for RecoverySemanticPlanSemanticPlanInput.1.Kind.
+type RecoverySemanticPlanSemanticPlanInput1Kind string
+
+// RecoverySemanticPlanSemanticPlanStep defines model for RecoverySemanticPlanSemanticPlanStep.
+type RecoverySemanticPlanSemanticPlanStep struct {
+	Dependencies []RecoverySemanticPlanOpaqueId             `json:"dependencies"`
+	Destination  RecoverySemanticPlanOpaqueId               `json:"destination"`
+	Inputs       []RecoverySemanticPlanSemanticPlanInput    `json:"inputs"`
+	Operation    RecoverySemanticPlanOpaqueId               `json:"operation"`
+	Output       RecoverySemanticPlanSemanticPlanStepOutput `json:"output"`
+	Step         RecoverySemanticPlanOpaqueId               `json:"step"`
+}
+
+// RecoverySemanticPlanSemanticPlanStepOutput defines model for RecoverySemanticPlanSemanticPlanStep.Output.
+type RecoverySemanticPlanSemanticPlanStepOutput string
+
+// RecoverySemanticPrerequisite defines model for RecoverySemanticPrerequisite.
+type RecoverySemanticPrerequisite struct {
+	Action           RecoverySemanticPrerequisiteRecoveryDigest32 `json:"action"`
+	DomainVersion    RecoverySemanticPrerequisiteDomainVersion    `json:"domain_version"`
+	Evidence         RecoverySemanticPrerequisiteOpaqueId         `json:"evidence"`
+	Fact             RecoverySemanticPrerequisiteOpaqueId         `json:"fact"`
+	IssuedAtUnixMs   RecoverySemanticPrerequisiteSafeInteger      `json:"issued_at_unix_ms"`
+	Kind             RecoverySemanticPrerequisiteKind             `json:"kind"`
+	Lease            RecoverySemanticPrerequisiteOpaqueId         `json:"lease"`
+	Material         RecoverySemanticPrerequisiteRecoveryDigest32 `json:"material"`
+	Producer         RecoverySemanticPrerequisiteOpaqueId         `json:"producer"`
+	Purpose          string                                       `json:"purpose"`
+	Resource         RecoverySemanticPrerequisiteOpaqueId         `json:"resource"`
+	Scope            RecoverySemanticPrerequisiteScope            `json:"scope"`
+	ValidUntilUnixMs RecoverySemanticPrerequisiteSafeInteger      `json:"valid_until_unix_ms"`
+	Version          RecoverySemanticPrerequisiteRecoveryDigest32 `json:"version"`
+}
+
+// RecoverySemanticPrerequisiteDomainVersion defines model for RecoverySemanticPrerequisite.DomainVersion.
+type RecoverySemanticPrerequisiteDomainVersion int64
+
+// RecoverySemanticPrerequisiteKind defines model for RecoverySemanticPrerequisite.Kind.
+type RecoverySemanticPrerequisiteKind string
+
+// RecoverySemanticPrerequisiteOpaqueId defines model for RecoverySemanticPrerequisiteOpaqueId.
+type RecoverySemanticPrerequisiteOpaqueId = string
+
+// RecoverySemanticPrerequisiteRecoveryDigest32 defines model for RecoverySemanticPrerequisiteRecoveryDigest32.
+type RecoverySemanticPrerequisiteRecoveryDigest32 = []int64
+
+// RecoverySemanticPrerequisiteSafeInteger defines model for RecoverySemanticPrerequisiteSafeInteger.
+type RecoverySemanticPrerequisiteSafeInteger = int64
+
+// RecoverySemanticPrerequisiteScope defines model for RecoverySemanticPrerequisiteScope.
+type RecoverySemanticPrerequisiteScope struct {
+	AuthorityDomain RecoverySemanticPrerequisiteOpaqueId `json:"authority_domain"`
+	ProcessId       RecoverySemanticPrerequisiteOpaqueId `json:"process_id"`
+	TenantId        RecoverySemanticPrerequisiteOpaqueId `json:"tenant_id"`
+}
+
+// RecoverySemanticProviderRequest defines model for RecoverySemanticProviderRequest.
+type RecoverySemanticProviderRequest struct {
+	Account         RecoverySemanticProviderRequestOpaqueId      `json:"account"`
+	Attempt         string                                       `json:"attempt"`
+	DomainVersion   RecoverySemanticProviderRequestDomainVersion `json:"domain_version"`
+	Kind            RecoverySemanticProviderRequestKind          `json:"kind"`
+	Operation       RecoverySemanticProviderRequestOpaqueId      `json:"operation"`
+	Payload         RecoverySemanticPayload                      `json:"payload"`
+	Provider        RecoverySemanticProviderRequestOpaqueId      `json:"provider"`
+	ProviderVersion string                                       `json:"provider_version"`
+	Resource        RecoverySemanticProviderRequestOpaqueId      `json:"resource"`
+}
+
+// RecoverySemanticProviderRequestDomainVersion defines model for RecoverySemanticProviderRequest.DomainVersion.
+type RecoverySemanticProviderRequestDomainVersion int64
+
+// RecoverySemanticProviderRequestKind defines model for RecoverySemanticProviderRequest.Kind.
+type RecoverySemanticProviderRequestKind string
+
+// RecoverySemanticProviderRequestOpaqueId defines model for RecoverySemanticProviderRequestOpaqueId.
+type RecoverySemanticProviderRequestOpaqueId = string
+
+// RecoverySemanticProviderResponse defines model for RecoverySemanticProviderResponse.
+type RecoverySemanticProviderResponse struct {
+	Account                RecoverySemanticProviderResponseOpaqueId `json:"account"`
+	Attempt                string                                   `json:"attempt"`
+	CheckedProviderVersion string                                   `json:"checked_provider_version"`
+	Operation              RecoverySemanticProviderResponseOpaqueId `json:"operation"`
+	Payload                RecoverySemanticPayload                  `json:"payload"`
+	Provider               RecoverySemanticProviderResponseOpaqueId `json:"provider"`
+	Resource               RecoverySemanticProviderResponseOpaqueId `json:"resource"`
+}
+
+// RecoverySemanticProviderResponseOpaqueId defines model for RecoverySemanticProviderResponseOpaqueId.
+type RecoverySemanticProviderResponseOpaqueId = string
+
+// RecoverySemanticTransformation defines model for RecoverySemanticTransformation.
+type RecoverySemanticTransformation struct {
+	Configuration  RecoverySemanticTransformationRecoveryDigest32       `json:"configuration"`
+	Destination    RecoverySemanticTransformationOpaqueId               `json:"destination"`
+	Disposition    RecoverySemanticTransformationDisposition            `json:"disposition"`
+	DomainVersion  RecoverySemanticTransformationDomainVersion          `json:"domain_version"`
+	Implementation RecoverySemanticTransformationRecoveryDigest32       `json:"implementation"`
+	Influence      RecoverySemanticTransformationRecoveryDigest32       `json:"influence"`
+	Inputs         []RecoverySemanticTransformationSemanticInputVersion `json:"inputs"`
+	IssuedAtUnixMs RecoverySemanticTransformationSafeInteger            `json:"issued_at_unix_ms"`
+	Output         RecoverySemanticTransformationRecoveryDigest32       `json:"output"`
+
+	// OutputLabel Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	OutputLabel      SecurityInformationLabel                       `json:"output_label"`
+	OutputSchema     RecoverySemanticTransformationRecoveryDigest32 `json:"output_schema"`
+	Producer         RecoverySemanticTransformationOpaqueId         `json:"producer"`
+	ProducerAction   RecoverySemanticTransformationRecoveryDigest32 `json:"producer_action"`
+	Purpose          string                                         `json:"purpose"`
+	Scope            RecoverySemanticTransformationScope            `json:"scope"`
+	ValidUntilUnixMs RecoverySemanticTransformationSafeInteger      `json:"valid_until_unix_ms"`
+}
+
+// RecoverySemanticTransformationDisposition defines model for RecoverySemanticTransformation.Disposition.
+type RecoverySemanticTransformationDisposition string
+
+// RecoverySemanticTransformationDomainVersion defines model for RecoverySemanticTransformation.DomainVersion.
+type RecoverySemanticTransformationDomainVersion int64
+
+// RecoverySemanticTransformationOpaqueId defines model for RecoverySemanticTransformationOpaqueId.
+type RecoverySemanticTransformationOpaqueId = string
+
+// RecoverySemanticTransformationRecoveryDigest32 defines model for RecoverySemanticTransformationRecoveryDigest32.
+type RecoverySemanticTransformationRecoveryDigest32 = []int64
+
+// RecoverySemanticTransformationSafeInteger defines model for RecoverySemanticTransformationSafeInteger.
+type RecoverySemanticTransformationSafeInteger = int64
+
+// RecoverySemanticTransformationScope defines model for RecoverySemanticTransformationScope.
+type RecoverySemanticTransformationScope struct {
+	AuthorityDomain RecoverySemanticTransformationOpaqueId `json:"authority_domain"`
+	ProcessId       RecoverySemanticTransformationOpaqueId `json:"process_id"`
+	TenantId        RecoverySemanticTransformationOpaqueId `json:"tenant_id"`
+}
+
+// RecoverySemanticTransformationSemanticInputVersion defines model for RecoverySemanticTransformationSemanticInputVersion.
+type RecoverySemanticTransformationSemanticInputVersion struct {
+	Content  RecoverySemanticTransformationRecoveryDigest32 `json:"content"`
+	Resource RecoverySemanticTransformationOpaqueId         `json:"resource"`
+	Version  RecoverySemanticTransformationRecoveryDigest32 `json:"version"`
+}
+
+// RecoverySignedArtifactArchiveManifest defines model for RecoverySignedArtifactArchiveManifest.
+type RecoverySignedArtifactArchiveManifest struct {
+	Algorithm    RecoverySignedArtifactArchiveManifestAlgorithm `json:"algorithm"`
+	AuthorityKey string                                         `json:"authority_key"`
+	Body         RecoveryArtifactArchiveManifest                `json:"body"`
+	Signature    string                                         `json:"signature"`
+}
+
+// RecoverySignedArtifactArchiveManifestAlgorithm defines model for RecoverySignedArtifactArchiveManifest.Algorithm.
+type RecoverySignedArtifactArchiveManifestAlgorithm string
+
+// RecoverySignedArtifactCertificate defines model for RecoverySignedArtifactCertificate.
+type RecoverySignedArtifactCertificate struct {
+	Algorithm    RecoverySignedArtifactCertificateAlgorithm `json:"algorithm"`
+	AuthorityKey string                                     `json:"authority_key"`
+	Body         RecoveryArtifactCertificate                `json:"body"`
+	Signature    string                                     `json:"signature"`
+}
+
+// RecoverySignedArtifactCertificateAlgorithm defines model for RecoverySignedArtifactCertificate.Algorithm.
+type RecoverySignedArtifactCertificateAlgorithm string
+
+// RecoverySignedAuthorityCoverage defines model for RecoverySignedAuthorityCoverage.
+type RecoverySignedAuthorityCoverage struct {
+	Algorithm    RecoverySignedAuthorityCoverageAlgorithm `json:"algorithm"`
+	AuthorityKey string                                   `json:"authority_key"`
+	Body         RecoveryAuthorityCoverage                `json:"body"`
+	Signature    string                                   `json:"signature"`
+}
+
+// RecoverySignedAuthorityCoverageAlgorithm defines model for RecoverySignedAuthorityCoverage.Algorithm.
+type RecoverySignedAuthorityCoverageAlgorithm string
+
+// RecoverySignedAuthorityCoverageOpaqueId defines model for RecoverySignedAuthorityCoverageOpaqueId.
+type RecoverySignedAuthorityCoverageOpaqueId = string
+
+// RecoverySignedAuthorityCoverageRecoveryDigest32 defines model for RecoverySignedAuthorityCoverageRecoveryDigest32.
+type RecoverySignedAuthorityCoverageRecoveryDigest32 = []int64
+
+// RecoverySignedAuthorityCoverageSafeInteger defines model for RecoverySignedAuthorityCoverageSafeInteger.
+type RecoverySignedAuthorityCoverageSafeInteger = int64
+
+// RecoverySignedAuthorityCoverageScope defines model for RecoverySignedAuthorityCoverageScope.
+type RecoverySignedAuthorityCoverageScope struct {
+	AuthorityDomain RecoverySignedAuthorityCoverageOpaqueId `json:"authority_domain"`
+	ProcessId       RecoverySignedAuthorityCoverageOpaqueId `json:"process_id"`
+	TenantId        RecoverySignedAuthorityCoverageOpaqueId `json:"tenant_id"`
+}
+
+// RecoverySignedConfinedDisclosure defines model for RecoverySignedConfinedDisclosure.
+type RecoverySignedConfinedDisclosure struct {
+	Algorithm    RecoverySignedConfinedDisclosureAlgorithm `json:"algorithm"`
+	AuthorityKey string                                    `json:"authority_key"`
+	Body         RecoveryConfinedReturnEvidence            `json:"body"`
+	Signature    string                                    `json:"signature"`
+}
+
+// RecoverySignedConfinedDisclosureAlgorithm defines model for RecoverySignedConfinedDisclosure.Algorithm.
+type RecoverySignedConfinedDisclosureAlgorithm string
+
+// RecoverySignedConfinedDisclosureArtifactInfluence defines model for RecoverySignedConfinedDisclosureArtifactInfluence.
+type RecoverySignedConfinedDisclosureArtifactInfluence struct {
+	Commitment           RecoverySignedConfinedDisclosureRecoveryDigest32 `json:"commitment"`
+	ExternallyInfluenced bool                                             `json:"externally_influenced"`
+	Unknown              bool                                             `json:"unknown"`
+}
+
+// RecoverySignedConfinedDisclosureArtifactRecipient defines model for RecoverySignedConfinedDisclosureArtifactRecipient.
+type RecoverySignedConfinedDisclosureArtifactRecipient struct {
+	// Clearance Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	Clearance         SecurityInformationLabel                     `json:"clearance"`
+	ContextGeneration RecoverySignedConfinedDisclosureSafeInteger  `json:"context_generation"`
+	IsolationEpoch    string                                       `json:"isolation_epoch"`
+	Lineage           RecoverySignedConfinedDisclosureOpaqueId     `json:"lineage"`
+	Principal         string                                       `json:"principal"`
+	Recipient         RecoverySignedConfinedDisclosureOpaqueId     `json:"recipient"`
+	Runtime           string                                       `json:"runtime"`
+	Scope             RecoverySignedConfinedDisclosureScope        `json:"scope"`
+	Sink              RecoverySignedConfinedDisclosureArtifactSink `json:"sink"`
+}
+
+// RecoverySignedConfinedDisclosureArtifactReference defines model for RecoverySignedConfinedDisclosureArtifactReference.
+type RecoverySignedConfinedDisclosureArtifactReference struct {
+	Artifact   RecoverySignedConfinedDisclosureOpaqueId         `json:"artifact"`
+	Provenance RecoverySignedConfinedDisclosureRecoveryDigest32 `json:"provenance"`
+	Scope      RecoverySignedConfinedDisclosureScope            `json:"scope"`
+	Version    RecoverySignedConfinedDisclosureOpaqueId         `json:"version"`
+}
+
+// RecoverySignedConfinedDisclosureArtifactSink defines model for RecoverySignedConfinedDisclosureArtifactSink.
+type RecoverySignedConfinedDisclosureArtifactSink struct {
+	union json.RawMessage
+}
+
+// RecoverySignedConfinedDisclosureArtifactSink0 defines model for .
+type RecoverySignedConfinedDisclosureArtifactSink0 struct {
+	Kind RecoverySignedConfinedDisclosureArtifactSink0Kind `json:"kind"`
+}
+
+// RecoverySignedConfinedDisclosureArtifactSink0Kind defines model for RecoverySignedConfinedDisclosureArtifactSink.0.Kind.
+type RecoverySignedConfinedDisclosureArtifactSink0Kind string
+
+// RecoverySignedConfinedDisclosureArtifactSink1 defines model for .
+type RecoverySignedConfinedDisclosureArtifactSink1 struct {
+	Context RecoverySignedConfinedDisclosureModelContext      `json:"context"`
+	Kind    RecoverySignedConfinedDisclosureArtifactSink1Kind `json:"kind"`
+}
+
+// RecoverySignedConfinedDisclosureArtifactSink1Kind defines model for RecoverySignedConfinedDisclosureArtifactSink.1.Kind.
+type RecoverySignedConfinedDisclosureArtifactSink1Kind string
+
+// RecoverySignedConfinedDisclosureArtifactSink2 defines model for .
+type RecoverySignedConfinedDisclosureArtifactSink2 struct {
+	Kind RecoverySignedConfinedDisclosureArtifactSink2Kind `json:"kind"`
+}
+
+// RecoverySignedConfinedDisclosureArtifactSink2Kind defines model for RecoverySignedConfinedDisclosureArtifactSink.2.Kind.
+type RecoverySignedConfinedDisclosureArtifactSink2Kind string
+
+// RecoverySignedConfinedDisclosureModelContext defines model for RecoverySignedConfinedDisclosureModelContext.
+type RecoverySignedConfinedDisclosureModelContext struct {
+	Account      RecoverySignedConfinedDisclosureOpaqueId            `json:"account"`
+	Cache        string                                              `json:"cache"`
+	Context      RecoverySignedConfinedDisclosureOpaqueId            `json:"context"`
+	Contract     RecoverySignedConfinedDisclosureRecoveryDigest32    `json:"contract"`
+	Conversation string                                              `json:"conversation"`
+	Provider     RecoverySignedConfinedDisclosureOpaqueId            `json:"provider"`
+	SideFiles    []RecoverySignedConfinedDisclosureArtifactReference `json:"side_files"`
+}
+
+// RecoverySignedConfinedDisclosureOpaqueId defines model for RecoverySignedConfinedDisclosureOpaqueId.
+type RecoverySignedConfinedDisclosureOpaqueId = string
+
+// RecoverySignedConfinedDisclosureRecoveryDigest32 defines model for RecoverySignedConfinedDisclosureRecoveryDigest32.
+type RecoverySignedConfinedDisclosureRecoveryDigest32 = []int64
+
+// RecoverySignedConfinedDisclosureSafeInteger defines model for RecoverySignedConfinedDisclosureSafeInteger.
+type RecoverySignedConfinedDisclosureSafeInteger = int64
+
+// RecoverySignedConfinedDisclosureScope defines model for RecoverySignedConfinedDisclosureScope.
+type RecoverySignedConfinedDisclosureScope struct {
+	AuthorityDomain RecoverySignedConfinedDisclosureOpaqueId `json:"authority_domain"`
+	ProcessId       RecoverySignedConfinedDisclosureOpaqueId `json:"process_id"`
+	TenantId        RecoverySignedConfinedDisclosureOpaqueId `json:"tenant_id"`
+}
+
+// RecoverySignedConfinedEndorsement defines model for RecoverySignedConfinedEndorsement.
+type RecoverySignedConfinedEndorsement struct {
+	Algorithm    RecoverySignedConfinedEndorsementAlgorithm `json:"algorithm"`
+	AuthorityKey string                                     `json:"authority_key"`
+	Body         RecoveryConfinedReturnEvidence             `json:"body"`
+	Signature    string                                     `json:"signature"`
+}
+
+// RecoverySignedConfinedEndorsementAlgorithm defines model for RecoverySignedConfinedEndorsement.Algorithm.
+type RecoverySignedConfinedEndorsementAlgorithm string
+
+// RecoverySignedConfinedEndorsementArtifactInfluence defines model for RecoverySignedConfinedEndorsementArtifactInfluence.
+type RecoverySignedConfinedEndorsementArtifactInfluence struct {
+	Commitment           RecoverySignedConfinedEndorsementRecoveryDigest32 `json:"commitment"`
+	ExternallyInfluenced bool                                              `json:"externally_influenced"`
+	Unknown              bool                                              `json:"unknown"`
+}
+
+// RecoverySignedConfinedEndorsementArtifactRecipient defines model for RecoverySignedConfinedEndorsementArtifactRecipient.
+type RecoverySignedConfinedEndorsementArtifactRecipient struct {
+	// Clearance Canonical portable DLM information label. Identifier maxLength is a structural Unicode-scalar bound; runtime validation additionally enforces the normative 256-byte UTF-8 ceiling and owner self readership.
+	Clearance         SecurityInformationLabel                      `json:"clearance"`
+	ContextGeneration RecoverySignedConfinedEndorsementSafeInteger  `json:"context_generation"`
+	IsolationEpoch    string                                        `json:"isolation_epoch"`
+	Lineage           RecoverySignedConfinedEndorsementOpaqueId     `json:"lineage"`
+	Principal         string                                        `json:"principal"`
+	Recipient         RecoverySignedConfinedEndorsementOpaqueId     `json:"recipient"`
+	Runtime           string                                        `json:"runtime"`
+	Scope             RecoverySignedConfinedEndorsementScope        `json:"scope"`
+	Sink              RecoverySignedConfinedEndorsementArtifactSink `json:"sink"`
+}
+
+// RecoverySignedConfinedEndorsementArtifactReference defines model for RecoverySignedConfinedEndorsementArtifactReference.
+type RecoverySignedConfinedEndorsementArtifactReference struct {
+	Artifact   RecoverySignedConfinedEndorsementOpaqueId         `json:"artifact"`
+	Provenance RecoverySignedConfinedEndorsementRecoveryDigest32 `json:"provenance"`
+	Scope      RecoverySignedConfinedEndorsementScope            `json:"scope"`
+	Version    RecoverySignedConfinedEndorsementOpaqueId         `json:"version"`
+}
+
+// RecoverySignedConfinedEndorsementArtifactSink defines model for RecoverySignedConfinedEndorsementArtifactSink.
+type RecoverySignedConfinedEndorsementArtifactSink struct {
+	union json.RawMessage
+}
+
+// RecoverySignedConfinedEndorsementArtifactSink0 defines model for .
+type RecoverySignedConfinedEndorsementArtifactSink0 struct {
+	Kind RecoverySignedConfinedEndorsementArtifactSink0Kind `json:"kind"`
+}
+
+// RecoverySignedConfinedEndorsementArtifactSink0Kind defines model for RecoverySignedConfinedEndorsementArtifactSink.0.Kind.
+type RecoverySignedConfinedEndorsementArtifactSink0Kind string
+
+// RecoverySignedConfinedEndorsementArtifactSink1 defines model for .
+type RecoverySignedConfinedEndorsementArtifactSink1 struct {
+	Context RecoverySignedConfinedEndorsementModelContext      `json:"context"`
+	Kind    RecoverySignedConfinedEndorsementArtifactSink1Kind `json:"kind"`
+}
+
+// RecoverySignedConfinedEndorsementArtifactSink1Kind defines model for RecoverySignedConfinedEndorsementArtifactSink.1.Kind.
+type RecoverySignedConfinedEndorsementArtifactSink1Kind string
+
+// RecoverySignedConfinedEndorsementArtifactSink2 defines model for .
+type RecoverySignedConfinedEndorsementArtifactSink2 struct {
+	Kind RecoverySignedConfinedEndorsementArtifactSink2Kind `json:"kind"`
+}
+
+// RecoverySignedConfinedEndorsementArtifactSink2Kind defines model for RecoverySignedConfinedEndorsementArtifactSink.2.Kind.
+type RecoverySignedConfinedEndorsementArtifactSink2Kind string
+
+// RecoverySignedConfinedEndorsementModelContext defines model for RecoverySignedConfinedEndorsementModelContext.
+type RecoverySignedConfinedEndorsementModelContext struct {
+	Account      RecoverySignedConfinedEndorsementOpaqueId            `json:"account"`
+	Cache        string                                               `json:"cache"`
+	Context      RecoverySignedConfinedEndorsementOpaqueId            `json:"context"`
+	Contract     RecoverySignedConfinedEndorsementRecoveryDigest32    `json:"contract"`
+	Conversation string                                               `json:"conversation"`
+	Provider     RecoverySignedConfinedEndorsementOpaqueId            `json:"provider"`
+	SideFiles    []RecoverySignedConfinedEndorsementArtifactReference `json:"side_files"`
+}
+
+// RecoverySignedConfinedEndorsementOpaqueId defines model for RecoverySignedConfinedEndorsementOpaqueId.
+type RecoverySignedConfinedEndorsementOpaqueId = string
+
+// RecoverySignedConfinedEndorsementRecoveryDigest32 defines model for RecoverySignedConfinedEndorsementRecoveryDigest32.
+type RecoverySignedConfinedEndorsementRecoveryDigest32 = []int64
+
+// RecoverySignedConfinedEndorsementSafeInteger defines model for RecoverySignedConfinedEndorsementSafeInteger.
+type RecoverySignedConfinedEndorsementSafeInteger = int64
+
+// RecoverySignedConfinedEndorsementScope defines model for RecoverySignedConfinedEndorsementScope.
+type RecoverySignedConfinedEndorsementScope struct {
+	AuthorityDomain RecoverySignedConfinedEndorsementOpaqueId `json:"authority_domain"`
+	ProcessId       RecoverySignedConfinedEndorsementOpaqueId `json:"process_id"`
+	TenantId        RecoverySignedConfinedEndorsementOpaqueId `json:"tenant_id"`
+}
+
+// RecoverySignedExplanationReport defines model for RecoverySignedExplanationReport.
+type RecoverySignedExplanationReport struct {
+	Algorithm    RecoverySignedExplanationReportAlgorithm `json:"algorithm"`
+	AuthorityKey string                                   `json:"authority_key"`
+	Body         RecoveryExplanationReport                `json:"body"`
+	Signature    string                                   `json:"signature"`
+}
+
+// RecoverySignedExplanationReportAlgorithm defines model for RecoverySignedExplanationReport.Algorithm.
+type RecoverySignedExplanationReportAlgorithm string
+
+// RecoverySignedExplanationReportDestinationId defines model for RecoverySignedExplanationReportDestinationId.
+type RecoverySignedExplanationReportDestinationId = string
+
+// RecoverySignedExplanationReportOpaqueId defines model for RecoverySignedExplanationReportOpaqueId.
+type RecoverySignedExplanationReportOpaqueId = string
+
+// RecoverySignedExplanationReportOperation defines model for RecoverySignedExplanationReportOperation.
+type RecoverySignedExplanationReportOperation struct {
+	NativeAdmissionDigest RecoverySignedExplanationReportRecoveryDigest32 `json:"native_admission_digest"`
+	OperationId           RecoverySignedExplanationReportOpaqueId         `json:"operation_id"`
+	OperationVersion      int64                                           `json:"operation_version"`
+}
+
+// RecoverySignedExplanationReportRecoveryDigest32 defines model for RecoverySignedExplanationReportRecoveryDigest32.
+type RecoverySignedExplanationReportRecoveryDigest32 = []int64
+
+// RecoverySignedExplanationReportRecoveryEffectAdmissionUnresolvedV1 defines model for RecoverySignedExplanationReportRecoveryEffectAdmissionUnresolvedV1.
+type RecoverySignedExplanationReportRecoveryEffectAdmissionUnresolvedV1 struct {
+	AdmissionIntent RecoverySignedExplanationReportOpaqueId                                `json:"admission_intent"`
+	Kind            RecoverySignedExplanationReportRecoveryEffectAdmissionUnresolvedV1Kind `json:"kind"`
+}
+
+// RecoverySignedExplanationReportRecoveryEffectAdmissionUnresolvedV1Kind defines model for RecoverySignedExplanationReportRecoveryEffectAdmissionUnresolvedV1.Kind.
+type RecoverySignedExplanationReportRecoveryEffectAdmissionUnresolvedV1Kind string
+
+// RecoverySignedExplanationReportRecoveryEffectAwaitingApprovalV1 defines model for RecoverySignedExplanationReportRecoveryEffectAwaitingApprovalV1.
+type RecoverySignedExplanationReportRecoveryEffectAwaitingApprovalV1 struct {
+	Kind      RecoverySignedExplanationReportRecoveryEffectAwaitingApprovalV1Kind `json:"kind"`
+	Operation RecoverySignedExplanationReportOperation                            `json:"operation"`
+}
+
+// RecoverySignedExplanationReportRecoveryEffectAwaitingApprovalV1Kind defines model for RecoverySignedExplanationReportRecoveryEffectAwaitingApprovalV1.Kind.
+type RecoverySignedExplanationReportRecoveryEffectAwaitingApprovalV1Kind string
+
+// RecoverySignedExplanationReportRecoveryEffectAwaitingCallerReportV1 defines model for RecoverySignedExplanationReportRecoveryEffectAwaitingCallerReportV1.
+type RecoverySignedExplanationReportRecoveryEffectAwaitingCallerReportV1 struct {
+	Kind      RecoverySignedExplanationReportRecoveryEffectAwaitingCallerReportV1Kind `json:"kind"`
+	Operation RecoverySignedExplanationReportOperation                                `json:"operation"`
+}
+
+// RecoverySignedExplanationReportRecoveryEffectAwaitingCallerReportV1Kind defines model for RecoverySignedExplanationReportRecoveryEffectAwaitingCallerReportV1.Kind.
+type RecoverySignedExplanationReportRecoveryEffectAwaitingCallerReportV1Kind string
+
+// RecoverySignedExplanationReportRecoveryEffectClosedBeforeEffectV1 defines model for RecoverySignedExplanationReportRecoveryEffectClosedBeforeEffectV1.
+type RecoverySignedExplanationReportRecoveryEffectClosedBeforeEffectV1 struct {
+	Closure   RecoverySignedExplanationReportOpaqueId                               `json:"closure"`
+	Kind      RecoverySignedExplanationReportRecoveryEffectClosedBeforeEffectV1Kind `json:"kind"`
+	Operation RecoverySignedExplanationReportOperation                              `json:"operation"`
+}
+
+// RecoverySignedExplanationReportRecoveryEffectClosedBeforeEffectV1Kind defines model for RecoverySignedExplanationReportRecoveryEffectClosedBeforeEffectV1.Kind.
+type RecoverySignedExplanationReportRecoveryEffectClosedBeforeEffectV1Kind string
+
+// RecoverySignedExplanationReportRecoveryEffectCompleteV1 defines model for RecoverySignedExplanationReportRecoveryEffectCompleteV1.
+type RecoverySignedExplanationReportRecoveryEffectCompleteV1 struct {
+	EffectCount RecoverySignedExplanationReportSafeInteger                  `json:"effect_count"`
+	Kind        RecoverySignedExplanationReportRecoveryEffectCompleteV1Kind `json:"kind"`
+	Operation   RecoverySignedExplanationReportOperation                    `json:"operation"`
+}
+
+// RecoverySignedExplanationReportRecoveryEffectCompleteV1Kind defines model for RecoverySignedExplanationReportRecoveryEffectCompleteV1.Kind.
+type RecoverySignedExplanationReportRecoveryEffectCompleteV1Kind string
+
+// RecoverySignedExplanationReportRecoveryEffectFailedAfterEffectV1 defines model for RecoverySignedExplanationReportRecoveryEffectFailedAfterEffectV1.
+type RecoverySignedExplanationReportRecoveryEffectFailedAfterEffectV1 struct {
+	AppliedEffects int64                                                                `json:"applied_effects"`
+	Kind           RecoverySignedExplanationReportRecoveryEffectFailedAfterEffectV1Kind `json:"kind"`
+	Operation      RecoverySignedExplanationReportOperation                             `json:"operation"`
+}
+
+// RecoverySignedExplanationReportRecoveryEffectFailedAfterEffectV1Kind defines model for RecoverySignedExplanationReportRecoveryEffectFailedAfterEffectV1.Kind.
+type RecoverySignedExplanationReportRecoveryEffectFailedAfterEffectV1Kind string
+
+// RecoverySignedExplanationReportRecoveryEffectInFlightV1 defines model for RecoverySignedExplanationReportRecoveryEffectInFlightV1.
+type RecoverySignedExplanationReportRecoveryEffectInFlightV1 struct {
+	Kind      RecoverySignedExplanationReportRecoveryEffectInFlightV1Kind `json:"kind"`
+	Operation RecoverySignedExplanationReportOperation                    `json:"operation"`
+}
+
+// RecoverySignedExplanationReportRecoveryEffectInFlightV1Kind defines model for RecoverySignedExplanationReportRecoveryEffectInFlightV1.Kind.
+type RecoverySignedExplanationReportRecoveryEffectInFlightV1Kind string
+
+// RecoverySignedExplanationReportRecoveryEffectNeverAdmittedV1 defines model for RecoverySignedExplanationReportRecoveryEffectNeverAdmittedV1.
+type RecoverySignedExplanationReportRecoveryEffectNeverAdmittedV1 struct {
+	Kind RecoverySignedExplanationReportRecoveryEffectNeverAdmittedV1Kind `json:"kind"`
+}
+
+// RecoverySignedExplanationReportRecoveryEffectNeverAdmittedV1Kind defines model for RecoverySignedExplanationReportRecoveryEffectNeverAdmittedV1.Kind.
+type RecoverySignedExplanationReportRecoveryEffectNeverAdmittedV1Kind string
+
+// RecoverySignedExplanationReportRecoveryEffectPartialV1 defines model for RecoverySignedExplanationReportRecoveryEffectPartialV1.
+type RecoverySignedExplanationReportRecoveryEffectPartialV1 struct {
+	AppliedEffects int64                                                      `json:"applied_effects"`
+	Kind           RecoverySignedExplanationReportRecoveryEffectPartialV1Kind `json:"kind"`
+	Operation      RecoverySignedExplanationReportOperation                   `json:"operation"`
+}
+
+// RecoverySignedExplanationReportRecoveryEffectPartialV1Kind defines model for RecoverySignedExplanationReportRecoveryEffectPartialV1.Kind.
+type RecoverySignedExplanationReportRecoveryEffectPartialV1Kind string
+
+// RecoverySignedExplanationReportRecoveryEffectUnknownV1 defines model for RecoverySignedExplanationReportRecoveryEffectUnknownV1.
+type RecoverySignedExplanationReportRecoveryEffectUnknownV1 struct {
+	Kind      RecoverySignedExplanationReportRecoveryEffectUnknownV1Kind `json:"kind"`
+	Operation RecoverySignedExplanationReportOperation                   `json:"operation"`
+}
+
+// RecoverySignedExplanationReportRecoveryEffectUnknownV1Kind defines model for RecoverySignedExplanationReportRecoveryEffectUnknownV1.Kind.
+type RecoverySignedExplanationReportRecoveryEffectUnknownV1Kind string
+
+// RecoverySignedExplanationReportRefusalCode defines model for RecoverySignedExplanationReportRefusalCode.
+type RecoverySignedExplanationReportRefusalCode string
+
+// RecoverySignedExplanationReportSafeInteger defines model for RecoverySignedExplanationReportSafeInteger.
+type RecoverySignedExplanationReportSafeInteger = int64
+
+// RecoverySignedExplanationReportScope defines model for RecoverySignedExplanationReportScope.
+type RecoverySignedExplanationReportScope struct {
+	AuthorityDomain RecoverySignedExplanationReportOpaqueId `json:"authority_domain"`
+	ProcessId       RecoverySignedExplanationReportOpaqueId `json:"process_id"`
+	TenantId        RecoverySignedExplanationReportOpaqueId `json:"tenant_id"`
+}
+
+// RecoverySignedExplanationView defines model for RecoverySignedExplanationView.
+type RecoverySignedExplanationView struct {
+	Algorithm    RecoverySignedExplanationViewAlgorithm `json:"algorithm"`
+	AuthorityKey string                                 `json:"authority_key"`
+	Body         RecoveryExplanationView                `json:"body"`
+	Signature    string                                 `json:"signature"`
+}
+
+// RecoverySignedExplanationViewAlgorithm defines model for RecoverySignedExplanationView.Algorithm.
+type RecoverySignedExplanationViewAlgorithm string
+
+// RecoverySignedExplanationViewDestinationId defines model for RecoverySignedExplanationViewDestinationId.
+type RecoverySignedExplanationViewDestinationId = string
+
+// RecoverySignedExplanationViewOpaqueId defines model for RecoverySignedExplanationViewOpaqueId.
+type RecoverySignedExplanationViewOpaqueId = string
+
+// RecoverySignedExplanationViewOperation defines model for RecoverySignedExplanationViewOperation.
+type RecoverySignedExplanationViewOperation struct {
+	NativeAdmissionDigest RecoverySignedExplanationViewRecoveryDigest32 `json:"native_admission_digest"`
+	OperationId           RecoverySignedExplanationViewOpaqueId         `json:"operation_id"`
+	OperationVersion      int64                                         `json:"operation_version"`
+}
+
+// RecoverySignedExplanationViewRecoveryDigest32 defines model for RecoverySignedExplanationViewRecoveryDigest32.
+type RecoverySignedExplanationViewRecoveryDigest32 = []int64
+
+// RecoverySignedExplanationViewRecoveryEffectAdmissionUnresolvedV1 defines model for RecoverySignedExplanationViewRecoveryEffectAdmissionUnresolvedV1.
+type RecoverySignedExplanationViewRecoveryEffectAdmissionUnresolvedV1 struct {
+	AdmissionIntent RecoverySignedExplanationViewOpaqueId                                `json:"admission_intent"`
+	Kind            RecoverySignedExplanationViewRecoveryEffectAdmissionUnresolvedV1Kind `json:"kind"`
+}
+
+// RecoverySignedExplanationViewRecoveryEffectAdmissionUnresolvedV1Kind defines model for RecoverySignedExplanationViewRecoveryEffectAdmissionUnresolvedV1.Kind.
+type RecoverySignedExplanationViewRecoveryEffectAdmissionUnresolvedV1Kind string
+
+// RecoverySignedExplanationViewRecoveryEffectAwaitingApprovalV1 defines model for RecoverySignedExplanationViewRecoveryEffectAwaitingApprovalV1.
+type RecoverySignedExplanationViewRecoveryEffectAwaitingApprovalV1 struct {
+	Kind      RecoverySignedExplanationViewRecoveryEffectAwaitingApprovalV1Kind `json:"kind"`
+	Operation RecoverySignedExplanationViewOperation                            `json:"operation"`
+}
+
+// RecoverySignedExplanationViewRecoveryEffectAwaitingApprovalV1Kind defines model for RecoverySignedExplanationViewRecoveryEffectAwaitingApprovalV1.Kind.
+type RecoverySignedExplanationViewRecoveryEffectAwaitingApprovalV1Kind string
+
+// RecoverySignedExplanationViewRecoveryEffectAwaitingCallerReportV1 defines model for RecoverySignedExplanationViewRecoveryEffectAwaitingCallerReportV1.
+type RecoverySignedExplanationViewRecoveryEffectAwaitingCallerReportV1 struct {
+	Kind      RecoverySignedExplanationViewRecoveryEffectAwaitingCallerReportV1Kind `json:"kind"`
+	Operation RecoverySignedExplanationViewOperation                                `json:"operation"`
+}
+
+// RecoverySignedExplanationViewRecoveryEffectAwaitingCallerReportV1Kind defines model for RecoverySignedExplanationViewRecoveryEffectAwaitingCallerReportV1.Kind.
+type RecoverySignedExplanationViewRecoveryEffectAwaitingCallerReportV1Kind string
+
+// RecoverySignedExplanationViewRecoveryEffectClosedBeforeEffectV1 defines model for RecoverySignedExplanationViewRecoveryEffectClosedBeforeEffectV1.
+type RecoverySignedExplanationViewRecoveryEffectClosedBeforeEffectV1 struct {
+	Closure   RecoverySignedExplanationViewOpaqueId                               `json:"closure"`
+	Kind      RecoverySignedExplanationViewRecoveryEffectClosedBeforeEffectV1Kind `json:"kind"`
+	Operation RecoverySignedExplanationViewOperation                              `json:"operation"`
+}
+
+// RecoverySignedExplanationViewRecoveryEffectClosedBeforeEffectV1Kind defines model for RecoverySignedExplanationViewRecoveryEffectClosedBeforeEffectV1.Kind.
+type RecoverySignedExplanationViewRecoveryEffectClosedBeforeEffectV1Kind string
+
+// RecoverySignedExplanationViewRecoveryEffectCompleteV1 defines model for RecoverySignedExplanationViewRecoveryEffectCompleteV1.
+type RecoverySignedExplanationViewRecoveryEffectCompleteV1 struct {
+	EffectCount RecoverySignedExplanationViewSafeInteger                  `json:"effect_count"`
+	Kind        RecoverySignedExplanationViewRecoveryEffectCompleteV1Kind `json:"kind"`
+	Operation   RecoverySignedExplanationViewOperation                    `json:"operation"`
+}
+
+// RecoverySignedExplanationViewRecoveryEffectCompleteV1Kind defines model for RecoverySignedExplanationViewRecoveryEffectCompleteV1.Kind.
+type RecoverySignedExplanationViewRecoveryEffectCompleteV1Kind string
+
+// RecoverySignedExplanationViewRecoveryEffectFailedAfterEffectV1 defines model for RecoverySignedExplanationViewRecoveryEffectFailedAfterEffectV1.
+type RecoverySignedExplanationViewRecoveryEffectFailedAfterEffectV1 struct {
+	AppliedEffects int64                                                              `json:"applied_effects"`
+	Kind           RecoverySignedExplanationViewRecoveryEffectFailedAfterEffectV1Kind `json:"kind"`
+	Operation      RecoverySignedExplanationViewOperation                             `json:"operation"`
+}
+
+// RecoverySignedExplanationViewRecoveryEffectFailedAfterEffectV1Kind defines model for RecoverySignedExplanationViewRecoveryEffectFailedAfterEffectV1.Kind.
+type RecoverySignedExplanationViewRecoveryEffectFailedAfterEffectV1Kind string
+
+// RecoverySignedExplanationViewRecoveryEffectInFlightV1 defines model for RecoverySignedExplanationViewRecoveryEffectInFlightV1.
+type RecoverySignedExplanationViewRecoveryEffectInFlightV1 struct {
+	Kind      RecoverySignedExplanationViewRecoveryEffectInFlightV1Kind `json:"kind"`
+	Operation RecoverySignedExplanationViewOperation                    `json:"operation"`
+}
+
+// RecoverySignedExplanationViewRecoveryEffectInFlightV1Kind defines model for RecoverySignedExplanationViewRecoveryEffectInFlightV1.Kind.
+type RecoverySignedExplanationViewRecoveryEffectInFlightV1Kind string
+
+// RecoverySignedExplanationViewRecoveryEffectNeverAdmittedV1 defines model for RecoverySignedExplanationViewRecoveryEffectNeverAdmittedV1.
+type RecoverySignedExplanationViewRecoveryEffectNeverAdmittedV1 struct {
+	Kind RecoverySignedExplanationViewRecoveryEffectNeverAdmittedV1Kind `json:"kind"`
+}
+
+// RecoverySignedExplanationViewRecoveryEffectNeverAdmittedV1Kind defines model for RecoverySignedExplanationViewRecoveryEffectNeverAdmittedV1.Kind.
+type RecoverySignedExplanationViewRecoveryEffectNeverAdmittedV1Kind string
+
+// RecoverySignedExplanationViewRecoveryEffectPartialV1 defines model for RecoverySignedExplanationViewRecoveryEffectPartialV1.
+type RecoverySignedExplanationViewRecoveryEffectPartialV1 struct {
+	AppliedEffects int64                                                    `json:"applied_effects"`
+	Kind           RecoverySignedExplanationViewRecoveryEffectPartialV1Kind `json:"kind"`
+	Operation      RecoverySignedExplanationViewOperation                   `json:"operation"`
+}
+
+// RecoverySignedExplanationViewRecoveryEffectPartialV1Kind defines model for RecoverySignedExplanationViewRecoveryEffectPartialV1.Kind.
+type RecoverySignedExplanationViewRecoveryEffectPartialV1Kind string
+
+// RecoverySignedExplanationViewRecoveryEffectUnknownV1 defines model for RecoverySignedExplanationViewRecoveryEffectUnknownV1.
+type RecoverySignedExplanationViewRecoveryEffectUnknownV1 struct {
+	Kind      RecoverySignedExplanationViewRecoveryEffectUnknownV1Kind `json:"kind"`
+	Operation RecoverySignedExplanationViewOperation                   `json:"operation"`
+}
+
+// RecoverySignedExplanationViewRecoveryEffectUnknownV1Kind defines model for RecoverySignedExplanationViewRecoveryEffectUnknownV1.Kind.
+type RecoverySignedExplanationViewRecoveryEffectUnknownV1Kind string
+
+// RecoverySignedExplanationViewRefusalCode defines model for RecoverySignedExplanationViewRefusalCode.
+type RecoverySignedExplanationViewRefusalCode string
+
+// RecoverySignedExplanationViewSafeInteger defines model for RecoverySignedExplanationViewSafeInteger.
+type RecoverySignedExplanationViewSafeInteger = int64
+
+// RecoverySignedExplanationViewScope defines model for RecoverySignedExplanationViewScope.
+type RecoverySignedExplanationViewScope struct {
+	AuthorityDomain RecoverySignedExplanationViewOpaqueId `json:"authority_domain"`
+	ProcessId       RecoverySignedExplanationViewOpaqueId `json:"process_id"`
+	TenantId        RecoverySignedExplanationViewOpaqueId `json:"tenant_id"`
+}
+
+// RecoverySignedGrantV2 defines model for RecoverySignedGrantV2.
+type RecoverySignedGrantV2 struct {
+	Algorithm    RecoverySignedGrantV2Algorithm `json:"algorithm"`
+	AuthorityKey string                         `json:"authority_key"`
+	Body         struct {
+		Claims        SecurityDeclassificationGrantPointerPropertiesBody `json:"claims"`
+		DomainVersion RecoverySignedGrantV2BodyDomainVersion             `json:"domain_version"`
+		Recovery      RecoveryGrantBinding                               `json:"recovery"`
+		Schema        RecoverySignedGrantV2BodySchema                    `json:"schema"`
+	} `json:"body"`
+	Signature string `json:"signature"`
+}
+
+// RecoverySignedGrantV2Algorithm defines model for RecoverySignedGrantV2.Algorithm.
+type RecoverySignedGrantV2Algorithm string
+
+// RecoverySignedGrantV2BodyDomainVersion defines model for RecoverySignedGrantV2.Body.DomainVersion.
+type RecoverySignedGrantV2BodyDomainVersion int64
+
+// RecoverySignedGrantV2BodySchema defines model for RecoverySignedGrantV2.Body.Schema.
+type RecoverySignedGrantV2BodySchema string
+
+// RecoverySignedGrantV2OpaqueId defines model for RecoverySignedGrantV2OpaqueId.
+type RecoverySignedGrantV2OpaqueId = string
+
+// RecoverySignedGrantV2RecoveryDigest32 defines model for RecoverySignedGrantV2RecoveryDigest32.
+type RecoverySignedGrantV2RecoveryDigest32 = []int64
+
+// RecoverySignedGrantV2SafeInteger defines model for RecoverySignedGrantV2SafeInteger.
+type RecoverySignedGrantV2SafeInteger = int64
+
+// RecoverySignedGrantV2Scope defines model for RecoverySignedGrantV2Scope.
+type RecoverySignedGrantV2Scope struct {
+	AuthorityDomain RecoverySignedGrantV2OpaqueId `json:"authority_domain"`
+	ProcessId       RecoverySignedGrantV2OpaqueId `json:"process_id"`
+	TenantId        RecoverySignedGrantV2OpaqueId `json:"tenant_id"`
+}
+
+// RecoverySignedPolicyDeploymentChange defines model for RecoverySignedPolicyDeploymentChange.
+type RecoverySignedPolicyDeploymentChange struct {
+	Algorithm    RecoverySignedPolicyDeploymentChangeAlgorithm `json:"algorithm"`
+	AuthorityKey string                                        `json:"authority_key"`
+	Body         RecoveryPolicyDeploymentChange                `json:"body"`
+	Signature    string                                        `json:"signature"`
+}
+
+// RecoverySignedPolicyDeploymentChangeAlgorithm defines model for RecoverySignedPolicyDeploymentChange.Algorithm.
+type RecoverySignedPolicyDeploymentChangeAlgorithm string
+
+// RecoverySignedPolicyDeploymentChangeOpaqueId defines model for RecoverySignedPolicyDeploymentChangeOpaqueId.
+type RecoverySignedPolicyDeploymentChangeOpaqueId = string
+
+// RecoverySignedPolicyDeploymentChangeRecoveryDigest32 defines model for RecoverySignedPolicyDeploymentChangeRecoveryDigest32.
+type RecoverySignedPolicyDeploymentChangeRecoveryDigest32 = []int64
+
+// RecoverySignedPolicyDeploymentChangeSafeInteger defines model for RecoverySignedPolicyDeploymentChangeSafeInteger.
+type RecoverySignedPolicyDeploymentChangeSafeInteger = int64
+
+// RecoverySignedPolicyDeploymentChangeScope defines model for RecoverySignedPolicyDeploymentChangeScope.
+type RecoverySignedPolicyDeploymentChangeScope struct {
+	AuthorityDomain RecoverySignedPolicyDeploymentChangeOpaqueId `json:"authority_domain"`
+	ProcessId       RecoverySignedPolicyDeploymentChangeOpaqueId `json:"process_id"`
+	TenantId        RecoverySignedPolicyDeploymentChangeOpaqueId `json:"tenant_id"`
+}
+
+// RecoverySignedProviderFinality defines model for RecoverySignedProviderFinality.
+type RecoverySignedProviderFinality struct {
+	Algorithm    RecoverySignedProviderFinalityAlgorithm `json:"algorithm"`
+	AuthorityKey string                                  `json:"authority_key"`
+	Body         RecoveryProviderFinality                `json:"body"`
+	Signature    string                                  `json:"signature"`
+}
+
+// RecoverySignedProviderFinalityAlgorithm defines model for RecoverySignedProviderFinality.Algorithm.
+type RecoverySignedProviderFinalityAlgorithm string
+
+// RecoverySignedProviderFinalityOpaqueId defines model for RecoverySignedProviderFinalityOpaqueId.
+type RecoverySignedProviderFinalityOpaqueId = string
+
+// RecoverySignedProviderFinalityRecoveryDigest32 defines model for RecoverySignedProviderFinalityRecoveryDigest32.
+type RecoverySignedProviderFinalityRecoveryDigest32 = []int64
+
+// RecoverySignedProviderFinalitySafeInteger defines model for RecoverySignedProviderFinalitySafeInteger.
+type RecoverySignedProviderFinalitySafeInteger = int64
+
+// RecoverySignedProviderFinalityScope defines model for RecoverySignedProviderFinalityScope.
+type RecoverySignedProviderFinalityScope struct {
+	AuthorityDomain RecoverySignedProviderFinalityOpaqueId `json:"authority_domain"`
+	ProcessId       RecoverySignedProviderFinalityOpaqueId `json:"process_id"`
+	TenantId        RecoverySignedProviderFinalityOpaqueId `json:"tenant_id"`
+}
+
+// RecoverySignedRecoverySetupProbe defines model for RecoverySignedRecoverySetupProbe.
+type RecoverySignedRecoverySetupProbe struct {
+	Algorithm    RecoverySignedRecoverySetupProbeAlgorithm `json:"algorithm"`
+	AuthorityKey string                                    `json:"authority_key"`
+	Body         RecoveryRecoverySetupProbe                `json:"body"`
+	Signature    string                                    `json:"signature"`
+}
+
+// RecoverySignedRecoverySetupProbeAlgorithm defines model for RecoverySignedRecoverySetupProbe.Algorithm.
+type RecoverySignedRecoverySetupProbeAlgorithm string
+
+// RecoverySignedRecoverySetupProbeOpaqueId defines model for RecoverySignedRecoverySetupProbeOpaqueId.
+type RecoverySignedRecoverySetupProbeOpaqueId = string
+
+// RecoverySignedRecoverySetupProbeRecoveryDigest32 defines model for RecoverySignedRecoverySetupProbeRecoveryDigest32.
+type RecoverySignedRecoverySetupProbeRecoveryDigest32 = []int64
+
+// RecoverySignedRecoverySetupProbeSafeInteger defines model for RecoverySignedRecoverySetupProbeSafeInteger.
+type RecoverySignedRecoverySetupProbeSafeInteger = int64
+
+// RecoverySignedRecoverySetupProbeScope defines model for RecoverySignedRecoverySetupProbeScope.
+type RecoverySignedRecoverySetupProbeScope struct {
+	AuthorityDomain RecoverySignedRecoverySetupProbeOpaqueId `json:"authority_domain"`
+	ProcessId       RecoverySignedRecoverySetupProbeOpaqueId `json:"process_id"`
+	TenantId        RecoverySignedRecoverySetupProbeOpaqueId `json:"tenant_id"`
+}
+
+// RecoverySignedRecoverySetupReport defines model for RecoverySignedRecoverySetupReport.
+type RecoverySignedRecoverySetupReport struct {
+	Algorithm    RecoverySignedRecoverySetupReportAlgorithm `json:"algorithm"`
+	AuthorityKey string                                     `json:"authority_key"`
+	Body         RecoveryRecoverySetupReport                `json:"body"`
+	Signature    string                                     `json:"signature"`
+}
+
+// RecoverySignedRecoverySetupReportAlgorithm defines model for RecoverySignedRecoverySetupReport.Algorithm.
+type RecoverySignedRecoverySetupReportAlgorithm string
+
+// RecoverySignedRecoverySetupReportOpaqueId defines model for RecoverySignedRecoverySetupReportOpaqueId.
+type RecoverySignedRecoverySetupReportOpaqueId = string
+
+// RecoverySignedRecoverySetupReportRecoveryDigest32 defines model for RecoverySignedRecoverySetupReportRecoveryDigest32.
+type RecoverySignedRecoverySetupReportRecoveryDigest32 = []int64
+
+// RecoverySignedRecoverySetupReportSafeInteger defines model for RecoverySignedRecoverySetupReportSafeInteger.
+type RecoverySignedRecoverySetupReportSafeInteger = int64
+
+// RecoverySignedRecoverySetupReportScope defines model for RecoverySignedRecoverySetupReportScope.
+type RecoverySignedRecoverySetupReportScope struct {
+	AuthorityDomain RecoverySignedRecoverySetupReportOpaqueId `json:"authority_domain"`
+	ProcessId       RecoverySignedRecoverySetupReportOpaqueId `json:"process_id"`
+	TenantId        RecoverySignedRecoverySetupReportOpaqueId `json:"tenant_id"`
+}
+
+// RecoverySignedScopedEndorsement defines model for RecoverySignedScopedEndorsement.
+type RecoverySignedScopedEndorsement struct {
+	Algorithm    RecoverySignedScopedEndorsementAlgorithm `json:"algorithm"`
+	AuthorityKey string                                   `json:"authority_key"`
+	Body         RecoveryScopedEndorsement                `json:"body"`
+	Signature    string                                   `json:"signature"`
+}
+
+// RecoverySignedScopedEndorsementAlgorithm defines model for RecoverySignedScopedEndorsement.Algorithm.
+type RecoverySignedScopedEndorsementAlgorithm string
+
+// RecoverySignedSemanticAnnotation defines model for RecoverySignedSemanticAnnotation.
+type RecoverySignedSemanticAnnotation struct {
+	Algorithm    RecoverySignedSemanticAnnotationAlgorithm `json:"algorithm"`
+	AuthorityKey string                                    `json:"authority_key"`
+	Body         RecoverySemanticAnnotation                `json:"body"`
+	Signature    string                                    `json:"signature"`
+}
+
+// RecoverySignedSemanticAnnotationAlgorithm defines model for RecoverySignedSemanticAnnotation.Algorithm.
+type RecoverySignedSemanticAnnotationAlgorithm string
+
+// RecoverySignedSemanticAudience defines model for RecoverySignedSemanticAudience.
+type RecoverySignedSemanticAudience struct {
+	Algorithm    RecoverySignedSemanticAudienceAlgorithm `json:"algorithm"`
+	AuthorityKey string                                  `json:"authority_key"`
+	Body         RecoverySemanticAudience                `json:"body"`
+	Signature    string                                  `json:"signature"`
+}
+
+// RecoverySignedSemanticAudienceAlgorithm defines model for RecoverySignedSemanticAudience.Algorithm.
+type RecoverySignedSemanticAudienceAlgorithm string
+
+// RecoverySignedSemanticDeployment defines model for RecoverySignedSemanticDeployment.
+type RecoverySignedSemanticDeployment struct {
+	Algorithm    RecoverySignedSemanticDeploymentAlgorithm `json:"algorithm"`
+	AuthorityKey string                                    `json:"authority_key"`
+	Body         RecoverySemanticDeployment                `json:"body"`
+	Signature    string                                    `json:"signature"`
+}
+
+// RecoverySignedSemanticDeploymentAlgorithm defines model for RecoverySignedSemanticDeployment.Algorithm.
+type RecoverySignedSemanticDeploymentAlgorithm string
+
+// RecoverySignedSemanticPackage defines model for RecoverySignedSemanticPackage.
+type RecoverySignedSemanticPackage struct {
+	Algorithm    RecoverySignedSemanticPackageAlgorithm `json:"algorithm"`
+	AuthorityKey string                                 `json:"authority_key"`
+	Body         RecoverySemanticPackage                `json:"body"`
+	Signature    string                                 `json:"signature"`
+}
+
+// RecoverySignedSemanticPackageAlgorithm defines model for RecoverySignedSemanticPackage.Algorithm.
+type RecoverySignedSemanticPackageAlgorithm string
+
+// RecoverySignedSemanticPrerequisite defines model for RecoverySignedSemanticPrerequisite.
+type RecoverySignedSemanticPrerequisite struct {
+	Algorithm    RecoverySignedSemanticPrerequisiteAlgorithm `json:"algorithm"`
+	AuthorityKey string                                      `json:"authority_key"`
+	Body         RecoverySemanticPrerequisite                `json:"body"`
+	Signature    string                                      `json:"signature"`
+}
+
+// RecoverySignedSemanticPrerequisiteAlgorithm defines model for RecoverySignedSemanticPrerequisite.Algorithm.
+type RecoverySignedSemanticPrerequisiteAlgorithm string
+
+// RecoverySignedSemanticTransformation defines model for RecoverySignedSemanticTransformation.
+type RecoverySignedSemanticTransformation struct {
+	Algorithm    RecoverySignedSemanticTransformationAlgorithm `json:"algorithm"`
+	AuthorityKey string                                        `json:"authority_key"`
+	Body         RecoverySemanticTransformation                `json:"body"`
+	Signature    string                                        `json:"signature"`
+}
+
+// RecoverySignedSemanticTransformationAlgorithm defines model for RecoverySignedSemanticTransformation.Algorithm.
+type RecoverySignedSemanticTransformationAlgorithm string
+
+// RecoverySupportIssueEffect defines model for RecoverySupportIssueEffect.
+type RecoverySupportIssueEffect struct {
+	Account          string                           `json:"account"`
+	MaxResponseBytes int64                            `json:"max_response_bytes"`
+	ObservationKey   string                           `json:"observation_key"`
+	Provider         string                           `json:"provider"`
+	Resource         string                           `json:"resource"`
+	Schema           RecoverySupportIssueEffectSchema `json:"schema"`
+}
+
+// RecoverySupportIssueEffectSchema defines model for RecoverySupportIssueEffect.Schema.
+type RecoverySupportIssueEffectSchema string
+
+// RecoverySupportIssueEffectOpaqueId defines model for RecoverySupportIssueEffectOpaqueId.
+type RecoverySupportIssueEffectOpaqueId = string
+
+// RecoverySupportIssueEffectOperation defines model for RecoverySupportIssueEffectOperation.
+type RecoverySupportIssueEffectOperation struct {
+	NativeAdmissionDigest RecoverySupportIssueEffectRecoveryDigest32 `json:"native_admission_digest"`
+	OperationId           RecoverySupportIssueEffectOpaqueId         `json:"operation_id"`
+	OperationVersion      int64                                      `json:"operation_version"`
+}
+
+// RecoverySupportIssueEffectRecoveryDigest32 defines model for RecoverySupportIssueEffectRecoveryDigest32.
+type RecoverySupportIssueEffectRecoveryDigest32 = []int64
+
+// RecoverySupportIssueEffectRecoveryEffectAdmissionUnresolvedV1 defines model for RecoverySupportIssueEffectRecoveryEffectAdmissionUnresolvedV1.
+type RecoverySupportIssueEffectRecoveryEffectAdmissionUnresolvedV1 struct {
+	AdmissionIntent RecoverySupportIssueEffectOpaqueId                                `json:"admission_intent"`
+	Kind            RecoverySupportIssueEffectRecoveryEffectAdmissionUnresolvedV1Kind `json:"kind"`
+}
+
+// RecoverySupportIssueEffectRecoveryEffectAdmissionUnresolvedV1Kind defines model for RecoverySupportIssueEffectRecoveryEffectAdmissionUnresolvedV1.Kind.
+type RecoverySupportIssueEffectRecoveryEffectAdmissionUnresolvedV1Kind string
+
+// RecoverySupportIssueEffectRecoveryEffectAwaitingApprovalV1 defines model for RecoverySupportIssueEffectRecoveryEffectAwaitingApprovalV1.
+type RecoverySupportIssueEffectRecoveryEffectAwaitingApprovalV1 struct {
+	Kind      RecoverySupportIssueEffectRecoveryEffectAwaitingApprovalV1Kind `json:"kind"`
+	Operation RecoverySupportIssueEffectOperation                            `json:"operation"`
+}
+
+// RecoverySupportIssueEffectRecoveryEffectAwaitingApprovalV1Kind defines model for RecoverySupportIssueEffectRecoveryEffectAwaitingApprovalV1.Kind.
+type RecoverySupportIssueEffectRecoveryEffectAwaitingApprovalV1Kind string
+
+// RecoverySupportIssueEffectRecoveryEffectAwaitingCallerReportV1 defines model for RecoverySupportIssueEffectRecoveryEffectAwaitingCallerReportV1.
+type RecoverySupportIssueEffectRecoveryEffectAwaitingCallerReportV1 struct {
+	Kind      RecoverySupportIssueEffectRecoveryEffectAwaitingCallerReportV1Kind `json:"kind"`
+	Operation RecoverySupportIssueEffectOperation                                `json:"operation"`
+}
+
+// RecoverySupportIssueEffectRecoveryEffectAwaitingCallerReportV1Kind defines model for RecoverySupportIssueEffectRecoveryEffectAwaitingCallerReportV1.Kind.
+type RecoverySupportIssueEffectRecoveryEffectAwaitingCallerReportV1Kind string
+
+// RecoverySupportIssueEffectRecoveryEffectClosedBeforeEffectV1 defines model for RecoverySupportIssueEffectRecoveryEffectClosedBeforeEffectV1.
+type RecoverySupportIssueEffectRecoveryEffectClosedBeforeEffectV1 struct {
+	Closure   RecoverySupportIssueEffectOpaqueId                               `json:"closure"`
+	Kind      RecoverySupportIssueEffectRecoveryEffectClosedBeforeEffectV1Kind `json:"kind"`
+	Operation RecoverySupportIssueEffectOperation                              `json:"operation"`
+}
+
+// RecoverySupportIssueEffectRecoveryEffectClosedBeforeEffectV1Kind defines model for RecoverySupportIssueEffectRecoveryEffectClosedBeforeEffectV1.Kind.
+type RecoverySupportIssueEffectRecoveryEffectClosedBeforeEffectV1Kind string
+
+// RecoverySupportIssueEffectRecoveryEffectCompleteV1 defines model for RecoverySupportIssueEffectRecoveryEffectCompleteV1.
+type RecoverySupportIssueEffectRecoveryEffectCompleteV1 struct {
+	EffectCount RecoverySupportIssueEffectSafeInteger                  `json:"effect_count"`
+	Kind        RecoverySupportIssueEffectRecoveryEffectCompleteV1Kind `json:"kind"`
+	Operation   RecoverySupportIssueEffectOperation                    `json:"operation"`
+}
+
+// RecoverySupportIssueEffectRecoveryEffectCompleteV1Kind defines model for RecoverySupportIssueEffectRecoveryEffectCompleteV1.Kind.
+type RecoverySupportIssueEffectRecoveryEffectCompleteV1Kind string
+
+// RecoverySupportIssueEffectRecoveryEffectFailedAfterEffectV1 defines model for RecoverySupportIssueEffectRecoveryEffectFailedAfterEffectV1.
+type RecoverySupportIssueEffectRecoveryEffectFailedAfterEffectV1 struct {
+	AppliedEffects int64                                                           `json:"applied_effects"`
+	Kind           RecoverySupportIssueEffectRecoveryEffectFailedAfterEffectV1Kind `json:"kind"`
+	Operation      RecoverySupportIssueEffectOperation                             `json:"operation"`
+}
+
+// RecoverySupportIssueEffectRecoveryEffectFailedAfterEffectV1Kind defines model for RecoverySupportIssueEffectRecoveryEffectFailedAfterEffectV1.Kind.
+type RecoverySupportIssueEffectRecoveryEffectFailedAfterEffectV1Kind string
+
+// RecoverySupportIssueEffectRecoveryEffectInFlightV1 defines model for RecoverySupportIssueEffectRecoveryEffectInFlightV1.
+type RecoverySupportIssueEffectRecoveryEffectInFlightV1 struct {
+	Kind      RecoverySupportIssueEffectRecoveryEffectInFlightV1Kind `json:"kind"`
+	Operation RecoverySupportIssueEffectOperation                    `json:"operation"`
+}
+
+// RecoverySupportIssueEffectRecoveryEffectInFlightV1Kind defines model for RecoverySupportIssueEffectRecoveryEffectInFlightV1.Kind.
+type RecoverySupportIssueEffectRecoveryEffectInFlightV1Kind string
+
+// RecoverySupportIssueEffectRecoveryEffectNeverAdmittedV1 defines model for RecoverySupportIssueEffectRecoveryEffectNeverAdmittedV1.
+type RecoverySupportIssueEffectRecoveryEffectNeverAdmittedV1 struct {
+	Kind RecoverySupportIssueEffectRecoveryEffectNeverAdmittedV1Kind `json:"kind"`
+}
+
+// RecoverySupportIssueEffectRecoveryEffectNeverAdmittedV1Kind defines model for RecoverySupportIssueEffectRecoveryEffectNeverAdmittedV1.Kind.
+type RecoverySupportIssueEffectRecoveryEffectNeverAdmittedV1Kind string
+
+// RecoverySupportIssueEffectRecoveryEffectPartialV1 defines model for RecoverySupportIssueEffectRecoveryEffectPartialV1.
+type RecoverySupportIssueEffectRecoveryEffectPartialV1 struct {
+	AppliedEffects int64                                                 `json:"applied_effects"`
+	Kind           RecoverySupportIssueEffectRecoveryEffectPartialV1Kind `json:"kind"`
+	Operation      RecoverySupportIssueEffectOperation                   `json:"operation"`
+}
+
+// RecoverySupportIssueEffectRecoveryEffectPartialV1Kind defines model for RecoverySupportIssueEffectRecoveryEffectPartialV1.Kind.
+type RecoverySupportIssueEffectRecoveryEffectPartialV1Kind string
+
+// RecoverySupportIssueEffectRecoveryEffectUnknownV1 defines model for RecoverySupportIssueEffectRecoveryEffectUnknownV1.
+type RecoverySupportIssueEffectRecoveryEffectUnknownV1 struct {
+	Kind      RecoverySupportIssueEffectRecoveryEffectUnknownV1Kind `json:"kind"`
+	Operation RecoverySupportIssueEffectOperation                   `json:"operation"`
+}
+
+// RecoverySupportIssueEffectRecoveryEffectUnknownV1Kind defines model for RecoverySupportIssueEffectRecoveryEffectUnknownV1.Kind.
+type RecoverySupportIssueEffectRecoveryEffectUnknownV1Kind string
+
+// RecoverySupportIssueEffectRefusalCode defines model for RecoverySupportIssueEffectRefusalCode.
+type RecoverySupportIssueEffectRefusalCode string
+
+// RecoverySupportIssueEffectSafeInteger defines model for RecoverySupportIssueEffectSafeInteger.
+type RecoverySupportIssueEffectSafeInteger = int64
+
+// RecoverySupportIssueEffectScope defines model for RecoverySupportIssueEffectScope.
+type RecoverySupportIssueEffectScope struct {
+	AuthorityDomain RecoverySupportIssueEffectOpaqueId `json:"authority_domain"`
+	ProcessId       RecoverySupportIssueEffectOpaqueId `json:"process_id"`
+	TenantId        RecoverySupportIssueEffectOpaqueId `json:"tenant_id"`
+}
+
+// RecoverySupportIssueInput defines model for RecoverySupportIssueInput.
+type RecoverySupportIssueInput struct {
+	Body  string `json:"body"`
+	Title string `json:"title"`
+}
+
+// RecoverySupportIssueInputOpaqueId defines model for RecoverySupportIssueInputOpaqueId.
+type RecoverySupportIssueInputOpaqueId = string
+
+// RecoverySupportIssueInputOperation defines model for RecoverySupportIssueInputOperation.
+type RecoverySupportIssueInputOperation struct {
+	NativeAdmissionDigest RecoverySupportIssueInputRecoveryDigest32 `json:"native_admission_digest"`
+	OperationId           RecoverySupportIssueInputOpaqueId         `json:"operation_id"`
+	OperationVersion      int64                                     `json:"operation_version"`
+}
+
+// RecoverySupportIssueInputRecoveryDigest32 defines model for RecoverySupportIssueInputRecoveryDigest32.
+type RecoverySupportIssueInputRecoveryDigest32 = []int64
+
+// RecoverySupportIssueInputRecoveryEffectAdmissionUnresolvedV1 defines model for RecoverySupportIssueInputRecoveryEffectAdmissionUnresolvedV1.
+type RecoverySupportIssueInputRecoveryEffectAdmissionUnresolvedV1 struct {
+	AdmissionIntent RecoverySupportIssueInputOpaqueId                                `json:"admission_intent"`
+	Kind            RecoverySupportIssueInputRecoveryEffectAdmissionUnresolvedV1Kind `json:"kind"`
+}
+
+// RecoverySupportIssueInputRecoveryEffectAdmissionUnresolvedV1Kind defines model for RecoverySupportIssueInputRecoveryEffectAdmissionUnresolvedV1.Kind.
+type RecoverySupportIssueInputRecoveryEffectAdmissionUnresolvedV1Kind string
+
+// RecoverySupportIssueInputRecoveryEffectAwaitingApprovalV1 defines model for RecoverySupportIssueInputRecoveryEffectAwaitingApprovalV1.
+type RecoverySupportIssueInputRecoveryEffectAwaitingApprovalV1 struct {
+	Kind      RecoverySupportIssueInputRecoveryEffectAwaitingApprovalV1Kind `json:"kind"`
+	Operation RecoverySupportIssueInputOperation                            `json:"operation"`
+}
+
+// RecoverySupportIssueInputRecoveryEffectAwaitingApprovalV1Kind defines model for RecoverySupportIssueInputRecoveryEffectAwaitingApprovalV1.Kind.
+type RecoverySupportIssueInputRecoveryEffectAwaitingApprovalV1Kind string
+
+// RecoverySupportIssueInputRecoveryEffectAwaitingCallerReportV1 defines model for RecoverySupportIssueInputRecoveryEffectAwaitingCallerReportV1.
+type RecoverySupportIssueInputRecoveryEffectAwaitingCallerReportV1 struct {
+	Kind      RecoverySupportIssueInputRecoveryEffectAwaitingCallerReportV1Kind `json:"kind"`
+	Operation RecoverySupportIssueInputOperation                                `json:"operation"`
+}
+
+// RecoverySupportIssueInputRecoveryEffectAwaitingCallerReportV1Kind defines model for RecoverySupportIssueInputRecoveryEffectAwaitingCallerReportV1.Kind.
+type RecoverySupportIssueInputRecoveryEffectAwaitingCallerReportV1Kind string
+
+// RecoverySupportIssueInputRecoveryEffectClosedBeforeEffectV1 defines model for RecoverySupportIssueInputRecoveryEffectClosedBeforeEffectV1.
+type RecoverySupportIssueInputRecoveryEffectClosedBeforeEffectV1 struct {
+	Closure   RecoverySupportIssueInputOpaqueId                               `json:"closure"`
+	Kind      RecoverySupportIssueInputRecoveryEffectClosedBeforeEffectV1Kind `json:"kind"`
+	Operation RecoverySupportIssueInputOperation                              `json:"operation"`
+}
+
+// RecoverySupportIssueInputRecoveryEffectClosedBeforeEffectV1Kind defines model for RecoverySupportIssueInputRecoveryEffectClosedBeforeEffectV1.Kind.
+type RecoverySupportIssueInputRecoveryEffectClosedBeforeEffectV1Kind string
+
+// RecoverySupportIssueInputRecoveryEffectCompleteV1 defines model for RecoverySupportIssueInputRecoveryEffectCompleteV1.
+type RecoverySupportIssueInputRecoveryEffectCompleteV1 struct {
+	EffectCount RecoverySupportIssueInputSafeInteger                  `json:"effect_count"`
+	Kind        RecoverySupportIssueInputRecoveryEffectCompleteV1Kind `json:"kind"`
+	Operation   RecoverySupportIssueInputOperation                    `json:"operation"`
+}
+
+// RecoverySupportIssueInputRecoveryEffectCompleteV1Kind defines model for RecoverySupportIssueInputRecoveryEffectCompleteV1.Kind.
+type RecoverySupportIssueInputRecoveryEffectCompleteV1Kind string
+
+// RecoverySupportIssueInputRecoveryEffectFailedAfterEffectV1 defines model for RecoverySupportIssueInputRecoveryEffectFailedAfterEffectV1.
+type RecoverySupportIssueInputRecoveryEffectFailedAfterEffectV1 struct {
+	AppliedEffects int64                                                          `json:"applied_effects"`
+	Kind           RecoverySupportIssueInputRecoveryEffectFailedAfterEffectV1Kind `json:"kind"`
+	Operation      RecoverySupportIssueInputOperation                             `json:"operation"`
+}
+
+// RecoverySupportIssueInputRecoveryEffectFailedAfterEffectV1Kind defines model for RecoverySupportIssueInputRecoveryEffectFailedAfterEffectV1.Kind.
+type RecoverySupportIssueInputRecoveryEffectFailedAfterEffectV1Kind string
+
+// RecoverySupportIssueInputRecoveryEffectInFlightV1 defines model for RecoverySupportIssueInputRecoveryEffectInFlightV1.
+type RecoverySupportIssueInputRecoveryEffectInFlightV1 struct {
+	Kind      RecoverySupportIssueInputRecoveryEffectInFlightV1Kind `json:"kind"`
+	Operation RecoverySupportIssueInputOperation                    `json:"operation"`
+}
+
+// RecoverySupportIssueInputRecoveryEffectInFlightV1Kind defines model for RecoverySupportIssueInputRecoveryEffectInFlightV1.Kind.
+type RecoverySupportIssueInputRecoveryEffectInFlightV1Kind string
+
+// RecoverySupportIssueInputRecoveryEffectNeverAdmittedV1 defines model for RecoverySupportIssueInputRecoveryEffectNeverAdmittedV1.
+type RecoverySupportIssueInputRecoveryEffectNeverAdmittedV1 struct {
+	Kind RecoverySupportIssueInputRecoveryEffectNeverAdmittedV1Kind `json:"kind"`
+}
+
+// RecoverySupportIssueInputRecoveryEffectNeverAdmittedV1Kind defines model for RecoverySupportIssueInputRecoveryEffectNeverAdmittedV1.Kind.
+type RecoverySupportIssueInputRecoveryEffectNeverAdmittedV1Kind string
+
+// RecoverySupportIssueInputRecoveryEffectPartialV1 defines model for RecoverySupportIssueInputRecoveryEffectPartialV1.
+type RecoverySupportIssueInputRecoveryEffectPartialV1 struct {
+	AppliedEffects int64                                                `json:"applied_effects"`
+	Kind           RecoverySupportIssueInputRecoveryEffectPartialV1Kind `json:"kind"`
+	Operation      RecoverySupportIssueInputOperation                   `json:"operation"`
+}
+
+// RecoverySupportIssueInputRecoveryEffectPartialV1Kind defines model for RecoverySupportIssueInputRecoveryEffectPartialV1.Kind.
+type RecoverySupportIssueInputRecoveryEffectPartialV1Kind string
+
+// RecoverySupportIssueInputRecoveryEffectUnknownV1 defines model for RecoverySupportIssueInputRecoveryEffectUnknownV1.
+type RecoverySupportIssueInputRecoveryEffectUnknownV1 struct {
+	Kind      RecoverySupportIssueInputRecoveryEffectUnknownV1Kind `json:"kind"`
+	Operation RecoverySupportIssueInputOperation                   `json:"operation"`
+}
+
+// RecoverySupportIssueInputRecoveryEffectUnknownV1Kind defines model for RecoverySupportIssueInputRecoveryEffectUnknownV1.Kind.
+type RecoverySupportIssueInputRecoveryEffectUnknownV1Kind string
+
+// RecoverySupportIssueInputRefusalCode defines model for RecoverySupportIssueInputRefusalCode.
+type RecoverySupportIssueInputRefusalCode string
+
+// RecoverySupportIssueInputSafeInteger defines model for RecoverySupportIssueInputSafeInteger.
+type RecoverySupportIssueInputSafeInteger = int64
+
+// RecoverySupportIssueInputScope defines model for RecoverySupportIssueInputScope.
+type RecoverySupportIssueInputScope struct {
+	AuthorityDomain RecoverySupportIssueInputOpaqueId `json:"authority_domain"`
+	ProcessId       RecoverySupportIssueInputOpaqueId `json:"process_id"`
+	TenantId        RecoverySupportIssueInputOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryTrajectory defines model for RecoveryTrajectory.
+type RecoveryTrajectory struct {
+	ContractDigest    RecoveryObservationRecoveryDigest32 `json:"contract_digest"`
+	DeterministicTime RecoveryObservationSafeInteger      `json:"deterministic_time"`
+	Frames            []struct {
+		Expected struct {
+			ConsumedAuthority     RecoveryObservationSafeInteger      `json:"consumed_authority"`
+			EffectCount           RecoveryObservationSafeInteger      `json:"effect_count"`
+			KnowledgeDigest       RecoveryObservationRecoveryDigest32 `json:"knowledge_digest"`
+			NativeAdmissionDigest RecoveryObservationRecoveryDigest32 `json:"native_admission_digest"`
+			ProcessRequestDigest  RecoveryObservationRecoveryDigest32 `json:"process_request_digest"`
+			RemainingBudget       RecoveryObservationSafeInteger      `json:"remaining_budget"`
+		} `json:"expected"`
+		Observation RecoveryObservation `json:"observation"`
+	} `json:"frames"`
+	PolicyDigest  RecoveryObservationRecoveryDigest32 `json:"policy_digest"`
+	ProfileDigest RecoveryObservationRecoveryDigest32 `json:"profile_digest"`
+	Schema        RecoveryTrajectorySchema            `json:"schema"`
+	SourceDigest  RecoveryObservationRecoveryDigest32 `json:"source_digest"`
+	Version       RecoveryTrajectoryVersion           `json:"version"`
+}
+
+// RecoveryTrajectorySchema defines model for RecoveryTrajectory.Schema.
+type RecoveryTrajectorySchema string
+
+// RecoveryTrajectoryVersion defines model for RecoveryTrajectory.Version.
+type RecoveryTrajectoryVersion int64
+
+// RecoveryTransportRequest defines model for RecoveryTransportRequest.
+type RecoveryTransportRequest struct {
+	Capability string `json:"capability"`
+	Command    string `json:"command"`
+}
+
+// RecoveryTransportRequestOpaqueId defines model for RecoveryTransportRequestOpaqueId.
+type RecoveryTransportRequestOpaqueId = string
+
+// RecoveryTransportRequestOperation defines model for RecoveryTransportRequestOperation.
+type RecoveryTransportRequestOperation struct {
+	NativeAdmissionDigest RecoveryTransportRequestRecoveryDigest32 `json:"native_admission_digest"`
+	OperationId           RecoveryTransportRequestOpaqueId         `json:"operation_id"`
+	OperationVersion      int64                                    `json:"operation_version"`
+}
+
+// RecoveryTransportRequestRecoveryDigest32 defines model for RecoveryTransportRequestRecoveryDigest32.
+type RecoveryTransportRequestRecoveryDigest32 = []int64
+
+// RecoveryTransportRequestRecoveryEffectAdmissionUnresolvedV1 defines model for RecoveryTransportRequestRecoveryEffectAdmissionUnresolvedV1.
+type RecoveryTransportRequestRecoveryEffectAdmissionUnresolvedV1 struct {
+	AdmissionIntent RecoveryTransportRequestOpaqueId                                `json:"admission_intent"`
+	Kind            RecoveryTransportRequestRecoveryEffectAdmissionUnresolvedV1Kind `json:"kind"`
+}
+
+// RecoveryTransportRequestRecoveryEffectAdmissionUnresolvedV1Kind defines model for RecoveryTransportRequestRecoveryEffectAdmissionUnresolvedV1.Kind.
+type RecoveryTransportRequestRecoveryEffectAdmissionUnresolvedV1Kind string
+
+// RecoveryTransportRequestRecoveryEffectAwaitingApprovalV1 defines model for RecoveryTransportRequestRecoveryEffectAwaitingApprovalV1.
+type RecoveryTransportRequestRecoveryEffectAwaitingApprovalV1 struct {
+	Kind      RecoveryTransportRequestRecoveryEffectAwaitingApprovalV1Kind `json:"kind"`
+	Operation RecoveryTransportRequestOperation                            `json:"operation"`
+}
+
+// RecoveryTransportRequestRecoveryEffectAwaitingApprovalV1Kind defines model for RecoveryTransportRequestRecoveryEffectAwaitingApprovalV1.Kind.
+type RecoveryTransportRequestRecoveryEffectAwaitingApprovalV1Kind string
+
+// RecoveryTransportRequestRecoveryEffectAwaitingCallerReportV1 defines model for RecoveryTransportRequestRecoveryEffectAwaitingCallerReportV1.
+type RecoveryTransportRequestRecoveryEffectAwaitingCallerReportV1 struct {
+	Kind      RecoveryTransportRequestRecoveryEffectAwaitingCallerReportV1Kind `json:"kind"`
+	Operation RecoveryTransportRequestOperation                                `json:"operation"`
+}
+
+// RecoveryTransportRequestRecoveryEffectAwaitingCallerReportV1Kind defines model for RecoveryTransportRequestRecoveryEffectAwaitingCallerReportV1.Kind.
+type RecoveryTransportRequestRecoveryEffectAwaitingCallerReportV1Kind string
+
+// RecoveryTransportRequestRecoveryEffectClosedBeforeEffectV1 defines model for RecoveryTransportRequestRecoveryEffectClosedBeforeEffectV1.
+type RecoveryTransportRequestRecoveryEffectClosedBeforeEffectV1 struct {
+	Closure   RecoveryTransportRequestOpaqueId                               `json:"closure"`
+	Kind      RecoveryTransportRequestRecoveryEffectClosedBeforeEffectV1Kind `json:"kind"`
+	Operation RecoveryTransportRequestOperation                              `json:"operation"`
+}
+
+// RecoveryTransportRequestRecoveryEffectClosedBeforeEffectV1Kind defines model for RecoveryTransportRequestRecoveryEffectClosedBeforeEffectV1.Kind.
+type RecoveryTransportRequestRecoveryEffectClosedBeforeEffectV1Kind string
+
+// RecoveryTransportRequestRecoveryEffectCompleteV1 defines model for RecoveryTransportRequestRecoveryEffectCompleteV1.
+type RecoveryTransportRequestRecoveryEffectCompleteV1 struct {
+	EffectCount RecoveryTransportRequestSafeInteger                  `json:"effect_count"`
+	Kind        RecoveryTransportRequestRecoveryEffectCompleteV1Kind `json:"kind"`
+	Operation   RecoveryTransportRequestOperation                    `json:"operation"`
+}
+
+// RecoveryTransportRequestRecoveryEffectCompleteV1Kind defines model for RecoveryTransportRequestRecoveryEffectCompleteV1.Kind.
+type RecoveryTransportRequestRecoveryEffectCompleteV1Kind string
+
+// RecoveryTransportRequestRecoveryEffectFailedAfterEffectV1 defines model for RecoveryTransportRequestRecoveryEffectFailedAfterEffectV1.
+type RecoveryTransportRequestRecoveryEffectFailedAfterEffectV1 struct {
+	AppliedEffects int64                                                         `json:"applied_effects"`
+	Kind           RecoveryTransportRequestRecoveryEffectFailedAfterEffectV1Kind `json:"kind"`
+	Operation      RecoveryTransportRequestOperation                             `json:"operation"`
+}
+
+// RecoveryTransportRequestRecoveryEffectFailedAfterEffectV1Kind defines model for RecoveryTransportRequestRecoveryEffectFailedAfterEffectV1.Kind.
+type RecoveryTransportRequestRecoveryEffectFailedAfterEffectV1Kind string
+
+// RecoveryTransportRequestRecoveryEffectInFlightV1 defines model for RecoveryTransportRequestRecoveryEffectInFlightV1.
+type RecoveryTransportRequestRecoveryEffectInFlightV1 struct {
+	Kind      RecoveryTransportRequestRecoveryEffectInFlightV1Kind `json:"kind"`
+	Operation RecoveryTransportRequestOperation                    `json:"operation"`
+}
+
+// RecoveryTransportRequestRecoveryEffectInFlightV1Kind defines model for RecoveryTransportRequestRecoveryEffectInFlightV1.Kind.
+type RecoveryTransportRequestRecoveryEffectInFlightV1Kind string
+
+// RecoveryTransportRequestRecoveryEffectNeverAdmittedV1 defines model for RecoveryTransportRequestRecoveryEffectNeverAdmittedV1.
+type RecoveryTransportRequestRecoveryEffectNeverAdmittedV1 struct {
+	Kind RecoveryTransportRequestRecoveryEffectNeverAdmittedV1Kind `json:"kind"`
+}
+
+// RecoveryTransportRequestRecoveryEffectNeverAdmittedV1Kind defines model for RecoveryTransportRequestRecoveryEffectNeverAdmittedV1.Kind.
+type RecoveryTransportRequestRecoveryEffectNeverAdmittedV1Kind string
+
+// RecoveryTransportRequestRecoveryEffectPartialV1 defines model for RecoveryTransportRequestRecoveryEffectPartialV1.
+type RecoveryTransportRequestRecoveryEffectPartialV1 struct {
+	AppliedEffects int64                                               `json:"applied_effects"`
+	Kind           RecoveryTransportRequestRecoveryEffectPartialV1Kind `json:"kind"`
+	Operation      RecoveryTransportRequestOperation                   `json:"operation"`
+}
+
+// RecoveryTransportRequestRecoveryEffectPartialV1Kind defines model for RecoveryTransportRequestRecoveryEffectPartialV1.Kind.
+type RecoveryTransportRequestRecoveryEffectPartialV1Kind string
+
+// RecoveryTransportRequestRecoveryEffectUnknownV1 defines model for RecoveryTransportRequestRecoveryEffectUnknownV1.
+type RecoveryTransportRequestRecoveryEffectUnknownV1 struct {
+	Kind      RecoveryTransportRequestRecoveryEffectUnknownV1Kind `json:"kind"`
+	Operation RecoveryTransportRequestOperation                   `json:"operation"`
+}
+
+// RecoveryTransportRequestRecoveryEffectUnknownV1Kind defines model for RecoveryTransportRequestRecoveryEffectUnknownV1.Kind.
+type RecoveryTransportRequestRecoveryEffectUnknownV1Kind string
+
+// RecoveryTransportRequestRefusalCode defines model for RecoveryTransportRequestRefusalCode.
+type RecoveryTransportRequestRefusalCode string
+
+// RecoveryTransportRequestSafeInteger defines model for RecoveryTransportRequestSafeInteger.
+type RecoveryTransportRequestSafeInteger = int64
+
+// RecoveryTransportRequestScope defines model for RecoveryTransportRequestScope.
+type RecoveryTransportRequestScope struct {
+	AuthorityDomain RecoveryTransportRequestOpaqueId `json:"authority_domain"`
+	ProcessId       RecoveryTransportRequestOpaqueId `json:"process_id"`
+	TenantId        RecoveryTransportRequestOpaqueId `json:"tenant_id"`
 }
 
 // ResultCancelled defines model for ResultCancelled.
@@ -6339,6 +14588,56 @@ type SecurityDeclassificationGrantDigest32 = []int64
 // SecurityDeclassificationGrantFlowIdentifier defines model for SecurityDeclassificationGrantFlowIdentifier.
 type SecurityDeclassificationGrantFlowIdentifier = string
 
+// SecurityDeclassificationGrantPointerPropertiesBody defines model for SecurityDeclassificationGrantPointerPropertiesBody.
+type SecurityDeclassificationGrantPointerPropertiesBody struct {
+	AgentId              SecurityDeclassificationGrantFlowIdentifier                     `json:"agent_id"`
+	AuthorityKeyId       SecurityDeclassificationGrantFlowIdentifier                     `json:"authority_key_id"`
+	CapabilityId         SecurityDeclassificationGrantFlowIdentifier                     `json:"capability_id"`
+	DestinationId        SecurityDeclassificationGrantFlowIdentifier                     `json:"destination_id"`
+	DomainVersion        SecurityDeclassificationGrantPointerPropertiesBodyDomainVersion `json:"domain_version"`
+	ExpiresAtUnixSeconds int64                                                           `json:"expires_at_unix_seconds"`
+	GrantId              SecurityDeclassificationGrantFlowIdentifier                     `json:"grant_id"`
+	IssuedAtUnixSeconds  int64                                                           `json:"issued_at_unix_seconds"`
+	Purpose              SecurityDeclassificationGrantFlowIdentifier                     `json:"purpose"`
+	RequestHash          SecurityDeclassificationGrantDigest32                           `json:"request_hash"`
+	SessionId            SecurityDeclassificationGrantFlowIdentifier                     `json:"session_id"`
+	SourceLabelHash      SecurityDeclassificationGrantDigest32                           `json:"source_label_hash"`
+	SubjectId            SecurityDeclassificationGrantFlowIdentifier                     `json:"subject_id"`
+	TargetLabel          SecurityDeclassificationGrantPointerPropertiesBody_TargetLabel  `json:"target_label"`
+	TenantId             SecurityDeclassificationGrantFlowIdentifier                     `json:"tenant_id"`
+	ToolName             SecurityDeclassificationGrantFlowIdentifier                     `json:"tool_name"`
+}
+
+// SecurityDeclassificationGrantPointerPropertiesBodyDomainVersion defines model for SecurityDeclassificationGrantPointerPropertiesBody.DomainVersion.
+type SecurityDeclassificationGrantPointerPropertiesBodyDomainVersion int64
+
+// SecurityDeclassificationGrantPointerPropertiesBodyTargetLabelKind defines model for SecurityDeclassificationGrantPointerPropertiesBody.TargetLabel.Kind.
+type SecurityDeclassificationGrantPointerPropertiesBodyTargetLabelKind string
+
+// SecurityDeclassificationGrantPointerPropertiesBodyTargetLabel0 defines model for .
+type SecurityDeclassificationGrantPointerPropertiesBodyTargetLabel0 struct {
+	Compartments []SecurityInformationLabelFlowIdentifier                           `json:"compartments"`
+	Kind         SecurityDeclassificationGrantPointerPropertiesBodyTargetLabel0Kind `json:"kind"`
+	Owners       map[string][]SecurityInformationLabelFlowIdentifier                `json:"owners"`
+}
+
+// SecurityDeclassificationGrantPointerPropertiesBodyTargetLabel0Kind defines model for SecurityDeclassificationGrantPointerPropertiesBody.TargetLabel.0.Kind.
+type SecurityDeclassificationGrantPointerPropertiesBodyTargetLabel0Kind string
+
+// SecurityDeclassificationGrantPointerPropertiesBodyTargetLabel1 defines model for .
+type SecurityDeclassificationGrantPointerPropertiesBodyTargetLabel1 struct {
+	Kind SecurityDeclassificationGrantPointerPropertiesBodyTargetLabel1Kind `json:"kind"`
+}
+
+// SecurityDeclassificationGrantPointerPropertiesBodyTargetLabel1Kind defines model for SecurityDeclassificationGrantPointerPropertiesBody.TargetLabel.1.Kind.
+type SecurityDeclassificationGrantPointerPropertiesBodyTargetLabel1Kind string
+
+// SecurityDeclassificationGrantPointerPropertiesBody_TargetLabel defines model for SecurityDeclassificationGrantPointerPropertiesBody.TargetLabel.
+type SecurityDeclassificationGrantPointerPropertiesBody_TargetLabel struct {
+	Kind  SecurityDeclassificationGrantPointerPropertiesBodyTargetLabelKind `json:"kind"`
+	union json.RawMessage
+}
+
 // SecurityDeclassificationOutcomeReceiptBodyV1 defines model for SecurityDeclassificationOutcomeReceiptBodyV1.
 type SecurityDeclassificationOutcomeReceiptBodyV1 struct {
 	EventId     SecurityFlowDenialReceiptBodyV1Identifier             `json:"event_id"`
@@ -7623,6 +15922,7 @@ type SecurityResponsePlanV1 struct {
 	ApprovalRequirement     SecurityResponsePlanV1ApprovalRequirement `json:"approval_requirement"`
 	CreatedAtUnixMs         SecurityResponsePlanV1Time                `json:"created_at_unix_ms"`
 	Effects                 []SecurityResponseEffectV1                `json:"effects"`
+	Execution               SecurityResponsePlanV1ExecutionBinding    `json:"execution"`
 	ExpiresAtUnixMs         SecurityResponsePlanV1Time                `json:"expires_at_unix_ms"`
 	OperatorCapability      SecurityResponsePlanV1OperatorCapability  `json:"operator_capability"`
 	PlanHash                SecurityResponsePlanV1Digest              `json:"plan_hash"`
@@ -7661,6 +15961,18 @@ type SecurityResponsePlanV1ApprovalRequirement1ApprovalType string
 
 // SecurityResponsePlanV1Digest defines model for SecurityResponsePlanV1Digest.
 type SecurityResponsePlanV1Digest = []int64
+
+// SecurityResponsePlanV1ExecutionBinding defines model for SecurityResponsePlanV1ExecutionBinding.
+type SecurityResponsePlanV1ExecutionBinding struct {
+	Mode          SecurityResponsePlanV1ExecutionBindingMode          `json:"mode"`
+	SchemaVersion SecurityResponsePlanV1ExecutionBindingSchemaVersion `json:"schema_version"`
+}
+
+// SecurityResponsePlanV1ExecutionBindingMode defines model for SecurityResponsePlanV1ExecutionBinding.Mode.
+type SecurityResponsePlanV1ExecutionBindingMode string
+
+// SecurityResponsePlanV1ExecutionBindingSchemaVersion defines model for SecurityResponsePlanV1ExecutionBinding.SchemaVersion.
+type SecurityResponsePlanV1ExecutionBindingSchemaVersion int64
 
 // SecurityResponsePlanV1Identifier defines model for SecurityResponsePlanV1Identifier.
 type SecurityResponsePlanV1Identifier = string
@@ -10285,6 +18597,4006 @@ func (t *ReceiptRecordDecision) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+// AsRecoveryApprovalIntentObligations0 returns the union data inside the RecoveryApprovalIntent_Obligations_Item as a RecoveryApprovalIntentObligations0
+func (t RecoveryApprovalIntent_Obligations_Item) AsRecoveryApprovalIntentObligations0() (RecoveryApprovalIntentObligations0, error) {
+	var body RecoveryApprovalIntentObligations0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryApprovalIntentObligations0 overwrites any union data inside the RecoveryApprovalIntent_Obligations_Item as the provided RecoveryApprovalIntentObligations0
+func (t *RecoveryApprovalIntent_Obligations_Item) FromRecoveryApprovalIntentObligations0(v RecoveryApprovalIntentObligations0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryApprovalIntentObligations0 performs a merge with any union data inside the RecoveryApprovalIntent_Obligations_Item, using the provided RecoveryApprovalIntentObligations0
+func (t *RecoveryApprovalIntent_Obligations_Item) MergeRecoveryApprovalIntentObligations0(v RecoveryApprovalIntentObligations0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryApprovalIntentObligations1 returns the union data inside the RecoveryApprovalIntent_Obligations_Item as a RecoveryApprovalIntentObligations1
+func (t RecoveryApprovalIntent_Obligations_Item) AsRecoveryApprovalIntentObligations1() (RecoveryApprovalIntentObligations1, error) {
+	var body RecoveryApprovalIntentObligations1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryApprovalIntentObligations1 overwrites any union data inside the RecoveryApprovalIntent_Obligations_Item as the provided RecoveryApprovalIntentObligations1
+func (t *RecoveryApprovalIntent_Obligations_Item) FromRecoveryApprovalIntentObligations1(v RecoveryApprovalIntentObligations1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryApprovalIntentObligations1 performs a merge with any union data inside the RecoveryApprovalIntent_Obligations_Item, using the provided RecoveryApprovalIntentObligations1
+func (t *RecoveryApprovalIntent_Obligations_Item) MergeRecoveryApprovalIntentObligations1(v RecoveryApprovalIntentObligations1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryApprovalIntentObligations2 returns the union data inside the RecoveryApprovalIntent_Obligations_Item as a RecoveryApprovalIntentObligations2
+func (t RecoveryApprovalIntent_Obligations_Item) AsRecoveryApprovalIntentObligations2() (RecoveryApprovalIntentObligations2, error) {
+	var body RecoveryApprovalIntentObligations2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryApprovalIntentObligations2 overwrites any union data inside the RecoveryApprovalIntent_Obligations_Item as the provided RecoveryApprovalIntentObligations2
+func (t *RecoveryApprovalIntent_Obligations_Item) FromRecoveryApprovalIntentObligations2(v RecoveryApprovalIntentObligations2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryApprovalIntentObligations2 performs a merge with any union data inside the RecoveryApprovalIntent_Obligations_Item, using the provided RecoveryApprovalIntentObligations2
+func (t *RecoveryApprovalIntent_Obligations_Item) MergeRecoveryApprovalIntentObligations2(v RecoveryApprovalIntentObligations2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryApprovalIntentObligations3 returns the union data inside the RecoveryApprovalIntent_Obligations_Item as a RecoveryApprovalIntentObligations3
+func (t RecoveryApprovalIntent_Obligations_Item) AsRecoveryApprovalIntentObligations3() (RecoveryApprovalIntentObligations3, error) {
+	var body RecoveryApprovalIntentObligations3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryApprovalIntentObligations3 overwrites any union data inside the RecoveryApprovalIntent_Obligations_Item as the provided RecoveryApprovalIntentObligations3
+func (t *RecoveryApprovalIntent_Obligations_Item) FromRecoveryApprovalIntentObligations3(v RecoveryApprovalIntentObligations3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryApprovalIntentObligations3 performs a merge with any union data inside the RecoveryApprovalIntent_Obligations_Item, using the provided RecoveryApprovalIntentObligations3
+func (t *RecoveryApprovalIntent_Obligations_Item) MergeRecoveryApprovalIntentObligations3(v RecoveryApprovalIntentObligations3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoveryApprovalIntent_Obligations_Item) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoveryApprovalIntent_Obligations_Item) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoveryArtifactCertificateArtifactProducer0 returns the union data inside the RecoveryArtifactCertificateArtifactProducer as a RecoveryArtifactCertificateArtifactProducer0
+func (t RecoveryArtifactCertificateArtifactProducer) AsRecoveryArtifactCertificateArtifactProducer0() (RecoveryArtifactCertificateArtifactProducer0, error) {
+	var body RecoveryArtifactCertificateArtifactProducer0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryArtifactCertificateArtifactProducer0 overwrites any union data inside the RecoveryArtifactCertificateArtifactProducer as the provided RecoveryArtifactCertificateArtifactProducer0
+func (t *RecoveryArtifactCertificateArtifactProducer) FromRecoveryArtifactCertificateArtifactProducer0(v RecoveryArtifactCertificateArtifactProducer0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryArtifactCertificateArtifactProducer0 performs a merge with any union data inside the RecoveryArtifactCertificateArtifactProducer, using the provided RecoveryArtifactCertificateArtifactProducer0
+func (t *RecoveryArtifactCertificateArtifactProducer) MergeRecoveryArtifactCertificateArtifactProducer0(v RecoveryArtifactCertificateArtifactProducer0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryArtifactCertificateArtifactProducer1 returns the union data inside the RecoveryArtifactCertificateArtifactProducer as a RecoveryArtifactCertificateArtifactProducer1
+func (t RecoveryArtifactCertificateArtifactProducer) AsRecoveryArtifactCertificateArtifactProducer1() (RecoveryArtifactCertificateArtifactProducer1, error) {
+	var body RecoveryArtifactCertificateArtifactProducer1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryArtifactCertificateArtifactProducer1 overwrites any union data inside the RecoveryArtifactCertificateArtifactProducer as the provided RecoveryArtifactCertificateArtifactProducer1
+func (t *RecoveryArtifactCertificateArtifactProducer) FromRecoveryArtifactCertificateArtifactProducer1(v RecoveryArtifactCertificateArtifactProducer1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryArtifactCertificateArtifactProducer1 performs a merge with any union data inside the RecoveryArtifactCertificateArtifactProducer, using the provided RecoveryArtifactCertificateArtifactProducer1
+func (t *RecoveryArtifactCertificateArtifactProducer) MergeRecoveryArtifactCertificateArtifactProducer1(v RecoveryArtifactCertificateArtifactProducer1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryArtifactCertificateArtifactProducer2 returns the union data inside the RecoveryArtifactCertificateArtifactProducer as a RecoveryArtifactCertificateArtifactProducer2
+func (t RecoveryArtifactCertificateArtifactProducer) AsRecoveryArtifactCertificateArtifactProducer2() (RecoveryArtifactCertificateArtifactProducer2, error) {
+	var body RecoveryArtifactCertificateArtifactProducer2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryArtifactCertificateArtifactProducer2 overwrites any union data inside the RecoveryArtifactCertificateArtifactProducer as the provided RecoveryArtifactCertificateArtifactProducer2
+func (t *RecoveryArtifactCertificateArtifactProducer) FromRecoveryArtifactCertificateArtifactProducer2(v RecoveryArtifactCertificateArtifactProducer2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryArtifactCertificateArtifactProducer2 performs a merge with any union data inside the RecoveryArtifactCertificateArtifactProducer, using the provided RecoveryArtifactCertificateArtifactProducer2
+func (t *RecoveryArtifactCertificateArtifactProducer) MergeRecoveryArtifactCertificateArtifactProducer2(v RecoveryArtifactCertificateArtifactProducer2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryArtifactCertificateArtifactProducer3 returns the union data inside the RecoveryArtifactCertificateArtifactProducer as a RecoveryArtifactCertificateArtifactProducer3
+func (t RecoveryArtifactCertificateArtifactProducer) AsRecoveryArtifactCertificateArtifactProducer3() (RecoveryArtifactCertificateArtifactProducer3, error) {
+	var body RecoveryArtifactCertificateArtifactProducer3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryArtifactCertificateArtifactProducer3 overwrites any union data inside the RecoveryArtifactCertificateArtifactProducer as the provided RecoveryArtifactCertificateArtifactProducer3
+func (t *RecoveryArtifactCertificateArtifactProducer) FromRecoveryArtifactCertificateArtifactProducer3(v RecoveryArtifactCertificateArtifactProducer3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryArtifactCertificateArtifactProducer3 performs a merge with any union data inside the RecoveryArtifactCertificateArtifactProducer, using the provided RecoveryArtifactCertificateArtifactProducer3
+func (t *RecoveryArtifactCertificateArtifactProducer) MergeRecoveryArtifactCertificateArtifactProducer3(v RecoveryArtifactCertificateArtifactProducer3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryArtifactCertificateArtifactProducer4 returns the union data inside the RecoveryArtifactCertificateArtifactProducer as a RecoveryArtifactCertificateArtifactProducer4
+func (t RecoveryArtifactCertificateArtifactProducer) AsRecoveryArtifactCertificateArtifactProducer4() (RecoveryArtifactCertificateArtifactProducer4, error) {
+	var body RecoveryArtifactCertificateArtifactProducer4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryArtifactCertificateArtifactProducer4 overwrites any union data inside the RecoveryArtifactCertificateArtifactProducer as the provided RecoveryArtifactCertificateArtifactProducer4
+func (t *RecoveryArtifactCertificateArtifactProducer) FromRecoveryArtifactCertificateArtifactProducer4(v RecoveryArtifactCertificateArtifactProducer4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryArtifactCertificateArtifactProducer4 performs a merge with any union data inside the RecoveryArtifactCertificateArtifactProducer, using the provided RecoveryArtifactCertificateArtifactProducer4
+func (t *RecoveryArtifactCertificateArtifactProducer) MergeRecoveryArtifactCertificateArtifactProducer4(v RecoveryArtifactCertificateArtifactProducer4) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoveryArtifactCertificateArtifactProducer) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoveryArtifactCertificateArtifactProducer) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoveryArtifactProducer0 returns the union data inside the RecoveryArtifactProducer as a RecoveryArtifactProducer0
+func (t RecoveryArtifactProducer) AsRecoveryArtifactProducer0() (RecoveryArtifactProducer0, error) {
+	var body RecoveryArtifactProducer0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryArtifactProducer0 overwrites any union data inside the RecoveryArtifactProducer as the provided RecoveryArtifactProducer0
+func (t *RecoveryArtifactProducer) FromRecoveryArtifactProducer0(v RecoveryArtifactProducer0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryArtifactProducer0 performs a merge with any union data inside the RecoveryArtifactProducer, using the provided RecoveryArtifactProducer0
+func (t *RecoveryArtifactProducer) MergeRecoveryArtifactProducer0(v RecoveryArtifactProducer0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryArtifactProducer1 returns the union data inside the RecoveryArtifactProducer as a RecoveryArtifactProducer1
+func (t RecoveryArtifactProducer) AsRecoveryArtifactProducer1() (RecoveryArtifactProducer1, error) {
+	var body RecoveryArtifactProducer1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryArtifactProducer1 overwrites any union data inside the RecoveryArtifactProducer as the provided RecoveryArtifactProducer1
+func (t *RecoveryArtifactProducer) FromRecoveryArtifactProducer1(v RecoveryArtifactProducer1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryArtifactProducer1 performs a merge with any union data inside the RecoveryArtifactProducer, using the provided RecoveryArtifactProducer1
+func (t *RecoveryArtifactProducer) MergeRecoveryArtifactProducer1(v RecoveryArtifactProducer1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryArtifactProducer2 returns the union data inside the RecoveryArtifactProducer as a RecoveryArtifactProducer2
+func (t RecoveryArtifactProducer) AsRecoveryArtifactProducer2() (RecoveryArtifactProducer2, error) {
+	var body RecoveryArtifactProducer2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryArtifactProducer2 overwrites any union data inside the RecoveryArtifactProducer as the provided RecoveryArtifactProducer2
+func (t *RecoveryArtifactProducer) FromRecoveryArtifactProducer2(v RecoveryArtifactProducer2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryArtifactProducer2 performs a merge with any union data inside the RecoveryArtifactProducer, using the provided RecoveryArtifactProducer2
+func (t *RecoveryArtifactProducer) MergeRecoveryArtifactProducer2(v RecoveryArtifactProducer2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryArtifactProducer3 returns the union data inside the RecoveryArtifactProducer as a RecoveryArtifactProducer3
+func (t RecoveryArtifactProducer) AsRecoveryArtifactProducer3() (RecoveryArtifactProducer3, error) {
+	var body RecoveryArtifactProducer3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryArtifactProducer3 overwrites any union data inside the RecoveryArtifactProducer as the provided RecoveryArtifactProducer3
+func (t *RecoveryArtifactProducer) FromRecoveryArtifactProducer3(v RecoveryArtifactProducer3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryArtifactProducer3 performs a merge with any union data inside the RecoveryArtifactProducer, using the provided RecoveryArtifactProducer3
+func (t *RecoveryArtifactProducer) MergeRecoveryArtifactProducer3(v RecoveryArtifactProducer3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryArtifactProducer4 returns the union data inside the RecoveryArtifactProducer as a RecoveryArtifactProducer4
+func (t RecoveryArtifactProducer) AsRecoveryArtifactProducer4() (RecoveryArtifactProducer4, error) {
+	var body RecoveryArtifactProducer4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryArtifactProducer4 overwrites any union data inside the RecoveryArtifactProducer as the provided RecoveryArtifactProducer4
+func (t *RecoveryArtifactProducer) FromRecoveryArtifactProducer4(v RecoveryArtifactProducer4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryArtifactProducer4 performs a merge with any union data inside the RecoveryArtifactProducer, using the provided RecoveryArtifactProducer4
+func (t *RecoveryArtifactProducer) MergeRecoveryArtifactProducer4(v RecoveryArtifactProducer4) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoveryArtifactProducer) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoveryArtifactProducer) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoveryArtifactRecipientArtifactSink0 returns the union data inside the RecoveryArtifactRecipientArtifactSink as a RecoveryArtifactRecipientArtifactSink0
+func (t RecoveryArtifactRecipientArtifactSink) AsRecoveryArtifactRecipientArtifactSink0() (RecoveryArtifactRecipientArtifactSink0, error) {
+	var body RecoveryArtifactRecipientArtifactSink0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryArtifactRecipientArtifactSink0 overwrites any union data inside the RecoveryArtifactRecipientArtifactSink as the provided RecoveryArtifactRecipientArtifactSink0
+func (t *RecoveryArtifactRecipientArtifactSink) FromRecoveryArtifactRecipientArtifactSink0(v RecoveryArtifactRecipientArtifactSink0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryArtifactRecipientArtifactSink0 performs a merge with any union data inside the RecoveryArtifactRecipientArtifactSink, using the provided RecoveryArtifactRecipientArtifactSink0
+func (t *RecoveryArtifactRecipientArtifactSink) MergeRecoveryArtifactRecipientArtifactSink0(v RecoveryArtifactRecipientArtifactSink0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryArtifactRecipientArtifactSink1 returns the union data inside the RecoveryArtifactRecipientArtifactSink as a RecoveryArtifactRecipientArtifactSink1
+func (t RecoveryArtifactRecipientArtifactSink) AsRecoveryArtifactRecipientArtifactSink1() (RecoveryArtifactRecipientArtifactSink1, error) {
+	var body RecoveryArtifactRecipientArtifactSink1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryArtifactRecipientArtifactSink1 overwrites any union data inside the RecoveryArtifactRecipientArtifactSink as the provided RecoveryArtifactRecipientArtifactSink1
+func (t *RecoveryArtifactRecipientArtifactSink) FromRecoveryArtifactRecipientArtifactSink1(v RecoveryArtifactRecipientArtifactSink1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryArtifactRecipientArtifactSink1 performs a merge with any union data inside the RecoveryArtifactRecipientArtifactSink, using the provided RecoveryArtifactRecipientArtifactSink1
+func (t *RecoveryArtifactRecipientArtifactSink) MergeRecoveryArtifactRecipientArtifactSink1(v RecoveryArtifactRecipientArtifactSink1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryArtifactRecipientArtifactSink2 returns the union data inside the RecoveryArtifactRecipientArtifactSink as a RecoveryArtifactRecipientArtifactSink2
+func (t RecoveryArtifactRecipientArtifactSink) AsRecoveryArtifactRecipientArtifactSink2() (RecoveryArtifactRecipientArtifactSink2, error) {
+	var body RecoveryArtifactRecipientArtifactSink2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryArtifactRecipientArtifactSink2 overwrites any union data inside the RecoveryArtifactRecipientArtifactSink as the provided RecoveryArtifactRecipientArtifactSink2
+func (t *RecoveryArtifactRecipientArtifactSink) FromRecoveryArtifactRecipientArtifactSink2(v RecoveryArtifactRecipientArtifactSink2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryArtifactRecipientArtifactSink2 performs a merge with any union data inside the RecoveryArtifactRecipientArtifactSink, using the provided RecoveryArtifactRecipientArtifactSink2
+func (t *RecoveryArtifactRecipientArtifactSink) MergeRecoveryArtifactRecipientArtifactSink2(v RecoveryArtifactRecipientArtifactSink2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoveryArtifactRecipientArtifactSink) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoveryArtifactRecipientArtifactSink) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoveryArtifactReleaseIntentKind0 returns the union data inside the RecoveryArtifactReleaseIntent_Kind as a RecoveryArtifactReleaseIntentKind0
+func (t RecoveryArtifactReleaseIntent_Kind) AsRecoveryArtifactReleaseIntentKind0() (RecoveryArtifactReleaseIntentKind0, error) {
+	var body RecoveryArtifactReleaseIntentKind0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryArtifactReleaseIntentKind0 overwrites any union data inside the RecoveryArtifactReleaseIntent_Kind as the provided RecoveryArtifactReleaseIntentKind0
+func (t *RecoveryArtifactReleaseIntent_Kind) FromRecoveryArtifactReleaseIntentKind0(v RecoveryArtifactReleaseIntentKind0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryArtifactReleaseIntentKind0 performs a merge with any union data inside the RecoveryArtifactReleaseIntent_Kind, using the provided RecoveryArtifactReleaseIntentKind0
+func (t *RecoveryArtifactReleaseIntent_Kind) MergeRecoveryArtifactReleaseIntentKind0(v RecoveryArtifactReleaseIntentKind0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryArtifactReleaseIntentKind1 returns the union data inside the RecoveryArtifactReleaseIntent_Kind as a RecoveryArtifactReleaseIntentKind1
+func (t RecoveryArtifactReleaseIntent_Kind) AsRecoveryArtifactReleaseIntentKind1() (RecoveryArtifactReleaseIntentKind1, error) {
+	var body RecoveryArtifactReleaseIntentKind1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryArtifactReleaseIntentKind1 overwrites any union data inside the RecoveryArtifactReleaseIntent_Kind as the provided RecoveryArtifactReleaseIntentKind1
+func (t *RecoveryArtifactReleaseIntent_Kind) FromRecoveryArtifactReleaseIntentKind1(v RecoveryArtifactReleaseIntentKind1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryArtifactReleaseIntentKind1 performs a merge with any union data inside the RecoveryArtifactReleaseIntent_Kind, using the provided RecoveryArtifactReleaseIntentKind1
+func (t *RecoveryArtifactReleaseIntent_Kind) MergeRecoveryArtifactReleaseIntentKind1(v RecoveryArtifactReleaseIntentKind1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoveryArtifactReleaseIntent_Kind) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoveryArtifactReleaseIntent_Kind) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoveryArtifactReleaseIntentArtifactSink0 returns the union data inside the RecoveryArtifactReleaseIntentArtifactSink as a RecoveryArtifactReleaseIntentArtifactSink0
+func (t RecoveryArtifactReleaseIntentArtifactSink) AsRecoveryArtifactReleaseIntentArtifactSink0() (RecoveryArtifactReleaseIntentArtifactSink0, error) {
+	var body RecoveryArtifactReleaseIntentArtifactSink0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryArtifactReleaseIntentArtifactSink0 overwrites any union data inside the RecoveryArtifactReleaseIntentArtifactSink as the provided RecoveryArtifactReleaseIntentArtifactSink0
+func (t *RecoveryArtifactReleaseIntentArtifactSink) FromRecoveryArtifactReleaseIntentArtifactSink0(v RecoveryArtifactReleaseIntentArtifactSink0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryArtifactReleaseIntentArtifactSink0 performs a merge with any union data inside the RecoveryArtifactReleaseIntentArtifactSink, using the provided RecoveryArtifactReleaseIntentArtifactSink0
+func (t *RecoveryArtifactReleaseIntentArtifactSink) MergeRecoveryArtifactReleaseIntentArtifactSink0(v RecoveryArtifactReleaseIntentArtifactSink0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryArtifactReleaseIntentArtifactSink1 returns the union data inside the RecoveryArtifactReleaseIntentArtifactSink as a RecoveryArtifactReleaseIntentArtifactSink1
+func (t RecoveryArtifactReleaseIntentArtifactSink) AsRecoveryArtifactReleaseIntentArtifactSink1() (RecoveryArtifactReleaseIntentArtifactSink1, error) {
+	var body RecoveryArtifactReleaseIntentArtifactSink1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryArtifactReleaseIntentArtifactSink1 overwrites any union data inside the RecoveryArtifactReleaseIntentArtifactSink as the provided RecoveryArtifactReleaseIntentArtifactSink1
+func (t *RecoveryArtifactReleaseIntentArtifactSink) FromRecoveryArtifactReleaseIntentArtifactSink1(v RecoveryArtifactReleaseIntentArtifactSink1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryArtifactReleaseIntentArtifactSink1 performs a merge with any union data inside the RecoveryArtifactReleaseIntentArtifactSink, using the provided RecoveryArtifactReleaseIntentArtifactSink1
+func (t *RecoveryArtifactReleaseIntentArtifactSink) MergeRecoveryArtifactReleaseIntentArtifactSink1(v RecoveryArtifactReleaseIntentArtifactSink1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryArtifactReleaseIntentArtifactSink2 returns the union data inside the RecoveryArtifactReleaseIntentArtifactSink as a RecoveryArtifactReleaseIntentArtifactSink2
+func (t RecoveryArtifactReleaseIntentArtifactSink) AsRecoveryArtifactReleaseIntentArtifactSink2() (RecoveryArtifactReleaseIntentArtifactSink2, error) {
+	var body RecoveryArtifactReleaseIntentArtifactSink2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryArtifactReleaseIntentArtifactSink2 overwrites any union data inside the RecoveryArtifactReleaseIntentArtifactSink as the provided RecoveryArtifactReleaseIntentArtifactSink2
+func (t *RecoveryArtifactReleaseIntentArtifactSink) FromRecoveryArtifactReleaseIntentArtifactSink2(v RecoveryArtifactReleaseIntentArtifactSink2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryArtifactReleaseIntentArtifactSink2 performs a merge with any union data inside the RecoveryArtifactReleaseIntentArtifactSink, using the provided RecoveryArtifactReleaseIntentArtifactSink2
+func (t *RecoveryArtifactReleaseIntentArtifactSink) MergeRecoveryArtifactReleaseIntentArtifactSink2(v RecoveryArtifactReleaseIntentArtifactSink2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoveryArtifactReleaseIntentArtifactSink) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoveryArtifactReleaseIntentArtifactSink) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoveryArtifactVersionArtifactProducer0 returns the union data inside the RecoveryArtifactVersionArtifactProducer as a RecoveryArtifactVersionArtifactProducer0
+func (t RecoveryArtifactVersionArtifactProducer) AsRecoveryArtifactVersionArtifactProducer0() (RecoveryArtifactVersionArtifactProducer0, error) {
+	var body RecoveryArtifactVersionArtifactProducer0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryArtifactVersionArtifactProducer0 overwrites any union data inside the RecoveryArtifactVersionArtifactProducer as the provided RecoveryArtifactVersionArtifactProducer0
+func (t *RecoveryArtifactVersionArtifactProducer) FromRecoveryArtifactVersionArtifactProducer0(v RecoveryArtifactVersionArtifactProducer0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryArtifactVersionArtifactProducer0 performs a merge with any union data inside the RecoveryArtifactVersionArtifactProducer, using the provided RecoveryArtifactVersionArtifactProducer0
+func (t *RecoveryArtifactVersionArtifactProducer) MergeRecoveryArtifactVersionArtifactProducer0(v RecoveryArtifactVersionArtifactProducer0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryArtifactVersionArtifactProducer1 returns the union data inside the RecoveryArtifactVersionArtifactProducer as a RecoveryArtifactVersionArtifactProducer1
+func (t RecoveryArtifactVersionArtifactProducer) AsRecoveryArtifactVersionArtifactProducer1() (RecoveryArtifactVersionArtifactProducer1, error) {
+	var body RecoveryArtifactVersionArtifactProducer1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryArtifactVersionArtifactProducer1 overwrites any union data inside the RecoveryArtifactVersionArtifactProducer as the provided RecoveryArtifactVersionArtifactProducer1
+func (t *RecoveryArtifactVersionArtifactProducer) FromRecoveryArtifactVersionArtifactProducer1(v RecoveryArtifactVersionArtifactProducer1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryArtifactVersionArtifactProducer1 performs a merge with any union data inside the RecoveryArtifactVersionArtifactProducer, using the provided RecoveryArtifactVersionArtifactProducer1
+func (t *RecoveryArtifactVersionArtifactProducer) MergeRecoveryArtifactVersionArtifactProducer1(v RecoveryArtifactVersionArtifactProducer1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryArtifactVersionArtifactProducer2 returns the union data inside the RecoveryArtifactVersionArtifactProducer as a RecoveryArtifactVersionArtifactProducer2
+func (t RecoveryArtifactVersionArtifactProducer) AsRecoveryArtifactVersionArtifactProducer2() (RecoveryArtifactVersionArtifactProducer2, error) {
+	var body RecoveryArtifactVersionArtifactProducer2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryArtifactVersionArtifactProducer2 overwrites any union data inside the RecoveryArtifactVersionArtifactProducer as the provided RecoveryArtifactVersionArtifactProducer2
+func (t *RecoveryArtifactVersionArtifactProducer) FromRecoveryArtifactVersionArtifactProducer2(v RecoveryArtifactVersionArtifactProducer2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryArtifactVersionArtifactProducer2 performs a merge with any union data inside the RecoveryArtifactVersionArtifactProducer, using the provided RecoveryArtifactVersionArtifactProducer2
+func (t *RecoveryArtifactVersionArtifactProducer) MergeRecoveryArtifactVersionArtifactProducer2(v RecoveryArtifactVersionArtifactProducer2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryArtifactVersionArtifactProducer3 returns the union data inside the RecoveryArtifactVersionArtifactProducer as a RecoveryArtifactVersionArtifactProducer3
+func (t RecoveryArtifactVersionArtifactProducer) AsRecoveryArtifactVersionArtifactProducer3() (RecoveryArtifactVersionArtifactProducer3, error) {
+	var body RecoveryArtifactVersionArtifactProducer3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryArtifactVersionArtifactProducer3 overwrites any union data inside the RecoveryArtifactVersionArtifactProducer as the provided RecoveryArtifactVersionArtifactProducer3
+func (t *RecoveryArtifactVersionArtifactProducer) FromRecoveryArtifactVersionArtifactProducer3(v RecoveryArtifactVersionArtifactProducer3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryArtifactVersionArtifactProducer3 performs a merge with any union data inside the RecoveryArtifactVersionArtifactProducer, using the provided RecoveryArtifactVersionArtifactProducer3
+func (t *RecoveryArtifactVersionArtifactProducer) MergeRecoveryArtifactVersionArtifactProducer3(v RecoveryArtifactVersionArtifactProducer3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryArtifactVersionArtifactProducer4 returns the union data inside the RecoveryArtifactVersionArtifactProducer as a RecoveryArtifactVersionArtifactProducer4
+func (t RecoveryArtifactVersionArtifactProducer) AsRecoveryArtifactVersionArtifactProducer4() (RecoveryArtifactVersionArtifactProducer4, error) {
+	var body RecoveryArtifactVersionArtifactProducer4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryArtifactVersionArtifactProducer4 overwrites any union data inside the RecoveryArtifactVersionArtifactProducer as the provided RecoveryArtifactVersionArtifactProducer4
+func (t *RecoveryArtifactVersionArtifactProducer) FromRecoveryArtifactVersionArtifactProducer4(v RecoveryArtifactVersionArtifactProducer4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryArtifactVersionArtifactProducer4 performs a merge with any union data inside the RecoveryArtifactVersionArtifactProducer, using the provided RecoveryArtifactVersionArtifactProducer4
+func (t *RecoveryArtifactVersionArtifactProducer) MergeRecoveryArtifactVersionArtifactProducer4(v RecoveryArtifactVersionArtifactProducer4) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoveryArtifactVersionArtifactProducer) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoveryArtifactVersionArtifactProducer) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoveryAuthorityCoverageObligations0 returns the union data inside the RecoveryAuthorityCoverage_Obligations_Item as a RecoveryAuthorityCoverageObligations0
+func (t RecoveryAuthorityCoverage_Obligations_Item) AsRecoveryAuthorityCoverageObligations0() (RecoveryAuthorityCoverageObligations0, error) {
+	var body RecoveryAuthorityCoverageObligations0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryAuthorityCoverageObligations0 overwrites any union data inside the RecoveryAuthorityCoverage_Obligations_Item as the provided RecoveryAuthorityCoverageObligations0
+func (t *RecoveryAuthorityCoverage_Obligations_Item) FromRecoveryAuthorityCoverageObligations0(v RecoveryAuthorityCoverageObligations0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryAuthorityCoverageObligations0 performs a merge with any union data inside the RecoveryAuthorityCoverage_Obligations_Item, using the provided RecoveryAuthorityCoverageObligations0
+func (t *RecoveryAuthorityCoverage_Obligations_Item) MergeRecoveryAuthorityCoverageObligations0(v RecoveryAuthorityCoverageObligations0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryAuthorityCoverageObligations1 returns the union data inside the RecoveryAuthorityCoverage_Obligations_Item as a RecoveryAuthorityCoverageObligations1
+func (t RecoveryAuthorityCoverage_Obligations_Item) AsRecoveryAuthorityCoverageObligations1() (RecoveryAuthorityCoverageObligations1, error) {
+	var body RecoveryAuthorityCoverageObligations1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryAuthorityCoverageObligations1 overwrites any union data inside the RecoveryAuthorityCoverage_Obligations_Item as the provided RecoveryAuthorityCoverageObligations1
+func (t *RecoveryAuthorityCoverage_Obligations_Item) FromRecoveryAuthorityCoverageObligations1(v RecoveryAuthorityCoverageObligations1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryAuthorityCoverageObligations1 performs a merge with any union data inside the RecoveryAuthorityCoverage_Obligations_Item, using the provided RecoveryAuthorityCoverageObligations1
+func (t *RecoveryAuthorityCoverage_Obligations_Item) MergeRecoveryAuthorityCoverageObligations1(v RecoveryAuthorityCoverageObligations1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryAuthorityCoverageObligations2 returns the union data inside the RecoveryAuthorityCoverage_Obligations_Item as a RecoveryAuthorityCoverageObligations2
+func (t RecoveryAuthorityCoverage_Obligations_Item) AsRecoveryAuthorityCoverageObligations2() (RecoveryAuthorityCoverageObligations2, error) {
+	var body RecoveryAuthorityCoverageObligations2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryAuthorityCoverageObligations2 overwrites any union data inside the RecoveryAuthorityCoverage_Obligations_Item as the provided RecoveryAuthorityCoverageObligations2
+func (t *RecoveryAuthorityCoverage_Obligations_Item) FromRecoveryAuthorityCoverageObligations2(v RecoveryAuthorityCoverageObligations2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryAuthorityCoverageObligations2 performs a merge with any union data inside the RecoveryAuthorityCoverage_Obligations_Item, using the provided RecoveryAuthorityCoverageObligations2
+func (t *RecoveryAuthorityCoverage_Obligations_Item) MergeRecoveryAuthorityCoverageObligations2(v RecoveryAuthorityCoverageObligations2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryAuthorityCoverageObligations3 returns the union data inside the RecoveryAuthorityCoverage_Obligations_Item as a RecoveryAuthorityCoverageObligations3
+func (t RecoveryAuthorityCoverage_Obligations_Item) AsRecoveryAuthorityCoverageObligations3() (RecoveryAuthorityCoverageObligations3, error) {
+	var body RecoveryAuthorityCoverageObligations3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryAuthorityCoverageObligations3 overwrites any union data inside the RecoveryAuthorityCoverage_Obligations_Item as the provided RecoveryAuthorityCoverageObligations3
+func (t *RecoveryAuthorityCoverage_Obligations_Item) FromRecoveryAuthorityCoverageObligations3(v RecoveryAuthorityCoverageObligations3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryAuthorityCoverageObligations3 performs a merge with any union data inside the RecoveryAuthorityCoverage_Obligations_Item, using the provided RecoveryAuthorityCoverageObligations3
+func (t *RecoveryAuthorityCoverage_Obligations_Item) MergeRecoveryAuthorityCoverageObligations3(v RecoveryAuthorityCoverageObligations3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoveryAuthorityCoverage_Obligations_Item) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoveryAuthorityCoverage_Obligations_Item) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoveryAuthorizationRequirementsObligations0 returns the union data inside the RecoveryAuthorizationRequirements_Obligations_Item as a RecoveryAuthorizationRequirementsObligations0
+func (t RecoveryAuthorizationRequirements_Obligations_Item) AsRecoveryAuthorizationRequirementsObligations0() (RecoveryAuthorizationRequirementsObligations0, error) {
+	var body RecoveryAuthorizationRequirementsObligations0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryAuthorizationRequirementsObligations0 overwrites any union data inside the RecoveryAuthorizationRequirements_Obligations_Item as the provided RecoveryAuthorizationRequirementsObligations0
+func (t *RecoveryAuthorizationRequirements_Obligations_Item) FromRecoveryAuthorizationRequirementsObligations0(v RecoveryAuthorizationRequirementsObligations0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryAuthorizationRequirementsObligations0 performs a merge with any union data inside the RecoveryAuthorizationRequirements_Obligations_Item, using the provided RecoveryAuthorizationRequirementsObligations0
+func (t *RecoveryAuthorizationRequirements_Obligations_Item) MergeRecoveryAuthorizationRequirementsObligations0(v RecoveryAuthorizationRequirementsObligations0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryAuthorizationRequirementsObligations1 returns the union data inside the RecoveryAuthorizationRequirements_Obligations_Item as a RecoveryAuthorizationRequirementsObligations1
+func (t RecoveryAuthorizationRequirements_Obligations_Item) AsRecoveryAuthorizationRequirementsObligations1() (RecoveryAuthorizationRequirementsObligations1, error) {
+	var body RecoveryAuthorizationRequirementsObligations1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryAuthorizationRequirementsObligations1 overwrites any union data inside the RecoveryAuthorizationRequirements_Obligations_Item as the provided RecoveryAuthorizationRequirementsObligations1
+func (t *RecoveryAuthorizationRequirements_Obligations_Item) FromRecoveryAuthorizationRequirementsObligations1(v RecoveryAuthorizationRequirementsObligations1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryAuthorizationRequirementsObligations1 performs a merge with any union data inside the RecoveryAuthorizationRequirements_Obligations_Item, using the provided RecoveryAuthorizationRequirementsObligations1
+func (t *RecoveryAuthorizationRequirements_Obligations_Item) MergeRecoveryAuthorizationRequirementsObligations1(v RecoveryAuthorizationRequirementsObligations1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryAuthorizationRequirementsObligations2 returns the union data inside the RecoveryAuthorizationRequirements_Obligations_Item as a RecoveryAuthorizationRequirementsObligations2
+func (t RecoveryAuthorizationRequirements_Obligations_Item) AsRecoveryAuthorizationRequirementsObligations2() (RecoveryAuthorizationRequirementsObligations2, error) {
+	var body RecoveryAuthorizationRequirementsObligations2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryAuthorizationRequirementsObligations2 overwrites any union data inside the RecoveryAuthorizationRequirements_Obligations_Item as the provided RecoveryAuthorizationRequirementsObligations2
+func (t *RecoveryAuthorizationRequirements_Obligations_Item) FromRecoveryAuthorizationRequirementsObligations2(v RecoveryAuthorizationRequirementsObligations2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryAuthorizationRequirementsObligations2 performs a merge with any union data inside the RecoveryAuthorizationRequirements_Obligations_Item, using the provided RecoveryAuthorizationRequirementsObligations2
+func (t *RecoveryAuthorizationRequirements_Obligations_Item) MergeRecoveryAuthorizationRequirementsObligations2(v RecoveryAuthorizationRequirementsObligations2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryAuthorizationRequirementsObligations3 returns the union data inside the RecoveryAuthorizationRequirements_Obligations_Item as a RecoveryAuthorizationRequirementsObligations3
+func (t RecoveryAuthorizationRequirements_Obligations_Item) AsRecoveryAuthorizationRequirementsObligations3() (RecoveryAuthorizationRequirementsObligations3, error) {
+	var body RecoveryAuthorizationRequirementsObligations3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryAuthorizationRequirementsObligations3 overwrites any union data inside the RecoveryAuthorizationRequirements_Obligations_Item as the provided RecoveryAuthorizationRequirementsObligations3
+func (t *RecoveryAuthorizationRequirements_Obligations_Item) FromRecoveryAuthorizationRequirementsObligations3(v RecoveryAuthorizationRequirementsObligations3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryAuthorizationRequirementsObligations3 performs a merge with any union data inside the RecoveryAuthorizationRequirements_Obligations_Item, using the provided RecoveryAuthorizationRequirementsObligations3
+func (t *RecoveryAuthorizationRequirements_Obligations_Item) MergeRecoveryAuthorizationRequirementsObligations3(v RecoveryAuthorizationRequirementsObligations3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoveryAuthorizationRequirements_Obligations_Item) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoveryAuthorizationRequirements_Obligations_Item) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoveryCommandCommand0 returns the union data inside the RecoveryCommand_Command as a RecoveryCommandCommand0
+func (t RecoveryCommand_Command) AsRecoveryCommandCommand0() (RecoveryCommandCommand0, error) {
+	var body RecoveryCommandCommand0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryCommandCommand0 overwrites any union data inside the RecoveryCommand_Command as the provided RecoveryCommandCommand0
+func (t *RecoveryCommand_Command) FromRecoveryCommandCommand0(v RecoveryCommandCommand0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryCommandCommand0 performs a merge with any union data inside the RecoveryCommand_Command, using the provided RecoveryCommandCommand0
+func (t *RecoveryCommand_Command) MergeRecoveryCommandCommand0(v RecoveryCommandCommand0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryCommandCommand1 returns the union data inside the RecoveryCommand_Command as a RecoveryCommandCommand1
+func (t RecoveryCommand_Command) AsRecoveryCommandCommand1() (RecoveryCommandCommand1, error) {
+	var body RecoveryCommandCommand1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryCommandCommand1 overwrites any union data inside the RecoveryCommand_Command as the provided RecoveryCommandCommand1
+func (t *RecoveryCommand_Command) FromRecoveryCommandCommand1(v RecoveryCommandCommand1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryCommandCommand1 performs a merge with any union data inside the RecoveryCommand_Command, using the provided RecoveryCommandCommand1
+func (t *RecoveryCommand_Command) MergeRecoveryCommandCommand1(v RecoveryCommandCommand1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryCommandCommand2 returns the union data inside the RecoveryCommand_Command as a RecoveryCommandCommand2
+func (t RecoveryCommand_Command) AsRecoveryCommandCommand2() (RecoveryCommandCommand2, error) {
+	var body RecoveryCommandCommand2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryCommandCommand2 overwrites any union data inside the RecoveryCommand_Command as the provided RecoveryCommandCommand2
+func (t *RecoveryCommand_Command) FromRecoveryCommandCommand2(v RecoveryCommandCommand2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryCommandCommand2 performs a merge with any union data inside the RecoveryCommand_Command, using the provided RecoveryCommandCommand2
+func (t *RecoveryCommand_Command) MergeRecoveryCommandCommand2(v RecoveryCommandCommand2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryCommandCommand3 returns the union data inside the RecoveryCommand_Command as a RecoveryCommandCommand3
+func (t RecoveryCommand_Command) AsRecoveryCommandCommand3() (RecoveryCommandCommand3, error) {
+	var body RecoveryCommandCommand3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryCommandCommand3 overwrites any union data inside the RecoveryCommand_Command as the provided RecoveryCommandCommand3
+func (t *RecoveryCommand_Command) FromRecoveryCommandCommand3(v RecoveryCommandCommand3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryCommandCommand3 performs a merge with any union data inside the RecoveryCommand_Command, using the provided RecoveryCommandCommand3
+func (t *RecoveryCommand_Command) MergeRecoveryCommandCommand3(v RecoveryCommandCommand3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryCommandCommand4 returns the union data inside the RecoveryCommand_Command as a RecoveryCommandCommand4
+func (t RecoveryCommand_Command) AsRecoveryCommandCommand4() (RecoveryCommandCommand4, error) {
+	var body RecoveryCommandCommand4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryCommandCommand4 overwrites any union data inside the RecoveryCommand_Command as the provided RecoveryCommandCommand4
+func (t *RecoveryCommand_Command) FromRecoveryCommandCommand4(v RecoveryCommandCommand4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryCommandCommand4 performs a merge with any union data inside the RecoveryCommand_Command, using the provided RecoveryCommandCommand4
+func (t *RecoveryCommand_Command) MergeRecoveryCommandCommand4(v RecoveryCommandCommand4) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryCommandCommand5 returns the union data inside the RecoveryCommand_Command as a RecoveryCommandCommand5
+func (t RecoveryCommand_Command) AsRecoveryCommandCommand5() (RecoveryCommandCommand5, error) {
+	var body RecoveryCommandCommand5
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryCommandCommand5 overwrites any union data inside the RecoveryCommand_Command as the provided RecoveryCommandCommand5
+func (t *RecoveryCommand_Command) FromRecoveryCommandCommand5(v RecoveryCommandCommand5) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryCommandCommand5 performs a merge with any union data inside the RecoveryCommand_Command, using the provided RecoveryCommandCommand5
+func (t *RecoveryCommand_Command) MergeRecoveryCommandCommand5(v RecoveryCommandCommand5) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryCommandCommand6 returns the union data inside the RecoveryCommand_Command as a RecoveryCommandCommand6
+func (t RecoveryCommand_Command) AsRecoveryCommandCommand6() (RecoveryCommandCommand6, error) {
+	var body RecoveryCommandCommand6
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryCommandCommand6 overwrites any union data inside the RecoveryCommand_Command as the provided RecoveryCommandCommand6
+func (t *RecoveryCommand_Command) FromRecoveryCommandCommand6(v RecoveryCommandCommand6) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryCommandCommand6 performs a merge with any union data inside the RecoveryCommand_Command, using the provided RecoveryCommandCommand6
+func (t *RecoveryCommand_Command) MergeRecoveryCommandCommand6(v RecoveryCommandCommand6) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoveryCommand_Command) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoveryCommand_Command) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoveryCommandResponseRecoveryEffectNeverAdmittedV1 returns the union data inside the RecoveryCommandResponse_Effect as a RecoveryCommandResponseRecoveryEffectNeverAdmittedV1
+func (t RecoveryCommandResponse_Effect) AsRecoveryCommandResponseRecoveryEffectNeverAdmittedV1() (RecoveryCommandResponseRecoveryEffectNeverAdmittedV1, error) {
+	var body RecoveryCommandResponseRecoveryEffectNeverAdmittedV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryCommandResponseRecoveryEffectNeverAdmittedV1 overwrites any union data inside the RecoveryCommandResponse_Effect as the provided RecoveryCommandResponseRecoveryEffectNeverAdmittedV1
+func (t *RecoveryCommandResponse_Effect) FromRecoveryCommandResponseRecoveryEffectNeverAdmittedV1(v RecoveryCommandResponseRecoveryEffectNeverAdmittedV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryCommandResponseRecoveryEffectNeverAdmittedV1 performs a merge with any union data inside the RecoveryCommandResponse_Effect, using the provided RecoveryCommandResponseRecoveryEffectNeverAdmittedV1
+func (t *RecoveryCommandResponse_Effect) MergeRecoveryCommandResponseRecoveryEffectNeverAdmittedV1(v RecoveryCommandResponseRecoveryEffectNeverAdmittedV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryCommandResponseRecoveryEffectAdmissionUnresolvedV1 returns the union data inside the RecoveryCommandResponse_Effect as a RecoveryCommandResponseRecoveryEffectAdmissionUnresolvedV1
+func (t RecoveryCommandResponse_Effect) AsRecoveryCommandResponseRecoveryEffectAdmissionUnresolvedV1() (RecoveryCommandResponseRecoveryEffectAdmissionUnresolvedV1, error) {
+	var body RecoveryCommandResponseRecoveryEffectAdmissionUnresolvedV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryCommandResponseRecoveryEffectAdmissionUnresolvedV1 overwrites any union data inside the RecoveryCommandResponse_Effect as the provided RecoveryCommandResponseRecoveryEffectAdmissionUnresolvedV1
+func (t *RecoveryCommandResponse_Effect) FromRecoveryCommandResponseRecoveryEffectAdmissionUnresolvedV1(v RecoveryCommandResponseRecoveryEffectAdmissionUnresolvedV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryCommandResponseRecoveryEffectAdmissionUnresolvedV1 performs a merge with any union data inside the RecoveryCommandResponse_Effect, using the provided RecoveryCommandResponseRecoveryEffectAdmissionUnresolvedV1
+func (t *RecoveryCommandResponse_Effect) MergeRecoveryCommandResponseRecoveryEffectAdmissionUnresolvedV1(v RecoveryCommandResponseRecoveryEffectAdmissionUnresolvedV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryCommandResponseRecoveryEffectClosedBeforeEffectV1 returns the union data inside the RecoveryCommandResponse_Effect as a RecoveryCommandResponseRecoveryEffectClosedBeforeEffectV1
+func (t RecoveryCommandResponse_Effect) AsRecoveryCommandResponseRecoveryEffectClosedBeforeEffectV1() (RecoveryCommandResponseRecoveryEffectClosedBeforeEffectV1, error) {
+	var body RecoveryCommandResponseRecoveryEffectClosedBeforeEffectV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryCommandResponseRecoveryEffectClosedBeforeEffectV1 overwrites any union data inside the RecoveryCommandResponse_Effect as the provided RecoveryCommandResponseRecoveryEffectClosedBeforeEffectV1
+func (t *RecoveryCommandResponse_Effect) FromRecoveryCommandResponseRecoveryEffectClosedBeforeEffectV1(v RecoveryCommandResponseRecoveryEffectClosedBeforeEffectV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryCommandResponseRecoveryEffectClosedBeforeEffectV1 performs a merge with any union data inside the RecoveryCommandResponse_Effect, using the provided RecoveryCommandResponseRecoveryEffectClosedBeforeEffectV1
+func (t *RecoveryCommandResponse_Effect) MergeRecoveryCommandResponseRecoveryEffectClosedBeforeEffectV1(v RecoveryCommandResponseRecoveryEffectClosedBeforeEffectV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryCommandResponseRecoveryEffectAwaitingApprovalV1 returns the union data inside the RecoveryCommandResponse_Effect as a RecoveryCommandResponseRecoveryEffectAwaitingApprovalV1
+func (t RecoveryCommandResponse_Effect) AsRecoveryCommandResponseRecoveryEffectAwaitingApprovalV1() (RecoveryCommandResponseRecoveryEffectAwaitingApprovalV1, error) {
+	var body RecoveryCommandResponseRecoveryEffectAwaitingApprovalV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryCommandResponseRecoveryEffectAwaitingApprovalV1 overwrites any union data inside the RecoveryCommandResponse_Effect as the provided RecoveryCommandResponseRecoveryEffectAwaitingApprovalV1
+func (t *RecoveryCommandResponse_Effect) FromRecoveryCommandResponseRecoveryEffectAwaitingApprovalV1(v RecoveryCommandResponseRecoveryEffectAwaitingApprovalV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryCommandResponseRecoveryEffectAwaitingApprovalV1 performs a merge with any union data inside the RecoveryCommandResponse_Effect, using the provided RecoveryCommandResponseRecoveryEffectAwaitingApprovalV1
+func (t *RecoveryCommandResponse_Effect) MergeRecoveryCommandResponseRecoveryEffectAwaitingApprovalV1(v RecoveryCommandResponseRecoveryEffectAwaitingApprovalV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryCommandResponseRecoveryEffectInFlightV1 returns the union data inside the RecoveryCommandResponse_Effect as a RecoveryCommandResponseRecoveryEffectInFlightV1
+func (t RecoveryCommandResponse_Effect) AsRecoveryCommandResponseRecoveryEffectInFlightV1() (RecoveryCommandResponseRecoveryEffectInFlightV1, error) {
+	var body RecoveryCommandResponseRecoveryEffectInFlightV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryCommandResponseRecoveryEffectInFlightV1 overwrites any union data inside the RecoveryCommandResponse_Effect as the provided RecoveryCommandResponseRecoveryEffectInFlightV1
+func (t *RecoveryCommandResponse_Effect) FromRecoveryCommandResponseRecoveryEffectInFlightV1(v RecoveryCommandResponseRecoveryEffectInFlightV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryCommandResponseRecoveryEffectInFlightV1 performs a merge with any union data inside the RecoveryCommandResponse_Effect, using the provided RecoveryCommandResponseRecoveryEffectInFlightV1
+func (t *RecoveryCommandResponse_Effect) MergeRecoveryCommandResponseRecoveryEffectInFlightV1(v RecoveryCommandResponseRecoveryEffectInFlightV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryCommandResponseRecoveryEffectAwaitingCallerReportV1 returns the union data inside the RecoveryCommandResponse_Effect as a RecoveryCommandResponseRecoveryEffectAwaitingCallerReportV1
+func (t RecoveryCommandResponse_Effect) AsRecoveryCommandResponseRecoveryEffectAwaitingCallerReportV1() (RecoveryCommandResponseRecoveryEffectAwaitingCallerReportV1, error) {
+	var body RecoveryCommandResponseRecoveryEffectAwaitingCallerReportV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryCommandResponseRecoveryEffectAwaitingCallerReportV1 overwrites any union data inside the RecoveryCommandResponse_Effect as the provided RecoveryCommandResponseRecoveryEffectAwaitingCallerReportV1
+func (t *RecoveryCommandResponse_Effect) FromRecoveryCommandResponseRecoveryEffectAwaitingCallerReportV1(v RecoveryCommandResponseRecoveryEffectAwaitingCallerReportV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryCommandResponseRecoveryEffectAwaitingCallerReportV1 performs a merge with any union data inside the RecoveryCommandResponse_Effect, using the provided RecoveryCommandResponseRecoveryEffectAwaitingCallerReportV1
+func (t *RecoveryCommandResponse_Effect) MergeRecoveryCommandResponseRecoveryEffectAwaitingCallerReportV1(v RecoveryCommandResponseRecoveryEffectAwaitingCallerReportV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryCommandResponseRecoveryEffectUnknownV1 returns the union data inside the RecoveryCommandResponse_Effect as a RecoveryCommandResponseRecoveryEffectUnknownV1
+func (t RecoveryCommandResponse_Effect) AsRecoveryCommandResponseRecoveryEffectUnknownV1() (RecoveryCommandResponseRecoveryEffectUnknownV1, error) {
+	var body RecoveryCommandResponseRecoveryEffectUnknownV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryCommandResponseRecoveryEffectUnknownV1 overwrites any union data inside the RecoveryCommandResponse_Effect as the provided RecoveryCommandResponseRecoveryEffectUnknownV1
+func (t *RecoveryCommandResponse_Effect) FromRecoveryCommandResponseRecoveryEffectUnknownV1(v RecoveryCommandResponseRecoveryEffectUnknownV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryCommandResponseRecoveryEffectUnknownV1 performs a merge with any union data inside the RecoveryCommandResponse_Effect, using the provided RecoveryCommandResponseRecoveryEffectUnknownV1
+func (t *RecoveryCommandResponse_Effect) MergeRecoveryCommandResponseRecoveryEffectUnknownV1(v RecoveryCommandResponseRecoveryEffectUnknownV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryCommandResponseRecoveryEffectCompleteV1 returns the union data inside the RecoveryCommandResponse_Effect as a RecoveryCommandResponseRecoveryEffectCompleteV1
+func (t RecoveryCommandResponse_Effect) AsRecoveryCommandResponseRecoveryEffectCompleteV1() (RecoveryCommandResponseRecoveryEffectCompleteV1, error) {
+	var body RecoveryCommandResponseRecoveryEffectCompleteV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryCommandResponseRecoveryEffectCompleteV1 overwrites any union data inside the RecoveryCommandResponse_Effect as the provided RecoveryCommandResponseRecoveryEffectCompleteV1
+func (t *RecoveryCommandResponse_Effect) FromRecoveryCommandResponseRecoveryEffectCompleteV1(v RecoveryCommandResponseRecoveryEffectCompleteV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryCommandResponseRecoveryEffectCompleteV1 performs a merge with any union data inside the RecoveryCommandResponse_Effect, using the provided RecoveryCommandResponseRecoveryEffectCompleteV1
+func (t *RecoveryCommandResponse_Effect) MergeRecoveryCommandResponseRecoveryEffectCompleteV1(v RecoveryCommandResponseRecoveryEffectCompleteV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryCommandResponseRecoveryEffectPartialV1 returns the union data inside the RecoveryCommandResponse_Effect as a RecoveryCommandResponseRecoveryEffectPartialV1
+func (t RecoveryCommandResponse_Effect) AsRecoveryCommandResponseRecoveryEffectPartialV1() (RecoveryCommandResponseRecoveryEffectPartialV1, error) {
+	var body RecoveryCommandResponseRecoveryEffectPartialV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryCommandResponseRecoveryEffectPartialV1 overwrites any union data inside the RecoveryCommandResponse_Effect as the provided RecoveryCommandResponseRecoveryEffectPartialV1
+func (t *RecoveryCommandResponse_Effect) FromRecoveryCommandResponseRecoveryEffectPartialV1(v RecoveryCommandResponseRecoveryEffectPartialV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryCommandResponseRecoveryEffectPartialV1 performs a merge with any union data inside the RecoveryCommandResponse_Effect, using the provided RecoveryCommandResponseRecoveryEffectPartialV1
+func (t *RecoveryCommandResponse_Effect) MergeRecoveryCommandResponseRecoveryEffectPartialV1(v RecoveryCommandResponseRecoveryEffectPartialV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryCommandResponseRecoveryEffectFailedAfterEffectV1 returns the union data inside the RecoveryCommandResponse_Effect as a RecoveryCommandResponseRecoveryEffectFailedAfterEffectV1
+func (t RecoveryCommandResponse_Effect) AsRecoveryCommandResponseRecoveryEffectFailedAfterEffectV1() (RecoveryCommandResponseRecoveryEffectFailedAfterEffectV1, error) {
+	var body RecoveryCommandResponseRecoveryEffectFailedAfterEffectV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryCommandResponseRecoveryEffectFailedAfterEffectV1 overwrites any union data inside the RecoveryCommandResponse_Effect as the provided RecoveryCommandResponseRecoveryEffectFailedAfterEffectV1
+func (t *RecoveryCommandResponse_Effect) FromRecoveryCommandResponseRecoveryEffectFailedAfterEffectV1(v RecoveryCommandResponseRecoveryEffectFailedAfterEffectV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryCommandResponseRecoveryEffectFailedAfterEffectV1 performs a merge with any union data inside the RecoveryCommandResponse_Effect, using the provided RecoveryCommandResponseRecoveryEffectFailedAfterEffectV1
+func (t *RecoveryCommandResponse_Effect) MergeRecoveryCommandResponseRecoveryEffectFailedAfterEffectV1(v RecoveryCommandResponseRecoveryEffectFailedAfterEffectV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoveryCommandResponse_Effect) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoveryCommandResponse_Effect) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoveryCommandResponseRelease0 returns the union data inside the RecoveryCommandResponse_Release as a RecoveryCommandResponseRelease0
+func (t RecoveryCommandResponse_Release) AsRecoveryCommandResponseRelease0() (RecoveryCommandResponseRelease0, error) {
+	var body RecoveryCommandResponseRelease0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryCommandResponseRelease0 overwrites any union data inside the RecoveryCommandResponse_Release as the provided RecoveryCommandResponseRelease0
+func (t *RecoveryCommandResponse_Release) FromRecoveryCommandResponseRelease0(v RecoveryCommandResponseRelease0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryCommandResponseRelease0 performs a merge with any union data inside the RecoveryCommandResponse_Release, using the provided RecoveryCommandResponseRelease0
+func (t *RecoveryCommandResponse_Release) MergeRecoveryCommandResponseRelease0(v RecoveryCommandResponseRelease0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryCommandResponseRelease1 returns the union data inside the RecoveryCommandResponse_Release as a RecoveryCommandResponseRelease1
+func (t RecoveryCommandResponse_Release) AsRecoveryCommandResponseRelease1() (RecoveryCommandResponseRelease1, error) {
+	var body RecoveryCommandResponseRelease1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryCommandResponseRelease1 overwrites any union data inside the RecoveryCommandResponse_Release as the provided RecoveryCommandResponseRelease1
+func (t *RecoveryCommandResponse_Release) FromRecoveryCommandResponseRelease1(v RecoveryCommandResponseRelease1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryCommandResponseRelease1 performs a merge with any union data inside the RecoveryCommandResponse_Release, using the provided RecoveryCommandResponseRelease1
+func (t *RecoveryCommandResponse_Release) MergeRecoveryCommandResponseRelease1(v RecoveryCommandResponseRelease1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryCommandResponseRelease2 returns the union data inside the RecoveryCommandResponse_Release as a RecoveryCommandResponseRelease2
+func (t RecoveryCommandResponse_Release) AsRecoveryCommandResponseRelease2() (RecoveryCommandResponseRelease2, error) {
+	var body RecoveryCommandResponseRelease2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryCommandResponseRelease2 overwrites any union data inside the RecoveryCommandResponse_Release as the provided RecoveryCommandResponseRelease2
+func (t *RecoveryCommandResponse_Release) FromRecoveryCommandResponseRelease2(v RecoveryCommandResponseRelease2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryCommandResponseRelease2 performs a merge with any union data inside the RecoveryCommandResponse_Release, using the provided RecoveryCommandResponseRelease2
+func (t *RecoveryCommandResponse_Release) MergeRecoveryCommandResponseRelease2(v RecoveryCommandResponseRelease2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryCommandResponseRelease3 returns the union data inside the RecoveryCommandResponse_Release as a RecoveryCommandResponseRelease3
+func (t RecoveryCommandResponse_Release) AsRecoveryCommandResponseRelease3() (RecoveryCommandResponseRelease3, error) {
+	var body RecoveryCommandResponseRelease3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryCommandResponseRelease3 overwrites any union data inside the RecoveryCommandResponse_Release as the provided RecoveryCommandResponseRelease3
+func (t *RecoveryCommandResponse_Release) FromRecoveryCommandResponseRelease3(v RecoveryCommandResponseRelease3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryCommandResponseRelease3 performs a merge with any union data inside the RecoveryCommandResponse_Release, using the provided RecoveryCommandResponseRelease3
+func (t *RecoveryCommandResponse_Release) MergeRecoveryCommandResponseRelease3(v RecoveryCommandResponseRelease3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryCommandResponseRelease4 returns the union data inside the RecoveryCommandResponse_Release as a RecoveryCommandResponseRelease4
+func (t RecoveryCommandResponse_Release) AsRecoveryCommandResponseRelease4() (RecoveryCommandResponseRelease4, error) {
+	var body RecoveryCommandResponseRelease4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryCommandResponseRelease4 overwrites any union data inside the RecoveryCommandResponse_Release as the provided RecoveryCommandResponseRelease4
+func (t *RecoveryCommandResponse_Release) FromRecoveryCommandResponseRelease4(v RecoveryCommandResponseRelease4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryCommandResponseRelease4 performs a merge with any union data inside the RecoveryCommandResponse_Release, using the provided RecoveryCommandResponseRelease4
+func (t *RecoveryCommandResponse_Release) MergeRecoveryCommandResponseRelease4(v RecoveryCommandResponseRelease4) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoveryCommandResponse_Release) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoveryCommandResponse_Release) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoveryConfinedExecutionProfileArtifactSink0 returns the union data inside the RecoveryConfinedExecutionProfileArtifactSink as a RecoveryConfinedExecutionProfileArtifactSink0
+func (t RecoveryConfinedExecutionProfileArtifactSink) AsRecoveryConfinedExecutionProfileArtifactSink0() (RecoveryConfinedExecutionProfileArtifactSink0, error) {
+	var body RecoveryConfinedExecutionProfileArtifactSink0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryConfinedExecutionProfileArtifactSink0 overwrites any union data inside the RecoveryConfinedExecutionProfileArtifactSink as the provided RecoveryConfinedExecutionProfileArtifactSink0
+func (t *RecoveryConfinedExecutionProfileArtifactSink) FromRecoveryConfinedExecutionProfileArtifactSink0(v RecoveryConfinedExecutionProfileArtifactSink0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryConfinedExecutionProfileArtifactSink0 performs a merge with any union data inside the RecoveryConfinedExecutionProfileArtifactSink, using the provided RecoveryConfinedExecutionProfileArtifactSink0
+func (t *RecoveryConfinedExecutionProfileArtifactSink) MergeRecoveryConfinedExecutionProfileArtifactSink0(v RecoveryConfinedExecutionProfileArtifactSink0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryConfinedExecutionProfileArtifactSink1 returns the union data inside the RecoveryConfinedExecutionProfileArtifactSink as a RecoveryConfinedExecutionProfileArtifactSink1
+func (t RecoveryConfinedExecutionProfileArtifactSink) AsRecoveryConfinedExecutionProfileArtifactSink1() (RecoveryConfinedExecutionProfileArtifactSink1, error) {
+	var body RecoveryConfinedExecutionProfileArtifactSink1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryConfinedExecutionProfileArtifactSink1 overwrites any union data inside the RecoveryConfinedExecutionProfileArtifactSink as the provided RecoveryConfinedExecutionProfileArtifactSink1
+func (t *RecoveryConfinedExecutionProfileArtifactSink) FromRecoveryConfinedExecutionProfileArtifactSink1(v RecoveryConfinedExecutionProfileArtifactSink1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryConfinedExecutionProfileArtifactSink1 performs a merge with any union data inside the RecoveryConfinedExecutionProfileArtifactSink, using the provided RecoveryConfinedExecutionProfileArtifactSink1
+func (t *RecoveryConfinedExecutionProfileArtifactSink) MergeRecoveryConfinedExecutionProfileArtifactSink1(v RecoveryConfinedExecutionProfileArtifactSink1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryConfinedExecutionProfileArtifactSink2 returns the union data inside the RecoveryConfinedExecutionProfileArtifactSink as a RecoveryConfinedExecutionProfileArtifactSink2
+func (t RecoveryConfinedExecutionProfileArtifactSink) AsRecoveryConfinedExecutionProfileArtifactSink2() (RecoveryConfinedExecutionProfileArtifactSink2, error) {
+	var body RecoveryConfinedExecutionProfileArtifactSink2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryConfinedExecutionProfileArtifactSink2 overwrites any union data inside the RecoveryConfinedExecutionProfileArtifactSink as the provided RecoveryConfinedExecutionProfileArtifactSink2
+func (t *RecoveryConfinedExecutionProfileArtifactSink) FromRecoveryConfinedExecutionProfileArtifactSink2(v RecoveryConfinedExecutionProfileArtifactSink2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryConfinedExecutionProfileArtifactSink2 performs a merge with any union data inside the RecoveryConfinedExecutionProfileArtifactSink, using the provided RecoveryConfinedExecutionProfileArtifactSink2
+func (t *RecoveryConfinedExecutionProfileArtifactSink) MergeRecoveryConfinedExecutionProfileArtifactSink2(v RecoveryConfinedExecutionProfileArtifactSink2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoveryConfinedExecutionProfileArtifactSink) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoveryConfinedExecutionProfileArtifactSink) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoveryConfinedLimitsArtifactSink0 returns the union data inside the RecoveryConfinedLimitsArtifactSink as a RecoveryConfinedLimitsArtifactSink0
+func (t RecoveryConfinedLimitsArtifactSink) AsRecoveryConfinedLimitsArtifactSink0() (RecoveryConfinedLimitsArtifactSink0, error) {
+	var body RecoveryConfinedLimitsArtifactSink0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryConfinedLimitsArtifactSink0 overwrites any union data inside the RecoveryConfinedLimitsArtifactSink as the provided RecoveryConfinedLimitsArtifactSink0
+func (t *RecoveryConfinedLimitsArtifactSink) FromRecoveryConfinedLimitsArtifactSink0(v RecoveryConfinedLimitsArtifactSink0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryConfinedLimitsArtifactSink0 performs a merge with any union data inside the RecoveryConfinedLimitsArtifactSink, using the provided RecoveryConfinedLimitsArtifactSink0
+func (t *RecoveryConfinedLimitsArtifactSink) MergeRecoveryConfinedLimitsArtifactSink0(v RecoveryConfinedLimitsArtifactSink0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryConfinedLimitsArtifactSink1 returns the union data inside the RecoveryConfinedLimitsArtifactSink as a RecoveryConfinedLimitsArtifactSink1
+func (t RecoveryConfinedLimitsArtifactSink) AsRecoveryConfinedLimitsArtifactSink1() (RecoveryConfinedLimitsArtifactSink1, error) {
+	var body RecoveryConfinedLimitsArtifactSink1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryConfinedLimitsArtifactSink1 overwrites any union data inside the RecoveryConfinedLimitsArtifactSink as the provided RecoveryConfinedLimitsArtifactSink1
+func (t *RecoveryConfinedLimitsArtifactSink) FromRecoveryConfinedLimitsArtifactSink1(v RecoveryConfinedLimitsArtifactSink1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryConfinedLimitsArtifactSink1 performs a merge with any union data inside the RecoveryConfinedLimitsArtifactSink, using the provided RecoveryConfinedLimitsArtifactSink1
+func (t *RecoveryConfinedLimitsArtifactSink) MergeRecoveryConfinedLimitsArtifactSink1(v RecoveryConfinedLimitsArtifactSink1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryConfinedLimitsArtifactSink2 returns the union data inside the RecoveryConfinedLimitsArtifactSink as a RecoveryConfinedLimitsArtifactSink2
+func (t RecoveryConfinedLimitsArtifactSink) AsRecoveryConfinedLimitsArtifactSink2() (RecoveryConfinedLimitsArtifactSink2, error) {
+	var body RecoveryConfinedLimitsArtifactSink2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryConfinedLimitsArtifactSink2 overwrites any union data inside the RecoveryConfinedLimitsArtifactSink as the provided RecoveryConfinedLimitsArtifactSink2
+func (t *RecoveryConfinedLimitsArtifactSink) FromRecoveryConfinedLimitsArtifactSink2(v RecoveryConfinedLimitsArtifactSink2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryConfinedLimitsArtifactSink2 performs a merge with any union data inside the RecoveryConfinedLimitsArtifactSink, using the provided RecoveryConfinedLimitsArtifactSink2
+func (t *RecoveryConfinedLimitsArtifactSink) MergeRecoveryConfinedLimitsArtifactSink2(v RecoveryConfinedLimitsArtifactSink2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoveryConfinedLimitsArtifactSink) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoveryConfinedLimitsArtifactSink) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoveryConfinedReturnEvidenceArtifactSink0 returns the union data inside the RecoveryConfinedReturnEvidenceArtifactSink as a RecoveryConfinedReturnEvidenceArtifactSink0
+func (t RecoveryConfinedReturnEvidenceArtifactSink) AsRecoveryConfinedReturnEvidenceArtifactSink0() (RecoveryConfinedReturnEvidenceArtifactSink0, error) {
+	var body RecoveryConfinedReturnEvidenceArtifactSink0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryConfinedReturnEvidenceArtifactSink0 overwrites any union data inside the RecoveryConfinedReturnEvidenceArtifactSink as the provided RecoveryConfinedReturnEvidenceArtifactSink0
+func (t *RecoveryConfinedReturnEvidenceArtifactSink) FromRecoveryConfinedReturnEvidenceArtifactSink0(v RecoveryConfinedReturnEvidenceArtifactSink0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryConfinedReturnEvidenceArtifactSink0 performs a merge with any union data inside the RecoveryConfinedReturnEvidenceArtifactSink, using the provided RecoveryConfinedReturnEvidenceArtifactSink0
+func (t *RecoveryConfinedReturnEvidenceArtifactSink) MergeRecoveryConfinedReturnEvidenceArtifactSink0(v RecoveryConfinedReturnEvidenceArtifactSink0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryConfinedReturnEvidenceArtifactSink1 returns the union data inside the RecoveryConfinedReturnEvidenceArtifactSink as a RecoveryConfinedReturnEvidenceArtifactSink1
+func (t RecoveryConfinedReturnEvidenceArtifactSink) AsRecoveryConfinedReturnEvidenceArtifactSink1() (RecoveryConfinedReturnEvidenceArtifactSink1, error) {
+	var body RecoveryConfinedReturnEvidenceArtifactSink1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryConfinedReturnEvidenceArtifactSink1 overwrites any union data inside the RecoveryConfinedReturnEvidenceArtifactSink as the provided RecoveryConfinedReturnEvidenceArtifactSink1
+func (t *RecoveryConfinedReturnEvidenceArtifactSink) FromRecoveryConfinedReturnEvidenceArtifactSink1(v RecoveryConfinedReturnEvidenceArtifactSink1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryConfinedReturnEvidenceArtifactSink1 performs a merge with any union data inside the RecoveryConfinedReturnEvidenceArtifactSink, using the provided RecoveryConfinedReturnEvidenceArtifactSink1
+func (t *RecoveryConfinedReturnEvidenceArtifactSink) MergeRecoveryConfinedReturnEvidenceArtifactSink1(v RecoveryConfinedReturnEvidenceArtifactSink1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryConfinedReturnEvidenceArtifactSink2 returns the union data inside the RecoveryConfinedReturnEvidenceArtifactSink as a RecoveryConfinedReturnEvidenceArtifactSink2
+func (t RecoveryConfinedReturnEvidenceArtifactSink) AsRecoveryConfinedReturnEvidenceArtifactSink2() (RecoveryConfinedReturnEvidenceArtifactSink2, error) {
+	var body RecoveryConfinedReturnEvidenceArtifactSink2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryConfinedReturnEvidenceArtifactSink2 overwrites any union data inside the RecoveryConfinedReturnEvidenceArtifactSink as the provided RecoveryConfinedReturnEvidenceArtifactSink2
+func (t *RecoveryConfinedReturnEvidenceArtifactSink) FromRecoveryConfinedReturnEvidenceArtifactSink2(v RecoveryConfinedReturnEvidenceArtifactSink2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryConfinedReturnEvidenceArtifactSink2 performs a merge with any union data inside the RecoveryConfinedReturnEvidenceArtifactSink, using the provided RecoveryConfinedReturnEvidenceArtifactSink2
+func (t *RecoveryConfinedReturnEvidenceArtifactSink) MergeRecoveryConfinedReturnEvidenceArtifactSink2(v RecoveryConfinedReturnEvidenceArtifactSink2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoveryConfinedReturnEvidenceArtifactSink) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoveryConfinedReturnEvidenceArtifactSink) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsSecurityDeclassificationGrant returns the union data inside the RecoveryDisclosureGrant as a SecurityDeclassificationGrant
+func (t RecoveryDisclosureGrant) AsSecurityDeclassificationGrant() (SecurityDeclassificationGrant, error) {
+	var body SecurityDeclassificationGrant
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityDeclassificationGrant overwrites any union data inside the RecoveryDisclosureGrant as the provided SecurityDeclassificationGrant
+func (t *RecoveryDisclosureGrant) FromSecurityDeclassificationGrant(v SecurityDeclassificationGrant) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityDeclassificationGrant performs a merge with any union data inside the RecoveryDisclosureGrant, using the provided SecurityDeclassificationGrant
+func (t *RecoveryDisclosureGrant) MergeSecurityDeclassificationGrant(v SecurityDeclassificationGrant) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryDisclosureGrant1 returns the union data inside the RecoveryDisclosureGrant as a RecoveryDisclosureGrant1
+func (t RecoveryDisclosureGrant) AsRecoveryDisclosureGrant1() (RecoveryDisclosureGrant1, error) {
+	var body RecoveryDisclosureGrant1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryDisclosureGrant1 overwrites any union data inside the RecoveryDisclosureGrant as the provided RecoveryDisclosureGrant1
+func (t *RecoveryDisclosureGrant) FromRecoveryDisclosureGrant1(v RecoveryDisclosureGrant1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryDisclosureGrant1 performs a merge with any union data inside the RecoveryDisclosureGrant, using the provided RecoveryDisclosureGrant1
+func (t *RecoveryDisclosureGrant) MergeRecoveryDisclosureGrant1(v RecoveryDisclosureGrant1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoveryDisclosureGrant) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoveryDisclosureGrant) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoveryExplanationSnapshotRecoveryEffectNeverAdmittedV1 returns the union data inside the RecoveryExplanationSnapshot_Effect as a RecoveryExplanationSnapshotRecoveryEffectNeverAdmittedV1
+func (t RecoveryExplanationSnapshot_Effect) AsRecoveryExplanationSnapshotRecoveryEffectNeverAdmittedV1() (RecoveryExplanationSnapshotRecoveryEffectNeverAdmittedV1, error) {
+	var body RecoveryExplanationSnapshotRecoveryEffectNeverAdmittedV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryExplanationSnapshotRecoveryEffectNeverAdmittedV1 overwrites any union data inside the RecoveryExplanationSnapshot_Effect as the provided RecoveryExplanationSnapshotRecoveryEffectNeverAdmittedV1
+func (t *RecoveryExplanationSnapshot_Effect) FromRecoveryExplanationSnapshotRecoveryEffectNeverAdmittedV1(v RecoveryExplanationSnapshotRecoveryEffectNeverAdmittedV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryExplanationSnapshotRecoveryEffectNeverAdmittedV1 performs a merge with any union data inside the RecoveryExplanationSnapshot_Effect, using the provided RecoveryExplanationSnapshotRecoveryEffectNeverAdmittedV1
+func (t *RecoveryExplanationSnapshot_Effect) MergeRecoveryExplanationSnapshotRecoveryEffectNeverAdmittedV1(v RecoveryExplanationSnapshotRecoveryEffectNeverAdmittedV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryExplanationSnapshotRecoveryEffectAdmissionUnresolvedV1 returns the union data inside the RecoveryExplanationSnapshot_Effect as a RecoveryExplanationSnapshotRecoveryEffectAdmissionUnresolvedV1
+func (t RecoveryExplanationSnapshot_Effect) AsRecoveryExplanationSnapshotRecoveryEffectAdmissionUnresolvedV1() (RecoveryExplanationSnapshotRecoveryEffectAdmissionUnresolvedV1, error) {
+	var body RecoveryExplanationSnapshotRecoveryEffectAdmissionUnresolvedV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryExplanationSnapshotRecoveryEffectAdmissionUnresolvedV1 overwrites any union data inside the RecoveryExplanationSnapshot_Effect as the provided RecoveryExplanationSnapshotRecoveryEffectAdmissionUnresolvedV1
+func (t *RecoveryExplanationSnapshot_Effect) FromRecoveryExplanationSnapshotRecoveryEffectAdmissionUnresolvedV1(v RecoveryExplanationSnapshotRecoveryEffectAdmissionUnresolvedV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryExplanationSnapshotRecoveryEffectAdmissionUnresolvedV1 performs a merge with any union data inside the RecoveryExplanationSnapshot_Effect, using the provided RecoveryExplanationSnapshotRecoveryEffectAdmissionUnresolvedV1
+func (t *RecoveryExplanationSnapshot_Effect) MergeRecoveryExplanationSnapshotRecoveryEffectAdmissionUnresolvedV1(v RecoveryExplanationSnapshotRecoveryEffectAdmissionUnresolvedV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryExplanationSnapshotRecoveryEffectClosedBeforeEffectV1 returns the union data inside the RecoveryExplanationSnapshot_Effect as a RecoveryExplanationSnapshotRecoveryEffectClosedBeforeEffectV1
+func (t RecoveryExplanationSnapshot_Effect) AsRecoveryExplanationSnapshotRecoveryEffectClosedBeforeEffectV1() (RecoveryExplanationSnapshotRecoveryEffectClosedBeforeEffectV1, error) {
+	var body RecoveryExplanationSnapshotRecoveryEffectClosedBeforeEffectV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryExplanationSnapshotRecoveryEffectClosedBeforeEffectV1 overwrites any union data inside the RecoveryExplanationSnapshot_Effect as the provided RecoveryExplanationSnapshotRecoveryEffectClosedBeforeEffectV1
+func (t *RecoveryExplanationSnapshot_Effect) FromRecoveryExplanationSnapshotRecoveryEffectClosedBeforeEffectV1(v RecoveryExplanationSnapshotRecoveryEffectClosedBeforeEffectV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryExplanationSnapshotRecoveryEffectClosedBeforeEffectV1 performs a merge with any union data inside the RecoveryExplanationSnapshot_Effect, using the provided RecoveryExplanationSnapshotRecoveryEffectClosedBeforeEffectV1
+func (t *RecoveryExplanationSnapshot_Effect) MergeRecoveryExplanationSnapshotRecoveryEffectClosedBeforeEffectV1(v RecoveryExplanationSnapshotRecoveryEffectClosedBeforeEffectV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryExplanationSnapshotRecoveryEffectAwaitingApprovalV1 returns the union data inside the RecoveryExplanationSnapshot_Effect as a RecoveryExplanationSnapshotRecoveryEffectAwaitingApprovalV1
+func (t RecoveryExplanationSnapshot_Effect) AsRecoveryExplanationSnapshotRecoveryEffectAwaitingApprovalV1() (RecoveryExplanationSnapshotRecoveryEffectAwaitingApprovalV1, error) {
+	var body RecoveryExplanationSnapshotRecoveryEffectAwaitingApprovalV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryExplanationSnapshotRecoveryEffectAwaitingApprovalV1 overwrites any union data inside the RecoveryExplanationSnapshot_Effect as the provided RecoveryExplanationSnapshotRecoveryEffectAwaitingApprovalV1
+func (t *RecoveryExplanationSnapshot_Effect) FromRecoveryExplanationSnapshotRecoveryEffectAwaitingApprovalV1(v RecoveryExplanationSnapshotRecoveryEffectAwaitingApprovalV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryExplanationSnapshotRecoveryEffectAwaitingApprovalV1 performs a merge with any union data inside the RecoveryExplanationSnapshot_Effect, using the provided RecoveryExplanationSnapshotRecoveryEffectAwaitingApprovalV1
+func (t *RecoveryExplanationSnapshot_Effect) MergeRecoveryExplanationSnapshotRecoveryEffectAwaitingApprovalV1(v RecoveryExplanationSnapshotRecoveryEffectAwaitingApprovalV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryExplanationSnapshotRecoveryEffectInFlightV1 returns the union data inside the RecoveryExplanationSnapshot_Effect as a RecoveryExplanationSnapshotRecoveryEffectInFlightV1
+func (t RecoveryExplanationSnapshot_Effect) AsRecoveryExplanationSnapshotRecoveryEffectInFlightV1() (RecoveryExplanationSnapshotRecoveryEffectInFlightV1, error) {
+	var body RecoveryExplanationSnapshotRecoveryEffectInFlightV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryExplanationSnapshotRecoveryEffectInFlightV1 overwrites any union data inside the RecoveryExplanationSnapshot_Effect as the provided RecoveryExplanationSnapshotRecoveryEffectInFlightV1
+func (t *RecoveryExplanationSnapshot_Effect) FromRecoveryExplanationSnapshotRecoveryEffectInFlightV1(v RecoveryExplanationSnapshotRecoveryEffectInFlightV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryExplanationSnapshotRecoveryEffectInFlightV1 performs a merge with any union data inside the RecoveryExplanationSnapshot_Effect, using the provided RecoveryExplanationSnapshotRecoveryEffectInFlightV1
+func (t *RecoveryExplanationSnapshot_Effect) MergeRecoveryExplanationSnapshotRecoveryEffectInFlightV1(v RecoveryExplanationSnapshotRecoveryEffectInFlightV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryExplanationSnapshotRecoveryEffectAwaitingCallerReportV1 returns the union data inside the RecoveryExplanationSnapshot_Effect as a RecoveryExplanationSnapshotRecoveryEffectAwaitingCallerReportV1
+func (t RecoveryExplanationSnapshot_Effect) AsRecoveryExplanationSnapshotRecoveryEffectAwaitingCallerReportV1() (RecoveryExplanationSnapshotRecoveryEffectAwaitingCallerReportV1, error) {
+	var body RecoveryExplanationSnapshotRecoveryEffectAwaitingCallerReportV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryExplanationSnapshotRecoveryEffectAwaitingCallerReportV1 overwrites any union data inside the RecoveryExplanationSnapshot_Effect as the provided RecoveryExplanationSnapshotRecoveryEffectAwaitingCallerReportV1
+func (t *RecoveryExplanationSnapshot_Effect) FromRecoveryExplanationSnapshotRecoveryEffectAwaitingCallerReportV1(v RecoveryExplanationSnapshotRecoveryEffectAwaitingCallerReportV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryExplanationSnapshotRecoveryEffectAwaitingCallerReportV1 performs a merge with any union data inside the RecoveryExplanationSnapshot_Effect, using the provided RecoveryExplanationSnapshotRecoveryEffectAwaitingCallerReportV1
+func (t *RecoveryExplanationSnapshot_Effect) MergeRecoveryExplanationSnapshotRecoveryEffectAwaitingCallerReportV1(v RecoveryExplanationSnapshotRecoveryEffectAwaitingCallerReportV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryExplanationSnapshotRecoveryEffectUnknownV1 returns the union data inside the RecoveryExplanationSnapshot_Effect as a RecoveryExplanationSnapshotRecoveryEffectUnknownV1
+func (t RecoveryExplanationSnapshot_Effect) AsRecoveryExplanationSnapshotRecoveryEffectUnknownV1() (RecoveryExplanationSnapshotRecoveryEffectUnknownV1, error) {
+	var body RecoveryExplanationSnapshotRecoveryEffectUnknownV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryExplanationSnapshotRecoveryEffectUnknownV1 overwrites any union data inside the RecoveryExplanationSnapshot_Effect as the provided RecoveryExplanationSnapshotRecoveryEffectUnknownV1
+func (t *RecoveryExplanationSnapshot_Effect) FromRecoveryExplanationSnapshotRecoveryEffectUnknownV1(v RecoveryExplanationSnapshotRecoveryEffectUnknownV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryExplanationSnapshotRecoveryEffectUnknownV1 performs a merge with any union data inside the RecoveryExplanationSnapshot_Effect, using the provided RecoveryExplanationSnapshotRecoveryEffectUnknownV1
+func (t *RecoveryExplanationSnapshot_Effect) MergeRecoveryExplanationSnapshotRecoveryEffectUnknownV1(v RecoveryExplanationSnapshotRecoveryEffectUnknownV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryExplanationSnapshotRecoveryEffectCompleteV1 returns the union data inside the RecoveryExplanationSnapshot_Effect as a RecoveryExplanationSnapshotRecoveryEffectCompleteV1
+func (t RecoveryExplanationSnapshot_Effect) AsRecoveryExplanationSnapshotRecoveryEffectCompleteV1() (RecoveryExplanationSnapshotRecoveryEffectCompleteV1, error) {
+	var body RecoveryExplanationSnapshotRecoveryEffectCompleteV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryExplanationSnapshotRecoveryEffectCompleteV1 overwrites any union data inside the RecoveryExplanationSnapshot_Effect as the provided RecoveryExplanationSnapshotRecoveryEffectCompleteV1
+func (t *RecoveryExplanationSnapshot_Effect) FromRecoveryExplanationSnapshotRecoveryEffectCompleteV1(v RecoveryExplanationSnapshotRecoveryEffectCompleteV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryExplanationSnapshotRecoveryEffectCompleteV1 performs a merge with any union data inside the RecoveryExplanationSnapshot_Effect, using the provided RecoveryExplanationSnapshotRecoveryEffectCompleteV1
+func (t *RecoveryExplanationSnapshot_Effect) MergeRecoveryExplanationSnapshotRecoveryEffectCompleteV1(v RecoveryExplanationSnapshotRecoveryEffectCompleteV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryExplanationSnapshotRecoveryEffectPartialV1 returns the union data inside the RecoveryExplanationSnapshot_Effect as a RecoveryExplanationSnapshotRecoveryEffectPartialV1
+func (t RecoveryExplanationSnapshot_Effect) AsRecoveryExplanationSnapshotRecoveryEffectPartialV1() (RecoveryExplanationSnapshotRecoveryEffectPartialV1, error) {
+	var body RecoveryExplanationSnapshotRecoveryEffectPartialV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryExplanationSnapshotRecoveryEffectPartialV1 overwrites any union data inside the RecoveryExplanationSnapshot_Effect as the provided RecoveryExplanationSnapshotRecoveryEffectPartialV1
+func (t *RecoveryExplanationSnapshot_Effect) FromRecoveryExplanationSnapshotRecoveryEffectPartialV1(v RecoveryExplanationSnapshotRecoveryEffectPartialV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryExplanationSnapshotRecoveryEffectPartialV1 performs a merge with any union data inside the RecoveryExplanationSnapshot_Effect, using the provided RecoveryExplanationSnapshotRecoveryEffectPartialV1
+func (t *RecoveryExplanationSnapshot_Effect) MergeRecoveryExplanationSnapshotRecoveryEffectPartialV1(v RecoveryExplanationSnapshotRecoveryEffectPartialV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryExplanationSnapshotRecoveryEffectFailedAfterEffectV1 returns the union data inside the RecoveryExplanationSnapshot_Effect as a RecoveryExplanationSnapshotRecoveryEffectFailedAfterEffectV1
+func (t RecoveryExplanationSnapshot_Effect) AsRecoveryExplanationSnapshotRecoveryEffectFailedAfterEffectV1() (RecoveryExplanationSnapshotRecoveryEffectFailedAfterEffectV1, error) {
+	var body RecoveryExplanationSnapshotRecoveryEffectFailedAfterEffectV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryExplanationSnapshotRecoveryEffectFailedAfterEffectV1 overwrites any union data inside the RecoveryExplanationSnapshot_Effect as the provided RecoveryExplanationSnapshotRecoveryEffectFailedAfterEffectV1
+func (t *RecoveryExplanationSnapshot_Effect) FromRecoveryExplanationSnapshotRecoveryEffectFailedAfterEffectV1(v RecoveryExplanationSnapshotRecoveryEffectFailedAfterEffectV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryExplanationSnapshotRecoveryEffectFailedAfterEffectV1 performs a merge with any union data inside the RecoveryExplanationSnapshot_Effect, using the provided RecoveryExplanationSnapshotRecoveryEffectFailedAfterEffectV1
+func (t *RecoveryExplanationSnapshot_Effect) MergeRecoveryExplanationSnapshotRecoveryEffectFailedAfterEffectV1(v RecoveryExplanationSnapshotRecoveryEffectFailedAfterEffectV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoveryExplanationSnapshot_Effect) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoveryExplanationSnapshot_Effect) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoveryExplanationSnapshotInfluence0 returns the union data inside the RecoveryExplanationSnapshot_Influence as a RecoveryExplanationSnapshotInfluence0
+func (t RecoveryExplanationSnapshot_Influence) AsRecoveryExplanationSnapshotInfluence0() (RecoveryExplanationSnapshotInfluence0, error) {
+	var body RecoveryExplanationSnapshotInfluence0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryExplanationSnapshotInfluence0 overwrites any union data inside the RecoveryExplanationSnapshot_Influence as the provided RecoveryExplanationSnapshotInfluence0
+func (t *RecoveryExplanationSnapshot_Influence) FromRecoveryExplanationSnapshotInfluence0(v RecoveryExplanationSnapshotInfluence0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryExplanationSnapshotInfluence0 performs a merge with any union data inside the RecoveryExplanationSnapshot_Influence, using the provided RecoveryExplanationSnapshotInfluence0
+func (t *RecoveryExplanationSnapshot_Influence) MergeRecoveryExplanationSnapshotInfluence0(v RecoveryExplanationSnapshotInfluence0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryExplanationSnapshotInfluence1 returns the union data inside the RecoveryExplanationSnapshot_Influence as a RecoveryExplanationSnapshotInfluence1
+func (t RecoveryExplanationSnapshot_Influence) AsRecoveryExplanationSnapshotInfluence1() (RecoveryExplanationSnapshotInfluence1, error) {
+	var body RecoveryExplanationSnapshotInfluence1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryExplanationSnapshotInfluence1 overwrites any union data inside the RecoveryExplanationSnapshot_Influence as the provided RecoveryExplanationSnapshotInfluence1
+func (t *RecoveryExplanationSnapshot_Influence) FromRecoveryExplanationSnapshotInfluence1(v RecoveryExplanationSnapshotInfluence1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryExplanationSnapshotInfluence1 performs a merge with any union data inside the RecoveryExplanationSnapshot_Influence, using the provided RecoveryExplanationSnapshotInfluence1
+func (t *RecoveryExplanationSnapshot_Influence) MergeRecoveryExplanationSnapshotInfluence1(v RecoveryExplanationSnapshotInfluence1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoveryExplanationSnapshot_Influence) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoveryExplanationSnapshot_Influence) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoveryExplanationSnapshotObservationsState0 returns the union data inside the RecoveryExplanationSnapshot_Observations_State as a RecoveryExplanationSnapshotObservationsState0
+func (t RecoveryExplanationSnapshot_Observations_State) AsRecoveryExplanationSnapshotObservationsState0() (RecoveryExplanationSnapshotObservationsState0, error) {
+	var body RecoveryExplanationSnapshotObservationsState0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryExplanationSnapshotObservationsState0 overwrites any union data inside the RecoveryExplanationSnapshot_Observations_State as the provided RecoveryExplanationSnapshotObservationsState0
+func (t *RecoveryExplanationSnapshot_Observations_State) FromRecoveryExplanationSnapshotObservationsState0(v RecoveryExplanationSnapshotObservationsState0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryExplanationSnapshotObservationsState0 performs a merge with any union data inside the RecoveryExplanationSnapshot_Observations_State, using the provided RecoveryExplanationSnapshotObservationsState0
+func (t *RecoveryExplanationSnapshot_Observations_State) MergeRecoveryExplanationSnapshotObservationsState0(v RecoveryExplanationSnapshotObservationsState0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryExplanationSnapshotObservationsState1 returns the union data inside the RecoveryExplanationSnapshot_Observations_State as a RecoveryExplanationSnapshotObservationsState1
+func (t RecoveryExplanationSnapshot_Observations_State) AsRecoveryExplanationSnapshotObservationsState1() (RecoveryExplanationSnapshotObservationsState1, error) {
+	var body RecoveryExplanationSnapshotObservationsState1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryExplanationSnapshotObservationsState1 overwrites any union data inside the RecoveryExplanationSnapshot_Observations_State as the provided RecoveryExplanationSnapshotObservationsState1
+func (t *RecoveryExplanationSnapshot_Observations_State) FromRecoveryExplanationSnapshotObservationsState1(v RecoveryExplanationSnapshotObservationsState1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryExplanationSnapshotObservationsState1 performs a merge with any union data inside the RecoveryExplanationSnapshot_Observations_State, using the provided RecoveryExplanationSnapshotObservationsState1
+func (t *RecoveryExplanationSnapshot_Observations_State) MergeRecoveryExplanationSnapshotObservationsState1(v RecoveryExplanationSnapshotObservationsState1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryExplanationSnapshotObservationsState2 returns the union data inside the RecoveryExplanationSnapshot_Observations_State as a RecoveryExplanationSnapshotObservationsState2
+func (t RecoveryExplanationSnapshot_Observations_State) AsRecoveryExplanationSnapshotObservationsState2() (RecoveryExplanationSnapshotObservationsState2, error) {
+	var body RecoveryExplanationSnapshotObservationsState2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryExplanationSnapshotObservationsState2 overwrites any union data inside the RecoveryExplanationSnapshot_Observations_State as the provided RecoveryExplanationSnapshotObservationsState2
+func (t *RecoveryExplanationSnapshot_Observations_State) FromRecoveryExplanationSnapshotObservationsState2(v RecoveryExplanationSnapshotObservationsState2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryExplanationSnapshotObservationsState2 performs a merge with any union data inside the RecoveryExplanationSnapshot_Observations_State, using the provided RecoveryExplanationSnapshotObservationsState2
+func (t *RecoveryExplanationSnapshot_Observations_State) MergeRecoveryExplanationSnapshotObservationsState2(v RecoveryExplanationSnapshotObservationsState2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoveryExplanationSnapshot_Observations_State) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoveryExplanationSnapshot_Observations_State) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoveryExplanationSnapshotObservationsTarget0 returns the union data inside the RecoveryExplanationSnapshot_Observations_Target as a RecoveryExplanationSnapshotObservationsTarget0
+func (t RecoveryExplanationSnapshot_Observations_Target) AsRecoveryExplanationSnapshotObservationsTarget0() (RecoveryExplanationSnapshotObservationsTarget0, error) {
+	var body RecoveryExplanationSnapshotObservationsTarget0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryExplanationSnapshotObservationsTarget0 overwrites any union data inside the RecoveryExplanationSnapshot_Observations_Target as the provided RecoveryExplanationSnapshotObservationsTarget0
+func (t *RecoveryExplanationSnapshot_Observations_Target) FromRecoveryExplanationSnapshotObservationsTarget0(v RecoveryExplanationSnapshotObservationsTarget0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryExplanationSnapshotObservationsTarget0 performs a merge with any union data inside the RecoveryExplanationSnapshot_Observations_Target, using the provided RecoveryExplanationSnapshotObservationsTarget0
+func (t *RecoveryExplanationSnapshot_Observations_Target) MergeRecoveryExplanationSnapshotObservationsTarget0(v RecoveryExplanationSnapshotObservationsTarget0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryExplanationSnapshotObservationsTarget1 returns the union data inside the RecoveryExplanationSnapshot_Observations_Target as a RecoveryExplanationSnapshotObservationsTarget1
+func (t RecoveryExplanationSnapshot_Observations_Target) AsRecoveryExplanationSnapshotObservationsTarget1() (RecoveryExplanationSnapshotObservationsTarget1, error) {
+	var body RecoveryExplanationSnapshotObservationsTarget1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryExplanationSnapshotObservationsTarget1 overwrites any union data inside the RecoveryExplanationSnapshot_Observations_Target as the provided RecoveryExplanationSnapshotObservationsTarget1
+func (t *RecoveryExplanationSnapshot_Observations_Target) FromRecoveryExplanationSnapshotObservationsTarget1(v RecoveryExplanationSnapshotObservationsTarget1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryExplanationSnapshotObservationsTarget1 performs a merge with any union data inside the RecoveryExplanationSnapshot_Observations_Target, using the provided RecoveryExplanationSnapshotObservationsTarget1
+func (t *RecoveryExplanationSnapshot_Observations_Target) MergeRecoveryExplanationSnapshotObservationsTarget1(v RecoveryExplanationSnapshotObservationsTarget1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryExplanationSnapshotObservationsTarget2 returns the union data inside the RecoveryExplanationSnapshot_Observations_Target as a RecoveryExplanationSnapshotObservationsTarget2
+func (t RecoveryExplanationSnapshot_Observations_Target) AsRecoveryExplanationSnapshotObservationsTarget2() (RecoveryExplanationSnapshotObservationsTarget2, error) {
+	var body RecoveryExplanationSnapshotObservationsTarget2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryExplanationSnapshotObservationsTarget2 overwrites any union data inside the RecoveryExplanationSnapshot_Observations_Target as the provided RecoveryExplanationSnapshotObservationsTarget2
+func (t *RecoveryExplanationSnapshot_Observations_Target) FromRecoveryExplanationSnapshotObservationsTarget2(v RecoveryExplanationSnapshotObservationsTarget2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryExplanationSnapshotObservationsTarget2 performs a merge with any union data inside the RecoveryExplanationSnapshot_Observations_Target, using the provided RecoveryExplanationSnapshotObservationsTarget2
+func (t *RecoveryExplanationSnapshot_Observations_Target) MergeRecoveryExplanationSnapshotObservationsTarget2(v RecoveryExplanationSnapshotObservationsTarget2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryExplanationSnapshotObservationsTarget3 returns the union data inside the RecoveryExplanationSnapshot_Observations_Target as a RecoveryExplanationSnapshotObservationsTarget3
+func (t RecoveryExplanationSnapshot_Observations_Target) AsRecoveryExplanationSnapshotObservationsTarget3() (RecoveryExplanationSnapshotObservationsTarget3, error) {
+	var body RecoveryExplanationSnapshotObservationsTarget3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryExplanationSnapshotObservationsTarget3 overwrites any union data inside the RecoveryExplanationSnapshot_Observations_Target as the provided RecoveryExplanationSnapshotObservationsTarget3
+func (t *RecoveryExplanationSnapshot_Observations_Target) FromRecoveryExplanationSnapshotObservationsTarget3(v RecoveryExplanationSnapshotObservationsTarget3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryExplanationSnapshotObservationsTarget3 performs a merge with any union data inside the RecoveryExplanationSnapshot_Observations_Target, using the provided RecoveryExplanationSnapshotObservationsTarget3
+func (t *RecoveryExplanationSnapshot_Observations_Target) MergeRecoveryExplanationSnapshotObservationsTarget3(v RecoveryExplanationSnapshotObservationsTarget3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoveryExplanationSnapshot_Observations_Target) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoveryExplanationSnapshot_Observations_Target) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoveryIsolationBoundaryArtifactSink0 returns the union data inside the RecoveryIsolationBoundaryArtifactSink as a RecoveryIsolationBoundaryArtifactSink0
+func (t RecoveryIsolationBoundaryArtifactSink) AsRecoveryIsolationBoundaryArtifactSink0() (RecoveryIsolationBoundaryArtifactSink0, error) {
+	var body RecoveryIsolationBoundaryArtifactSink0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryIsolationBoundaryArtifactSink0 overwrites any union data inside the RecoveryIsolationBoundaryArtifactSink as the provided RecoveryIsolationBoundaryArtifactSink0
+func (t *RecoveryIsolationBoundaryArtifactSink) FromRecoveryIsolationBoundaryArtifactSink0(v RecoveryIsolationBoundaryArtifactSink0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryIsolationBoundaryArtifactSink0 performs a merge with any union data inside the RecoveryIsolationBoundaryArtifactSink, using the provided RecoveryIsolationBoundaryArtifactSink0
+func (t *RecoveryIsolationBoundaryArtifactSink) MergeRecoveryIsolationBoundaryArtifactSink0(v RecoveryIsolationBoundaryArtifactSink0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryIsolationBoundaryArtifactSink1 returns the union data inside the RecoveryIsolationBoundaryArtifactSink as a RecoveryIsolationBoundaryArtifactSink1
+func (t RecoveryIsolationBoundaryArtifactSink) AsRecoveryIsolationBoundaryArtifactSink1() (RecoveryIsolationBoundaryArtifactSink1, error) {
+	var body RecoveryIsolationBoundaryArtifactSink1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryIsolationBoundaryArtifactSink1 overwrites any union data inside the RecoveryIsolationBoundaryArtifactSink as the provided RecoveryIsolationBoundaryArtifactSink1
+func (t *RecoveryIsolationBoundaryArtifactSink) FromRecoveryIsolationBoundaryArtifactSink1(v RecoveryIsolationBoundaryArtifactSink1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryIsolationBoundaryArtifactSink1 performs a merge with any union data inside the RecoveryIsolationBoundaryArtifactSink, using the provided RecoveryIsolationBoundaryArtifactSink1
+func (t *RecoveryIsolationBoundaryArtifactSink) MergeRecoveryIsolationBoundaryArtifactSink1(v RecoveryIsolationBoundaryArtifactSink1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryIsolationBoundaryArtifactSink2 returns the union data inside the RecoveryIsolationBoundaryArtifactSink as a RecoveryIsolationBoundaryArtifactSink2
+func (t RecoveryIsolationBoundaryArtifactSink) AsRecoveryIsolationBoundaryArtifactSink2() (RecoveryIsolationBoundaryArtifactSink2, error) {
+	var body RecoveryIsolationBoundaryArtifactSink2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryIsolationBoundaryArtifactSink2 overwrites any union data inside the RecoveryIsolationBoundaryArtifactSink as the provided RecoveryIsolationBoundaryArtifactSink2
+func (t *RecoveryIsolationBoundaryArtifactSink) FromRecoveryIsolationBoundaryArtifactSink2(v RecoveryIsolationBoundaryArtifactSink2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryIsolationBoundaryArtifactSink2 performs a merge with any union data inside the RecoveryIsolationBoundaryArtifactSink, using the provided RecoveryIsolationBoundaryArtifactSink2
+func (t *RecoveryIsolationBoundaryArtifactSink) MergeRecoveryIsolationBoundaryArtifactSink2(v RecoveryIsolationBoundaryArtifactSink2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoveryIsolationBoundaryArtifactSink) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoveryIsolationBoundaryArtifactSink) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoveryObservationRecoveryEffectNeverAdmittedV1 returns the union data inside the RecoveryObservation_Effect as a RecoveryObservationRecoveryEffectNeverAdmittedV1
+func (t RecoveryObservation_Effect) AsRecoveryObservationRecoveryEffectNeverAdmittedV1() (RecoveryObservationRecoveryEffectNeverAdmittedV1, error) {
+	var body RecoveryObservationRecoveryEffectNeverAdmittedV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryObservationRecoveryEffectNeverAdmittedV1 overwrites any union data inside the RecoveryObservation_Effect as the provided RecoveryObservationRecoveryEffectNeverAdmittedV1
+func (t *RecoveryObservation_Effect) FromRecoveryObservationRecoveryEffectNeverAdmittedV1(v RecoveryObservationRecoveryEffectNeverAdmittedV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryObservationRecoveryEffectNeverAdmittedV1 performs a merge with any union data inside the RecoveryObservation_Effect, using the provided RecoveryObservationRecoveryEffectNeverAdmittedV1
+func (t *RecoveryObservation_Effect) MergeRecoveryObservationRecoveryEffectNeverAdmittedV1(v RecoveryObservationRecoveryEffectNeverAdmittedV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryObservationRecoveryEffectAdmissionUnresolvedV1 returns the union data inside the RecoveryObservation_Effect as a RecoveryObservationRecoveryEffectAdmissionUnresolvedV1
+func (t RecoveryObservation_Effect) AsRecoveryObservationRecoveryEffectAdmissionUnresolvedV1() (RecoveryObservationRecoveryEffectAdmissionUnresolvedV1, error) {
+	var body RecoveryObservationRecoveryEffectAdmissionUnresolvedV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryObservationRecoveryEffectAdmissionUnresolvedV1 overwrites any union data inside the RecoveryObservation_Effect as the provided RecoveryObservationRecoveryEffectAdmissionUnresolvedV1
+func (t *RecoveryObservation_Effect) FromRecoveryObservationRecoveryEffectAdmissionUnresolvedV1(v RecoveryObservationRecoveryEffectAdmissionUnresolvedV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryObservationRecoveryEffectAdmissionUnresolvedV1 performs a merge with any union data inside the RecoveryObservation_Effect, using the provided RecoveryObservationRecoveryEffectAdmissionUnresolvedV1
+func (t *RecoveryObservation_Effect) MergeRecoveryObservationRecoveryEffectAdmissionUnresolvedV1(v RecoveryObservationRecoveryEffectAdmissionUnresolvedV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryObservationRecoveryEffectClosedBeforeEffectV1 returns the union data inside the RecoveryObservation_Effect as a RecoveryObservationRecoveryEffectClosedBeforeEffectV1
+func (t RecoveryObservation_Effect) AsRecoveryObservationRecoveryEffectClosedBeforeEffectV1() (RecoveryObservationRecoveryEffectClosedBeforeEffectV1, error) {
+	var body RecoveryObservationRecoveryEffectClosedBeforeEffectV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryObservationRecoveryEffectClosedBeforeEffectV1 overwrites any union data inside the RecoveryObservation_Effect as the provided RecoveryObservationRecoveryEffectClosedBeforeEffectV1
+func (t *RecoveryObservation_Effect) FromRecoveryObservationRecoveryEffectClosedBeforeEffectV1(v RecoveryObservationRecoveryEffectClosedBeforeEffectV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryObservationRecoveryEffectClosedBeforeEffectV1 performs a merge with any union data inside the RecoveryObservation_Effect, using the provided RecoveryObservationRecoveryEffectClosedBeforeEffectV1
+func (t *RecoveryObservation_Effect) MergeRecoveryObservationRecoveryEffectClosedBeforeEffectV1(v RecoveryObservationRecoveryEffectClosedBeforeEffectV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryObservationRecoveryEffectAwaitingApprovalV1 returns the union data inside the RecoveryObservation_Effect as a RecoveryObservationRecoveryEffectAwaitingApprovalV1
+func (t RecoveryObservation_Effect) AsRecoveryObservationRecoveryEffectAwaitingApprovalV1() (RecoveryObservationRecoveryEffectAwaitingApprovalV1, error) {
+	var body RecoveryObservationRecoveryEffectAwaitingApprovalV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryObservationRecoveryEffectAwaitingApprovalV1 overwrites any union data inside the RecoveryObservation_Effect as the provided RecoveryObservationRecoveryEffectAwaitingApprovalV1
+func (t *RecoveryObservation_Effect) FromRecoveryObservationRecoveryEffectAwaitingApprovalV1(v RecoveryObservationRecoveryEffectAwaitingApprovalV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryObservationRecoveryEffectAwaitingApprovalV1 performs a merge with any union data inside the RecoveryObservation_Effect, using the provided RecoveryObservationRecoveryEffectAwaitingApprovalV1
+func (t *RecoveryObservation_Effect) MergeRecoveryObservationRecoveryEffectAwaitingApprovalV1(v RecoveryObservationRecoveryEffectAwaitingApprovalV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryObservationRecoveryEffectInFlightV1 returns the union data inside the RecoveryObservation_Effect as a RecoveryObservationRecoveryEffectInFlightV1
+func (t RecoveryObservation_Effect) AsRecoveryObservationRecoveryEffectInFlightV1() (RecoveryObservationRecoveryEffectInFlightV1, error) {
+	var body RecoveryObservationRecoveryEffectInFlightV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryObservationRecoveryEffectInFlightV1 overwrites any union data inside the RecoveryObservation_Effect as the provided RecoveryObservationRecoveryEffectInFlightV1
+func (t *RecoveryObservation_Effect) FromRecoveryObservationRecoveryEffectInFlightV1(v RecoveryObservationRecoveryEffectInFlightV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryObservationRecoveryEffectInFlightV1 performs a merge with any union data inside the RecoveryObservation_Effect, using the provided RecoveryObservationRecoveryEffectInFlightV1
+func (t *RecoveryObservation_Effect) MergeRecoveryObservationRecoveryEffectInFlightV1(v RecoveryObservationRecoveryEffectInFlightV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryObservationRecoveryEffectAwaitingCallerReportV1 returns the union data inside the RecoveryObservation_Effect as a RecoveryObservationRecoveryEffectAwaitingCallerReportV1
+func (t RecoveryObservation_Effect) AsRecoveryObservationRecoveryEffectAwaitingCallerReportV1() (RecoveryObservationRecoveryEffectAwaitingCallerReportV1, error) {
+	var body RecoveryObservationRecoveryEffectAwaitingCallerReportV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryObservationRecoveryEffectAwaitingCallerReportV1 overwrites any union data inside the RecoveryObservation_Effect as the provided RecoveryObservationRecoveryEffectAwaitingCallerReportV1
+func (t *RecoveryObservation_Effect) FromRecoveryObservationRecoveryEffectAwaitingCallerReportV1(v RecoveryObservationRecoveryEffectAwaitingCallerReportV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryObservationRecoveryEffectAwaitingCallerReportV1 performs a merge with any union data inside the RecoveryObservation_Effect, using the provided RecoveryObservationRecoveryEffectAwaitingCallerReportV1
+func (t *RecoveryObservation_Effect) MergeRecoveryObservationRecoveryEffectAwaitingCallerReportV1(v RecoveryObservationRecoveryEffectAwaitingCallerReportV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryObservationRecoveryEffectUnknownV1 returns the union data inside the RecoveryObservation_Effect as a RecoveryObservationRecoveryEffectUnknownV1
+func (t RecoveryObservation_Effect) AsRecoveryObservationRecoveryEffectUnknownV1() (RecoveryObservationRecoveryEffectUnknownV1, error) {
+	var body RecoveryObservationRecoveryEffectUnknownV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryObservationRecoveryEffectUnknownV1 overwrites any union data inside the RecoveryObservation_Effect as the provided RecoveryObservationRecoveryEffectUnknownV1
+func (t *RecoveryObservation_Effect) FromRecoveryObservationRecoveryEffectUnknownV1(v RecoveryObservationRecoveryEffectUnknownV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryObservationRecoveryEffectUnknownV1 performs a merge with any union data inside the RecoveryObservation_Effect, using the provided RecoveryObservationRecoveryEffectUnknownV1
+func (t *RecoveryObservation_Effect) MergeRecoveryObservationRecoveryEffectUnknownV1(v RecoveryObservationRecoveryEffectUnknownV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryObservationRecoveryEffectCompleteV1 returns the union data inside the RecoveryObservation_Effect as a RecoveryObservationRecoveryEffectCompleteV1
+func (t RecoveryObservation_Effect) AsRecoveryObservationRecoveryEffectCompleteV1() (RecoveryObservationRecoveryEffectCompleteV1, error) {
+	var body RecoveryObservationRecoveryEffectCompleteV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryObservationRecoveryEffectCompleteV1 overwrites any union data inside the RecoveryObservation_Effect as the provided RecoveryObservationRecoveryEffectCompleteV1
+func (t *RecoveryObservation_Effect) FromRecoveryObservationRecoveryEffectCompleteV1(v RecoveryObservationRecoveryEffectCompleteV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryObservationRecoveryEffectCompleteV1 performs a merge with any union data inside the RecoveryObservation_Effect, using the provided RecoveryObservationRecoveryEffectCompleteV1
+func (t *RecoveryObservation_Effect) MergeRecoveryObservationRecoveryEffectCompleteV1(v RecoveryObservationRecoveryEffectCompleteV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryObservationRecoveryEffectPartialV1 returns the union data inside the RecoveryObservation_Effect as a RecoveryObservationRecoveryEffectPartialV1
+func (t RecoveryObservation_Effect) AsRecoveryObservationRecoveryEffectPartialV1() (RecoveryObservationRecoveryEffectPartialV1, error) {
+	var body RecoveryObservationRecoveryEffectPartialV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryObservationRecoveryEffectPartialV1 overwrites any union data inside the RecoveryObservation_Effect as the provided RecoveryObservationRecoveryEffectPartialV1
+func (t *RecoveryObservation_Effect) FromRecoveryObservationRecoveryEffectPartialV1(v RecoveryObservationRecoveryEffectPartialV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryObservationRecoveryEffectPartialV1 performs a merge with any union data inside the RecoveryObservation_Effect, using the provided RecoveryObservationRecoveryEffectPartialV1
+func (t *RecoveryObservation_Effect) MergeRecoveryObservationRecoveryEffectPartialV1(v RecoveryObservationRecoveryEffectPartialV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryObservationRecoveryEffectFailedAfterEffectV1 returns the union data inside the RecoveryObservation_Effect as a RecoveryObservationRecoveryEffectFailedAfterEffectV1
+func (t RecoveryObservation_Effect) AsRecoveryObservationRecoveryEffectFailedAfterEffectV1() (RecoveryObservationRecoveryEffectFailedAfterEffectV1, error) {
+	var body RecoveryObservationRecoveryEffectFailedAfterEffectV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryObservationRecoveryEffectFailedAfterEffectV1 overwrites any union data inside the RecoveryObservation_Effect as the provided RecoveryObservationRecoveryEffectFailedAfterEffectV1
+func (t *RecoveryObservation_Effect) FromRecoveryObservationRecoveryEffectFailedAfterEffectV1(v RecoveryObservationRecoveryEffectFailedAfterEffectV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryObservationRecoveryEffectFailedAfterEffectV1 performs a merge with any union data inside the RecoveryObservation_Effect, using the provided RecoveryObservationRecoveryEffectFailedAfterEffectV1
+func (t *RecoveryObservation_Effect) MergeRecoveryObservationRecoveryEffectFailedAfterEffectV1(v RecoveryObservationRecoveryEffectFailedAfterEffectV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoveryObservation_Effect) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoveryObservation_Effect) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoveryObservationRelease0 returns the union data inside the RecoveryObservation_Release as a RecoveryObservationRelease0
+func (t RecoveryObservation_Release) AsRecoveryObservationRelease0() (RecoveryObservationRelease0, error) {
+	var body RecoveryObservationRelease0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryObservationRelease0 overwrites any union data inside the RecoveryObservation_Release as the provided RecoveryObservationRelease0
+func (t *RecoveryObservation_Release) FromRecoveryObservationRelease0(v RecoveryObservationRelease0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryObservationRelease0 performs a merge with any union data inside the RecoveryObservation_Release, using the provided RecoveryObservationRelease0
+func (t *RecoveryObservation_Release) MergeRecoveryObservationRelease0(v RecoveryObservationRelease0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryObservationRelease1 returns the union data inside the RecoveryObservation_Release as a RecoveryObservationRelease1
+func (t RecoveryObservation_Release) AsRecoveryObservationRelease1() (RecoveryObservationRelease1, error) {
+	var body RecoveryObservationRelease1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryObservationRelease1 overwrites any union data inside the RecoveryObservation_Release as the provided RecoveryObservationRelease1
+func (t *RecoveryObservation_Release) FromRecoveryObservationRelease1(v RecoveryObservationRelease1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryObservationRelease1 performs a merge with any union data inside the RecoveryObservation_Release, using the provided RecoveryObservationRelease1
+func (t *RecoveryObservation_Release) MergeRecoveryObservationRelease1(v RecoveryObservationRelease1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryObservationRelease2 returns the union data inside the RecoveryObservation_Release as a RecoveryObservationRelease2
+func (t RecoveryObservation_Release) AsRecoveryObservationRelease2() (RecoveryObservationRelease2, error) {
+	var body RecoveryObservationRelease2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryObservationRelease2 overwrites any union data inside the RecoveryObservation_Release as the provided RecoveryObservationRelease2
+func (t *RecoveryObservation_Release) FromRecoveryObservationRelease2(v RecoveryObservationRelease2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryObservationRelease2 performs a merge with any union data inside the RecoveryObservation_Release, using the provided RecoveryObservationRelease2
+func (t *RecoveryObservation_Release) MergeRecoveryObservationRelease2(v RecoveryObservationRelease2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryObservationRelease3 returns the union data inside the RecoveryObservation_Release as a RecoveryObservationRelease3
+func (t RecoveryObservation_Release) AsRecoveryObservationRelease3() (RecoveryObservationRelease3, error) {
+	var body RecoveryObservationRelease3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryObservationRelease3 overwrites any union data inside the RecoveryObservation_Release as the provided RecoveryObservationRelease3
+func (t *RecoveryObservation_Release) FromRecoveryObservationRelease3(v RecoveryObservationRelease3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryObservationRelease3 performs a merge with any union data inside the RecoveryObservation_Release, using the provided RecoveryObservationRelease3
+func (t *RecoveryObservation_Release) MergeRecoveryObservationRelease3(v RecoveryObservationRelease3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryObservationRelease4 returns the union data inside the RecoveryObservation_Release as a RecoveryObservationRelease4
+func (t RecoveryObservation_Release) AsRecoveryObservationRelease4() (RecoveryObservationRelease4, error) {
+	var body RecoveryObservationRelease4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryObservationRelease4 overwrites any union data inside the RecoveryObservation_Release as the provided RecoveryObservationRelease4
+func (t *RecoveryObservation_Release) FromRecoveryObservationRelease4(v RecoveryObservationRelease4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryObservationRelease4 performs a merge with any union data inside the RecoveryObservation_Release, using the provided RecoveryObservationRelease4
+func (t *RecoveryObservation_Release) MergeRecoveryObservationRelease4(v RecoveryObservationRelease4) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoveryObservation_Release) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoveryObservation_Release) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoveryReturnAdmissionOpaqueId returns the union data inside the RecoveryReturnAdmission_Disclosure as a RecoveryReturnAdmissionOpaqueId
+func (t RecoveryReturnAdmission_Disclosure) AsRecoveryReturnAdmissionOpaqueId() (RecoveryReturnAdmissionOpaqueId, error) {
+	var body RecoveryReturnAdmissionOpaqueId
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryReturnAdmissionOpaqueId overwrites any union data inside the RecoveryReturnAdmission_Disclosure as the provided RecoveryReturnAdmissionOpaqueId
+func (t *RecoveryReturnAdmission_Disclosure) FromRecoveryReturnAdmissionOpaqueId(v RecoveryReturnAdmissionOpaqueId) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryReturnAdmissionOpaqueId performs a merge with any union data inside the RecoveryReturnAdmission_Disclosure, using the provided RecoveryReturnAdmissionOpaqueId
+func (t *RecoveryReturnAdmission_Disclosure) MergeRecoveryReturnAdmissionOpaqueId(v RecoveryReturnAdmissionOpaqueId) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryReturnAdmissionDisclosure1 returns the union data inside the RecoveryReturnAdmission_Disclosure as a RecoveryReturnAdmissionDisclosure1
+func (t RecoveryReturnAdmission_Disclosure) AsRecoveryReturnAdmissionDisclosure1() (RecoveryReturnAdmissionDisclosure1, error) {
+	var body RecoveryReturnAdmissionDisclosure1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryReturnAdmissionDisclosure1 overwrites any union data inside the RecoveryReturnAdmission_Disclosure as the provided RecoveryReturnAdmissionDisclosure1
+func (t *RecoveryReturnAdmission_Disclosure) FromRecoveryReturnAdmissionDisclosure1(v RecoveryReturnAdmissionDisclosure1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryReturnAdmissionDisclosure1 performs a merge with any union data inside the RecoveryReturnAdmission_Disclosure, using the provided RecoveryReturnAdmissionDisclosure1
+func (t *RecoveryReturnAdmission_Disclosure) MergeRecoveryReturnAdmissionDisclosure1(v RecoveryReturnAdmissionDisclosure1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoveryReturnAdmission_Disclosure) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoveryReturnAdmission_Disclosure) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoveryReturnAdmissionOpaqueId returns the union data inside the RecoveryReturnAdmission_Endorsement as a RecoveryReturnAdmissionOpaqueId
+func (t RecoveryReturnAdmission_Endorsement) AsRecoveryReturnAdmissionOpaqueId() (RecoveryReturnAdmissionOpaqueId, error) {
+	var body RecoveryReturnAdmissionOpaqueId
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryReturnAdmissionOpaqueId overwrites any union data inside the RecoveryReturnAdmission_Endorsement as the provided RecoveryReturnAdmissionOpaqueId
+func (t *RecoveryReturnAdmission_Endorsement) FromRecoveryReturnAdmissionOpaqueId(v RecoveryReturnAdmissionOpaqueId) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryReturnAdmissionOpaqueId performs a merge with any union data inside the RecoveryReturnAdmission_Endorsement, using the provided RecoveryReturnAdmissionOpaqueId
+func (t *RecoveryReturnAdmission_Endorsement) MergeRecoveryReturnAdmissionOpaqueId(v RecoveryReturnAdmissionOpaqueId) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryReturnAdmissionEndorsement1 returns the union data inside the RecoveryReturnAdmission_Endorsement as a RecoveryReturnAdmissionEndorsement1
+func (t RecoveryReturnAdmission_Endorsement) AsRecoveryReturnAdmissionEndorsement1() (RecoveryReturnAdmissionEndorsement1, error) {
+	var body RecoveryReturnAdmissionEndorsement1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryReturnAdmissionEndorsement1 overwrites any union data inside the RecoveryReturnAdmission_Endorsement as the provided RecoveryReturnAdmissionEndorsement1
+func (t *RecoveryReturnAdmission_Endorsement) FromRecoveryReturnAdmissionEndorsement1(v RecoveryReturnAdmissionEndorsement1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryReturnAdmissionEndorsement1 performs a merge with any union data inside the RecoveryReturnAdmission_Endorsement, using the provided RecoveryReturnAdmissionEndorsement1
+func (t *RecoveryReturnAdmission_Endorsement) MergeRecoveryReturnAdmissionEndorsement1(v RecoveryReturnAdmissionEndorsement1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoveryReturnAdmission_Endorsement) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoveryReturnAdmission_Endorsement) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoveryReturnAdmissionArtifactSink0 returns the union data inside the RecoveryReturnAdmissionArtifactSink as a RecoveryReturnAdmissionArtifactSink0
+func (t RecoveryReturnAdmissionArtifactSink) AsRecoveryReturnAdmissionArtifactSink0() (RecoveryReturnAdmissionArtifactSink0, error) {
+	var body RecoveryReturnAdmissionArtifactSink0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryReturnAdmissionArtifactSink0 overwrites any union data inside the RecoveryReturnAdmissionArtifactSink as the provided RecoveryReturnAdmissionArtifactSink0
+func (t *RecoveryReturnAdmissionArtifactSink) FromRecoveryReturnAdmissionArtifactSink0(v RecoveryReturnAdmissionArtifactSink0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryReturnAdmissionArtifactSink0 performs a merge with any union data inside the RecoveryReturnAdmissionArtifactSink, using the provided RecoveryReturnAdmissionArtifactSink0
+func (t *RecoveryReturnAdmissionArtifactSink) MergeRecoveryReturnAdmissionArtifactSink0(v RecoveryReturnAdmissionArtifactSink0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryReturnAdmissionArtifactSink1 returns the union data inside the RecoveryReturnAdmissionArtifactSink as a RecoveryReturnAdmissionArtifactSink1
+func (t RecoveryReturnAdmissionArtifactSink) AsRecoveryReturnAdmissionArtifactSink1() (RecoveryReturnAdmissionArtifactSink1, error) {
+	var body RecoveryReturnAdmissionArtifactSink1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryReturnAdmissionArtifactSink1 overwrites any union data inside the RecoveryReturnAdmissionArtifactSink as the provided RecoveryReturnAdmissionArtifactSink1
+func (t *RecoveryReturnAdmissionArtifactSink) FromRecoveryReturnAdmissionArtifactSink1(v RecoveryReturnAdmissionArtifactSink1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryReturnAdmissionArtifactSink1 performs a merge with any union data inside the RecoveryReturnAdmissionArtifactSink, using the provided RecoveryReturnAdmissionArtifactSink1
+func (t *RecoveryReturnAdmissionArtifactSink) MergeRecoveryReturnAdmissionArtifactSink1(v RecoveryReturnAdmissionArtifactSink1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryReturnAdmissionArtifactSink2 returns the union data inside the RecoveryReturnAdmissionArtifactSink as a RecoveryReturnAdmissionArtifactSink2
+func (t RecoveryReturnAdmissionArtifactSink) AsRecoveryReturnAdmissionArtifactSink2() (RecoveryReturnAdmissionArtifactSink2, error) {
+	var body RecoveryReturnAdmissionArtifactSink2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryReturnAdmissionArtifactSink2 overwrites any union data inside the RecoveryReturnAdmissionArtifactSink as the provided RecoveryReturnAdmissionArtifactSink2
+func (t *RecoveryReturnAdmissionArtifactSink) FromRecoveryReturnAdmissionArtifactSink2(v RecoveryReturnAdmissionArtifactSink2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryReturnAdmissionArtifactSink2 performs a merge with any union data inside the RecoveryReturnAdmissionArtifactSink, using the provided RecoveryReturnAdmissionArtifactSink2
+func (t *RecoveryReturnAdmissionArtifactSink) MergeRecoveryReturnAdmissionArtifactSink2(v RecoveryReturnAdmissionArtifactSink2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoveryReturnAdmissionArtifactSink) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoveryReturnAdmissionArtifactSink) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoveryReturnContractArtifactSink0 returns the union data inside the RecoveryReturnContractArtifactSink as a RecoveryReturnContractArtifactSink0
+func (t RecoveryReturnContractArtifactSink) AsRecoveryReturnContractArtifactSink0() (RecoveryReturnContractArtifactSink0, error) {
+	var body RecoveryReturnContractArtifactSink0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryReturnContractArtifactSink0 overwrites any union data inside the RecoveryReturnContractArtifactSink as the provided RecoveryReturnContractArtifactSink0
+func (t *RecoveryReturnContractArtifactSink) FromRecoveryReturnContractArtifactSink0(v RecoveryReturnContractArtifactSink0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryReturnContractArtifactSink0 performs a merge with any union data inside the RecoveryReturnContractArtifactSink, using the provided RecoveryReturnContractArtifactSink0
+func (t *RecoveryReturnContractArtifactSink) MergeRecoveryReturnContractArtifactSink0(v RecoveryReturnContractArtifactSink0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryReturnContractArtifactSink1 returns the union data inside the RecoveryReturnContractArtifactSink as a RecoveryReturnContractArtifactSink1
+func (t RecoveryReturnContractArtifactSink) AsRecoveryReturnContractArtifactSink1() (RecoveryReturnContractArtifactSink1, error) {
+	var body RecoveryReturnContractArtifactSink1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryReturnContractArtifactSink1 overwrites any union data inside the RecoveryReturnContractArtifactSink as the provided RecoveryReturnContractArtifactSink1
+func (t *RecoveryReturnContractArtifactSink) FromRecoveryReturnContractArtifactSink1(v RecoveryReturnContractArtifactSink1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryReturnContractArtifactSink1 performs a merge with any union data inside the RecoveryReturnContractArtifactSink, using the provided RecoveryReturnContractArtifactSink1
+func (t *RecoveryReturnContractArtifactSink) MergeRecoveryReturnContractArtifactSink1(v RecoveryReturnContractArtifactSink1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryReturnContractArtifactSink2 returns the union data inside the RecoveryReturnContractArtifactSink as a RecoveryReturnContractArtifactSink2
+func (t RecoveryReturnContractArtifactSink) AsRecoveryReturnContractArtifactSink2() (RecoveryReturnContractArtifactSink2, error) {
+	var body RecoveryReturnContractArtifactSink2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryReturnContractArtifactSink2 overwrites any union data inside the RecoveryReturnContractArtifactSink as the provided RecoveryReturnContractArtifactSink2
+func (t *RecoveryReturnContractArtifactSink) FromRecoveryReturnContractArtifactSink2(v RecoveryReturnContractArtifactSink2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryReturnContractArtifactSink2 performs a merge with any union data inside the RecoveryReturnContractArtifactSink, using the provided RecoveryReturnContractArtifactSink2
+func (t *RecoveryReturnContractArtifactSink) MergeRecoveryReturnContractArtifactSink2(v RecoveryReturnContractArtifactSink2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoveryReturnContractArtifactSink) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoveryReturnContractArtifactSink) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoveryScopedEndorsementTarget0 returns the union data inside the RecoveryScopedEndorsement_Target as a RecoveryScopedEndorsementTarget0
+func (t RecoveryScopedEndorsement_Target) AsRecoveryScopedEndorsementTarget0() (RecoveryScopedEndorsementTarget0, error) {
+	var body RecoveryScopedEndorsementTarget0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryScopedEndorsementTarget0 overwrites any union data inside the RecoveryScopedEndorsement_Target as the provided RecoveryScopedEndorsementTarget0
+func (t *RecoveryScopedEndorsement_Target) FromRecoveryScopedEndorsementTarget0(v RecoveryScopedEndorsementTarget0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryScopedEndorsementTarget0 performs a merge with any union data inside the RecoveryScopedEndorsement_Target, using the provided RecoveryScopedEndorsementTarget0
+func (t *RecoveryScopedEndorsement_Target) MergeRecoveryScopedEndorsementTarget0(v RecoveryScopedEndorsementTarget0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoveryScopedEndorsementTarget1 returns the union data inside the RecoveryScopedEndorsement_Target as a RecoveryScopedEndorsementTarget1
+func (t RecoveryScopedEndorsement_Target) AsRecoveryScopedEndorsementTarget1() (RecoveryScopedEndorsementTarget1, error) {
+	var body RecoveryScopedEndorsementTarget1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoveryScopedEndorsementTarget1 overwrites any union data inside the RecoveryScopedEndorsement_Target as the provided RecoveryScopedEndorsementTarget1
+func (t *RecoveryScopedEndorsement_Target) FromRecoveryScopedEndorsementTarget1(v RecoveryScopedEndorsementTarget1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoveryScopedEndorsementTarget1 performs a merge with any union data inside the RecoveryScopedEndorsement_Target, using the provided RecoveryScopedEndorsementTarget1
+func (t *RecoveryScopedEndorsement_Target) MergeRecoveryScopedEndorsementTarget1(v RecoveryScopedEndorsementTarget1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoveryScopedEndorsement_Target) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoveryScopedEndorsement_Target) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoverySemanticDeploymentSemanticSelector0 returns the union data inside the RecoverySemanticDeploymentSemanticSelector as a RecoverySemanticDeploymentSemanticSelector0
+func (t RecoverySemanticDeploymentSemanticSelector) AsRecoverySemanticDeploymentSemanticSelector0() (RecoverySemanticDeploymentSemanticSelector0, error) {
+	var body RecoverySemanticDeploymentSemanticSelector0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoverySemanticDeploymentSemanticSelector0 overwrites any union data inside the RecoverySemanticDeploymentSemanticSelector as the provided RecoverySemanticDeploymentSemanticSelector0
+func (t *RecoverySemanticDeploymentSemanticSelector) FromRecoverySemanticDeploymentSemanticSelector0(v RecoverySemanticDeploymentSemanticSelector0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoverySemanticDeploymentSemanticSelector0 performs a merge with any union data inside the RecoverySemanticDeploymentSemanticSelector, using the provided RecoverySemanticDeploymentSemanticSelector0
+func (t *RecoverySemanticDeploymentSemanticSelector) MergeRecoverySemanticDeploymentSemanticSelector0(v RecoverySemanticDeploymentSemanticSelector0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoverySemanticDeploymentSemanticSelector1 returns the union data inside the RecoverySemanticDeploymentSemanticSelector as a RecoverySemanticDeploymentSemanticSelector1
+func (t RecoverySemanticDeploymentSemanticSelector) AsRecoverySemanticDeploymentSemanticSelector1() (RecoverySemanticDeploymentSemanticSelector1, error) {
+	var body RecoverySemanticDeploymentSemanticSelector1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoverySemanticDeploymentSemanticSelector1 overwrites any union data inside the RecoverySemanticDeploymentSemanticSelector as the provided RecoverySemanticDeploymentSemanticSelector1
+func (t *RecoverySemanticDeploymentSemanticSelector) FromRecoverySemanticDeploymentSemanticSelector1(v RecoverySemanticDeploymentSemanticSelector1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoverySemanticDeploymentSemanticSelector1 performs a merge with any union data inside the RecoverySemanticDeploymentSemanticSelector, using the provided RecoverySemanticDeploymentSemanticSelector1
+func (t *RecoverySemanticDeploymentSemanticSelector) MergeRecoverySemanticDeploymentSemanticSelector1(v RecoverySemanticDeploymentSemanticSelector1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoverySemanticDeploymentSemanticSelector2 returns the union data inside the RecoverySemanticDeploymentSemanticSelector as a RecoverySemanticDeploymentSemanticSelector2
+func (t RecoverySemanticDeploymentSemanticSelector) AsRecoverySemanticDeploymentSemanticSelector2() (RecoverySemanticDeploymentSemanticSelector2, error) {
+	var body RecoverySemanticDeploymentSemanticSelector2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoverySemanticDeploymentSemanticSelector2 overwrites any union data inside the RecoverySemanticDeploymentSemanticSelector as the provided RecoverySemanticDeploymentSemanticSelector2
+func (t *RecoverySemanticDeploymentSemanticSelector) FromRecoverySemanticDeploymentSemanticSelector2(v RecoverySemanticDeploymentSemanticSelector2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoverySemanticDeploymentSemanticSelector2 performs a merge with any union data inside the RecoverySemanticDeploymentSemanticSelector, using the provided RecoverySemanticDeploymentSemanticSelector2
+func (t *RecoverySemanticDeploymentSemanticSelector) MergeRecoverySemanticDeploymentSemanticSelector2(v RecoverySemanticDeploymentSemanticSelector2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoverySemanticDeploymentSemanticSelector) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoverySemanticDeploymentSemanticSelector) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoverySemanticDeploymentSemanticValue0 returns the union data inside the RecoverySemanticDeploymentSemanticValue as a RecoverySemanticDeploymentSemanticValue0
+func (t RecoverySemanticDeploymentSemanticValue) AsRecoverySemanticDeploymentSemanticValue0() (RecoverySemanticDeploymentSemanticValue0, error) {
+	var body RecoverySemanticDeploymentSemanticValue0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoverySemanticDeploymentSemanticValue0 overwrites any union data inside the RecoverySemanticDeploymentSemanticValue as the provided RecoverySemanticDeploymentSemanticValue0
+func (t *RecoverySemanticDeploymentSemanticValue) FromRecoverySemanticDeploymentSemanticValue0(v RecoverySemanticDeploymentSemanticValue0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoverySemanticDeploymentSemanticValue0 performs a merge with any union data inside the RecoverySemanticDeploymentSemanticValue, using the provided RecoverySemanticDeploymentSemanticValue0
+func (t *RecoverySemanticDeploymentSemanticValue) MergeRecoverySemanticDeploymentSemanticValue0(v RecoverySemanticDeploymentSemanticValue0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoverySemanticDeploymentSemanticValue1 returns the union data inside the RecoverySemanticDeploymentSemanticValue as a RecoverySemanticDeploymentSemanticValue1
+func (t RecoverySemanticDeploymentSemanticValue) AsRecoverySemanticDeploymentSemanticValue1() (RecoverySemanticDeploymentSemanticValue1, error) {
+	var body RecoverySemanticDeploymentSemanticValue1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoverySemanticDeploymentSemanticValue1 overwrites any union data inside the RecoverySemanticDeploymentSemanticValue as the provided RecoverySemanticDeploymentSemanticValue1
+func (t *RecoverySemanticDeploymentSemanticValue) FromRecoverySemanticDeploymentSemanticValue1(v RecoverySemanticDeploymentSemanticValue1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoverySemanticDeploymentSemanticValue1 performs a merge with any union data inside the RecoverySemanticDeploymentSemanticValue, using the provided RecoverySemanticDeploymentSemanticValue1
+func (t *RecoverySemanticDeploymentSemanticValue) MergeRecoverySemanticDeploymentSemanticValue1(v RecoverySemanticDeploymentSemanticValue1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoverySemanticDeploymentSemanticValue2 returns the union data inside the RecoverySemanticDeploymentSemanticValue as a RecoverySemanticDeploymentSemanticValue2
+func (t RecoverySemanticDeploymentSemanticValue) AsRecoverySemanticDeploymentSemanticValue2() (RecoverySemanticDeploymentSemanticValue2, error) {
+	var body RecoverySemanticDeploymentSemanticValue2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoverySemanticDeploymentSemanticValue2 overwrites any union data inside the RecoverySemanticDeploymentSemanticValue as the provided RecoverySemanticDeploymentSemanticValue2
+func (t *RecoverySemanticDeploymentSemanticValue) FromRecoverySemanticDeploymentSemanticValue2(v RecoverySemanticDeploymentSemanticValue2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoverySemanticDeploymentSemanticValue2 performs a merge with any union data inside the RecoverySemanticDeploymentSemanticValue, using the provided RecoverySemanticDeploymentSemanticValue2
+func (t *RecoverySemanticDeploymentSemanticValue) MergeRecoverySemanticDeploymentSemanticValue2(v RecoverySemanticDeploymentSemanticValue2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoverySemanticDeploymentSemanticValue) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoverySemanticDeploymentSemanticValue) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoverySemanticPackageSemanticSelector0 returns the union data inside the RecoverySemanticPackageSemanticSelector as a RecoverySemanticPackageSemanticSelector0
+func (t RecoverySemanticPackageSemanticSelector) AsRecoverySemanticPackageSemanticSelector0() (RecoverySemanticPackageSemanticSelector0, error) {
+	var body RecoverySemanticPackageSemanticSelector0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoverySemanticPackageSemanticSelector0 overwrites any union data inside the RecoverySemanticPackageSemanticSelector as the provided RecoverySemanticPackageSemanticSelector0
+func (t *RecoverySemanticPackageSemanticSelector) FromRecoverySemanticPackageSemanticSelector0(v RecoverySemanticPackageSemanticSelector0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoverySemanticPackageSemanticSelector0 performs a merge with any union data inside the RecoverySemanticPackageSemanticSelector, using the provided RecoverySemanticPackageSemanticSelector0
+func (t *RecoverySemanticPackageSemanticSelector) MergeRecoverySemanticPackageSemanticSelector0(v RecoverySemanticPackageSemanticSelector0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoverySemanticPackageSemanticSelector1 returns the union data inside the RecoverySemanticPackageSemanticSelector as a RecoverySemanticPackageSemanticSelector1
+func (t RecoverySemanticPackageSemanticSelector) AsRecoverySemanticPackageSemanticSelector1() (RecoverySemanticPackageSemanticSelector1, error) {
+	var body RecoverySemanticPackageSemanticSelector1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoverySemanticPackageSemanticSelector1 overwrites any union data inside the RecoverySemanticPackageSemanticSelector as the provided RecoverySemanticPackageSemanticSelector1
+func (t *RecoverySemanticPackageSemanticSelector) FromRecoverySemanticPackageSemanticSelector1(v RecoverySemanticPackageSemanticSelector1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoverySemanticPackageSemanticSelector1 performs a merge with any union data inside the RecoverySemanticPackageSemanticSelector, using the provided RecoverySemanticPackageSemanticSelector1
+func (t *RecoverySemanticPackageSemanticSelector) MergeRecoverySemanticPackageSemanticSelector1(v RecoverySemanticPackageSemanticSelector1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoverySemanticPackageSemanticSelector2 returns the union data inside the RecoverySemanticPackageSemanticSelector as a RecoverySemanticPackageSemanticSelector2
+func (t RecoverySemanticPackageSemanticSelector) AsRecoverySemanticPackageSemanticSelector2() (RecoverySemanticPackageSemanticSelector2, error) {
+	var body RecoverySemanticPackageSemanticSelector2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoverySemanticPackageSemanticSelector2 overwrites any union data inside the RecoverySemanticPackageSemanticSelector as the provided RecoverySemanticPackageSemanticSelector2
+func (t *RecoverySemanticPackageSemanticSelector) FromRecoverySemanticPackageSemanticSelector2(v RecoverySemanticPackageSemanticSelector2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoverySemanticPackageSemanticSelector2 performs a merge with any union data inside the RecoverySemanticPackageSemanticSelector, using the provided RecoverySemanticPackageSemanticSelector2
+func (t *RecoverySemanticPackageSemanticSelector) MergeRecoverySemanticPackageSemanticSelector2(v RecoverySemanticPackageSemanticSelector2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoverySemanticPackageSemanticSelector) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoverySemanticPackageSemanticSelector) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoverySemanticPackageSemanticValue0 returns the union data inside the RecoverySemanticPackageSemanticValue as a RecoverySemanticPackageSemanticValue0
+func (t RecoverySemanticPackageSemanticValue) AsRecoverySemanticPackageSemanticValue0() (RecoverySemanticPackageSemanticValue0, error) {
+	var body RecoverySemanticPackageSemanticValue0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoverySemanticPackageSemanticValue0 overwrites any union data inside the RecoverySemanticPackageSemanticValue as the provided RecoverySemanticPackageSemanticValue0
+func (t *RecoverySemanticPackageSemanticValue) FromRecoverySemanticPackageSemanticValue0(v RecoverySemanticPackageSemanticValue0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoverySemanticPackageSemanticValue0 performs a merge with any union data inside the RecoverySemanticPackageSemanticValue, using the provided RecoverySemanticPackageSemanticValue0
+func (t *RecoverySemanticPackageSemanticValue) MergeRecoverySemanticPackageSemanticValue0(v RecoverySemanticPackageSemanticValue0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoverySemanticPackageSemanticValue1 returns the union data inside the RecoverySemanticPackageSemanticValue as a RecoverySemanticPackageSemanticValue1
+func (t RecoverySemanticPackageSemanticValue) AsRecoverySemanticPackageSemanticValue1() (RecoverySemanticPackageSemanticValue1, error) {
+	var body RecoverySemanticPackageSemanticValue1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoverySemanticPackageSemanticValue1 overwrites any union data inside the RecoverySemanticPackageSemanticValue as the provided RecoverySemanticPackageSemanticValue1
+func (t *RecoverySemanticPackageSemanticValue) FromRecoverySemanticPackageSemanticValue1(v RecoverySemanticPackageSemanticValue1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoverySemanticPackageSemanticValue1 performs a merge with any union data inside the RecoverySemanticPackageSemanticValue, using the provided RecoverySemanticPackageSemanticValue1
+func (t *RecoverySemanticPackageSemanticValue) MergeRecoverySemanticPackageSemanticValue1(v RecoverySemanticPackageSemanticValue1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoverySemanticPackageSemanticValue2 returns the union data inside the RecoverySemanticPackageSemanticValue as a RecoverySemanticPackageSemanticValue2
+func (t RecoverySemanticPackageSemanticValue) AsRecoverySemanticPackageSemanticValue2() (RecoverySemanticPackageSemanticValue2, error) {
+	var body RecoverySemanticPackageSemanticValue2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoverySemanticPackageSemanticValue2 overwrites any union data inside the RecoverySemanticPackageSemanticValue as the provided RecoverySemanticPackageSemanticValue2
+func (t *RecoverySemanticPackageSemanticValue) FromRecoverySemanticPackageSemanticValue2(v RecoverySemanticPackageSemanticValue2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoverySemanticPackageSemanticValue2 performs a merge with any union data inside the RecoverySemanticPackageSemanticValue, using the provided RecoverySemanticPackageSemanticValue2
+func (t *RecoverySemanticPackageSemanticValue) MergeRecoverySemanticPackageSemanticValue2(v RecoverySemanticPackageSemanticValue2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoverySemanticPackageSemanticValue) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoverySemanticPackageSemanticValue) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoverySemanticPayloadSemanticValue0 returns the union data inside the RecoverySemanticPayloadSemanticValue as a RecoverySemanticPayloadSemanticValue0
+func (t RecoverySemanticPayloadSemanticValue) AsRecoverySemanticPayloadSemanticValue0() (RecoverySemanticPayloadSemanticValue0, error) {
+	var body RecoverySemanticPayloadSemanticValue0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoverySemanticPayloadSemanticValue0 overwrites any union data inside the RecoverySemanticPayloadSemanticValue as the provided RecoverySemanticPayloadSemanticValue0
+func (t *RecoverySemanticPayloadSemanticValue) FromRecoverySemanticPayloadSemanticValue0(v RecoverySemanticPayloadSemanticValue0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoverySemanticPayloadSemanticValue0 performs a merge with any union data inside the RecoverySemanticPayloadSemanticValue, using the provided RecoverySemanticPayloadSemanticValue0
+func (t *RecoverySemanticPayloadSemanticValue) MergeRecoverySemanticPayloadSemanticValue0(v RecoverySemanticPayloadSemanticValue0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoverySemanticPayloadSemanticValue1 returns the union data inside the RecoverySemanticPayloadSemanticValue as a RecoverySemanticPayloadSemanticValue1
+func (t RecoverySemanticPayloadSemanticValue) AsRecoverySemanticPayloadSemanticValue1() (RecoverySemanticPayloadSemanticValue1, error) {
+	var body RecoverySemanticPayloadSemanticValue1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoverySemanticPayloadSemanticValue1 overwrites any union data inside the RecoverySemanticPayloadSemanticValue as the provided RecoverySemanticPayloadSemanticValue1
+func (t *RecoverySemanticPayloadSemanticValue) FromRecoverySemanticPayloadSemanticValue1(v RecoverySemanticPayloadSemanticValue1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoverySemanticPayloadSemanticValue1 performs a merge with any union data inside the RecoverySemanticPayloadSemanticValue, using the provided RecoverySemanticPayloadSemanticValue1
+func (t *RecoverySemanticPayloadSemanticValue) MergeRecoverySemanticPayloadSemanticValue1(v RecoverySemanticPayloadSemanticValue1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoverySemanticPayloadSemanticValue2 returns the union data inside the RecoverySemanticPayloadSemanticValue as a RecoverySemanticPayloadSemanticValue2
+func (t RecoverySemanticPayloadSemanticValue) AsRecoverySemanticPayloadSemanticValue2() (RecoverySemanticPayloadSemanticValue2, error) {
+	var body RecoverySemanticPayloadSemanticValue2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoverySemanticPayloadSemanticValue2 overwrites any union data inside the RecoverySemanticPayloadSemanticValue as the provided RecoverySemanticPayloadSemanticValue2
+func (t *RecoverySemanticPayloadSemanticValue) FromRecoverySemanticPayloadSemanticValue2(v RecoverySemanticPayloadSemanticValue2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoverySemanticPayloadSemanticValue2 performs a merge with any union data inside the RecoverySemanticPayloadSemanticValue, using the provided RecoverySemanticPayloadSemanticValue2
+func (t *RecoverySemanticPayloadSemanticValue) MergeRecoverySemanticPayloadSemanticValue2(v RecoverySemanticPayloadSemanticValue2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoverySemanticPayloadSemanticValue) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoverySemanticPayloadSemanticValue) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoverySemanticPlanSemanticPlanInput0 returns the union data inside the RecoverySemanticPlanSemanticPlanInput as a RecoverySemanticPlanSemanticPlanInput0
+func (t RecoverySemanticPlanSemanticPlanInput) AsRecoverySemanticPlanSemanticPlanInput0() (RecoverySemanticPlanSemanticPlanInput0, error) {
+	var body RecoverySemanticPlanSemanticPlanInput0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoverySemanticPlanSemanticPlanInput0 overwrites any union data inside the RecoverySemanticPlanSemanticPlanInput as the provided RecoverySemanticPlanSemanticPlanInput0
+func (t *RecoverySemanticPlanSemanticPlanInput) FromRecoverySemanticPlanSemanticPlanInput0(v RecoverySemanticPlanSemanticPlanInput0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoverySemanticPlanSemanticPlanInput0 performs a merge with any union data inside the RecoverySemanticPlanSemanticPlanInput, using the provided RecoverySemanticPlanSemanticPlanInput0
+func (t *RecoverySemanticPlanSemanticPlanInput) MergeRecoverySemanticPlanSemanticPlanInput0(v RecoverySemanticPlanSemanticPlanInput0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoverySemanticPlanSemanticPlanInput1 returns the union data inside the RecoverySemanticPlanSemanticPlanInput as a RecoverySemanticPlanSemanticPlanInput1
+func (t RecoverySemanticPlanSemanticPlanInput) AsRecoverySemanticPlanSemanticPlanInput1() (RecoverySemanticPlanSemanticPlanInput1, error) {
+	var body RecoverySemanticPlanSemanticPlanInput1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoverySemanticPlanSemanticPlanInput1 overwrites any union data inside the RecoverySemanticPlanSemanticPlanInput as the provided RecoverySemanticPlanSemanticPlanInput1
+func (t *RecoverySemanticPlanSemanticPlanInput) FromRecoverySemanticPlanSemanticPlanInput1(v RecoverySemanticPlanSemanticPlanInput1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoverySemanticPlanSemanticPlanInput1 performs a merge with any union data inside the RecoverySemanticPlanSemanticPlanInput, using the provided RecoverySemanticPlanSemanticPlanInput1
+func (t *RecoverySemanticPlanSemanticPlanInput) MergeRecoverySemanticPlanSemanticPlanInput1(v RecoverySemanticPlanSemanticPlanInput1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoverySemanticPlanSemanticPlanInput) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoverySemanticPlanSemanticPlanInput) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoverySignedConfinedDisclosureArtifactSink0 returns the union data inside the RecoverySignedConfinedDisclosureArtifactSink as a RecoverySignedConfinedDisclosureArtifactSink0
+func (t RecoverySignedConfinedDisclosureArtifactSink) AsRecoverySignedConfinedDisclosureArtifactSink0() (RecoverySignedConfinedDisclosureArtifactSink0, error) {
+	var body RecoverySignedConfinedDisclosureArtifactSink0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoverySignedConfinedDisclosureArtifactSink0 overwrites any union data inside the RecoverySignedConfinedDisclosureArtifactSink as the provided RecoverySignedConfinedDisclosureArtifactSink0
+func (t *RecoverySignedConfinedDisclosureArtifactSink) FromRecoverySignedConfinedDisclosureArtifactSink0(v RecoverySignedConfinedDisclosureArtifactSink0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoverySignedConfinedDisclosureArtifactSink0 performs a merge with any union data inside the RecoverySignedConfinedDisclosureArtifactSink, using the provided RecoverySignedConfinedDisclosureArtifactSink0
+func (t *RecoverySignedConfinedDisclosureArtifactSink) MergeRecoverySignedConfinedDisclosureArtifactSink0(v RecoverySignedConfinedDisclosureArtifactSink0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoverySignedConfinedDisclosureArtifactSink1 returns the union data inside the RecoverySignedConfinedDisclosureArtifactSink as a RecoverySignedConfinedDisclosureArtifactSink1
+func (t RecoverySignedConfinedDisclosureArtifactSink) AsRecoverySignedConfinedDisclosureArtifactSink1() (RecoverySignedConfinedDisclosureArtifactSink1, error) {
+	var body RecoverySignedConfinedDisclosureArtifactSink1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoverySignedConfinedDisclosureArtifactSink1 overwrites any union data inside the RecoverySignedConfinedDisclosureArtifactSink as the provided RecoverySignedConfinedDisclosureArtifactSink1
+func (t *RecoverySignedConfinedDisclosureArtifactSink) FromRecoverySignedConfinedDisclosureArtifactSink1(v RecoverySignedConfinedDisclosureArtifactSink1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoverySignedConfinedDisclosureArtifactSink1 performs a merge with any union data inside the RecoverySignedConfinedDisclosureArtifactSink, using the provided RecoverySignedConfinedDisclosureArtifactSink1
+func (t *RecoverySignedConfinedDisclosureArtifactSink) MergeRecoverySignedConfinedDisclosureArtifactSink1(v RecoverySignedConfinedDisclosureArtifactSink1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoverySignedConfinedDisclosureArtifactSink2 returns the union data inside the RecoverySignedConfinedDisclosureArtifactSink as a RecoverySignedConfinedDisclosureArtifactSink2
+func (t RecoverySignedConfinedDisclosureArtifactSink) AsRecoverySignedConfinedDisclosureArtifactSink2() (RecoverySignedConfinedDisclosureArtifactSink2, error) {
+	var body RecoverySignedConfinedDisclosureArtifactSink2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoverySignedConfinedDisclosureArtifactSink2 overwrites any union data inside the RecoverySignedConfinedDisclosureArtifactSink as the provided RecoverySignedConfinedDisclosureArtifactSink2
+func (t *RecoverySignedConfinedDisclosureArtifactSink) FromRecoverySignedConfinedDisclosureArtifactSink2(v RecoverySignedConfinedDisclosureArtifactSink2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoverySignedConfinedDisclosureArtifactSink2 performs a merge with any union data inside the RecoverySignedConfinedDisclosureArtifactSink, using the provided RecoverySignedConfinedDisclosureArtifactSink2
+func (t *RecoverySignedConfinedDisclosureArtifactSink) MergeRecoverySignedConfinedDisclosureArtifactSink2(v RecoverySignedConfinedDisclosureArtifactSink2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoverySignedConfinedDisclosureArtifactSink) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoverySignedConfinedDisclosureArtifactSink) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRecoverySignedConfinedEndorsementArtifactSink0 returns the union data inside the RecoverySignedConfinedEndorsementArtifactSink as a RecoverySignedConfinedEndorsementArtifactSink0
+func (t RecoverySignedConfinedEndorsementArtifactSink) AsRecoverySignedConfinedEndorsementArtifactSink0() (RecoverySignedConfinedEndorsementArtifactSink0, error) {
+	var body RecoverySignedConfinedEndorsementArtifactSink0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoverySignedConfinedEndorsementArtifactSink0 overwrites any union data inside the RecoverySignedConfinedEndorsementArtifactSink as the provided RecoverySignedConfinedEndorsementArtifactSink0
+func (t *RecoverySignedConfinedEndorsementArtifactSink) FromRecoverySignedConfinedEndorsementArtifactSink0(v RecoverySignedConfinedEndorsementArtifactSink0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoverySignedConfinedEndorsementArtifactSink0 performs a merge with any union data inside the RecoverySignedConfinedEndorsementArtifactSink, using the provided RecoverySignedConfinedEndorsementArtifactSink0
+func (t *RecoverySignedConfinedEndorsementArtifactSink) MergeRecoverySignedConfinedEndorsementArtifactSink0(v RecoverySignedConfinedEndorsementArtifactSink0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoverySignedConfinedEndorsementArtifactSink1 returns the union data inside the RecoverySignedConfinedEndorsementArtifactSink as a RecoverySignedConfinedEndorsementArtifactSink1
+func (t RecoverySignedConfinedEndorsementArtifactSink) AsRecoverySignedConfinedEndorsementArtifactSink1() (RecoverySignedConfinedEndorsementArtifactSink1, error) {
+	var body RecoverySignedConfinedEndorsementArtifactSink1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoverySignedConfinedEndorsementArtifactSink1 overwrites any union data inside the RecoverySignedConfinedEndorsementArtifactSink as the provided RecoverySignedConfinedEndorsementArtifactSink1
+func (t *RecoverySignedConfinedEndorsementArtifactSink) FromRecoverySignedConfinedEndorsementArtifactSink1(v RecoverySignedConfinedEndorsementArtifactSink1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoverySignedConfinedEndorsementArtifactSink1 performs a merge with any union data inside the RecoverySignedConfinedEndorsementArtifactSink, using the provided RecoverySignedConfinedEndorsementArtifactSink1
+func (t *RecoverySignedConfinedEndorsementArtifactSink) MergeRecoverySignedConfinedEndorsementArtifactSink1(v RecoverySignedConfinedEndorsementArtifactSink1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRecoverySignedConfinedEndorsementArtifactSink2 returns the union data inside the RecoverySignedConfinedEndorsementArtifactSink as a RecoverySignedConfinedEndorsementArtifactSink2
+func (t RecoverySignedConfinedEndorsementArtifactSink) AsRecoverySignedConfinedEndorsementArtifactSink2() (RecoverySignedConfinedEndorsementArtifactSink2, error) {
+	var body RecoverySignedConfinedEndorsementArtifactSink2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRecoverySignedConfinedEndorsementArtifactSink2 overwrites any union data inside the RecoverySignedConfinedEndorsementArtifactSink as the provided RecoverySignedConfinedEndorsementArtifactSink2
+func (t *RecoverySignedConfinedEndorsementArtifactSink) FromRecoverySignedConfinedEndorsementArtifactSink2(v RecoverySignedConfinedEndorsementArtifactSink2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRecoverySignedConfinedEndorsementArtifactSink2 performs a merge with any union data inside the RecoverySignedConfinedEndorsementArtifactSink, using the provided RecoverySignedConfinedEndorsementArtifactSink2
+func (t *RecoverySignedConfinedEndorsementArtifactSink) MergeRecoverySignedConfinedEndorsementArtifactSink2(v RecoverySignedConfinedEndorsementArtifactSink2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RecoverySignedConfinedEndorsementArtifactSink) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RecoverySignedConfinedEndorsementArtifactSink) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsResultErrError0 returns the union data inside the ResultErr_Error as a ResultErrError0
 func (t ResultErr_Error) AsResultErrError0() (ResultErrError0, error) {
 	var body ResultErrError0
@@ -11551,6 +23863,101 @@ func (t SecurityDeclassificationGrant_Body_TargetLabel) MarshalJSON() ([]byte, e
 }
 
 func (t *SecurityDeclassificationGrant_Body_TargetLabel) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	if err != nil {
+		return err
+	}
+	object := make(map[string]json.RawMessage)
+	err = json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["kind"]; found {
+		err = json.Unmarshal(raw, &t.Kind)
+		if err != nil {
+			return fmt.Errorf("error reading 'kind': %w", err)
+		}
+	}
+
+	return err
+}
+
+// AsSecurityDeclassificationGrantPointerPropertiesBodyTargetLabel0 returns the union data inside the SecurityDeclassificationGrantPointerPropertiesBody_TargetLabel as a SecurityDeclassificationGrantPointerPropertiesBodyTargetLabel0
+func (t SecurityDeclassificationGrantPointerPropertiesBody_TargetLabel) AsSecurityDeclassificationGrantPointerPropertiesBodyTargetLabel0() (SecurityDeclassificationGrantPointerPropertiesBodyTargetLabel0, error) {
+	var body SecurityDeclassificationGrantPointerPropertiesBodyTargetLabel0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityDeclassificationGrantPointerPropertiesBodyTargetLabel0 overwrites any union data inside the SecurityDeclassificationGrantPointerPropertiesBody_TargetLabel as the provided SecurityDeclassificationGrantPointerPropertiesBodyTargetLabel0
+func (t *SecurityDeclassificationGrantPointerPropertiesBody_TargetLabel) FromSecurityDeclassificationGrantPointerPropertiesBodyTargetLabel0(v SecurityDeclassificationGrantPointerPropertiesBodyTargetLabel0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityDeclassificationGrantPointerPropertiesBodyTargetLabel0 performs a merge with any union data inside the SecurityDeclassificationGrantPointerPropertiesBody_TargetLabel, using the provided SecurityDeclassificationGrantPointerPropertiesBodyTargetLabel0
+func (t *SecurityDeclassificationGrantPointerPropertiesBody_TargetLabel) MergeSecurityDeclassificationGrantPointerPropertiesBodyTargetLabel0(v SecurityDeclassificationGrantPointerPropertiesBodyTargetLabel0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSecurityDeclassificationGrantPointerPropertiesBodyTargetLabel1 returns the union data inside the SecurityDeclassificationGrantPointerPropertiesBody_TargetLabel as a SecurityDeclassificationGrantPointerPropertiesBodyTargetLabel1
+func (t SecurityDeclassificationGrantPointerPropertiesBody_TargetLabel) AsSecurityDeclassificationGrantPointerPropertiesBodyTargetLabel1() (SecurityDeclassificationGrantPointerPropertiesBodyTargetLabel1, error) {
+	var body SecurityDeclassificationGrantPointerPropertiesBodyTargetLabel1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSecurityDeclassificationGrantPointerPropertiesBodyTargetLabel1 overwrites any union data inside the SecurityDeclassificationGrantPointerPropertiesBody_TargetLabel as the provided SecurityDeclassificationGrantPointerPropertiesBodyTargetLabel1
+func (t *SecurityDeclassificationGrantPointerPropertiesBody_TargetLabel) FromSecurityDeclassificationGrantPointerPropertiesBodyTargetLabel1(v SecurityDeclassificationGrantPointerPropertiesBodyTargetLabel1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSecurityDeclassificationGrantPointerPropertiesBodyTargetLabel1 performs a merge with any union data inside the SecurityDeclassificationGrantPointerPropertiesBody_TargetLabel, using the provided SecurityDeclassificationGrantPointerPropertiesBodyTargetLabel1
+func (t *SecurityDeclassificationGrantPointerPropertiesBody_TargetLabel) MergeSecurityDeclassificationGrantPointerPropertiesBodyTargetLabel1(v SecurityDeclassificationGrantPointerPropertiesBodyTargetLabel1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t SecurityDeclassificationGrantPointerPropertiesBody_TargetLabel) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	object := make(map[string]json.RawMessage)
+	if t.union != nil {
+		err = json.Unmarshal(b, &object)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	object["kind"], err = json.Marshal(t.Kind)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'kind': %w", err)
+	}
+
+	b, err = json.Marshal(object)
+	return b, err
+}
+
+func (t *SecurityDeclassificationGrantPointerPropertiesBody_TargetLabel) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	if err != nil {
 		return err

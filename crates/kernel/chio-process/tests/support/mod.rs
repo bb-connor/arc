@@ -79,6 +79,17 @@ pub fn kernel_with_artifacts(
     nonce: bool,
     supplemental: bool,
 ) -> Result<Arc<ChioKernel>> {
+    kernel_with_configuration(path, server, payment, nonce, supplemental, config())
+}
+
+pub fn kernel_with_configuration(
+    path: &Path,
+    server: Box<dyn ToolServerConnection>,
+    payment: bool,
+    nonce: bool,
+    supplemental: bool,
+    configuration: KernelConfig,
+) -> Result<Arc<ChioKernel>> {
     private_dir(path)?;
     let locks = path.join("locks");
     private_dir(&locks)?;
@@ -87,7 +98,7 @@ pub fn kernel_with_artifacts(
         SqliteAuthorityStore::provision(&database, &locks)?;
     }
     let authority = SqliteAuthorityStore::open_serving(&database, &locks)?;
-    let mut kernel = ChioKernel::new(config());
+    let mut kernel = ChioKernel::new(configuration);
     kernel.set_capability_trust_root(
         issuer().public_key(),
         scope_hash(&scope(&["append", "read"]))?,

@@ -1,0 +1,24 @@
+
+running 7 tests
+test recovery::tests::knowledge::setup::cli_host::p6_setup_cli_qualification_host ... ignored, private CLI host; execute with CHIO_P6_CLI_EXCHANGE and an actual CLI controller
+test recovery::tests::knowledge::setup::p6_setup_cannot_accept_a_new_native_semantic_plan_before_ready ... ok
+test recovery::tests::knowledge::setup::p6_setup_every_foreign_binding_and_old_profile_refuses ... ok
+test recovery::tests::knowledge::setup::p6_setup_lost_live_broker_refuses_the_protected_review_route ... ok
+test recovery::tests::knowledge::setup::p6_setup_missing_broker_and_failed_benign_cannot_unlock_work ... ok
+test recovery::tests::knowledge::setup::p6_setup_profile_change_between_preflight_and_native_capture_refuses ... ok
+test recovery::tests::knowledge::setup::p6_setup_real_restart_recovers_the_identical_operation_once ... 
+thread 'recovery::tests::knowledge::setup::p6_setup_real_restart_recovers_the_identical_operation_once' (69639) panicked at crates/platform/chio-control-plane/src/recovery/tests/knowledge/setup.rs:90:5:
+assertion `left == right` failed
+  left: 2
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    recovery::tests::knowledge::setup::p6_setup_real_restart_recovers_the_identical_operation_once
+
+test result: FAILED. 5 passed; 1 failed; 1 ignored; 0 measured; 1264 filtered out; finished in 75.62s
+
+error: test failed, to rerun pass `-p chio-control-plane --lib`

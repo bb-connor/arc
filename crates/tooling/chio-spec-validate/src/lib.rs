@@ -38,7 +38,10 @@ use std::path::{Path, PathBuf};
 use jsonschema::{Retrieve, Uri};
 use serde_json::Value;
 
+mod utf8_bytes;
+
 const CHIO_SCHEMA_URI_PREFIXES: &[&str] = &[
+    "https://chio.computer/schemas/",
     "https://chio.world/schemas/",
     "https://chio-protocol.dev/schemas/",
 ];
@@ -106,7 +109,7 @@ pub fn validate_value(
     doc_path: &Path,
     doc: &Value,
 ) -> Result<(), ValidateError> {
-    let mut options = jsonschema::options();
+    let mut options = jsonschema::options().with_keyword("x-maxUtf8Bytes", utf8_bytes::keyword);
     if let Some(base_uri) = schema_base_uri(schema_path) {
         options = options.with_base_uri(base_uri);
     }
@@ -470,6 +473,60 @@ mod tests {
         result.unwrap_or_else(|err| {
             panic!("protocol.dev absolute $id ref should resolve locally: {err}")
         });
+    }
+
+    #[test]
+    fn current_schema_namespace_resolves_locally_and_refuses_unregistered_uris(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let root = unique_temp_dir("chio-spec-validate-current-namespace");
+        let schema_dir = root.join("spec/schemas/test/v1");
+        fs::create_dir_all(&schema_dir)?;
+        let schema_path = schema_dir.join("root.schema.json");
+        fs::write(
+            schema_dir.join("sibling.schema.json"),
+            serde_json::to_vec(&json!({
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "$id": "https://chio.computer/schemas/test/v1/sibling/v1",
+                "type": "string",
+                "minLength": 1
+            }))?,
+        )?;
+        let schema_for = |reference: &str| {
+            json!({
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "$id": "https://chio.computer/schemas/test/v1/root.schema.json",
+                "$ref": reference
+            })
+        };
+        let positive = validate_value(
+            &schema_path,
+            &schema_for("https://chio.computer/schemas/test/v1/sibling/v1"),
+            &root.join("document.json"),
+            &json!("current-namespace"),
+        );
+        let unregistered: Vec<_> = [
+            "https://chio.computer.invalid/schemas/test/v1/sibling/v1",
+            "https://chio.computer/schemas/test/v1/unregistered/v1",
+        ]
+        .into_iter()
+        .map(|reference| {
+            validate_value(
+                &schema_path,
+                &schema_for(reference),
+                &root.join("document.json"),
+                &json!("current-namespace"),
+            )
+        })
+        .collect();
+        fs::remove_dir_all(&root)?;
+        assert!(
+            positive.is_ok(),
+            "registered current namespace: {positive:?}"
+        );
+        for result in unregistered {
+            assert!(matches!(result, Err(ValidateError::SchemaCompile(..))));
+        }
+        Ok(())
     }
 
     #[test]

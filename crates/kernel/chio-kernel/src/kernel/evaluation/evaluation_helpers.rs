@@ -1,6 +1,7 @@
 use super::*;
 use crate::admission_operation::AdmissionOperationV1;
 use crate::budget_store::BudgetReverseHoldDecision;
+use crate::kernel::admission_coordinator::ConfirmedPreDispatchCompensation;
 use crate::kernel::dispatch::PreDispatchMonetaryUnwindFailure;
 use crate::kernel::responses::{PreflightNonceSource, ReservedHoldStamp};
 
@@ -257,6 +258,7 @@ impl ChioKernel {
             payment_authorization,
             None,
         )
+        .map(|_| ())
     }
 
     fn compensate_durable_admission_after_pre_dispatch_cleanup_with_payment_unwind(
@@ -265,11 +267,11 @@ impl ChioKernel {
         reverse: Option<&BudgetReverseHoldDecision>,
         payment_authorization: Option<&PaymentAuthorization>,
         payment_unwind: Option<&PreDispatchPaymentUnwindEvidence>,
-    ) -> Result<(), KernelError> {
+    ) -> Result<Option<ConfirmedPreDispatchCompensation>, KernelError> {
         let Some(operation) = operation else {
-            return Ok(());
+            return Ok(None);
         };
-        self.compensate_durable_admission_before_dispatch(
+        self.compensate_durable_admission_before_dispatch_with_observation(
             operation,
             serde_json::json!({
                 "authority": "kernel-confirmed-pre-dispatch-cleanup",
@@ -282,6 +284,7 @@ impl ChioKernel {
             current_unix_timestamp_ms(),
             payment_unwind,
         )
+        .map(Some)
     }
 
     pub(super) fn with_pre_invocation_guard_evidence<T>(
@@ -603,14 +606,31 @@ impl ChioKernel {
             ),
             None => runtime_admission_metadata,
         };
-        if runtime_release_confirmed && lease_release.confirmed {
+        let compensation = if runtime_release_confirmed && lease_release.confirmed {
             self.compensate_durable_admission_after_pre_dispatch_cleanup_with_payment_unwind(
                 denial.durable_operation,
                 reverse.as_ref(),
                 denial.payment_authorization,
                 unwind_evidence.as_ref(),
-            )?;
-        }
+            )?
+        } else {
+            None
+        };
+        let native_compensation_metadata = self.compensated_native_denial_metadata(
+            denial.request,
+            denial.durable_operation,
+            compensation.as_ref(),
+        )?;
+        // A qualified native Deny attests the confirmed compensation, including
+        // its trusted time. Generic and unconfirmed denials keep their original
+        // evaluation timestamp.
+        let denial_timestamp = match (native_compensation_metadata.as_ref(), compensation.as_ref())
+        {
+            (Some(_), Some(confirmed)) => confirmed.trusted_time_unix_ms() / 1_000,
+            _ => denial.timestamp,
+        };
+        let runtime_admission_metadata =
+            merge_metadata_objects(runtime_admission_metadata, native_compensation_metadata);
 
         if let (Some(charge), Some(reverse)) =
             (denial.budget_mutation.charge_result(), reverse.as_ref())
@@ -619,7 +639,7 @@ impl ChioKernel {
                 .build_pre_execution_monetary_deny_response_with_metadata_and_payee_binding(
                     denial.request,
                     denial.reason,
-                    denial.timestamp,
+                    denial_timestamp,
                     charge,
                     reverse.committed_cost_units_after,
                     denial.cap,
@@ -638,7 +658,7 @@ impl ChioKernel {
         self.build_deny_response_with_metadata_and_payee_binding(
             denial.request,
             denial.reason,
-            denial.timestamp,
+            denial_timestamp,
             Some(denial.matched_grant_index),
             runtime_admission_metadata,
             denial.verified_payee_binding,

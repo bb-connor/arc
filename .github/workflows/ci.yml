@@ -25,7 +25,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, research/openappa-recovery-20261001]
     types: [opened, synchronize, reopened, unlabeled]
 
 concurrency:
@@ -40,7 +40,7 @@ env:
   CARGO_BUILD_JOBS: "1"
   CARGO_TERM_COLOR: always
   CHIO_CI_RUSTFLAGS: "-D warnings -C link-arg=-Wl,--threads=1"
-  CHIO_KANI_VERSION: 0.67.0
+  CHIO_KANI_VERSION: 0.68.0
   # PR-tier proptest case count for the named invariants. The nightly tier
   # (4096) lives in .github/workflows/nightly.yml.
   PROPTEST_CASES: "256"
@@ -152,6 +152,12 @@ jobs:
           python3 scripts/tests/check-fuzz-manifest-selection.test.py
           bash scripts/tests/check-drogon-consumer-gate.test.sh
           bash ./scripts/tests/check-flow-security.test.sh
+          python3 ./scripts/check-portable-recovery-lock.py
+          python3 ./scripts/tests/check-portable-recovery-lock.test.py
+          python3 ./scripts/check-recovery-boundaries.py
+          python3 ./scripts/tests/check-recovery-boundaries.test.py
+          python3 ./scripts/check-source-names.py
+          python3 ./scripts/tests/check-source-names.test.py
           bash ./scripts/tests/check-deception-security.test.sh
           /bin/bash -p ./scripts/tests/check-temporal-security.test.sh
           bash ./scripts/tests/check-response-recovery.test.sh
@@ -166,8 +172,10 @@ jobs:
           bash ./scripts/tests/formal-workflow-wiring.test.sh
           cargo metadata --manifest-path fuzz/Cargo.toml --locked --no-deps --format-version 1 >/dev/null
           bash ./scripts/check-corpus-metadata.sh
+          python3 scripts/tests/legacy-machine-interfaces.test.py
           bash ./scripts/tests/fuzz-budget-hard-halt.test.sh
           bash ./scripts/tests/check-proof-report.test.sh
+          bash ./scripts/tests/check-kani-toolchain.test.sh
           bash ./scripts/tests/lane-gate.test.sh
           bash ./scripts/check-liability-roster-enforcement.sh
           bash ./scripts/tests/check-liability-roster-enforcement.test.sh
@@ -520,7 +528,7 @@ jobs:
           set -euo pipefail
           cargo install kani-verifier --locked --version "${CHIO_KANI_VERSION}"
           cargo kani setup
-          cargo kani --version
+          bash scripts/check-kani-toolchain.sh
 
       - name: Verify all PR Kani harnesses
         env:
@@ -639,7 +647,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       - uses: ./.github/actions/setup-rust
         with:
-          toolchain: "1.94.1"
+          toolchain: "1.95.0"
           cache: "false"
 
       - name: Resolve and check the MSRV cache target

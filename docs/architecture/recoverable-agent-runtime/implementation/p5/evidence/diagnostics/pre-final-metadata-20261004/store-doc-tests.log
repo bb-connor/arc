@@ -1,0 +1,8 @@
+   Compiling chio-store-sqlite v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-store-sqlite)
+    Finished `test` profile [unoptimized] target(s) in 32.75s
+   Doc-tests chio_store_sqlite
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

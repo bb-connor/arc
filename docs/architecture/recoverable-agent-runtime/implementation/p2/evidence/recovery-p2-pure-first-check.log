@@ -1,0 +1,4 @@
+    Checking chio-security-types v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-security-types)
+    Checking chio-core-types v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-core-types)
+    Checking chio-recovery v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-recovery)
+    Finished `dev` profile [unoptimized] target(s) in 13.09s

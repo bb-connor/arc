@@ -36,7 +36,9 @@ pub mod issuance;
 mod keyring_runtime;
 pub mod passport_verifier;
 pub mod policy;
+pub mod recovery;
 pub mod reputation;
+pub mod semantic;
 pub use chio_risk_comptroller as risk_comptroller;
 pub mod scim_lifecycle;
 pub mod security;
@@ -562,11 +564,11 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::*;
-    use chio_errors::ErrorCodeSpec;
     use chio_errors::_generated::error_codes::{
         CLI_IO, CLI_YAML, GUARD_DENIED, MANIFEST_SCHEMA_INVALID, MANIFEST_SIGNATURE_INVALID,
         PROVIDER_TOOL_SERVER_ERROR, REPLAY_DETERMINISTIC_MISMATCH,
     };
+    use chio_errors::ErrorCodeSpec;
     use chio_guards::PostInvocationPipeline;
 
     fn make_kernel(require_web3_evidence: bool) -> ChioKernel {
@@ -944,3 +946,6 @@ mod tests {
         assert!(kernel.post_invocation_hook_count() >= 1);
     }
 }
+
+pub mod confinement;
+pub mod knowledge;

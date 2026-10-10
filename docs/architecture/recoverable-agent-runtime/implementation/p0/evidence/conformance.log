@@ -1,0 +1,570 @@
+   Compiling serde v1.0.228
+   Compiling serde_core v1.0.228
+   Compiling subtle v2.6.1
+   Compiling serde_json v1.0.149
+   Compiling portable-atomic v1.13.1
+   Compiling critical-section v1.2.0
+   Compiling derive_more-impl v2.1.1
+   Compiling rustc-hash v2.1.1
+   Compiling futures-io v0.3.32
+   Compiling ff v0.13.1
+   Compiling arrayvec v0.7.6
+   Compiling hashbrown v0.17.0
+   Compiling slab v0.4.12
+   Compiling group v0.13.0
+   Compiling alloy-rlp-derive v0.3.13
+   Compiling futures-util v0.3.32
+   Compiling byteorder v1.5.0
+   Compiling hash32 v0.2.1
+   Compiling postcard-derive v0.2.2
+   Compiling httpdate v1.0.3
+   Compiling sha3 v0.10.8
+   Compiling crc-catalog v2.4.0
+   Compiling http-range-header v0.4.2
+   Compiling crc v3.4.0
+   Compiling block2 v0.6.2
+   Compiling dispatch2 v0.3.1
+   Compiling winnow v1.0.1
+   Compiling toml_datetime v1.1.1+spec-1.1.0
+   Compiling rustix v1.1.4
+   Compiling objc2-core-foundation v0.3.2
+   Compiling auto_impl v1.3.0
+   Compiling signature v3.0.0
+   Compiling rand_chacha v0.3.1
+   Compiling strum v0.27.2
+   Compiling futures-utils-wasm v0.1.0
+   Compiling rand v0.8.6
+   Compiling async-stream-impl v0.3.6
+   Compiling toml_parser v1.1.1+spec-1.1.0
+   Compiling parking v2.2.1
+   Compiling syn v1.0.109
+   Compiling async-stream v0.3.6
+   Compiling foldhash v0.1.5
+   Compiling wasmtime-internal-core v46.0.3
+   Compiling futures-executor v0.3.32
+   Compiling siphasher v1.0.2
+   Compiling futures v0.3.32
+   Compiling crossbeam-epoch v0.9.20
+   Compiling futures-lite v2.6.1
+   Compiling n0-error-macros v1.0.0
+   Compiling indexmap v2.14.1
+   Compiling hashbrown v0.16.1
+   Compiling derive_more v2.1.1
+   Compiling const-hex v1.18.1
+   Compiling zeroize v1.9.0
+   Compiling smallvec v1.15.1
+   Compiling bytes v1.11.1
+   Compiling generic-array v0.14.7
+   Compiling der v0.7.10
+   Compiling icu_normalizer v2.1.1
+   Compiling parking_lot_core v0.9.12
+   Compiling once_cell v1.21.4
+   Compiling parking_lot v0.12.5
+   Compiling either v1.15.0
+   Compiling rustls-pki-types v1.14.0
+   Compiling idna_adapter v1.2.1
+   Compiling tracing-core v0.1.36
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling block-padding v0.3.3
+   Compiling idna v1.1.0
+   Compiling crypto-bigint v0.5.5
+   Compiling digest v0.10.7
+   Compiling inout v0.1.4
+   Compiling tokio v1.50.0
+   Compiling alloy-rlp v0.3.13
+   Compiling cipher v0.4.4
+   Compiling sha2 v0.10.9
+   Compiling hmac v0.12.1
+   Compiling pbkdf2 v0.12.2
+   Compiling aes v0.8.4
+   Compiling salsa20 v0.10.2
+   Compiling cbc v0.1.2
+   Compiling signature v2.2.0
+   Compiling spki v0.7.3
+   Compiling scrypt v0.11.0
+   Compiling url v2.5.8
+   Compiling hkdf v0.12.4
+   Compiling tracing v0.1.44
+   Compiling rfc6979 v0.4.0
+   Compiling pkcs5 v0.7.1
+   Compiling curve25519-dalek v4.1.3
+   Compiling chio-security-types v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-security-types)
+   Compiling ruint v1.20.0
+   Compiling pkcs8 v0.10.2
+   Compiling aws-lc-rs v1.18.1 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/third_party/aws-lc-rs-chio)
+   Compiling sec1 v0.7.3
+   Compiling ed25519 v2.2.3
+   Compiling heapless v0.7.17
+   Compiling elliptic-curve v0.13.8
+   Compiling ed25519-dalek v2.2.0
+   Compiling http v1.4.0
+   Compiling itertools v0.14.0
+   Compiling ipnet v2.12.0
+   Compiling rs_merkle v1.5.0
+   Compiling postcard v1.1.3
+   Compiling ecdsa v0.16.9
+   Compiling serdect v0.2.0
+   Compiling serde_urlencoded v0.7.1
+   Compiling http-body v1.0.1
+   Compiling k256 v0.13.4
+   Compiling http-body-util v0.1.3
+   Compiling alloy-sol-type-parser v1.5.7
+   Compiling universal-hash v0.5.1
+   Compiling darling_core v0.23.0
+   Compiling aead v0.5.2
+   Compiling alloy-primitives v1.5.7
+   Compiling rustls-webpki v0.103.15
+   Compiling webpki-roots v1.0.6
+   Compiling toml_edit v0.25.9+spec-1.1.0
+   Compiling frost-core v3.0.0
+   Compiling chrono v0.4.44
+   Compiling rustls v0.23.45
+   Compiling alloy-json-abi v1.5.7
+   Compiling objc2-foundation v0.3.2
+   Compiling frost-rerandomized v3.0.0
+   Compiling frost-ed25519 v3.0.0
+   Compiling proc-macro-crate v3.5.0
+   Compiling pem v3.0.6
+   Compiling alloy-sol-macro-input v1.5.7
+   Compiling darling_macro v0.23.0
+   Compiling num_enum_derive v0.7.6
+   Compiling tokio-util v0.7.18
+   Compiling hyper v1.8.1
+   Compiling darling v0.23.0
+   Compiling alloy-sol-macro-expander v1.5.7
+   Compiling alloy-eip2930 v0.2.3
+   Compiling serde_with_macros v3.18.0
+   Compiling tower v0.5.3
+   Compiling tokio-stream v0.1.18
+   Compiling num_enum v0.7.6
+   Compiling alloy-eip7702 v0.6.3
+   Compiling hyper-util v0.1.20
+   Compiling alloy-serde v1.8.3
+   Compiling tower-http v0.6.8
+   Compiling serde_with v3.18.0
+   Compiling alloy-eip7928 v0.3.3
+   Compiling alloy-eip2124 v0.2.0
+   Compiling nybbles v0.4.8
+   Compiling alloy-trie v0.9.5
+   Compiling alloy-tx-macros v1.8.3
+   Compiling ahash v0.8.12
+   Compiling fluent-uri v0.4.1
+   Compiling serde_path_to_error v0.1.20
+   Compiling referencing v0.46.0
+   Compiling alloy-sol-macro v1.5.7
+   Compiling webpki-roots v0.26.11
+   Compiling email_address v0.2.9
+   Compiling tempfile v3.27.0
+   Compiling hashlink v0.11.0
+   Compiling tokio-rustls v0.26.4
+   Compiling rustls-platform-verifier v0.6.2
+   Compiling hyper-rustls v0.27.7
+   Compiling rusqlite v0.39.0
+   Compiling alloy-sol-types v1.5.7
+   Compiling reqwest v0.13.2
+   Compiling jsonschema v0.46.0
+   Compiling alloy-eips v1.8.3
+   Compiling poly1305 v0.8.0
+   Compiling primeorder v0.13.6
+   Compiling prost-derive v0.14.3
+   Compiling lru v0.18.2
+   Compiling serde-value v0.7.0
+   Compiling pkcs1 v0.7.5
+   Compiling olpc-cjson v0.1.4
+   Compiling num-bigint-dig v0.8.6
+   Compiling serde_plain v1.0.2
+   Compiling p256 v0.13.2
+   Compiling p384 v0.13.1
+   Compiling alloy-consensus v1.8.3
+   Compiling alloy-json-rpc v1.8.3
+   Compiling oauth2 v5.0.0
+   Compiling alloy-signer v1.8.3
+   Compiling jsonwebtoken v10.4.0
+   Compiling prost v0.14.3
+   Compiling alloy-transport v1.8.3
+   Compiling rsa v0.9.10
+   Compiling prost-types v0.14.3
+   Compiling alloy-transport-http v1.8.3
+   Compiling sha1 v0.10.6
+   Compiling itertools v0.10.5
+   Compiling oci-spec v0.9.0
+   Compiling tls_codec v0.4.2
+   Compiling toml_datetime v0.6.11
+   Compiling serde_spanned v0.6.9
+   Compiling toml_edit v0.22.27
+   Compiling alloy-rpc-client v1.8.3
+   Compiling alloy-core v1.5.7
+   Compiling prost-reflect v0.16.3
+   Compiling x509-cert v0.2.5
+   Compiling alloy-consensus-any v1.8.3
+   Compiling alloy-network-primitives v1.8.3
+   Compiling openidconnect v4.0.1
+   Compiling tough v0.22.0
+   Compiling alloy-rpc-types-eth v1.8.3
+   Compiling chio-core-types v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-core-types)
+   Compiling objc2-app-kit v0.3.2
+   Compiling sigstore_protobuf_specs v0.5.1
+   Compiling webbrowser v1.2.2
+   Compiling alloy-rpc-types-any v1.8.3
+   Compiling crypto_secretbox v0.1.1
+   Compiling alloy-network v1.8.3
+   Compiling alloy-chains v0.2.33
+   Compiling dashmap v6.1.0
+   Compiling serde_json_canonicalizer v0.3.2
+   Compiling oci-client v0.17.0
+   Compiling lru v0.16.3
+   Compiling toml v0.8.23
+   Compiling alloy v1.8.3
+   Compiling alloy-dyn-abi v1.5.7
+   Compiling alloy-provider v1.8.3
+   Compiling chio-egress-contract v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/protocol/chio-egress-contract)
+   Compiling tracing-log v0.2.0
+   Compiling ciborium v0.2.2
+   Compiling tracing-subscriber v0.3.23
+   Compiling chio-web3-bindings v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-web3-bindings)
+   Compiling ureq v2.12.1
+   Compiling coset v0.4.2
+   Compiling jsonwebtoken v9.3.1
+   Compiling chio-data-guards-redactors-default v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/guards/chio-data-guards/redactors/default)
+   Compiling chio-log-redact v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/observability/chio-log-redact)
+   Compiling chio-supervisor v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-supervisor)
+   Compiling spez v0.1.2
+   Compiling sigstore v0.14.0
+   Compiling pem-rfc7468 v1.0.0
+   Compiling cranelift-srcgen v0.133.3
+   Compiling n0-error v1.0.0
+   Compiling cranelift-bitset v0.133.3
+   Compiling der v0.8.2
+   Compiling semver v1.0.27
+   Compiling cranelift-assembler-x64-meta v0.133.3
+   Compiling pairing v0.23.0
+   Compiling object v0.37.3
+   Compiling chio-workflow-preflight v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-workflow-preflight)
+   Compiling bls12_381_plus v0.8.13
+   Compiling hashbrown v0.15.5
+   Compiling spki v0.8.0
+   Compiling event-listener v5.4.2
+   Compiling n0-future v0.3.2
+   Compiling alloy-contract v1.8.3
+   Compiling vergen-lib v9.1.0
+   Compiling curve25519-dalek v5.0.0-rc.0
+   Compiling pulley-macros v46.0.3
+   Compiling crossbeam-utils v0.8.21
+   Compiling leb128fmt v0.1.0
+   Compiling target-lexicon v0.13.5
+   Compiling base16ct v1.0.0
+   Compiling spin v0.10.1
+   Compiling cordyceps v0.3.4
+   Compiling diatomic-waker v0.2.3
+   Compiling serdect v0.4.3
+   Compiling futures-buffered v0.2.13
+   Compiling pkcs8 v0.11.0
+   Compiling affinidi-bbs v0.1.0
+   Compiling wasmparser v0.251.0
+   Compiling cranelift-entity v0.133.3
+   Compiling polyval v0.6.2
+   Compiling gimli v0.33.0
+   Compiling noq-udp v1.0.1
+   Compiling vergen v9.1.0
+   Compiling crossbeam-channel v0.5.15
+   Compiling wasmtime-internal-versioned-export-macros v46.0.3
+   Compiling bumpalo v3.20.2
+   Compiling cranelift-isle v0.133.3
+   Compiling futures-core v0.3.32
+   Compiling system-configuration-sys v0.6.0
+   Compiling termcolor v1.4.1
+   Compiling data-encoding v2.11.0
+   Compiling cranelift-bforest v0.133.3
+   Compiling data-encoding-macro-internal v0.1.18
+   Compiling ghash v0.5.1
+   Compiling pulley-interpreter v46.0.3
+   Compiling ed25519 v3.0.0
+   Compiling prefix-trie v0.8.4
+   Compiling ctr v0.9.2
+   Compiling vergen-gitcl v9.1.0
+   Compiling num_threads v0.1.7
+   Compiling dotenvy v0.15.7
+   Compiling cranelift-codegen-shared v0.133.3
+   Compiling futures-sink v0.3.32
+   Compiling object v0.39.1
+   Compiling hashlink v0.10.0
+   Compiling time v0.3.47
+   Compiling ar_archive_writer v0.5.1
+   Compiling cranelift-codegen-meta v0.133.3
+   Compiling hickory-proto v0.26.1
+   Compiling aes-gcm v0.10.3
+   Compiling ed25519-dalek v3.0.0-rc.0
+   Compiling psm v0.1.30
+   Compiling crossbeam-queue v0.3.13
+   Compiling data-encoding-macro v0.1.20
+   Compiling futures-intrusive v0.5.0
+   Compiling cranelift-assembler-x64 v0.133.3
+   Compiling rustls-platform-verifier v0.7.0
+   Compiling h2 v0.4.16
+   Compiling fastbloom v0.17.0
+   Compiling objc2-security v0.3.2
+   Compiling noq v1.0.1
+   Compiling rand_pcg v0.10.2
+   Compiling core-foundation v0.9.4
+   Compiling blake3 v1.8.5
+   Compiling enum-assoc v1.3.0
+   Compiling sorted-index-buffer v0.2.1
+   Compiling tagptr v0.2.0
+   Compiling base64 v0.22.1
+   Compiling unicode-bidi v0.3.18
+   Compiling lru-slab v0.1.2
+   Compiling unicode-properties v0.1.4
+   Compiling identity-hash v0.1.0
+   Compiling cpp_demangle v0.4.5
+   Compiling stringprep v0.1.5
+   Compiling sqlx-core v0.8.6
+   Compiling moka v0.12.15
+   Compiling noq-proto v1.0.1
+   Compiling chio-listing v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-listing)
+   Compiling chio-revocation-oracle v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-revocation-oracle)
+   Compiling chio-pheromone v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-pheromone)
+   Compiling chio-finding v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-finding)
+   Compiling chio-fincred v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-fincred)
+   Compiling chio-did v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-did)
+   Compiling chio-kernel-core v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-kernel-core)
+   Compiling chio-lineage v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/observability/chio-lineage)
+   Compiling chio-attest-verify v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-attest-verify)
+   Compiling chio-custody-hw v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-custody-hw)
+   Compiling chio-quarantine v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-quarantine)
+   Compiling chio-swarm-authority v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-swarm-authority)
+   Compiling chio-fiscal v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-fiscal)
+   Compiling chio-governance v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-governance)
+   Compiling chio-weights v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-weights)
+   Compiling chio-disclosure-lineage v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-disclosure-lineage)
+   Compiling hickory-net v0.26.1
+   Compiling cranelift-codegen v0.133.3
+   Compiling wasm-encoder v0.251.0
+   Compiling system-configuration v0.7.0
+   Compiling chio-open-market v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-open-market)
+   Compiling chio-appraisal v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-appraisal)
+   Compiling iroh-base v1.0.1
+   Compiling objc2-security-foundation v0.3.2
+   Compiling axum-core v0.5.6
+   Compiling chacha20 v0.9.1
+   Compiling md-5 v0.10.6
+   Compiling nix v0.31.2
+   Compiling iroh-dns v1.0.1
+   Compiling atoi v2.0.0
+   Compiling strum_macros v0.28.0
+   Compiling zstd-sys v2.0.16+zstd.1.5.7
+   Compiling stacker v0.1.23
+   Compiling proc-macro-error-attr v0.4.12
+   Compiling quick-xml v0.41.0
+   Compiling glob v0.3.3
+   Compiling resolv-conf v0.7.6
+   Compiling wasmtime-internal-component-util v46.0.3
+   Compiling matchit v0.8.4
+   Compiling home v0.5.12
+   Compiling netdev v0.45.0
+   Compiling whoami v1.6.1
+   Compiling constant_time_eq v0.4.2
+   Compiling chio-underwriting v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-underwriting)
+   Compiling arbitrary v1.4.2
+   Compiling sqlx-postgres v0.8.6
+   Compiling axum v0.8.8
+   Compiling chio-federation v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-federation)
+   Compiling plist v1.10.0
+   Compiling cranelift-control v0.133.3
+   Compiling strum v0.28.0
+   Compiling hickory-resolver v0.26.1
+   Compiling chacha20poly1305 v0.10.1
+   Compiling objc2-core-wlan v0.3.2
+   Compiling iroh-relay v1.0.1
+   Compiling sqlx-macros-core v0.8.6
+   Compiling wasmprinter v0.251.0
+   Compiling objc2-system-configuration v0.3.2
+   Compiling regalloc2 v0.15.1
+   Compiling syn-mid v0.5.4
+   Compiling scheduled-thread-pool v0.2.7
+   Compiling netwatch v0.19.1
+   Compiling iroh-metrics-derive v1.0.1
+   Compiling simple-dns v0.11.3
+   Compiling proc-macro-error v0.4.12
+   Compiling mac-addr v0.3.0
+   Compiling chio-credit v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-credit)
+   Compiling proc-macro-hack v0.5.20+deprecated
+   Compiling rustc-demangle v0.1.27
+   Compiling simdutf8 v0.1.5
+   Compiling sha1_smol v1.0.1
+   Compiling wasmtime-environ v46.0.3
+   Compiling tokio-websockets v0.13.3
+   Compiling iroh-metrics v1.0.1
+   Compiling r2d2 v0.8.10
+   Compiling sqlx-macros v0.8.6
+   Compiling chio-finding-market-port v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-finding-market-port)
+   Compiling serde_yaml_ng v0.10.0
+   Compiling n0-watcher v1.0.0
+   Compiling serde_bytes v0.11.19
+   Compiling phf_shared v0.12.1
+   Compiling iroh v1.0.1
+   Compiling clap_derive v4.6.0
+   Compiling recursive-proc-macro-impl v0.1.1
+   Compiling seize v0.5.1
+   Compiling zstd-safe v7.2.4
+   Compiling chrono-tz v0.10.4
+   Compiling id-arena v2.3.0
+   Compiling recursive v0.1.1
+   Compiling papaya v0.2.4
+   Compiling phf v0.12.1
+   Compiling chio-finding-market-migrations v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-finding-market-migrations)
+   Compiling r2d2_sqlite v0.33.0
+   Compiling chio-http-serve v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/protocol/chio-http-serve)
+   Compiling clap v4.6.0
+   Compiling sqlx v0.8.6
+   Compiling wasm-encoder v0.258.0
+   Compiling chio-sqlite-file-identity v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-sqlite-file-identity)
+   Compiling backon v1.6.0
+   Compiling yasna v0.6.0
+   Compiling bitcoin-private v0.1.0
+   Compiling chio-conformance v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/tooling/chio-conformance)
+   Compiling chunked_transfer v1.5.0
+   Compiling wasmtime-internal-unwinder v46.0.3
+   Compiling unicode-width v0.2.2
+   Compiling ascii v1.1.0
+   Compiling tiny_http v0.12.0
+   Compiling rcgen v0.14.8
+   Compiling wast v258.0.0
+   Compiling genawaiter-proc-macro v0.99.1
+   Compiling chio-finding-market-store-postgres v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-finding-market-store-postgres)
+   Compiling sqlparser v0.61.0
+   Compiling chio-decoy v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-decoy)
+   Compiling chio-reputation v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-reputation)
+   Compiling chio-flow v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-flow)
+   Compiling wit-parser v0.251.0
+   Compiling wasmtime-internal-fiber v46.0.3
+   Compiling wasmtime-internal-jit-debug v46.0.3
+   Compiling crossbeam-deque v0.8.6
+   Compiling inplace-vec-builder v0.1.1
+   Compiling chio-secure-ipc v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-secure-ipc)
+   Compiling serde_spanned v1.1.1
+   Compiling toml_datetime v0.7.5+spec-1.1.0
+   Compiling irpc-derive v0.17.0
+   Compiling dirs-sys-next v0.1.2
+   Compiling genawaiter-macro v0.99.1
+   Compiling wasmtime-internal-cranelift v46.0.3
+   Compiling binary-merge v0.1.2
+   Compiling fixedbitset v0.4.2
+   Compiling chio-market v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-market)
+   Compiling chio-web3 v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-web3)
+   Compiling toml_writer v1.1.1+spec-1.1.0
+   Compiling wasmtime-internal-component-macro v46.0.3
+   Compiling redb v4.1.0
+   Compiling wasmtime-internal-cache v46.0.3
+   Compiling toml v0.9.12+spec-1.1.0
+   Compiling irpc v0.17.0
+   Compiling petgraph v0.6.5
+   Compiling wasmtime-internal-wit-bindgen v46.0.3
+   Compiling range-collections v0.4.6
+   Compiling genawaiter v0.99.1
+   Compiling directories-next v2.0.0
+   Compiling chio-keyring v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-keyring)
+   Compiling chio-finding-worker v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-finding-worker)
+   Compiling rayon-core v1.13.0
+   Compiling wat v1.258.0
+   Compiling zstd v0.13.3
+   Compiling serde_yaml v0.9.34+deprecated
+   Compiling wasmtime v46.0.3
+   Compiling chio-spec-validate v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/tooling/chio-spec-validate)
+   Compiling iroh-io v0.6.2
+   Compiling chio-errors v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-errors)
+   Compiling iroh-blobs v0.103.0
+   Compiling debugid v0.8.0
+   Compiling positioned-io v0.3.5
+   Compiling self_cell v1.2.2
+   Compiling wasmparser v0.221.3
+   Compiling humantime v2.3.0
+   Compiling fixedbitset v0.5.7
+   Compiling futures-concurrency v7.7.1
+   Compiling env_logger v0.10.2
+   Compiling bao-tree v0.16.0
+   Compiling fxprof-processed-profile v0.8.1
+   Compiling rayon v1.11.0
+   Compiling chio-autonomy v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-autonomy)
+   Compiling bitcoin_hashes v0.12.0
+   Compiling wasm-compose v0.251.0
+   Compiling iroh-util v0.6.0
+   Compiling chio-core v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-core)
+   Compiling iroh-tickets v1.0.0
+   Compiling addr2line v0.26.1
+   Compiling wasmtime-internal-jit-icache-coherence v46.0.3
+   Compiling nested_enum_utils v0.2.3
+   Compiling fsevent-sys v4.1.0
+   Compiling filetime v0.2.27
+   Compiling reflink-copy v0.1.30
+   Compiling encoding_rs v0.8.35
+   Compiling mach2 v0.6.0
+   Compiling rusty-fork v0.3.1
+   Compiling notify v6.1.1
+   Compiling iroh-gossip v0.101.0
+   Compiling opentimestamps v0.2.0
+   Compiling pollster v0.4.0
+   Compiling proptest v1.10.0
+   Compiling chio-manifest v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-manifest)
+   Compiling chio-settle v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-settle)
+   Compiling chio-link v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-link)
+   Compiling chio-workflow v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-workflow)
+   Compiling chio-metering v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-metering)
+   Compiling chio-tool-call-fabric v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/protocol/chio-tool-call-fabric)
+   Compiling chio-selective-disclosure v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-selective-disclosure)
+   Compiling chio-cage v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-cage)
+   Compiling cranelift-frontend v0.133.3
+   Compiling chio-attest-buyer-core v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-attest-buyer-core)
+   Compiling cranelift-native v0.133.3
+   Compiling chio-signing-remote v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-signing-remote)
+   Compiling chio-credentials v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-credentials)
+   Compiling chio-kernel-browser v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-kernel-browser)
+   Compiling chio-tee-frame v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-tee-frame)
+   Compiling chio-adversarial-suite v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-adversarial-suite)
+   Compiling chio-federation-authority v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-federation-authority)
+   Compiling chio-pheromone-runtime v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-pheromone-runtime)
+   Compiling chio-pheromone-relay v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-pheromone-relay)
+   Compiling chio-kernel v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-kernel)
+   Compiling chio-federation-transport-iroh v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-federation-transport-iroh)
+   Compiling chio-finding-verifier v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-finding-verifier)
+   Compiling chio-cross-protocol v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/protocol/chio-cross-protocol)
+   Compiling chio-edge-metrics v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/protocol/chio-edge-metrics)
+   Compiling chio-http-session v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-http-session)
+   Compiling chio-trace-validate v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/tooling/chio-trace-validate)
+   Compiling chio-security-kernel v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-security-kernel)
+   Compiling chio-siem v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/observability/chio-siem)
+   Compiling chio-finding-hosted-edge v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-finding-hosted-edge)
+   Compiling chio-config v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-config)
+   Compiling chio-a2a-adapter v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/protocol/chio-a2a-adapter)
+   Compiling chio-guards v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/guards/chio-guards)
+   Compiling chio-transaction-passport v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-transaction-passport)
+   Compiling chio-mcp-edge v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/protocol/chio-mcp-edge)
+   Compiling chio-http-core v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-http-core)
+   Compiling chio-finding-challenge v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-finding-challenge)
+   Compiling chio-anchor v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-anchor)
+   Compiling chio-mcp-adapter v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/protocol/chio-mcp-adapter)
+   Compiling chio-acp-edge v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/protocol/chio-acp-edge)
+   Compiling chio-a2a-edge v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/protocol/chio-a2a-edge)
+   Compiling chio-openapi v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/protocol/chio-openapi)
+   Compiling chio-data-guards v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/guards/chio-data-guards)
+   Compiling chio-external-guards v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/guards/chio-external-guards)
+   Compiling chio-risk-comptroller v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-risk-comptroller)
+   Compiling chio-policy v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/guards/chio-policy)
+   Compiling chio-openapi-mcp-bridge v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/protocol/chio-openapi-mcp-bridge)
+   Compiling chio-wasm-guards v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/guards/chio-wasm-guards)
+   Compiling chio-commerce-order v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-commerce-order)
+   Compiling chio-enterprise-export v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-enterprise-export)
+   Compiling chio-trust-market-context v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-trust-market-context)
+   Compiling chio-agent-web-interop v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-agent-web-interop)
+   Compiling chio-store-sqlite v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-store-sqlite)
+   Compiling chio-control-plane v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-control-plane)
+   Compiling chio-mcp-remote v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/protocol/chio-mcp-remote)
+   Compiling chio-api-protect v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/products/chio-api-protect)
+    Finished `test` profile [unoptimized] target(s) in 3m 45s
+     Running unittests src/lib.rs (target/debug/deps/chio_conformance-88783b25b9a8f87a)
+
+running 1 test
+test recovery_trajectory::tests::trajectory_effect_assertions_reject_each_independent_mutation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 44 filtered out; finished in 0.00s
+

@@ -44,6 +44,7 @@ pub mod plan;
 pub mod pq;
 pub mod provider_attempt;
 pub mod receipt;
+pub mod recovery;
 pub mod runtime_attestation;
 mod schema_binding;
 pub mod security_event;

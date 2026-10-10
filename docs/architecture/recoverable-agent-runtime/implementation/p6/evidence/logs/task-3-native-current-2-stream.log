@@ -1,0 +1,16 @@
+   Compiling chio-store-sqlite v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-store-sqlite)
+   Compiling chio-conformance v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/tooling/chio-conformance)
+   Compiling chio-secret-broker v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-secret-broker)
+   Compiling chio-control-plane v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-control-plane)
+    Finished `test` profile [unoptimized] target(s) in 1m 23s
+     Running unittests src/lib.rs (target/recovery-p5-linux/host/debug/deps/chio_control_plane-6f8003448d0ced3f)
+
+running 6 tests
+test recovery::tests::knowledge::setup::p6_setup_cannot_accept_a_new_native_semantic_plan_before_ready ... ok
+test recovery::tests::knowledge::setup::p6_setup_every_foreign_binding_and_old_profile_refuses ... 
+thread 'recovery::tests::knowledge::setup::p6_setup_every_foreign_binding_and_old_profile_refuses' (67370) has overflowed its stack
+fatal runtime error: stack overflow, aborting
+error: test failed, to rerun pass `-p chio-control-plane --lib`
+
+Caused by:
+  process didn't exit successfully: `/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/target/recovery-p5-linux/host/debug/deps/chio_control_plane-6f8003448d0ced3f p6_setup_ --nocapture --test-threads=1` (signal: 6, SIGABRT: process abort signal)

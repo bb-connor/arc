@@ -1,0 +1,40 @@
+   Compiling chio-kernel v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-kernel)
+   Compiling chio-finding-verifier v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-finding-verifier)
+   Compiling chio-process v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-process)
+   Compiling chio-transaction-passport v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-transaction-passport)
+   Compiling chio-risk-comptroller v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-risk-comptroller)
+   Compiling chio-commerce-order v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-commerce-order)
+   Compiling chio-agent-web-interop v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-agent-web-interop)
+   Compiling chio-store-sqlite v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-store-sqlite)
+    Finished `test` profile [unoptimized] target(s) in 20.85s
+     Running tests/nonce_recovery.rs (target/debug/deps/nonce_recovery-5e935cafe6d697a6)
+
+running 3 tests
+test strict_nonce_subprocess ... ok
+
+running 1 test
+
+running 1 test
+test strict_nonce_call_completes_once_and_replays_after_reopening ... ok
+test strict_nonce_subprocess ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 1.01s
+
+
+running 1 test
+test strict_nonce_subprocess ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.92s
+
+test strict_nonce_unknown_effect_keeps_original_custody_after_process_death ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.26s
+
+     Running tests/recovery_p0_baseline.rs (target/debug/deps/recovery_p0_baseline-ff7175ec2f41f015)
+
+running 2 tests
+test measured_native_baseline ... ignored, explicit local performance baseline; run with --ignored --nocapture
+test exhaustive_request_review_preserves_native_owned_attachment_boundary ... ok
+
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.42s
+

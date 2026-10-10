@@ -1,3 +1,7 @@
+#[path = "linux/preparation.rs"]
+mod preparation;
+pub(super) use preparation::prepare_launch;
+
 include!("linux_parts/part_01.rs");
 include!("linux_parts/part_02.rs");
 

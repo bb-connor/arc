@@ -127,7 +127,7 @@ fn native_declassification_supports_public_nested_sync_and_async_with_all_creden
                 let mut client = NoChildRequests;
                 let proofs = NestedToolCallProofs {
                     dpop_proof: fixture.request.dpop_proof.clone(),
-                    declassification_grant: fixture.request.declassification_grant.clone(),
+                    declassification_grant: fixture.request.declassification_grant.as_ref().and_then(|grant|grant.legacy_v1()).cloned(),
                 };
                 let response = if asynchronous {
                     tokio::runtime::Builder::new_current_thread().enable_all().build()?.block_on(
@@ -363,7 +363,7 @@ fn public_nested_declassification_proof_reaches_native_untrusted_issuer_denial()
             )?));
         let proofs = NestedToolCallProofs {
             dpop_proof: None,
-            declassification_grant: Some(grant),
+            declassification_grant: grant.legacy_v1().cloned(),
         };
         let mut client = NoChildRequests;
         let response = if async_native {

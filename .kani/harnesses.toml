@@ -446,11 +446,6 @@ notes = "Truth table over the public settlement_state_id helper used by the prod
 # chio-weights Kani harness evidence
 # ---------------------------------------------------------------------
 # Source: crates/trust/chio-weights/src/kani_public_harnesses.rs.
-# A `public_string_set_predicate_algebra` stanza was sketched in the
-# A3.5 commented draft but does not exist in this PR's harness file
-# (the existing predicate harnesses are inlined inside the four
-# entries below); the manifest only lists harnesses that actually
-# exist.
 
 [[harness]]
 crate = "chio-weights"
@@ -498,4 +493,4 @@ default_unwind = 17
 timeout_secs = 1800
 lane = "pr"
 features = ["kani"]
-notes = "Production M5 arithmetic core: full-width overflow and signed-cap failures reject; successful awards are live-bond capped and exact-sum over three ordered buyer harms in a fixed 1:2:3 ratio plus the community fund."
+notes = "Production challenge-award arithmetic core: full-width overflow and signed-cap failures reject; successful awards are live-bond capped and exact-sum over three ordered buyer harms in a fixed 1:2:3 ratio plus the community fund."

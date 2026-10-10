@@ -328,3 +328,624 @@ if [[ $positive_classified_status -ne 0 ]]; then
 fi
 
 echo "OK: HttpEgressContract lint correctly accepts wired or classified callers and rejects bare reqwest dispatch (including ClientBuilder, Client::new/default, blocking, imported, alias, execute, top-level get, mention-only, send-without-builder, and mixed-file forms)."
+
+# Token-level coverage and compatibility controls use only synthetic Rust text.
+python3 - "$LINT" <<'PY'
+from pathlib import Path
+import os
+import subprocess
+import sys
+import tempfile
+
+CASES = [
+    ('bare-send', 1, {
+        'crates/chio-http-probe/src/lib.rs': """pub async fn dispatch(client: &reqwest::Client) {
+    let _ = client.get("https://example.invalid").send().await;
+}
+""",
+    }),
+    ('bare-client-execute', 1, {
+        'crates/chio-http-probe/src/lib.rs': """pub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {
+    let _ = client.execute(request).await;
+}
+""",
+    }),
+    ('real-builder-and-dispatch', 0, {
+        'crates/chio-http-probe/src/lib.rs': """use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
+pub async fn dispatch(contract: &HttpEgressContract) {
+    let client: reqwest::Client = client_builder_with_contract(contract).build().unwrap();
+    let request = client.get("https://example.invalid").build().unwrap();
+    let _ = send_with_contract(contract, &client, request).await;
+}
+""",
+    }),
+    ('non-dispatching-client-type', 0, {
+        'crates/chio-http-probe/src/lib.rs': """use reqwest::Client;
+pub fn inspect_type(_: &Client) {}
+""",
+    }),
+    ('explicit-classified-dispatch', 0, {
+        'crates/chio-http-probe/src/lib.rs': """pub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: synthetic operator diagnostic, outside agent tool egress.
+    let _ = client.execute(request).await;
+}
+""",
+    }),
+    ('builder-import-only', 1, {
+        'crates/chio-http-probe/src/lib.rs': """use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
+pub async fn dispatch(client: &reqwest::Client, contract: &HttpEgressContract) {
+    let request = client.get("https://example.invalid").build().unwrap();
+    let _ = send_with_contract(contract, client, request).await;
+}
+""",
+    }),
+    ('builder-comment-only', 1, {
+        'crates/chio-http-probe/src/lib.rs': """use chio_egress_contract::{send_with_contract, HttpEgressContract};
+// The comment client_builder_with_contract is not construction of this client.
+pub async fn dispatch(client: &reqwest::Client, contract: &HttpEgressContract) {
+    let request = client.get("https://example.invalid").build().unwrap();
+    let _ = send_with_contract(contract, client, request).await;
+}
+""",
+    }),
+    ('builder-string-only', 1, {
+        'crates/chio-http-probe/src/lib.rs': """use chio_egress_contract::{send_with_contract, HttpEgressContract};
+const DESCRIPTION: &str = "client_builder_with_contract";
+pub async fn dispatch(client: &reqwest::Client, contract: &HttpEgressContract) {
+    let request = client.get("https://example.invalid").build().unwrap();
+    let _ = send_with_contract(contract, client, request).await;
+}
+""",
+    }),
+    ('arbitrary-execute-receiver', 1, {
+        'crates/chio-http-probe/src/lib.rs': """pub async fn dispatch(transport: &reqwest::Client, request: reqwest::Request) {
+    let _ = transport.execute(request).await;
+}
+""",
+    }),
+    ('split-execute-receiver', 1, {
+        'crates/chio-http-probe/src/lib.rs': """pub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {
+    let _ = client
+        .execute(request)
+        .await;
+}
+""",
+    }),
+    ('spaced-execute', 1, {
+        'crates/chio-http-probe/src/lib.rs': """pub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {
+    let _ = client.execute (request).await;
+}
+""",
+    }),
+    ('spaced-send', 1, {
+        'crates/chio-http-probe/src/lib.rs': """pub async fn dispatch(client: &reqwest::Client) {
+    let _ = client.get("https://example.invalid").send ().await;
+}
+""",
+    }),
+    ('spaced-top-level-get', 1, {
+        'crates/chio-http-probe/src/lib.rs': """pub async fn dispatch() {
+    let _ = reqwest::get ("https://example.invalid").await;
+}
+""",
+    }),
+    ('multiline-client-import', 1, {
+        'crates/chio-http-probe/src/lib.rs': """use reqwest::{
+    Client,
+    Request,
+};
+pub async fn dispatch(client: &Client, request: Request) {
+    let _ = client.execute(request).await;
+}
+""",
+    }),
+    ('multiline-blocking-client-import', 1, {
+        'crates/chio-http-probe/src/lib.rs': """use reqwest::blocking::{
+    Client,
+};
+pub fn dispatch(client: &Client) {
+    let _ = client.get("https://example.invalid").send();
+}
+""",
+    }),
+    ('aliased-type-execute-receiver', 1, {
+        'crates/chio-http-probe/src/lib.rs': """use reqwest::Client as Http;
+pub async fn dispatch(transport: &Http, request: reqwest::Request) {
+    let _ = transport.execute(request).await;
+}
+""",
+    }),
+    ('real-builder-split-call', 0, {
+        'crates/chio-http-probe/src/lib.rs': """use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
+pub async fn dispatch(contract: &HttpEgressContract) {
+    let client: reqwest::Client = client_builder_with_contract
+        (contract).build().unwrap();
+    let request = client.get("https://example.invalid").build().unwrap();
+    let _ = send_with_contract(contract, &client, request).await;
+}
+""",
+    }),
+    ('contract-comment-does-not-hide-send', 1, {
+        'crates/chio-http-probe/src/lib.rs': """// HttpEgressContract and send_with_contract are documentation only here.
+pub async fn dispatch(client: &reqwest::Client) {
+    let _ = client.get("https://example.invalid").send().await;
+}
+""",
+    }),
+    ('anchored-multiline-client-import', 1, {
+        'crates/chio-http-probe/src/lib.rs': """use reqwest::{
+    Client,
+    Request,
+};
+pub async fn dispatch(client: &Client, request: Request) {
+    let _ = client.execute(request).await;
+}
+""",
+        'crates/chio-benign-anchor/src/lib.rs': """pub fn supported_type_reference(_: &reqwest::Client) {}
+""",
+    }),
+    ('anchored-multiline-blocking-client-import', 1, {
+        'crates/chio-http-probe/src/lib.rs': """use reqwest::blocking::{
+    Client,
+};
+pub fn dispatch(client: &Client) {
+    let _ = client.get("https://example.invalid").send();
+}
+""",
+        'crates/chio-benign-anchor/src/lib.rs': """pub fn supported_type_reference(_: &reqwest::Client) {}
+""",
+    }),
+    ('anchored-spaced-top-level-get', 1, {
+        'crates/chio-http-probe/src/lib.rs': """pub async fn dispatch() {
+    let _ = reqwest::get ("https://example.invalid").await;
+}
+""",
+        'crates/chio-benign-anchor/src/lib.rs': """pub fn supported_type_reference(_: &reqwest::Client) {}
+""",
+    }),
+    ('no-http-candidate', 0, {
+        'crates/chio-benign-probe/src/lib.rs': """pub fn local_contract() -> u8 { 7 }
+""",
+    }),
+    ('safe-http-and-channel-send', 0, {
+        'crates/chio-benign-probe/src/lib.rs': """use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
+pub async fn dispatch(contract: &HttpEgressContract) {
+    let client: reqwest::Client = client_builder_with_contract(contract).build().unwrap();
+    let request = client.get("https://example.invalid").build().unwrap();
+    let _ = send_with_contract(contract, &client, request).await;
+}
+pub async fn local_send(tx: tokio::sync::mpsc::Sender<u8>) {
+    let _ = tx.send(7).await;
+}
+""",
+    }),
+    ('safe-http-and-sqlite-execute', 0, {
+        'crates/chio-benign-probe/src/lib.rs': """use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
+pub async fn dispatch(contract: &HttpEgressContract) {
+    let client: reqwest::Client = client_builder_with_contract(contract).build().unwrap();
+    let request = client.get("https://example.invalid").build().unwrap();
+    let _ = send_with_contract(contract, &client, request).await;
+}
+pub fn local_database(connection: &rusqlite::Connection) {
+    let _ = connection.execute("CREATE TABLE IF NOT EXISTS records(value INTEGER)", []);
+}
+""",
+    }),
+    ('empty-crate-tree', 0, {
+    }),
+    ('execute-trailing-comma', 1, {
+        'crates/chio-http-probe/src/lib.rs': """pub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {
+    let _ = client.execute(request,).await;
+}
+""",
+    }),
+    ('execute-nested-macro', 1, {
+        'crates/chio-http-probe/src/lib.rs': """pub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {
+    let _ = client.execute(make_request!(one, two)).await;
+}
+""",
+    }),
+    ('execute-nested-type-arguments', 1, {
+        'crates/chio-http-probe/src/lib.rs': """pub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {
+    let _ = client.execute(make_request::<(u8, u8), u64>(request)).await;
+}
+""",
+    }),
+    ('execute-raw-identifier', 1, {
+        'crates/chio-http-probe/src/lib.rs': """pub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {
+    let _ = client.r#execute(request).await;
+}
+""",
+    }),
+    ('zero-argument-send-comments', 1, {
+        'crates/chio-http-probe/src/lib.rs': """pub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {
+    let _ = client.get("https://example.invalid").send( /* no arguments */ ).await;
+}
+""",
+    }),
+    ('classification-string-is-data', 1, {
+        'crates/chio-http-probe/src/lib.rs': """pub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {
+    let note = "CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: synthetic diagnostic";
+    let _ = (note, client.execute(request).await);
+}
+""",
+    }),
+    ('empty-classification-has-no-reason', 1, {
+        'crates/chio-http-probe/src/lib.rs': """pub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST:
+    let _ = client.execute(request).await;
+}
+""",
+    }),
+    ('block-comment-classification', 0, {
+        'crates/chio-http-probe/src/lib.rs': """pub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {
+    /* CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: synthetic diagnostic. */
+    let _ = client.execute(request).await;
+}
+""",
+    }),
+    ('nested-comment-and-raw-literal-data', 0, {
+        'crates/chio-http-probe/src/lib.rs': """pub fn inspect() {
+    /* outer /* reqwest::get("x"); */ prose */
+    let _ = r##"reqwest::Client::new().get("x").send();"##;
+}
+""",
+    }),
+    ('alloy-constructor-is-not-reqwest', 0, {
+        'crates/chio-http-probe/src/lib.rs': """use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
+pub async fn dispatch(contract: &HttpEgressContract) {
+    let client: reqwest::Client = client_builder_with_contract(contract).build().unwrap();
+    let request = client.get("https://example.invalid").build().unwrap();
+    let _ = send_with_contract(contract, &client, request).await;
+}
+pub fn local_client() { let _ = AlloyClientBuilder::default(); }
+use alloy::rpc::client::ClientBuilder as AlloyClientBuilder;
+""",
+    }),
+    ('qualified-helpers', 0, {
+        'crates/chio-http-probe/src/lib.rs': """use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
+pub async fn dispatch(contract: &HttpEgressContract) {
+    let client: reqwest::Client = chio_egress_contract::client_builder_with_contract(contract).build().unwrap();
+    let request = client.get("https://example.invalid").build().unwrap();
+    let _ = chio_egress_contract::send_with_contract(contract, &client, request).await;
+}
+""",
+    }),
+    ('aliased-helper-construction', 0, {
+        'crates/chio-http-probe/src/lib.rs': """use chio_egress_contract::{client_builder_with_contract as prepare, send_with_contract as dispatch, HttpEgressContract};
+pub async fn dispatch(contract: &HttpEgressContract) {
+    let client: reqwest::Client = prepare(contract).build().unwrap();
+    let request = client.get("https://example.invalid").build().unwrap();
+    let _ = dispatch(contract, &client, request).await;
+}
+""",
+    }),
+    ('aliased-helper-missing-construction', 1, {
+        'crates/chio-http-probe/src/lib.rs': """use chio_egress_contract::{client_builder_with_contract as prepare, send_with_contract as dispatch, HttpEgressContract};
+pub async fn send(client: &reqwest::Client, contract: &HttpEgressContract, request: reqwest::Request) {
+    let _ = dispatch(contract, client, request).await;
+}
+""",
+    }),
+    ('unrelated-builder-method-is-not-construction', 1, {
+        'crates/chio-http-probe/src/lib.rs': """use chio_egress_contract::{send_with_contract, HttpEgressContract};
+pub async fn dispatch(client: &reqwest::Client, contract: &HttpEgressContract, request: reqwest::Request) {
+    Fake::client_builder_with_contract(contract);
+    let _ = send_with_contract(contract, client, request).await;
+}
+""",
+    }),
+    ('function-declaration-is-not-construction', 1, {
+        'crates/chio-http-probe/src/lib.rs': """use chio_egress_contract::{send_with_contract, HttpEgressContract};
+fn client_builder_with_contract() {}
+pub async fn dispatch(client: &reqwest::Client, contract: &HttpEgressContract, request: reqwest::Request) {
+    let _ = send_with_contract(contract, client, request).await;
+}
+""",
+    }),
+    ('top-level-request-alias', 1, {
+        'crates/chio-http-probe/src/lib.rs': """use reqwest::get as fetch;
+pub async fn dispatch() { let _ = fetch("https://example.invalid").await; }
+""",
+    }),
+    ('blocking-namespace-alias', 1, {
+        'crates/chio-http-probe/src/lib.rs': """use reqwest::blocking as sync;
+pub fn dispatch() { let _ = sync::get("https://example.invalid"); }
+""",
+    }),
+    ('nondispatching-no-endpoint-constructor', 0, {
+        'crates/chio-http-probe/src/lib.rs': """use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
+pub async fn dispatch(contract: &HttpEgressContract) {
+    let client: reqwest::Client = client_builder_with_contract(contract).build().unwrap();
+    let request = client.get("https://example.invalid").build().unwrap();
+    let _ = send_with_contract(contract, &client, request).await;
+}
+pub fn unused_client() -> reqwest::Client { reqwest::Client::builder().build().unwrap() }
+""",
+    }),
+    ('sql-domain-execute-arity', 0, {
+        'crates/chio-http-probe/src/lib.rs': """use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
+pub async fn dispatch(contract: &HttpEgressContract) {
+    let client: reqwest::Client = client_builder_with_contract(contract).build().unwrap();
+    let request = client.get("https://example.invalid").build().unwrap();
+    let _ = send_with_contract(contract, &client, request).await;
+}
+pub fn local_domain(source: &Domain, first: u8, second: u8) {
+    source.execute(first, second);
+    source.execute(first, second, 7);
+}
+""",
+    }),
+    ('excluded-tests.rs', 0, {
+        'crates/chio-http-probe/src/tests.rs': """pub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {
+    let _ = client.execute(request).await;
+}
+""",
+    }),
+    ('excluded-contract-tests.rs', 0, {
+        'crates/chio-http-probe/src/contract-tests.rs': """pub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {
+    let _ = client.execute(request).await;
+}
+""",
+    }),
+    ('excluded-tests-dispatch.rs', 0, {
+        'crates/chio-http-probe/src/tests/dispatch.rs': """pub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {
+    let _ = client.execute(request).await;
+}
+""",
+    }),
+    ('excluded-protocol-chio-egress-contract', 0, {
+        'crates/protocol/chio-egress-contract/src/lib.rs': """pub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {
+    let _ = client.execute(request).await;
+}
+""",
+    }),
+    ('excluded-platform-chio-http-core', 0, {
+        'crates/platform/chio-http-core/src/lib.rs': """pub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {
+    let _ = client.execute(request).await;
+}
+""",
+    }),
+    ('excluded-protocol-chio-mcp-adapter', 0, {
+        'crates/protocol/chio-mcp-adapter/src/lib.rs': """pub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {
+    let _ = client.execute(request).await;
+}
+""",
+    }),
+    ('empty-block-classification-has-no-reason', 1, {
+        'crates/chio-http-probe/src/lib.rs': """pub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {
+    /* CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: */
+    let _ = client.execute(request).await;
+}
+""",
+    }),
+    ('raw-string-classification-is-data', 1, {
+        'crates/chio-http-probe/src/lib.rs': """pub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {
+    let _ = r##"CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: synthetic diagnostic"##;
+    let _ = client.execute(request).await;
+}
+""",
+    }),
+    ('qualified-async-execute', 1, {
+        'crates/chio-http-probe/src/lib.rs': """pub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {
+    let _ = reqwest::Client::execute(client, request).await;
+}
+""",
+    }),
+    ('qualified-blocking-execute', 1, {
+        'crates/chio-http-probe/src/lib.rs': """pub fn dispatch(client: &reqwest::blocking::Client, request: reqwest::blocking::Request) {
+    let _ = reqwest::blocking::Client::execute(client, request);
+}
+""",
+    }),
+    ('qualified-builder-send', 1, {
+        'crates/chio-http-probe/src/lib.rs': """pub async fn dispatch(request: reqwest::RequestBuilder) {
+    let _ = reqwest::RequestBuilder::send(request).await;
+}
+""",
+    }),
+    ('stringify-builder-is-data', 1, {
+        'crates/chio-http-probe/src/lib.rs': """use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
+pub async fn dispatch(client: &reqwest::Client, contract: &HttpEgressContract, request: reqwest::Request) {
+    let _ = stringify!(client_builder_with_contract(contract));
+    let _ = send_with_contract(contract, client, request).await;
+}
+""",
+    }),
+    ('adjacent-empty-comment-reason', 1, {
+        'crates/chio-http-probe/src/lib.rs': """pub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {
+    /* CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: */ /* */
+    let _ = client.execute(request).await;
+}
+""",
+    }),
+    ('aliased-associated-execute', 1, {
+        'crates/chio-http-probe/src/lib.rs': """use reqwest::Client as Http;
+pub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {
+    let _ = Http::execute(client, request).await;
+}
+""",
+    }),
+    ('qualified-type-execute', 1, {
+        'crates/chio-http-probe/src/lib.rs': """pub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {
+    let _ = <reqwest::Client>::execute(client, request).await;
+}
+""",
+    }),
+    ('aliased-qualified-type-execute', 1, {
+        'crates/chio-http-probe/src/lib.rs': """use reqwest::Client as Http;
+pub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {
+    let _ = <Http>::execute(client, request).await;
+}
+""",
+    }),
+    ('associated-blocking-request-builder-send', 1, {
+        'crates/chio-http-probe/src/lib.rs': """pub fn dispatch(request: reqwest::blocking::RequestBuilder) {
+    let _ = reqwest::blocking::RequestBuilder::send(request);
+}
+""",
+    }),
+    ('aliased-associated-request-builder-send', 1, {
+        'crates/chio-http-probe/src/lib.rs': """use reqwest::RequestBuilder as Wire;
+pub async fn dispatch(request: Wire) { let _ = Wire::send(request).await; }
+""",
+    }),
+    ('stringify-is-not-http-dispatch', 0, {
+        'crates/chio-http-probe/src/lib.rs': """pub fn inspect_type(_: &reqwest::Client) {
+    let _ = stringify!(reqwest::Client::execute(client, request));
+}
+""",
+    }),
+    ('nested-data-macro-is-not-http', 0, {
+        'crates/chio-http-probe/src/lib.rs': """pub fn inspect_type(_: &reqwest::Client) {
+    let _ = stringify!([reqwest::RequestBuilder::send(request), stringify!(reqwest::get("x"))]);
+}
+""",
+    }),
+    ('unknown-macro-does-not-prove-construction', 1, {
+        'crates/chio-http-probe/src/lib.rs': """use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
+pub async fn dispatch(client: &reqwest::Client, contract: &HttpEgressContract, request: reqwest::Request) {
+    configured_client!(client_builder_with_contract(contract));
+    let _ = send_with_contract(contract, client, request).await;
+}
+""",
+    }),
+    ('macro-data-comment-cannot-classify', 1, {
+        'crates/chio-http-probe/src/lib.rs': """pub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {
+    let _ = stringify!{ /* CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: diagnostic text. */ };
+    let _ = client.execute(request).await;
+}
+""",
+    }),
+    ('adjacent-comment-cannot-supply-reason', 1, {
+        'crates/chio-http-probe/src/lib.rs': """pub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {
+    /* CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: */ /* unrelated prose */
+    let _ = client.execute(request).await;
+}
+""",
+    }),
+    ('nested-empty-comment-cannot-supply-reason', 1, {
+        'crates/chio-http-probe/src/lib.rs': """pub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {
+    /* CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: /* */ */
+    let _ = client.execute(request).await;
+}
+""",
+    }),
+    ('adjacent-real-comment-classification', 0, {
+        'crates/chio-http-probe/src/lib.rs': """pub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {
+    /* CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: explicit diagnostic. */ /* adjacent */
+    let _ = client.execute(request).await;
+}
+""",
+    }),
+    ('multiline-real-comment-classification', 0, {
+        'crates/chio-http-probe/src/lib.rs': """pub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {
+    /*
+       CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: explicit diagnostic.
+    */
+    let _ = client.execute(request).await;
+}
+""",
+    }),
+    ('shadowed-data-macro-remains-conservative', 1, {
+        'crates/chio-http-probe/src/lib.rs': """macro_rules! stringify { ($request:expr) => { $request }; }
+pub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {
+    let _ = stringify!(client.execute(request)).await;
+}
+""",
+    }),
+    ('concat-literals-do-not-prove-construction', 1, {
+        'crates/chio-http-probe/src/lib.rs': """use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
+pub async fn dispatch(client: &reqwest::Client, contract: &HttpEgressContract, request: reqwest::Request) {
+    let _ = concat!("client_builder_with_contract", "(contract)");
+    let _ = send_with_contract(contract, client, request).await;
+}
+""",
+    }),
+    ('imported-data-name-is-executing-macro', 1, {
+        'crates/chio-http-probe/src/helpers.rs': '#[macro_export]\nmacro_rules! dispatch_passthrough { ($expression:expr) => { $expression }; }\n',
+        'crates/chio-http-probe/src/lib.rs': 'mod helpers;\nuse crate::dispatch_passthrough as stringify;\npub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {\n    let _ = stringify!(client.execute(request)).await;\n}\n',
+    }),
+    ('imported-concat-is-executing-macro', 1, {
+        'crates/chio-http-probe/src/lib.rs': 'mod helpers;\nuse crate::dispatch_passthrough as concat;\npub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {\n    let _ = concat!(client.execute(request)).await;\n}\n',
+        'crates/chio-http-probe/src/helpers.rs': '#[macro_export]\nmacro_rules! dispatch_passthrough { ($expression:expr) => { $expression }; }\n',
+    }),
+    ('braced-imported-data-name-executes', 1, {
+        'crates/chio-http-probe/src/lib.rs': 'mod helpers;\nuse crate::{dispatch_passthrough as stringify};\npub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {\n    let _ = stringify!(client.execute(request)).await;\n}\n',
+        'crates/chio-http-probe/src/helpers.rs': '#[macro_export]\nmacro_rules! dispatch_passthrough { ($expression:expr) => { $expression }; }\n',
+    }),
+    ('direct-nonstandard-macro-import-executes', 1, {
+        'crates/chio-http-probe/src/lib.rs': 'mod helpers;\nuse crate::concat;\npub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {\n    let _ = concat!(client.execute(request)).await;\n}\n',
+        'crates/chio-http-probe/src/helpers.rs': '#[macro_export]\nmacro_rules! concat { ($expression:expr) => { $expression }; }\n',
+    }),
+    ('standard-macro-import-remains-data', 0, {
+        'crates/chio-http-probe/src/lib.rs': 'use std::stringify;\npub fn inspect_type(_: &reqwest::Client) { let _ = stringify!(reqwest::Client::execute(client, request)); }\n',
+    }),
+    ('core-macro-import-remains-data', 0, {
+        'crates/chio-http-probe/src/lib.rs': 'use core::stringify;\npub fn inspect_type(_: &reqwest::Client) { let _ = stringify!(reqwest::Client::execute(client, request)); }\n',
+    }),
+    ('visible-standard-namespace-alias-executes', 1, {
+        'crates/chio-http-probe/src/lib.rs': 'mod helpers;\nuse crate::helpers as std;\npub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {\n    let _ = std::stringify!(client.execute(request)).await;\n}\n',
+        'crates/chio-http-probe/src/helpers.rs': '#[macro_export]\nmacro_rules! dispatch_passthrough { ($expression:expr) => { $expression }; }\npub use crate::dispatch_passthrough as stringify;\n',
+    }),
+    ('visible-standard-module-binding-executes', 1, {
+        'crates/chio-http-probe/src/lib.rs': 'mod helpers;\nmod std { pub use crate::dispatch_passthrough as stringify; }\npub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {\n    let _ = std::stringify!(client.execute(request)).await;\n}\n',
+        'crates/chio-http-probe/src/helpers.rs': '#[macro_export]\nmacro_rules! dispatch_passthrough { ($expression:expr) => { $expression }; }\n',
+    }),
+    ('quoted-module-is-not-binding', 0, {
+        'crates/chio-http-probe/src/lib.rs': 'pub fn inspect_type(_: &reqwest::Client) {\n    let _ = std::stringify!(mod std {} reqwest::Client::execute(client, request));\n}\n',
+    }),
+    ('quoted-macro-definition-is-not-binding', 0, {
+        'crates/chio-http-probe/src/lib.rs': 'pub fn inspect_type(_: &reqwest::Client) {\n let _ = stringify!(macro_rules! stringify { ($request:expr) => { $request }; });\n let _ = stringify!(reqwest::Client::execute(client, request));\n}\n',
+    }),
+    ('unknown-macro-module-remains-conservative', 1, {
+        'crates/chio-http-probe/src/lib.rs': 'mod helpers;\ndefine_namespace!(mod std { pub use crate::dispatch_passthrough as stringify; });\npub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {\n let _ = std::stringify!(client.execute(request)).await;\n}\n',
+        'crates/chio-http-probe/src/helpers.rs': '#[macro_export]\nmacro_rules! dispatch_passthrough { ($expression:expr) => { $expression }; }\n',
+    }),
+    ('unknown-macro-definition-remains-conservative', 1, {
+        'crates/chio-http-probe/src/lib.rs': 'define_macro!(macro_rules! stringify { ($expression:expr) => { $expression }; });\npub async fn dispatch(client: &reqwest::Client, request: reqwest::Request) {\n let _ = stringify!(client.execute(request)).await;\n}\n',
+    }),
+]
+
+with tempfile.TemporaryDirectory(prefix="chio-egress-token-") as directory:
+    work = Path(directory)
+    for name, expected, sources in CASES:
+        fixture = work / name
+        (fixture / "crates").mkdir(parents=True)
+        for relative, source in sources.items():
+            path = fixture / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(source, encoding="utf-8")
+        environment = os.environ.copy()
+        environment["CHIO_EGRESS_LINT_ROOT"] = str(fixture)
+        result = subprocess.run(["bash", sys.argv[1]], env=environment,
+                                text=True, capture_output=True, timeout=30)
+        if result.returncode != expected:
+            print(f"FAIL: {name}: expected status {expected}, actual {result.returncode}", file=sys.stderr)
+            print(result.stdout + result.stderr, file=sys.stderr)
+            raise SystemExit(1)
+    invalid_sources = {
+        "non-utf8-source": b"fn invalid() { }\xff",
+        "unterminated-comment": b"/* reqwest::Client::new()",
+        "unterminated-literal": b'fn invalid() { let text = "reqwest',
+    }
+    for name, source in invalid_sources.items():
+        fixture = work / name
+        path = fixture / "crates/chio-invalid/src/lib.rs"
+        path.parent.mkdir(parents=True)
+        path.write_bytes(source)
+        environment = os.environ.copy()
+        environment["CHIO_EGRESS_LINT_ROOT"] = str(fixture)
+        result = subprocess.run(["bash", sys.argv[1]], env=environment,
+                                text=True, capture_output=True, timeout=30)
+        if result.returncode != 1 or "cannot be validated" not in result.stderr:
+            raise SystemExit(f"FAIL: malformed source was not refused: {name}")
+    missing = work / "missing-crates"
+    missing.mkdir()
+    environment["CHIO_EGRESS_LINT_ROOT"] = str(missing)
+    result = subprocess.run(["bash", sys.argv[1]], env=environment,
+                            text=True, capture_output=True, timeout=30)
+    if result.returncode != 1 or "cannot be validated" not in result.stderr:
+        raise SystemExit("FAIL: missing crate source root was not refused")
+    print(f"OK: {len(CASES) + 4} token coverage, classification, compatibility and invalid-input controls.")
+PY

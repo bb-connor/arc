@@ -798,7 +798,7 @@ if CHIO_KANI_VERSION=latest ./scripts/kani-mutant-killer.sh \
   echo "invalid Kani version selector unexpectedly passed" >&2
   exit 1
 fi
-grep -Fq "CHIO_KANI_VERSION must remain 0.67.0" \
+grep -Fq "CHIO_KANI_VERSION must remain 0.68.0" \
   "${tmp_dir}/invalid-kani-version.log"
 
 fake_bin="${tmp_dir}/fake-bin"
@@ -808,7 +808,9 @@ cat >"${fake_bin}/cargo" <<'SH'
 set -euo pipefail
 
 if [[ "${1:-}" == "kani" && "${2:-}" == "--version" ]]; then
-  printf '%s\n' 'Kani Rust Verifier 0.67.0 (cargo plugin)'
+  printf '%s\n' 'Kani Rust Verifier 0.68.0 (kani-0.68.0) (cargo plugin)' \
+    'using rustc 1.100.0-nightly (8925ea358 2026-08-20) (commit 8925ea35 2026-08-20) with LLVM 22.1.0' \
+    'CBMC 6.11.0'
   exit 0
 fi
 printf '%s\0' "$@" >>"${KANI_ARGUMENTS}"

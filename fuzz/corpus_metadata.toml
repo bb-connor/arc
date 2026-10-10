@@ -18,8 +18,8 @@
 #   libfuzzer_crash            promoted via promote_fuzz_seed.sh --mode libfuzzer
 #   adversarial_curated        hand-written adversarial vector
 #   adversarial_promoted       promoted via promote_fuzz_seed.sh --mode adversarial
-#   m03_counterexample         minimised counterexample from chio-policy proptests
-#   m02_verdict_divergence     promoted from cross-SDK verdict divergence
+#   policy_counterexample         minimised counterexample from chio-policy proptests
+#   sdk_verdict_divergence     promoted from cross-SDK verdict divergence
 #
 # When scripts/promote_fuzz_seed.sh --mode adversarial promotes a fresh
 # seed it must append a new [[seed]] block here with the appropriate
@@ -965,7 +965,7 @@ source    = "hand_curated_coverage"
 [[seed]]
 target    = "eval_receipt_bundle"
 path      = "fuzz/corpus/eval_receipt_bundle/valid-bundle.json"
-sha256    = "27331e1d7d7f94f0e6292d78a4dbf8e1ff0320d5e82cb0b782cc55357bfb1a97"
+sha256    = "5050b9ae6f32079e225fb7096625e6b4192d31f2222729c03fcf9851c5ca2d67"
 source    = "hand_curated_coverage"
 
 [[seed]]

@@ -219,7 +219,7 @@ def main():
         "protected_effect_count": 2, "confined_targets_terminated_on_host_death": 4,
         "aggregate_projection": quotas, "worker_image": args.worker_image, "runner": report,
         "original_native_launches": original_launches,
-        "m5_acceptance_complete": False,
+        "qualification_complete": False,
         "limits": ["overlap and store projections are external observations",
                    "original launch signatures are checked; PID linkage and death are external observations",
                    "admitted effects have unknown terminal outcomes",

@@ -1,0 +1,22 @@
+
+running 3 tests
+test strict_nonce_subprocess ... ok
+
+running 1 test
+
+running 1 test
+test strict_nonce_subprocess ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 1.30s
+
+test strict_nonce_call_completes_once_and_replays_after_reopening ... ok
+
+running 1 test
+test strict_nonce_subprocess ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 1.16s
+
+test strict_nonce_unknown_effect_keeps_original_custody_after_process_death ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.23s
+

@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.computer/schemas/chio-wire/v1/recovery/artifact-influence.schema.json",
+  "title": "Artifact Influence V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "commitment",
+    "externally_influenced",
+    "unknown"
+  ],
+  "properties": {
+    "commitment": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "externally_influenced": {
+      "type": "boolean"
+    },
+    "unknown": {
+      "type": "boolean"
+    }
+  },
+  "$defs": {
+    "recoveryDigest32": {
+      "type": "array",
+      "minItems": 32,
+      "maxItems": 32,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255,
+        "title": "Recovery digest octet"
+      },
+      "title": "Recovery digest32"
+    }
+  }
+}

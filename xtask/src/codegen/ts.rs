@@ -1,3 +1,4 @@
+use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -5,10 +6,13 @@ use std::process::Command;
 
 use sha2::{Digest, Sha256};
 
-use crate::support::{digest_to_hex, display_path, walk_schema_json, workspace_root};
+use crate::support::{digest_to_hex, display_path, walk_schema_json, workspace_root, TempDir};
 use crate::XtaskError;
 
 use super::CHIO_WIRE_V1_SCHEMAS;
+
+#[path = "typescript_definitions.rs"]
+mod definitions;
 
 /// Relative path (from workspace root) of the directory that hosts the
 /// pinned json-schema-to-typescript install. The xtask invokes
@@ -26,7 +30,6 @@ const TS_CODEGEN_TOOL_VERSION: &str = "json-schema-to-typescript 15.0.4";
 pub(super) fn codegen_ts(check_only: bool) -> Result<(), XtaskError> {
     let workspace_root = workspace_root()?;
     let schemas_dir = workspace_root.join(CHIO_WIRE_V1_SCHEMAS);
-    let out_path = workspace_root.join(CHIO_WIRE_V1_TS_OUT);
     let scripts_dir = workspace_root.join(TS_CODEGEN_SCRIPTS_DIR);
 
     if !schemas_dir.exists() {
@@ -82,6 +85,12 @@ pub(super) fn codegen_ts(check_only: bool) -> Result<(), XtaskError> {
     }
     let schema_sha = digest_to_hex(&schema_hasher.finalize());
 
+    let staging = TempDir::new("chio-codegen-ts")
+        .map_err(|error| XtaskError::Io("typescript schema staging".into(), error))?;
+    chio_spec_codegen::LocalSchemaCatalog::load(&schemas_dir)
+        .and_then(|catalog| catalog.mirror(staging.path()))
+        .map_err(XtaskError::Codegen)?;
+
     // Render each schema in isolation, then wrap each emitted file in a
     // namespace keyed by its `<group>/<name>` path so the cross-schema name
     // collisions (e.g., `Operation` between capability/grant and
@@ -106,7 +115,24 @@ pub(super) fn codegen_ts(check_only: bool) -> Result<(), XtaskError> {
                 display_path(path)
             ))
         })?;
-        let raw_ts = run_json2ts(&json2ts, path)?;
+        let schema_relative = path
+            .strip_prefix(&schemas_dir)
+            .map_err(|_| XtaskError::Usage("typescript schema escaped catalog".into()))?;
+        let mirrored = staging.path().join(schema_relative);
+        // Grant epochs use a positive field facet, while the declared generic
+        // SafeInteger codec remains part of the public namespace API. Retain
+        // that historical name in the private mirror without exposing other
+        // unreachable definitions or changing the authoritative schema.
+        let retain_public_definitions =
+            schema_relative == Path::new("recovery/grant-binding.schema.json");
+        if retain_public_definitions {
+            let source = fs::read(&mirrored)
+                .map_err(|error| XtaskError::Io(display_path(&mirrored), error))?;
+            let prepared = definitions::prepare_public_definitions(&source, &["safeInteger"])?;
+            fs::write(&mirrored, prepared)
+                .map_err(|error| XtaskError::Io(display_path(&mirrored), error))?;
+        }
+        let raw_ts = run_json2ts(&json2ts, &mirrored, retain_public_definitions)?;
         let normalized = normalize_ts_chunk(&raw_ts);
         body.push_str(
             "// -----------------------------------------------------------------------------\n",
@@ -129,45 +155,163 @@ pub(super) fn codegen_ts(check_only: bool) -> Result<(), XtaskError> {
         body.pop();
     }
 
-    if check_only {
-        if !out_path.exists() {
-            return Err(XtaskError::Drift(format!(
-                "{} is missing; rerun `cargo xtask codegen --lang ts`",
-                display_path(&out_path)
-            )));
-        }
-        let existing = fs::read_to_string(&out_path)
-            .map_err(|err| XtaskError::Io(display_path(&out_path), err))?;
-        if existing != body {
-            return Err(XtaskError::Drift(format!(
-                "{} is stale; rerun `cargo xtask codegen --lang ts` (computed {} bytes, on-disk {} bytes)",
-                display_path(&out_path),
-                body.len(),
-                existing.len()
-            )));
-        }
-        println!(
-            "codegen ts: {} in sync ({} bytes, {} schemas, schema-sha {})",
-            display_path(&out_path),
-            existing.len(),
-            schema_files.len(),
-            &schema_sha[..16]
-        );
-        return Ok(());
+    for output in [
+        CHIO_WIRE_V1_TS_OUT,
+        "sdks/typescript/packages/node-http/src/_generated/index.ts",
+    ] {
+        write_or_check(&workspace_root.join(output), &body, check_only)?;
     }
-
-    if let Some(parent) = out_path.parent() {
-        fs::create_dir_all(parent).map_err(|err| XtaskError::Io(display_path(parent), err))?;
-    }
-    fs::write(&out_path, body.as_bytes())
-        .map_err(|err| XtaskError::Io(display_path(&out_path), err))?;
+    let schemas = recovery_schema_bundle(&schema_files)?;
+    let bundle = format!(
+        "{}export const recoveryWireSchemas: readonly object[] = {};\n",
+        ts_header(&schema_sha),
+        serde_json::to_string_pretty(&schemas)
+            .map_err(|error| XtaskError::Usage(format!("codegen schema bundle: {error}")))?
+    );
+    write_or_check(
+        &workspace_root
+            .join("sdks/typescript/packages/node-http/src/_generated/recovery-schemas.ts"),
+        &bundle,
+        check_only,
+    )?;
     println!(
-        "codegen ts: wrote {} ({} bytes, {} schemas, schema-sha {})",
-        display_path(&out_path),
-        body.len(),
+        "codegen ts: {} schemas, schema-sha {}",
         schema_files.len(),
         &schema_sha[..16]
     );
+    Ok(())
+}
+
+fn write_or_check(path: &Path, body: &str, check_only: bool) -> Result<(), XtaskError> {
+    if check_only {
+        let existing =
+            fs::read_to_string(path).map_err(|error| XtaskError::Io(display_path(path), error))?;
+        if existing != body {
+            return Err(XtaskError::Drift(format!(
+                "{} is stale; rerun `cargo xtask codegen --lang ts`",
+                display_path(path)
+            )));
+        }
+    } else {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|error| XtaskError::Io(display_path(parent), error))?;
+        }
+        fs::write(path, body).map_err(|error| XtaskError::Io(display_path(path), error))?;
+    }
+    println!(
+        "codegen ts: {} {} ({} bytes)",
+        if check_only { "checked" } else { "wrote" },
+        display_path(path),
+        body.len()
+    );
+    Ok(())
+}
+
+// Generate the public client's structural validators from the same source
+// schemas as its types. The closure is finite, local and pinned. This performs
+// wire-shape validation only; authority verification remains in Rust.
+fn recovery_schema_bundle(paths: &[PathBuf]) -> Result<Vec<serde_json::Value>, XtaskError> {
+    let mut schemas = BTreeMap::new();
+    let mut ids = BTreeMap::new();
+    let mut pending = BTreeSet::new();
+    for path in paths {
+        let canonical =
+            fs::canonicalize(path).map_err(|error| XtaskError::Io(display_path(path), error))?;
+        let bytes = fs::read(path).map_err(|error| XtaskError::Io(display_path(path), error))?;
+        let value: serde_json::Value = serde_json::from_slice(&bytes).map_err(|error| {
+            XtaskError::Usage(format!("invalid schema {}: {error}", display_path(path)))
+        })?;
+        // Historical schemas without an ID remain available to type codegen,
+        // but cannot enter this public validator's explicitly pinned closure.
+        let Some(id) = value["$id"].as_str().map(str::to_owned) else {
+            continue;
+        };
+        ids.insert(id, canonical.clone());
+        if path.parent().and_then(Path::file_name) == Some(OsStr::new("recovery"))
+            && matches!(
+                path.file_name().and_then(OsStr::to_str),
+                Some(
+                    "command.schema.json"
+                        | "command-result.schema.json"
+                        | "command-response.schema.json"
+                        | "review-document.schema.json"
+                        | "signed-explanation-view.schema.json"
+                        | "decision-report-view.schema.json"
+                        | "signed-recovery-setup-probe.schema.json"
+                        | "signed-recovery-setup-report.schema.json"
+                        | "policy-maintenance-view.schema.json"
+                )
+            )
+        {
+            pending.insert(canonical.clone());
+        }
+        schemas.insert(canonical, value);
+    }
+    let mut emitted = BTreeMap::new();
+    while let Some(path) = pending.pop_first() {
+        if emitted.contains_key(&path) {
+            continue;
+        }
+        let mut value = schemas
+            .get(&path)
+            .cloned()
+            .ok_or_else(|| XtaskError::Usage("unknown recovery schema reference".into()))?;
+        resolve_schema_refs(&mut value, &path, &schemas, &ids, &mut pending)?;
+        emitted.insert(path, value);
+    }
+    Ok(emitted.into_values().collect())
+}
+fn resolve_schema_refs(
+    value: &mut serde_json::Value,
+    path: &Path,
+    schemas: &BTreeMap<PathBuf, serde_json::Value>,
+    ids: &BTreeMap<String, PathBuf>,
+    pending: &mut BTreeSet<PathBuf>,
+) -> Result<(), XtaskError> {
+    match value {
+        serde_json::Value::Object(map) => {
+            if let Some(serde_json::Value::String(reference)) = map.get_mut("$ref") {
+                if !reference.starts_with('#') {
+                    let (file, fragment) = reference
+                        .split_once('#')
+                        .unwrap_or((reference.as_str(), ""));
+                    let target = if file.starts_with("https://") {
+                        ids.get(file).cloned().ok_or_else(|| {
+                            XtaskError::Usage("external recovery schema reference refused".into())
+                        })?
+                    } else {
+                        let parent = path
+                            .parent()
+                            .ok_or_else(|| XtaskError::Usage("schema parent missing".into()))?;
+                        fs::canonicalize(parent.join(file))
+                            .map_err(|error| XtaskError::Io(file.into(), error))?
+                    };
+                    let schema = schemas.get(&target).ok_or_else(|| {
+                        XtaskError::Usage("unpinned recovery schema reference refused".into())
+                    })?;
+                    let id = schema["$id"]
+                        .as_str()
+                        .ok_or_else(|| XtaskError::Usage("schema ID missing".into()))?;
+                    *reference = if fragment.is_empty() {
+                        id.to_owned()
+                    } else {
+                        format!("{id}#{fragment}")
+                    };
+                    pending.insert(target);
+                }
+            }
+            for value in map.values_mut() {
+                resolve_schema_refs(value, path, schemas, ids, pending)?;
+            }
+        }
+        serde_json::Value::Array(values) => {
+            for value in values {
+                resolve_schema_refs(value, path, schemas, ids, pending)?;
+            }
+        }
+        _ => {}
+    }
     Ok(())
 }
 
@@ -242,7 +386,11 @@ pub(crate) fn pascal_case(input: &str) -> String {
 
 /// Run `json2ts` against a single schema file and return the captured
 /// stdout. Errors include the schema path so deviations surface clearly.
-fn run_json2ts(json2ts: &Path, schema: &Path) -> Result<String, XtaskError> {
+fn run_json2ts(
+    json2ts: &Path,
+    schema: &Path,
+    retain_public_definitions: bool,
+) -> Result<String, XtaskError> {
     let output = Command::new(json2ts)
         .arg("-i")
         .arg(schema)
@@ -255,7 +403,11 @@ fn run_json2ts(json2ts: &Path, schema: &Path) -> Result<String, XtaskError> {
         .arg("--cwd")
         .arg(schema.parent().unwrap_or_else(|| Path::new(".")))
         .arg("--no-bannerComment")
-        .arg("--unreachableDefinitions=false")
+        .arg(if retain_public_definitions {
+            "--unreachableDefinitions=true"
+        } else {
+            "--unreachableDefinitions=false"
+        })
         .arg("--strictIndexSignatures=false")
         .arg("--additionalProperties=false")
         .output()

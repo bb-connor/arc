@@ -1,0 +1,28 @@
+{
+  "id": "p2-native",
+  "actual_command": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "chio-control-plane",
+    "--lib",
+    "recovery_p2_",
+    "--",
+    "--test-threads=1"
+  ],
+  "cwd": ".",
+  "environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2",
+    "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+  },
+  "exit_code": 0,
+  "status": "passed",
+  "started_unix_seconds": 1791075279,
+  "duration_seconds": 17.968,
+  "log": "evidence/p2-native.log",
+  "log_sha256": "106f2d85704c53a12cd0493d387c01b8efee3c6685a1713a219dd18f4046c111",
+  "required_for_local_phase_acceptance": true
+}

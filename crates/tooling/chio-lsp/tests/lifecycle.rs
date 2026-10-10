@@ -16,7 +16,7 @@ fn server_advertises_text_document_sync_full() {
     let snap = ChioLanguageServer::capabilities_snapshot();
     assert!(
         snap.text_document_sync_full,
-        "P4.T1 negotiates FULL text document sync"
+        "the server negotiates full text document sync"
     );
     // Definition and completion are advertised in the capability snapshot.
     assert!(snap.definition);

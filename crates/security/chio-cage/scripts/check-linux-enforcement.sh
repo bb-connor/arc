@@ -152,6 +152,9 @@ export CHIO_CAGE_TEST_DYNAMIC_RUNTIME
 export CHIO_CAGE_PARENT_SECRET="must-not-cross"
 export CARGO_INCREMENTAL=0
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-/tmp/chio-cage-target}"
+# The all-target lane deliberately compiles a configured acceptance fixture.
+# Ordinary workspace builds may leave the example safely unconfigured.
+export CHIO_CONFINED_CANARY_MODE=error
 
 cd "$root"
 
@@ -165,7 +168,7 @@ build_static_helper() {
   # The execution image ships the musl target, which produces a static PIE
   # using its standard settings and does not alter host build-script flags.
   CARGO_TARGET_DIR="$static_target_dir" \
-    cargo build --locked --target x86_64-unknown-linux-musl -p chio-cage --bin chio-cage-init --features "$features"
+    cargo build --offline --locked --target x86_64-unknown-linux-musl -p chio-cage --bin chio-cage-init --features "$features"
   static_helper="$static_target_dir/x86_64-unknown-linux-musl/debug/chio-cage-init"
   if [[ ! -x "$static_helper" ]]; then
     echo "static PIE cage-init build did not produce an executable" >&2
@@ -221,7 +224,7 @@ all_targets_output="$log_dir/all-targets.out"
 run_cargo_lane \
   "real-Linux all-target cage lane" \
   "$all_targets_output" \
-  cargo test -p chio-cage --all-targets \
+  cargo test --offline --locked -p chio-cage --all-targets \
     --features real-linux-enforcement -- --test-threads=1
 python3 -I "$inventory_checker" \
   --root "$root" \
@@ -303,7 +306,7 @@ mutation_output="$log_dir/enforcement-mutations.out"
 run_cargo_lane \
   "real-Linux cage mutation lane" \
   "$mutation_output" \
-  cargo test -p chio-cage --test linux_enforcement \
+  cargo test --offline --locked -p chio-cage --test linux_enforcement \
     --features real-linux-enforcement,enforcement-mutants \
     mutation_ -- --test-threads=1
 

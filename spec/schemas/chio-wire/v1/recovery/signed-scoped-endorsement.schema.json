@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.computer/schemas/chio-wire/v1/recovery/signed-scoped-endorsement.schema.json",
+  "title": "Signed Scoped Endorsement V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "body",
+    "authority_key",
+    "algorithm",
+    "signature"
+  ],
+  "properties": {
+    "body": {
+      "$ref": "scoped-endorsement.schema.json"
+    },
+    "authority_key": {
+      "type": "string",
+      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    },
+    "algorithm": {
+      "type": "string",
+      "enum": [
+        "ed25519",
+        "p256",
+        "p384",
+        "hybrid"
+      ]
+    },
+    "signature": {
+      "type": "string",
+      "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    }
+  },
+  "$defs": {}
+}

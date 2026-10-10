@@ -1,0 +1,18 @@
+{
+  "id": "egress-custody-diagnostic",
+  "actual_command": [
+    "target/debug/deps/chio_store_sqlite-f12c8dd52e54f54f",
+    "admission_operation_store::tests::security_participant_state::egress::portable::portable_commands_recheck_selected_binding_live_material_and_actual_lease",
+    "--exact",
+    "--nocapture"
+  ],
+  "cwd": ".",
+  "environment": {},
+  "exit_code": 0,
+  "status": "passed",
+  "started_unix_seconds": 1791065739,
+  "duration_seconds": 4.777,
+  "log": "evidence/egress-custody-diagnostic.log",
+  "log_sha256": "c99b61eb71dc1df1b1fef540a34902196167cf53c188588d6f1c4488947d2361",
+  "required_for_local_phase_acceptance": false
+}

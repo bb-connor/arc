@@ -1,0 +1,14 @@
+...............................................F........................ [ 59%]
+.................................................                        [100%]
+=================================== FAILURES ===================================
+___________ test_recovery_does_not_rename_existing_security_exports ____________
+
+    def test_recovery_does_not_rename_existing_security_exports():
+>       assert generated.Digest32 is security.Digest32
+               ^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'chio_sdk._generated' has no attribute 'Digest32'
+
+sdks/python/chio-sdk-python/tests/test_recovery_contracts.py:64: AttributeError
+=========================== short test summary info ============================
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_contracts.py::test_recovery_does_not_rename_existing_security_exports
+1 failed, 120 passed in 1.24s

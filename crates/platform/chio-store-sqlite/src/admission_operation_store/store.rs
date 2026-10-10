@@ -16,6 +16,80 @@ use chio_kernel::dpop::authority::DpopReplayAuthorityV1;
 mod native_security;
 
 impl AdmissionOperationStore for SqliteAdmissionOperationStore {
+    fn verify_confined_return_delivery(
+        &self,
+        input: chio_kernel::admission_operation::ConfinedReturnDeliveryInput<'_>,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<chio_security_types::confinement::IsolationBoundaryV1, AdmissionOperationStoreError>
+    {
+        SqliteAdmissionOperationStore::verify_confined_return_delivery(self, input, fence, now)
+    }
+    fn verify_confined_return_candidate(
+        &self,
+        input: chio_kernel::admission_operation::ConfinedReturnCandidateInput<'_>,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        SqliteAdmissionOperationStore::verify_confined_return_candidate(self, input, fence, now)
+    }
+    fn verify_confined_process_attachment(
+        &self,
+        input: chio_kernel::admission_operation::ConfinedProcessAttachment<'_>,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        SqliteAdmissionOperationStore::verify_confined_process_attachment(self, input, fence, now)
+    }
+    fn confined_process_context(
+        &self,
+        runtime: &str,
+        root_process: &str,
+        process: &str,
+        lineage: &[chio_core::capability::token::CapabilityToken],
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<Option<chio_kernel::SecurityInvocationContext>, AdmissionOperationStoreError> {
+        SqliteAdmissionOperationStore::confined_process_context(
+            self,
+            runtime,
+            root_process,
+            process,
+            lineage,
+            fence,
+            now,
+        )
+    }
+    fn durable_knowledge_enforced(
+        &self,
+        runtime: &str,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<bool, AdmissionOperationStoreError> {
+        let mut connection = self.connection()?;
+        let tx = self.begin_read(&mut connection)?;
+        verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
+        schema::authority_validation_time(&tx, now)?;
+        let value = super::knowledge::enforced(&tx, runtime)?;
+        tx.commit().map_err(sqlite_error)?;
+        Ok(value)
+    }
+
+    fn semantic_output_disposition(
+        &self,
+        operation: &AdmissionOperationV1,
+        request: &chio_kernel::ToolCallRequest,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<
+        Option<chio_security_types::semantic::SemanticOutputDispositionV1>,
+        AdmissionOperationStoreError,
+    > {
+        self.captured_semantic_output_disposition(operation, request, fence, now)
+    }
+    fn recovery_authority(&self) -> Option<&dyn chio_kernel::recovery::RecoveryAuthorityPort> {
+        Some(self)
+    }
     fn await_caller_report(
         &self,
         command: &AdmissionOperationCommand,
@@ -86,6 +160,29 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         // The same fenced writer independently verifies initialization, original
         // admission and the actual lease before resolving inherited labels.
         self.join_security_participant_input(operation, lease, &initialized, context, command, now)
+    }
+
+    fn join_native_security_input_classified<'call>(
+        &self,
+        classification: &'call chio_kernel::admission_operation::NativeSecurityInputClassificationAuthority<'call>,
+    ) -> Result<
+        chio_kernel::admission_operation::NativeSecurityInputJoinOutcome<'call>,
+        AdmissionOperationStoreError,
+    > {
+        let binding = classification.binding();
+        let lease = classification.lease();
+        let now = classification.trusted_now_unix_ms();
+        let initialized = self
+            .load_security_participant_state(
+                binding.security_authority_id(),
+                lease.store_fence(),
+                now,
+            )?
+            .ok_or_else(|| invariant("selected native initialization is absent"))?;
+        if initialized.admission_binding()? != *binding {
+            return Err(invariant("selected native initialization binding differs"));
+        }
+        self.join_security_participant_input_classified(&initialized, classification)
     }
 
     fn join_native_security_nonce_preflight(
@@ -206,6 +303,13 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         AdmissionOperationStoreError,
     > {
         self.load_native_flow_join_record(operation_id, fence, now)
+    }
+
+    fn require_native_pre_authorization_finishing_funding(
+        &self,
+        context: &chio_kernel::admission_operation::NativeSecurityEgressContext<'_>,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        self.require_native_pre_authorization_finishing_funding_from_port(context)
     }
 
     fn acquire_native_security_egress(
@@ -885,6 +989,93 @@ impl SqliteAdmissionOperationStore {
 
 /// Persist a recovery claim for `stored`, or accept the compatible claim it
 /// already carries, inside the caller's write transaction.
+/// Claim selection DATA from the exact owning lifecycle and live-claim rules.
+/// This factory writes nothing and mints no lease, actor or physical authority.
+pub(super) enum PreparedRecoveryClaimData {
+    Active(UntrustedAdmissionRecoveryClaim),
+    Write(UntrustedAdmissionRecoveryClaim),
+}
+
+pub(super) fn prepare_recovery_claim_tx(
+    transaction: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    stored: &StoredOperation,
+    request: RecoveryClaimRequest<'_>,
+    trusted_now_unix_ms: u64,
+) -> Result<PreparedRecoveryClaimData, AdmissionOperationStoreError> {
+    let validation_time = schema::authority_validation_time(transaction, trusted_now_unix_ms)?;
+    if validation_time >= request.expires_at_unix_ms {
+        return Err(AdmissionOperationError::LeaseExpired.into());
+    }
+    let RecoveryClaimRequest {
+        operation_id,
+        expected_version,
+        claimant_id,
+        expires_at_unix_ms,
+        fence,
+    } = request;
+    if stored.operation.state().is_terminal() {
+        return Err(invariant("terminal operation cannot be recovery-claimed"));
+    }
+    if trusted_now_unix_ms < stored.updated_at_unix_ms {
+        return Err(invariant("trusted operation time regressed"));
+    }
+    if stored.operation.version() != expected_version {
+        return Err(AdmissionOperationError::StaleVersion {
+            expected: expected_version,
+            actual: stored.operation.version(),
+        }
+        .into());
+    }
+    if crate::economic_state_cache::has_reserved_terminal_stage(transaction, operation_id.as_str())
+        .map_err(map_economic_cache_error)?
+    {
+        if let Some(active) = stored.recovery_claim.as_ref().filter(|active| {
+            active.expires_at_unix_ms() > validation_time
+                && active.store_fence() == fence
+                && active.claimant_id() == claimant_id
+                && active.claimed_version() == expected_version
+        }) {
+            return Ok(PreparedRecoveryClaimData::Active(active.clone()));
+        }
+        return Err(AdmissionOperationStoreError::Fenced);
+    }
+
+    let coordinator_lease_id = coordinator_lease_id_for_epoch(
+        transaction,
+        owner,
+        stored.operation.coordinator_lease_epoch(),
+    )?;
+    let claim = UntrustedAdmissionRecoveryClaim::new(
+        operation_id.clone(),
+        claimant_id.clone(),
+        coordinator_lease_id,
+        stored.operation.coordinator_lease_epoch(),
+        expected_version,
+        expires_at_unix_ms,
+        fence.clone(),
+    )?;
+    if let Some(active) = stored
+        .recovery_claim
+        .as_ref()
+        .filter(|active| active.expires_at_unix_ms() > validation_time)
+    {
+        if active.store_fence() == fence {
+            let same_claimant = active.claimant_id() == claimant_id
+                && active.coordinator_lease_id() == claim.coordinator_lease_id()
+                && active.coordinator_lease_epoch() == claim.coordinator_lease_epoch();
+            if same_claimant && active.claimed_version() == expected_version {
+                return Ok(PreparedRecoveryClaimData::Active(active.clone()));
+            }
+            if !same_claimant || active.claimed_version() >= expected_version {
+                return Err(AdmissionOperationStoreError::Fenced);
+            }
+        }
+    }
+
+    Ok(PreparedRecoveryClaimData::Write(claim))
+}
+
 pub(super) fn claim_recovery_tx(
     transaction: &Transaction<'_>,
     owner: &SqliteServingOwner,
@@ -892,83 +1083,26 @@ pub(super) fn claim_recovery_tx(
     request: RecoveryClaimRequest<'_>,
     trusted_now_unix_ms: u64,
 ) -> Result<ClaimWrite, AdmissionOperationStoreError> {
-    {
-        let validation_time = schema::authority_validation_time(transaction, trusted_now_unix_ms)?;
-        if validation_time >= request.expires_at_unix_ms {
-            return Err(AdmissionOperationError::LeaseExpired.into());
-        }
-        let RecoveryClaimRequest {
-            operation_id,
-            expected_version,
-            claimant_id,
-            expires_at_unix_ms,
-            fence,
-        } = request;
-        if stored.operation.state().is_terminal() {
-            return Err(invariant("terminal operation cannot be recovery-claimed"));
-        }
-        if trusted_now_unix_ms < stored.updated_at_unix_ms {
-            return Err(invariant("trusted operation time regressed"));
-        }
-        if stored.operation.version() != expected_version {
-            return Err(AdmissionOperationError::StaleVersion {
-                expected: expected_version,
-                actual: stored.operation.version(),
-            }
-            .into());
-        }
-        if crate::economic_state_cache::has_reserved_terminal_stage(
-            transaction,
-            operation_id.as_str(),
-        )
-        .map_err(map_economic_cache_error)?
-        {
-            if let Some(active) = stored.recovery_claim.as_ref().filter(|active| {
-                active.expires_at_unix_ms() > validation_time
-                    && active.store_fence() == fence
-                    && active.claimant_id() == claimant_id
-                    && active.claimed_version() == expected_version
-            }) {
-                return Ok(ClaimWrite::Active(active.clone()));
-            }
-            return Err(AdmissionOperationStoreError::Fenced);
-        }
-
-        let coordinator_lease_id = coordinator_lease_id_for_epoch(
-            transaction,
-            owner,
-            stored.operation.coordinator_lease_epoch(),
-        )?;
-        let claim = UntrustedAdmissionRecoveryClaim::new(
-            operation_id.clone(),
-            claimant_id.clone(),
-            coordinator_lease_id,
-            stored.operation.coordinator_lease_epoch(),
-            expected_version,
-            expires_at_unix_ms,
-            fence.clone(),
-        )?;
-        if let Some(active) = stored
-            .recovery_claim
-            .as_ref()
-            .filter(|active| active.expires_at_unix_ms() > validation_time)
-        {
-            if active.store_fence() == fence {
-                let same_claimant = active.claimant_id() == claimant_id
-                    && active.coordinator_lease_id() == claim.coordinator_lease_id()
-                    && active.coordinator_lease_epoch() == claim.coordinator_lease_epoch();
-                if same_claimant && active.claimed_version() == expected_version {
-                    return Ok(ClaimWrite::Active(active.clone()));
-                }
-                if !same_claimant || active.claimed_version() >= expected_version {
-                    return Err(AdmissionOperationStoreError::Fenced);
-                }
-            }
-        }
-
-        let changed = transaction
-            .execute(
-                r#"
+    let claim = match prepare_recovery_claim_tx(
+        transaction,
+        owner,
+        stored,
+        request,
+        trusted_now_unix_ms,
+    )? {
+        PreparedRecoveryClaimData::Active(claim) => return Ok(ClaimWrite::Active(claim)),
+        PreparedRecoveryClaimData::Write(claim) => claim,
+    };
+    let RecoveryClaimRequest {
+        operation_id,
+        expected_version,
+        claimant_id,
+        expires_at_unix_ms,
+        fence,
+    } = request;
+    let changed = transaction
+        .execute(
+            r#"
                 UPDATE admission_operations
                 SET recovery_claimant_id = ?1,
                     recovery_coordinator_lease_id = ?2,
@@ -981,35 +1115,34 @@ pub(super) fn claim_recovery_tx(
                     updated_at_unix_ms = ?9
                 WHERE operation_id = ?10 AND version = ?4 AND terminal = 0
                 "#,
-                params![
-                    claimant_id.as_str(),
-                    claim.coordinator_lease_id().as_str(),
-                    sqlite_i64(claim.coordinator_lease_epoch(), "coordinator_lease_epoch")?,
-                    sqlite_i64(expected_version, "claimed_version")?,
-                    sqlite_i64(expires_at_unix_ms, "expires_at_unix_ms")?,
-                    &fence.store_uuid,
-                    &fence.lease_id,
-                    sqlite_i64(fence.owner_epoch, "store_owner_epoch")?,
-                    sqlite_i64(trusted_now_unix_ms, "trusted_now_unix_ms")?,
-                    operation_id.as_str(),
-                ],
-            )
-            .map_err(sqlite_error)?;
-        if changed != 1 {
-            return Err(AdmissionOperationStoreError::Fenced);
-        }
-        let encoded = encode_operation(&stored.operation)?;
-        append_operation_commit(
-            transaction,
-            &stored.operation,
-            &encoded,
-            Some(&claim),
-            "recovery_claim",
-            owner,
-            trusted_now_unix_ms,
-        )?;
-        Ok(ClaimWrite::Written(claim))
+            params![
+                claimant_id.as_str(),
+                claim.coordinator_lease_id().as_str(),
+                sqlite_i64(claim.coordinator_lease_epoch(), "coordinator_lease_epoch")?,
+                sqlite_i64(expected_version, "claimed_version")?,
+                sqlite_i64(expires_at_unix_ms, "expires_at_unix_ms")?,
+                &fence.store_uuid,
+                &fence.lease_id,
+                sqlite_i64(fence.owner_epoch, "store_owner_epoch")?,
+                sqlite_i64(trusted_now_unix_ms, "trusted_now_unix_ms")?,
+                operation_id.as_str(),
+            ],
+        )
+        .map_err(sqlite_error)?;
+    if changed != 1 {
+        return Err(AdmissionOperationStoreError::Fenced);
     }
+    let encoded = encode_operation(&stored.operation)?;
+    append_operation_commit(
+        transaction,
+        &stored.operation,
+        &encoded,
+        Some(&claim),
+        "recovery_claim",
+        owner,
+        trusted_now_unix_ms,
+    )?;
+    Ok(ClaimWrite::Written(claim))
 }
 
 impl SqliteAdmissionOperationStore {

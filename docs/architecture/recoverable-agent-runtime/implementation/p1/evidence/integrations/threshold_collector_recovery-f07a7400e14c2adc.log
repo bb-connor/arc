@@ -1,0 +1,30 @@
+
+running 25 tests
+test creation_rejects_missing_separation_identity_and_excessive_timeout ... ok
+test collector_rejects_clock_regression_without_changing_state ... ok
+test delivery_retry_never_shrinks_the_original_set_when_a_surplus_vote_expires ... ok
+test acknowledged_retries_preserve_votes_delivery_and_transition_time ... ok
+test expired_history_is_readable_but_cannot_be_delivered ... ok
+test explicit_context_migration_denies_changed_or_unavailable_authority ... ok
+test explicit_context_migration_version_overflow_preserves_unbound_history ... ok
+test explicit_context_migration_preserves_retained_history_and_is_idempotent ... ok
+test in_memory_version_overflow_does_not_partially_mutate_state ... ok
+test recovery_rechecks_current_authority_and_policy ... ok
+test recovery_preserves_original_tokens_and_durable_delivery ... ok
+test recovery_rejects_a_tampered_proposal_without_changing_state ... ok
+test recovery_rejects_a_tampered_vote_without_changing_state ... ok
+test recovery_rejects_algorithm_metadata_substitution ... ok
+test recovery_rejects_distinct_tokens_from_the_same_approver ... ok
+test recovery_rejects_duplicate_token_ids_from_distinct_approvers ... ok
+test recovery_rejects_missing_submitter_and_self_approval ... ok
+test recovery_rejects_rebound_and_noncanonical_requirements ... ok
+test recovery_rejects_state_that_precedes_its_votes ... ok
+test recovery_rejects_signed_votes_bound_to_different_operations ... ok
+test recovery_rejects_quorum_and_version_metadata_inconsistent_with_votes ... ok
+test collector_reloads_trusted_context_before_every_operation ... ok
+test restored_votes_must_fit_the_execution_replay_identifier_contract ... ok
+test unbound_legacy_record_cannot_gain_authority_from_a_matching_live_context ... ok
+test unavailable_context_never_falls_back_to_signed_proposal_fields ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+

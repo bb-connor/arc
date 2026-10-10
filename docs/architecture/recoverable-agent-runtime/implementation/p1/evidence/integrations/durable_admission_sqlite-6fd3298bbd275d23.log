@@ -1,0 +1,20 @@
+
+running 15 tests
+test output_digest_admission_rejects_malformed_commitments ... ok
+test delivery_marked_grant_cannot_fall_through_to_an_unmarked_sibling ... ok
+test federation_context::sqlite_retained_federation_context_survives_owner_restart_without_redispatch ... ok
+test malformed_delivery_digests_are_rejected_before_dispatch ... ok
+test security_release::payment_capture_precedes_checkpoint_and_is_not_repeated ... ok
+test security_release::security_refusal_cannot_repeat_or_reverse_captured_payment ... ok
+test security_release::security_refusal_cannot_repeat_zero_charge_release ... ok
+test security_release::zero_charge_release_precedes_checkpoint_and_is_not_repeated ... ok
+test sqlite_durable_admission_atomically_publishes_receipt_and_terminal_outcome ... ok
+test output_digest_delivery_contract_enforces_every_lane ... ok
+test sqlite_durable_zero_charge_persists_release_evidence_and_reopens_cleanly ... ok
+test sqlite_restart_completes_a_committed_capture_without_request_replay ... ok
+test sqlite_restart_terminalizes_an_unrecorded_dispatch_without_moving_funds ... ok
+test sqlite_restart_completes_a_committed_release_without_request_replay ... ok
+test stream_delivery_cannot_satisfy_a_committed_output_digest ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 25.15s
+

@@ -1,0 +1,27 @@
+# DO NOT EDIT - regenerate via 'cargo xtask codegen --lang python'.
+#
+# Source: spec/schemas/chio-wire/v1/**/*.schema.json
+# Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
+# Schema sha256: 35f8e30cf30553986a159b074ee485804a85db29547a8102522cd7bfa3080d2e
+#
+# Manual edits will be overwritten by the next regeneration; the
+# spec-drift CI lane enforces this header on every file
+# under sdks/python/chio-sdk-python/src/chio_sdk/_generated/.
+
+from __future__ import annotations
+from typing import Literal
+from pydantic import BaseModel, ConfigDict, Field, RootModel
+from ..security import declassification_grant_schema
+from . import signed_grant_v2_schema
+
+class RecoveryDisclosureGrantRecoveryV2(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    kind: Literal['recovery_v2']
+    grant: signed_grant_v2_schema.SignedRecoveryDeclassificationGrantV2
+
+class VersionSelectedDisclosureGrant(RootModel[declassification_grant_schema.SignedDeclassificationGrant | RecoveryDisclosureGrantRecoveryV2]):
+    root: declassification_grant_schema.SignedDeclassificationGrant | RecoveryDisclosureGrantRecoveryV2 = Field(..., title='Version selected disclosure grant')
+
+# Public compatibility aliases reference the actual current model classes.
+RecoveryDisclosureGrantVersionSelectedDisclosureGrant = VersionSelectedDisclosureGrant
+VersionSelectedDisclosureGrant1 = RecoveryDisclosureGrantRecoveryV2

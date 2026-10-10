@@ -803,9 +803,10 @@ fn operation_store_error(error: AdmissionOperationStoreError) -> AdmissionAuthor
         AdmissionOperationStoreError::Unavailable(_) => AdmissionAuthorityErrorCode::Unavailable,
         AdmissionOperationStoreError::Fenced => AdmissionAuthorityErrorCode::Fenced,
         AdmissionOperationStoreError::NotFound => AdmissionAuthorityErrorCode::NotFound,
-        AdmissionOperationStoreError::Invariant(_) | AdmissionOperationStoreError::Operation(_) => {
-            AdmissionAuthorityErrorCode::Invariant
-        }
+        AdmissionOperationStoreError::RecoveryAuthorityDenied
+        | AdmissionOperationStoreError::RecoveryMediationRequired
+        | AdmissionOperationStoreError::Invariant(_)
+        | AdmissionOperationStoreError::Operation(_) => AdmissionAuthorityErrorCode::Invariant,
         AdmissionOperationStoreError::OutcomeUnknown(_) => {
             AdmissionAuthorityErrorCode::OutcomeUnknown
         }

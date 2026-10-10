@@ -1,0 +1,20 @@
+E
+======================================================================
+ERROR: test_audit (unittest.loader._FailedTest.test_audit)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_audit
+Traceback (most recent call last):
+  File "/opt/homebrew/Cellar/python@3.14/3.14.4/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/loader.py", line 426, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/opt/homebrew/Cellar/python@3.14/3.14.4/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/loader.py", line 367, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/implementation/p6/evidence/test_audit.py", line 8, in <module>
+    from package_audit import audit_gate, audit_model_attempt
+ImportError: cannot import name 'audit_model_attempt' from 'package_audit' (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/implementation/p6/evidence/package_audit.py)
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.000s
+
+FAILED (errors=1)

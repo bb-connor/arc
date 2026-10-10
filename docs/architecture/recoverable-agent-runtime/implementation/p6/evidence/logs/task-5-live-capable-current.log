@@ -1,0 +1,197 @@
+Quiet Linux gates complete; exact corrected custody files promoted before new cohort
+Retained 1/96 langgraph-support-baseline-authorized-r1 complete
+Retained 2/96 langgraph-support-baseline-authorized-r2 complete
+Retained 3/96 langgraph-support-baseline-authorized-r3 complete
+Retained 4/96 langgraph-support-baseline-lost_ack_restart-r1 complete
+Retained 5/96 langgraph-support-baseline-lost_ack_restart-r2 complete
+Retained 6/96 langgraph-support-baseline-lost_ack_restart-r3 complete
+Retained 7/96 langgraph-support-baseline-wrong_authority-r1 refused
+Retained 8/96 langgraph-support-baseline-wrong_authority-r2 refused
+Retained 9/96 langgraph-support-baseline-wrong_authority-r3 refused
+Retained 10/96 langgraph-support-baseline-conflicting_basis-r1 refused
+Retained 11/96 langgraph-support-baseline-conflicting_basis-r2 refused
+Retained 12/96 langgraph-support-baseline-conflicting_basis-r3 refused
+Retained 13/96 langgraph-support-product-authorized-r1 complete
+Retained 14/96 langgraph-support-product-authorized-r2 complete
+Retained 15/96 langgraph-support-product-authorized-r3 complete
+Retained 16/96 langgraph-support-product-lost_ack_restart-r1 complete
+Retained 17/96 langgraph-support-product-lost_ack_restart-r2 complete
+Retained 18/96 langgraph-support-product-wrong_authority-r1 refused
+Retained 19/96 langgraph-support-product-wrong_authority-r2 refused
+Retained 20/96 langgraph-support-product-lost_ack_restart-r3 complete
+Retained 21/96 langgraph-support-product-wrong_authority-r3 refused
+Retained 22/96 langgraph-support-product-conflicting_basis-r1 refused
+Retained 23/96 langgraph-support-product-conflicting_basis-r2 refused
+Retained 24/96 langgraph-artifact-baseline-authorized-r1 complete
+Retained 25/96 langgraph-support-product-conflicting_basis-r3 refused
+Retained 26/96 langgraph-artifact-baseline-authorized-r2 complete
+Retained 27/96 langgraph-artifact-baseline-authorized-r3 complete
+Retained 28/96 langgraph-artifact-baseline-lost_ack_restart-r1 complete
+Retained 29/96 langgraph-artifact-baseline-lost_ack_restart-r2 complete
+Retained 30/96 langgraph-artifact-baseline-lost_ack_restart-r3 complete
+Retained 31/96 langgraph-artifact-baseline-wrong_authority-r1 refused
+Retained 32/96 langgraph-artifact-baseline-wrong_authority-r2 refused
+Retained 33/96 langgraph-artifact-baseline-wrong_authority-r3 refused
+Retained 34/96 langgraph-artifact-baseline-conflicting_basis-r1 refused
+Retained 35/96 langgraph-artifact-baseline-conflicting_basis-r2 refused
+Retained 36/96 langgraph-artifact-baseline-conflicting_basis-r3 refused
+Retained 37/96 langgraph-artifact-product-authorized-r1 complete
+Retained 38/96 langgraph-artifact-product-authorized-r2 complete
+Retained 39/96 langgraph-artifact-product-authorized-r3 complete
+Retained 40/96 langgraph-artifact-product-lost_ack_restart-r1 complete
+Retained 41/96 langgraph-artifact-product-lost_ack_restart-r2 complete
+Retained 42/96 langgraph-artifact-product-lost_ack_restart-r3 complete
+Retained 43/96 langgraph-artifact-product-wrong_authority-r1 refused
+Retained 44/96 langgraph-artifact-product-wrong_authority-r2 refused
+Retained 45/96 langgraph-artifact-product-wrong_authority-r3 refused
+Retained 46/96 langgraph-artifact-product-conflicting_basis-r1 refused
+Retained 47/96 langgraph-artifact-product-conflicting_basis-r2 refused
+Retained 48/96 langgraph-artifact-product-conflicting_basis-r3 refused
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 49/96 crewai-support-baseline-authorized-r1 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 50/96 crewai-support-baseline-authorized-r2 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 51/96 crewai-support-baseline-authorized-r3 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 52/96 crewai-support-baseline-lost_ack_restart-r1 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 53/96 crewai-support-baseline-lost_ack_restart-r2 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 54/96 crewai-support-baseline-wrong_authority-r1 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 55/96 crewai-support-baseline-wrong_authority-r2 skipped_tool
+Retained 56/96 crewai-support-baseline-lost_ack_restart-r3 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 57/96 crewai-support-baseline-wrong_authority-r3 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 58/96 crewai-support-baseline-conflicting_basis-r1 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 59/96 crewai-support-baseline-conflicting_basis-r2 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 60/96 crewai-support-product-authorized-r1 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 61/96 crewai-support-baseline-conflicting_basis-r3 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 62/96 crewai-support-product-authorized-r2 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 63/96 crewai-support-product-authorized-r3 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 64/96 crewai-support-product-lost_ack_restart-r1 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 65/96 crewai-support-product-lost_ack_restart-r2 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 66/96 crewai-support-product-wrong_authority-r1 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 67/96 crewai-support-product-wrong_authority-r2 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 68/96 crewai-support-product-lost_ack_restart-r3 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 69/96 crewai-support-product-wrong_authority-r3 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 70/96 crewai-support-product-conflicting_basis-r1 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 71/96 crewai-support-product-conflicting_basis-r2 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 72/96 crewai-artifact-baseline-authorized-r1 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 73/96 crewai-support-product-conflicting_basis-r3 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 74/96 crewai-artifact-baseline-authorized-r2 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 75/96 crewai-artifact-baseline-authorized-r3 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 76/96 crewai-artifact-baseline-lost_ack_restart-r1 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 77/96 crewai-artifact-baseline-lost_ack_restart-r2 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 78/96 crewai-artifact-baseline-lost_ack_restart-r3 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 79/96 crewai-artifact-baseline-wrong_authority-r1 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 80/96 crewai-artifact-baseline-wrong_authority-r2 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 81/96 crewai-artifact-baseline-wrong_authority-r3 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 82/96 crewai-artifact-baseline-conflicting_basis-r1 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 83/96 crewai-artifact-baseline-conflicting_basis-r2 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 84/96 crewai-artifact-baseline-conflicting_basis-r3 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 85/96 crewai-artifact-product-authorized-r1 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 86/96 crewai-artifact-product-authorized-r2 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 87/96 crewai-artifact-product-authorized-r3 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 88/96 crewai-artifact-product-lost_ack_restart-r1 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 89/96 crewai-artifact-product-lost_ack_restart-r2 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 90/96 crewai-artifact-product-lost_ack_restart-r3 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 91/96 crewai-artifact-product-wrong_authority-r1 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 92/96 crewai-artifact-product-wrong_authority-r2 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 93/96 crewai-artifact-product-wrong_authority-r3 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 94/96 crewai-artifact-product-conflicting_basis-r1 skipped_tool
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Retained 95/96 crewai-artifact-product-conflicting_basis-r2 skipped_tool
+Retained 96/96 crewai-artifact-product-conflicting_basis-r3 skipped_tool
+Traceback (most recent call last):
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/fixtures/recovery-product/campaign_main.py", line 152, in <module>
+    if __name__ == "__main__": main()
+                               ^^^^^^
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/fixtures/recovery-product/campaign_main.py", line 148, in main
+    assert all(stratum["completion"]["numerator"] >= 1 for stratum in report["strata"] if stratum["case"] in ["authorized", "lost_ack_restart"])
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

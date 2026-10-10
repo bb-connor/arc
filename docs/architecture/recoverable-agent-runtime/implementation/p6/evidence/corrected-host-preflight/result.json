@@ -1,0 +1,247 @@
+{
+  "passed": true,
+  "mode": "model-free-native-preflight",
+  "provider_requests": 0,
+  "cases": [
+    {
+      "id": "langgraph-support-baseline-authorized-r1",
+      "native": {
+        "approval_records": 2,
+        "artifact_deliveries": 0,
+        "artifact_releases": 0,
+        "artifacts": 0,
+        "charges": 1,
+        "duplicate_effects": 0,
+        "effects": 1,
+        "extra_approvals": 0,
+        "fence": {
+          "lease_id": "01a10bed-b036-7170-a997-8c3bb96f2e77",
+          "owner_epoch": 2,
+          "store_uuid": "01a10bed-6724-71b2-8825-046e82a7689d"
+        },
+        "native_actions": 1,
+        "preexisting_effects": 0,
+        "provider_effects_total": 2,
+        "recovery_success": false,
+        "setup_effects": 1,
+        "source_label_retained": true,
+        "unauthorized_effects": 0,
+        "unresolved": 0,
+        "unresolved_age_ms": 0,
+        "useful_completion": true
+      },
+      "source_binding": "167c0487c96e7391f25436bb8eab898c22a3037bb141c2902c727ba80b2e1c19",
+      "provider_requests": 0
+    },
+    {
+      "id": "langgraph-support-product-authorized-r1",
+      "native": {
+        "approval_records": 2,
+        "artifact_deliveries": 0,
+        "artifact_releases": 0,
+        "artifacts": 0,
+        "charges": 1,
+        "duplicate_effects": 0,
+        "effects": 1,
+        "extra_approvals": 0,
+        "fence": {
+          "lease_id": "01a10bed-b072-7b83-8cff-b18d30881770",
+          "owner_epoch": 2,
+          "store_uuid": "01a10bed-678b-7431-a086-05210ab359e6"
+        },
+        "native_actions": 1,
+        "preexisting_effects": 0,
+        "provider_effects_total": 2,
+        "recovery_success": false,
+        "setup_effects": 1,
+        "source_label_retained": true,
+        "unauthorized_effects": 0,
+        "unresolved": 0,
+        "unresolved_age_ms": 0,
+        "useful_completion": true
+      },
+      "source_binding": "167c0487c96e7391f25436bb8eab898c22a3037bb141c2902c727ba80b2e1c19",
+      "provider_requests": 0
+    },
+    {
+      "id": "langgraph-artifact-baseline-authorized-r1",
+      "native": {
+        "approval_records": 1,
+        "artifact_deliveries": 1,
+        "artifact_releases": 1,
+        "artifacts": 1,
+        "charges": 0,
+        "duplicate_effects": 0,
+        "effects": 1,
+        "extra_approvals": 0,
+        "fence": {
+          "lease_id": "01a10bee-a628-7c83-8d1f-5b3c48a853ca",
+          "owner_epoch": 2,
+          "store_uuid": "01a10bee-5d39-7c72-8284-c5100d7ee928"
+        },
+        "native_actions": 1,
+        "preexisting_effects": 0,
+        "provider_effects_total": 1,
+        "recovery_success": false,
+        "setup_effects": 1,
+        "source_label_retained": true,
+        "unauthorized_effects": 0,
+        "unresolved": 0,
+        "unresolved_age_ms": 0,
+        "useful_completion": true
+      },
+      "source_binding": "167c0487c96e7391f25436bb8eab898c22a3037bb141c2902c727ba80b2e1c19",
+      "provider_requests": 0
+    },
+    {
+      "id": "langgraph-artifact-product-authorized-r1",
+      "native": {
+        "approval_records": 1,
+        "artifact_deliveries": 1,
+        "artifact_releases": 1,
+        "artifacts": 1,
+        "charges": 0,
+        "duplicate_effects": 0,
+        "effects": 1,
+        "extra_approvals": 0,
+        "fence": {
+          "lease_id": "01a10bee-ab7d-77b3-b3e6-8c3ee891452f",
+          "owner_epoch": 2,
+          "store_uuid": "01a10bee-629a-7cf2-96e5-cf9a886b7e5e"
+        },
+        "native_actions": 1,
+        "preexisting_effects": 0,
+        "provider_effects_total": 1,
+        "recovery_success": false,
+        "setup_effects": 1,
+        "source_label_retained": true,
+        "unauthorized_effects": 0,
+        "unresolved": 0,
+        "unresolved_age_ms": 0,
+        "useful_completion": true
+      },
+      "source_binding": "167c0487c96e7391f25436bb8eab898c22a3037bb141c2902c727ba80b2e1c19",
+      "provider_requests": 0
+    },
+    {
+      "id": "crewai-support-baseline-authorized-r1",
+      "native": {
+        "approval_records": 2,
+        "artifact_deliveries": 0,
+        "artifact_releases": 0,
+        "artifacts": 0,
+        "charges": 1,
+        "duplicate_effects": 0,
+        "effects": 1,
+        "extra_approvals": 0,
+        "fence": {
+          "lease_id": "01a10bef-05eb-7890-b162-40451a74235f",
+          "owner_epoch": 2,
+          "store_uuid": "01a10bee-bd3e-7e63-81e0-550bd2691569"
+        },
+        "native_actions": 1,
+        "preexisting_effects": 0,
+        "provider_effects_total": 2,
+        "recovery_success": false,
+        "setup_effects": 1,
+        "source_label_retained": true,
+        "unauthorized_effects": 0,
+        "unresolved": 0,
+        "unresolved_age_ms": 0,
+        "useful_completion": true
+      },
+      "source_binding": "167c0487c96e7391f25436bb8eab898c22a3037bb141c2902c727ba80b2e1c19",
+      "provider_requests": 0
+    },
+    {
+      "id": "crewai-support-product-authorized-r1",
+      "native": {
+        "approval_records": 2,
+        "artifact_deliveries": 0,
+        "artifact_releases": 0,
+        "artifacts": 0,
+        "charges": 1,
+        "duplicate_effects": 0,
+        "effects": 1,
+        "extra_approvals": 0,
+        "fence": {
+          "lease_id": "01a10bef-0b47-7a61-bc9b-c3a50ba0e205",
+          "owner_epoch": 2,
+          "store_uuid": "01a10bee-c293-7c03-af74-55ca514aeb0d"
+        },
+        "native_actions": 1,
+        "preexisting_effects": 0,
+        "provider_effects_total": 2,
+        "recovery_success": false,
+        "setup_effects": 1,
+        "source_label_retained": true,
+        "unauthorized_effects": 0,
+        "unresolved": 0,
+        "unresolved_age_ms": 0,
+        "useful_completion": true
+      },
+      "source_binding": "167c0487c96e7391f25436bb8eab898c22a3037bb141c2902c727ba80b2e1c19",
+      "provider_requests": 0
+    },
+    {
+      "id": "crewai-artifact-baseline-authorized-r1",
+      "native": {
+        "approval_records": 1,
+        "artifact_deliveries": 1,
+        "artifact_releases": 1,
+        "artifacts": 1,
+        "charges": 0,
+        "duplicate_effects": 0,
+        "effects": 1,
+        "extra_approvals": 0,
+        "fence": {
+          "lease_id": "01a10bf0-0216-7622-8199-1de982e41eca",
+          "owner_epoch": 2,
+          "store_uuid": "01a10bef-b921-7850-b1b9-767fd520c936"
+        },
+        "native_actions": 1,
+        "preexisting_effects": 0,
+        "provider_effects_total": 1,
+        "recovery_success": false,
+        "setup_effects": 1,
+        "source_label_retained": true,
+        "unauthorized_effects": 0,
+        "unresolved": 0,
+        "unresolved_age_ms": 0,
+        "useful_completion": true
+      },
+      "source_binding": "167c0487c96e7391f25436bb8eab898c22a3037bb141c2902c727ba80b2e1c19",
+      "provider_requests": 0
+    },
+    {
+      "id": "crewai-artifact-product-authorized-r1",
+      "native": {
+        "approval_records": 1,
+        "artifact_deliveries": 1,
+        "artifact_releases": 1,
+        "artifacts": 1,
+        "charges": 0,
+        "duplicate_effects": 0,
+        "effects": 1,
+        "extra_approvals": 0,
+        "fence": {
+          "lease_id": "01a10bf0-0262-7c31-9b83-0c3c78d5b9cc",
+          "owner_epoch": 2,
+          "store_uuid": "01a10bef-b98c-7c41-b039-86ce4a7faecd"
+        },
+        "native_actions": 1,
+        "preexisting_effects": 0,
+        "provider_effects_total": 1,
+        "recovery_success": false,
+        "setup_effects": 1,
+        "source_label_retained": true,
+        "unauthorized_effects": 0,
+        "unresolved": 0,
+        "unresolved_age_ms": 0,
+        "useful_completion": true
+      },
+      "source_binding": "167c0487c96e7391f25436bb8eab898c22a3037bb141c2902c727ba80b2e1c19",
+      "provider_requests": 0
+    }
+  ]
+}

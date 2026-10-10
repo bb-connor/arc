@@ -3,6 +3,7 @@ use serde::Serialize;
 use super::*;
 use crate::finding_denial::{record_finding_denial, FindingDenial};
 use crate::kernel::delivery_contract;
+use crate::recovery::RecoveryCapturedDeploymentV1;
 
 #[path = "terminal_payment.rs"]
 mod payment;
@@ -10,6 +11,12 @@ use payment::DurablePaymentSettlementInput;
 
 #[path = "terminal/evaluation_contract.rs"]
 mod evaluation_contract;
+#[path = "terminal/historical_signing.rs"]
+mod historical_signing;
+#[path = "terminal/public_delivery.rs"]
+mod public_delivery;
+#[path = "terminal/semantic.rs"]
+mod semantic;
 
 pub(crate) struct DurableToolReturn {
     raw: RawInvocationOutcomeV1,
@@ -392,6 +399,61 @@ impl ChioKernel {
         Ok(DurableToolReturn { raw, outcome })
     }
 
+    /// Read authenticated unfinished return custody before selecting a signer
+    /// hold. This never selects a replacement signer or permits redispatch.
+    pub(super) fn frozen_recovery_signer_unavailable(
+        &self,
+        admission: &DurableToolAdmission,
+    ) -> Result<bool, KernelError> {
+        if admission.operation.state() != AdmissionOperationState::Finalizing {
+            return Ok(false);
+        }
+        let original = admission.original_retained_request().ok_or_else(|| {
+            KernelError::DurableAdmission("captured signing original request absent".into())
+        })?;
+        original
+            .validate_binding(admission.operation.binding())
+            .map_err(durable_store_error)?;
+        let returned = self.load_durable_tool_return(admission)?;
+        let request = returned
+            .recovery_request()
+            .map_err(tool_outcome_error)?
+            .ok_or_else(|| {
+                KernelError::DurableAdmission(
+                    "captured signing original return request absent".into(),
+                )
+            })?;
+        original
+            .validate_request_material(&request)
+            .map_err(durable_store_error)?;
+        original
+            .validate_native_security_context(
+                returned.raw.security_invocation_context().ok_or_else(|| {
+                    KernelError::DurableAdmission("captured signing original context absent".into())
+                })?,
+            )
+            .map_err(durable_store_error)?;
+        let grant_index = returned
+            .raw
+            .matched_grant_index()
+            .map_err(tool_outcome_error)?;
+        if !admission.permits_grant(grant_index)
+            || original.retained_matching_grant(grant_index).is_none()
+        {
+            return Err(KernelError::DurableAdmission(
+                "captured signing return differs from original grant".into(),
+            ));
+        }
+        // Legacy records stay explicitly unbound. Modern missing identities
+        // and malformed signing profiles already fail canonical raw validation.
+        let Some(identity) = returned.raw.receipt_signing_identity() else {
+            return Ok(false);
+        };
+        identity.validate().map_err(tool_outcome_error)?;
+        let current = self.freeze_receipt_signing_identity()?;
+        Ok(identity.public_key() != current.public_key())
+    }
+
     fn terminal_tool_call_output(output: ToolServerOutput) -> (ToolCallOutput, Option<String>) {
         match output {
             ToolServerOutput::Value(value) => (ToolCallOutput::Value(value), None),
@@ -491,6 +553,33 @@ impl ChioKernel {
         admission: &DurableToolAdmission,
         request: &ToolCallRequest,
     ) -> Result<ToolCallResponse, KernelError> {
+        self.completed_tool_response_inner(admission, request, None)
+    }
+
+    pub(super) fn completed_recovery_tool_response(
+        &self,
+        admission: &DurableToolAdmission,
+        request: &ToolCallRequest,
+        actor: &crate::recovery::AuthenticatedRecoveryActor,
+    ) -> Result<ToolCallResponse, KernelError> {
+        self.completed_tool_response_inner(admission, request, Some(actor))
+    }
+
+    fn completed_tool_response_inner(
+        &self,
+        admission: &DurableToolAdmission,
+        request: &ToolCallRequest,
+        recovery_actor: Option<&crate::recovery::AuthenticatedRecoveryActor>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        if self
+            .captured_recovery_deployment(&admission.operation)?
+            .is_some()
+            && recovery_actor.is_none()
+        {
+            return Err(KernelError::DurableAdmission(
+                "captured recovery result requires current scoped delivery authority".into(),
+            ));
+        }
         let runtime = self.durable_runtime()?;
         let tool_return = self.load_durable_tool_return(admission)?;
         self.require_caller_output_release(&tool_return, request)?;
@@ -511,7 +600,7 @@ impl ChioKernel {
             recovery_status,
         } = self.durable_evaluation_contract(admission, request, &tool_return.raw)?;
         let DurableEvaluatedOutput {
-            output,
+            mut output,
             incomplete_reason,
             post_invocation_metadata,
             post_invocation_evidence,
@@ -522,6 +611,7 @@ impl ChioKernel {
             matched_grant_index,
             &plan,
         )?;
+        self.apply_captured_semantic_disposition(admission, request, &mut output)?;
         let expected_chunks = match (&output, &incomplete_reason) {
             (ToolCallOutput::Stream(stream), None) => Some(stream.chunk_count()),
             _ => None,
@@ -542,6 +632,7 @@ impl ChioKernel {
             .ok_or_else(|| {
                 KernelError::DurableAdmission("projected receipt disappeared".to_owned())
             })?;
+        self.require_no_historical_settlement_delivery(&receipt)?;
         let mut delivery_evaluation = delivery_contract::evaluate_delivery(
             expected_output_digest.as_deref(),
             &receipt_content.content_hash,
@@ -799,7 +890,16 @@ impl ChioKernel {
                 )
             };
         self.require_caller_output_release(&tool_return, request)?;
-        Ok(ToolCallResponse {
+        if let Some(actor) = recovery_actor {
+            self.release_current_recovery_result(
+                admission,
+                actor,
+                request,
+                &tool_return.raw,
+                &output,
+            )?;
+        }
+        let response = ToolCallResponse {
             request_id: request.request_id.clone(),
             verdict,
             // A denied delivery returns no payload. An actual digest mismatch
@@ -810,7 +910,9 @@ impl ChioKernel {
             terminal_state,
             receipt,
             execution_nonce: None,
-        })
+        };
+        self.require_current_public_tool_response(admission, request, &response)?;
+        Ok(response)
     }
 
     fn validate_completed_durable_receipt(
@@ -1073,11 +1175,15 @@ impl ChioKernel {
             .outcome
             .validate_canonical_blob(&admission.operation, &raw_blob)
             .map_err(tool_outcome_error)?;
-        // Select no replacement authority for unfinished historical output.
-        // Check before output/settlement callbacks and pin the eventual body
-        // again in the core identity-bound signing primitive.
-        let signing_identity = self.durable_return_signing_identity(&tool_return.raw)?;
-        self.require_original_receipt_signer(&signing_identity)?;
+        // Ordinary returns keep their frozen signer. Authenticated captured
+        // recovery may instead sign a distinct, permanently withheld private
+        // settlement attestation without restoring old private key material.
+        let (signing_identity, private_settlement) = self.select_captured_settlement_signer(
+            admission,
+            request,
+            tool_return,
+            security_release.is_some(),
+        )?;
         let _guard_evidence_scope = scope_pre_invocation_guard_evidence(
             tool_return.raw.pre_invocation_guard_evidence().to_vec(),
         );
@@ -1091,7 +1197,7 @@ impl ChioKernel {
             recovery_status,
         } = self.durable_evaluation_contract(admission, request, &tool_return.raw)?;
         let DurableEvaluatedOutput {
-            output,
+            mut output,
             incomplete_reason,
             post_invocation_metadata,
             post_invocation_evidence,
@@ -1102,6 +1208,7 @@ impl ChioKernel {
             matched_grant_index,
             &plan,
         )?;
+        self.apply_captured_semantic_disposition(admission, request, &mut output)?;
         let _post_invocation_evidence_scope =
             scope_post_invocation_guard_evidence(post_invocation_evidence);
         let expected_chunks = match (&output, &incomplete_reason) {
@@ -1676,6 +1783,8 @@ impl ChioKernel {
         } else {
             metadata
         };
+        let metadata =
+            self.attach_private_settlement_metadata(metadata, private_settlement.as_ref())?;
         let action =
             ToolCallAction::from_parameters(request.arguments.clone()).map_err(|error| {
                 KernelError::ReceiptSigningFailed(format!("failed to hash parameters: {error}"))
@@ -1685,6 +1794,30 @@ impl ChioKernel {
         let receipt_tenant_id = (authenticated_tenant_id != LOCAL_SYSTEM_TENANT_ID)
             .then(|| authenticated_tenant_id.to_owned());
         drop(mutation_guard);
+        let receipt_policy_hash = match self.captured_recovery_deployment(&admission.operation)? {
+            Some(RecoveryCapturedDeploymentV1::Verified(profile)) => {
+                if super::recovery_runtime::hex(&profile.policy_digest)
+                    != admission.operation.binding().policy_hash().as_str()
+                {
+                    return Err(KernelError::DurableAdmission(
+                        "captured recovery receipt policy conflicts with native custody".to_owned(),
+                    ));
+                }
+                admission
+                    .operation
+                    .binding()
+                    .policy_hash()
+                    .as_str()
+                    .to_owned()
+            }
+            Some(RecoveryCapturedDeploymentV1::LegacyUnavailable)
+            | Some(RecoveryCapturedDeploymentV1::Quarantined) => {
+                return Err(KernelError::DurableAdmission(
+                    "captured recovery receipt verifier is unavailable".to_owned(),
+                ));
+            }
+            None => self.config.policy_hash.clone(),
+        };
         let receipt = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             self.build_and_sign_receipt_for_identity(
                 ReceiptParams {
@@ -1702,6 +1835,7 @@ impl ChioKernel {
                     tenant_id: receipt_tenant_id,
                 },
                 signing_identity.public_key(),
+                &receipt_policy_hash,
             )
         }))
         .map_err(|_| {
@@ -1934,13 +2068,15 @@ impl ChioKernel {
         {
             self.append_memory_provenance_for_write(store, key, request, &projected_receipt)?;
         }
-        let (verdict, reason, terminal_state, execution_nonce) =
+        let captured_recovery = self
+            .captured_recovery_deployment(&admission.operation)?
+            .is_some();
+        let (verdict, reason, terminal_state) =
             if let Some(denial) = delivery_evaluation.denial.as_ref() {
                 (
                     Verdict::Deny,
                     Some(denial.message.to_owned()),
                     OperationTerminalState::Completed,
-                    None,
                 )
             } else {
                 match incomplete_reason {
@@ -1948,22 +2084,8 @@ impl ChioKernel {
                         Verdict::Deny,
                         Some(reason.clone()),
                         OperationTerminalState::Incomplete { reason },
-                        None,
                     ),
-                    None => (
-                        Verdict::Allow,
-                        None,
-                        OperationTerminalState::Completed,
-                        if tool_return.caller_report_digest().is_some() {
-                            None
-                        } else {
-                            self.mint_execution_nonce_for_allow(
-                                request,
-                                &request.capability,
-                                &projected_receipt,
-                            )?
-                        },
-                    ),
+                    None => (Verdict::Allow, None, OperationTerminalState::Completed),
                 }
             };
         self.require_caller_output_release(tool_return, request)?;
@@ -1973,11 +2095,14 @@ impl ChioKernel {
             // A denied delivery returns no payload. An actual digest mismatch
             // exposes only the deterministic redaction binding; another
             // delivery denial may retain the already-committed matched digest.
-            output: delivery_evaluation.denial.is_none().then_some(output),
+            output: (delivery_evaluation.denial.is_none() && !captured_recovery).then_some(output),
             reason,
             terminal_state,
             receipt: projected_receipt,
-            execution_nonce,
+            // Private captured-fate settlement creates no new caller
+            // credential. Only fresh public delivery may mint one after the
+            // current disclosure gate has succeeded.
+            execution_nonce: None,
         })
     }
 }

@@ -1,0 +1,16 @@
+   Compiling chio-control-plane v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-control-plane)
+    Finished `test` profile [unoptimized] target(s) in 57.61s
+     Running unittests src/lib.rs (target/recovery-p5-linux/host/debug/deps/chio_control_plane-6f8003448d0ced3f)
+
+running 1 test
+test recovery::tests::overload::p6_overload_disconnected_intake_cannot_starve_existing_native_settlement ... Error: "settlement starved beyond the declared two-second deadline"
+FAILED
+
+failures:
+
+failures:
+    recovery::tests::overload::p6_overload_disconnected_intake_cannot_starve_existing_native_settlement
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1271 filtered out; finished in 61.61s
+
+error: test failed, to rerun pass `-p chio-control-plane --lib`

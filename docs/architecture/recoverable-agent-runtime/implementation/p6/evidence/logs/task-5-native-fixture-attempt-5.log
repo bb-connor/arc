@@ -1,0 +1,24 @@
+   Compiling chio-control-plane v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-control-plane)
+    Finished `test` profile [unoptimized] target(s) in 1m 11s
+     Running unittests src/lib.rs (target/debug/deps/chio_control_plane-7c73bd7964d7c479)
+
+running 1 test
+test recovery::tests::knowledge::qualification::p6_comparative_native_fixture_has_two_useful_workflows_and_fresh_refusals ... FAILED
+
+failures:
+
+---- recovery::tests::knowledge::qualification::p6_comparative_native_fixture_has_two_useful_workflows_and_fresh_refusals stdout ----
+
+thread 'recovery::tests::knowledge::qualification::p6_comparative_native_fixture_has_two_useful_workflows_and_fresh_refusals' (29742055) panicked at crates/platform/chio-control-plane/src/recovery/tests/knowledge/qualification.rs:20:13:
+assertion `left == right` failed: support/conflicting_basis
+  left: true
+ right: false
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    recovery::tests::knowledge::qualification::p6_comparative_native_fixture_has_two_useful_workflows_and_fresh_refusals
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1254 filtered out; finished in 157.74s
+
+error: test failed, to rerun pass `-p chio-control-plane --lib`

@@ -1,0 +1,12 @@
+
+> @chio-protocol/node-http@0.1.0 build
+> tsc && npm run build:cjs
+
+
+> @chio-protocol/node-http@0.1.0 build:cjs
+> esbuild src/index.ts --bundle --platform=node --format=cjs --packages=external --outfile=dist/index.cjs
+
+
+  dist/index.cjs  89.2kb
+
+⚡ Done in 7ms

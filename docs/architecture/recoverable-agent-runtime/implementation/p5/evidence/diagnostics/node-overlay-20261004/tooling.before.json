@@ -1,0 +1,69 @@
+{
+  "schema": "chio.recovery-p5-cached-tooling.v1",
+  "mode": "cached_read_only_dependencies_with_current_workspace_package_links",
+  "lock_exact_installation": false,
+  "tools": [
+    {
+      "tool": "vitest",
+      "version": "3.2.6",
+      "used_from": "sdks/typescript/node_modules/vitest/package.json",
+      "cache_source": "/Users/connor/Medica/backbay/standalone/arc/sdks/typescript/node_modules/vitest/package.json"
+    },
+    {
+      "tool": "vite",
+      "version": "7.3.5",
+      "used_from": "sdks/typescript/node_modules/vite/package.json",
+      "cache_source": "/Users/connor/Medica/backbay/standalone/arc/sdks/typescript/node_modules/vite/package.json"
+    },
+    {
+      "tool": "esbuild",
+      "version": "0.27.7",
+      "used_from": "sdks/typescript/node_modules/esbuild/package.json",
+      "cache_source": "/Users/connor/Medica/backbay/standalone/arc/sdks/typescript/node_modules/esbuild/package.json"
+    },
+    {
+      "tool": "typescript",
+      "version": "5.7.3",
+      "used_from": "sdks/typescript/node_modules/typescript/package.json",
+      "cache_source": "/Users/connor/Medica/backbay/standalone/arc/sdks/typescript/node_modules/typescript/package.json"
+    },
+    {
+      "tool": "ajv",
+      "version": "8.20.0",
+      "used_from": "sdks/typescript/node_modules/ajv/package.json",
+      "cache_source": "/Users/connor/Medica/backbay/standalone/arc/sdks/typescript/packages/conformance/node_modules/ajv/package.json"
+    },
+    {
+      "tool": "json-schema-to-typescript",
+      "version": "15.0.4",
+      "used_from": "sdks/typescript/scripts/node_modules/json-schema-to-typescript/package.json",
+      "cache_source": "/Users/connor/Medica/backbay/standalone/arc/sdks/typescript/scripts/node_modules/json-schema-to-typescript/package.json"
+    },
+    {
+      "tool": "ajv",
+      "version": "8.20.0",
+      "used_from": "sdks/typescript/packages/node-http/node_modules/ajv/package.json",
+      "cache_source": "/Users/connor/Medica/backbay/standalone/arc/sdks/typescript/packages/conformance/node_modules/ajv/package.json"
+    },
+    {
+      "tool": "vitest",
+      "version": "4.1.8",
+      "used_from": "sdks/typescript/packages/conformance/node_modules/vitest/package.json",
+      "cache_source": "/Users/connor/Medica/backbay/standalone/arc/sdks/typescript/packages/conformance/node_modules/vitest/package.json"
+    },
+    {
+      "tool": "vite",
+      "version": "8.0.16",
+      "used_from": "sdks/typescript/packages/conformance/node_modules/vite/package.json",
+      "cache_source": "/Users/connor/Medica/backbay/standalone/arc/sdks/typescript/packages/conformance/node_modules/vite/package.json"
+    },
+    {
+      "tool": "ajv",
+      "version": "8.20.0",
+      "used_from": "sdks/typescript/packages/conformance/node_modules/ajv/package.json",
+      "cache_source": "/Users/connor/Medica/backbay/standalone/arc/sdks/typescript/packages/conformance/node_modules/ajv/package.json"
+    }
+  ],
+  "python_interpreter": "/Users/connor/Medica/backbay/standalone/arc/sdks/python/chio-crewai/.venv/bin/python",
+  "overlays_removed_before_sealing": true
+}

@@ -1,0 +1,1 @@
+sdks/typescript/packages/conformance/src/index.ts(17,10): error TS2305: Module '"@chio-protocol/node-http"' has no exported member 'createWireSchemaValidator'.

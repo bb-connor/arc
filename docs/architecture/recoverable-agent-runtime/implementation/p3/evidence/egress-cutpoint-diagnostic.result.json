@@ -1,0 +1,18 @@
+{
+  "id": "egress-cutpoint-diagnostic",
+  "actual_command": [
+    "target/debug/deps/chio_store_sqlite-f12c8dd52e54f54f",
+    "admission_operation_store::tests::security_participant_state::egress::faults::acquisition_and_commit_errors_recover_exactly_one_event_per_phase",
+    "--exact",
+    "--nocapture"
+  ],
+  "cwd": ".",
+  "environment": {},
+  "exit_code": 0,
+  "status": "passed",
+  "started_unix_seconds": 1791065709,
+  "duration_seconds": 29.697,
+  "log": "evidence/egress-cutpoint-diagnostic.log",
+  "log_sha256": "5acc53c494b728999250ace022dff678bcbec85dec1bacf0462ea629586bb249",
+  "required_for_local_phase_acceptance": false
+}

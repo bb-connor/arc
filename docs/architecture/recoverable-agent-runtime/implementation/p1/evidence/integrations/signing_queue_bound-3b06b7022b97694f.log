@@ -1,0 +1,17 @@
+
+running 12 tests
+test backpressure_under_exhausted_budget_signs_inline_without_parking ... ok
+test aggregate_byte_budget_backpressures_even_with_channel_room ... ok
+test oversized_inline_fallback_still_refuses_render_a_sign_b ... ok
+test oversized_preimage_signs_inline_without_exceeding_queue_bound ... ok
+test shutdown_before_send_rejects_request_no_post_shutdown_enqueue ... ok
+test sign_refuses_oversized_content_fail_closed ... ok
+test sign_accepts_content_at_the_byte_budget ... ok
+test try_sign_returns_oversized_content_unsent ... ok
+test signing_block_counter_covers_all_inline_fallbacks ... ok
+test zero_per_request_cap_admits_large_receipts_unlimited ... ok
+test many_blocked_producers_do_not_retain_more_than_budget ... ok
+test default_budget_admits_large_async_receipts_above_one_mib ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+

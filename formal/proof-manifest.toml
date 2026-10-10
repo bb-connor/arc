@@ -272,8 +272,8 @@ discharged_assumptions = []
 # distributed-time model. The broad transport assumption remains required
 # alongside the narrower named fairness and partition assumption. In
 # particular, weak fairness does not prove a finite evaluation-count bound.
-m04_p5_t5_assumptions_decision = "ASSUME-NETWORK-TRANSPORT-scoped-not-retired"
-m04_p5_t5_rationale_anchor = "formal/tla/DistributedRevocation.tla::StaleEvaluationDenied"
+network_transport_assumptions_decision = "ASSUME-NETWORK-TRANSPORT-scoped-not-retired"
+network_transport_rationale_anchor = "formal/tla/DistributedRevocation.tla::StaleEvaluationDenied"
 
 # Ordered symbol-level hashes for manual Rust-to-model review seams.
 # The rollup uses length-prefixed normalized token streams in rust_symbols order.

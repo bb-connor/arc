@@ -1,0 +1,14 @@
+
+running 9 tests
+test descriptors_lock_kinds_labels_and_buckets ... ok
+test metrics_endpoint_ignores_other_paths ... ok
+test metrics_endpoint_serves_prometheus_body ... ok
+test guard_metrics_report_driven_counts ... ok
+test metrics_endpoint_serves_prometheus_text ... ok
+test metrics_endpoint_shares_settlement_unresolved_counter ... ok
+test scrape_contains_all_seven_guard_metric_families ... ok
+test signing_block_counter_reports_reason_label ... ok
+test watchdog_gauges_render_from_health_report ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

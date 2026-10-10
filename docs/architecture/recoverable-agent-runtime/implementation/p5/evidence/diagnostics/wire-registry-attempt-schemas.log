@@ -1,0 +1,2 @@
+MANIFEST.sha256 bytes do not match deterministic regeneration
+MANIFEST.sha256 has stale self-hash entry for spec/schemas/MANIFEST.sha256

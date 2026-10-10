@@ -1,0 +1,56 @@
+    Blocking waiting for file lock on artifact directory
+    Finished `test` profile [unoptimized] target(s) in 27.34s
+     Running unittests src/lib.rs (target/debug/deps/chio_control_plane-6d760a2608e455ae)
+
+running 18 tests
+test recovery::tests::recovery_p1_crash_child ... ignored, only the fresh-process P1 parent starts this child
+test recovery::tests::recovery_p1_export_signed_vectors ... ignored, explicit regeneration of public synthetic P1 conformance vectors
+test recovery::tests::additional_refusals::recovery_p1_constrained_control_tokens_cannot_skip_their_enforcement ... ok
+test recovery::tests::additional_refusals::recovery_p1_current_preview_clearance_does_not_leak_the_retained_payload ... ok
+test recovery::tests::recovery_p1_cancel_negative_lookup_fences_late_original_admission ... ok
+test recovery::tests::recovery_p1_expired_initiating_authority_cannot_renew_pending_work ... ok
+test recovery::tests::recovery_p1_fresh_process_cutpoints_preserve_original_ownership ... FAILED
+test recovery::tests::additional_refusals::recovery_p1_equal_labels_with_a_new_foreign_generation_are_stale ... ok
+test recovery::tests::recovery_p1_command_replay_conflict_rotation_and_revocation ... FAILED
+test recovery::tests::recovery_p1_rotated_scope_refuses_pending_approval_without_replacing_identity ... ok
+test recovery::tests::recovery_p1_frozen_denial_gets_a_distinct_successful_native_continuation ... FAILED
+test recovery::tests::recovery_p1_transport_closed_replay_and_audience_refusals ... ok
+test recovery::tests::recovery_p1_two_coordinators_select_once_and_review_exact_payload ... ok
+test recovery::tests::additional_refusals::recovery_p1_protected_identity_and_history_tampering_fail_closed ... ok
+test recovery::tests::recovery_p1_cancel_after_capture_preserves_effect_and_no_lock_spans_await has been running for over 60 seconds
+test recovery::tests::recovery_p1_workflow_flood_retains_settlement_and_tombstones ... ok
+test recovery::tests::recovery_p1_cancel_after_capture_preserves_effect_and_no_lock_spans_await ... FAILED
+test recovery::tests::recovery_p1_partial_finality_is_positive_scoped_and_spends_the_original ... ok
+test recovery::tests::recovery_p1_native_disclosure_once_and_exact_receipt_replay ... ok
+
+failures:
+
+---- recovery::tests::recovery_p1_fresh_process_cutpoints_preserve_original_ownership stdout ----
+
+thread 'recovery::tests::recovery_p1_fresh_process_cutpoints_preserve_original_ownership' (20408424) panicked at crates/platform/chio-control-plane/src/recovery/tests.rs:1023:9:
+assertion `left == right` failed: lost or repeated physical effect: creation, ClosedBeforeEffect { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(6) }, closure: EvidenceRef([redacted]) }
+  left: 0
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- recovery::tests::recovery_p1_command_replay_conflict_rotation_and_revocation stdout ----
+Error: "result"
+
+---- recovery::tests::recovery_p1_frozen_denial_gets_a_distinct_successful_native_continuation stdout ----
+
+thread 'recovery::tests::recovery_p1_frozen_denial_gets_a_distinct_successful_native_continuation' (20408425) panicked at crates/platform/chio-control-plane/src/recovery/tests.rs:626:5:
+assertion failed: matches!(result.status.effect, EffectObservationV1::Complete { .. })
+
+---- recovery::tests::recovery_p1_cancel_after_capture_preserves_effect_and_no_lock_spans_await stdout ----
+Error: Elapsed(())
+
+
+failures:
+    recovery::tests::recovery_p1_cancel_after_capture_preserves_effect_and_no_lock_spans_await
+    recovery::tests::recovery_p1_command_replay_conflict_rotation_and_revocation
+    recovery::tests::recovery_p1_fresh_process_cutpoints_preserve_original_ownership
+    recovery::tests::recovery_p1_frozen_denial_gets_a_distinct_successful_native_continuation
+
+test result: FAILED. 12 passed; 4 failed; 2 ignored; 0 measured; 1160 filtered out; finished in 75.29s
+
+error: test failed, to rerun pass `-p chio-control-plane --lib`

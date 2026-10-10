@@ -1,0 +1,14 @@
+   Compiling chio-semantic-contracts v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-semantic-contracts)
+   Compiling chio-core-types v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-core-types)
+    Finished `test` profile [unoptimized] target(s) in 2.23s
+     Running tests/recovery_p6_contracts.rs (target/debug/deps/recovery_p6_contracts-35601220fc98dbe5)
+
+running 5 tests
+test p6_proposal_requires_both_trajectory_classes_and_an_actual_policy_change ... ok
+test p6_product_report_bounds_closed_fields_and_redacted_debug ... ok
+test p6_setup_report_requires_a_distinct_reopened_writer_and_bounded_probe_lifetime ... ok
+test p6_operator_signatures_bind_every_base_target_proposal_and_fence ... ok
+test p6_product_shared_vectors_recompute_and_match_closed_schemas ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+

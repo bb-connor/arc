@@ -1,0 +1,85 @@
+{
+  "schema": "chio.recovery-p6-supported-matrix.v1",
+  "status": "supported_only_when_final_verified_record_passes",
+  "runtime_source_binding": "b1bcd48cadb7b9c7f1ff5dd4ad8d9910056590e22058527756114e21239c1063",
+  "supported": [
+    {
+      "surface": "Protected native Rust product composition",
+      "profile": "Fenced SQLite + process journal + selected semantic operator + native knowledge broker",
+      "evidence": "Actual Linux setup, policy, native recovery and physical capture suites"
+    },
+    {
+      "surface": "Guided CLI setup",
+      "profile": "Exact benign/refused operation, actual writer reopen, signed current readiness",
+      "evidence": "evidence/task-3-cli-linux-canonical/result.json"
+    },
+    {
+      "surface": "Classified report/proposal and reviewed semantic deployment",
+      "profile": "Fresh current audience and independent selected operator, exact base/target/serving fence",
+      "evidence": "requirements-coverage.json OPS-07"
+    },
+    {
+      "surface": "Native settlement under overload",
+      "profile": "Two dedicated workers/two outstanding jobs, four bounded command intake, default Linux stack",
+      "evidence": "actual disconnected four-provider flood with two-second settlement deadline"
+    },
+    {
+      "surface": "LangGraph",
+      "profile": "1.2.12 StateGraph with categories/opaque IDs only in checkpoints, current native replay authority",
+      "evidence": "evidence/task-4-host-acceptance/result.json and complete live cohort"
+    },
+    {
+      "surface": "CrewAI",
+      "profile": "1.15.23 Crew/BaseTool, cache/memory/planning/tracing/delegation disabled, fresh native replay",
+      "evidence": "evidence/task-4-host-acceptance/result.json and complete live cohort"
+    },
+    {
+      "surface": "Comparative support-to-issue workflow",
+      "profile": "Private authenticated native recovery endpoint, same owned operation/effect contract in both arms",
+      "evidence": "immutable 96-trial qualification manifest and independently counted native records"
+    },
+    {
+      "surface": "Comparative protected artifact reuse/restart",
+      "profile": "Private trusted test bridge to actual NativeKnowledgeRuntime custody/read/release and exact authorized sink",
+      "evidence": "immutable 96-trial qualification manifest and independent release/delivery records"
+    },
+    {
+      "surface": "P5 confined returns",
+      "profile": "Historical sealed Boolean-only model-disabled Linux GNU/musl profile",
+      "evidence": "immutable P5 package, 10 recovery cases/72 cage tests/27 probes/10 helper mutants/11 images"
+    },
+    {
+      "surface": "Portable product contracts",
+      "profile": "Rust 1.93 alloc/std and WASM; canonical generated Rust/Python/TypeScript",
+      "evidence": "current local gate catalog"
+    },
+    {
+      "surface": "Finite native/pure performance",
+      "profile": "Exact predeclared E6 host/compiler/debug profile, immutable P0 reference and unchanged original budgets",
+      "evidence": "evidence/matched-linux-performance/result.json; all original and failed hardware measurements retained"
+    }
+  ],
+  "unsupported": [
+    "General production artifact HTTP tool",
+    "OpenAPPA matched execution on these native ownership/custody semantics",
+    "Model-enabled P5 cage, nested launches and additional return channels",
+    "Covert-channel resistance",
+    "Arbitrary external-provider exactly-once semantics",
+    "Whole SQL/two-store/provider formal proof",
+    "Cross-platform confinement expansion",
+    "Hosted CI, deployment and production release",
+    "Production migration or supervisory code savings",
+    "Safety or token/effect/label claims for interrupted unknown measurements",
+    "Current Mac latency qualification or shared-workstation latency SLA",
+    "E4 native latency qualification (failed original absolute ceiling)"
+  ],
+  "interpretation": "Finite declared synthetic corpus only. No general superiority, fairness or account-independent availability inference. Phase completion requires exact-source native gates, original numeric budgets and fresh whole-phase review.",
+  "qualified_model_candidate": "gpt-5.4-2026-03-05 with pinned CrewAI BaseLLM stop contract",
+  "retained_failed_model": "gpt-5.4-mini-2026-03-17",
+  "planned_trials_including_interruption": 480,
+  "retained_failed_full_model_cohort": "96 trials: all 48 CrewAI rows skipped tools because the custom provider did not apply the declared stop contract",
+  "primary_fix_runtime_changed_paths": 6,
+  "final_qualification_cohort": "review-fix-qualification: 96 trials, 46 complete, 44 refused, six skipped tools; all sixteen positive strata pass",
+  "review": "One fresh whole-phase original-source review with two P1s, resolved by the author in one source-bound TDD pass. Final fix bytes were not freshly re-reviewed.",
+  "performance_profile": "Predeclared E6 Linux x86_64, 8 OCPUs/64 GiB, AMD EPYC 9J45, kernel 7.0.0-1012-oracle, Rust 1.94.1 debug/default stacks. Immutable P0 p95 128652683 ns; P6 p95 142600820 ns passes effective 155383219 ns and original absolute 220683049 ns ceiling. Native suites/live trials retain actual E4 profiles. Current Mac and E4 performance unqualified; failed attempts retained."
+}

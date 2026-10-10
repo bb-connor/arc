@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/fixtures/recovery-product/host_acceptance.py", line 153, in <module>
+    main()
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/fixtures/recovery-product/host_acceptance.py", line 118, in main
+    wait("ready")
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/fixtures/recovery-product/host_acceptance.py", line 114, in wait
+    raise RuntimeError("native framework fixture terminated")
+RuntimeError: native framework fixture terminated

@@ -4,9 +4,7 @@ use std::os::fd::AsRawFd;
 use std::sync::atomic::{AtomicUsize, Ordering};
 #[cfg(target_os = "linux")]
 use std::sync::{Arc, OnceLock};
-use std::time::Duration;
-#[cfg(target_os = "linux")]
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use crate::receipt::CageReceiptBindings;
 #[cfg(target_os = "linux")]
@@ -101,6 +99,8 @@ pub struct CageLaunchOptions {
 /// Secret-free observation of a descriptor-owned, sealed launch preparation.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize)]
 pub struct CageLaunchPreparationEvidence {
+    base_profile_digest: String,
+    base_plan_digest: String,
     manifest_digest: String,
     profile_digest: String,
     plan_digest: String,
@@ -113,6 +113,15 @@ pub struct CageLaunchPreparationEvidence {
 }
 
 impl CageLaunchPreparationEvidence {
+    /// Operator-pinnable configuration before ephemeral stdio socket identities.
+    #[must_use]
+    pub fn base_profile_digest(&self) -> &str {
+        &self.base_profile_digest
+    }
+    #[must_use]
+    pub fn base_plan_digest(&self) -> &str {
+        &self.base_plan_digest
+    }
     #[must_use]
     pub fn manifest_digest(&self) -> &str {
         &self.manifest_digest
@@ -297,8 +306,22 @@ pub struct EnforcedChild {
     custody_permit: Option<ChildCustodyPermit>,
     #[cfg(target_os = "linux")]
     owner_pid: u32,
+    #[cfg(target_os = "linux")]
+    deadline: Option<std::sync::mpsc::SyncSender<()>>,
     evidence: FullyEnforcedEvidence,
     stdio: Option<EnforcedStdio>,
+}
+
+/// Non-forgeable observed exit custody. Deserialized receipts are descriptions,
+/// while this value can only follow the retained child's pidfd observation.
+pub struct ObservedCageExit {
+    record: CageEnforcementRecord,
+}
+impl ObservedCageExit {
+    #[must_use]
+    pub fn record(&self) -> &CageEnforcementRecord {
+        &self.record
+    }
 }
 
 /// Parent-side target stdio handles released only after verified target exec.
@@ -326,6 +349,55 @@ impl EnforcedStdio {
 }
 
 impl EnforcedChild {
+    /// Arm exactly one absolute execution deadline on the retained pidfd.
+    /// Keeping the affine child handle alive cannot postpone termination. The
+    /// timer has no process number lookup, stdio, or authority/store dependency.
+    pub fn enforce_deadline(&mut self, deadline: Instant) -> Result<(), CageLaunchError> {
+        #[cfg(target_os = "linux")]
+        {
+            self.require_process_owner("child_deadline_owner")?;
+            if self.deadline.is_some() || self.child.is_none() || deadline <= Instant::now() {
+                return Err(CageLaunchError::terminalization_failed(
+                    &self.evidence,
+                    CageEnforcementFailureCode::Timeout,
+                    "child_deadline_state",
+                ));
+            }
+            let (sender, receiver) = std::sync::mpsc::sync_channel::<()>(0);
+            let pidfd = Arc::clone(&self.pidfd);
+            let owner_pid = self.owner_pid;
+            std::thread::Builder::new()
+                .name("chio-cage-deadline".into())
+                .spawn(move || {
+                    let remaining = deadline.saturating_duration_since(Instant::now());
+                    if matches!(
+                        receiver.recv_timeout(remaining),
+                        Err(std::sync::mpsc::RecvTimeoutError::Timeout)
+                    ) && std::process::id() == owner_pid
+                    {
+                        let _ = platform::kill_pidfd(&pidfd);
+                    }
+                })
+                .map_err(|_| {
+                    CageLaunchError::terminalization_failed(
+                        &self.evidence,
+                        CageEnforcementFailureCode::Timeout,
+                        "child_deadline_monitor",
+                    )
+                })?;
+            self.deadline = Some(sender);
+            Ok(())
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            let _ = deadline;
+            Err(CageLaunchError::unsupported())
+        }
+    }
+    pub fn try_wait_verified(&mut self) -> Result<Option<ObservedCageExit>, CageLaunchError> {
+        self.try_wait()
+            .map(|record| record.map(|record| ObservedCageExit { record }))
+    }
     #[must_use]
     pub fn process_id(&self) -> u32 {
         self.evidence.prepared.process_id
@@ -357,6 +429,7 @@ impl EnforcedChild {
                 Ok(platform::PidfdReap::Exited(status)) => status,
                 Ok(platform::PidfdReap::ReapedWithoutStatus) => {
                     let _ = self.child.take();
+                    drop(self.deadline.take());
                     drop(self.custody_permit.take());
                     drop(self.stdio.take());
                     return Err(CageLaunchError::terminalization_failed(
@@ -376,6 +449,7 @@ impl EnforcedChild {
                 }
             };
             let _ = self.child.take();
+            drop(self.deadline.take());
             drop(self.custody_permit.take());
             drop(self.stdio.take());
             self.exited_record(status, receipt_bindings).map(Some)
@@ -644,6 +718,7 @@ impl EnforcedChild {
             pidfd,
             custody_permit: Some(custody_permit),
             owner_pid,
+            deadline: None,
             evidence,
             stdio: Some(stdio),
         }

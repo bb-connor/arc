@@ -1,6 +1,9 @@
 """Chio SDK for Python -- thin HTTP client to the Chio sidecar kernel."""
 
 from typing import Any
+from chio_sdk.recovery import RecoveryClient
+from chio_sdk.recovery_errors import RecoveryError, RecoveryErrorCode
+from chio_sdk.recovery_wire import LosslessJsonNumber
 
 from chio_sdk.models import (
     ChioHttpRequest,
@@ -69,6 +72,10 @@ from chio_sdk.cognition_market import (
 __all__ = [
     # Client
     "ChioClient",
+    "RecoveryClient",
+    "RecoveryError",
+    "RecoveryErrorCode",
+    "LosslessJsonNumber",
     # Testing
     "MockChioClient",
     "MockVerdict",

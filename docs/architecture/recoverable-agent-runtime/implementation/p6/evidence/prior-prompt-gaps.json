@@ -1,0 +1,232 @@
+{
+  "measurement_status": "unavailable",
+  "qualifying": false,
+  "cause": "Framework mutated prompt objects retained by reference; original request hashes/byte counts and original rows remain unchanged. No prompt is reconstructed or repaired.",
+  "gaps": [
+    {
+      "cohort": "available-account-qualification",
+      "id": "crewai-support-baseline-authorized-r2",
+      "attempt": 0,
+      "recorded_prompt_sha256": "c5061cfc51cb460f2940c2c6c50708d32d16126a6b7d484de2a9686fef583587",
+      "recorded_prompt_bytes": 2226,
+      "retained_messages_sha256": "cf6a23b18fd43829adba4fec9ac37152a438965b5bbb177ebef31e82ab3bd32c",
+      "retained_messages_bytes": 2581
+    },
+    {
+      "cohort": "available-account-qualification",
+      "id": "crewai-support-baseline-authorized-r3",
+      "attempt": 0,
+      "recorded_prompt_sha256": "c5061cfc51cb460f2940c2c6c50708d32d16126a6b7d484de2a9686fef583587",
+      "recorded_prompt_bytes": 2226,
+      "retained_messages_sha256": "3001fc5513a9d871aae85d7e666d26e2b18e2633e2422c7b3957edb2b1256023",
+      "retained_messages_bytes": 2581
+    },
+    {
+      "cohort": "available-account-qualification",
+      "id": "crewai-support-baseline-lost_ack_restart-r1",
+      "attempt": 0,
+      "recorded_prompt_sha256": "43404649f7b9ca22ad59a0b662f31eb334fcebd5ddde1d6d81a8c7edff154a6f",
+      "recorded_prompt_bytes": 2353,
+      "retained_messages_sha256": "d47d96c8f6d1270a0ea1a884ce4a623d2a8bfa369b9194b01b98807818b42582",
+      "retained_messages_bytes": 2738
+    },
+    {
+      "cohort": "available-account-qualification",
+      "id": "crewai-support-baseline-lost_ack_restart-r2",
+      "attempt": 0,
+      "recorded_prompt_sha256": "43404649f7b9ca22ad59a0b662f31eb334fcebd5ddde1d6d81a8c7edff154a6f",
+      "recorded_prompt_bytes": 2353,
+      "retained_messages_sha256": "c07224f508a385a306f43ee8be8471d01598f498c75e9a3ecf0a2029197298d1",
+      "retained_messages_bytes": 2734
+    },
+    {
+      "cohort": "available-account-qualification",
+      "id": "crewai-support-baseline-wrong_authority-r1",
+      "attempt": 0,
+      "recorded_prompt_sha256": "ba4c2e49f52ca709f1cb507042bf6613c4404ad4dcaaff29bc32cb416e0bd439",
+      "recorded_prompt_bytes": 2338,
+      "retained_messages_sha256": "bc46919c838f0fa29d99a422f1886f9a3e3bd787ebbd8a08e3a9c9a586b26ef2",
+      "retained_messages_bytes": 2560
+    },
+    {
+      "cohort": "available-account-qualification",
+      "id": "crewai-support-baseline-conflicting_basis-r1",
+      "attempt": 0,
+      "recorded_prompt_sha256": "9bc0153e33194c581453b743eb8cc3a3f8bc2508b42b79f495b1d58e3f091872",
+      "recorded_prompt_bytes": 2364,
+      "retained_messages_sha256": "3ccb7a2b206de3c0ab21806da59ab2f8b7bd1b63cae40c4298b59f3e990582d5",
+      "retained_messages_bytes": 2594
+    },
+    {
+      "cohort": "available-account-qualification",
+      "id": "crewai-support-baseline-conflicting_basis-r2",
+      "attempt": 0,
+      "recorded_prompt_sha256": "9bc0153e33194c581453b743eb8cc3a3f8bc2508b42b79f495b1d58e3f091872",
+      "recorded_prompt_bytes": 2364,
+      "retained_messages_sha256": "2dbe7841de0c773418e4235510e27e026fd645ec7c2c52cec1a251e57a940640",
+      "retained_messages_bytes": 2545
+    },
+    {
+      "cohort": "available-account-qualification",
+      "id": "crewai-support-baseline-conflicting_basis-r3",
+      "attempt": 0,
+      "recorded_prompt_sha256": "9bc0153e33194c581453b743eb8cc3a3f8bc2508b42b79f495b1d58e3f091872",
+      "recorded_prompt_bytes": 2364,
+      "retained_messages_sha256": "4da4edf44a810a76998967ece9a57f6d617c5b35cb0dc3db253bc064c0ece2b5",
+      "retained_messages_bytes": 2619
+    },
+    {
+      "cohort": "available-account-qualification",
+      "id": "crewai-support-product-authorized-r1",
+      "attempt": 0,
+      "recorded_prompt_sha256": "c5061cfc51cb460f2940c2c6c50708d32d16126a6b7d484de2a9686fef583587",
+      "recorded_prompt_bytes": 2226,
+      "retained_messages_sha256": "a4080df2f26fda24bcf8aafcea3acdb4fcafb5069a67bb3a750ffa6bf23e5287",
+      "retained_messages_bytes": 2670
+    },
+    {
+      "cohort": "available-account-qualification",
+      "id": "crewai-support-product-authorized-r2",
+      "attempt": 0,
+      "recorded_prompt_sha256": "c5061cfc51cb460f2940c2c6c50708d32d16126a6b7d484de2a9686fef583587",
+      "recorded_prompt_bytes": 2226,
+      "retained_messages_sha256": "a1ebfeaad094aff01546e54366204b25c05b436770d626b8c242a5a160431d30",
+      "retained_messages_bytes": 2636
+    },
+    {
+      "cohort": "available-account-qualification",
+      "id": "crewai-support-product-authorized-r3",
+      "attempt": 0,
+      "recorded_prompt_sha256": "c5061cfc51cb460f2940c2c6c50708d32d16126a6b7d484de2a9686fef583587",
+      "recorded_prompt_bytes": 2226,
+      "retained_messages_sha256": "a95e0da2a35f1b0fbfea325fbd796e3bea5fbb0beb950e472faebb72133d6beb",
+      "retained_messages_bytes": 2582
+    },
+    {
+      "cohort": "available-account-qualification",
+      "id": "crewai-support-product-lost_ack_restart-r1",
+      "attempt": 0,
+      "recorded_prompt_sha256": "43404649f7b9ca22ad59a0b662f31eb334fcebd5ddde1d6d81a8c7edff154a6f",
+      "recorded_prompt_bytes": 2353,
+      "retained_messages_sha256": "fd4aa8e2694657d0bba70a5bf67abb893461b6929b4474b8b82979b4dd428efe",
+      "retained_messages_bytes": 2720
+    },
+    {
+      "cohort": "available-account-qualification",
+      "id": "crewai-support-product-lost_ack_restart-r2",
+      "attempt": 0,
+      "recorded_prompt_sha256": "43404649f7b9ca22ad59a0b662f31eb334fcebd5ddde1d6d81a8c7edff154a6f",
+      "recorded_prompt_bytes": 2353,
+      "retained_messages_sha256": "8f70a4e031e90c5c8c79358953af5be50815c481031913c9bcf04fec486415a8",
+      "retained_messages_bytes": 2715
+    },
+    {
+      "cohort": "available-account-qualification",
+      "id": "crewai-support-product-wrong_authority-r1",
+      "attempt": 0,
+      "recorded_prompt_sha256": "ba4c2e49f52ca709f1cb507042bf6613c4404ad4dcaaff29bc32cb416e0bd439",
+      "recorded_prompt_bytes": 2338,
+      "retained_messages_sha256": "508cdd9e06fc70031bec3c3c49679a29d4b7e25763b43455cc103500e46e9adb",
+      "retained_messages_bytes": 2588
+    },
+    {
+      "cohort": "available-account-qualification",
+      "id": "crewai-support-product-wrong_authority-r2",
+      "attempt": 0,
+      "recorded_prompt_sha256": "ba4c2e49f52ca709f1cb507042bf6613c4404ad4dcaaff29bc32cb416e0bd439",
+      "recorded_prompt_bytes": 2338,
+      "retained_messages_sha256": "9af384a320d5e613923d9692a31b45398dd6129b5bebd1763304bf812cb7e451",
+      "retained_messages_bytes": 2519
+    },
+    {
+      "cohort": "available-account-qualification",
+      "id": "crewai-support-product-lost_ack_restart-r3",
+      "attempt": 0,
+      "recorded_prompt_sha256": "43404649f7b9ca22ad59a0b662f31eb334fcebd5ddde1d6d81a8c7edff154a6f",
+      "recorded_prompt_bytes": 2353,
+      "retained_messages_sha256": "8a01dbfa5485dce4ed1e8d997ba4425b836322b6314acab8cdbcaa4db72f1acb",
+      "retained_messages_bytes": 2740
+    },
+    {
+      "cohort": "available-account-qualification",
+      "id": "crewai-support-product-conflicting_basis-r2",
+      "attempt": 0,
+      "recorded_prompt_sha256": "9bc0153e33194c581453b743eb8cc3a3f8bc2508b42b79f495b1d58e3f091872",
+      "recorded_prompt_bytes": 2364,
+      "retained_messages_sha256": "2e0071a9cf7213a3e01eb0fbf25280f5f14146d464c6e110e7d93712cd44d4b7",
+      "retained_messages_bytes": 2607
+    },
+    {
+      "cohort": "available-account-qualification",
+      "id": "crewai-artifact-baseline-lost_ack_restart-r3",
+      "attempt": 0,
+      "recorded_prompt_sha256": "1d4cc926a77e8b86cd429b01beba345ddfc3abeefdeac4647bcecdce2474b3cd",
+      "recorded_prompt_bytes": 2357,
+      "retained_messages_sha256": "726e81e41023c8f508f45674b89026c3c350d5b64164c6579011d5714dfff97f",
+      "retained_messages_bytes": 2742
+    },
+    {
+      "cohort": "available-account-qualification",
+      "id": "crewai-artifact-baseline-wrong_authority-r2",
+      "attempt": 0,
+      "recorded_prompt_sha256": "da9c1e71d8a55dcb6ee7a33937e6359d88aeeaac3ccb2094aa4595ca7d4d66bb",
+      "recorded_prompt_bytes": 2342,
+      "retained_messages_sha256": "eba3eabbe5f2c8a35121a2e461d828a3db82230166af7f810d285a8903a59998",
+      "retained_messages_bytes": 2588
+    },
+    {
+      "cohort": "available-account-qualification",
+      "id": "crewai-artifact-baseline-conflicting_basis-r1",
+      "attempt": 0,
+      "recorded_prompt_sha256": "391af67ac8624e9a4c54f077e5c2bbed123d83031a138b6a2befe6c80f6a5d16",
+      "recorded_prompt_bytes": 2368,
+      "retained_messages_sha256": "3c75fcd99e346942281112dc52bdde31a23c7003b8865580adfd4facba729110",
+      "retained_messages_bytes": 2595
+    },
+    {
+      "cohort": "available-account-qualification",
+      "id": "crewai-artifact-product-authorized-r2",
+      "attempt": 0,
+      "recorded_prompt_sha256": "15e3b8f529b513036a53c2a3ae65c9569dabd84c4c63f5a7c3e1791b69efafb1",
+      "recorded_prompt_bytes": 2230,
+      "retained_messages_sha256": "3eda1be5f416e2ade8c0a2cb9b9646b4521e0fe3881bc4211f2e6153bfa7ef95",
+      "retained_messages_bytes": 2583
+    },
+    {
+      "cohort": "available-account-qualification",
+      "id": "crewai-artifact-product-wrong_authority-r2",
+      "attempt": 0,
+      "recorded_prompt_sha256": "da9c1e71d8a55dcb6ee7a33937e6359d88aeeaac3ccb2094aa4595ca7d4d66bb",
+      "recorded_prompt_bytes": 2342,
+      "retained_messages_sha256": "79aa7ef22015a14125df6c328a8c467dc0bf8345542412f38bdb9012ec0b6e19",
+      "retained_messages_bytes": 2640
+    },
+    {
+      "cohort": "available-account-qualification",
+      "id": "crewai-artifact-product-wrong_authority-r3",
+      "attempt": 0,
+      "recorded_prompt_sha256": "da9c1e71d8a55dcb6ee7a33937e6359d88aeeaac3ccb2094aa4595ca7d4d66bb",
+      "recorded_prompt_bytes": 2342,
+      "retained_messages_sha256": "edeacda498f8a4acaf6f795c6b630e0950905223f34ec6a1552ec52c8281b323",
+      "retained_messages_bytes": 2634
+    },
+    {
+      "cohort": "available-account-qualification",
+      "id": "crewai-artifact-product-conflicting_basis-r1",
+      "attempt": 0,
+      "recorded_prompt_sha256": "391af67ac8624e9a4c54f077e5c2bbed123d83031a138b6a2befe6c80f6a5d16",
+      "recorded_prompt_bytes": 2368,
+      "retained_messages_sha256": "0d1f644e64fa8f32512f4accbc59a20245559fafef15d2289a8a7736fd0f90c0",
+      "retained_messages_bytes": 2605
+    },
+    {
+      "cohort": "available-account-qualification",
+      "id": "crewai-artifact-product-conflicting_basis-r2",
+      "attempt": 0,
+      "recorded_prompt_sha256": "391af67ac8624e9a4c54f077e5c2bbed123d83031a138b6a2befe6c80f6a5d16",
+      "recorded_prompt_bytes": 2368,
+      "retained_messages_sha256": "79a97405150e652f6e4c8e7ee3e001efb8ad9701bd05c644877080efcf98b3be",
+      "retained_messages_bytes": 2569
+    }
+  ]
+}

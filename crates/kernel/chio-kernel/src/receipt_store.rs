@@ -12,6 +12,9 @@ use chio_security_types::ports::OpaqueReceiptRef;
 use crate::capability_lineage::CapabilitySnapshot;
 use crate::checkpoint::KernelCheckpoint;
 
+mod native_registration;
+pub use native_registration::NativeReceiptStoreRegistration;
+
 /// Durable logical active-defense evidence index backed by signed receipts.
 ///
 /// Implementations append the receipt and publish the unique logical evidence
@@ -361,7 +364,9 @@ pub enum ReceiptStoreError {
     #[error("receipt-store durable outcome is unknown: {0}")]
     OutcomeUnknown(String),
 
-    #[error("retention co-archival incomplete for {table}: {live} live rows, {archived} archived; aborting delete to preserve inclusion-proof integrity")]
+    #[error(
+        "retention co-archival incomplete for {table}: {live} live rows, {archived} archived; aborting delete to preserve inclusion-proof integrity"
+    )]
     RetentionArchiveIncomplete {
         table: &'static str,
         live: u64,
@@ -373,10 +378,14 @@ pub enum ReceiptStoreError {
     )]
     RetentionWatermarkRegression { attempted: u64, current: u64 },
 
-    #[error("claim receipt log projection is missing over a checkpointed or archived range (watermark {watermark}); the entry ordering cannot be safely regenerated to match committed checkpoint boundaries; restore the claim_receipt_log_entries projection from a backup taken before it was lost")]
+    #[error(
+        "claim receipt log projection is missing over a checkpointed or archived range (watermark {watermark}); the entry ordering cannot be safely regenerated to match committed checkpoint boundaries; restore the claim_receipt_log_entries projection from a backup taken before it was lost"
+    )]
     ArchivedRangeProjection { watermark: u64 },
 
-    #[error("tenant-scoped retention is not expressible as a prefix watermark and is unsupported; no data was modified")]
+    #[error(
+        "tenant-scoped retention is not expressible as a prefix watermark and is unsupported; no data was modified"
+    )]
     RetentionTenantScopeUnsupported,
 
     #[error("receipt commit writer is not serving after {restarts} restart(s): {last_error}")]
@@ -437,6 +446,15 @@ fn receipt_writer_liveness_unknown_label() -> String {
 }
 
 pub trait ReceiptStore: Send + Sync {
+    /// Concrete configured owner discovery, not a financial authority port.
+    /// Unsupported backends remain unavailable. Opt-in owned registration
+    /// captures the actual concrete type without restricting ordinary borrowed
+    /// backends. The Native adapter checks that type and this exact object's
+    /// address before entering the owner's private serialized lane.
+    fn native_finishing_owner(&self) -> Option<&(dyn std::any::Any + Send + Sync)> {
+        None
+    }
+
     fn append_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError>;
     /// Whether this store is an authoritative durable sink for signed native
     /// security release evidence such as cage and broker receipts.
@@ -1384,6 +1402,11 @@ fn claimed_authorization_error(
         ),
         Store::Invariant(detail) => AdmissionBudgetAuthorizationError::Invariant(detail),
         Store::OutcomeUnknown(detail) => AdmissionBudgetAuthorizationError::OutcomeUnknown(detail),
+        Store::RecoveryAuthorityDenied | Store::RecoveryMediationRequired => {
+            AdmissionBudgetAuthorizationError::Invariant(
+                "recovery preview refusal is outside budget authorization".into(),
+            )
+        }
         Store::Operation(error) => AdmissionBudgetAuthorizationError::Operation(error),
     }
 }
@@ -1399,6 +1422,9 @@ fn claimed_capture_error(
         Store::NotFound => Capture::Invariant("admission operation was not found".to_owned()),
         Store::Invariant(detail) => Capture::Invariant(detail),
         Store::OutcomeUnknown(detail) => Capture::OutcomeUnknown(detail),
+        Store::RecoveryAuthorityDenied | Store::RecoveryMediationRequired => {
+            Capture::Invariant("recovery preview refusal is outside capture claims".into())
+        }
         Store::Operation(error) => Capture::Operation(error),
     }
 }

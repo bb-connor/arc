@@ -1,0 +1,30 @@
+   Compiling chio-manifest v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-manifest)
+   Compiling chio-custody-hw v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-custody-hw)
+   Compiling chio-tool-call-fabric v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/protocol/chio-tool-call-fabric)
+   Compiling chio-cage v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-cage)
+   Compiling chio-kernel v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-kernel)
+   Compiling chio-finding-verifier v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-finding-verifier)
+   Compiling chio-transaction-passport v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-transaction-passport)
+   Compiling chio-risk-comptroller v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-risk-comptroller)
+   Compiling chio-commerce-order v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-commerce-order)
+   Compiling chio-agent-web-interop v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-agent-web-interop)
+   Compiling chio-store-sqlite v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-store-sqlite)
+   Compiling chio-process v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-process)
+    Finished `test` profile [unoptimized] target(s) in 1m 00s
+     Running tests/processes.rs (target/debug/deps/processes-d922f54dd5f7011e)
+
+running 1 test
+test p5_ordinary_depth_64_keeps_root_context_and_normal_admission ... FAILED
+
+failures:
+
+---- p5_ordinary_depth_64_keeps_root_context_and_normal_admission stdout ----
+Error: Kernel(DurableAdmission("confined context unavailable"))
+
+
+failures:
+    p5_ordinary_depth_64_keeps_root_context_and_normal_admission
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 16 filtered out; finished in 1.71s
+
+error: test failed, to rerun pass `-p chio-process --test processes`

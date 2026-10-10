@@ -1,0 +1,27 @@
+   Compiling chio-kernel v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-kernel)
+   Compiling chio-finding-verifier v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-finding-verifier)
+   Compiling chio-transaction-passport v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-transaction-passport)
+   Compiling chio-risk-comptroller v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-risk-comptroller)
+   Compiling chio-commerce-order v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-commerce-order)
+   Compiling chio-agent-web-interop v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-agent-web-interop)
+   Compiling chio-store-sqlite v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-store-sqlite)
+    Finished `test` profile [unoptimized] target(s) in 1m 08s
+   Doc-tests chio_kernel
+
+running 13 tests
+test crates/kernel/chio-kernel/src/kernel/active_response_dispatch.rs - kernel::active_response_dispatch::ResponseDispatchPreparationRequest (line 117) - compile fail ... ok
+test crates/kernel/chio-kernel/src/runtime/recovery_custody.rs - runtime::recovery_custody::RecoveryRequestCustody (line 13) - compile fail ... ok
+test crates/kernel/chio-kernel/src/recovery/records.rs - recovery::records::RecoveryProviderLookup (line 307) - compile fail ... ok
+test crates/kernel/chio-kernel/src/admission_operation/projection.rs - admission_operation::projection::VerifiedAdmissionReceipt (line 118) - compile fail ... ok
+test crates/kernel/chio-kernel/src/runtime/recovery_review.rs - runtime::recovery_review::RecoveryRequestProjection (line 23) - compile fail ... ok
+test crates/kernel/chio-kernel/src/runtime/recovery_review.rs - runtime::recovery_review::RecoveryRequestProjection (line 30) - compile fail ... ok
+test crates/kernel/chio-kernel/src/kernel/active_response_dispatch.rs - kernel::active_response_dispatch::ResponseDispatchPreparationRequest (line 109) - compile fail ... ok
+test crates/kernel/chio-kernel/src/runtime/recovery_custody.rs - runtime::recovery_custody::RecoveryRequestCustody (line 8) - compile fail ... ok
+test crates/kernel/chio-kernel/src/dispatch_status.rs - dispatch_status::QualifiedDispatchStatusProvider (line 166) - compile fail ... ok
+test crates/kernel/chio-kernel/src/recovery/records.rs - recovery::records::RecoveryProviderLookup (line 314) - compile fail ... ok
+test crates/kernel/chio-kernel/src/kernel/verified_treaty.rs - kernel::verified_treaty::VerifiedFederationTreatyMaterial (line 37) - compile fail ... ok
+test crates/kernel/chio-kernel/src/recovery/ports.rs - recovery::ports::AuthenticatedRecoveryActor (line 11) - compile fail ... ok
+test crates/kernel/chio-kernel/src/runtime/recovery_review.rs - runtime::recovery_review::RecoveryRequestProjection (line 17) - compile fail ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.56s
+

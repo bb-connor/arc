@@ -12,6 +12,8 @@ mod faults;
 #[cfg(feature = "admission-test-support")]
 pub use faults::NativeOutputJoinTestFault;
 mod integrity;
+#[cfg(feature = "admission-test-support")]
+mod legacy_test;
 mod record;
 mod schema;
 mod write;
@@ -21,6 +23,20 @@ pub(in crate::admission_operation_store) use schema::{exists, sql, verify_catalo
 
 const PROJECTION: &str = "security_participant_output";
 const MUTATION: &str = "join_security_participant_output";
+
+/// Read authenticated captured output taint inside an existing fenced
+/// transaction. No current classification or new output join is selected.
+pub(in crate::admission_operation_store) fn captured_output(
+    tx: &Connection,
+    operation: &AdmissionOperationId,
+) -> Result<NativeSecurityOutputJoinRecordV1, AdmissionOperationStoreError> {
+    let record = load_operation(tx, operation)?
+        .ok_or_else(|| invalid("recovery captured output taint is absent"))?;
+    record.validate(tx)?;
+    let initialized = super::records::load_metadata(tx, record.authority.as_str())?
+        .ok_or_else(|| invalid("recovery captured output initialization is absent"))?;
+    record.evidence(&initialized)
+}
 
 /// Minted only after validating finalization custody inside the writer's
 /// transaction. It enables the closed monotone row policy and, when selected,

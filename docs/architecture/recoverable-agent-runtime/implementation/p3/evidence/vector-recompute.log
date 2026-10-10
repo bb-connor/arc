@@ -1,0 +1,5 @@
+    Blocking waiting for file lock on artifact directory
+   Compiling chio-semantic-contracts v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-semantic-contracts)
+    Finished `dev` profile [unoptimized] target(s) in 1m 29s
+     Running `target/debug/examples/p3_vectors`
+PASS: all 50 P3 vector bytes independently recomputed

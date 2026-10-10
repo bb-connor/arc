@@ -1,0 +1,899 @@
+{
+  "schema": "chio.recovery-p1-regression-classification.v1",
+  "note": "Initial failed stdout is retained. Every failure has an explicit passing rerun/corrected fixture or an environment blocker; these are not a green full-workspace aggregate.",
+  "suites": [
+    {
+      "suite": "control_plane_library",
+      "initial_failures": 60,
+      "classifications": {
+        "blocked_socket_eperm": 54,
+        "blocked_dns": 1,
+        "passed_sequentially_under_unchanged_production_deadlines": 5
+      },
+      "failures": [
+        {
+          "test": "attestation::tests::attestation_oidc_and_metadata_helpers_cover_parse_and_resolution_edges",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "f7fb70bc60bcdb02c9a4313299f1fcbe3227ba6273ec4b98f043b539448c2595"
+        },
+        {
+          "test": "policy::tests::build_pipeline_from_external_guard_policy",
+          "classification": "blocked_dns",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "ebc6b56ce0530d57fe4eb6598dca889b7bc9cc2d7566fd17e9f406b5f58b03ab"
+        },
+        {
+          "test": "security::adapters::tests::native_flow::support::capture::combined_credentials::nested::native_declassification_supports_public_nested_sync_and_async_with_all_credentials",
+          "classification": "passed_sequentially_under_unchanged_production_deadlines",
+          "evidence": "evidence/native-regression-reruns/native_declassification_supports_public_nested_sync_and_async_with_all_credentials.log",
+          "initial_failure_stdout_sha256": "21ba80205f97aa9c654f485c93f216e09341652ae86e4c57fc4b5799165d10a2"
+        },
+        {
+          "test": "security::adapters::tests::native_flow::support::capture::combined_credentials::nested::native_captured_lifecycle_supports_public_nested_sync_and_async_dispatch",
+          "classification": "passed_sequentially_under_unchanged_production_deadlines",
+          "evidence": "evidence/native-regression-reruns/native_captured_lifecycle_supports_public_nested_sync_and_async_dispatch.log",
+          "initial_failure_stdout_sha256": "744c94284b262f93551e8163964bf50d141e73097d08425dbac7adad061e35c4"
+        },
+        {
+          "test": "security::adapters::tests::native_flow::support::capture::combined_credentials::nested::public_nested_native_capture_retains_runtime_approval_and_dpop_for_local_and_egress",
+          "classification": "passed_sequentially_under_unchanged_production_deadlines",
+          "evidence": "evidence/native-regression-reruns/public_nested_native_capture_retains_runtime_approval_and_dpop_for_local_and_egress.log",
+          "initial_failure_stdout_sha256": "6a1556958312a1f874ecc2d8bffc3a607abbe0aaa9ddd34e542233e39b78dc7f"
+        },
+        {
+          "test": "security::adapters::tests::native_flow::support::capture::native_atomic_capture_faults_roll_back_budget_and_operation_together",
+          "classification": "passed_sequentially_under_unchanged_production_deadlines",
+          "evidence": "evidence/native-regression-reruns/native_atomic_capture_faults_roll_back_budget_and_operation_together.log",
+          "initial_failure_stdout_sha256": "bde30053eb86c2cc187256060618d1ee5029df443818bacdcf5a43812f58a048"
+        },
+        {
+          "test": "security::adapters::tests::native_flow::support::capture::native_atomic_capture_retains_quota_and_ledger_without_tool_effect",
+          "classification": "passed_sequentially_under_unchanged_production_deadlines",
+          "evidence": "evidence/native-regression-reruns/native_atomic_capture_retains_quota_and_ledger_without_tool_effect.log",
+          "initial_failure_stdout_sha256": "a944031ac2e0d0ebabd03d641ca8b8ddf19e1f9ff36adcb3559a4d07b6eb8288"
+        },
+        {
+          "test": "trust_control::service_runtime::router::tests::standalone_legacy_holds_use_exact_versioned_rich_lifecycle",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "5bb1826a5fe9248e946c4a2dde8ec21cc0e6801d12251aad6099499d358ee361"
+        },
+        {
+          "test": "trust_control::service_runtime::router::tests::live_structured_denial_has_no_invented_usage_sequence_or_cache_mutation",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "5bb1826a5fe9248e946c4a2dde8ec21cc0e6801d12251aad6099499d358ee361"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::budget::budget_wrappers_include_budget_event_identity_when_provided",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "e4bfee60249bb5437675ab71e0cd9371960e7ddd1955ea64716cb457ca36548e"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::budget::budget_wrappers_use_split_budget_routes",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "0438578acb234ffa5295d4c8f99a1a66363dd05dc2fcd774a71af90735a05118"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::budget::remote_budget_get_rejects_substituted_capability_without_partial_cache_update",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "8596fc2ff70d72020bed34a33203b5a2c67244d86b3c14b8e1c907f5c24a821e"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::budget::remote_budget_get_reloads_costs_seeded_by_a_partial_response",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "ad906b4e121740a045e8b05b96492486df1c18f255b06f2b67c4ae9c19167ce4"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::budget::remote_budget_list_cannot_regress_or_conflict_with_newer_cached_usage",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "101b1359a1a0ff81667c7812f33bb069f73901ea752b04bbdf98df7c4904de36"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::budget::remote_budget_store_binds_authorize_response_identity_and_event",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "599a0f412b1ad50e062804476e5c538464d650dcc716dc11b51db53c5bf48f5e"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::budget::remote_budget_store_legacy_with_ids_validates_identity_before_network",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "6bd4b58f0efa81dc8f671baeb33ad5ed23fbd0ef844760a9cc65c30c1ad31ba0"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::budget::remote_budget_store_preserves_authority_term_and_commit_metadata",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "aa708377c03a465ce2af579934a1effc1a77c69918cd13d416aa778ec353c73d"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::budget::remote_budget_store_preserves_captured_authorize_replay_decision",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "b0ed86c4e5f12d230fd5624d9b42bfd77c1c4c0034f5ea70a907e0bc4939141e"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::budget::remote_budget_store_rejects_impossible_authorize_projection_without_poisoning_cache",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "6e2107c3a49af93171cdb9d0d57e5298eb79c1d765f45b7027faade3c2a1fae6"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::budget::remote_budget_store_rejects_incomplete_event_projection_without_poisoning_cache",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "dbe73951669a14519831208de7eb38e9767fa124fbcb072f6c96a262b280186c"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::budget::remote_budget_store_rejects_legacy_identity_substitution_without_poisoning_cache",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "03d0214f8288565d11c72458e76247fca920154b5c3ad706d30f303319b8b0ce"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::budget::remote_budget_store_requires_coherent_authorize_event_state",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "e7b7df09d64c84102ff413cbf4f3c80927acda51bcd6503aef98f71952e4e810"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::budget::remote_capture_cancel_and_authorize_replays_cannot_regress_cached_usage",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "787e62855c7a2f413381721d334c5bdbedd2f0b0ddcbae1cfb5c9de1950f159e"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::client::remote_child_point_load_rejects_mismatched_receipt_id",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "239465d6d59fa4f22167da430816e2003e16f80c99cde368025164ecd34a0d43"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::client::remote_receipt_store_append_fails_closed_at_the_configured_budget",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "65d1e70e9de74ddddbc2174434c0796cce4580e5c319d390308f5fb1fd858d55"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::client::remote_receipt_store_capability_snapshot_fails_closed_at_the_configured_budget",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "004ecaac53b4076bd08abc09b788cae5b39efb88aa32840654cfda19805e7f91"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::client::remote_receipt_store_point_load_miss_returns_none",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "28a50be654e507b3c922f00262c770fe8f1bffea07e8d2bbdd2e51c65f728ad8"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::client::remote_receipt_store_point_loads_child_receipt_by_id",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "a6b939b0e0ac221d968759ae8f0434ccd6c9a264cf92406f88b7771916497d83"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::client::remote_receipt_store_point_loads_tool_receipt_by_id",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "0effbeee3a40c1ae9d70a216df4ce65e86aca7db763e409a3dfd0775d9b77274"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::client::remote_tool_point_load_rejects_mismatched_receipt_id",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "f0f0319064d53380b68bcf7de2b74a562c3c8bbe684f75aa5d04259774d2c64d"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::client::request_json_retries_retryable_status_and_marks_preferred_endpoint",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "cdcffb6759462ed6c01a3a1744e0348ac29277a57524e7af422ebc0a2929ec13"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::client::request_text_without_service_auth_reads_text_response",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "79957997f5d3dd082c21071d6be70c3fd3c6a75cf2af2e198a3a683c9d3d48ae"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::client::trust_control_get_wrappers_encode_queries_and_service_auth",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "2f1bfec679e710da50824abc5ff2a044edb50b91936c99714724fbac1d02266c"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::client::trust_control_post_wrappers_send_json_bodies_and_encoded_paths",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "5cdcbe7034030fdd6fd595bd0821efcbe762ace804fe683385ecef165f143e5b"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::retained_budget_hold::fenced_hold_lookup_preserves_all_retained_fields",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "bc02636ea87041aa67a94135829d6abd0e747b409d487fed0733d36a8593b4e3"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::retained_budget_hold::hold_lookup_rejects_unavailable_fenced_and_ambiguous_responses",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "0b1122fac6cf04185ebaf8c67f45957be75014fd597014a57bf0931706b42cd0"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::retained_budget_hold::only_an_authoritative_null_is_reported_as_absent",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "b29910ef4d3459a4473c479b186942d1dd24f43e905255179390f4f71aa63637"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::structured_budget::advisory_remote_authority_rejects_unescrowed_family_mutations_before_network",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "5413263fd538011e3fa1ac0b4baa82aeb7d6cf64a7775172a5fd3e81ab9ffd33"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::structured_budget::all_rich_lifecycle_methods_fail_before_mutation_after_restart_on_old_server",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "8ae115e5a3b4d7c045de19758daf480bfa4c9bdff787cc7c5c3673c39a48c9a1"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::structured_budget::fenced_reverse_requires_returned_cumulative_state_without_poisoning_cache",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "d04ec7e65a873463626c66e0a2350dbbbd48acb152db39ddb73ef2ee2cb6483d"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::structured_budget::remote_budget_store_cancels_durable_capture_without_process_local_state",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "385ec9e59e354aa70022e78ced6ac7e92bc7e2e336362774dcbab64e4f03248b"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::structured_budget::remote_budget_store_looks_up_exact_cumulative_operation_projection",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "9a127477a2ea6521cf3146c37ee5f09be09db40fee508ae3a2265808e58022e4"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::structured_budget::remote_budget_store_preserves_structured_capture_decision",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "5545a5f7a61e423c7a9ed28cebdde2db7bc353ffb629e5323594ca689a3a03a9"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::structured_budget::remote_budget_store_rejects_impossible_structured_capture_event_state",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "0a9b39b25b2aec6e2de38e17dd00f31b88374f96a578e1b4e7e84b6d45cc334f"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::structured_budget::remote_budget_store_rejects_nonterminal_monetary_lifecycle_states",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "d4f0c807d2d2ef2b7eb3aa9338944edbd97c8160d29cdaa5b02be818952d514b"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::structured_budget::remote_budget_store_rejects_stripped_or_mismatched_lifecycle_coupling",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "84bc41bbf69cb3f877a2966e48855279ae68c6d9ce24ee082c8b69ab1bfc34a3"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::structured_budget::remote_budget_store_rejects_structured_capture_identity_substitution",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "332e7bcf21f97b145ea2d968d8a25966738cad6c22397ba2a585ed93e15a45ba"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::structured_budget::remote_budget_store_rejects_structured_reconcile_identity_substitution_without_poisoning_cache",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "3173e4a5f6361714e34035675faef577d76580ea724019851f8770167c79b425"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::structured_budget::remote_budget_store_rejects_structured_reconcile_mismatch_without_poisoning_cache",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "1ddaec782941d7ff397761e23b9f6980a6841f817ebbc15412030afa220d6980"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::structured_budget::remote_budget_store_rejects_structured_reverse_substitution_without_poisoning_cache",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "a6fb375661531164f8f6e8fdc033b5bf9d66fe9b60d18283b000a00b08a98a15"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::structured_budget::remote_budget_store_rejects_v1_shape_on_versioned_lifecycle_endpoint",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "852b29aa7172e5d507f0eb35165ba6e95f2e0a3a562b239dd15262f5cd69af60"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::structured_budget::remote_budget_store_round_trips_exact_structured_authorization",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "3f9aa16f088f9b36bd5cecb237ba71bd98e081300ff91baa3b9f9b73c69100b9"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::structured_budget::remote_capture_rejects_projection_downgrade_exact_usage_swap_and_quota_drift",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "32b00590651fead1200ffbe36c9da7d03ac16eb71ab10f63d6d51a2e112d2cc7"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::structured_budget::remote_capture_retry_is_clock_free_after_delay",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "052fe86e0d676613047892f904ac1cca29b91f90e6fb75b909476b1967028b8b"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::structured_budget::structured_authorization_normalizes_legacy_max_invocations_into_grant_quota",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "60c8f4a8325e40c8e1afffe694768cd8effc7b208375b4509d0143455b4aa026"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::structured_budget::structured_authorization_rejects_substitution_before_cache_mutation",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "cfd6695fbd79315397e61021fd99b86a2858e3d5ca06c889a2b9bf9a2655778e"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::structured_budget::structured_quota_exhaustion_denial_does_not_invent_usage_sequence",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "082cf4454412a47824705f0c0dc0a234c8ca7bdc6ed9febec0a0b6e36a6822ef"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::structured_budget::structured_reconcile_uses_durable_server_state_after_client_restart",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "1e5edaa72610302147066cd639938a145938e617d1c3ee3cadddb8eed682e4f1"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::structured_budget::structured_remote_does_not_fallback_to_legacy_on_mixed_version_peer",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "5ee0fe7dd18d86b9c35dc608fa3541ae03be7bf754b355acb251c8f066338b3e"
+        },
+        {
+          "test": "trust_control::service_runtime::tests::structured_budget::structured_remote_downgrades_unverified_partition_escrow_claim",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/owning-library-regressions.log",
+          "initial_failure_stdout_sha256": "d6da1067546d71fc12cfce9379a671347ab19a89e922c20be12f68bbadc5b18b"
+        }
+      ]
+    },
+    {
+      "suite": "storage_library",
+      "initial_failures": 62,
+      "classifications": {
+        "passed_after_exact_predecessor_fixture_correction": 18,
+        "passed_with_canonical_macos_temp_path": 14,
+        "blocked_linux_dev_shm_anchor": 29,
+        "passed_after_global_predecessor_fixture_correction": 1
+      },
+      "failures": [
+        {
+          "test": "admission_operation_store::tests::dpop_replay::activation::v24_upgrade_preserves_import_events_and_bytes_without_inventing_activation",
+          "classification": "passed_after_exact_predecessor_fixture_correction",
+          "evidence": "evidence/upgrade-canonical-temp-final.log; evidence/populated-migration-regressions-final.log; evidence/v28-anchor-migration-final.log",
+          "initial_failure_stdout_sha256": "1c94c8d1c05252d6f754677e6a5d1e5d9dac4e848bce28c8c96fba77fd75d603"
+        },
+        {
+          "test": "admission_operation_store::tests::dpop_replay::claims::migration::v25_upgrade_preserves_activated_dpop_and_existing_admission_without_adopting_claims",
+          "classification": "passed_after_exact_predecessor_fixture_correction",
+          "evidence": "evidence/upgrade-canonical-temp-final.log; evidence/populated-migration-regressions-final.log; evidence/v28-anchor-migration-final.log",
+          "initial_failure_stdout_sha256": "1c94c8d1c05252d6f754677e6a5d1e5d9dac4e848bce28c8c96fba77fd75d603"
+        },
+        {
+          "test": "admission_operation_store::tests::dpop_replay::migration::v23_upgrade_adds_only_empty_dpop_history_and_rejects_unqualified_namespaces",
+          "classification": "passed_after_exact_predecessor_fixture_correction",
+          "evidence": "evidence/upgrade-canonical-temp-final.log; evidence/populated-migration-regressions-final.log; evidence/v28-anchor-migration-final.log",
+          "initial_failure_stdout_sha256": "1c94c8d1c05252d6f754677e6a5d1e5d9dac4e848bce28c8c96fba77fd75d603"
+        },
+        {
+          "test": "admission_operation_store::tests::governed_approval_replay::claims::migration::v23_upgrade_preserves_active_approval_authority_and_owned_claims",
+          "classification": "passed_after_exact_predecessor_fixture_correction",
+          "evidence": "evidence/upgrade-canonical-temp-final.log; evidence/populated-migration-regressions-final.log; evidence/v28-anchor-migration-final.log",
+          "initial_failure_stdout_sha256": "1c94c8d1c05252d6f754677e6a5d1e5d9dac4e848bce28c8c96fba77fd75d603"
+        },
+        {
+          "test": "admission_operation_store::tests::governed_approval_replay::migration::v21_upgrade_introduces_only_empty_approval_history_and_rejects_unqualified_namespaces",
+          "classification": "passed_after_exact_predecessor_fixture_correction",
+          "evidence": "evidence/upgrade-canonical-temp-final.log; evidence/populated-migration-regressions-final.log; evidence/v28-anchor-migration-final.log",
+          "initial_failure_stdout_sha256": "1c94c8d1c05252d6f754677e6a5d1e5d9dac4e848bce28c8c96fba77fd75d603"
+        },
+        {
+          "test": "admission_operation_store::tests::governed_approval_replay::migration::v22_upgrade_preserves_imported_approval_bytes_and_rejects_unqualified_claims",
+          "classification": "passed_after_exact_predecessor_fixture_correction",
+          "evidence": "evidence/upgrade-canonical-temp-final.log; evidence/populated-migration-regressions-final.log; evidence/v28-anchor-migration-final.log",
+          "initial_failure_stdout_sha256": "1c94c8d1c05252d6f754677e6a5d1e5d9dac4e848bce28c8c96fba77fd75d603"
+        },
+        {
+          "test": "admission_operation_store::tests::runtime_replay::activation::v21_upgrade_preserves_active_runtime_source_history",
+          "classification": "passed_after_exact_predecessor_fixture_correction",
+          "evidence": "evidence/upgrade-canonical-temp-final.log; evidence/populated-migration-regressions-final.log; evidence/v28-anchor-migration-final.log",
+          "initial_failure_stdout_sha256": "1c94c8d1c05252d6f754677e6a5d1e5d9dac4e848bce28c8c96fba77fd75d603"
+        },
+        {
+          "test": "admission_operation_store::tests::runtime_replay::claims::migration::populated_v19_upgrade_preserves_exact_commits_anchors_and_imported_source",
+          "classification": "passed_after_exact_predecessor_fixture_correction",
+          "evidence": "evidence/upgrade-canonical-temp-final.log; evidence/populated-migration-regressions-final.log; evidence/v28-anchor-migration-final.log",
+          "initial_failure_stdout_sha256": "1c94c8d1c05252d6f754677e6a5d1e5d9dac4e848bce28c8c96fba77fd75d603"
+        },
+        {
+          "test": "admission_operation_store::tests::runtime_replay::claims::migration::populated_v20_upgrade_preserves_claims_releases_and_global_history",
+          "classification": "passed_after_exact_predecessor_fixture_correction",
+          "evidence": "evidence/upgrade-canonical-temp-final.log; evidence/populated-migration-regressions-final.log; evidence/v28-anchor-migration-final.log",
+          "initial_failure_stdout_sha256": "1c94c8d1c05252d6f754677e6a5d1e5d9dac4e848bce28c8c96fba77fd75d603"
+        },
+        {
+          "test": "admission_operation_store::tests::schema::caller_wait::populated_v33_caller_wait_upgrade_preserves_original_rows_and_commit_chain",
+          "classification": "passed_after_exact_predecessor_fixture_correction",
+          "evidence": "evidence/upgrade-canonical-temp-final.log; evidence/populated-migration-regressions-final.log; evidence/v28-anchor-migration-final.log",
+          "initial_failure_stdout_sha256": "1c94c8d1c05252d6f754677e6a5d1e5d9dac4e848bce28c8c96fba77fd75d603"
+        },
+        {
+          "test": "admission_operation_store::tests::security_participant_migration::integrity::restoring_destination_before_import_is_rejected_by_independent_anchor",
+          "classification": "passed_with_canonical_macos_temp_path",
+          "evidence": "evidence/store-path-reruns/restoring_destination_before_import_is_rejected_by_independent_anchor.log",
+          "initial_failure_stdout_sha256": "5f99dc91a5308c4abb37e7c71c96c4867b1212e8a1488eb3c94d1462e1b5ed01"
+        },
+        {
+          "test": "admission_operation_store::tests::security_participant_migration::migration::v26_upgrade_is_empty_and_rejects_partial_future_or_aliased_state_without_repair",
+          "classification": "passed_after_exact_predecessor_fixture_correction",
+          "evidence": "evidence/upgrade-canonical-temp-final.log; evidence/populated-migration-regressions-final.log; evidence/v28-anchor-migration-final.log",
+          "initial_failure_stdout_sha256": "1c94c8d1c05252d6f754677e6a5d1e5d9dac4e848bce28c8c96fba77fd75d603"
+        },
+        {
+          "test": "admission_operation_store::tests::security_participant_state::dispatch_ledger::v30_upgrade_adds_empty_dispatch_ledger_without_rewriting_native_history",
+          "classification": "passed_after_exact_predecessor_fixture_correction",
+          "evidence": "evidence/upgrade-canonical-temp-final.log; evidence/populated-migration-regressions-final.log; evidence/v28-anchor-migration-final.log",
+          "initial_failure_stdout_sha256": "1c94c8d1c05252d6f754677e6a5d1e5d9dac4e848bce28c8c96fba77fd75d603"
+        },
+        {
+          "test": "admission_operation_store::tests::security_participant_state::egress::migration::v29_upgrade_preserves_native_initialization_join_bytes_and_global_digests",
+          "classification": "passed_after_exact_predecessor_fixture_correction",
+          "evidence": "evidence/upgrade-canonical-temp-final.log; evidence/populated-migration-regressions-final.log; evidence/v28-anchor-migration-final.log",
+          "initial_failure_stdout_sha256": "1c94c8d1c05252d6f754677e6a5d1e5d9dac4e848bce28c8c96fba77fd75d603"
+        },
+        {
+          "test": "admission_operation_store::tests::security_participant_state::integrity::restoring_private_database_before_hydration_cannot_erase_the_anchored_initialization",
+          "classification": "passed_with_canonical_macos_temp_path",
+          "evidence": "evidence/store-path-reruns/restoring_private_database_before_hydration_cannot_erase_the_anchored_initialization.log",
+          "initial_failure_stdout_sha256": "4d39273f28bc7c88ff03d27103372f4ddffa31dab3cf92200413b6a9b34307c5"
+        },
+        {
+          "test": "admission_operation_store::tests::security_participant_state::migration::v27_upgrade_adds_empty_native_tables_but_rejects_partial_future_and_aliases",
+          "classification": "passed_after_exact_predecessor_fixture_correction",
+          "evidence": "evidence/upgrade-canonical-temp-final.log; evidence/populated-migration-regressions-final.log; evidence/v28-anchor-migration-final.log",
+          "initial_failure_stdout_sha256": "1c94c8d1c05252d6f754677e6a5d1e5d9dac4e848bce28c8c96fba77fd75d603"
+        },
+        {
+          "test": "admission_operation_store::tests::security_participant_state::migration::v27_import_history_and_global_digests_survive_empty_v28_upgrade",
+          "classification": "passed_after_exact_predecessor_fixture_correction",
+          "evidence": "evidence/upgrade-canonical-temp-final.log; evidence/populated-migration-regressions-final.log; evidence/v28-anchor-migration-final.log",
+          "initial_failure_stdout_sha256": "1c94c8d1c05252d6f754677e6a5d1e5d9dac4e848bce28c8c96fba77fd75d603"
+        },
+        {
+          "test": "admission_operation_store::tests::security_participant_state::migration::v28_initialization_and_anchor_survive_v29_without_rewriting_history",
+          "classification": "passed_after_exact_predecessor_fixture_correction",
+          "evidence": "evidence/upgrade-canonical-temp-final.log; evidence/populated-migration-regressions-final.log; evidence/v28-anchor-migration-final.log",
+          "initial_failure_stdout_sha256": "1c94c8d1c05252d6f754677e6a5d1e5d9dac4e848bce28c8c96fba77fd75d603"
+        },
+        {
+          "test": "admission_operation_store::tests::security_participant_state::mutations::faults::restoring_database_before_join_cannot_erase_acknowledged_mutation_history",
+          "classification": "passed_with_canonical_macos_temp_path",
+          "evidence": "evidence/store-path-reruns/restoring_database_before_join_cannot_erase_acknowledged_mutation_history.log",
+          "initial_failure_stdout_sha256": "ddc8491b885da4e90c2e2e007193a168b70339a9a77bf91adc041a056379394e"
+        },
+        {
+          "test": "admission_operation_store::tests::security_participant_state::nonce_preflight::v32_upgrade_adds_empty_nonce_preflight_journal_without_rewriting_native_history",
+          "classification": "passed_after_exact_predecessor_fixture_correction",
+          "evidence": "evidence/upgrade-canonical-temp-final.log; evidence/populated-migration-regressions-final.log; evidence/v28-anchor-migration-final.log",
+          "initial_failure_stdout_sha256": "1c94c8d1c05252d6f754677e6a5d1e5d9dac4e848bce28c8c96fba77fd75d603"
+        },
+        {
+          "test": "admission_operation_store::tests::security_participant_state::output::v31_upgrade_adds_empty_output_journal_without_rewriting_native_history",
+          "classification": "passed_after_exact_predecessor_fixture_correction",
+          "evidence": "evidence/upgrade-canonical-temp-final.log; evidence/populated-migration-regressions-final.log; evidence/v28-anchor-migration-final.log",
+          "initial_failure_stdout_sha256": "1c94c8d1c05252d6f754677e6a5d1e5d9dac4e848bce28c8c96fba77fd75d603"
+        },
+        {
+          "test": "capability_lineage::tests::qualified_capability_snapshots_advance_the_external_rollback_generation",
+          "classification": "blocked_linux_dev_shm_anchor",
+          "evidence": "evidence/store-library.log",
+          "initial_failure_stdout_sha256": "b14e32cb752b5511f821a4ab6d828af1665c1f8c832790a0488f5a0621c83bb1"
+        },
+        {
+          "test": "dead_letters::tests::qualified_alongside_store_rejects_dead_letter_rollback",
+          "classification": "blocked_linux_dev_shm_anchor",
+          "evidence": "evidence/store-library.log",
+          "initial_failure_stdout_sha256": "696975064dfd45596db9b6f2ba4a29701d8eab0f60a9518ae3bc1cdb74a991f3"
+        },
+        {
+          "test": "enterprise_migration_state::connection_recovery::a_denied_rollback_fences_the_store",
+          "classification": "passed_with_canonical_macos_temp_path",
+          "evidence": "evidence/store-path-reruns/a_denied_rollback_fences_the_store.log",
+          "initial_failure_stdout_sha256": "59765015d091339aebcaa3fbbef25691cec2908d9496b15bf74bafe4c1b05c00"
+        },
+        {
+          "test": "enterprise_migration_state::connection_recovery::a_panic_after_commit_recovers_with_the_write_visible",
+          "classification": "passed_with_canonical_macos_temp_path",
+          "evidence": "evidence/store-path-reruns/a_panic_after_commit_recovers_with_the_write_visible.log",
+          "initial_failure_stdout_sha256": "1a2c36ff30059223d26a9e33ba061be02e5bc6c6132013918ccc1f2834eb979e"
+        },
+        {
+          "test": "enterprise_migration_state::connection_recovery::a_panic_before_commit_rolls_back_and_the_store_serves",
+          "classification": "passed_with_canonical_macos_temp_path",
+          "evidence": "evidence/store-path-reruns/a_panic_before_commit_rolls_back_and_the_store_serves.log",
+          "initial_failure_stdout_sha256": "e0d57da8510c2fa514b358f09042d6fce3d4f3d717e54b5916232941f42bd471"
+        },
+        {
+          "test": "enterprise_migration_state::connection_recovery::the_store_pairs_no_artifact_with_a_commit",
+          "classification": "passed_with_canonical_macos_temp_path",
+          "evidence": "evidence/store-path-reruns/the_store_pairs_no_artifact_with_a_commit.log",
+          "initial_failure_stdout_sha256": "6631d59d18325a089cdf5b66d91e0c92eab84c2ebd4f05c69e1de859644db666"
+        },
+        {
+          "test": "finding_challenge_store::tests::submission_retention::offline_repair_atomically_restores_v13_exact_submission_bytes",
+          "classification": "passed_with_canonical_macos_temp_path",
+          "evidence": "evidence/store-path-reruns/offline_repair_atomically_restores_v13_exact_submission_bytes.log",
+          "initial_failure_stdout_sha256": "b75881378f7f231b9ed940f11096f36cc05558918f92a866a5bbaaff289b9463"
+        },
+        {
+          "test": "finding_challenge_store::tests::submission_retention::offline_repair_upgrades_earliest_accepted_legacy_submission_schema",
+          "classification": "passed_with_canonical_macos_temp_path",
+          "evidence": "evidence/upgrade-canonical-temp-final.log",
+          "initial_failure_stdout_sha256": "2cf3e24e0d918ac4799539abc7de3f83344a8daca4b700b4a3e39ef4fc11dd8e"
+        },
+        {
+          "test": "finding_pool_ledger::tests::claimed_admission_operation_scan_is_bounded_and_cursor_ordered",
+          "classification": "blocked_linux_dev_shm_anchor",
+          "evidence": "evidence/store-library.log",
+          "initial_failure_stdout_sha256": "d0138d0398bec203c4ec38a71a1013061469441987d47214e5c923fbbbdd006f"
+        },
+        {
+          "test": "finding_pool_ledger::tests::leased_outbox_rows_remain_observable_as_pending",
+          "classification": "blocked_linux_dev_shm_anchor",
+          "evidence": "evidence/store-library.log",
+          "initial_failure_stdout_sha256": "7773472395271bcf58493bada132e6cfbdd2de108744ae86f4695cd040b53eef"
+        },
+        {
+          "test": "finding_pool_ledger::tests::qualified_ledger_binds_validation_to_the_borrowed_database_file",
+          "classification": "blocked_linux_dev_shm_anchor",
+          "evidence": "evidence/store-library.log",
+          "initial_failure_stdout_sha256": "d59f9a3a79377ac0214c27d8aaa8d8a4f38f845d36f236cdc5789b0719f6b1f8"
+        },
+        {
+          "test": "finding_pool_ledger::tests::qualified_ledger_persists_one_receipt_sink",
+          "classification": "blocked_linux_dev_shm_anchor",
+          "evidence": "evidence/store-library.log",
+          "initial_failure_stdout_sha256": "049c9aebb61307fdde2409f0b8d4c1d455ae34c23828a3004176ee29d06b1543"
+        },
+        {
+          "test": "finding_pool_ledger::tests::qualified_ledger_rejects_a_writable_parent_directory",
+          "classification": "blocked_linux_dev_shm_anchor",
+          "evidence": "evidence/store-library.log",
+          "initial_failure_stdout_sha256": "ececd336a3b58ea82e075b5ab974d2b24709cf8c95d46c3ce79d35d1f9ab40b2"
+        },
+        {
+          "test": "finding_pool_ledger::tests::qualified_ledger_rejects_unusable_domains",
+          "classification": "blocked_linux_dev_shm_anchor",
+          "evidence": "evidence/store-library.log",
+          "initial_failure_stdout_sha256": "fbffd35ab6419c2359a67de535c5e7b2286607e1434361ae1a79ba0cdfd3975d"
+        },
+        {
+          "test": "finding_pool_ledger::tests::qualified_schema_indexes_pending_outbox_and_expiration_reclamation",
+          "classification": "blocked_linux_dev_shm_anchor",
+          "evidence": "evidence/store-library.log",
+          "initial_failure_stdout_sha256": "cf341844aad3cee2c86d0a6d6c80e03a5e8cc5fcce04c53113891506a303c4fa"
+        },
+        {
+          "test": "finding_pool_ledger::tests::recovered_mutation_loads_the_reservations_persisted_tenant",
+          "classification": "blocked_linux_dev_shm_anchor",
+          "evidence": "evidence/store-library.log",
+          "initial_failure_stdout_sha256": "2972fcfd81a7462450a1882ab2007f28fabc100879e780d67adbd61eb2ff517e"
+        },
+        {
+          "test": "finding_pool_ledger::tests::unknown_dispatch_exact_replay_ignores_later_allocation_totals",
+          "classification": "blocked_linux_dev_shm_anchor",
+          "evidence": "evidence/store-library.log",
+          "initial_failure_stdout_sha256": "1c3c9ae2d7c99f866b4d8ac2432b8ad3ec6c53781ba7ce9860ae33641c193fef"
+        },
+        {
+          "test": "iou_store::tests::qualified_alongside_store_rejects_iou_rollback",
+          "classification": "blocked_linux_dev_shm_anchor",
+          "evidence": "evidence/store-library.log",
+          "initial_failure_stdout_sha256": "d5df297cf9adde9b5a4bc0612b4e78144c1b77b558c5b15bcc5528e7a944e6be"
+        },
+        {
+          "test": "read_companion::tests::a_lazy_reader_rejects_a_replaced_database_path",
+          "classification": "passed_with_canonical_macos_temp_path",
+          "evidence": "evidence/store-path-reruns/a_lazy_reader_rejects_a_replaced_database_path.log",
+          "initial_failure_stdout_sha256": "e2f4f305acae1b66fb031e3b26a006cd23fb258564c2d82b204c55819719ee93"
+        },
+        {
+          "test": "read_companion::tests::a_reader_waits_for_a_return_once_the_bound_is_reached",
+          "classification": "passed_with_canonical_macos_temp_path",
+          "evidence": "evidence/store-path-reruns/a_reader_waits_for_a_return_once_the_bound_is_reached.log",
+          "initial_failure_stdout_sha256": "a2a283c190160594346aeb66242b3d7af6bb9e629136c039d8d0487fbc423e80"
+        },
+        {
+          "test": "read_companion::tests::a_restored_path_cannot_hide_a_connection_opened_on_a_clone",
+          "classification": "passed_with_canonical_macos_temp_path",
+          "evidence": "evidence/store-path-reruns/a_restored_path_cannot_hide_a_connection_opened_on_a_clone.log",
+          "initial_failure_stdout_sha256": "4ed90f9fe5eaa0da1bf2562c9522101f433c83e4316784df154c31fd9d624da7"
+        },
+        {
+          "test": "read_companion::tests::a_returned_connection_is_reused_rather_than_reopened",
+          "classification": "passed_with_canonical_macos_temp_path",
+          "evidence": "evidence/store-path-reruns/a_returned_connection_is_reused_rather_than_reopened.log",
+          "initial_failure_stdout_sha256": "2ab149b9d3f1547473f4d2045010998d0b4f236569bbc88c390b1974ba46f012"
+        },
+        {
+          "test": "read_companion::tests::concurrent_readers_hold_separate_connections",
+          "classification": "passed_with_canonical_macos_temp_path",
+          "evidence": "evidence/store-path-reruns/concurrent_readers_hold_separate_connections.log",
+          "initial_failure_stdout_sha256": "6b4dc2d76cf86e73d62f17790faa52e3aeccd50e7c7792df0222a4598cb354a1"
+        },
+        {
+          "test": "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_allows_explicitly_false_immutable_sqlite_uris",
+          "classification": "blocked_linux_dev_shm_anchor",
+          "evidence": "evidence/store-library.log",
+          "initial_failure_stdout_sha256": "c0b00595e8929328a0c9069da880a034802cbc48e17a469a201865679422edf7"
+        },
+        {
+          "test": "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_anchors_background_checkpoint_commits",
+          "classification": "blocked_linux_dev_shm_anchor",
+          "evidence": "evidence/store-library.log",
+          "initial_failure_stdout_sha256": "66016be1f6ecc9e939c00c7b63ccbbe29eeae9f1519f4f10abfbf7bea2d0de9b"
+        },
+        {
+          "test": "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_anchors_checkpoint_publication_bindings",
+          "classification": "blocked_linux_dev_shm_anchor",
+          "evidence": "evidence/store-library.log",
+          "initial_failure_stdout_sha256": "70c80138dd077ded6757a8aa5825ccdd9379b520e0215be79f2ccc2b707c79c6"
+        },
+        {
+          "test": "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_anchors_imported_checkpoint_commits",
+          "classification": "blocked_linux_dev_shm_anchor",
+          "evidence": "evidence/store-library.log",
+          "initial_failure_stdout_sha256": "bac12609dcc62890c3b9ba5f41d81759d78504afbf5ef29fed7d7b7737890412"
+        },
+        {
+          "test": "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_anchors_lineage_only_duplicate_mutations",
+          "classification": "blocked_linux_dev_shm_anchor",
+          "evidence": "evidence/store-library.log",
+          "initial_failure_stdout_sha256": "8e77177403b659350cdb64571f59b6a751b9f2ec221b0e2b0b026e46bc9d1562"
+        },
+        {
+          "test": "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_anchors_retention_rotation",
+          "classification": "blocked_linux_dev_shm_anchor",
+          "evidence": "evidence/store-library.log",
+          "initial_failure_stdout_sha256": "52b28a99dac65526b9ec10baf9f232ae9a74abed955a46f51fad28268add8efd"
+        },
+        {
+          "test": "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_anchors_standalone_checkpoint_commits",
+          "classification": "blocked_linux_dev_shm_anchor",
+          "evidence": "evidence/store-library.log",
+          "initial_failure_stdout_sha256": "8d5f21245e6c61ff09f088e5aee2c2fb75a5c5e18a27b28d9310f1bb8d052930"
+        },
+        {
+          "test": "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_anchors_standalone_lineage_mutations",
+          "classification": "blocked_linux_dev_shm_anchor",
+          "evidence": "evidence/store-library.log",
+          "initial_failure_stdout_sha256": "3702e689f44d36ca1821e75748468db3a77bb0c7272fb3d1b130902135f388e6"
+        },
+        {
+          "test": "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_refuses_to_seed_an_archive_only_store",
+          "classification": "blocked_linux_dev_shm_anchor",
+          "evidence": "evidence/store-library.log",
+          "initial_failure_stdout_sha256": "eb0ab5271d99c928a3fabe797f63cea03239cb41bd067f01550339143ba3ccfa"
+        },
+        {
+          "test": "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_rejects_atomic_database_replacement",
+          "classification": "blocked_linux_dev_shm_anchor",
+          "evidence": "evidence/store-library.log",
+          "initial_failure_stdout_sha256": "048a5323f3f67105b3bb01ba8747079841525750f1e389a9f176564e7b33c2ea"
+        },
+        {
+          "test": "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_rejects_internal_sink_identity_change",
+          "classification": "blocked_linux_dev_shm_anchor",
+          "evidence": "evidence/store-library.log",
+          "initial_failure_stdout_sha256": "15c54726db40cc6bb6890ddc51a1c2604d4f004e0adeb191ac1e3b0dda3d243c"
+        },
+        {
+          "test": "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_rejects_nonlocal_sqlite_uri_authorities",
+          "classification": "blocked_linux_dev_shm_anchor",
+          "evidence": "evidence/store-library.log",
+          "initial_failure_stdout_sha256": "a1dd685c2753c955c87e93b5aa6a93aa704606a9ef756d0f276f36b32e57b743"
+        },
+        {
+          "test": "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_rejects_read_only_sqlite_uris",
+          "classification": "blocked_linux_dev_shm_anchor",
+          "evidence": "evidence/store-library.log",
+          "initial_failure_stdout_sha256": "2c18198fe6048e2f18a5f5da13636c9fbcdd8432043d498f3f6d689f848434fe"
+        },
+        {
+          "test": "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_verifies_rollback_anchor_before_metadata_jobs",
+          "classification": "blocked_linux_dev_shm_anchor",
+          "evidence": "evidence/store-library.log",
+          "initial_failure_stdout_sha256": "43edf8ceb282443092744a938a3806730fd504888e0f4a314071d1bb6e092c75"
+        },
+        {
+          "test": "receipt_store::tests::qualified_finding_pool::qualified_settlement_state_writes_advance_the_rollback_anchor",
+          "classification": "blocked_linux_dev_shm_anchor",
+          "evidence": "evidence/store-library.log",
+          "initial_failure_stdout_sha256": "91b02f9a9c0e76d58f53f4d02e889db2f9d7a50c147acbfe9933f0dcaad16a1b"
+        },
+        {
+          "test": "receipt_store::tests::verified_head::qualified_reader_and_reopen_reject_live_rollback_after_writer_routed_receipt",
+          "classification": "blocked_linux_dev_shm_anchor",
+          "evidence": "evidence/store-library.log",
+          "initial_failure_stdout_sha256": "f7c69d15a8252f78a77bea12f55ac18aaeb1d22f163fb17c485724be0cd86d6c"
+        },
+        {
+          "test": "receipt_store::tests::verified_head::qualified_receipt_sink_rejects_locking_disabled_sqlite_uris",
+          "classification": "blocked_linux_dev_shm_anchor",
+          "evidence": "evidence/store-library.log",
+          "initial_failure_stdout_sha256": "2993b9b231fbdb364de465764657fef741e43b0771b4bb5b3a03e4f9bf4e7202"
+        },
+        {
+          "test": "serving_owner::global_commit_chain::schema_tests::supported_previous_global_schemas_preserve_history_when_adding_replay_kinds",
+          "classification": "passed_after_global_predecessor_fixture_correction",
+          "evidence": "evidence/global-migration-fixture-final.log",
+          "initial_failure_stdout_sha256": "a297340773f7e3766e8e6ae874c83b4e668c5ba78d4b5fddf26d761d3eb2861b"
+        }
+      ]
+    },
+    {
+      "suite": "kernel_library",
+      "initial_failures": 12,
+      "classifications": {
+        "blocked_socket_eperm": 12
+      },
+      "failures": [
+        {
+          "test": "kernel::tests::governed_acp_hold_flow_records_commerce_scope_and_payment_metadata",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/kernel-library.log",
+          "initial_failure_stdout_sha256": "7e656c26d45c56618bd21c84ec6b3b9cacacf815235fe4a6b12754f00e3f882d"
+        },
+        {
+          "test": "kernel::tests::governed_x402_authorization_failure_denies_before_tool_execution",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/kernel-library.log",
+          "initial_failure_stdout_sha256": "2d8131d8ba0de2cc6a63d377eda6f9893977c2006260330a40edc6538ec03aab"
+        },
+        {
+          "test": "kernel::tests::governed_x402_prepaid_flow_records_governed_authorization_and_receipt_metadata",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/kernel-library.log",
+          "initial_failure_stdout_sha256": "45710bb3a19d5756df9b854d343e9b3d0ae33621ed7830b42a3f8b0f2e22d082"
+        },
+        {
+          "test": "payment::tests::acp_adapter_posts_authorize_request_with_commerce_context_and_returns_hold",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/kernel-library.log",
+          "initial_failure_stdout_sha256": "040a6fd7a9f85854d7cfb3919abf6e4787e36af0758507eec8458967304919fc"
+        },
+        {
+          "test": "payment::tests::acp_adapter_externalizes_capture_release_and_refund",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/kernel-library.log",
+          "initial_failure_stdout_sha256": "93bfb8ce9e67d0a7f8559d57c7dcd2b05c2abff1b8b540c466c269c41812e526"
+        },
+        {
+          "test": "payment::tests::acp_adapter_rejects_unbound_terminal_response",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/kernel-library.log",
+          "initial_failure_stdout_sha256": "cfeafbbd13b7ffbeabd995ef8dd8f0c4a77e022c1eff088cfabbfaf31fb409ce"
+        },
+        {
+          "test": "payment::tests::acp_adapter_queries_bound_settlement_state",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/kernel-library.log",
+          "initial_failure_stdout_sha256": "15f8be1d4b818c3390f93ce0f185e9c8b429e8073f9544cfeaa8cd8d8a10927d"
+        },
+        {
+          "test": "payment::tests::payment_error_bodies_are_not_reflected",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/kernel-library.log",
+          "initial_failure_stdout_sha256": "fe492a855aefcdac9220b87e6d25d88af10bb3157a1fe1bba68c1a347e6c559e"
+        },
+        {
+          "test": "payment::tests::payment_response_body_is_bounded",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/kernel-library.log",
+          "initial_failure_stdout_sha256": "f0ad98a3cf4c63cb027c5ab9f88c0dd943090a2d1f4f4d68ebc7957a145f3a2d"
+        },
+        {
+          "test": "payment::tests::x402_adapter_maps_http_402_to_insufficient_funds",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/kernel-library.log",
+          "initial_failure_stdout_sha256": "115e970285b08c74596447fa2c57043bd31eb12f93df8a55dac6b3c3f999ba88"
+        },
+        {
+          "test": "payment::tests::x402_adapter_posts_authorize_request_and_returns_settled_payment",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/kernel-library.log",
+          "initial_failure_stdout_sha256": "4be9c982ae3184b5d5c981a61345f3e0a65018bf28d5af7da2f0e57e56b45c1d"
+        },
+        {
+          "test": "payment::tests::x402_adapter_uses_custom_path_bearer_token_and_governed_payload",
+          "classification": "blocked_socket_eperm",
+          "evidence": "evidence/kernel-library.log",
+          "initial_failure_stdout_sha256": "b8c324b38f4658b555910ba3cada2bc59e5a9dea79783815ab609b188a6f8436"
+        }
+      ]
+    },
+    {
+      "suite": "owning_integration_targets",
+      "targets": 95,
+      "initial_passed": 761,
+      "initial_failed": 56,
+      "ignored": 3,
+      "failure_groups": [
+        {
+          "binary": "web3_ops_qualification-c5cc693d9fa6e1de",
+          "classification": "blocked_dns",
+          "failed_cases": 1,
+          "initial_log": "evidence/integrations/web3_ops_qualification-c5cc693d9fa6e1de.log",
+          "passing_rerun_log": null
+        },
+        {
+          "binary": "polyglot_workers-c58de1997638e779",
+          "classification": "blocked_socket_eperm",
+          "failed_cases": 1,
+          "initial_log": "evidence/integrations/polyglot_workers-c58de1997638e779.log",
+          "passing_rerun_log": null
+        },
+        {
+          "binary": "worker_protocol-e2a96662abcf825d",
+          "classification": "blocked_socket_eperm",
+          "failed_cases": 2,
+          "initial_log": "evidence/integrations/worker_protocol-e2a96662abcf825d.log",
+          "passing_rerun_log": null
+        },
+        {
+          "binary": "execution_nonce_remote_delivery-5d1a55e8b90b337a",
+          "classification": "blocked_socket_eperm",
+          "failed_cases": 11,
+          "initial_log": "evidence/integrations/execution_nonce_remote_delivery-5d1a55e8b90b337a.log",
+          "passing_rerun_log": null
+        },
+        {
+          "binary": "finding_pool_ledger-a3e1b5c61badda10",
+          "classification": "blocked_linux_dev_shm_anchor",
+          "failed_cases": 38,
+          "initial_log": "evidence/integrations/finding_pool_ledger-a3e1b5c61badda10.log",
+          "passing_rerun_log": null
+        },
+        {
+          "binary": "receipt_retention_liveness-06031d081534ac72",
+          "classification": "passed_with_canonical_macos_temp_path",
+          "failed_cases": 3,
+          "initial_log": "evidence/integrations/receipt_retention_liveness-06031d081534ac72.log",
+          "passing_rerun_log": "evidence/retention-canonical-temp.log"
+        }
+      ],
+      "after_classification": {
+        "passed": 764,
+        "blocked": 53,
+        "ignored": 3
+      },
+      "count_note": "Only each binary's outermost final test summary counts; nested child subprocess summaries are not additional unique tests."
+    }
+  ]
+}

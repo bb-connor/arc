@@ -1,0 +1,9 @@
+
+running 4 tests
+test receipt_rejects_non_w3c_otel_trace_id ... ok
+test receipt_rejects_null_supply_chain ... ok
+test receipt_rejects_all_zero_otel_ids ... ok
+test receipt_records_w3c_otel_trace_and_span_ids ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

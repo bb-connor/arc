@@ -1,0 +1,70 @@
+{
+  "arm": "baseline",
+  "case": "lost_ack_restart",
+  "host": "langgraph",
+  "id": "langgraph-support-baseline-lost_ack_restart-r3",
+  "repetition": 3,
+  "workflow": "support",
+  "requested_model": "gpt-5.4-2026-03-05",
+  "authority_policy": "6cbea0e86b177e31ed3863462505826b686b5e6c133f1b0dc62b1bef0777ff41",
+  "source_binding": "599483edaa9ba14165c0f2b73126f1ad8e24f2f26b1fb730f8460a1d0b0dc985",
+  "model_attempts": [
+    {
+      "model": "gpt-5.4-2026-03-05",
+      "error": null,
+      "input_tokens": 141,
+      "output_tokens": 29,
+      "seconds": 1.418354,
+      "prompt_bytes": 782,
+      "prompt_sha256": "6764233c48f6fdca917d3b7f48b024ba0c303ca160c2c50d53a9710e3b079dd8",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You have one tool: recovery(choice). To call it, end with exactly:\nAction: recovery\nAction Input: {\"choice\":\"resume\"}\nDo not invent a result."
+        },
+        {
+          "role": "user",
+          "content": "Complete the reviewed synthetic support-to-public-issue workflow using its existing owned native command. Preserve private source restrictions. If already completed before restart, recover its original outcome without a new effect. The original operation completed but its acknowledgement was discarded; the native writer was closed and reopened. Use the same selected command to recover its original outcome. Call the recovery tool once with choice resume. Accept its bounded category. Do not guess success, create new operations, include credentials, or bypass a refusal."
+        }
+      ],
+      "request_id": "chatcmpl-EVb45y1TlF7kXvxRKUdKBtRMQkN6i",
+      "completion": "Action: recovery\nAction Input: {\"choice\":\"resume\"}"
+    }
+  ],
+  "tool_actions": 1,
+  "hidden_retries": 0,
+  "outcome": "complete",
+  "native": {
+    "approval_records": 2,
+    "artifact_deliveries": 0,
+    "artifact_releases": 0,
+    "artifacts": 0,
+    "charges": 1,
+    "duplicate_effects": 0,
+    "effects": 1,
+    "extra_approvals": 0,
+    "fence": {
+      "lease_id": "01a10bcc-fb02-7211-8c9a-2814e0dc48a2",
+      "owner_epoch": 3,
+      "store_uuid": "01a10bcc-01e7-7d52-9233-f6b21c4b0942"
+    },
+    "native_actions": 1,
+    "preexisting_effects": 1,
+    "provider_effects_total": 2,
+    "recovery_success": true,
+    "setup_effects": 1,
+    "source_label_retained": true,
+    "unauthorized_effects": 0,
+    "unresolved": 0,
+    "unresolved_age_ms": 0,
+    "useful_completion": true
+  },
+  "elapsed_seconds": 77.46531,
+  "native_preparation_seconds": 72.493105,
+  "host_model_native_seconds": 3.636834,
+  "host_output": {
+    "category": "complete",
+    "command_id": "trial-owned-original",
+    "workflow_id": "workflow:a247f54a5ddca79f3ed6f4153fbe69a722a25fa5a6595501b6b9ee14fda8a241"
+  }
+}

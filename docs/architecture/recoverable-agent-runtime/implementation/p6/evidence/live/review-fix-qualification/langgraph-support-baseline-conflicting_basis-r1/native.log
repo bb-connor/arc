@@ -1,0 +1,8 @@
+    Finished `test` profile [unoptimized] target(s) in 0.68s
+     Running unittests src/lib.rs (target/recovery-p5-linux/host/debug/deps/chio_control_plane-6f8003448d0ced3f)
+
+running 1 test
+test recovery::tests::knowledge::qualification::host::p6_live_comparative_native_host ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1281 filtered out; finished in 64.52s
+

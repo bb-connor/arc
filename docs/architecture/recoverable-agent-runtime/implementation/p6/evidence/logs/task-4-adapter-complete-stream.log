@@ -1,0 +1,4 @@
+    and getattr(agent, "multimodal", False)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+3 passed, 14 warnings in 4.08s

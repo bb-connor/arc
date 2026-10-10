@@ -1,0 +1,27 @@
+{
+  "id": "contracts",
+  "actual_command": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "chio-core-types",
+    "--test",
+    "recovery_p5_contracts"
+  ],
+  "cwd": ".",
+  "environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2",
+    "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+  },
+  "exit_code": 0,
+  "status": "passed",
+  "started_unix_seconds": 1791088116,
+  "duration_seconds": 4.181,
+  "log": "evidence/contracts.log",
+  "log_sha256": "be8fcbdf758298b4b5beded309d7e5513ca56f07e554d5b31a8037e17f5e1d6f",
+  "required_for_local_phase_acceptance": true,
+  "source_binding": "8c21e583e48bb02a33691c509c18252385d30b659237cb899982fd3583a00b93"
+}

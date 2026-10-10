@@ -1,0 +1,14 @@
+
+==================================== ERRORS ====================================
+____________ ERROR collecting tests/test_recovery_product_client.py ____________
+sdks/python/chio-sdk-python/tests/test_recovery_product_client.py:10: in <module>
+    REPORT = next(v['body'] for v in CASES if v['schema'] == 'decision-report.schema.json' and v['schema_valid'] and v['rust_valid'])
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sdks/python/chio-sdk-python/tests/test_recovery_product_client.py:10: in <genexpr>
+    REPORT = next(v['body'] for v in CASES if v['schema'] == 'decision-report.schema.json' and v['schema_valid'] and v['rust_valid'])
+                                                                                                                     ^^^^^^^^^^^^^^^
+E   KeyError: 'rust_valid'
+=========================== short test summary info ============================
+ERROR sdks/python/chio-sdk-python/tests/test_recovery_product_client.py - Key...
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 1.22s

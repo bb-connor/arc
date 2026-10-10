@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/implementation/p6/evidence/verify-package.py", line 25, in <module>
+    if __name__ == "__main__": main()
+                               ~~~~^^
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/implementation/p6/evidence/verify-package.py", line 18, in main
+    refuse([row["path"] for row in integrity["artifacts"]] == observed, "artifact_inventory")
+    ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/implementation/p6/evidence/package_audit.py", line 11, in refuse
+    raise ValueError("qualification." + reason)
+ValueError: qualification.artifact_inventory

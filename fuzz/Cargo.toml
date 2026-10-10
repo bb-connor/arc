@@ -26,6 +26,7 @@ path = "src/lib.rs"
 
 [patch.crates-io]
 aws-lc-rs = { path = "../third_party/aws-lc-rs-chio" }
+cpp_demangle = { path = "../third_party/cpp-demangle-chio" }
 regress = { path = "../third_party/regress-chio" }
 ignore = { path = "../third_party/ignore-chio" }
 nono = { path = "../third_party/nono-upstream-chio" }

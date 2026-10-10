@@ -74,6 +74,28 @@ pub fn fixed_runtime_unix_secs_for_current_thread() -> Option<u64> {
     FIXED_RUNTIME_UNIX_SECS.with(|slot| *slot.borrow())
 }
 
+/// Propagate a trusted fixed clock without selecting or resetting receipt IDs.
+/// The guard stays on the thread whose clock it owns.
+pub struct FixedRuntimeClockScope {
+    previous_unix_secs: Option<u64>,
+    _not_send: core::marker::PhantomData<std::rc::Rc<()>>,
+}
+
+impl Drop for FixedRuntimeClockScope {
+    fn drop(&mut self) {
+        FIXED_RUNTIME_UNIX_SECS.with(|slot| {
+            *slot.borrow_mut() = self.previous_unix_secs.take();
+        });
+    }
+}
+
+pub fn scope_fixed_runtime_clock_for_current_thread(now_unix_secs: u64) -> FixedRuntimeClockScope {
+    FixedRuntimeClockScope {
+        previous_unix_secs: FIXED_RUNTIME_UNIX_SECS.with(|slot| slot.replace(Some(now_unix_secs))),
+        _not_send: core::marker::PhantomData,
+    }
+}
+
 pub(crate) struct ScopedGovernedCallChainReceiptEvidence {
     previous: Option<GovernedCallChainReceiptEvidence>,
 }

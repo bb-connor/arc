@@ -17,6 +17,10 @@ pub(crate) struct NativeCaptureBinding<'a> {
 /// Private fields prevent callers from upgrading an egress or ledger digest.
 /// The connection borrow prevents use across transactions or owner handles.
 pub(crate) struct VerifiedNativeCapture<'tx> {
+    semantic: Option<super::super::super::semantic::SemanticCaptureWitness>,
+    recovery_owner: &'tx SqliteServingOwner,
+    recovery_valid_until_unix_ms: Option<u64>,
+    setup_capture_valid_until_unix_ms: Option<u64>,
     connection: &'tx Connection,
     operation: AdmissionOperationV1,
     ledger: AdmissionDigest,
@@ -30,10 +34,30 @@ pub(crate) struct VerifiedNativeCapture<'tx> {
     dpop_credential: Option<DpopReplayCredentialV1>,
 }
 
+/// Fresh capture needs its original, prepaid finishing obligations. Neither a
+/// retained bounds profile nor an absent predecessor profile supplies funding.
+/// Until the complete native phase factory exists, authenticate the original
+/// owner and refuse here, before any physical capture or dispatch mutation.
+fn require_native_capture_finishing_funding(
+    tx: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    input: &NativeCaptureBinding<'_>,
+    original: &chio_kernel::admission_operation::RetainedToolAdmissionRequestV1,
+    now: u64,
+) -> Result<(), AdmissionOperationStoreError> {
+    let custody = &input.custody;
+    verify_participant_recovery_tx(tx, owner, custody.operation, custody.lease, now)?;
+    original.validate_native_security_authority(custody.binding)?;
+    original.validate_native_security_context(custody.security_context)?;
+    Err(invalid(
+        "fresh native capture lacks authenticated finishing funding",
+    ))
+}
+
 impl<'tx> VerifiedNativeCapture<'tx> {
     pub(crate) fn verify(
         tx: &'tx Transaction<'_>,
-        owner: &SqliteServingOwner,
+        owner: &'tx SqliteServingOwner,
         input: &NativeCaptureBinding<'_>,
         grant_index: usize,
     ) -> Result<Self, AdmissionOperationStoreError> {
@@ -41,7 +65,21 @@ impl<'tx> VerifiedNativeCapture<'tx> {
         let operation = custody.operation;
         require_operation(operation)?;
         let now = observed_time(tx, custody.trusted_now_unix_ms)?;
-        verify_participant_recovery_tx(tx, owner, operation, custody.lease, now)?;
+        let setup_capture_valid_until_unix_ms = super::super::super::setup::require_capture(
+            tx,
+            owner,
+            operation,
+            custody.security_context,
+            custody.binding,
+            now,
+        )?;
+        let recovery_valid_until_unix_ms =
+            super::super::super::recovery::native::verify_capture_tx(
+                tx,
+                operation,
+                custody.request,
+                now,
+            )?;
         ensure_no_reserved_terminal_stage(tx, operation.binding().operation_id())?;
         let original = retained_request::load_retained_request_tx(tx, operation)?
             .ok_or_else(|| invalid("native capture lost its original request"))?;
@@ -69,8 +107,7 @@ impl<'tx> VerifiedNativeCapture<'tx> {
                 return Err(invalid("native capture capability or ancestor is revoked"));
             }
         }
-        original.validate_native_security_authority(custody.binding)?;
-        original.validate_native_security_context(custody.security_context)?;
+        require_native_capture_finishing_funding(tx, owner, input, &original, now)?;
         storage::verify_coverage(tx)?;
         let record = storage::load(tx, operation.binding().operation_id().as_str())?
             .ok_or_else(|| invalid("native capture requires its exact preparation ledger"))?;
@@ -172,7 +209,21 @@ impl<'tx> VerifiedNativeCapture<'tx> {
                 Ok::<_, AdmissionOperationStoreError>(validity.valid_until_unix_ms())
             })
             .transpose()?;
+        // Native policy, owned disclosure consumption and full credentials were
+        // verified above. A semantic endorsement cannot supply any of them.
+        let semantic = super::super::super::semantic::verify_capture_tx(
+            tx,
+            operation,
+            custody.request,
+            custody.binding,
+            custody.security_context,
+            now,
+        )?;
         Ok(Self {
+            semantic,
+            recovery_owner: owner,
+            recovery_valid_until_unix_ms,
+            setup_capture_valid_until_unix_ms,
             connection: tx,
             operation: operation.clone(),
             ledger: record.digest()?,
@@ -251,6 +302,10 @@ impl<'tx> VerifiedNativeCapture<'tx> {
                 "native capture witness differs from its committed successor",
             ));
         }
+        super::super::super::recovery::capture_tx(tx, self.recovery_owner, updated)?;
+        if let Some(semantic) = &self.semantic {
+            super::super::super::semantic::capture_tx(tx, self.recovery_owner, semantic, updated)?;
+        }
         Ok(())
     }
 
@@ -262,6 +317,7 @@ impl<'tx> VerifiedNativeCapture<'tx> {
             return Err(invalid("native capture witness changed transactions"));
         }
         let now = observed_time(tx, self.observed_at)?;
+        self.validate_setup_capture_time(now)?;
         self.validate_time(now)?;
         governed_approval_claim::verify_fresh_approval_tx(tx, &self.operation, now)?;
         dpop_claim::verify_fresh_dpop_tx(tx, &self.operation, now)?;
@@ -281,6 +337,15 @@ impl<'tx> VerifiedNativeCapture<'tx> {
                 .as_ref()
                 .and_then(|grant| grant.body.expires_at_unix_seconds().checked_mul(1000)),
         )?;
+        #[cfg(feature = "admission-test-support")]
+        let _setup_clock = expiry_test_support::setup_clock_after_state_verification(
+            tx,
+            &self.operation,
+            self.recovery_owner,
+            self.setup_capture_valid_until_unix_ms,
+            now,
+            |advanced| self.validate_time(advanced),
+        )?;
         // State verification can outlive its initial clock sample. The claims
         // above and the captured credentials name the same immutable episodes
         // in this write transaction. Sample again after state verification,
@@ -289,6 +354,7 @@ impl<'tx> VerifiedNativeCapture<'tx> {
         if commit_now < now {
             return Err(invalid("native capture clock regressed before commit"));
         }
+        self.validate_setup_capture_time(commit_now)?;
         #[cfg(feature = "admission-test-support")]
         {
             expiry_test_support::annotate_rejection(delayed, self.validate_time(commit_now))
@@ -299,7 +365,32 @@ impl<'tx> VerifiedNativeCapture<'tx> {
         }
     }
 
+    // The setup window bounds first acquisition, not the already owed caller
+    // return interval checked by validate_time in verify_caller_context.
+    fn validate_setup_capture_time(&self, now: u64) -> Result<(), AdmissionOperationStoreError> {
+        if self
+            .setup_capture_valid_until_unix_ms
+            .is_some_and(|until| now >= until)
+        {
+            return Err(AdmissionOperationStoreError::RecoveryMediationRequired);
+        }
+        Ok(())
+    }
+
     fn validate_time(&self, now: u64) -> Result<(), AdmissionOperationStoreError> {
+        if self
+            .semantic
+            .as_ref()
+            .is_some_and(|semantic| now >= semantic.valid_until())
+        {
+            return Err(invalid("native semantic authority expired before commit"));
+        }
+        if self
+            .recovery_valid_until_unix_ms
+            .is_some_and(|until| now >= until)
+        {
+            return Err(invalid("native recovery coverage expired before commit"));
+        }
         if now >= self.lease_expires_at {
             return Err(AdmissionOperationStoreError::Fenced);
         }

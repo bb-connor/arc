@@ -2,37 +2,33 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: eb3605a1594254370980dcf328ad3f0c7a751ff746d1530b9981c40163f5694a
+# Schema sha256: 35f8e30cf30553986a159b074ee485804a85db29547a8102522cd7bfa3080d2e
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
 # under sdks/python/chio-sdk-python/src/chio_sdk/_generated/.
 
-
 from __future__ import annotations
-
 from pydantic import BaseModel, ConfigDict, Field, RootModel, conint, constr
 
-
-class TokenDigest(RootModel[constr(pattern=r"^[0-9a-f]{64}$")]):
-    root: constr(pattern=r"^[0-9a-f]{64}$")
-
+class TokenDigest(RootModel[constr(pattern='^[0-9a-f]{64}$')]):
+    root: constr(pattern='^[0-9a-f]{64}$')
 
 class ChioVerifiedApprovalSetBody(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
+    model_config = ConfigDict(extra='forbid')
     token_digests: list[TokenDigest] = Field(..., max_length=32, min_length=1)
-    policy_hash: constr(pattern=r"^[0-9a-f]{64}$")
+    policy_hash: constr(pattern='^[0-9a-f]{64}$')
     threshold: conint(ge=1, le=32)
-    eligible_set_digest: constr(pattern=r"^[0-9a-f]{64}$")
+    eligible_set_digest: constr(pattern='^[0-9a-f]{64}$')
     request_id: constr(min_length=1)
-    governed_intent_hash: constr(pattern=r"^[0-9a-f]{64}$")
-    subject: constr(
-        pattern=r"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\+mldsa65)$"
-    )
-    authorizing_capability_digest: constr(pattern=r"^[0-9a-f]{64}$")
-    threshold_proposal_hash: constr(pattern=r"^[0-9a-f]{64}$")
+    governed_intent_hash: constr(pattern='^[0-9a-f]{64}$')
+    subject: constr(pattern='^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$')
+    authorizing_capability_digest: constr(pattern='^[0-9a-f]{64}$')
+    threshold_proposal_hash: constr(pattern='^[0-9a-f]{64}$')
     proposal_id: constr(min_length=1)
     proposal_created_at: conint(ge=0)
     proposal_deadline: conint(ge=1)
+
+# Public compatibility aliases reference the actual current model classes.
+CapabilityVerifiedApprovalSetChioVerifiedApprovalSetBody = ChioVerifiedApprovalSetBody
+CapabilityVerifiedApprovalSetTokenDigest = TokenDigest

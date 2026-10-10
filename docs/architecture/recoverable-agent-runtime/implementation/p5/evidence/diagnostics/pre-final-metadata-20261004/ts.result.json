@@ -1,0 +1,25 @@
+{
+  "id": "ts",
+  "actual_command": [
+    "node",
+    "node_modules/vitest/vitest.mjs",
+    "run",
+    "test/recovery_schema.test.ts",
+    "test/recovery_p1_schema.test.ts",
+    "test/recovery_p2_schema.test.ts",
+    "test/recovery_p3_schema.test.ts",
+    "test/recovery_p4_schema.test.ts",
+    "test/recovery_p5_schema.test.ts",
+    "test/recovery_client.test.ts"
+  ],
+  "cwd": "sdks/typescript/packages/conformance",
+  "environment": {},
+  "exit_code": 0,
+  "status": "passed",
+  "started_unix_seconds": 1791161025,
+  "duration_seconds": 5.416,
+  "log": "evidence/ts.log",
+  "log_sha256": "0aba39b8bfa941086612aa39d52849bfcc3913b9eaa9524cac2cd67cd63001e9",
+  "required_for_local_phase_acceptance": true,
+  "source_binding": "05aa889df57391692c09ef64d3ec178184f5d48c4bd4b6d3a654f470b00e079f"
+}

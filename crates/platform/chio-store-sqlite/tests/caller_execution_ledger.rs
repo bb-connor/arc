@@ -407,8 +407,8 @@ fn full_ledger_and_changed_schema_do_not_reset_retained_claims() -> TestResult {
 fn claimed_attempt_survives_process_death_without_redispatch() -> TestResult {
     use std::io::Write;
     use std::os::unix::process::ExitStatusExt;
-    const CHILD_ROOT: &str = "CHIO_CALLER_LEDGER_M3_CHILD_ROOT";
-    const CHILD_CUT: &str = "CHIO_CALLER_LEDGER_M3_CHILD_CUT";
+    const CHILD_ROOT: &str = "CHIO_CALLER_LEDGER_CRASH_CHILD_ROOT";
+    const CHILD_CUT: &str = "CHIO_CALLER_LEDGER_CRASH_CHILD_CUT";
     if let Some(root) = std::env::var_os(CHILD_ROOT) {
         let root = std::path::PathBuf::from(root);
         let authorization = SignedCallerDispatchAuthorizationV1::from_canonical_bytes(

@@ -1016,7 +1016,7 @@ fn model_budget_apply(state: u64, delta: u64, cap: u64) -> (Result<u64, ModelBud
 
 #[kani::proof]
 pub fn verify_budget_checked_add_no_overflow() {
-    // Phase 1: bounded axes. Every component is a u8 promoted to u64. This
+    // Bounded axes. Every component is a u8 promoted to u64. This
     // phase witnesses the cap-arm and the success-arm densely (full 256^3
     // enumeration of small budgets); the overflow arm is unreachable here
     // because 255 + 255 = 510 < u64::MAX.
@@ -1056,14 +1056,14 @@ pub fn verify_budget_checked_add_no_overflow() {
             // (a) Even though u8-bounded `current + delta` (max 510)
             // cannot overflow u64::MAX, we still assert the
             // load-bearing property here so a future widening of the
-            // bounds that DOES expose overflow in Phase 1 is caught
+            // bounds that DOES expose overflow in the bounded-axis harness is caught
             // by the same invariant rather than silently pruned.
             assert_eq!(post, current);
             assert!(current.checked_add(delta).is_none());
         }
     }
 
-    // Phase 2: dedicated overflow witness. Pin `current` to the top of
+    // Dedicated overflow witness. Pin `current` to the top of
     // the u64 range (`u64::MAX - tail` for a small symbolic `tail`) so
     // the overflow arm of `checked_add` is non-vacuous. `delta` ranges
     // freely as a u8-promoted u64; whenever `delta > tail`, the

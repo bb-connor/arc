@@ -28,7 +28,7 @@ default = []
 reqwest-egress = ["dep:reqwest", "dep:serde_json", "dep:tokio"]
 
 [dev-dependencies]
-reqwest = { workspace = true, default-features = false, features = ["rustls"] }
+reqwest = { workspace = true, default-features = false, features = ["rustls", "http2"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [lints]

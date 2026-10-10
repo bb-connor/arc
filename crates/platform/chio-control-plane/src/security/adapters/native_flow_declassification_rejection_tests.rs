@@ -51,7 +51,7 @@ fn native_declassification_rejects_missing_and_substituted_signed_claims() -> Te
             fixture.request.declassification_grant = Some(SignedDeclassificationGrant::sign(
                 serde_json::from_value(value)?,
                 &authority,
-            )?);
+            )?.into());
         }
         let response = fixture
             .kernel

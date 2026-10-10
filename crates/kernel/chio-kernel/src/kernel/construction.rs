@@ -256,6 +256,7 @@ impl ChioKernel {
             config,
             durable_admission_mode: crate::admission_operation::DurableAdmissionMode::default(),
             durable_admission_runtime: None,
+            native_output_retention: None,
             #[cfg(feature = "admission-test-support")]
             durable_finalization_cutpoint_hook: None,
             #[cfg(feature = "admission-test-support")]
@@ -264,6 +265,8 @@ impl ChioKernel {
             native_egress_checkpoint_hook: None,
             #[cfg(feature = "admission-test-support")]
             native_capture_checkpoint_hook: None,
+            #[cfg(feature = "admission-test-support")]
+            native_capture_observer: None,
             unsafe_ephemeral_financial_dispatch: false,
             guards: std::sync::Arc::new(Vec::new()),
             post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline::new(),
@@ -302,6 +305,7 @@ impl ChioKernel {
             receipt_mirror_gauge,
             child_receipt_mirror_gauge,
             receipt_store: None,
+            native_receipt_store_registration: None,
             receipt_store_write_lock: Mutex::new(()),
             retention_maintenance: None,
             payment_adapter: None,
@@ -325,6 +329,7 @@ impl ChioKernel {
             swarm_admission_required: false,
             security_pre_dispatch_policy: SecurityPreDispatchPolicy::Optional,
             security_pre_dispatch_hook: None,
+            native_flow_policy_witness_registration: None,
             runtime_admission_readiness_timeout: Duration::from_millis(
                 DEFAULT_RUNTIME_ADMISSION_READINESS_TIMEOUT_MS,
             ),
@@ -827,6 +832,18 @@ impl ChioKernel {
         self.try_set_receipt_store_handle(receipt_store)
     }
 
+    /// Install one owned receipt sink with trustworthy concrete identity for
+    /// optional Native owner discovery. Failed installation retains the
+    /// existing sink and registration; ordinary successful setters clear it.
+    pub fn set_native_receipt_store(
+        &mut self,
+        registration: crate::receipt_store::NativeReceiptStoreRegistration,
+    ) -> Result<(), KernelError> {
+        self.try_set_receipt_store_handle(registration.receipt_store_handle())?;
+        self.native_receipt_store_registration = Some(registration);
+        Ok(())
+    }
+
     pub fn try_set_receipt_store_handle(
         &mut self,
         receipt_store: Arc<dyn ReceiptStore>,
@@ -945,6 +962,7 @@ impl ChioKernel {
                 ));
         }
         self.receipt_store = Some(receipt_store);
+        self.native_receipt_store_registration = None;
         Ok(())
     }
 
@@ -1098,6 +1116,7 @@ impl ChioKernel {
     }
 
     pub fn set_security_pre_dispatch_hook(&mut self, hook: Arc<dyn SecurityPreDispatchHook>) {
+        self.native_flow_policy_witness_registration = None;
         self.security_pre_dispatch_hook = Some(hook);
     }
 
@@ -1109,6 +1128,7 @@ impl ChioKernel {
     }
 
     pub fn clear_security_pre_dispatch_hook(&mut self) {
+        self.native_flow_policy_witness_registration = None;
         self.security_pre_dispatch_hook = None;
     }
 

@@ -1,0 +1,173 @@
+{
+  "phase": "P6",
+  "requirements": [
+    {
+      "id": "SEC-12",
+      "sources": [
+        {
+          "path": "fixtures/recovery-product/assurance_map.py",
+          "anchor": "full_system_proof"
+        },
+        {
+          "path": "fixtures/recovery-product/manifest_builder.py",
+          "anchor": "source_binding"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "fixtures/recovery-product/test_assurance_map.py",
+          "anchor": "test_exact_source_and_complete_system_claim_cannot_be_substituted"
+        }
+      ]
+    },
+    {
+      "id": "OPS-04",
+      "sources": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/setup.rs",
+          "anchor": "pub fn qualify"
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/setup/gate.rs",
+          "anchor": "fn require_ready"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/setup.rs",
+          "anchor": "p6_setup_profile_change_between_preflight_and_native_capture_refuses"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/setup.rs",
+          "anchor": "p6_setup_every_foreign_binding_and_old_profile_refuses"
+        }
+      ]
+    },
+    {
+      "id": "OPS-07",
+      "sources": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/maintenance.rs",
+          "anchor": "pub fn submit_report"
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/semantic/policy.rs",
+          "anchor": "fn apply_reviewed_semantic_deployment"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/product.rs",
+          "anchor": "p6_policy_selected_operator_alone_applies_exact_proposal_and_native_target"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/product.rs",
+          "anchor": "p6_policy_report_release_rechecks_current_clearance_and_capability"
+        }
+      ]
+    },
+    {
+      "id": "OPS-09",
+      "sources": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/settlement.rs",
+          "anchor": "SettlementExecutor"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/overload.rs",
+          "anchor": "p6_overload_disconnected_intake_cannot_starve_existing_native_settlement"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/settlement.rs",
+          "anchor": "p6_reserved_disconnect_and_shutdown_preserve_two_owned_jobs"
+        }
+      ]
+    },
+    {
+      "id": "TEST-05",
+      "sources": [
+        {
+          "path": "fixtures/recovery-product/assurance_map.py",
+          "anchor": "ROWS"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "fixtures/recovery-product/test_assurance_map.py",
+          "anchor": "test_exact_source_and_complete_system_claim_cannot_be_substituted"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "anchor": "recovery_p1_fresh_process_cutpoints_preserve_original_ownership"
+        }
+      ]
+    },
+    {
+      "id": "TEST-06",
+      "sources": [
+        {
+          "path": "fixtures/recovery-product/manifest_builder.py",
+          "anchor": "trials ="
+        },
+        {
+          "path": "fixtures/recovery-product/campaign_baseline.py",
+          "anchor": "class SupervisorSession"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "fixtures/recovery-product/test_campaign_report.py",
+          "anchor": "test_authority_model_source_retry_and_unsupported_case_refuse"
+        },
+        {
+          "path": "fixtures/recovery-product/test_baseline.py",
+          "anchor": "test_no_fallback_or_hidden_retry_after_authoritative_refusal"
+        }
+      ]
+    },
+    {
+      "id": "TEST-07",
+      "sources": [
+        {
+          "path": "fixtures/recovery-product/campaign_report.py",
+          "anchor": "def summarize"
+        },
+        {
+          "path": "docs/architecture/recoverable-agent-runtime/implementation/p6/evidence/cohort_report.py",
+          "anchor": "def aggregate_interrupted_cohorts"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "fixtures/recovery-product/test_campaign_report.py",
+          "anchor": "test_framework_failure_after_native_completion_remains_unsuccessful"
+        },
+        {
+          "path": "docs/architecture/recoverable-agent-runtime/implementation/p6/evidence/test_cohorts.py",
+          "anchor": "test_interruption_preserves_planned_slots_and_unknown_measurements"
+        }
+      ]
+    },
+    {
+      "id": "TEST-08",
+      "sources": [
+        {
+          "path": "crates/kernel/chio-process/tests/recovery_p0_baseline.rs",
+          "anchor": "measured_native_baseline"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/overload.rs",
+          "anchor": "p6_overload_disconnected_intake_cannot_starve_existing_native_settlement"
+        },
+        {
+          "path": "fixtures/recovery-product/test_campaign_report.py",
+          "anchor": "test_extra_model_call_missing_native_and_nonfinite_latency_refuse"
+        }
+      ]
+    }
+  ]
+}

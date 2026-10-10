@@ -1,0 +1,31 @@
+{
+  "runtime_toolchain": {
+    "rustc": "1.94.1",
+    "cargo": "1.94.1",
+    "node": "25.5.0",
+    "python": "3.13.5"
+  },
+  "portable_msrv": "1.93.0",
+  "python_test_cache": {
+    "path": "/Users/connor/Medica/backbay/standalone/arc/sdks/python/chio-crewai/.venv",
+    "pytest": "8.4.2",
+    "pydantic": "2.13.4",
+    "httpx": "0.28.1",
+    "jsonschema": "4.26.0"
+  },
+  "typescript_test_cache": {
+    "conformance_vitest_used": "4.1.8",
+    "locked_vitest": "4.1.11",
+    "esbuild_used": "0.27.7",
+    "locked_esbuild": "0.28.1",
+    "typescript_used_and_locked": "5.7.3",
+    "ajv_used_and_locked": "8.20.0",
+    "cache_root": "/Users/connor/Medica/backbay/standalone/arc/sdks/typescript"
+  },
+  "codegen": {
+    "python": "datamodel-code-generator 0.34.0 (existing exact P0 bootstrap)",
+    "typescript": "json-schema-to-typescript 15.0.4",
+    "rust": "workspace xtask/schema catalog"
+  },
+  "qualification": "Existing offline caches were used without changing package pins. Cached Vitest/esbuild execution is not exact-lock clean-install or hosted CI qualification."
+}

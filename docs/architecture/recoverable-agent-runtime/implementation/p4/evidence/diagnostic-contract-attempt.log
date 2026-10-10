@@ -1,0 +1,27 @@
+    Blocking waiting for file lock on artifact directory
+   Compiling chio-security-types v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-security-types)
+   Compiling chio-spec-codegen v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/tooling/chio-spec-codegen)
+   Compiling chio-core-types v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-core-types)
+   Compiling chio-semantic-contracts v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-semantic-contracts)
+    Finished `test` profile [unoptimized] target(s) in 1m 42s
+     Running tests/recovery_p4_contracts.rs (target/debug/deps/recovery_p4_contracts-98b30481dacdf55f)
+
+running 5 tests
+test p4_bounds_missing_keys_duplicate_keys_and_provenance ... ok
+test p4_signatures_content_and_role_domains_cannot_substitute ... ok
+test p4_pure_certificate_and_archive_recompute_exact_provenance ... ok
+test p4_write_shared_vectors ... FAILED
+test p4_shared_contracts_and_closed_ingress ... ok
+
+failures:
+
+---- p4_write_shared_vectors stdout ----
+Error: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+
+
+failures:
+    p4_write_shared_vectors
+
+test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+
+error: test failed, to rerun pass `-p chio-core-types --test recovery_p4_contracts`

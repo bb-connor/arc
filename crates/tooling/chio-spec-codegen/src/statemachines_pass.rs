@@ -901,11 +901,17 @@ guards = ["input_valid"]
 "#;
 
     fn temp_dir(label: &str) -> Result<PathBuf> {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static SEQUENCE: AtomicU64 = AtomicU64::new(0);
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_err(|err| CodegenError::Io(PathBuf::from(label), std::io::Error::other(err)))?
             .as_nanos();
-        Ok(std::env::temp_dir().join(format!("chio-statemachine-{label}-{nonce}")))
+        let sequence = SEQUENCE.fetch_add(1, Ordering::Relaxed);
+        Ok(std::env::temp_dir().join(format!(
+            "chio-statemachine-{label}-{}-{nonce}-{sequence}",
+            std::process::id()
+        )))
     }
 
     fn load_text(text: &str) -> Result<Vec<StateMachine>> {

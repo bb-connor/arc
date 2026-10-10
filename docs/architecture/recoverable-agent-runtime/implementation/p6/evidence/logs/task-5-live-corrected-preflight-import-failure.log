@@ -1,0 +1,10 @@
+Earlier full-model cohort retained: {'complete': 24, 'refused': 24, 'skipped_tool': 48}
+Sealed corrected runtime promoted: 167c0487c96e7391f25436bb8eab898c22a3037bb141c2902c727ba80b2e1c19
+Traceback (most recent call last):
+  File "/home/ubuntu/p6-task5-queue-corrected.py", line 52, in <module>
+    from campaign_main import DeadlineSession
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/fixtures/recovery-product/campaign_main.py", line 15, in <module>
+    from campaign_baseline import SupervisorSession
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/fixtures/recovery-product/campaign_baseline.py", line 10, in <module>
+    from chio_sdk.recovery import RecoveryClient
+ModuleNotFoundError: No module named 'chio_sdk'

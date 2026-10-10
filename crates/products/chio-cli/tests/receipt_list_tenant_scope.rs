@@ -1,6 +1,6 @@
 //! Local `chio receipt list` / `chio receipt explain` tenant-scope tests.
 //!
-//! These exercise the P1 fix that prevents the local `--receipt-db`
+//! These verify tenant isolation that prevents the local `--receipt-db`
 //! reading path from silently defaulting to admin-all when the operator
 //! omits both `--tenant <id>` and `--admin-all`. Cross-tenant data must
 //! never leak from a multi-tenant SQLite receipt store unless the

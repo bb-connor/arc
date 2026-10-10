@@ -1,0 +1,16 @@
+{
+  "source_binding": "b1bcd48cadb7b9c7f1ff5dd4ad8d9910056590e22058527756114e21239c1063",
+  "source_stable": true,
+  "exit_code": 0,
+  "provider_requests": 0,
+  "mode": "public-model-free-native-preflight",
+  "command": [
+    "/home/ubuntu/recovery-runtime-p6-hosts/bin/python",
+    "fixtures/recovery-product/preflight.py",
+    "--checkout",
+    "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002",
+    "--evidence",
+    "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/target/recovery-p6/final-host-preflight"
+  ],
+  "result_sha256": "011a7c957fd3d24eec6cd0a4f309e250d8c54b7aa42c3dab831ce53a2206eeb2"
+}

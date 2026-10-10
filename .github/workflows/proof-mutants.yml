@@ -18,6 +18,9 @@ on:
       - "scripts/file-mutation-survivors.py"
       - "scripts/lean-mutants.py"
       - "scripts/check-kani-core.sh"
+      - "scripts/check-kani-toolchain.sh"
+      - "scripts/tests/check-kani-toolchain.test.sh"
+      - "scripts/tests/check-kani-probe-lifecycle.test.py"
       - "scripts/kani-mutant-killer.sh"
       - "scripts/proof-mutants.py"
       - "scripts/proof-mutants.sh"
@@ -34,7 +37,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  CHIO_KANI_VERSION: 0.67.0
+  CHIO_KANI_VERSION: 0.68.0
   CHIO_ELAN_VERSION: v4.2.1
   CHIO_ELAN_TARBALL_SHA256: 4e717523217af592fa2d7b9c479410a31816c065d66ccbf0c2149337cfec0f5c
 
@@ -57,6 +60,7 @@ jobs:
           ./scripts/tests/file-mutation-survivors.test.sh
           ./scripts/tests/lean-mutants.test.sh
           ./scripts/tests/proof-mutants.test.sh
+          ./scripts/tests/check-kani-toolchain.test.sh
 
   lean-mutants:
     name: lean-mutants
@@ -184,7 +188,7 @@ jobs:
           cargo install kani-verifier --version "${CHIO_KANI_VERSION}" --locked
           cargo kani setup
           cargo mutants --version
-          cargo kani --version
+          bash scripts/check-kani-toolchain.sh
 
       - name: Settle focused cargo-mutants discovery
         shell: bash

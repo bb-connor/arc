@@ -438,13 +438,14 @@ impl VerifiedEvidenceCorpusV1 {
                     .count();
                 let denied = u64::try_from(denied)
                     .map_err(|_| ParametricContractError::InvalidField("corpus.member_count"))?;
-                let magnitude = if total == 0 {
-                    0
-                } else {
-                    denied
-                        .checked_mul(10_000)
-                        .ok_or(ParametricContractError::InvalidField("trigger.magnitude"))?
-                        / total
+                let magnitude = match std::num::NonZeroU64::new(total) {
+                    None => 0,
+                    Some(total) => {
+                        denied
+                            .checked_mul(10_000)
+                            .ok_or(ParametricContractError::InvalidField("trigger.magnitude"))?
+                            / total.get()
+                    }
                 };
                 Ok(
                     (total >= *min_events && magnitude >= u64::from(*threshold_bps))

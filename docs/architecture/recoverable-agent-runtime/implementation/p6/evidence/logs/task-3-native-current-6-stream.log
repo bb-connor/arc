@@ -1,0 +1,15 @@
+   Compiling chio-control-plane v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-control-plane)
+    Finished `test` profile [unoptimized] target(s) in 57.77s
+     Running unittests src/lib.rs (target/recovery-p5-linux/host/debug/deps/chio_control_plane-6f8003448d0ced3f)
+
+running 7 tests
+test recovery::tests::knowledge::setup::cli_host::p6_setup_cli_qualification_host ... ignored, private CLI host; execute with CHIO_P6_CLI_EXCHANGE and an actual CLI controller
+test recovery::tests::knowledge::setup::p6_setup_cannot_accept_a_new_native_semantic_plan_before_ready ... ok
+test recovery::tests::knowledge::setup::p6_setup_every_foreign_binding_and_old_profile_refuses ... ok
+test recovery::tests::knowledge::setup::p6_setup_lost_live_broker_refuses_the_protected_review_route ... ok
+test recovery::tests::knowledge::setup::p6_setup_missing_broker_and_failed_benign_cannot_unlock_work ... ok
+test recovery::tests::knowledge::setup::p6_setup_profile_change_between_preflight_and_native_capture_refuses ... ok
+test recovery::tests::knowledge::setup::p6_setup_real_restart_recovers_the_identical_operation_once ... ok
+
+test result: ok. 6 passed; 0 failed; 1 ignored; 0 measured; 1264 filtered out; finished in 77.35s
+

@@ -6,9 +6,10 @@ invocation budget, and retains single-use continuations in the existing durable
 admission authority. Native MCP tools in this profile require verified Enforced
 cage launch with no network destinations. A missing prerequisite refuses startup.
 
-This path is being qualified for M5. The existing `smoke.sh` keeps its Disabled
-integration-only behavior. The commands below do not yet produce the complete M5
-scenario, accounting, confinement and terminal-outcome acceptance artifact.
+This path is being qualified for governed process execution. The existing
+`smoke.sh` keeps its Disabled integration-only behavior. The commands below do
+not yet produce the complete scenario, accounting, confinement and
+terminal-outcome acceptance artifact.
 
 ## Initialize
 
@@ -126,7 +127,7 @@ root and all children retain their original shared family binding.
 Collect and verify each response with `receipt verify-process-response`.
 The current `attest-run` completed-fanout format supports one graph whose tasks
 all returned allowed results. It refuses this shared-family profile; a
-multi-graph terminal artifact remains part of the unfinished M5 work.
+multi-graph terminal artifact remains unimplemented.
 
 ## Run supervised workers on Linux
 
@@ -232,7 +233,7 @@ The report contains verified file sizes, line counts, hashes and request IDs.
 Changed files, substituted worker identity and modified signed output refuse
 collection. Preserve `inputs.json` and the key through an operator-trusted
 channel; neither should be selected from an untrusted submitted evidence bundle.
-This result check does not yet verify M5's complete accounting, confinement
+This result check does not yet verify complete accounting, confinement
 chain or signed terminal artifact, and its output records that limit.
 
 ## Current boundary
@@ -241,7 +242,7 @@ The mailbox-only host regression exercises actual authenticated socket calls,
 missing/borrowed authority refusals, real effects, SIGKILL recovery, retained
 continuation custody and profile tampering. It is not a native confinement run.
 The native worker orchestration and Enforced reference-tool run need Linux
-qualification. The full M5 scenario matrix, signed completed fan-in, joined
+qualification. The full process scenario matrix, signed completed fan-in, joined
 accounting/confinement artifact and designated-runner acceptance remain open.
 The process host still refuses manifests requiring an information-flow runtime
 until that profile is installed. No Disabled fallback is provided for native
@@ -296,9 +297,10 @@ Version 3 also includes the original call receipt's Merkle inclusion proof and
 signed checkpoint from the host's receipt store. Export checkpoints the committed
 tail through the existing writer. Verification checks the pinned signer, receipt
 bytes, sequence, leaf index, tree size and root. These are local log membership
-claims; external checkpoint publication and the full M5 matrix remain separate.
+claims; external checkpoint publication and the full process matrix remain
+separate.
 Version 2 artifacts retain explicit unchecked nonce and log claims. Every report
-still includes `m5_acceptance_complete: false`.
+still includes `qualification_complete: false`.
 
 ### Observe a denied or uncertain call
 
@@ -334,7 +336,7 @@ observation. It does not dispatch, retry, refund or release a continuation. The
 observation may describe an ordinary denial without an admission record, but it
 does not prove an external effect was absent. Task authority, aggregate usage,
 confinement, physical effects and graph completion require their own evidence.
-This command does not replace `verify-run` or close M5 acceptance.
+This command does not replace `verify-run` or complete process qualification.
 
 ### Observe all worker outcomes and family accounting
 
@@ -382,7 +384,7 @@ scenario matrix still require additional evidence. Version 3 outcomes carry
 version 2 call observations with the original nonce custody and receipt-log
 inclusion, including signed recovery refusals. An uncertain effect stays uncertain;
 the proof authenticates that refusal without inventing a completed tool result.
-`m5_acceptance_complete` remains false. Version 1 artifacts remain verifiable
+`qualification_complete` remains false. Version 1 artifacts remain verifiable
 with their original limits and no native policy signer options. The separate
 completed-run verifier continues to require actual terminal launch receipts.
 
@@ -472,7 +474,7 @@ python3 examples/reference-swarm/qualify-process-filesystem.py \
 `qualify-process-budget.py` accept the same arguments. Run each on the
 supported Linux x86_64 cage profile as a non-root operator. The scripts retain
 commands, caller responses, signatures and external observations. Each reports
-`m5_acceptance_complete: false`; the complete scenario artifact and final
+`qualification_complete: false`; the complete scenario artifact and final
 qualification remain required. Crash and budget fixtures also retain original
 native launch files for the separate offline check above.
 
@@ -521,16 +523,16 @@ the same worker identities, responses, launches and durable accounting. An
 operator's file, socket, contention or PID observation remains an external
 observation authenticated by the separately retained capture digest. It is not
 a signed tool exit. `local_matrix_verified: true` reports that local composition;
-`m5_acceptance_complete` stays false pending combined-foundation and designated
+`qualification_complete` stays false pending combined-foundation and designated
 platform qualification. Failed commands keep their logs and do not emit a
 passing matrix.
 
 ## Provision brokered launch material
 
 `chio security provision-reference-runtime --broker-binding PATH` can prepare
-the signed launch material for a static brokered MCP tool. This is an M6
-composition primitive. The provider-backed reference topology and its combined
-keyring, broker and quota acceptance remain unqualified.
+the signed launch material for a static brokered MCP tool. This is a brokered
+launch composition primitive. The provider-backed reference topology and its
+combined keyring, broker and quota acceptance remain unqualified.
 
 The operator-reviewed binding file has exactly this shape (replace every
 example value with the reviewed broker's identity):
@@ -573,5 +575,5 @@ boundary, never in this file or the tool's command arguments.
 Provisioning does not register a broker attempt, install the kernel's
 supplemental quota verifier, capture a composite hold, or qualify the provider
 request. The current completed-run and worker-outcomes verifiers continue to
-accept only their qualified local launch profile. M6 must compose and verify
-those additional boundaries before claiming a brokered reference run.
+accept only their qualified local launch profile. A brokered reference run
+requires composition and verification of those additional boundaries.

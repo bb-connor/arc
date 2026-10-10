@@ -1,0 +1,40 @@
+{
+  "recorded_at_utc": "2026-10-03T03:41:18.431192+00:00",
+  "commands": {
+    "rustc": {
+      "argv": [
+        "rustc",
+        "--version"
+      ],
+      "exit_code": 0,
+      "stdout": "rustc 1.94.1 (e408947bf 2026-03-25)"
+    },
+    "msrv_rustc": {
+      "argv": [
+        "rustc",
+        "+1.93.0",
+        "--version"
+      ],
+      "exit_code": 0,
+      "stdout": "rustc 1.93.0 (254b59607 2026-01-19)"
+    },
+    "node": {
+      "argv": [
+        "node",
+        "--version"
+      ],
+      "exit_code": 0,
+      "stdout": "v25.5.0"
+    }
+  },
+  "python_runtime": {
+    "python": "3.13.5",
+    "pytest": "8.4.2",
+    "pydantic": "2.13.4",
+    "httpx": "0.28.1",
+    "jsonschema": "4.26.0"
+  },
+  "vitest_actual": "4.1.8",
+  "esbuild_actual": "0.27.7",
+  "typescript": "5.7.3"
+}

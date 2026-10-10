@@ -110,7 +110,7 @@ impl<'a> PreparedNativeSecurityEgress<'a> {
         self.retain_dispatch_ledger_current(grant_index, policy_json)
     }
 
-    fn validate_ledger_input(
+    pub(super) fn validate_ledger_input(
         &self,
         grant_index: usize,
         policy_json: &[u8],
@@ -136,7 +136,7 @@ impl<'a> PreparedNativeSecurityEgress<'a> {
         Ok(policy)
     }
 
-    fn retain_dispatch_ledger_current(
+    pub(super) fn retain_dispatch_ledger_current(
         &self,
         grant_index: usize,
         policy_json: &[u8],

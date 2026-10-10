@@ -325,6 +325,16 @@ files = ["crates/core/chio-arena/src/lib.rs"]
 first_seen = "5f394b7214"
 
 [[schema]]
+value = "chio.artifact.archive.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.artifact.provenance.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
 value = "chio.attest.buyer-attestation-explanation.v1"
 files = ["crates/trust/chio-attest-buyer/src/schemas.rs"]
 first_seen = "bb358ba692"
@@ -1138,6 +1148,26 @@ first_seen = "11e573d2d7"
 value = "chio.comptroller.surface-report.v1"
 files = ["crates/core/chio-core-types/src/signed_artifact.rs"]
 first_seen = "d91c44dcc7"
+
+[[schema]]
+value = "chio.confined.capability.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.confined.evidence-binding.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.confined.launch.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.confined.parent-control.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
 
 [[schema]]
 value = "chio.conformance.peers/v1"
@@ -2231,7 +2261,7 @@ first_seen = "9e67a20a1a"
 
 [[schema]]
 value = "chio.finding.kvm-canary-job.v1"
-files = ["crates/products/chio-finding-market-canary/src/main.rs"]
+files = ["crates/products/chio-finding-market-canary/src/hosted_canary.rs"]
 first_seen = "412dd041f1"
 
 [[schema]]
@@ -2256,7 +2286,7 @@ first_seen = "b6c26f2bab"
 
 [[schema]]
 value = "chio.finding.network-canary-pool.v1"
-files = ["crates/products/chio-finding-market-canary/src/main.rs"]
+files = ["crates/products/chio-finding-market-canary/src/hosted_canary.rs"]
 first_seen = "7658dce39b"
 
 [[schema]]
@@ -2785,6 +2815,16 @@ files = ["crates/economy/chio-market/src/insurance_flow.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
+value = "chio.isolation.boundary.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.isolation.return-contract.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
 value = "chio.kernel-caller-return-context.v1"
 files = ["crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller.rs"]
 first_seen = "7e54c14a60"
@@ -2928,6 +2968,66 @@ first_seen = "8741a02ebc"
 value = "chio.keyring.artifact-signature.v1"
 files = ["crates/security/chio-keyring/src/router.rs"]
 first_seen = "8741a02ebc"
+
+[[schema]]
+value = "chio.knowledge.actor-identity.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.knowledge.handle-identity.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.knowledge.import-influence.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.knowledge.influence-fold.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.knowledge.influence-scope.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.knowledge.influence.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.knowledge.object-custody.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.knowledge.observed-influence.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.knowledge.read-authority.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.knowledge.reference-identity.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.knowledge.reference-owner.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.knowledge.semantic-influence.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
 
 [[schema]]
 value = "chio.lineage.cli/v1"
@@ -3685,6 +3785,11 @@ files = ["crates/economy/chio-market/src/parametric.rs"]
 first_seen = "51e46336b1"
 
 [[schema]]
+value = "chio.participant.owner.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
 value = "chio.passport-issuance-offers.v1"
 files = ["crates/platform/chio-control-plane/src/passport_verifier.rs"]
 first_seen = "11e573d2d7"
@@ -4225,9 +4330,9 @@ files = ["crates/kernel/chio-kernel/src/tool_outcome.rs"]
 first_seen = "51e46336b1"
 
 [[schema]]
-value = "chio.process.abi.v2"
+value = "chio.process.abi.v3"
 files = ["crates/kernel/chio-process/src/lib.rs"]
-first_seen = "c5cca80042"
+first_seen = "de84fc306e"
 
 [[schema]]
 value = "chio.process.blobs.v1"
@@ -4478,6 +4583,211 @@ first_seen = "e299888892"
 value = "chio.receipt_lineage_statement.v1"
 files = ["crates/core/chio-core-types/src/receipt/lineage.rs"]
 first_seen = "11e573d2d7"
+
+[[schema]]
+value = "chio.recovery.action-intent.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.active-owner.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.authority-coverage.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.authority-scope.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.authorization-requirements.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.basis.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.capability-body.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.command.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.decision-report.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.deployment.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.effect-contract.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.explanation-evaluation.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.explanation-projection.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.explanation-snapshot.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.explanation.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.influence.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.offer.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.origin-claim.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.output-disposition.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.plan.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.planning-owner.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.planning-reservation.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.policy-maintenance-proposal.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.preview.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.protected-record.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.provider-resource.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.remedy-registry.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.semantic-policy.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.serving-fence.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.setup.benign-receipt.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.setup.creation.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.setup.creation.v2"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.setup.denied-command.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.setup.native-authority.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.setup.required-coverage.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.setup.retirement.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.setup.source-profile.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.setup.source-profile.v2"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.source.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.store-event.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.recovery.workflow-reservation.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
 
 [[schema]]
 value = "chio.reference-runtime-provision-report.v1"
@@ -5015,6 +5325,61 @@ files = ["crates/kernel/chio-kernel/src/tool_outcome/security_release.rs"]
 first_seen = "7e54c14a60"
 
 [[schema]]
+value = "chio.semantic.action.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.semantic.content.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.semantic.deployment.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.semantic.native-input-origin.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "59138e12ed"
+
+[[schema]]
+value = "chio.semantic.native-output-origin.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.semantic.native-request-semantics.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.semantic.native-status-origin.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.semantic.package.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.semantic.plan.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.semantic.registry.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio.semantic.role-key.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
 value = "chio.session_anchor.v1"
 files = ["crates/core/chio-core-types/src/session/anchor.rs"]
 first_seen = "11e573d2d7"
@@ -5450,14 +5815,109 @@ files = ["crates/core/chio-core-types/src/signed_artifact.rs", "crates/platform/
 first_seen = "1b9620751d"
 
 [[schema]]
+value = "chio:artifact-archive:v1"
+files = ["crates/core/chio-core-types/src/recovery/knowledge.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio:artifact-certificate:v1"
+files = ["crates/core/chio-core-types/src/recovery/knowledge.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio:confined-disclosure:v1"
+files = ["crates/core/chio-core-types/src/recovery/confinement.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio:confined-endorsement:v1"
+files = ["crates/core/chio-core-types/src/recovery/confinement.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
 value = "chio:declassification-grant:v1"
 files = ["crates/core/chio-core-types/src/declassification.rs"]
 first_seen = "6ea79bb5da"
 
 [[schema]]
+value = "chio:declassification-grant:v2"
+files = ["crates/core/chio-core-types/src/recovery/authority.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio:recovery-authority-coverage:v1"
+files = ["crates/core/chio-core-types/src/recovery/authority.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio:recovery-explanation-report:v1"
+files = ["crates/core/chio-core-types/src/recovery/explanation.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio:recovery-explanation-view:v1"
+files = ["crates/core/chio-core-types/src/recovery/explanation.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio:recovery-policy-deployment-change:v1"
+files = ["crates/core/chio-core-types/src/recovery/product.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio:recovery-provider-finality:v1"
+files = ["crates/core/chio-core-types/src/recovery/authority.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio:recovery-setup-probe:v1"
+files = ["crates/core/chio-core-types/src/recovery/product.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio:recovery-setup-report:v1"
+files = ["crates/core/chio-core-types/src/recovery/product.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio:scoped-endorsement:v1"
+files = ["crates/core/chio-core-types/src/recovery/semantic.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
 value = "chio:security-event:v1"
 files = ["crates/core/chio-core-types/src/security_event.rs"]
 first_seen = "9e9b3be5f6"
+
+[[schema]]
+value = "chio:semantic-annotation:v1"
+files = ["crates/core/chio-core-types/src/recovery/semantic.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio:semantic-audience:v1"
+files = ["crates/core/chio-core-types/src/recovery/semantic.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio:semantic-deployment:v1"
+files = ["crates/core/chio-core-types/src/recovery/semantic.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio:semantic-package:v1"
+files = ["crates/core/chio-core-types/src/recovery/semantic.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio:semantic-prerequisite:v1"
+files = ["crates/core/chio-core-types/src/recovery/semantic.rs"]
+first_seen = "de84fc306e"
+
+[[schema]]
+value = "chio:semantic-transformation:v1"
+files = ["crates/core/chio-core-types/src/recovery/semantic.rs"]
+first_seen = "de84fc306e"
 
 [[schema]]
 value = "chio_attestation_binding_v1"

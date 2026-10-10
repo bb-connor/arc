@@ -1,0 +1,64 @@
+{
+  "arm": "baseline",
+  "case": "lost_ack_restart",
+  "host": "langgraph",
+  "id": "langgraph-artifact-baseline-lost_ack_restart-r1",
+  "repetition": 1,
+  "workflow": "artifact",
+  "requested_model": "gpt-5.4-mini-2026-03-17",
+  "authority_policy": "6cbea0e86b177e31ed3863462505826b686b5e6c133f1b0dc62b1bef0777ff41",
+  "source_binding": "3c2dc49ad8a73714e716a903fe3b4c551f50157000ffea61b47ed5422253e74a",
+  "model_attempts": [
+    {
+      "model": null,
+      "error": "provider_unavailable",
+      "input_tokens": null,
+      "output_tokens": null,
+      "seconds": 0.33589,
+      "prompt_bytes": 786,
+      "prompt_sha256": "1e6396e8ea24cb5b0b8735207c2a2ded18504d2a832fd9919247d550b06e3ddf",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You have one tool: recovery(choice). To call it, end with exactly:\nAction: recovery\nAction Input: {\"choice\":\"resume\"}\nDo not invent a result."
+        },
+        {
+          "role": "user",
+          "content": "Reuse the retained protected research checkpoint through the existing native artifact mediator and authorized agent sink. Return only confirmation, never checkpoint bytes. After restart, keep its original artifact and release identity. The original operation completed but its acknowledgement was discarded; the native writer was closed and reopened. Use the same selected command to recover its original outcome. Call the recovery tool once with choice resume. Accept its bounded category. Do not guess success, create new operations, include credentials, or bypass a refusal."
+        }
+      ],
+      "request_id": null
+    }
+  ],
+  "tool_actions": 0,
+  "hidden_retries": 0,
+  "outcome": "provider_error",
+  "native": {
+    "approval_records": 1,
+    "artifact_deliveries": 1,
+    "artifact_releases": 1,
+    "artifacts": 1,
+    "charges": 0,
+    "duplicate_effects": 0,
+    "effects": 1,
+    "extra_approvals": 0,
+    "fence": {
+      "lease_id": "01a10b3e-b042-7d73-82a3-e9da260943b0",
+      "owner_epoch": 3,
+      "store_uuid": "01a10b3e-4a81-7b50-9f07-d77c1a5b2fe5"
+    },
+    "native_actions": 0,
+    "preexisting_effects": 1,
+    "provider_effects_total": 1,
+    "recovery_success": false,
+    "setup_effects": 1,
+    "source_label_retained": true,
+    "unauthorized_effects": 0,
+    "unresolved": 0,
+    "unresolved_age_ms": 0,
+    "useful_completion": false
+  },
+  "elapsed_seconds": 31.745953,
+  "native_preparation_seconds": 31.32424,
+  "error_category": "campaign.provider_unavailable"
+}

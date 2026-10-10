@@ -1,0 +1,11 @@
+
+running 6 tests
+test freshness_saturates_ttl_and_skew_edges ... ok
+test nonce_store_matches_fresh_and_replayed_projections ... ok
+test nonce_decision_matches_live_entry_test ... ok
+test freshness_projection_calls_verified_boundary ... ok
+test atomic_verifier_projection_calls_four_axis_model ... ok
+test requirement_fold_matches_runtime_control_flow ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+

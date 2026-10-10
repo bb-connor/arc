@@ -1,0 +1,21 @@
+   Compiling sigstore v0.14.0
+   Compiling chio-attest-verify v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-attest-verify)
+   Compiling chio-weights v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-weights)
+   Compiling chio-kernel v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-kernel)
+   Compiling chio-finding-verifier v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-finding-verifier)
+   Compiling chio-transaction-passport v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-transaction-passport)
+   Compiling chio-risk-comptroller v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-risk-comptroller)
+   Compiling chio-commerce-order v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-commerce-order)
+   Compiling chio-agent-web-interop v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-agent-web-interop)
+   Compiling chio-store-sqlite v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-store-sqlite)
+    Finished `test` profile [unoptimized] target(s) in 1m 09s
+     Running unittests src/lib.rs (target/debug/deps/chio_store_sqlite-4c890bbc859a569d)
+
+running 4 tests
+test admission_operation_store::tests::security_participant_migration::integrity::restoring_destination_before_import_is_rejected_by_independent_anchor ... ok
+test admission_operation_store::tests::security_participant_state::integrity::restoring_private_database_before_hydration_cannot_erase_the_anchored_initialization ... ok
+test serving_owner::tests::relocation::restoring_pre_export_database_cannot_undo_retirement ... ok
+test admission_operation_store::tests::security_participant_state::mutations::faults::restoring_database_before_join_cannot_erase_acknowledged_mutation_history ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 1831 filtered out; finished in 4.10s
+

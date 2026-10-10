@@ -14,6 +14,8 @@ from pathlib import Path
 EXPECTED_COUNTS = {
     "lib": 22,
     "bin_chio_cage_init": 0,
+    "bin_chio_confined_reader": 0,
+    "example_confined_return_canary": 0,
     "enforcement_evidence": 8,
     "linux_compile": 15,
     "linux_enforcement": 27,
@@ -66,19 +68,24 @@ def source_inventory(root: Path) -> dict[str, list[str]]:
 
     manifest = tomllib.loads((crate / "Cargo.toml").read_text(encoding="utf-8"))
     if manifest.get("bin") != [
-        {"name": "chio-cage-init", "path": "src/bin/chio-cage-init.rs"}
+        {"name": "chio-cage-init", "path": "src/bin/chio-cage-init.rs"},
+        {"name": "chio-confined-reader", "path": "src/bin/chio-confined-reader.rs"},
     ]:
         raise InventoryError("chio-cage binary target inventory changed")
     if manifest.get("example") or manifest.get("bench"):
         raise InventoryError(
             "chio-cage example or benchmark target inventory is not empty"
         )
-    for directory_name in ("examples", "benches"):
+    expected_files = {
+        "src/bin": {"chio-cage-init.rs", "chio-confined-reader.rs"},
+        "examples": {"confined-return-canary.rs"},
+        "benches": set(),
+    }
+    for directory_name, expected in expected_files.items():
         directory = crate / directory_name
-        if directory.is_dir() and any(directory.rglob("*.rs")):
-            raise InventoryError(
-                f"chio-cage implicit {directory_name} target inventory is not empty"
-            )
+        observed = {p.relative_to(directory).as_posix() for p in directory.rglob("*.rs")}
+        if observed != expected:
+            raise InventoryError(f"chio-cage implicit {directory_name} target inventory changed")
 
     integration_files = {
         path.relative_to(tests).as_posix() for path in tests.rglob("*.rs")
@@ -93,7 +100,10 @@ def source_inventory(root: Path) -> dict[str, list[str]]:
     inventory: dict[str, list[str]] = defaultdict(list)
     for path in sorted(source.rglob("*.rs")):
         relative = path.relative_to(crate).as_posix()
-        target = "bin_chio_cage_init" if relative.startswith("src/bin/") else "lib"
+        target = {
+            "src/bin/chio-cage-init.rs": "bin_chio_cage_init",
+            "src/bin/chio-confined-reader.rs": "bin_chio_confined_reader",
+        }.get(relative, "lib")
         for name, attributes in test_declarations(path):
             if (
                 relative == "src/launch.rs"
@@ -113,6 +123,9 @@ def source_inventory(root: Path) -> dict[str, list[str]]:
                 continue
             inventory[target].append(name)
 
+    inventory["example_confined_return_canary"] = [
+        name for name, _ in test_declarations(crate / "examples/confined-return-canary.rs")
+    ]
     for target in EXPECTED_COUNTS:
         inventory.setdefault(target, [])
         duplicates = sorted(
@@ -149,6 +162,10 @@ def header_target(kind: str, path: str) -> str:
         return "lib"
     if kind == "unittests" and path == "src/bin/chio-cage-init.rs":
         return "bin_chio_cage_init"
+    if kind == "unittests" and path == "src/bin/chio-confined-reader.rs":
+        return "bin_chio_confined_reader"
+    if kind == "unittests" and path == "examples/confined-return-canary.rs":
+        return "example_confined_return_canary"
     if kind == "tests/" and path.endswith(".rs"):
         return Path(path).stem
     raise InventoryError(f"unrecognized chio-cage target header: {kind}{path}")

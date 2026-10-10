@@ -1,0 +1,28 @@
+   Compiling chio-store-sqlite v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-store-sqlite)
+   Compiling chio-process v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-process)
+   Compiling chio-secret-broker v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-secret-broker)
+   Compiling chio-conformance v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/tooling/chio-conformance)
+   Compiling chio-control-plane v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-control-plane)
+    Finished `test` profile [unoptimized] target(s) in 1m 37s
+     Running unittests src/lib.rs (target/debug/deps/chio_control_plane-7c73bd7964d7c479)
+
+running 16 tests
+test confinement::channels::tests::p5_private_channel_overflow_returns_no_content_or_diagnostic_body ... ok
+test confinement::channels::tests::p5_private_channels_preserve_only_bounded_bytes_and_close_input ... ok
+test confinement::channels::tests::p5_private_channels_use_absolute_deadline_without_chunk_renewal ... ok
+test recovery::tests::knowledge::confinement::p5_native_attachment_requires_live_journal_ancestry_and_retained_signed_capability ... ok
+test recovery::tests::knowledge::confinement::p5_native_cancel_revokes_context_and_keeps_inputs_pinned_and_slot_consumed ... ok
+test recovery::tests::knowledge::confinement::p5_native_cancelled_principal_cannot_be_reissued_into_a_fresh_observation ... ok
+test recovery::tests::knowledge::confinement::p5_native_capability_issuer_and_actual_delegation_right_are_required ... ok
+test recovery::tests::knowledge::confinement::p5_native_forged_seed_and_capability_substitution_cannot_fork_context ... ok
+test recovery::tests::knowledge::confinement::p5_native_lost_reservation_and_attachment_acknowledgements_keep_original_slot ... ok
+test recovery::tests::knowledge::confinement::p5_native_ordinary_fork_retains_root_lineage_and_tainted_parent_control ... ok
+test recovery::tests::knowledge::confinement::p5_native_original_tree_quota_denies_attachment_without_refunding_native_slot ... ok
+test recovery::tests::knowledge::confinement::p5_native_permanent_counts_stop_epoch_churn_at_tree_limit ... ok
+test recovery::tests::knowledge::confinement::p5_native_profile_downgrade_and_integrity_root_alias_refuse ... ok
+test recovery::tests::knowledge::confinement::p5_native_protected_boundary_and_quota_tampering_cannot_reactivate_context ... ok
+test recovery::tests::knowledge::confinement::p5_native_reservation_replay_and_reopened_journal_keep_one_host_identity ... ok
+test recovery::tests::knowledge::confinement::p5_native_sensitive_observation_waits_for_real_enforcement ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 1219 filtered out; finished in 19.77s
+

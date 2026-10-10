@@ -1,0 +1,20 @@
+    Finished `test` profile [unoptimized] target(s) in 0.75s
+     Running unittests src/lib.rs (target/recovery-p5-linux/host/debug/deps/chio_control_plane-6f8003448d0ced3f)
+
+running 1 test
+test recovery::tests::knowledge::setup::p6_setup_every_foreign_binding_and_old_profile_refuses ... 
+thread 'recovery::tests::knowledge::setup::p6_setup_every_foreign_binding_and_old_profile_refuses' (66115) panicked at crates/platform/chio-control-plane/src/recovery/tests/knowledge/setup.rs:104:5:
+assertion `left == right` failed
+  left: 0
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    recovery::tests::knowledge::setup::p6_setup_every_foreign_binding_and_old_profile_refuses
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1266 filtered out; finished in 23.84s
+
+error: test failed, to rerun pass `-p chio-control-plane --lib`

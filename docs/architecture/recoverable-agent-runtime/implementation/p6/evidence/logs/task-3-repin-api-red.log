@@ -1,0 +1,49 @@
+    Checking chio-store-sqlite v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-store-sqlite)
+    Checking chio-conformance v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/tooling/chio-conformance)
+    Checking chio-secret-broker v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-secret-broker)
+    Checking chio-control-plane v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-control-plane)
+error[E0432]: unresolved import `crate::recovery::RecoverySetupHost`
+ --> crates/platform/chio-control-plane/src/recovery/tests/knowledge/setup.rs:4:5
+  |
+4 | use crate::recovery::RecoverySetupHost;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `RecoverySetupHost` in `recovery`
+
+error[E0599]: no function or associated item named `for_creation` found for struct `recovery::setup::RecoverySetupService` in the current scope
+   --> crates/platform/chio-control-plane/src/recovery/tests/knowledge/setup.rs:138:45
+    |
+138 |     let replacement = RecoverySetupService::for_creation(host,&f.f.control,&creation).await?;
+    |                                             ^^^^^^^^^^^^ function or associated item not found in `recovery::setup::RecoverySetupService`
+    |
+   ::: crates/platform/chio-control-plane/src/recovery/setup.rs:16:1
+    |
+ 16 | pub struct RecoverySetupService {
+    | ------------------------------- function or associated item `for_creation` not found for this struct
+    |
+note: if you're trying to build a new `recovery::setup::RecoverySetupService`, consider using `recovery::setup::RecoverySetupService::new` which returns `std::result::Result<recovery::setup::RecoverySetupService, recovery::runtime::RecoveryRuntimeError>`
+   --> crates/platform/chio-control-plane/src/recovery/setup.rs:31:5
+    |
+ 31 | /     pub fn new(
+ 32 | |         runtime: Arc<RecoveryRuntime>,
+ 33 | |         store: Arc<SqliteAdmissionOperationStore>,
+ 34 | |         fence: StoreMutationFence,
+...   |
+ 37 | |         workflow: WorkflowId,
+ 38 | |     ) -> Result<Self, RecoveryRuntimeError> {
+    | |___________________________________________^
+
+error[E0282]: type annotations needed
+   --> crates/platform/chio-control-plane/src/recovery/tests/knowledge/setup.rs:138:9
+    |
+138 |     let replacement = RecoverySetupService::for_creation(host,&f.f.control,&creation).await?;
+    |         ^^^^^^^^^^^
+139 |     assert_ne!(replacement.workflow(),&workflow);
+    |                ----------- type must be known at this point
+    |
+help: consider giving `replacement` an explicit type
+    |
+138 |     let replacement: /* Type */ = RecoverySetupService::for_creation(host,&f.f.control,&creation).await?;
+    |                    ++++++++++++
+
+Some errors have detailed explanations: E0282, E0432, E0599.
+For more information about an error, try `rustc --explain E0282`.
+error: could not compile `chio-control-plane` (lib test) due to 3 previous errors

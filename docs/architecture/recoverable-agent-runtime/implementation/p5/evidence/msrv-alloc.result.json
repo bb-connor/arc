@@ -1,0 +1,26 @@
+{
+  "id": "msrv-alloc",
+  "actual_command": [
+    "cargo",
+    "+1.93.0",
+    "check",
+    "--offline",
+    "--locked",
+    "--manifest-path",
+    "fixtures/recovery-portable-consumer/Cargo.toml"
+  ],
+  "cwd": ".",
+  "environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2",
+    "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+  },
+  "exit_code": 0,
+  "status": "passed",
+  "started_unix_seconds": 1791161508,
+  "duration_seconds": 0.882,
+  "log": "evidence/msrv-alloc.log",
+  "log_sha256": "dd621e9ff7c9eac161c730aa8a79332dd68698435a7a84d044d9ad39dfa1f5d2",
+  "required_for_local_phase_acceptance": true,
+  "source_binding": "562a3c3556f31e5afedbd7c7a426e542cc5e8cd51c28a7a43d8e9704ba4e9bc4"
+}

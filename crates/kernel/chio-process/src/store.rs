@@ -10,25 +10,78 @@ use crate::{digest, Checkpoint, ProcessError, ProcessLimits, ProcessSnapshot, Pr
 
 mod blobs;
 mod children;
+mod confined_delivery;
+mod confined_slots;
 #[cfg(feature = "worker-server")]
 mod credentials;
+mod knowledge;
+pub(crate) mod native_return_custody;
 mod nonces;
+mod objects;
+mod original_snapshot;
+mod recovery;
+mod unused_recovery_reservation;
+pub(crate) use original_snapshot::OriginalProcessSnapshot;
 
 pub(crate) struct Store {
     connection: Connection,
     pub namespace: String,
+    path: std::path::PathBuf,
+    #[cfg(unix)]
+    identity: (u64, u64),
 }
 
 impl Store {
     pub fn open(path: &Path, authority: &str, kernel_key: &str) -> Result<Self, ProcessError> {
         let path = private_file(path)?;
-        let mut connection = Connection::open(path)?;
+        #[cfg(unix)]
+        let identity = {
+            use std::os::unix::fs::MetadataExt;
+            let file = std::fs::symlink_metadata(&path)?;
+            (file.dev(), file.ino())
+        };
+        let mut connection = Connection::open_with_flags(
+            &path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE
+                | rusqlite::OpenFlags::SQLITE_OPEN_CREATE
+                | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX
+                | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
+        )?;
         connection.busy_timeout(Duration::from_secs(5))?;
         connection.pragma_update(None, "journal_mode", "WAL")?;
         connection.pragma_update(None, "synchronous", "FULL")?;
         connection.pragma_update(None, "foreign_keys", "ON")?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        confined_delivery::verify_before_open(&tx)?;
+        unused_recovery_reservation::verify_before_open(&tx)?;
+        // Earlier triggers fenced a single version instead of preventing only
+        // downgrades. Replace them before a supported journal upgrade.
+        tx.execute_batch(
+            "DROP TRIGGER IF EXISTS process_recovery_version_monotone;
+            DROP TRIGGER IF EXISTS process_knowledge_no_downgrade;",
+        )?;
         tx.execute_batch(include_str!("store.sql"))?;
+        tx.execute_batch("CREATE TRIGGER process_knowledge_no_downgrade BEFORE UPDATE OF version ON process_runtime
+            WHEN OLD.version>=3 AND NEW.version<OLD.version
+            BEGIN SELECT RAISE(ABORT,'knowledge enforcement is permanent'); END;")?;
+        let has_legacy = tx
+            .prepare("PRAGMA table_info(process_state_blobs)")?
+            .query_map([], |row| row.get::<_, String>(1))?
+            .collect::<Result<Vec<_>, _>>()?
+            .iter()
+            .any(|column| column == "legacy_quarantined");
+        if !has_legacy {
+            tx.execute_batch("ALTER TABLE process_state_blobs ADD COLUMN legacy_quarantined INTEGER NOT NULL DEFAULT 1 CHECK(legacy_quarantined IN(0,1))")?;
+        }
+        let has_generation = tx
+            .prepare("PRAGMA table_info(process_state_blobs)")?
+            .query_map([], |row| row.get::<_, String>(1))?
+            .collect::<Result<Vec<_>, _>>()?
+            .iter()
+            .any(|column| column == "knowledge_generation");
+        if !has_generation {
+            tx.execute_batch("ALTER TABLE process_state_blobs ADD COLUMN knowledge_generation TEXT NOT NULL DEFAULT 'legacy' CHECK(length(knowledge_generation) BETWEEN 1 AND 64)")?;
+        }
         // Journals created before dispatch attempts were recorded gain the column;
         // their existing operations keep attempt one and its request identity.
         let has_attempts = tx
@@ -51,15 +104,31 @@ impl Store {
             "SELECT version, namespace, authority, kernel_key FROM process_runtime WHERE singleton = 1",
             [], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
         )?;
-        if version != 1 || stored_authority != authority || stored_key != kernel_key {
+        if !matches!(version, 1..=7) || stored_authority != authority || stored_key != kernel_key {
             return Err(ProcessError::Configuration(
                 "process journal belongs to a different durable authority, kernel key or version",
             ));
         }
+        if version < 5
+            && tx.query_row(
+                "SELECT EXISTS(SELECT 1 FROM process_confined_return_slots)",
+                [],
+                |row| row.get::<_, bool>(0),
+            )?
+        {
+            return Err(ProcessError::Configuration(
+                "confined return data requires its journal version",
+            ));
+        }
+        unused_recovery_reservation::install_or_verify(&tx, version)?;
+        confined_delivery::install_or_verify(&tx, version)?;
         tx.commit()?;
         Ok(Self {
             connection,
             namespace,
+            path,
+            #[cfg(unix)]
+            identity,
         })
     }
 
@@ -89,6 +158,38 @@ impl Store {
         }
         result.reverse();
         Ok(result)
+    }
+
+    /// Host storage custody preserves exact ancestry after execution ends.
+    /// This grants neither original token liveness nor a new journal attachment.
+    pub(crate) fn retained_lineage(
+        &self,
+        id: &str,
+    ) -> Result<(ProcessSnapshot, Vec<CapabilityToken>), ProcessError> {
+        let snapshot = self.process(id)?;
+        let mut process = snapshot.clone();
+        let mut result = Vec::new();
+        loop {
+            let parent = process.parent_id;
+            result.push(process.capability);
+            if result.len() > 65 {
+                return Err(ProcessError::Invalid(
+                    "process lineage exceeds maximum depth",
+                ));
+            }
+            let Some(parent) = parent else {
+                if process.id != snapshot.root_id {
+                    return Err(ProcessError::Conflict);
+                }
+                break;
+            };
+            process = self.process(&parent)?;
+            if process.root_id != snapshot.root_id {
+                return Err(ProcessError::Conflict);
+            }
+        }
+        result.reverse();
+        Ok((snapshot, result))
     }
 
     pub fn create_root(
@@ -140,6 +241,7 @@ impl Store {
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        unused_recovery_reservation::require_open_recovery_reservation(&tx, id, key)?;
         let process =
             read_process(&tx, id)?.ok_or_else(|| ProcessError::NotFound(id.to_owned()))?;
         require_running(&process)?;
@@ -152,6 +254,17 @@ impl Store {
             "SELECT request_hash FROM process_calls WHERE process_id = ?1 AND operation_key = ?2",
             params![id, key], |row| row.get(0),
         ).optional()?;
+        let reserved: Option<Option<String>> = tx.query_row(
+            "SELECT final_binding FROM process_recovery_calls WHERE process_id=?1 AND operation_key=?2",
+            params![id,key],|row| row.get(0),
+        ).optional()?;
+        if reserved
+            .as_ref()
+            .is_some_and(|binding| binding.as_deref() != Some(request_hash))
+            || (reserved.is_some() && existing.is_none())
+        {
+            return Err(ProcessError::Conflict);
+        }
         match existing {
             Some(hash) if hash != request_hash => return Err(ProcessError::Conflict),
             Some(_) => {}
@@ -260,7 +373,11 @@ impl Store {
                 UNION ALL SELECT p.id FROM processes p JOIN descendants d ON p.parent_id = d.id
              ) UPDATE processes SET state = 'cancelled' WHERE id IN (SELECT id FROM descendants) AND state = 'running'", [id],
         )?;
+        let ordered = confined_delivery::cancellation_has_ordered_return(&tx, id);
         tx.commit()?;
+        if ordered? {
+            return Err(ProcessError::ConfinedReturnAlreadyOrdered);
+        }
         Ok(count)
     }
 }
@@ -410,7 +527,12 @@ pub(crate) fn private_file(path: &Path) -> Result<std::path::PathBuf, ProcessErr
     }
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
+        use std::os::unix::fs::{MetadataExt, PermissionsExt};
+        if file.nlink() != 1 {
+            return Err(ProcessError::Configuration(
+                "process journal cannot have hard-link aliases",
+            ));
+        }
         if file.permissions().mode() & 0o077 != 0 {
             return Err(ProcessError::Configuration(
                 "process journal must be private (mode 0600)",

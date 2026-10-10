@@ -39,7 +39,7 @@ impl NativeEgressCommand {
     pub(crate) fn declassified(
         commitment: EgressFenceCommit,
         consumption: DeclassificationConsumptionEvidenceCommit,
-        signed: &chio_core::SignedDeclassificationGrant,
+        signed: &chio_core::recovery::SignedDisclosureGrant,
     ) -> PortResult<Self> {
         if !signed
             .verify_signature()
@@ -68,6 +68,67 @@ impl NativeEgressCommand {
             Self::Acquire(_) => "acquired",
             Self::Commit(_) | Self::CommitDeclassified { .. } => "committed",
         }
+    }
+
+    /// Construct a first physical commit event. The caller still owns no
+    /// mutation authority; all non-clock material and absolute expiry remain.
+    pub(crate) fn at_event_time(&self, now: u64) -> PortResult<Self> {
+        self.fence()?;
+        let mut command = self.clone();
+        let commitment = match &mut command {
+            Self::Acquire(_) => return Err(PortError::invalid_data()),
+            Self::Commit(commitment) => commitment,
+            Self::CommitDeclassified {
+                commitment,
+                consumption,
+                ..
+            } => {
+                if consumption.consumption.consumed_at_unix_ms != commitment.committed_at_unix_ms {
+                    return Err(PortError::invalid_data());
+                }
+                let body = decode_declassification_receipt(&consumption.receipt)
+                    .map_err(|()| PortError::invalid_data())?;
+                let ActiveDefenseReceiptBody::DeclassificationConsumption(mut body) = body else {
+                    return Err(PortError::invalid_data());
+                };
+                body.header.occurred_at_unix_ms = now;
+                let body = ActiveDefenseReceiptBody::DeclassificationConsumption(body);
+                body.validate().map_err(|_| PortError::invalid_data())?;
+                consumption.consumption.consumed_at_unix_ms = now;
+                consumption.receipt.occurred_at_unix_ms = now;
+                consumption.receipt.canonical_body = CanonicalBody::new(
+                    canonical_json_bytes(&body).map_err(|_| PortError::invalid_data())?,
+                )
+                .map_err(|_| PortError::invalid_data())?;
+                consumption.receipt.body_hash =
+                    body.body_digest().map_err(|_| PortError::invalid_data())?;
+                consumption.receipt.evidence_id =
+                    body.evidence_id().map_err(|_| PortError::invalid_data())?;
+                commitment
+            }
+        };
+        if now < commitment.committed_at_unix_ms {
+            return Err(PortError::invalid_data());
+        }
+        commitment.committed_at_unix_ms = now;
+        command.fence()?;
+        command.validate_observation(now)?;
+        Ok(command)
+    }
+
+    /// Compare a delayed preparation to immutable physical history. This never
+    /// rewrites the retained event or consumes another use.
+    pub(crate) fn matches_preparation(&self, prepared: &Self) -> PortResult<bool> {
+        if self == prepared {
+            return Ok(true);
+        }
+        let now = match self {
+            Self::Acquire(_) => return Ok(false),
+            Self::Commit(commitment) | Self::CommitDeclassified { commitment, .. } => {
+                commitment.committed_at_unix_ms
+            }
+        };
+        Ok(prepared.at_event_time(now)? == *self)
     }
 
     pub(crate) fn fence(&self) -> PortResult<EgressFence> {

@@ -1,0 +1,3 @@
+    Finished `dev` profile [unoptimized] target(s) in 0.43s
+     Running `target/recovery-p5-linux/host/debug/examples/p0_baseline`
+P0_PURE_BASELINE {"digest":{"elapsed_ns":21184191,"max_ns":31369,"p50_ns":20840,"p95_ceiling_ns":250000,"p95_ns":21983,"p99_ns":28264,"samples":1000,"warmups":100},"errors":0,"graph_16_steps":{"elapsed_ns":10397311,"max_ns":17173,"p50_ns":10209,"p95_ceiling_ns":1000000,"p95_ns":10330,"p99_ns":16583,"samples":1000,"warmups":100},"intake":{"elapsed_ns":188125955,"max_ns":426752,"p50_ns":184851,"p95_ceiling_ns":5000000,"p95_ns":201985,"p99_ns":204237,"samples":1000,"warmups":100},"profile":"debug","reduction":{"elapsed_ns":131700,"max_ns":6834,"p50_ns":80,"p95_ceiling_ns":250000,"p95_ns":81,"p99_ns":81,"samples":1000,"warmups":100}}

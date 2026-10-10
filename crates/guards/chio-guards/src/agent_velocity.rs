@@ -271,7 +271,7 @@ impl Guard for AgentVelocityGuard {
             KernelError::Internal("agent-velocity guard state lock poisoned".to_string())
         })?;
 
-        // Phase 1 - RESERVE. Secure a slot for EVERY genuinely-new bucket this
+        // Reserve capacity. Secure a slot for EVERY genuinely-new bucket this
         // request needs across BOTH maps before consuming from EITHER, so a request
         // denied for lack of capacity never inserts an unpaired bucket or burns a
         // token for a call that never ran.
@@ -283,7 +283,7 @@ impl Guard for AgentVelocityGuard {
             return Ok(GuardDecision::deny(Vec::new()));
         }
 
-        // Phase 2 - obtain both buckets (creating the reserved new ones).
+        // Obtain both buckets (creating the reserved new ones).
         let state = &mut *state;
         let mut agent_bucket: Option<&mut TokenBucket> = match agent_limit {
             Some(max_per_agent) => {
@@ -306,7 +306,7 @@ impl Guard for AgentVelocityGuard {
             None => None,
         };
 
-        // Phase 3 - peek BOTH before consuming from EITHER, then commit both.
+        // Peek BOTH before consuming from EITHER, then commit both.
         let agent_ok = agent_bucket
             .as_mut()
             .map(|b| b.can_consume(1))

@@ -1,3 +1,5 @@
+#[path = "admission_coordinator/native_finishing.rs"]
+mod native_finishing;
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
@@ -23,9 +25,15 @@ mod caller_execution_checkpoint;
 pub use caller_execution_checkpoint::{CallerExecutionCheckpoint, CallerExecutionCheckpointHook};
 #[path = "admission_coordinator/collection_context.rs"]
 mod collection_context;
+#[path = "admission_coordinator/compensated_denial.rs"]
+mod compensated_denial;
+pub(in crate::kernel) use compensated_denial::ConfirmedPreDispatchCompensation;
 #[path = "admission_coordinator/execution_nonce.rs"]
 mod execution_nonce;
 pub(crate) use execution_nonce::require_live_nonce;
+#[path = "admission_coordinator/process_nonce_context.rs"]
+mod process_nonce_context;
+pub use process_nonce_context::OriginalProcessNonceContext;
 #[path = "admission_coordinator/federation_context.rs"]
 mod federation_context;
 use federation_context::FrozenFederationContext;
@@ -48,11 +56,17 @@ mod native_acquisition;
 mod native_egress;
 #[path = "admission_coordinator/native_output.rs"]
 mod native_output;
+#[path = "admission_coordinator/output_retention.rs"]
+mod output_retention;
 #[path = "admission_coordinator/payment_journal.rs"]
 mod payment_journal;
+#[path = "admission_coordinator/process_return_participant.rs"]
+mod process_return_participant;
 pub use native_output::NativeSecurityOutputJoinAuthority;
 #[path = "admission_coordinator/recovery.rs"]
 mod recovery;
+#[path = "admission_coordinator/recovery_runtime.rs"]
+mod recovery_runtime;
 #[path = "admission_coordinator/runtime_acquisition.rs"]
 mod runtime_acquisition;
 #[path = "admission_coordinator/runtime_participant.rs"]
@@ -63,11 +77,18 @@ pub use native_acquisition::{
 #[cfg(feature = "admission-test-support")]
 pub(crate) use native_egress::NativeCaptureCheckpointInput;
 #[cfg(feature = "admission-test-support")]
-pub use native_egress::NativeSecurityCaptureCheckpointHook;
-pub use native_egress::NativeSecurityDispatchCaptureAuthority;
-#[cfg(feature = "admission-test-support")]
 pub use native_egress::NativeSecurityEgressCheckpointHook;
-pub use native_egress::{AcquiredNativeSecurityEgress, PreparedNativeSecurityEgress};
+pub use native_egress::{
+    AcquiredNativeSecurityEgress, PreparedNativeSecurityEgress, PreparedNativeSecurityEgressCommit,
+};
+pub use native_egress::{
+    NativeFlowPolicyRefusal, NativeFlowPolicyRefusalOwner, NativeSecurityDispatchCaptureAuthority,
+};
+pub(in crate::kernel) use native_egress::{
+    NativeFlowPolicyWitnessRegistration, RESERVED_NATIVE_POLICY_OWNER,
+};
+#[cfg(feature = "admission-test-support")]
+pub use native_egress::{NativeSecurityCaptureCheckpointHook, NativeSecurityCaptureObserver};
 pub use runtime_acquisition::RuntimeParticipantClaimAuthority;
 #[path = "admission_coordinator/security_release.rs"]
 mod security_release;
@@ -220,6 +241,12 @@ impl DurableAdmissionRuntime {
 }
 
 impl ChioKernel {
+    /// Selected durable authority identity. This is an identifier, not a lease.
+    pub fn durable_authority_id(&self) -> Option<&str> {
+        self.durable_admission_runtime
+            .as_ref()
+            .map(|runtime| runtime.fence.store_uuid.as_str())
+    }
     /// Durable authority identity for runtimes that persist stable request ids.
     /// A process journal must stay bound to this store across restarts, since
     /// opening it against a fresh authority would discard dispatch history.
@@ -382,13 +409,15 @@ fn immutable_tool_admission_request_hash(
     post_return_plan: &DurablePostReturnPlan,
     security_binding: Option<&crate::admission_operation::AdmissionSecurityBindingV1>,
     authority_profile: Option<&crate::admission_operation::AdmissionAuthorityProfileV1>,
+    native_output_retention: Option<&crate::admission_operation::NativeOutputRetentionProfileV1>,
 ) -> Result<AdmissionDigest, KernelError> {
-    crate::admission_operation::immutable_tool_request_hash_with_profile(
+    crate::admission_operation::immutable_tool_request_hash_with_output_retention(
         request,
         matching_grants,
         &post_return_plan.frozen_steps,
         security_binding,
         authority_profile,
+        native_output_retention,
     )
     .map_err(durable_store_error)
 }
@@ -623,7 +652,15 @@ impl ChioKernel {
                 "admission store lacks atomic terminal tool-outcome projection support".to_owned(),
             ));
         }
-        let post_return_plan = self.durable_post_return_plan()?;
+        // A safe Input-only denial may precede capture. Missing selection stays
+        // explicit here and is refused at the actual native capture boundary.
+        let native_output_retention = if native_security_selected {
+            self.native_output_retention.as_deref()
+        } else {
+            None
+        };
+        let post_return_plan =
+            self.durable_post_return_plan_for_fresh_native_profile(native_output_retention)?;
 
         let supplemental_authorization_artifact_digest = request
             .supplemental_authorization
@@ -637,13 +674,16 @@ impl ChioKernel {
             || nonce_participant
             || requires_authority_admission)
             .then_some(authority_profile);
-        let immutable_request_hash = immutable_tool_admission_request_hash(
-            request,
-            matching_grants,
-            &post_return_plan,
-            security_binding.as_ref(),
-            authority_profile.as_ref(),
-        )?;
+        let immutable_request_hash =
+            crate::admission_operation::immutable_tool_request_hash_with_original_semantics(
+                request,
+                matching_grants,
+                &post_return_plan.frozen_steps,
+                security_binding.as_ref(),
+                authority_profile.as_ref(),
+                native_output_retention,
+            )
+            .map_err(durable_store_error)?;
         let action =
             ToolCallAction::from_parameters(request.arguments.clone()).map_err(|error| {
                 KernelError::DurableAdmission(format!(
@@ -722,12 +762,13 @@ impl ChioKernel {
                 )
             })?;
         let retained_request = authority_profile.as_ref().map(|profile| {
-            crate::admission_operation::RetainedToolAdmissionRequestV1::from_admission_with_profile(
+            crate::admission_operation::RetainedToolAdmissionRequestV1::from_admission_with_original_semantics(
                 request,
                 matching_grants,
                 &post_return_plan.frozen_steps,
                 security_binding.as_ref(),
                 Some(profile),
+                native_output_retention,
             )
         })
         .transpose()
@@ -1596,6 +1637,22 @@ impl ChioKernel {
         trusted_now_unix_ms: u64,
         confirmed_payment_unwind: Option<&PreDispatchPaymentUnwindEvidence>,
     ) -> Result<(), KernelError> {
+        self.compensate_durable_admission_before_dispatch_with_observation(
+            operation,
+            verifier_policy,
+            trusted_now_unix_ms,
+            confirmed_payment_unwind,
+        )
+        .map(|_| ())
+    }
+
+    pub(in crate::kernel) fn compensate_durable_admission_before_dispatch_with_observation(
+        &self,
+        operation: &AdmissionOperationV1,
+        verifier_policy: serde_json::Value,
+        trusted_now_unix_ms: u64,
+        confirmed_payment_unwind: Option<&PreDispatchPaymentUnwindEvidence>,
+    ) -> Result<ConfirmedPreDispatchCompensation, KernelError> {
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
@@ -1793,7 +1850,10 @@ impl ChioKernel {
                 "pre-dispatch compensation committed a different terminal operation".to_owned(),
             ));
         }
-        Ok(())
+        Ok(ConfirmedPreDispatchCompensation {
+            context: projection.context().clone(),
+            terminal,
+        })
     }
 
     pub(crate) fn capture_and_commit_durable_dispatch(
@@ -1969,7 +2029,15 @@ fn invocation_output_to_server_output(output: &InvocationOutputV1) -> ToolServer
 fn durable_store_error(
     error: crate::admission_operation::AdmissionOperationStoreError,
 ) -> KernelError {
-    KernelError::DurableAdmission(error.to_string())
+    match error {
+        crate::admission_operation::AdmissionOperationStoreError::RecoveryAuthorityDenied => {
+            KernelError::RecoveryAuthorityDenied
+        }
+        crate::admission_operation::AdmissionOperationStoreError::RecoveryMediationRequired => {
+            KernelError::RecoveryMediationRequired
+        }
+        error => KernelError::DurableAdmission(error.to_string()),
+    }
 }
 
 fn durable_outcome_store_error(error: ToolOutcomeStoreError) -> KernelError {

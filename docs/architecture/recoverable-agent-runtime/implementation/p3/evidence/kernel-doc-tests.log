@@ -1,0 +1,20 @@
+    Finished `test` profile [unoptimized] target(s) in 1.56s
+   Doc-tests chio_kernel
+
+running 13 tests
+test crates/kernel/chio-kernel/src/kernel/active_response_dispatch.rs - kernel::active_response_dispatch::ResponseDispatchPreparationRequest (line 117) - compile fail ... ok
+test crates/kernel/chio-kernel/src/admission_operation/projection.rs - admission_operation::projection::VerifiedAdmissionReceipt (line 118) - compile fail ... ok
+test crates/kernel/chio-kernel/src/runtime/recovery_custody.rs - runtime::recovery_custody::RecoveryRequestCustody (line 13) - compile fail ... ok
+test crates/kernel/chio-kernel/src/recovery/records.rs - recovery::records::RecoveryProviderLookup (line 307) - compile fail ... ok
+test crates/kernel/chio-kernel/src/kernel/active_response_dispatch.rs - kernel::active_response_dispatch::ResponseDispatchPreparationRequest (line 109) - compile fail ... ok
+test crates/kernel/chio-kernel/src/runtime/recovery_review.rs - runtime::recovery_review::RecoveryRequestProjection (line 30) - compile fail ... ok
+test crates/kernel/chio-kernel/src/runtime/recovery_review.rs - runtime::recovery_review::RecoveryRequestProjection (line 23) - compile fail ... ok
+test crates/kernel/chio-kernel/src/recovery/records.rs - recovery::records::RecoveryProviderLookup (line 314) - compile fail ... ok
+test crates/kernel/chio-kernel/src/kernel/verified_treaty.rs - kernel::verified_treaty::VerifiedFederationTreatyMaterial (line 37) - compile fail ... ok
+test crates/kernel/chio-kernel/src/runtime/recovery_custody.rs - runtime::recovery_custody::RecoveryRequestCustody (line 8) - compile fail ... ok
+test crates/kernel/chio-kernel/src/dispatch_status.rs - dispatch_status::QualifiedDispatchStatusProvider (line 166) - compile fail ... ok
+test crates/kernel/chio-kernel/src/recovery/ports.rs - recovery::ports::AuthenticatedRecoveryActor (line 11) - compile fail ... ok
+test crates/kernel/chio-kernel/src/runtime/recovery_review.rs - runtime::recovery_review::RecoveryRequestProjection (line 17) - compile fail ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.33s
+

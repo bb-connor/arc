@@ -1,0 +1,29 @@
+{
+  "id": "p4-native",
+  "actual_command": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "chio-control-plane",
+    "--lib",
+    "p4_",
+    "--",
+    "--test-threads=1"
+  ],
+  "cwd": ".",
+  "environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2",
+    "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+  },
+  "exit_code": 0,
+  "status": "passed",
+  "started_unix_seconds": 1791161382,
+  "duration_seconds": 111.286,
+  "log": "evidence/p4-native.log",
+  "log_sha256": "e3447ef5f639f76a7d76ec5324d41c36ed79089b76eeaff403361126b59cd367",
+  "required_for_local_phase_acceptance": true,
+  "source_binding": "562a3c3556f31e5afedbd7c7a426e542cc5e8cd51c28a7a43d8e9704ba4e9bc4"
+}

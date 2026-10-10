@@ -1,15 +1,18 @@
 //! Observe real allowed and compensated calls without changing their outcome.
-#![cfg(target_os = "linux")]
 
+#[cfg(target_os = "linux")]
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::process::{Command, Output};
 
+#[cfg(target_os = "linux")]
 use chio_core::{
     crypto::{canonical_json_bytes, sha256_hex, Keypair},
     receipt::{body::ChioReceipt, decision::ToolCallAction},
 };
-use serde_json::{json, Value};
+#[cfg(target_os = "linux")]
+use serde_json::json;
+use serde_json::Value;
 
 type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -23,6 +26,7 @@ fn success(output: Output) -> Result<Value> {
     Ok(serde_json::from_slice(&output.stdout)?)
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn retained_calls_bind_real_outcomes_and_reject_resigned_substitutions() -> Result {
     let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
@@ -65,7 +69,7 @@ fn retained_calls_bind_real_outcomes_and_reject_resigned_substitutions() -> Resu
     for name in ["alice", "bob", "carol", "dave"] {
         let folder = root.join(name);
         let artifact = folder.join("observed.json");
-        success(
+        let summary = success(
             Command::new(env!("CARGO_BIN_EXE_chio"))
                 .args(["process", "attest-call", "--state"])
                 .arg(&state)
@@ -79,7 +83,10 @@ fn retained_calls_bind_real_outcomes_and_reject_resigned_substitutions() -> Resu
                 .arg(&artifact)
                 .output()?,
         )?;
+        assert_eq!(summary["qualification_complete"], false);
+        assert_eq!(summary["m5_acceptance_complete"], false);
         let report = success(verify(&artifact, runtime, &folder, &key)?)?;
+        assert_eq!(report["qualification_complete"], false);
         assert_eq!(report["m5_acceptance_complete"], false);
         for check in ["execution_nonces", "receipt_log_inclusion"] {
             assert!(report["checks"]
@@ -201,5 +208,119 @@ fn retained_calls_bind_real_outcomes_and_reject_resigned_substitutions() -> Resu
         assert!(!verify(&path, runtime, &folder, &key)?.status.success());
     }
     assert_eq!(counts, [2, 2]);
+    Ok(())
+}
+
+#[test]
+fn retained_call_reports_preserve_incomplete_qualification_aliases() -> Result {
+    let fixtures =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/process-call-observation");
+    let directory = tempfile::tempdir()?;
+    let retained: Value = serde_json::from_slice(&std::fs::read(fixtures.join("unknown.json"))?)?;
+    let request = directory.path().join("request.json");
+    let context = directory.path().join("context.json");
+    std::fs::write(
+        &request,
+        serde_json::to_vec(&retained["action"]["parameters"]["request"])?,
+    )?;
+    std::fs::write(
+        &context,
+        serde_json::to_vec(&retained["action"]["parameters"]["context"])?,
+    )?;
+    let report = success(
+        Command::new(env!("CARGO_BIN_EXE_chio"))
+            .args(["process", "verify-call", "--artifact"])
+            .arg(fixtures.join("unknown.json"))
+            .arg("--trusted-kernel-pubkey")
+            .arg(fixtures.join("kernel.pub"))
+            .args(["--runtime-id", "714d3643-e7f7-42f9-95b5-6a3a0d734ce8"])
+            .arg("--request")
+            .arg(&request)
+            .arg("--context")
+            .arg(&context)
+            .output()?,
+    )?;
+    assert_eq!(report["qualification_complete"], false);
+    assert_eq!(report["m5_acceptance_complete"], false);
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn retained_call_exports_preserve_incomplete_qualification_aliases() -> Result {
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let directory = tempfile::tempdir()?;
+    let root = directory.path().canonicalize()?;
+    std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700))?;
+    let fixture = success(Command::new("python3")
+        .args(["-c", "import sys,json; from pathlib import Path; import swarm_shared_family; print(json.dumps(swarm_shared_family.exercise(sys.argv[1],Path(sys.argv[2]))))"])
+        .arg(env!("CARGO_BIN_EXE_chio")).arg(&root)
+        .env("PYTHONPATH", std::env::join_paths([
+            repository.join("sdks/python/chio-process/src"),
+            repository.join("crates/products/chio-cli/tests/process_host"),
+        ])?).output()?)?;
+    assert_eq!(fixture["effects"], 2);
+    assert_eq!(fixture["graphs"], 2);
+    let process = fixture["allowed"]
+        .as_array()
+        .and_then(|allowed| allowed.first())
+        .and_then(Value::as_str)
+        .ok_or("actual allowed worker")?;
+    let folder = root.join(process);
+    let state = root.join("state");
+    let artifact = folder.join("exported-call-observation.json");
+    let key = state.join("authority.db.kernel.pub");
+    let runtime = fixture["bootstrap"]["action"]["parameters"]["runtime_id"]
+        .as_str()
+        .ok_or("runtime")?;
+    let summary_output = Command::new(env!("CARGO_BIN_EXE_chio"))
+        .args(["process", "attest-call", "--state"])
+        .arg(&state)
+        .arg("--request")
+        .arg(folder.join("request.json"))
+        .arg("--context")
+        .arg(folder.join("context.json"))
+        .arg("--response")
+        .arg(folder.join("response.json"))
+        .arg("--out")
+        .arg(&artifact)
+        .output()?;
+    eprintln!(
+        "attest_call_alias_stdout={}",
+        String::from_utf8_lossy(&summary_output.stdout)
+    );
+    let summary = success(summary_output)?;
+    let report = success(
+        Command::new(env!("CARGO_BIN_EXE_chio"))
+            .args(["process", "verify-call", "--artifact"])
+            .arg(&artifact)
+            .arg("--trusted-kernel-pubkey")
+            .arg(&key)
+            .arg("--runtime-id")
+            .arg(runtime)
+            .arg("--request")
+            .arg(folder.join("request.json"))
+            .arg("--context")
+            .arg(folder.join("context.json"))
+            .output()?,
+    )?;
+    assert_eq!(report["process_id"], process);
+    assert_eq!(
+        report["artifact_schema"],
+        "chio.process.call-observation.v2"
+    );
+    assert_eq!(report["observed_operation_state"], "completed");
+    for check in ["execution_nonces", "receipt_log_inclusion"] {
+        assert!(report["checks"]
+            .as_array()
+            .ok_or("checks")?
+            .contains(&json!(check)));
+    }
+    let signed: ChioReceipt = serde_json::from_slice(&std::fs::read(&artifact)?)?;
+    assert!(signed.verify_signature()?);
+    assert_eq!(summary["receipt_id"], signed.id);
+    assert_eq!(summary["request_id"], report["request_id"]);
+    assert_eq!(summary["qualification_complete"], false);
+    assert_eq!(summary["m5_acceptance_complete"], false);
     Ok(())
 }

@@ -1,0 +1,9 @@
+    Finished `test` profile [unoptimized] target(s) in 0.62s
+     Running tests/recovery_p0_baseline.rs (target/recovery-p5-linux/host/debug/deps/recovery_p0_baseline-3e251693d800e8a9)
+
+running 1 test
+P0_NATIVE_BASELINE {"profile":"debug","elapsed_ns":16270025466,"warmups":8,"samples":64,"replays":8,"effect_count":72,"logical_call_charges":72,"errors":0,"p50_ns":218406412,"p95_ns":224502188,"p99_ns":239146387,"max_ns":239146387,"fixture":"native admission + SQLite authority/process stores + counting connector"}
+test measured_native_baseline ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 17.59s
+

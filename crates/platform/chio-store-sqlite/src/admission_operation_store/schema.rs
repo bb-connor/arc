@@ -1,4 +1,13 @@
 use super::*;
+mod captured_terminal_format;
+mod command_alias_format;
+mod knowledge_encoding_format;
+mod physical_write_catalog;
+#[cfg(test)]
+pub(in crate::admission_operation_store) use physical_write_catalog::command_catalog_difference_for_test;
+#[cfg(test)]
+pub(in crate::admission_operation_store) use physical_write_catalog::current_command_catalog_model_for_test;
+pub(in crate::admission_operation_store) use physical_write_catalog::verify_physical_command_catalog;
 
 mod clock;
 mod migration_v17;
@@ -18,6 +27,14 @@ mod migration_v31;
 mod migration_v32;
 mod migration_v33;
 mod migration_v34;
+mod recovery_format_migration;
+
+#[cfg(test)]
+pub(super) fn require_predecessor_knowledge_encoding_absence(
+    connection: &Connection,
+) -> Result<(), AdmissionOperationStoreError> {
+    knowledge_encoding_format::require_predecessor_absence(connection)
+}
 
 #[cfg(test)]
 pub(crate) fn pre_caller_wait_schema_fixture() -> String {
@@ -127,7 +144,17 @@ fn migrate_schema(
     if on_disk < 33 {
         migration_v33::verify_pre_migration_schema(&transaction, on_disk)?;
     }
-    migration_v34::verify_pre_migration_schema(&transaction, on_disk)?;
+    if on_disk < 34 {
+        migration_v34::verify_pre_migration_schema(&transaction, on_disk)?;
+    }
+    if on_disk == 34 {
+        verify_admission_operation_schema(&transaction, 34)?;
+        verify_admission_operation_data_invariants(&transaction)?;
+    }
+    recovery_format_migration::verify_predecessor(&transaction, on_disk)?;
+    command_alias_format::verify_predecessor(&transaction, on_disk)?;
+    captured_terminal_format::verify_predecessor(&transaction, on_disk)?;
+    knowledge_encoding_format::verify_predecessor(&transaction, on_disk)?;
     if on_disk < 18 && table_exists(&transaction, "admission_operations")? {
         // The legacy report-after-effect contract could refund an executed
         // caller as pre-dispatch compensation. A refunded terminal is not
@@ -226,6 +253,27 @@ fn migrate_schema(
     transaction
         .execute_batch(super::security_participant_state::nonce_preflight::sql())
         .map_err(sqlite_error)?;
+    transaction
+        .execute_batch(super::recovery::SQL)
+        .map_err(sqlite_error)?;
+    transaction
+        .execute_batch(super::recovery::deployment_history::SQL)
+        .map_err(sqlite_error)?;
+    transaction
+        .execute_batch(super::recovery::historical_holds::SQL)
+        .map_err(sqlite_error)?;
+    transaction
+        .execute_batch(recovery_format_migration::SQL)
+        .map_err(sqlite_error)?;
+    transaction
+        .execute_batch(command_alias_format::SQL)
+        .map_err(sqlite_error)?;
+    if on_disk < 39 {
+        transaction
+            .execute_batch(captured_terminal_format::TERMINAL_SQL)
+            .map_err(sqlite_error)?;
+    }
+    knowledge_encoding_format::install_current(&transaction)?;
     crate::stamp_schema_version(
         &transaction,
         ADMISSION_OPERATION_SCHEMA_KEY,
@@ -242,6 +290,16 @@ fn migrate_schema(
         .map_err(sqlite_error)?;
     if foreign_key_violation {
         return Err(invariant("admission schema migration broke a foreign key"));
+    }
+    #[cfg(test)]
+    if on_disk == 34 {
+        if let Some(marker) = std::env::var_os("CHIO_RECOVERY_MIGRATION_MARKER") {
+            std::fs::write(marker, b"verified-v35-before-commit")
+                .map_err(|_| invariant("migration test marker is unavailable"))?;
+            // The fresh-process parent verifies SQLite crash rollback. No
+            // destructor, Rust unwind or transaction rollback callback runs.
+            std::process::abort();
+        }
     }
     transaction.commit().map_err(sqlite_error)
 }
@@ -553,8 +611,14 @@ pub(crate) fn verify_admission_operation_invariants(
     connection: &Connection,
 ) -> Result<(), AdmissionOperationStoreError> {
     verify_admission_operation_schema(connection, ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION)?;
+    verify_admission_operation_inventory(connection)
+}
 
+fn verify_admission_operation_inventory(
+    connection: &Connection,
+) -> Result<(), AdmissionOperationStoreError> {
     verify_admission_operation_data_invariants(connection)?;
+    super::recovery::verify_all(connection)?;
     super::runtime_participant::verify_all(connection)?;
     super::governed_approval_claim::verify_all(connection)?;
     super::dpop_claim::verify_all(connection)?;
@@ -565,6 +629,8 @@ pub(crate) fn verify_admission_operation_invariants(
         .map(|_| ())
         .map_err(invariant)?;
     super::security_participant_migration::verify_all(connection)?;
+    super::knowledge::publication_capacity::verify_catalog(connection)?;
+    super::product::evidence_reclamation::verify_product_reclamation_inventory(connection)?;
     super::security_participant_state::egress::verify_catalog(connection)?;
     super::security_participant_state::output::verify_catalog(connection)?;
     super::security_participant_state::nonce_preflight::verify_catalog(connection)?;
@@ -585,6 +651,13 @@ fn verify_admission_operation_schema(
         ));
     }
     Ok(())
+}
+
+/// Construct the fixed compiled current catalog DATA. This is not an actual
+/// source, reservation, financing role or successor-format acceptance.
+pub(in crate::admission_operation_store) fn current_admission_write_catalog_model(
+) -> Result<Connection, AdmissionOperationStoreError> {
+    expected_admission_operation_schema(40)
 }
 
 fn expected_admission_operation_schema(
@@ -683,6 +756,50 @@ fn expected_admission_operation_schema(
     if version >= 33 {
         expected
             .execute_batch(super::security_participant_state::nonce_preflight::sql())
+            .map_err(sqlite_error)?;
+    }
+    if version >= 35 {
+        expected
+            .execute_batch(super::recovery::SQL)
+            .map_err(sqlite_error)?;
+    }
+    if version >= 36 {
+        expected
+            .execute_batch(super::recovery::deployment_history::SQL)
+            .map_err(sqlite_error)?;
+    }
+    if version >= 37 {
+        expected
+            .execute_batch(super::recovery::historical_holds::SQL)
+            .map_err(sqlite_error)?;
+        expected
+            .execute_batch(recovery_format_migration::SQL)
+            .map_err(sqlite_error)?;
+    }
+    if version >= 38 {
+        expected
+            .execute_batch(command_alias_format::SQL)
+            .map_err(sqlite_error)?;
+    }
+    if version >= 39 {
+        expected
+            .execute_batch(captured_terminal_format::TERMINAL_SQL)
+            .map_err(sqlite_error)?;
+        if version < 40 {
+            expected
+                .execute_batch(captured_terminal_format::ENCODING_SQL)
+                .map_err(sqlite_error)?;
+        }
+    }
+    if version >= 40 {
+        expected
+            .execute_batch(knowledge_encoding_format::ENCODING_SQL)
+            .map_err(sqlite_error)?;
+        expected
+            .execute_batch(knowledge_encoding_format::REFERENCE_SQL)
+            .map_err(sqlite_error)?;
+        expected
+            .execute_batch(knowledge_encoding_format::CHUNK_ACCOUNTING_SQL)
             .map_err(sqlite_error)?;
     }
     Ok(expected)

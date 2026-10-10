@@ -15,6 +15,13 @@ mod rejection {
     ));
 }
 
+mod policy_witness {
+    include!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/security/adapters/native_flow_policy_witness_tests.rs"
+    ));
+}
+
 mod faults {
     include!(concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -47,32 +54,33 @@ fn configure(mut fixture: Fixture, grant_ttl_secs: u64) -> TestResult<(Fixture, 
     let canonical =
         CanonicalBody::new(chio_core::canonical_json_bytes(&fixture.request.arguments)?)?;
     let now = now_ms()? / 1000;
-    fixture.request.declassification_grant = Some(SignedDeclassificationGrant::sign(
-        DeclassificationGrantBody::new(DeclassificationGrantClaims {
-            grant_id: GrantId::new("native-disclosure")?,
-            capability_id: RecordId::new(&fixture.request.capability.id)?,
-            tenant_id: key.tenant_id().clone(),
-            subject_id: key.principal_id().clone(),
-            agent_id: RecordId::new(&fixture.request.agent_id)?,
-            session_id: key.session_id().clone(),
-            source_label_hash: information_label_hash(&restricted_label())?,
-            target_label: InformationLabel::bottom(),
-            destination_id: DestinationId::new(&fixture.request.server_id)?,
-            tool_name: RecordId::new(&fixture.request.tool_name)?,
-            purpose: purpose.clone(),
-            request_hash: canonical_request_hash(&canonical)?,
-            issued_at_unix_seconds: now,
-            expires_at_unix_seconds: now
-                .checked_add(grant_ttl_secs)
-                .ok_or("grant expiry overflow")?,
-            authority_key_id: RecordId::new("native-disclosure-authority")?,
-        })?,
-        &authority,
-    )?);
-    let resolver = resolver(&fixture, &authority)?;
-    fixture
-        .kernel
-        .set_security_pre_dispatch_hook(Arc::new(resolver.with_captured_lifecycle()));
+    fixture.request.declassification_grant = Some(
+        SignedDeclassificationGrant::sign(
+            DeclassificationGrantBody::new(DeclassificationGrantClaims {
+                grant_id: GrantId::new("native-disclosure")?,
+                capability_id: RecordId::new(&fixture.request.capability.id)?,
+                tenant_id: key.tenant_id().clone(),
+                subject_id: key.principal_id().clone(),
+                agent_id: RecordId::new(&fixture.request.agent_id)?,
+                session_id: key.session_id().clone(),
+                source_label_hash: information_label_hash(&restricted_label())?,
+                target_label: InformationLabel::bottom(),
+                destination_id: DestinationId::new(&fixture.request.server_id)?,
+                tool_name: RecordId::new(&fixture.request.tool_name)?,
+                purpose: purpose.clone(),
+                request_hash: canonical_request_hash(&canonical)?,
+                issued_at_unix_seconds: now,
+                expires_at_unix_seconds: now
+                    .checked_add(grant_ttl_secs)
+                    .ok_or("grant expiry overflow")?,
+                authority_key_id: RecordId::new("native-disclosure-authority")?,
+            })?,
+            &authority,
+        )?
+        .into(),
+    );
+    let resolver = Arc::new(resolver(&fixture, &authority)?.with_captured_lifecycle());
+    resolver.install_captured_on_kernel(&mut fixture.kernel)?;
     Ok((fixture, authority))
 }
 

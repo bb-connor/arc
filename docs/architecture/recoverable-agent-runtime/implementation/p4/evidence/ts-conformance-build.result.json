@@ -1,0 +1,19 @@
+{
+  "id": "ts-conformance-build",
+  "actual_command": [
+    "node",
+    "node_modules/typescript/bin/tsc",
+    "-p",
+    "packages/conformance/tsconfig.json",
+    "--noEmit"
+  ],
+  "cwd": "sdks/typescript",
+  "environment": {},
+  "exit_code": 0,
+  "status": "passed",
+  "started_unix_seconds": 1791074356,
+  "duration_seconds": 0.824,
+  "log": "evidence/ts-conformance-build.log",
+  "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "required_for_local_phase_acceptance": true
+}

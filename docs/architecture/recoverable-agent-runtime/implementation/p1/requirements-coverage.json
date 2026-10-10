@@ -1,0 +1,1035 @@
+{
+  "phase": "P1",
+  "architecture_revision": 3,
+  "requirement_count": 43,
+  "qualification": "implemented, locally verified and reviewed for the supported sequential native support-disclosure profile; production and release qualification remain separate",
+  "requirements": [
+    {
+      "id": "SEC-03",
+      "obligation": "A workflow MUST have at most one unresolved effectful continuation.",
+      "normative_document": "01-security-model.md",
+      "proposed_acceptance_test": "recovery::concurrent_continuation_selection",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_two_coordinators_select_once_and_review_exact_payload"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_cancel_negative_lookup_fences_late_original_admission"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_partial_finality_is_positive_scoped_and_spends_the_original"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        }
+      ]
+    },
+    {
+      "id": "SEC-04",
+      "obligation": "An unknown, delivered-but-denied or awaiting-report operation MUST NOT authorize a replacement effect.",
+      "normative_document": "01-security-model.md",
+      "proposed_acceptance_test": "recovery::deny_receipt_with_unknown_effect",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_fresh_process_cutpoints_preserve_original_ownership"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_partial_finality_is_positive_scoped_and_spends_the_original"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_cancel_negative_lookup_fences_late_original_admission"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        }
+      ]
+    },
+    {
+      "id": "SEC-05",
+      "obligation": "Disclosure/endorsement MUST NOT reduce retained confidentiality or influence history.",
+      "normative_document": "01-security-model.md",
+      "proposed_acceptance_test": "flow::exceptions_preserve_knowledge",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_fresh_process_cutpoints_preserve_original_ownership"
+        },
+        {
+          "source": "crates/security/chio-flow/tests/recovery_authority.rs",
+          "test_or_review_anchor": "recovery_multiple_owners_require_conjunctive_scoped_coverage"
+        }
+      ]
+    },
+    {
+      "id": "SEC-06",
+      "obligation": "All authorization checks MUST bind tenant, authority domain, process and exact action; mismatches refuse.",
+      "normative_document": "01-security-model.md",
+      "proposed_acceptance_test": "authority::cross_context_substitution",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/core/chio-core-types/tests/recovery_p1_contracts.rs",
+          "test_or_review_anchor": "recovery_p1_shared_closed_wire_and_signature_corpus"
+        },
+        {
+          "source": "crates/security/chio-flow/tests/recovery_authority.rs",
+          "test_or_review_anchor": "recovery_resigned_context_substitutions_fail_the_intended_binding"
+        },
+        {
+          "source": "crates/security/chio-flow/tests/recovery_authority.rs",
+          "test_or_review_anchor": "recovery_all_resigned_grant_binding_fields_refuse_foreign_contexts"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests/refusals.rs",
+          "test_or_review_anchor": "recovery_p1_constrained_control_tokens_cannot_skip_their_enforcement"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        }
+      ]
+    },
+    {
+      "id": "SEC-07",
+      "obligation": "Stale serving/coordinator epochs MUST be rejected at every authoritative mutation and capture.",
+      "normative_document": "01-security-model.md",
+      "proposed_acceptance_test": "recovery::stale_owner_after_takeover",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_fresh_process_cutpoints_preserve_original_ownership"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests/refusals.rs",
+          "test_or_review_anchor": "recovery_p1_protected_identity_and_history_tampering_fail_closed"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_rotated_scope_refuses_pending_approval_without_replacing_identity"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        }
+      ]
+    },
+    {
+      "id": "SEC-09",
+      "obligation": "Every data-bearing release MUST be audience-governed for every enabled profile channel, including explanations, errors and retained outputs.",
+      "normative_document": "01-security-model.md",
+      "proposed_acceptance_test": "channels::complete_release_inventory",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests/refusals.rs",
+          "test_or_review_anchor": "recovery_p1_current_preview_clearance_does_not_leak_the_retained_payload"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_transport_closed_replay_and_audience_refusals"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_command_replay_conflict_rotation_and_revocation"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        }
+      ]
+    },
+    {
+      "id": "SEC-10",
+      "obligation": "Cancellation, expiry and Drop MUST NOT imply rollback of an accepted or uncertain external effect.",
+      "normative_document": "01-security-model.md",
+      "proposed_acceptance_test": "recovery::cancel_after_dispatch_cutpoints",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_cancel_after_capture_preserves_effect_and_no_lock_spans_await"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_fresh_process_cutpoints_preserve_original_ownership"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_partial_finality_is_positive_scoped_and_spends_the_original"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        }
+      ]
+    },
+    {
+      "id": "RUST-04",
+      "obligation": "Cancellation and unwinding MUST preserve durable ownership and consumed authority.",
+      "normative_document": "02-rust-design.md",
+      "proposed_acceptance_test": "runtime::abort_at_every_await",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_cancel_after_capture_preserves_effect_and_no_lock_spans_await"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_fresh_process_cutpoints_preserve_original_ownership"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        }
+      ]
+    },
+    {
+      "id": "RUST-05",
+      "obligation": "Async orchestration MUST NOT hold a store transaction across provider awaits.",
+      "normative_document": "02-rust-design.md",
+      "proposed_acceptance_test": "storage::blocked_provider_does_not_hold_writer",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_cancel_after_capture_preserves_effect_and_no_lock_spans_await"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        }
+      ]
+    },
+    {
+      "id": "RUST-09",
+      "obligation": "Live handle auto traits, consuming APIs and supervised task lifetimes MUST preserve exclusive dispatch without relying on Drop or must_use.",
+      "normative_document": "02-rust-design.md",
+      "proposed_acceptance_test": "compile_fail::owner_autotraits_and_consumption",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/kernel/chio-kernel/src/runtime/recovery_custody.rs",
+          "test_or_review_anchor": "compile_fail"
+        },
+        {
+          "source": "crates/kernel/chio-kernel/src/recovery/ports.rs",
+          "test_or_review_anchor": "compile_fail"
+        },
+        {
+          "source": "crates/kernel/chio-kernel/src/recovery/records.rs",
+          "test_or_review_anchor": "compile_fail"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_cancel_after_capture_preserves_effect_and_no_lock_spans_await"
+        }
+      ]
+    },
+    {
+      "id": "REC-01",
+      "obligation": "Workflow creation/commands MUST be idempotent and conflict on changed canonical content.",
+      "normative_document": "03-recovery-protocol.md",
+      "proposed_acceptance_test": "recovery::command_replay_and_substitution",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_command_replay_conflict_rotation_and_revocation"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_transport_closed_replay_and_audience_refusals"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        }
+      ]
+    },
+    {
+      "id": "REC-02",
+      "obligation": "Continuation selection MUST atomically enforce one unresolved effectful continuation.",
+      "normative_document": "03-recovery-protocol.md",
+      "proposed_acceptance_test": "recovery::two_coordinators_select",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_two_coordinators_select_once_and_review_exact_payload"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_fresh_process_cutpoints_preserve_original_ownership"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_cancel_negative_lookup_fences_late_original_admission"
+        }
+      ]
+    },
+    {
+      "id": "REC-03",
+      "obligation": "Approval MUST bind an identity reserved before immutable request admission.",
+      "normative_document": "03-recovery-protocol.md",
+      "proposed_acceptance_test": "recovery::reserve_approve_finalize_restart",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_fresh_process_cutpoints_preserve_original_ownership"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_frozen_denial_gets_a_distinct_successful_native_continuation"
+        }
+      ]
+    },
+    {
+      "id": "REC-04",
+      "obligation": "Existing frozen requests MUST never be rewritten to add grants or refreshed authority.",
+      "normative_document": "03-recovery-protocol.md",
+      "proposed_acceptance_test": "process::frozen_request_authorization_conflict",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_frozen_denial_gets_a_distinct_successful_native_continuation"
+        },
+        {
+          "source": "crates/kernel/chio-process/src/binding.rs",
+          "test_or_review_anchor": "recovery_p1_all_legacy_mode_route_and_profile_bytes_match_the_fixed_reference"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        }
+      ]
+    },
+    {
+      "id": "REC-05",
+      "obligation": "Recovery grants MUST use v2 and refuse downgraded, stripped or cross-workflow bindings.",
+      "normative_document": "03-recovery-protocol.md",
+      "proposed_acceptance_test": "grants::v2_binding_and_downgrade_vectors",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/core/chio-core-types/tests/recovery_p1_contracts.rs",
+          "test_or_review_anchor": "recovery_p1_version_selection_preserves_legacy_bytes_and_refuses_downgrade"
+        },
+        {
+          "source": "crates/core/chio-core-types/tests/recovery_p1_contracts.rs",
+          "test_or_review_anchor": "recovery_p1_shared_closed_wire_and_signature_corpus"
+        },
+        {
+          "source": "crates/security/chio-flow/tests/recovery_authority.rs",
+          "test_or_review_anchor": "recovery_all_resigned_grant_binding_fields_refuse_foreign_contexts"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        }
+      ]
+    },
+    {
+      "id": "REC-06",
+      "obligation": "Owner/compartment approval coverage MUST be verified against operator authority scope.",
+      "normative_document": "03-recovery-protocol.md",
+      "proposed_acceptance_test": "grants::multiple_owners_require_coverage",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/security/chio-flow/tests/recovery_authority.rs",
+          "test_or_review_anchor": "recovery_multiple_owners_require_conjunctive_scoped_coverage"
+        },
+        {
+          "source": "crates/security/chio-flow/tests/recovery_authority.rs",
+          "test_or_review_anchor": "recovery_alias_rotation_and_integrity_powers_cannot_manufacture_coverage"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        }
+      ]
+    },
+    {
+      "id": "REC-07",
+      "obligation": "Approval presentation MUST bind the exact canonical action and authorized preview.",
+      "normative_document": "03-recovery-protocol.md",
+      "proposed_acceptance_test": "approval::display_digest_and_recipient_substitution",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_two_coordinators_select_once_and_review_exact_payload"
+        },
+        {
+          "source": "crates/security/chio-flow/tests/recovery_authority.rs",
+          "test_or_review_anchor": "recovery_resigned_context_substitutions_fail_the_intended_binding"
+        },
+        {
+          "source": "crates/security/chio-flow/tests/recovery_authority.rs",
+          "test_or_review_anchor": "recovery_all_resigned_grant_binding_fields_refuse_foreign_contexts"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        }
+      ]
+    },
+    {
+      "id": "REC-08",
+      "obligation": "Native capture MUST own the recovery participant, grant consumption and budget join.",
+      "normative_document": "03-recovery-protocol.md",
+      "proposed_acceptance_test": "native::recovery_capture_participant_atomicity",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_fresh_process_cutpoints_preserve_original_ownership"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests/refusals.rs",
+          "test_or_review_anchor": "recovery_p1_equal_labels_with_a_new_foreign_generation_are_stale"
+        }
+      ]
+    },
+    {
+      "id": "REC-09",
+      "obligation": "Cross-store attachment MUST recover idempotently without assuming a distributed transaction.",
+      "normative_document": "03-recovery-protocol.md",
+      "proposed_acceptance_test": "recovery::process_authority_bridge_cutpoints",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_fresh_process_cutpoints_preserve_original_ownership"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        }
+      ]
+    },
+    {
+      "id": "REC-10",
+      "obligation": "Active ownership MUST close only from authoritative final effect/no-effect evidence.",
+      "normative_document": "03-recovery-protocol.md",
+      "proposed_acceptance_test": "recovery::closure_requires_all_participants",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_cancel_negative_lookup_fences_late_original_admission"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_partial_finality_is_positive_scoped_and_spends_the_original"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_fresh_process_cutpoints_preserve_original_ownership"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        }
+      ]
+    },
+    {
+      "id": "REC-11",
+      "obligation": "Reconciliation MUST never reset consumed grants or create a fresh identity for an uncertain effect.",
+      "normative_document": "03-recovery-protocol.md",
+      "proposed_acceptance_test": "recovery::unknown_does_not_reset_authority",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_partial_finality_is_positive_scoped_and_spends_the_original"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_fresh_process_cutpoints_preserve_original_ownership"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_cancel_negative_lookup_fences_late_original_admission"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        }
+      ]
+    },
+    {
+      "id": "REC-14",
+      "obligation": "Offer use MUST revalidate scoped versions, fresh revocation, budget and time.",
+      "normative_document": "03-recovery-protocol.md",
+      "proposed_acceptance_test": "recovery::basis_change_between_review_and_capture",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests/refusals.rs",
+          "test_or_review_anchor": "recovery_p1_equal_labels_with_a_new_foreign_generation_are_stale"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_expired_initiating_authority_cannot_renew_pending_work"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_rotated_scope_refuses_pending_approval_without_replacing_identity"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests/refusals.rs",
+          "test_or_review_anchor": "recovery_p1_constrained_control_tokens_cannot_skip_their_enforcement"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        }
+      ]
+    },
+    {
+      "id": "REC-15",
+      "obligation": "Existing pending native approval operations MUST retain their owning resume protocol.",
+      "normative_document": "03-recovery-protocol.md",
+      "proposed_acceptance_test": "recovery::native_pending_approval_adapter",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/governed_approval_replay/claims/migration.rs",
+          "test_or_review_anchor": "v23_upgrade_preserves_active_approval_authority_and_owned_claims"
+        },
+        {
+          "source": "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/native.rs",
+          "test_or_review_anchor": "EffectObservationV1::AwaitingApproval"
+        }
+      ]
+    },
+    {
+      "id": "REC-16",
+      "obligation": "Capture MUST distinguish the proven same-call input observation from unrelated source-generation changes.",
+      "normative_document": "03-recovery-protocol.md",
+      "proposed_acceptance_test": "recovery::self_observation_and_concurrent_knowledge",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests/refusals.rs",
+          "test_or_review_anchor": "recovery_p1_equal_labels_with_a_new_foreign_generation_are_stale"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_fresh_process_cutpoints_preserve_original_ownership"
+        }
+      ]
+    },
+    {
+      "id": "REC-18",
+      "obligation": "Approval/grant issuance MUST retain one exact challenge-bound body across signing, lost acknowledgements, expiry and restart.",
+      "normative_document": "03-recovery-protocol.md",
+      "proposed_acceptance_test": "approval::issuer_sign_attach_publish_cutpoints",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_fresh_process_cutpoints_preserve_original_ownership"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_expired_initiating_authority_cannot_renew_pending_work"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_rotated_scope_refuses_pending_approval_without_replacing_identity"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        }
+      ]
+    },
+    {
+      "id": "REC-19",
+      "obligation": "Admission intent MUST be durable before entering the kernel, and closure MUST fence late admission using authoritative state even when projections are absent.",
+      "normative_document": "03-recovery-protocol.md",
+      "proposed_acceptance_test": "recovery::admit_before_link_and_late_submission",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_cancel_negative_lookup_fences_late_original_admission"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_fresh_process_cutpoints_preserve_original_ownership"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        }
+      ]
+    },
+    {
+      "id": "REC-20",
+      "obligation": "Partial or failed-after-effect settlement MUST spend the step identity independently of result availability and cancellation.",
+      "normative_document": "03-recovery-protocol.md",
+      "proposed_acceptance_test": "recovery::partial_effect_and_delayed_release",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_partial_finality_is_positive_scoped_and_spends_the_original"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_cancel_after_capture_preserves_effect_and_no_lock_spans_await"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_fresh_process_cutpoints_preserve_original_ownership"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        }
+      ]
+    },
+    {
+      "id": "REC-21",
+      "obligation": "Reservation finalization MUST reuse the existing complete process binding and charge the logical-call slot exactly once.",
+      "normative_document": "03-recovery-protocol.md",
+      "proposed_acceptance_test": "process::finalization_binding_and_quota_equivalence",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/kernel/chio-process/src/binding.rs",
+          "test_or_review_anchor": "recovery_p1_all_legacy_mode_route_and_profile_bytes_match_the_fixed_reference"
+        },
+        {
+          "source": "crates/kernel/chio-process/src/store/recovery.rs",
+          "test_or_review_anchor": "recovery_p1_populated_legacy_journal_preserves_bytes_and_refuses_downgrade"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_fresh_process_cutpoints_preserve_original_ownership"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        }
+      ]
+    },
+    {
+      "id": "REC-22",
+      "obligation": "Approval and coverage MUST bind the exact unsigned authorization requirements and satisfy every required authority class for the same action without cycles or duplicated approvers.",
+      "normative_document": "03-recovery-protocol.md",
+      "proposed_acceptance_test": "grants::coverage_conjunction_target_and_binding_graph",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/security/chio-flow/tests/recovery_authority.rs",
+          "test_or_review_anchor": "recovery_multiple_owners_require_conjunctive_scoped_coverage"
+        },
+        {
+          "source": "crates/security/chio-flow/tests/recovery_authority.rs",
+          "test_or_review_anchor": "recovery_resigned_context_substitutions_fail_the_intended_binding"
+        },
+        {
+          "source": "crates/security/chio-flow/tests/recovery_authority.rs",
+          "test_or_review_anchor": "recovery_alias_rotation_and_integrity_powers_cannot_manufacture_coverage"
+        },
+        {
+          "source": "crates/core/chio-core-types/tests/recovery_p1_contracts.rs",
+          "test_or_review_anchor": "recovery_p1_shared_closed_wire_and_signature_corpus"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        }
+      ]
+    },
+    {
+      "id": "REC-23",
+      "obligation": "Finalization MUST retain recoverable exact request and fixed authorization custody separately from credential-free native history.",
+      "normative_document": "03-recovery-protocol.md",
+      "proposed_acceptance_test": "recovery::signed_envelope_custody_after_restart",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_fresh_process_cutpoints_preserve_original_ownership"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests/refusals.rs",
+          "test_or_review_anchor": "recovery_p1_protected_identity_and_history_tampering_fail_closed"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        }
+      ]
+    },
+    {
+      "id": "REC-24",
+      "obligation": "Recovery MUST preserve operation-owned nonce preflight, exact issuance attachment and phase-specific closure without rewriting the frozen process envelope.",
+      "normative_document": "03-recovery-protocol.md",
+      "proposed_acceptance_test": "recovery::nonce_preflight_lost_ack_and_expiry",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_fresh_process_cutpoints_preserve_original_ownership"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_expired_initiating_authority_cannot_renew_pending_work"
+        },
+        {
+          "source": "crates/kernel/chio-process/src/binding.rs",
+          "test_or_review_anchor": "recovery_p1_all_legacy_mode_route_and_profile_bytes_match_the_fixed_reference"
+        }
+      ]
+    },
+    {
+      "id": "CON-12",
+      "obligation": "Provider submission and any retry MUST obey the qualified native effect contract, including deduplication scope, lifetime and complete effect cardinality.",
+      "normative_document": "05-semantic-contracts.md",
+      "proposed_acceptance_test": "contracts::hidden_transport_retry_and_partial_batch",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/connector.rs",
+          "test_or_review_anchor": "pinned_connector_request_keeps_credentials_and_native_correlation_out_of_input"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/connector.rs",
+          "test_or_review_anchor": "pinned_connector_refuses_unscoped_execution_and_unsafe_configuration"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_partial_finality_is_positive_scoped_and_spends_the_original"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_fresh_process_cutpoints_preserve_original_ownership"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        }
+      ]
+    },
+    {
+      "id": "OPS-01",
+      "obligation": "All SDK/CLI paths MUST share Rust-owned recovery semantics and stable command identity.",
+      "normative_document": "08-protocol-operations.md",
+      "proposed_acceptance_test": "protocol::cross_sdk_replay_and_conflict",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_transport_closed_replay_and_audience_refusals"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_command_replay_conflict_rotation_and_revocation"
+        },
+        {
+          "source": "sdks/python/chio-sdk-python/tests/test_recovery_client.py",
+          "test_or_review_anchor": "test_recovery_preserves_canonical_identity_without_automatic_retry"
+        },
+        {
+          "source": "sdks/typescript/packages/conformance/test/recovery_client.test.ts",
+          "test_or_review_anchor": "RecoveryClient"
+        }
+      ]
+    },
+    {
+      "id": "OPS-05",
+      "obligation": "Time and key changes MUST refuse stale authority without corrupting historical recovery.",
+      "normative_document": "08-protocol-operations.md",
+      "proposed_acceptance_test": "operations::clock_rollback_rotation_and_revocation",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_expired_initiating_authority_cannot_renew_pending_work"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_rotated_scope_refuses_pending_approval_without_replacing_identity"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_command_replay_conflict_rotation_and_revocation"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_fresh_process_cutpoints_preserve_original_ownership"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        }
+      ]
+    },
+    {
+      "id": "OPS-06",
+      "obligation": "Store upgrades/rollbacks MUST preserve original identities and reject incompatible serving binaries.",
+      "normative_document": "08-protocol-operations.md",
+      "proposed_acceptance_test": "migration::interrupted_upgrade_and_old_binary",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/schema/recovery.rs",
+          "test_or_review_anchor": "recovery_p1_populated_v34_upgrade_preserves_original_operations_and_global_chain"
+        },
+        {
+          "source": "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/schema/recovery.rs",
+          "test_or_review_anchor": "recovery_p1_os_death_before_upgrade_commit_is_restartable_and_byte_preserving"
+        },
+        {
+          "source": "crates/kernel/chio-process/src/store/recovery.rs",
+          "test_or_review_anchor": "recovery_p1_populated_legacy_journal_preserves_bytes_and_refuses_downgrade"
+        },
+        {
+          "source": "crates/kernel/chio-process/src/binding.rs",
+          "test_or_review_anchor": "recovery_p1_all_legacy_mode_route_and_profile_bytes_match_the_fixed_reference"
+        }
+      ]
+    },
+    {
+      "id": "OPS-08",
+      "obligation": "Telemetry MUST be audience-safe and never substitute for durable ownership/audit state.",
+      "normative_document": "08-protocol-operations.md",
+      "proposed_acceptance_test": "observability::telemetry_loss_and_secret_canaries",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_transport_closed_replay_and_audience_refusals"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests/refusals.rs",
+          "test_or_review_anchor": "recovery_p1_current_preview_clearance_does_not_leak_the_retained_payload"
+        },
+        {
+          "source": "crates/core/chio-core-types/tests/recovery_p1_contracts.rs",
+          "test_or_review_anchor": "recovery_p1_shared_closed_wire_and_signature_corpus"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        }
+      ]
+    },
+    {
+      "id": "OPS-10",
+      "obligation": "Cancellation and notification failures MUST not create new effect attempts.",
+      "normative_document": "08-protocol-operations.md",
+      "proposed_acceptance_test": "operations::cancel_and_delivery_replay",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_cancel_after_capture_preserves_effect_and_no_lock_spans_await"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_fresh_process_cutpoints_preserve_original_ownership"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_command_replay_conflict_rotation_and_revocation"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        }
+      ]
+    },
+    {
+      "id": "OPS-11",
+      "obligation": "Command replay MUST resolve committed identity before stale-revision rejection and freshly authorize every returned projection without reapplying mutations.",
+      "normative_document": "08-protocol-operations.md",
+      "proposed_acceptance_test": "protocol::lost_ack_stale_revision_and_revoked_replay",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_command_replay_conflict_rotation_and_revocation"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_transport_closed_replay_and_audience_refusals"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests/refusals.rs",
+          "test_or_review_anchor": "recovery_p1_current_preview_clearance_does_not_leak_the_retained_payload"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        }
+      ]
+    },
+    {
+      "id": "OPS-12",
+      "obligation": "New recovery intake MUST obey durable per-tenant/authority quotas while preserving headroom and ownership for existing unresolved work.",
+      "normative_document": "08-protocol-operations.md",
+      "proposed_acceptance_test": "operations::workflow_flood_and_disk_headroom",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_workflow_flood_retains_settlement_and_tombstones"
+        },
+        {
+          "source": "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/resources.rs",
+          "test_or_review_anchor": "recovery_p1_pinned_reader_wal_headroom_refuses_intake_and_preserves_committed_data"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_cancel_after_capture_preserves_effect_and_no_lock_spans_await"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        }
+      ]
+    },
+    {
+      "id": "OPS-13",
+      "obligation": "Historical settlement MUST use scoped current recovery authority independently of expired initiating authority, without creating execution rights or bypassing current release checks.",
+      "normative_document": "08-protocol-operations.md",
+      "proposed_acceptance_test": "operations::revoked_caller_settlement_and_lookup_authority",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_fresh_process_cutpoints_preserve_original_ownership"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_partial_finality_is_positive_scoped_and_spends_the_original"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests/refusals.rs",
+          "test_or_review_anchor": "recovery_p1_current_preview_clearance_does_not_leak_the_retained_payload"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        }
+      ]
+    },
+    {
+      "id": "TEST-02",
+      "obligation": "Every security negative MUST have a successful relevant benign counterpart.",
+      "normative_document": "09-conformance.md",
+      "proposed_acceptance_test": "conformance::paired_case_inventory",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        },
+        {
+          "source": "crates/security/chio-flow/tests/recovery_authority.rs",
+          "test_or_review_anchor": "recovery_multiple_owners_require_conjunctive_scoped_coverage"
+        },
+        {
+          "source": "crates/core/chio-core-types/tests/recovery_p1_contracts.rs",
+          "test_or_review_anchor": "recovery_p1_shared_closed_wire_and_signature_corpus"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_transport_closed_replay_and_audience_refusals"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_partial_finality_is_positive_scoped_and_spends_the_original"
+        }
+      ]
+    },
+    {
+      "id": "TEST-03",
+      "obligation": "Crash campaigns MUST use fresh processes and independent effect/evidence checks.",
+      "normative_document": "09-conformance.md",
+      "proposed_acceptance_test": "conformance::native_os_death_cutpoints",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_fresh_process_cutpoints_preserve_original_ownership"
+        },
+        {
+          "source": "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/schema/recovery.rs",
+          "test_or_review_anchor": "recovery_p1_os_death_before_upgrade_commit_is_restartable_and_byte_preserving"
+        }
+      ]
+    },
+    {
+      "id": "TEST-04",
+      "obligation": "Mutation tests MUST reject the intended broken invariant rather than incidental fixture failure.",
+      "normative_document": "09-conformance.md",
+      "proposed_acceptance_test": "conformance::mutation_reason_coverage",
+      "implementation_status": "implemented_and_local_phase_acceptance_passed",
+      "acceptance_anchors": [
+        {
+          "source": "crates/security/chio-flow/tests/recovery_authority.rs",
+          "test_or_review_anchor": "recovery_resigned_context_substitutions_fail_the_intended_binding"
+        },
+        {
+          "source": "crates/security/chio-flow/tests/recovery_authority.rs",
+          "test_or_review_anchor": "recovery_all_resigned_grant_binding_fields_refuse_foreign_contexts"
+        },
+        {
+          "source": "crates/security/chio-flow/tests/recovery_authority.rs",
+          "test_or_review_anchor": "recovery_alias_rotation_and_integrity_powers_cannot_manufacture_coverage"
+        },
+        {
+          "source": "crates/core/chio-core-types/tests/recovery_p1_contracts.rs",
+          "test_or_review_anchor": "recovery_p1_shared_closed_wire_and_signature_corpus"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests/refusals.rs",
+          "test_or_review_anchor": "recovery_p1_equal_labels_with_a_new_foreign_generation_are_stale"
+        },
+        {
+          "source": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+          "test_or_review_anchor": "recovery_p1_native_disclosure_once_and_exact_receipt_replay"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,313 @@
+{
+  "format_version": 1,
+  "scope": "foundation data-only contracts, canonical intake and mandatory assertions; no live grant-v2 or native recovery qualification",
+  "vectors": [
+    {
+      "name": "unknown-retains-original-operation",
+      "contract": "observation",
+      "valid": true,
+      "schema_valid": true,
+      "wire": "{\"continuation_id\":\"continuation-a\",\"control\":\"cancel_requested\",\"effect\":{\"kind\":\"unknown\",\"operation\":{\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"operation_id\":\"operation-original\",\"operation_version\":1}},\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"release\":{\"kind\":\"not_available\"},\"revision\":2,\"schema\":\"chio.recovery.observation.v1\",\"scope\":{\"authority_domain\":\"authority-a\",\"process_id\":\"process-a\",\"tenant_id\":\"tenant-a\"},\"step_id\":\"step-a\",\"version\":1,\"workflow_id\":\"workflow-a\"}"
+    },
+    {
+      "name": "mandatory-profile",
+      "contract": "profile",
+      "valid": true,
+      "schema_valid": true,
+      "wire": "{\"attachment_profile\":\"ordinary\",\"deployment_digest\":[9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9],\"protocol_version\":1,\"required_features\":[\"native_capture\",\"recovery_bound_grant\",\"exact_request_custody\",\"current_audience\"],\"schema\":\"chio.recovery.profile-requirements.v1\"}"
+    },
+    {
+      "name": "one-submission-effect-contract",
+      "contract": "effect_contract",
+      "valid": true,
+      "schema_valid": true,
+      "wire": "{\"account_id\":\"account-a\",\"deduplication\":\"not_assumed\",\"effect_cardinality\":1,\"lookup_finality\":\"exact_operation_authoritative_final\",\"partial_settlement\":\"preserve_spent_identity\",\"provider_id\":\"provider-a\",\"recovery_profile\":{\"attachment_profile\":\"ordinary\",\"deployment_digest\":[9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9],\"protocol_version\":1,\"required_features\":[\"native_capture\",\"recovery_bound_grant\",\"exact_request_custody\",\"current_audience\"],\"schema\":\"chio.recovery.profile-requirements.v1\"},\"resource_id\":\"issue-a\",\"schema\":\"chio.semantic.effect-contract.v1\",\"submission_identity\":\"original_native_operation\",\"transport_retry\":\"no_automatic_retries\",\"version\":1}"
+    },
+    {
+      "name": "effects-authority-knowledge-trajectory",
+      "contract": "trajectory",
+      "valid": true,
+      "schema_valid": true,
+      "wire": "{\"contract_digest\":[2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],\"deterministic_time\":100,\"frames\":[{\"expected\":{\"consumed_authority\":1,\"effect_count\":1,\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"process_request_digest\":[4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4],\"remaining_budget\":9},\"observation\":{\"continuation_id\":\"continuation-a\",\"control\":\"cancel_requested\",\"effect\":{\"kind\":\"unknown\",\"operation\":{\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"operation_id\":\"operation-original\",\"operation_version\":1}},\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"release\":{\"kind\":\"not_available\"},\"revision\":2,\"schema\":\"chio.recovery.observation.v1\",\"scope\":{\"authority_domain\":\"authority-a\",\"process_id\":\"process-a\",\"tenant_id\":\"tenant-a\"},\"step_id\":\"step-a\",\"version\":1,\"workflow_id\":\"workflow-a\"}}],\"policy_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"profile_digest\":[9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9],\"schema\":\"chio.recovery.trajectory.v1\",\"source_digest\":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],\"version\":1}"
+    },
+    {
+      "name": "causal-graph",
+      "contract": "graph",
+      "valid": true,
+      "schema_valid": true,
+      "wire": "{\"nodes\":[{\"dependencies\":[],\"estimated_cost_units\":1,\"step_id\":\"step-a\",\"template_id\":\"read\"},{\"dependencies\":[\"step-a\"],\"estimated_cost_units\":2,\"step_id\":\"step-b\",\"template_id\":\"disclose\"}],\"schema\":\"chio.recovery.dependency-graph.v1\",\"version\":1}"
+    },
+    {
+      "name": "bad-version-2",
+      "contract": "observation",
+      "valid": false,
+      "schema_valid": false,
+      "wire": "{\"continuation_id\":\"continuation-a\",\"control\":\"cancel_requested\",\"effect\":{\"kind\":\"unknown\",\"operation\":{\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"operation_id\":\"operation-original\",\"operation_version\":1}},\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"release\":{\"kind\":\"not_available\"},\"revision\":2,\"schema\":\"chio.recovery.observation.v1\",\"scope\":{\"authority_domain\":\"authority-a\",\"process_id\":\"process-a\",\"tenant_id\":\"tenant-a\"},\"step_id\":\"step-a\",\"version\":2,\"workflow_id\":\"workflow-a\"}"
+    },
+    {
+      "name": "bad-version-None",
+      "contract": "observation",
+      "valid": false,
+      "schema_valid": false,
+      "wire": "{\"continuation_id\":\"continuation-a\",\"control\":\"cancel_requested\",\"effect\":{\"kind\":\"unknown\",\"operation\":{\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"operation_id\":\"operation-original\",\"operation_version\":1}},\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"release\":{\"kind\":\"not_available\"},\"revision\":2,\"schema\":\"chio.recovery.observation.v1\",\"scope\":{\"authority_domain\":\"authority-a\",\"process_id\":\"process-a\",\"tenant_id\":\"tenant-a\"},\"step_id\":\"step-a\",\"version\":null,\"workflow_id\":\"workflow-a\"}"
+    },
+    {
+      "name": "bad-schema-chio.recovery.o",
+      "contract": "observation",
+      "valid": false,
+      "schema_valid": false,
+      "wire": "{\"continuation_id\":\"continuation-a\",\"control\":\"cancel_requested\",\"effect\":{\"kind\":\"unknown\",\"operation\":{\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"operation_id\":\"operation-original\",\"operation_version\":1}},\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"release\":{\"kind\":\"not_available\"},\"revision\":2,\"schema\":\"chio.recovery.observation.v99\",\"scope\":{\"authority_domain\":\"authority-a\",\"process_id\":\"process-a\",\"tenant_id\":\"tenant-a\"},\"step_id\":\"step-a\",\"version\":1,\"workflow_id\":\"workflow-a\"}"
+    },
+    {
+      "name": "bad-workflow_id-None",
+      "contract": "observation",
+      "valid": false,
+      "schema_valid": false,
+      "wire": "{\"continuation_id\":\"continuation-a\",\"control\":\"cancel_requested\",\"effect\":{\"kind\":\"unknown\",\"operation\":{\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"operation_id\":\"operation-original\",\"operation_version\":1}},\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"release\":{\"kind\":\"not_available\"},\"revision\":2,\"schema\":\"chio.recovery.observation.v1\",\"scope\":{\"authority_domain\":\"authority-a\",\"process_id\":\"process-a\",\"tenant_id\":\"tenant-a\"},\"step_id\":\"step-a\",\"version\":1,\"workflow_id\":null}"
+    },
+    {
+      "name": "bad-workflow_id-aaaaaaaaaaaaaaa",
+      "contract": "observation",
+      "valid": false,
+      "schema_valid": false,
+      "wire": "{\"continuation_id\":\"continuation-a\",\"control\":\"cancel_requested\",\"effect\":{\"kind\":\"unknown\",\"operation\":{\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"operation_id\":\"operation-original\",\"operation_version\":1}},\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"release\":{\"kind\":\"not_available\"},\"revision\":2,\"schema\":\"chio.recovery.observation.v1\",\"scope\":{\"authority_domain\":\"authority-a\",\"process_id\":\"process-a\",\"tenant_id\":\"tenant-a\"},\"step_id\":\"step-a\",\"version\":1,\"workflow_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}"
+    },
+    {
+      "name": "bad-workflow_id-../operation",
+      "contract": "observation",
+      "valid": false,
+      "schema_valid": false,
+      "wire": "{\"continuation_id\":\"continuation-a\",\"control\":\"cancel_requested\",\"effect\":{\"kind\":\"unknown\",\"operation\":{\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"operation_id\":\"operation-original\",\"operation_version\":1}},\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"release\":{\"kind\":\"not_available\"},\"revision\":2,\"schema\":\"chio.recovery.observation.v1\",\"scope\":{\"authority_domain\":\"authority-a\",\"process_id\":\"process-a\",\"tenant_id\":\"tenant-a\"},\"step_id\":\"step-a\",\"version\":1,\"workflow_id\":\"../operation\"}"
+    },
+    {
+      "name": "bad-revision-900719925474099",
+      "contract": "observation",
+      "valid": false,
+      "schema_valid": false,
+      "wire": "{\"continuation_id\":\"continuation-a\",\"control\":\"cancel_requested\",\"effect\":{\"kind\":\"unknown\",\"operation\":{\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"operation_id\":\"operation-original\",\"operation_version\":1}},\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"release\":{\"kind\":\"not_available\"},\"revision\":9007199254740992,\"schema\":\"chio.recovery.observation.v1\",\"scope\":{\"authority_domain\":\"authority-a\",\"process_id\":\"process-a\",\"tenant_id\":\"tenant-a\"},\"step_id\":\"step-a\",\"version\":1,\"workflow_id\":\"workflow-a\"}"
+    },
+    {
+      "name": "missing-continuation",
+      "contract": "observation",
+      "valid": false,
+      "schema_valid": false,
+      "wire": "{\"control\":\"cancel_requested\",\"effect\":{\"kind\":\"unknown\",\"operation\":{\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"operation_id\":\"operation-original\",\"operation_version\":1}},\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"release\":{\"kind\":\"not_available\"},\"revision\":2,\"schema\":\"chio.recovery.observation.v1\",\"scope\":{\"authority_domain\":\"authority-a\",\"process_id\":\"process-a\",\"tenant_id\":\"tenant-a\"},\"step_id\":\"step-a\",\"version\":1,\"workflow_id\":\"workflow-a\"}"
+    },
+    {
+      "name": "unknown-protected-field",
+      "contract": "observation",
+      "valid": false,
+      "schema_valid": false,
+      "wire": "{\"authority_override\":\"secret-canary\",\"continuation_id\":\"continuation-a\",\"control\":\"cancel_requested\",\"effect\":{\"kind\":\"unknown\",\"operation\":{\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"operation_id\":\"operation-original\",\"operation_version\":1}},\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"release\":{\"kind\":\"not_available\"},\"revision\":2,\"schema\":\"chio.recovery.observation.v1\",\"scope\":{\"authority_domain\":\"authority-a\",\"process_id\":\"process-a\",\"tenant_id\":\"tenant-a\"},\"step_id\":\"step-a\",\"version\":1,\"workflow_id\":\"workflow-a\"}"
+    },
+    {
+      "name": "unknown-effect-variant",
+      "contract": "observation",
+      "valid": false,
+      "schema_valid": false,
+      "wire": "{\"continuation_id\":\"continuation-a\",\"control\":\"cancel_requested\",\"effect\":{\"kind\":\"retryable\"},\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"release\":{\"kind\":\"not_available\"},\"revision\":2,\"schema\":\"chio.recovery.observation.v1\",\"scope\":{\"authority_domain\":\"authority-a\",\"process_id\":\"process-a\",\"tenant_id\":\"tenant-a\"},\"step_id\":\"step-a\",\"version\":1,\"workflow_id\":\"workflow-a\"}"
+    },
+    {
+      "name": "unknown-cannot-claim-release",
+      "contract": "observation",
+      "valid": false,
+      "schema_valid": false,
+      "wire": "{\"continuation_id\":\"continuation-a\",\"control\":\"cancel_requested\",\"effect\":{\"kind\":\"unknown\",\"operation\":{\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"operation_id\":\"operation-original\",\"operation_version\":1}},\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"release\":{\"kind\":\"released\",\"release_id\":\"release-a\"},\"revision\":2,\"schema\":\"chio.recovery.observation.v1\",\"scope\":{\"authority_domain\":\"authority-a\",\"process_id\":\"process-a\",\"tenant_id\":\"tenant-a\"},\"step_id\":\"step-a\",\"version\":1,\"workflow_id\":\"workflow-a\"}"
+    },
+    {
+      "name": "partial-effect-cannot-be-zero",
+      "contract": "observation",
+      "valid": false,
+      "schema_valid": false,
+      "wire": "{\"continuation_id\":\"continuation-a\",\"control\":\"cancel_requested\",\"effect\":{\"applied_effects\":0,\"kind\":\"partial\",\"operation\":{\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"operation_id\":\"operation-original\",\"operation_version\":1}},\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"release\":{\"kind\":\"not_available\"},\"revision\":2,\"schema\":\"chio.recovery.observation.v1\",\"scope\":{\"authority_domain\":\"authority-a\",\"process_id\":\"process-a\",\"tenant_id\":\"tenant-a\"},\"step_id\":\"step-a\",\"version\":1,\"workflow_id\":\"workflow-a\"}"
+    },
+    {
+      "name": "oversized-digest",
+      "contract": "observation",
+      "valid": false,
+      "schema_valid": false,
+      "wire": "{\"continuation_id\":\"continuation-a\",\"control\":\"cancel_requested\",\"effect\":{\"kind\":\"unknown\",\"operation\":{\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"operation_id\":\"operation-original\",\"operation_version\":1}},\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"release\":{\"kind\":\"not_available\"},\"revision\":2,\"schema\":\"chio.recovery.observation.v1\",\"scope\":{\"authority_domain\":\"authority-a\",\"process_id\":\"process-a\",\"tenant_id\":\"tenant-a\"},\"step_id\":\"step-a\",\"version\":1,\"workflow_id\":\"workflow-a\"}"
+    },
+    {
+      "name": "duplicate-key",
+      "contract": "observation",
+      "valid": false,
+      "schema_valid": true,
+      "wire": "{\"continuation_id\":\"continuation-a\",\"control\":\"cancel_requested\",\"effect\":{\"kind\":\"unknown\",\"operation\":{\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"operation_id\":\"operation-original\",\"operation_version\":1}},\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"release\":{\"kind\":\"not_available\"},\"revision\":2,\"revision\":2,\"schema\":\"chio.recovery.observation.v1\",\"scope\":{\"authority_domain\":\"authority-a\",\"process_id\":\"process-a\",\"tenant_id\":\"tenant-a\"},\"step_id\":\"step-a\",\"version\":1,\"workflow_id\":\"workflow-a\"}"
+    },
+    {
+      "name": "whitespace-encoding",
+      "contract": "observation",
+      "valid": false,
+      "schema_valid": true,
+      "wire": " {\"continuation_id\":\"continuation-a\",\"control\":\"cancel_requested\",\"effect\":{\"kind\":\"unknown\",\"operation\":{\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"operation_id\":\"operation-original\",\"operation_version\":1}},\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"release\":{\"kind\":\"not_available\"},\"revision\":2,\"schema\":\"chio.recovery.observation.v1\",\"scope\":{\"authority_domain\":\"authority-a\",\"process_id\":\"process-a\",\"tenant_id\":\"tenant-a\"},\"step_id\":\"step-a\",\"version\":1,\"workflow_id\":\"workflow-a\"}",
+      "error": "non_canonical"
+    },
+    {
+      "name": "non-integer-number",
+      "contract": "observation",
+      "valid": false,
+      "schema_valid": true,
+      "wire": "{\"continuation_id\":\"continuation-a\",\"control\":\"cancel_requested\",\"effect\":{\"kind\":\"unknown\",\"operation\":{\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"operation_id\":\"operation-original\",\"operation_version\":1}},\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"release\":{\"kind\":\"not_available\"},\"revision\":2.0,\"schema\":\"chio.recovery.observation.v1\",\"scope\":{\"authority_domain\":\"authority-a\",\"process_id\":\"process-a\",\"tenant_id\":\"tenant-a\"},\"step_id\":\"step-a\",\"version\":1,\"workflow_id\":\"workflow-a\"}",
+      "error": "unsafe_integer"
+    },
+    {
+      "name": "stripped-protocol_version",
+      "contract": "profile",
+      "valid": false,
+      "schema_valid": false,
+      "wire": "{\"attachment_profile\":\"ordinary\",\"deployment_digest\":[9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9],\"required_features\":[\"native_capture\",\"recovery_bound_grant\",\"exact_request_custody\",\"current_audience\"],\"schema\":\"chio.recovery.profile-requirements.v1\"}"
+    },
+    {
+      "name": "stripped-deployment_digest",
+      "contract": "profile",
+      "valid": false,
+      "schema_valid": false,
+      "wire": "{\"attachment_profile\":\"ordinary\",\"protocol_version\":1,\"required_features\":[\"native_capture\",\"recovery_bound_grant\",\"exact_request_custody\",\"current_audience\"],\"schema\":\"chio.recovery.profile-requirements.v1\"}"
+    },
+    {
+      "name": "stripped-required_features",
+      "contract": "profile",
+      "valid": false,
+      "schema_valid": false,
+      "wire": "{\"attachment_profile\":\"ordinary\",\"deployment_digest\":[9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9],\"protocol_version\":1,\"schema\":\"chio.recovery.profile-requirements.v1\"}"
+    },
+    {
+      "name": "missing-required-enforcement",
+      "contract": "profile",
+      "valid": false,
+      "schema_valid": false,
+      "wire": "{\"attachment_profile\":\"ordinary\",\"deployment_digest\":[9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9],\"protocol_version\":1,\"required_features\":[\"native_capture\",\"recovery_bound_grant\",\"exact_request_custody\"],\"schema\":\"chio.recovery.profile-requirements.v1\"}"
+    },
+    {
+      "name": "noncanonical-enforcement-order",
+      "contract": "profile",
+      "valid": false,
+      "schema_valid": true,
+      "wire": "{\"attachment_profile\":\"ordinary\",\"deployment_digest\":[9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9],\"protocol_version\":1,\"required_features\":[\"current_audience\",\"exact_request_custody\",\"recovery_bound_grant\",\"native_capture\"],\"schema\":\"chio.recovery.profile-requirements.v1\"}"
+    },
+    {
+      "name": "strict-nonce-profile-without-participant",
+      "contract": "profile",
+      "valid": false,
+      "schema_valid": false,
+      "wire": "{\"attachment_profile\":\"operation_owned_nonce\",\"deployment_digest\":[9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9],\"protocol_version\":1,\"required_features\":[\"native_capture\",\"recovery_bound_grant\",\"exact_request_custody\",\"current_audience\"],\"schema\":\"chio.recovery.profile-requirements.v1\"}"
+    },
+    {
+      "name": "hidden-transport-retry",
+      "contract": "effect_contract",
+      "valid": false,
+      "schema_valid": false,
+      "wire": "{\"account_id\":\"account-a\",\"deduplication\":\"not_assumed\",\"effect_cardinality\":1,\"lookup_finality\":\"exact_operation_authoritative_final\",\"partial_settlement\":\"preserve_spent_identity\",\"provider_id\":\"provider-a\",\"recovery_profile\":{\"attachment_profile\":\"ordinary\",\"deployment_digest\":[9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9],\"protocol_version\":1,\"required_features\":[\"native_capture\",\"recovery_bound_grant\",\"exact_request_custody\",\"current_audience\"],\"schema\":\"chio.recovery.profile-requirements.v1\"},\"resource_id\":\"issue-a\",\"schema\":\"chio.semantic.effect-contract.v1\",\"submission_identity\":\"original_native_operation\",\"transport_retry\":\"automatic\",\"version\":1}"
+    },
+    {
+      "name": "zero-effect-cardinality",
+      "contract": "effect_contract",
+      "valid": false,
+      "schema_valid": false,
+      "wire": "{\"account_id\":\"account-a\",\"deduplication\":\"not_assumed\",\"effect_cardinality\":0,\"lookup_finality\":\"exact_operation_authoritative_final\",\"partial_settlement\":\"preserve_spent_identity\",\"provider_id\":\"provider-a\",\"recovery_profile\":{\"attachment_profile\":\"ordinary\",\"deployment_digest\":[9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9],\"protocol_version\":1,\"required_features\":[\"native_capture\",\"recovery_bound_grant\",\"exact_request_custody\",\"current_audience\"],\"schema\":\"chio.recovery.profile-requirements.v1\"},\"resource_id\":\"issue-a\",\"schema\":\"chio.semantic.effect-contract.v1\",\"submission_identity\":\"original_native_operation\",\"transport_retry\":\"no_automatic_retries\",\"version\":1}"
+    },
+    {
+      "name": "trajectory-missing-effect_count",
+      "contract": "trajectory",
+      "valid": false,
+      "schema_valid": false,
+      "wire": "{\"contract_digest\":[2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],\"deterministic_time\":100,\"frames\":[{\"expected\":{\"consumed_authority\":1,\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"process_request_digest\":[4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4],\"remaining_budget\":9},\"observation\":{\"continuation_id\":\"continuation-a\",\"control\":\"cancel_requested\",\"effect\":{\"kind\":\"unknown\",\"operation\":{\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"operation_id\":\"operation-original\",\"operation_version\":1}},\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"release\":{\"kind\":\"not_available\"},\"revision\":2,\"schema\":\"chio.recovery.observation.v1\",\"scope\":{\"authority_domain\":\"authority-a\",\"process_id\":\"process-a\",\"tenant_id\":\"tenant-a\"},\"step_id\":\"step-a\",\"version\":1,\"workflow_id\":\"workflow-a\"}}],\"policy_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"profile_digest\":[9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9],\"schema\":\"chio.recovery.trajectory.v1\",\"source_digest\":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],\"version\":1}"
+    },
+    {
+      "name": "trajectory-missing-consumed_authority",
+      "contract": "trajectory",
+      "valid": false,
+      "schema_valid": false,
+      "wire": "{\"contract_digest\":[2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],\"deterministic_time\":100,\"frames\":[{\"expected\":{\"effect_count\":1,\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"process_request_digest\":[4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4],\"remaining_budget\":9},\"observation\":{\"continuation_id\":\"continuation-a\",\"control\":\"cancel_requested\",\"effect\":{\"kind\":\"unknown\",\"operation\":{\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"operation_id\":\"operation-original\",\"operation_version\":1}},\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"release\":{\"kind\":\"not_available\"},\"revision\":2,\"schema\":\"chio.recovery.observation.v1\",\"scope\":{\"authority_domain\":\"authority-a\",\"process_id\":\"process-a\",\"tenant_id\":\"tenant-a\"},\"step_id\":\"step-a\",\"version\":1,\"workflow_id\":\"workflow-a\"}}],\"policy_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"profile_digest\":[9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9],\"schema\":\"chio.recovery.trajectory.v1\",\"source_digest\":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],\"version\":1}"
+    },
+    {
+      "name": "trajectory-missing-remaining_budget",
+      "contract": "trajectory",
+      "valid": false,
+      "schema_valid": false,
+      "wire": "{\"contract_digest\":[2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],\"deterministic_time\":100,\"frames\":[{\"expected\":{\"consumed_authority\":1,\"effect_count\":1,\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"process_request_digest\":[4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4]},\"observation\":{\"continuation_id\":\"continuation-a\",\"control\":\"cancel_requested\",\"effect\":{\"kind\":\"unknown\",\"operation\":{\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"operation_id\":\"operation-original\",\"operation_version\":1}},\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"release\":{\"kind\":\"not_available\"},\"revision\":2,\"schema\":\"chio.recovery.observation.v1\",\"scope\":{\"authority_domain\":\"authority-a\",\"process_id\":\"process-a\",\"tenant_id\":\"tenant-a\"},\"step_id\":\"step-a\",\"version\":1,\"workflow_id\":\"workflow-a\"}}],\"policy_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"profile_digest\":[9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9],\"schema\":\"chio.recovery.trajectory.v1\",\"source_digest\":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],\"version\":1}"
+    },
+    {
+      "name": "trajectory-missing-knowledge_digest",
+      "contract": "trajectory",
+      "valid": false,
+      "schema_valid": false,
+      "wire": "{\"contract_digest\":[2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],\"deterministic_time\":100,\"frames\":[{\"expected\":{\"consumed_authority\":1,\"effect_count\":1,\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"process_request_digest\":[4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4],\"remaining_budget\":9},\"observation\":{\"continuation_id\":\"continuation-a\",\"control\":\"cancel_requested\",\"effect\":{\"kind\":\"unknown\",\"operation\":{\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"operation_id\":\"operation-original\",\"operation_version\":1}},\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"release\":{\"kind\":\"not_available\"},\"revision\":2,\"schema\":\"chio.recovery.observation.v1\",\"scope\":{\"authority_domain\":\"authority-a\",\"process_id\":\"process-a\",\"tenant_id\":\"tenant-a\"},\"step_id\":\"step-a\",\"version\":1,\"workflow_id\":\"workflow-a\"}}],\"policy_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"profile_digest\":[9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9],\"schema\":\"chio.recovery.trajectory.v1\",\"source_digest\":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],\"version\":1}"
+    },
+    {
+      "name": "trajectory-missing-native_admission_digest",
+      "contract": "trajectory",
+      "valid": false,
+      "schema_valid": false,
+      "wire": "{\"contract_digest\":[2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],\"deterministic_time\":100,\"frames\":[{\"expected\":{\"consumed_authority\":1,\"effect_count\":1,\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"process_request_digest\":[4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4],\"remaining_budget\":9},\"observation\":{\"continuation_id\":\"continuation-a\",\"control\":\"cancel_requested\",\"effect\":{\"kind\":\"unknown\",\"operation\":{\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"operation_id\":\"operation-original\",\"operation_version\":1}},\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"release\":{\"kind\":\"not_available\"},\"revision\":2,\"schema\":\"chio.recovery.observation.v1\",\"scope\":{\"authority_domain\":\"authority-a\",\"process_id\":\"process-a\",\"tenant_id\":\"tenant-a\"},\"step_id\":\"step-a\",\"version\":1,\"workflow_id\":\"workflow-a\"}}],\"policy_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"profile_digest\":[9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9],\"schema\":\"chio.recovery.trajectory.v1\",\"source_digest\":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],\"version\":1}"
+    },
+    {
+      "name": "trajectory-missing-process_request_digest",
+      "contract": "trajectory",
+      "valid": false,
+      "schema_valid": false,
+      "wire": "{\"contract_digest\":[2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],\"deterministic_time\":100,\"frames\":[{\"expected\":{\"consumed_authority\":1,\"effect_count\":1,\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"remaining_budget\":9},\"observation\":{\"continuation_id\":\"continuation-a\",\"control\":\"cancel_requested\",\"effect\":{\"kind\":\"unknown\",\"operation\":{\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"operation_id\":\"operation-original\",\"operation_version\":1}},\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"release\":{\"kind\":\"not_available\"},\"revision\":2,\"schema\":\"chio.recovery.observation.v1\",\"scope\":{\"authority_domain\":\"authority-a\",\"process_id\":\"process-a\",\"tenant_id\":\"tenant-a\"},\"step_id\":\"step-a\",\"version\":1,\"workflow_id\":\"workflow-a\"}}],\"policy_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"profile_digest\":[9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9],\"schema\":\"chio.recovery.trajectory.v1\",\"source_digest\":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],\"version\":1}"
+    },
+    {
+      "name": "empty-trajectory",
+      "contract": "trajectory",
+      "valid": false,
+      "schema_valid": false,
+      "wire": "{\"contract_digest\":[2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],\"deterministic_time\":100,\"frames\":[],\"policy_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"profile_digest\":[9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9],\"schema\":\"chio.recovery.trajectory.v1\",\"source_digest\":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],\"version\":1}"
+    },
+    {
+      "name": "overlong-dependency-list",
+      "contract": "graph",
+      "valid": false,
+      "schema_valid": false,
+      "wire": "{\"nodes\":[{\"dependencies\":[],\"estimated_cost_units\":1,\"step_id\":\"step-a\",\"template_id\":\"read\"},{\"dependencies\":[\"step-a\",\"step-a\",\"step-a\",\"step-a\",\"step-a\",\"step-a\",\"step-a\",\"step-a\",\"step-a\",\"step-a\",\"step-a\",\"step-a\",\"step-a\",\"step-a\",\"step-a\",\"step-a\",\"step-a\"],\"estimated_cost_units\":2,\"step_id\":\"step-b\",\"template_id\":\"disclose\"}],\"schema\":\"chio.recovery.dependency-graph.v1\",\"version\":1}"
+    },
+    {
+      "name": "wrong-authority_domain",
+      "contract": "observation",
+      "valid": false,
+      "schema_valid": true,
+      "wire": "{\"continuation_id\":\"continuation-a\",\"control\":\"cancel_requested\",\"effect\":{\"kind\":\"unknown\",\"operation\":{\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"operation_id\":\"operation-original\",\"operation_version\":1}},\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"release\":{\"kind\":\"not_available\"},\"revision\":2,\"schema\":\"chio.recovery.observation.v1\",\"scope\":{\"authority_domain\":\"other-context\",\"process_id\":\"process-a\",\"tenant_id\":\"tenant-a\"},\"step_id\":\"step-a\",\"version\":1,\"workflow_id\":\"workflow-a\"}",
+      "expected_scope": {
+        "authority_domain": "authority-a",
+        "process_id": "process-a",
+        "tenant_id": "tenant-a"
+      },
+      "error": "binding_mismatch"
+    },
+    {
+      "name": "wrong-tenant_id",
+      "contract": "observation",
+      "valid": false,
+      "schema_valid": true,
+      "wire": "{\"continuation_id\":\"continuation-a\",\"control\":\"cancel_requested\",\"effect\":{\"kind\":\"unknown\",\"operation\":{\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"operation_id\":\"operation-original\",\"operation_version\":1}},\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"release\":{\"kind\":\"not_available\"},\"revision\":2,\"schema\":\"chio.recovery.observation.v1\",\"scope\":{\"authority_domain\":\"authority-a\",\"process_id\":\"process-a\",\"tenant_id\":\"other-context\"},\"step_id\":\"step-a\",\"version\":1,\"workflow_id\":\"workflow-a\"}",
+      "expected_scope": {
+        "authority_domain": "authority-a",
+        "process_id": "process-a",
+        "tenant_id": "tenant-a"
+      },
+      "error": "binding_mismatch"
+    },
+    {
+      "name": "wrong-process_id",
+      "contract": "observation",
+      "valid": false,
+      "schema_valid": true,
+      "wire": "{\"continuation_id\":\"continuation-a\",\"control\":\"cancel_requested\",\"effect\":{\"kind\":\"unknown\",\"operation\":{\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"operation_id\":\"operation-original\",\"operation_version\":1}},\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"release\":{\"kind\":\"not_available\"},\"revision\":2,\"schema\":\"chio.recovery.observation.v1\",\"scope\":{\"authority_domain\":\"authority-a\",\"process_id\":\"other-context\",\"tenant_id\":\"tenant-a\"},\"step_id\":\"step-a\",\"version\":1,\"workflow_id\":\"workflow-a\"}",
+      "expected_scope": {
+        "authority_domain": "authority-a",
+        "process_id": "process-a",
+        "tenant_id": "tenant-a"
+      },
+      "error": "binding_mismatch"
+    },
+    {
+      "name": "missing-admission-projection-retains-intent",
+      "contract": "observation",
+      "valid": true,
+      "schema_valid": true,
+      "wire": "{\"continuation_id\":\"continuation-a\",\"control\":\"cancel_requested\",\"effect\":{\"admission_intent\":\"intent-original\",\"kind\":\"admission_unresolved\"},\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"release\":{\"kind\":\"not_available\"},\"revision\":2,\"schema\":\"chio.recovery.observation.v1\",\"scope\":{\"authority_domain\":\"authority-a\",\"process_id\":\"process-a\",\"tenant_id\":\"tenant-a\"},\"step_id\":\"step-a\",\"version\":1,\"workflow_id\":\"workflow-a\"}"
+    }
+  ]
+}

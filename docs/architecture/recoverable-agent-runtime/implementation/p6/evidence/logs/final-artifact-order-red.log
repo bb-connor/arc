@@ -1,0 +1,28 @@
+.F
+======================================================================
+FAIL: test_sealed_inventory_matches_verifiers_string_order_with_prefix_directories (test_sources.SourceArchiveTest.test_sealed_inventory_matches_verifiers_string_order_with_prefix_directories)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/implementation/p6/evidence/test_sources.py", line 27, in test_sealed_inventory_matches_verifiers_string_order_with_prefix_directories
+    self.assertEqual(observed, expected)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+AssertionError: Lists differ: ['evidence/final-linux/native.log', 'evidence/final-linux-postf[31 chars]son'] != ['evidence/final-linux-postfix/native.log', 'evidence/final-lin[31 chars]son']
+
+First differing element 0:
+'evidence/final-linux/native.log'
+'evidence/final-linux-postfix/native.log'
+
+- ['evidence/final-linux/native.log',
+-  'evidence/final-linux-postfix/native.log',
+? ^
+
++ ['evidence/final-linux-postfix/native.log',
+? ^
+
++  'evidence/final-linux/native.log',
+   'verification.json']
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.012s
+
+FAILED (failures=1)

@@ -1,0 +1,22 @@
+{
+  "id": "std",
+  "actual_command": [
+    "cargo",
+    "check",
+    "--offline",
+    "--locked",
+    "--manifest-path",
+    "fixtures/recovery-portable-consumer/Cargo.toml",
+    "--features",
+    "std"
+  ],
+  "cwd": ".",
+  "environment": {},
+  "exit_code": 0,
+  "status": "passed",
+  "started_unix_seconds": 1791062815,
+  "duration_seconds": 18.539,
+  "log": "evidence/std.log",
+  "log_sha256": "212929594a57303c8f1f44810a03bf36bf43d63e7e427f03da0613bac03671d5",
+  "required_for_local_phase_acceptance": true
+}

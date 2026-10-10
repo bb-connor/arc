@@ -1,0 +1,25 @@
+{
+  "system": "Linux",
+  "machine": "x86_64",
+  "kernel": "7.0.0-1012-oracle",
+  "rustc": "rustc 1.94.1 (e408947bf 2026-03-25)\nbinary: rustc\ncommit-hash: e408947bfd200af42db322daf0fadfe7e26d3bd1\ncommit-date: 2026-03-25\nhost: x86_64-unknown-linux-gnu\nrelease: 1.94.1\nLLVM version: 21.1.8\n",
+  "cargo": "cargo 1.94.1 (29ea6fb6a 2026-03-24)\n",
+  "profile": "debug",
+  "debug_info": "0",
+  "incremental": false,
+  "build_jobs": 8,
+  "default_stack": true,
+  "host_load_before": [
+    1.56494140625,
+    2.50927734375,
+    2.3828125
+  ],
+  "processor": "AMD EPYC 7J13 64-Core Processor",
+  "declaration_sha256": "af6e6cac2f9ea9f510e41e81c0499c12393c3c5b4ff99a3924cf58dddec10d49",
+  "current_runtime_binding": "b1bcd48cadb7b9c7f1ff5dd4ad8d9910056590e22058527756114e21239c1063",
+  "host_load_after": [
+    1.31396484375,
+    2.3408203125,
+    2.330078125
+  ]
+}

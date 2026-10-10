@@ -1,0 +1,13 @@
+   Compiling chio-control-plane v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-control-plane)
+    Finished `test` profile [unoptimized] target(s) in 3m 11s
+     Running unittests src/lib.rs (target/debug/deps/chio_control_plane-7c73bd7964d7c479)
+
+running 5 tests
+test recovery::tests::knowledge::product::p6_policy_http_projection_rechecks_revoked_audience_without_canaries ... ok
+test recovery::tests::knowledge::product::p6_policy_report_release_rechecks_current_clearance_and_capability ... ok
+test recovery::tests::knowledge::product::p6_policy_report_retains_classification_replay_and_artifact_pins_after_restart ... ok
+test recovery::tests::knowledge::product::p6_policy_reports_stop_at_the_retained_tenant_domain_quota ... ok
+test recovery::tests::knowledge::product::p6_policy_selected_operator_alone_applies_exact_proposal_and_native_target ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 1235 filtered out; finished in 198.19s
+

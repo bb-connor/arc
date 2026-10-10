@@ -1,0 +1,3 @@
+/tmp/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Actual LangGraph/CrewAI native benign, identical replay and revoked replay passed

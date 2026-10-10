@@ -8,11 +8,13 @@ pub mod event;
 pub mod flow;
 pub mod migration;
 pub mod ports;
+pub mod recovery;
 pub mod response;
 pub mod response_dispatch;
 mod response_domains;
 pub mod response_execution;
 pub mod response_simulation;
+pub mod semantic;
 
 pub use response_dispatch::DispatchRejection;
 pub use response_execution::{
@@ -75,3 +77,6 @@ pub use response::{
     ResponseTransitionRecord, MAX_RESPONSE_EFFECTS, MAX_RESPONSE_MUTATIONS,
     RESPONSE_STATE_SCHEMA_VERSION,
 };
+
+pub mod confinement;
+pub mod knowledge;

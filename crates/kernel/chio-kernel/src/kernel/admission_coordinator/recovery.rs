@@ -293,6 +293,11 @@ impl ChioKernel {
                         })?;
                     }
                     AdmissionOperationState::Finalizing => {
+                        if self.quarantine_unavailable_recovery(&operation, trusted_now_unix_ms)? {
+                            // One typed durable hold retains this exact captured
+                            // operation. It grants no replay or replacement rights.
+                            continue;
+                        }
                         let retained_request = self.load_original_request_for_finalization(
                             &operation,
                             trusted_now_unix_ms,

@@ -19,6 +19,13 @@ def sha256(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def source_bytes(path, revision):
+    """Explicit historical validation never presents itself as a live-tree check."""
+    if revision is None:
+        return (ROOT / path).read_bytes()
+    return subprocess.check_output(["git", "show", f"{revision}:{path}"], cwd=ROOT)
+
+
 def require(condition, message):
     if not condition:
         raise ValueError(message)
@@ -88,7 +95,7 @@ def validate_model_evidence():
     }
 
 
-def validate_foundation_evidence():
+def validate_foundation_evidence(revision):
     evidence = json.loads((SPEC / "foundation-tests-third-pass.json").read_text())
     require(evidence["schema"] == "chio.recovery-architecture-foundation-check.v1",
             "unknown foundation test evidence")
@@ -104,13 +111,13 @@ def validate_foundation_evidence():
     require(not evidence["new_architecture_implementation_qualified"],
             "foundation tests cannot qualify proposed architecture")
     for entry in evidence["selected_source_inputs"]:
-        require(sha256(ROOT / entry["path"]) == entry["sha256"],
+        require(hashlib.sha256(source_bytes(entry["path"], revision)).hexdigest() == entry["sha256"],
                 f"foundation test input drift: {entry['path']}")
     return {key: evidence[key] for key in ["command", "passed", "failed", "count_note", "scope",
                                           "record_kind", "new_architecture_implementation_qualified"]}
 
 
-def validate():
+def validate(revision=None):
     registry = json.loads((SPEC / "requirements.json").read_text())
     inventory = json.loads((SPEC / "source-map.json").read_text())
     require(registry["architecture_revision"] == inventory["architecture_revision"] == 3,
@@ -160,7 +167,8 @@ def validate():
     for source in inventory["files"]:
         path = ROOT / source["path"]
         require(path.is_file(), f"missing source: {source['path']}")
-        require(sha256(path) == source["sha256"], f"source drift: {source['path']}")
+        require(hashlib.sha256(source_bytes(source["path"], revision)).hexdigest() == source["sha256"],
+                f"source drift: {source['path']}")
         source_paths.add(source["path"])
     for finding in inventory["findings"]:
         require(set(finding["paths"]) <= source_paths,
@@ -174,10 +182,10 @@ def validate():
     require(ancestry.returncode == 0, "checkout does not contain the architecture source base")
     for path in ["Cargo.toml", "Cargo.lock"]:
         original = subprocess.check_output(["git", "show", f"{source_base}:{path}"], cwd=ROOT)
-        require((ROOT / path).read_bytes() == original, f"root build input changed: {path}")
+        require(source_bytes(path, revision) == original, f"root build input changed: {path}")
 
     review_models = validate_model_evidence()
-    foundation_tests = validate_foundation_evidence()
+    foundation_tests = validate_foundation_evidence(revision)
     model = (SPEC / "model/results.txt").read_text()
     baseline = re.search(r"BASELINE PASS: (\d+) reachable states, (\d+) transitions;", model)
     require(baseline is not None, "model has no completed baseline")
@@ -199,6 +207,8 @@ def validate():
         "schema": "chio.recovery-architecture-validation.v1",
         "status": "structural_checks_passed",
         "scope": "Architecture documents, traceability, source hashes and retained bounded-model evidence only",
+        "source_revision_checked": revision if revision is not None else "working_tree",
+        "live_source_tree_checked": revision is None,
         "requirements": len(records),
         "functionality_mappings": len(registry["functionality_coverage"]),
         "markdown_files": len(markdown_files),
@@ -211,7 +221,8 @@ def validate():
                   "scope": "One effectful step, two continuations/coordinators, two owner epochs; no production proof"},
         "review_models": review_models,
         "root_manifest_and_lock_unchanged": True,
-        "implementation_tests_rerun": True,
+        "implementation_tests_rerun": False,
+        "retained_foundation_test_evidence_verified": True,
         "foundation_test_evidence": foundation_tests,
         "architecture_approved": False,
         "inputs": [{"path": str(p.relative_to(SPEC)), "sha256": sha256(p)} for p in inputs],
@@ -221,10 +232,17 @@ def validate():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--write-report", action="store_true")
+    parser.add_argument("--source-revision", help="Check an explicit historical source revision instead of live inputs")
     args = parser.parse_args()
     # The README links to the report produced by this command. Require the
     # initial report placeholder to exist before validating navigation.
-    result = validate()
+    revision = None
+    if args.source_revision:
+        revision = subprocess.check_output(
+            ["git", "rev-parse", "--verify", f"{args.source_revision}^{{commit}}"],
+            cwd=ROOT, text=True,
+        ).strip()
+    result = validate(revision)
     if args.write_report:
         (SPEC / "validation.json").write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps({k: v for k, v in result.items() if k != "inputs"}, indent=2))

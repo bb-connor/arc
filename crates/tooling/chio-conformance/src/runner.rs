@@ -1035,7 +1035,13 @@ mod tests {
     fn runtime_state_is_private_and_removed_after_the_run() {
         let runtime_state = ConformanceRuntimeState::create()
             .unwrap_or_else(|error| panic!("create conformance runtime state: {error}"));
-        let runtime_root = runtime_state._directory.path().to_path_buf();
+        // State paths are canonical. On macOS the temporary directory may be
+        // named through /var while its canonical identity is under /private/var.
+        let runtime_root = runtime_state
+            ._directory
+            .path()
+            .canonicalize()
+            .unwrap_or_else(|error| panic!("canonicalize runtime directory: {error}"));
         assert_eq!(
             runtime_state.session_db_path.parent(),
             Some(runtime_root.as_path())

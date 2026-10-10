@@ -51,7 +51,8 @@ fn restoring_private_database_before_hydration_cannot_erase_the_anchored_initial
 ) -> AnchoredTestResult {
     let fixture = fixture();
     let source = imported(&fixture, "source")?;
-    let backup = fixture._temp.path().join("before-native.db");
+    // Preserve SQLite's no-symlink policy when temporary paths use an alias.
+    let backup = fs::canonicalize(fixture._temp.path())?.join("before-native.db");
     fixture.store.connection()?.execute(
         "VACUUM INTO ?1",
         [backup.to_str().ok_or("non-UTF8 fixture path")?],

@@ -1,0 +1,34 @@
+   |                        ----- type must be known at this point
+   |
+help: consider giving `probe` an explicit type
+   |
+57 |     let probe: /* Type */ = service.probe(&f.f.control, &workflow).await?;
+   |              ++++++++++++
+
+error[E0282]: type annotations needed
+  --> crates/platform/chio-control-plane/src/recovery/tests/knowledge/setup.rs:74:17
+   |
+74 |         assert!(service.qualify(&f.f.control, &signed).await.is_err());
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot infer type
+
+error[E0282]: type annotations needed
+  --> crates/platform/chio-control-plane/src/recovery/tests/knowledge/setup.rs:84:13
+   |
+84 |     assert!(service.qualify(&f.f.control, &probe).await.is_err());
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot infer type
+
+error[E0599]: no method named `accept_setup_report` found for struct `chio_store_sqlite::SqliteAdmissionOperationStore` in the current scope
+  --> crates/platform/chio-control-plane/src/recovery/tests/knowledge/setup.rs:85:19
+   |
+85 |     assert!(store.accept_setup_report(&report, &f.f.authority.mutation_fence(), now_ms()?).is_err());
+   |                   ^^^^^^^^^^^^^^^^^^^ method not found in `chio_store_sqlite::SqliteAdmissionOperationStore`
+
+error[E0282]: type annotations needed
+  --> crates/platform/chio-control-plane/src/recovery/tests/knowledge/setup.rs:97:13
+   |
+97 |     assert!(service.probe(&f.f.control, &workflow).await.is_err());
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot infer type
+
+Some errors have detailed explanations: E0282, E0432, E0599.
+For more information about an error, try `rustc --explain E0282`.
+error: could not compile `chio-control-plane` (lib test) due to 9 previous errors

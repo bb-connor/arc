@@ -1,0 +1,23 @@
+F..........................................................              [100%]
+=================================== FAILURES ===================================
+___________ test_explanation_view_is_one_request_with_no_full_basis ____________
+
+    @pytest.mark.asyncio
+    async def test_explanation_view_is_one_request_with_no_full_basis():
+        calls=[]
+        async def response(request):
+            calls.append(request)
+            return httpx.Response(200,json=POSITIVE['view'])
+        client=RecoveryClient('https://host.example',transport=httpx.MockTransport(response))
+        try:
+            view=await client.explain('protected-capability','workflow')
+>           assert view.body.projection.summary=='alternatives_under_snapshot'
+E           AssertionError: assert <Summary.alternatives_under_snapshot: 'alternatives_under_snapshot'> == 'alternatives_under_snapshot'
+E            +  where <Summary.alternatives_under_snapshot: 'alternatives_under_snapshot'> = Projection(summary=<Summary.alternatives_under_snapshot: 'alternatives_under_snapshot'>, candidates=[Candidate(template_id=OpaqueId(root='public-remedy'), assessment=<Assessment.feasible_under_snapshot: 'feasible_under_snapshot'>)]).summary
+E            +    where Projection(summary=<Summary.alternatives_under_snapshot: 'alternatives_under_snapshot'>, candidates=[Candidate(template_id=OpaqueId(root='public-remedy'), assessment=<Assessment.feasible_under_snapshot: 'feasible_under_snapshot'>)]) = RecoveryExplanationViewV1(schema_='chio.recovery.explanation-view.v1', version=1, planner_version='chio.recovery.plann...plate_id=OpaqueId(root='public-remedy'), assessment=<Assessment.feasible_under_snapshot: 'feasible_under_snapshot'>)])).projection
+E            +      where RecoveryExplanationViewV1(schema_='chio.recovery.explanation-view.v1', version=1, planner_version='chio.recovery.plann...plate_id=OpaqueId(root='public-remedy'), assessment=<Assessment.feasible_under_snapshot: 'feasible_under_snapshot'>)])) = RecoverySignedExplanationViewV1(body=RecoveryExplanationViewV1(schema_='chio.recovery.explanation-view.v1', version=1,...f2454dca64f55a619f7adfe37a00b325682aab7a3a0c6e56590831cfefef413e5e35c713e90a51de213be64c15c730743c2a43b0cf3ba255cd105').body
+
+sdks/python/chio-sdk-python/tests/test_recovery_explanations.py:17: AssertionError
+=========================== short test summary info ============================
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_explanations.py::test_explanation_view_is_one_request_with_no_full_basis
+1 failed, 58 passed in 2.26s

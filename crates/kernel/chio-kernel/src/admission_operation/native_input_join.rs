@@ -8,6 +8,11 @@ use chio_security_types::ports::{FlowJoinRequest, FlowStateKey, FlowStateSnapsho
 use chio_security_types::InformationLabel;
 use serde::{Deserialize, Serialize};
 
+mod classification;
+pub use classification::{
+    NativeSecurityInputClassificationAuthority, NativeSecurityInputJoinOutcome,
+};
+
 #[derive(Clone, Copy)]
 pub(super) enum InputJoinPhase {
     Dispatch,

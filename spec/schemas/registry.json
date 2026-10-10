@@ -2738,6 +2738,496 @@
       "artifactKind": "verified_approval_set",
       "introducedBy": "enterprise-security-execution-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/capability/verified-approval-set.schema.json"
+    },
+    {
+      "schema": "chio.recovery.observation.v1",
+      "artifactKind": "recovery_observation",
+      "introducedBy": "recovery-contracts",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/observation.schema.json"
+    },
+    {
+      "schema": "chio.recovery.profile-requirements.v1",
+      "artifactKind": "recovery_profile_requirements",
+      "introducedBy": "recovery-contracts",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/profile-requirements.schema.json"
+    },
+    {
+      "schema": "chio.semantic.effect-contract.v1",
+      "artifactKind": "recovery_effect_contract",
+      "introducedBy": "recovery-contracts",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/effect-contract.schema.json"
+    },
+    {
+      "schema": "chio.recovery.dependency-graph.v1",
+      "artifactKind": "recovery_dependency_graph",
+      "introducedBy": "recovery-contracts",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/dependency-graph.schema.json"
+    },
+    {
+      "schema": "chio.recovery.trajectory.v1",
+      "artifactKind": "recovery_trajectory",
+      "introducedBy": "recovery-contracts",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/trajectory.schema.json"
+    },
+    {
+      "schema": "chio.recovery.authorization-requirements.v1",
+      "artifactKind": "recovery_authorization_requirements",
+      "introducedBy": "recovery-authority",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/authorization-requirements.schema.json"
+    },
+    {
+      "schema": "chio.recovery.action-intent.v1",
+      "artifactKind": "recovery_action_intent",
+      "introducedBy": "recovery-authority",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/action-intent.schema.json"
+    },
+    {
+      "schema": "chio.recovery.grant-binding.v1",
+      "artifactKind": "recovery_grant_binding",
+      "introducedBy": "recovery-authority",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/grant-binding.schema.json"
+    },
+    {
+      "schema": "chio.recovery.approval-intent.v1",
+      "artifactKind": "recovery_approval_intent",
+      "introducedBy": "recovery-authority",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/approval-intent.schema.json"
+    },
+    {
+      "schema": "chio.recovery.authority-coverage.v1",
+      "artifactKind": "recovery_authority_coverage",
+      "introducedBy": "recovery-authority",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/authority-coverage.schema.json"
+    },
+    {
+      "schema": "chio.recovery.signed-authority-coverage.v1",
+      "artifactKind": "recovery_signed_authority_coverage",
+      "introducedBy": "recovery-authority",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-authority-coverage.schema.json",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/recovery/authority-coverage.schema.json"
+    },
+    {
+      "schema": "chio.declassification-grant.v2",
+      "artifactKind": "recovery_declassification_grant",
+      "introducedBy": "recovery-authority",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-grant-v2.schema.json"
+    },
+    {
+      "schema": "chio.recovery.command.v1",
+      "artifactKind": "recovery_command",
+      "introducedBy": "recovery-authority",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/command.schema.json"
+    },
+    {
+      "schema": "chio.recovery.provider-finality.v1",
+      "artifactKind": "recovery_provider_finality",
+      "introducedBy": "recovery-authority",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/provider-finality.schema.json"
+    },
+    {
+      "schema": "chio.recovery.signed-provider-finality.v1",
+      "artifactKind": "recovery_signed_provider_finality",
+      "introducedBy": "recovery-authority",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-provider-finality.schema.json",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/recovery/provider-finality.schema.json"
+    },
+    {
+      "schema": "chio.recovery.explanation-snapshot.v1",
+      "artifactKind": "recovery_explanation_snapshot",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/explanation-snapshot.schema.json",
+      "introducedBy": "recovery-explanation"
+    },
+    {
+      "schema": "chio.recovery.remedy-registry.v1",
+      "artifactKind": "recovery_remedy_registry",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/remedy-registry.schema.json",
+      "introducedBy": "recovery-explanation"
+    },
+    {
+      "schema": "chio.recovery.explanation-report.v1",
+      "artifactKind": "recovery_explanation_report",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/explanation-report.schema.json",
+      "introducedBy": "recovery-explanation"
+    },
+    {
+      "schema": "chio.recovery.explanation-view.v1",
+      "artifactKind": "recovery_explanation_view",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/explanation-view.schema.json",
+      "introducedBy": "recovery-explanation"
+    },
+    {
+      "schema": "chio.recovery.signed-explanation-report.v1",
+      "artifactKind": "recovery_signed_explanation_report",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-explanation-report.schema.json",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/recovery/explanation-report.schema.json",
+      "introducedBy": "recovery-explanation"
+    },
+    {
+      "schema": "chio.recovery.signed-explanation-view.v1",
+      "artifactKind": "recovery_signed_explanation_view",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-explanation-view.schema.json",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/recovery/explanation-view.schema.json",
+      "introducedBy": "recovery-explanation"
+    },
+    {
+      "schema": "chio.semantic.package.v1",
+      "artifactKind": "semantic_package",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/semantic-package.schema.json",
+      "introducedBy": "recovery-semantic"
+    },
+    {
+      "schema": "chio.semantic.deployment.v1",
+      "artifactKind": "semantic_deployment",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/semantic-deployment.schema.json",
+      "introducedBy": "recovery-semantic"
+    },
+    {
+      "schema": "chio.semantic.action.v1",
+      "artifactKind": "semantic_action",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/semantic-action.schema.json",
+      "introducedBy": "recovery-semantic"
+    },
+    {
+      "schema": "chio.semantic.payload.v1",
+      "artifactKind": "semantic_payload",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/semantic-payload.schema.json",
+      "introducedBy": "recovery-semantic"
+    },
+    {
+      "schema": "chio.semantic.plan.v1",
+      "artifactKind": "semantic_plan",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/semantic-plan.schema.json",
+      "introducedBy": "recovery-semantic"
+    },
+    {
+      "schema": "chio.semantic.audience.v1",
+      "artifactKind": "semantic_audience",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/semantic-audience.schema.json",
+      "introducedBy": "recovery-semantic"
+    },
+    {
+      "schema": "chio.scoped.endorsement.v1",
+      "artifactKind": "scoped_endorsement",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/scoped-endorsement.schema.json",
+      "introducedBy": "recovery-semantic"
+    },
+    {
+      "schema": "chio.semantic.annotation.v1",
+      "artifactKind": "semantic_annotation",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/semantic-annotation.schema.json",
+      "introducedBy": "recovery-semantic"
+    },
+    {
+      "schema": "chio.semantic.transformation.v1",
+      "artifactKind": "semantic_transformation",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/semantic-transformation.schema.json",
+      "introducedBy": "recovery-semantic"
+    },
+    {
+      "schema": "chio.semantic.prerequisite.v1",
+      "artifactKind": "semantic_prerequisite",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/semantic-prerequisite.schema.json",
+      "introducedBy": "recovery-semantic"
+    },
+    {
+      "schema": "chio.signed.semantic.package.v1",
+      "artifactKind": "signed_semantic_package",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-semantic-package.schema.json",
+      "introducedBy": "recovery-semantic",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/recovery/semantic-package.schema.json"
+    },
+    {
+      "schema": "chio.signed.semantic.deployment.v1",
+      "artifactKind": "signed_semantic_deployment",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-semantic-deployment.schema.json",
+      "introducedBy": "recovery-semantic",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/recovery/semantic-deployment.schema.json"
+    },
+    {
+      "schema": "chio.signed.semantic.audience.v1",
+      "artifactKind": "signed_semantic_audience",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-semantic-audience.schema.json",
+      "introducedBy": "recovery-semantic",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/recovery/semantic-audience.schema.json"
+    },
+    {
+      "schema": "chio.signed.scoped.endorsement.v1",
+      "artifactKind": "signed_scoped_endorsement",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-scoped-endorsement.schema.json",
+      "introducedBy": "recovery-semantic",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/recovery/scoped-endorsement.schema.json"
+    },
+    {
+      "schema": "chio.signed.semantic.annotation.v1",
+      "artifactKind": "signed_semantic_annotation",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-semantic-annotation.schema.json",
+      "introducedBy": "recovery-semantic",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/recovery/semantic-annotation.schema.json"
+    },
+    {
+      "schema": "chio.signed.semantic.transformation.v1",
+      "artifactKind": "signed_semantic_transformation",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-semantic-transformation.schema.json",
+      "introducedBy": "recovery-semantic",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/recovery/semantic-transformation.schema.json"
+    },
+    {
+      "schema": "chio.signed.semantic.prerequisite.v1",
+      "artifactKind": "signed_semantic_prerequisite",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-semantic-prerequisite.schema.json",
+      "introducedBy": "recovery-semantic",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/recovery/semantic-prerequisite.schema.json"
+    },
+    {
+      "schema": "chio.semantic.invocation.v1",
+      "artifactKind": "semantic_invocation",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/semantic-invocation.schema.json",
+      "introducedBy": "recovery-semantic"
+    },
+    {
+      "schema": "chio.semantic.provider.response.v1",
+      "artifactKind": "semantic_provider_response",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/semantic-provider-response.schema.json",
+      "introducedBy": "recovery-semantic"
+    },
+    {
+      "schema": "chio.semantic.provider.request.v1",
+      "artifactKind": "semantic_provider_request",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/semantic-provider-request.schema.json",
+      "introducedBy": "recovery-semantic"
+    },
+    {
+      "schema": "chio.artifact.reference.v1",
+      "artifactKind": "artifact_reference",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/artifact-reference.schema.json",
+      "introducedBy": "recovery-knowledge"
+    },
+    {
+      "schema": "chio.artifact.influence.v1",
+      "artifactKind": "artifact_influence",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/artifact-influence.schema.json",
+      "introducedBy": "recovery-knowledge"
+    },
+    {
+      "schema": "chio.artifact.producer.v1",
+      "artifactKind": "artifact_producer",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/artifact-producer.schema.json",
+      "introducedBy": "recovery-knowledge"
+    },
+    {
+      "schema": "chio.model.context.v1",
+      "artifactKind": "model_context",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/model-context.schema.json",
+      "introducedBy": "recovery-knowledge"
+    },
+    {
+      "schema": "chio.artifact.recipient.v1",
+      "artifactKind": "artifact_recipient",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/artifact-recipient.schema.json",
+      "introducedBy": "recovery-knowledge"
+    },
+    {
+      "schema": "chio.artifact.handle.v1",
+      "artifactKind": "artifact_handle",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/artifact-handle.schema.json",
+      "introducedBy": "recovery-knowledge"
+    },
+    {
+      "schema": "chio.artifact.version.v1",
+      "artifactKind": "artifact_version",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/artifact-version.schema.json",
+      "introducedBy": "recovery-knowledge"
+    },
+    {
+      "schema": "chio.artifact.certificate.v1",
+      "artifactKind": "artifact_certificate",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/artifact-certificate.schema.json",
+      "introducedBy": "recovery-knowledge"
+    },
+    {
+      "schema": "chio.artifact.archive.manifest.v1",
+      "artifactKind": "artifact_archive_manifest",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/artifact-archive-manifest.schema.json",
+      "introducedBy": "recovery-knowledge"
+    },
+    {
+      "schema": "chio.labeled.checkpoint.v1",
+      "artifactKind": "labeled_checkpoint",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/labeled-checkpoint.schema.json",
+      "introducedBy": "recovery-knowledge"
+    },
+    {
+      "schema": "chio.artifact.release.intent.v1",
+      "artifactKind": "artifact_release_intent",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/artifact-release-intent.schema.json",
+      "introducedBy": "recovery-knowledge"
+    },
+    {
+      "schema": "chio.signed.artifact.certificate.v1",
+      "artifactKind": "signed_artifact_certificate",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-artifact-certificate.schema.json",
+      "introducedBy": "recovery-knowledge",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/recovery/artifact-certificate.schema.json"
+    },
+    {
+      "schema": "chio.signed.artifact.archive.manifest.v1",
+      "artifactKind": "signed_artifact_archive_manifest",
+      "version": 1,
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-artifact-archive-manifest.schema.json",
+      "introducedBy": "recovery-knowledge",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/recovery/artifact-archive-manifest.schema.json"
+    },
+    {
+      "schema": "chio.confined-execution-profile.v1",
+      "artifactKind": "confined_execution_profile",
+      "introducedBy": "recovery-confinement",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/confined-execution-profile.schema.json"
+    },
+    {
+      "schema": "chio.confined-limits.v1",
+      "artifactKind": "confined_limits",
+      "introducedBy": "recovery-confinement",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/confined-limits.schema.json"
+    },
+    {
+      "schema": "chio.confined-return-evidence.v1",
+      "artifactKind": "confined_return_evidence",
+      "introducedBy": "recovery-confinement",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/confined-return-evidence.schema.json"
+    },
+    {
+      "schema": "chio.isolation-boundary.v1",
+      "artifactKind": "isolation_boundary",
+      "introducedBy": "recovery-confinement",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/isolation-boundary.schema.json"
+    },
+    {
+      "schema": "chio.return-admission.v1",
+      "artifactKind": "return_admission",
+      "introducedBy": "recovery-confinement",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/return-admission.schema.json"
+    },
+    {
+      "schema": "chio.return-contract.v1",
+      "artifactKind": "return_contract",
+      "introducedBy": "recovery-confinement",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/return-contract.schema.json"
+    },
+    {
+      "schema": "chio.signed-confined-disclosure.v1",
+      "artifactKind": "signed_confined_disclosure",
+      "introducedBy": "recovery-confinement",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-confined-disclosure.schema.json"
+    },
+    {
+      "schema": "chio.signed-confined-endorsement.v1",
+      "artifactKind": "signed_confined_endorsement",
+      "introducedBy": "recovery-confinement",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-confined-endorsement.schema.json"
+    },
+    {
+      "schema": "chio.decision-report.v1",
+      "artifactKind": "decision_report",
+      "introducedBy": "recovery-product",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/decision-report.schema.json"
+    },
+    {
+      "schema": "chio.policy-trajectory-ref.v1",
+      "artifactKind": "policy_trajectory_ref",
+      "introducedBy": "recovery-product",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/policy-trajectory-ref.schema.json"
+    },
+    {
+      "schema": "chio.policy-maintenance-proposal.v1",
+      "artifactKind": "policy_maintenance_proposal",
+      "introducedBy": "recovery-product",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/policy-maintenance-proposal.schema.json"
+    },
+    {
+      "schema": "chio.policy-deployment-change.v1",
+      "artifactKind": "policy_deployment_change",
+      "introducedBy": "recovery-product",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/policy-deployment-change.schema.json"
+    },
+    {
+      "schema": "chio.recovery-setup-probe.v1",
+      "artifactKind": "recovery_setup_probe",
+      "introducedBy": "recovery-product",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/recovery-setup-probe.schema.json"
+    },
+    {
+      "schema": "chio.recovery-setup-report.v1",
+      "artifactKind": "recovery_setup_report",
+      "introducedBy": "recovery-product",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/recovery-setup-report.schema.json"
+    },
+    {
+      "schema": "chio.signed-policy-deployment-change.v1",
+      "artifactKind": "signed_policy_deployment_change",
+      "introducedBy": "recovery-product",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-policy-deployment-change.schema.json"
+    },
+    {
+      "schema": "chio.signed-recovery-setup-probe.v1",
+      "artifactKind": "signed_recovery_setup_probe",
+      "introducedBy": "recovery-product",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-recovery-setup-probe.schema.json"
+    },
+    {
+      "schema": "chio.signed-recovery-setup-report.v1",
+      "artifactKind": "signed_recovery_setup_report",
+      "introducedBy": "recovery-product",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-recovery-setup-report.schema.json"
+    },
+    {
+      "schema": "chio.decision-report-view.v1",
+      "artifactKind": "decision_report_view",
+      "introducedBy": "recovery-product",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/decision-report-view.schema.json"
+    },
+    {
+      "schema": "chio.policy-maintenance-view.v1",
+      "artifactKind": "policy_maintenance_view",
+      "introducedBy": "recovery-product",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/policy-maintenance-view.schema.json"
     }
   ]
 }

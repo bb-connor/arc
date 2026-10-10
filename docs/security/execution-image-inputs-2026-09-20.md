@@ -1,5 +1,9 @@
 # Execution image input qualification
 
+For the current Rust 1.95 recipe and its separate qualification boundary, see
+[Rust 1.95 execution image inputs](execution-image-inputs-rust195.md).
+The records below retain their historical source and toolchain identities.
+
 Updated September 24, 2026.
 The images for the historical inputs below are built and locally validated.
 The current candidate retains the reviewed AWS-LC repair and composes the

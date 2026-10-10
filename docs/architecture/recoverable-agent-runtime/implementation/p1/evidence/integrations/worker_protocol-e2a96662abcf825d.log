@@ -1,0 +1,30 @@
+
+running 12 tests
+test framing_is_bounded_and_socket_paths_are_not_clobbered ... FAILED
+test disconnected_worker_does_not_abort_dispatch_and_shutdown_drains_calls ... FAILED
+test credential_expiry_and_revocation_are_durable ... ok
+test governed_worker_context_reaches_required_swarm_kernel_without_granting_authority ... ok
+test expired_credential_rejects_even_inspection ... ok
+test governed_worker_input_cannot_bypass_authentication_or_select_a_capability ... ok
+test governed_worker_completed_outcome_reopens_with_identical_intent_and_receipt ... ok
+test guest_identity_is_fixed_and_admin_operations_are_absent ... ok
+test revocation_during_dispatch_withholds_output_and_a_new_credential_recovers ... ok
+test state_blob_wire_validates_digest_encoding_ownership_and_credentials ... ok
+test worker_recovery_policy_is_bound_to_the_logical_operation ... ok
+test oversized_response_retains_the_original_effect_identity ... ok
+
+failures:
+
+---- framing_is_bounded_and_socket_paths_are_not_clobbered stdout ----
+Error: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- disconnected_worker_does_not_abort_dispatch_and_shutdown_drains_calls stdout ----
+Error: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+
+failures:
+    disconnected_worker_does_not_abort_dispatch_and_shutdown_drains_calls
+    framing_is_bounded_and_socket_paths_are_not_clobbered
+
+test result: FAILED. 10 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 36.44s
+

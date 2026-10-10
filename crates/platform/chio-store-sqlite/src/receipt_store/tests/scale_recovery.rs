@@ -246,7 +246,7 @@ fn receipt_history_recovery_campaign_calibration() -> TestResult {
 }
 
 #[test]
-#[ignore = "milestone campaign; one million real appends, integrity, retention and restore"]
+#[ignore = "scale campaign; one million real appends, integrity, retention and restore"]
 fn million_receipts_preserve_integrity_queries_retention_and_restore() -> TestResult {
     run_history_recovery(1_000_000)
 }

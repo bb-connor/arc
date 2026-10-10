@@ -1,0 +1,44 @@
+Review models: four independent finite seams; one operation/command/context in each.
+Assumptions: atomic authoritative transitions; correct native evidence; immutable payloads; authentic current authorization.
+Excluded: complete cross-store bridge, cryptography, provider deduplication, byte custody, clocks, fairness and production implementation.
+REVIEW BASELINE PASS Admission: 22 reachable states, 30 transitions; exhaustive within stated bounds.
+REVIEW BASELINE PASS Knowledge: 9 reachable states, 8 transitions; exhaustive within stated bounds.
+REVIEW BASELINE PASS Replay: 10 reachable states, 14 transitions; exhaustive within stated bounds.
+REVIEW BASELINE PASS PartialEffect: 7 reachable states, 8 transitions; exhaustive within stated bounds.
+REVIEW MUTATION REJECTED CloseFromProjection: missing projection closed a potentially effective native operation
+  1. retain immutable admission intent
+  2. submit original request; response may be lost
+  3. native admission commits without projection acknowledgement
+  4. native capture commits
+  5. commit cancellation intent
+  6. close no-effect and fence the admission intent
+REVIEW MUTATION REJECTED IgnoreAdmissionTombstone: late submission reopened a closed admission intent
+  1. retain immutable admission intent
+  2. submit original request; response may be lost
+  3. commit cancellation intent
+  4. close no-effect and fence the admission intent
+  5. native admission commits without projection acknowledgement
+REVIEW MUTATION REJECTED IgnoreCancellation: capture followed an earlier committed cancellation
+  1. retain immutable admission intent
+  2. submit original request; response may be lost
+  3. native admission commits without projection acknowledgement
+  4. commit cancellation intent
+  5. native capture commits
+REVIEW MUTATION REJECTED ReleaseWithoutJoin: bytes escaped before native knowledge joined
+  1. commit restricted artifact observation and release record
+  2. release restricted bytes into recipient context
+REVIEW MUTATION REJECTED IgnoreKnowledgeFence: stale public preparation captured after restricted observation
+  1. prepare exact public dispatch at original flow generation
+  2. commit restricted artifact observation and release record
+  3. capture previously prepared public dispatch
+REVIEW MUTATION REJECTED RevisionBeforeReplay: committed command replay incorrectly conflicted on its old revision
+  1. commit command expecting revision zero; lose acknowledgement
+  2. replay same command and original expected revision
+REVIEW MUTATION REJECTED CachedResponseAfterRevocation: cached protected response escaped after read revocation
+  1. commit command expecting revision zero; lose acknowledgement
+  2. revoke current read authority
+  3. replay same command and original expected revision
+REVIEW MUTATION REJECTED PartialFailureAsNoEffect: partial failure caused a second external effect for the same step
+  1. settle partial external effect with failed task outcome
+  2. MUTATED classify unsuccessful outcome as retryable no-effect
+  3. MUTATED perform replacement effect for same step

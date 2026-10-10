@@ -1,0 +1,13 @@
+
+running 8 tests
+test expired_consumed_marker_does_not_block_a_validated_nonce ... ok
+test expired_row_is_pruned_and_slot_becomes_free ... ok
+test configured_capacity_denies_new_ids_without_evicting_replay_markers ... ok
+test distinct_ids_each_succeed ... ok
+test fresh_nonce_is_reserved ... ok
+test trait_reserve_uses_wall_clock_now ... ok
+test replayed_nonce_is_rejected_within_retention ... ok
+test persists_consumed_marker_across_reopen ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+

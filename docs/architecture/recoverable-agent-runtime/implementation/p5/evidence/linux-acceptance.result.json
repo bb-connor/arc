@@ -1,0 +1,80 @@
+{
+  "id": "linux-acceptance",
+  "actual_command": [
+    "python3",
+    "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/run-linux-acceptance.py"
+  ],
+  "cwd": ".",
+  "required_for_phase_exit": true,
+  "required_for_local_phase_acceptance": false,
+  "host": {
+    "system": "Linux",
+    "machine": "x86_64"
+  },
+  "started_unix_seconds": 1791161347,
+  "status": "passed",
+  "exit_code": 0,
+  "source_binding": "562a3c3556f31e5afedbd7c7a426e542cc5e8cd51c28a7a43d8e9704ba4e9bc4",
+  "kernel": "6.17.0-1020-oracle",
+  "toolchain": {
+    "rustc": "rustc 1.94.1 (e408947bf 2026-03-25)\nbinary: rustc\ncommit-hash: e408947bfd200af42db322daf0fadfe7e26d3bd1\ncommit-date: 2026-03-25\nhost: x86_64-unknown-linux-gnu\nrelease: 1.94.1\nLLVM version: 21.1.8",
+    "cargo": "cargo 1.94.1 (29ea6fb6a 2026-03-24)",
+    "cc": "cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+    "readelf": "GNU readelf (GNU Binutils for Ubuntu) 2.42\nCopyright (C) 2024 Free Software Foundation, Inc.\nThis program is free software; you may redistribute it under the terms of\nthe GNU General Public License version 3 or (at your option) any later version.\nThis program has absolutely no warranty."
+  },
+  "build_profile": {
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0"
+  },
+  "cage_challenge": "17995f181d6c078ffaa35b453b7a8f0fd160b8319be578af9537ffe5f30c2a84",
+  "linux_tests": 10,
+  "measured_images": [
+    {
+      "path": "target/recovery-p5-linux/static/x86_64-unknown-linux-musl/debug/chio-cage-init",
+      "sha256": "681faf1bf0f3a0f5e2b4589fec0bea185dc1ef747a7ce0cfd9e63b00efeba79c"
+    },
+    {
+      "path": "target/recovery-p5-linux/static/x86_64-unknown-linux-musl/debug/chio-confined-reader",
+      "sha256": "0aa671bb1815e90d4daca4a9822a097540646e80a78a51a80336990bb6a280c5"
+    },
+    {
+      "path": "target/recovery-p5-linux/images/error",
+      "sha256": "265492253965fc9770048ae8c6fd08ac80f8efe26c0b1e22bda658e046ab73f3"
+    },
+    {
+      "path": "target/recovery-p5-linux/images/log",
+      "sha256": "a7805848ed43d1e1841c55157cb3e9d692dc086b62b6863f7bccb2b6edeb7ef0"
+    },
+    {
+      "path": "target/recovery-p5-linux/images/progress",
+      "sha256": "377c8841941f492ea62a1d83ffa75bfa152a65c4568b3fd2b919ff99ee48a013"
+    },
+    {
+      "path": "target/recovery-p5-linux/images/stream",
+      "sha256": "9aafafc7102e2aa5e933d26e1a7e64aba5b1d572513a89caa613541b97597676"
+    },
+    {
+      "path": "target/recovery-p5-linux/images/file",
+      "sha256": "5294c5f80345fd25adc48a8ec028c1576231688218ec0b5c502ba9d9389accd0"
+    },
+    {
+      "path": "target/recovery-p5-linux/images/callback",
+      "sha256": "b743bbd69e6bd6972347a00b0c96d6002ddfb311b4d93a5bf926b91224f7b9a6"
+    },
+    {
+      "path": "target/recovery-p5-linux/images/wrong-predicate",
+      "sha256": "458529b0e6914d4b59c3115539887f15c40af26290bfe25549650999426752f9"
+    },
+    {
+      "path": "target/recovery-p5-linux/images/overflow",
+      "sha256": "a73155f982b41c59f276031db6792e2aa1ee284d26f31b540836ab40e4083017"
+    },
+    {
+      "path": "target/recovery-p5-linux/images/hang",
+      "sha256": "55ce728e192a25cd637329d5e80cc0ba5febdd980e4e92f566e6c967a20a0a4a"
+    }
+  ],
+  "duration_seconds": 182.916,
+  "log": "evidence/linux-acceptance.log",
+  "log_sha256": "6358b5b3e44729e5fb9e1a1d2894b6a1ce026fc8ac0f8a0ccf3fc0b2333e30cf"
+}

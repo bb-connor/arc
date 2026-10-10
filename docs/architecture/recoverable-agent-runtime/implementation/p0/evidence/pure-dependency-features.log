@@ -1,0 +1,35 @@
+{
+  "status": "passed",
+  "pure_sources": [
+    "crates/security/chio-recovery/src/decision.rs",
+    "crates/security/chio-recovery/src/lib.rs",
+    "crates/security/chio-recovery/src/workflow.rs",
+    "crates/security/chio-semantic-contracts/src/effect.rs",
+    "crates/security/chio-semantic-contracts/src/graph.rs",
+    "crates/security/chio-semantic-contracts/src/lib.rs",
+    "crates/security/chio-semantic-contracts/src/work.rs"
+  ],
+  "isolated_alloc_features": {
+    "chio-core-types": [],
+    "chio-recovery": [],
+    "chio-security-types": [
+      "default"
+    ],
+    "chio-semantic-contracts": []
+  },
+  "isolated_std_features": {
+    "chio-core-types": [
+      "std"
+    ],
+    "chio-recovery": [
+      "std"
+    ],
+    "chio-security-types": [
+      "default",
+      "std"
+    ],
+    "chio-semantic-contracts": [
+      "std"
+    ]
+  }
+}

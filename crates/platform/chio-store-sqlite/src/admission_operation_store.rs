@@ -42,8 +42,16 @@ use serde::{Deserialize, Serialize};
 use crate::serving_owner::{SqliteServingOwner, SqliteServingOwnerError};
 use crate::store_connection::StoreConnection;
 
+#[cfg(feature = "admission-test-support")]
+mod authentication_test_support;
 mod budget_custody;
 mod caller_budget;
+#[cfg(feature = "admission-test-support")]
+mod outcome_read_test_support;
+mod raw_custody_liability;
+#[cfg(test)]
+pub(crate) mod raw_liability_test_support;
+mod tool_outcome_liability;
 pub use budget_custody::{AdmissionBudgetCustodySnapshot, RetainedToolAdmissionCustodySnapshot};
 mod caller_dispatch_context;
 mod caller_wait;
@@ -86,6 +94,7 @@ mod obligation;
 mod participant;
 mod projection;
 mod retained_request;
+pub(crate) use retained_request::original_output_read_bounds;
 mod runtime_participant;
 mod runtime_replay;
 mod schema;
@@ -99,6 +108,8 @@ pub(crate) use security_participant_state::dispatch_ledger::{
     NativeCaptureBinding, VerifiedNativeCapture,
 };
 pub(crate) use security_participant_state::egress::projection_reference as security_participant_egress_projection_reference;
+#[cfg(feature = "admission-test-support")]
+pub use security_participant_state::knowledge::read_work_test_support::NativeInfluenceReadWorkFixture;
 pub(crate) use security_participant_state::nonce_preflight::projection_reference as security_participant_nonce_preflight_projection_reference;
 pub(crate) use security_participant_state::output::projection_reference as security_participant_output_projection_reference;
 pub(crate) use security_participant_state::projection_reference as security_participant_state_projection_reference;
@@ -110,7 +121,48 @@ pub use security_participant_state::{
     SecurityParticipantEgressHistory, SecurityParticipantFlowJoinHistory,
     SecurityParticipantStateInitialization,
 };
+mod product;
+mod recovery;
+pub use product::{StoredDecisionReportV1, StoredPolicyMaintenanceProposalV1};
+#[cfg(feature = "admission-test-support")]
+pub use recovery::command_quota_test_support::{
+    apply_recovery_quota_fixture_inspections, apply_recovery_quota_fixture_resumptions,
+    checkpoint_recovery_quota_fixture_wal, construct_recovery_quota_fixture_legacy_format,
+    fill_recovery_quota_fixture_intake_bytes, fill_recovery_quota_fixture_intake_events,
+    fill_recovery_quota_fixture_settlement_events, grow_recovery_quota_fixture_retained_history,
+    grow_recovery_quota_fixture_uncheckpointed_history, observe_recovery_quota_fixture_clock_work,
+    observe_recovery_quota_fixture_errors, recovery_quota_fixture_finalized_shape,
+    retain_recovery_quota_fixture_legacy_inspections, retain_recovery_quota_fixture_records,
+    RecoveryClockWorkFixtureObservation, RecoveryLegacyQuotaFixtureScope,
+    RecoveryQuotaFixtureDiagnostic, RecoveryQuotaFixtureDiagnosticScope,
+    RecoveryQuotaFixtureRecord,
+};
+
+#[cfg(feature = "admission-test-support")]
+pub use recovery::legacy_audience_test_support::{
+    retain_knowledge_fixture_legacy_top_recipient, retain_recovery_fixture_legacy_top_actor,
+};
+#[cfg(feature = "admission-test-support")]
+pub use recovery::legacy_history_test_support::retain_unadmitted_legacy_recovery_fixture;
+#[cfg(feature = "admission-test-support")]
+pub use recovery::legacy_planning_test_support::{
+    construct_recovery_planning_fixture_legacy_format,
+    retain_recovery_planning_fixture_legacy_revisions, RecoveryLegacyPlanningFixtureScope,
+};
+mod semantic;
+mod setup;
+pub use semantic::{
+    NativePolicyChangeReceiptV1, NativeSemanticCaptureRecordV1, NativeSemanticInstallationV1,
+    NativeSemanticPolicyBasisV1, SemanticPolicyIdentityV1, SemanticStatusOriginData,
+};
+pub use setup::{
+    NativeSetupCreationHost, NativeSetupPreparationError, NativeSetupPreparationV1,
+    NativeSetupProbeEvidenceV1, NativeSetupRetirementAuthorizationV1, NativeSetupRetirementBodyV1,
+};
 mod store;
+pub(crate) use recovery::projection_reference as recovery_projection_reference;
+pub(crate) use recovery::terminal_custody::repair_completed_at_startup;
+pub(crate) use recovery::verify_all as verify_recovery_records;
 pub(crate) use store::claim_lease_tx;
 
 /// How a joint transaction proves its recovery authority: a lease the
@@ -218,7 +270,7 @@ pub use security_participant_migration::{
 };
 
 const ADMISSION_OPERATION_SCHEMA_KEY: &str = "admission_operation";
-pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 34;
+pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 40;
 const ADMISSION_OPERATION_SCHEMA_ANCHORS: &[&str] = &[
     "admission_operations",
     "admission_operation_commits",
@@ -587,7 +639,12 @@ impl SqliteAdmissionOperationStore {
                     decision,
                     operation,
                 },
-            )?;
+            );
+        #[cfg(feature = "admission-test-support")]
+        if let Err(error) = &response {
+            recovery::command_quota_test_support::record_native_capture_refusal(error);
+        }
+        let response = response?;
         #[cfg(feature = "admission-test-support")]
         {
             self.native_capture_response_for_test(original, response)
@@ -900,8 +957,15 @@ impl SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let transaction =
             self.begin_write(&mut connection, Some(&projection.context().store_fence))?;
-        let (terminal, changed) =
-            self.commit_terminal_projection_in_transaction(&transaction, projection)?;
+        let origin = self
+            .serving_owner
+            .prepare_native_source_transaction(&transaction)
+            .map_err(map_owner_error)?;
+        let (terminal, changed) = self.commit_terminal_projection_with_origin_in_transaction(
+            &transaction,
+            projection,
+            Some(&origin),
+        )?;
         self.commit_write(transaction)?;
         if changed {
             self.sync_after_write(&connection)?;
@@ -909,14 +973,20 @@ impl SqliteAdmissionOperationStore {
         Ok(terminal)
     }
 
-    pub(super) fn commit_terminal_projection_in_transaction(
+    fn commit_terminal_projection_with_origin_in_transaction(
         &self,
         transaction: &Transaction<'_>,
         projection: &AdmissionTerminalProjection,
+        origin: Option<&crate::serving_owner::NativeSourceTransactionOrigin<'_>>,
     ) -> Result<(AdmissionTerminal, bool), AdmissionOperationStoreError> {
         let stored = load_by_operation_id_tx(transaction, &projection.context().operation_id)?
             .ok_or(AdmissionOperationStoreError::NotFound)?;
-        self.commit_terminal_projection_from_source_in_transaction(transaction, projection, &stored)
+        self.commit_terminal_projection_from_source_with_origin_in_transaction(
+            transaction,
+            projection,
+            &stored,
+            origin,
+        )
     }
 
     fn commit_terminal_projection_from_source_in_transaction(
@@ -924,6 +994,21 @@ impl SqliteAdmissionOperationStore {
         transaction: &Transaction<'_>,
         projection: &AdmissionTerminalProjection,
         stored: &StoredOperation,
+    ) -> Result<(AdmissionTerminal, bool), AdmissionOperationStoreError> {
+        self.commit_terminal_projection_from_source_with_origin_in_transaction(
+            transaction,
+            projection,
+            stored,
+            None,
+        )
+    }
+
+    fn commit_terminal_projection_from_source_with_origin_in_transaction(
+        &self,
+        transaction: &Transaction<'_>,
+        projection: &AdmissionTerminalProjection,
+        stored: &StoredOperation,
+        origin: Option<&crate::serving_owner::NativeSourceTransactionOrigin<'_>>,
     ) -> Result<(AdmissionTerminal, bool), AdmissionOperationStoreError> {
         if projection.requires_anchored_economic_commit() {
             return Err(invariant(
@@ -968,7 +1053,12 @@ impl SqliteAdmissionOperationStore {
                 &context.store_fence,
                 context.trusted_time_unix_ms,
             )?;
-            return Ok((terminal, false));
+            let changed = recovery::terminal_custody::publish_completed(
+                transaction,
+                &self.serving_owner,
+                &stored.operation,
+            )?;
+            return Ok((terminal, changed));
         }
         if context.request_id != stored.operation.replay_key().request_id
             || context.expected_operation_version != stored.operation.version()
@@ -1050,7 +1140,7 @@ impl SqliteAdmissionOperationStore {
             &context.store_fence,
             context.trusted_time_unix_ms,
         )?;
-        append_operation_commit(
+        let append = commit_chain::append_operation_commit_with_receipt(
             transaction,
             &updated,
             &encoded,
@@ -1059,7 +1149,16 @@ impl SqliteAdmissionOperationStore {
             &self.serving_owner,
             context.trusted_time_unix_ms,
         )?;
+        if let Some(origin) = origin {
+            projection::native_status::verify_native_status_terminal_append(
+                transaction,
+                self,
+                origin,
+                append,
+            )?;
+        }
         execution_nonce::verify_reservation(transaction, &updated)?;
+        recovery::terminal_custody::publish_completed(transaction, &self.serving_owner, &updated)?;
         terminal_from_operation(&updated).map(|terminal| (terminal, true))
     }
 
@@ -1071,11 +1170,16 @@ impl SqliteAdmissionOperationStore {
         let context = verified.context();
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection, Some(&context.store_fence))?;
-        let terminal = self.commit_verified_signed_terminal_projection_in_transaction(
+        let origin = self
+            .serving_owner
+            .prepare_native_source_transaction(&transaction)
+            .map_err(map_owner_error)?;
+        let terminal = self.commit_verified_signed_terminal_projection_with_origin_in_transaction(
             &transaction,
             &verified,
             context.trusted_time_unix_ms,
             None,
+            Some(&origin),
         )?;
         self.commit_write(transaction)?;
         self.sync_after_write(&connection)?;
@@ -1308,7 +1412,7 @@ fn decode_row(raw: RawOperationRow) -> Result<StoredOperation, AdmissionOperatio
 }
 
 fn load_by_operation_id_tx(
-    transaction: &Transaction<'_>,
+    transaction: &Connection,
     operation_id: &AdmissionOperationId,
 ) -> Result<Option<StoredOperation>, AdmissionOperationStoreError> {
     let raw = transaction
@@ -1535,6 +1639,10 @@ pub(crate) fn receipt_projection_error(error: AdmissionOperationStoreError) -> R
         AdmissionOperationStoreError::OutcomeUnknown(detail) => {
             ReceiptStoreError::OutcomeUnknown(detail)
         }
+        AdmissionOperationStoreError::RecoveryAuthorityDenied
+        | AdmissionOperationStoreError::RecoveryMediationRequired => ReceiptStoreError::Conflict(
+            "recovery preview refusal is outside receipt projection".into(),
+        ),
         AdmissionOperationStoreError::Operation(error) => {
             ReceiptStoreError::Conflict(error.to_string())
         }
@@ -1609,3 +1717,8 @@ mod tests;
 
 #[cfg(all(test, unix))]
 pub(crate) use tests::security_participant_state::with_flow_sql_fixture;
+
+mod knowledge;
+pub use knowledge::*;
+
+pub(crate) use security_participant_state::NativeKnowledgeJoinAuthority;

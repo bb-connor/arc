@@ -1,0 +1,421 @@
+{
+  "effects": [
+    {
+      "kind": "never_admitted"
+    },
+    {
+      "kind": "admission_unresolved",
+      "admission_intent": "intent"
+    },
+    {
+      "kind": "closed_before_effect",
+      "operation": {
+        "operation_id": "operation",
+        "native_admission_digest": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "operation_version": 1
+      },
+      "closure": "closure"
+    },
+    {
+      "kind": "awaiting_approval",
+      "operation": {
+        "operation_id": "operation",
+        "native_admission_digest": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "operation_version": 1
+      }
+    },
+    {
+      "kind": "in_flight",
+      "operation": {
+        "operation_id": "operation",
+        "native_admission_digest": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "operation_version": 1
+      }
+    },
+    {
+      "kind": "awaiting_caller_report",
+      "operation": {
+        "operation_id": "operation",
+        "native_admission_digest": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "operation_version": 1
+      }
+    },
+    {
+      "kind": "unknown",
+      "operation": {
+        "operation_id": "operation",
+        "native_admission_digest": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "operation_version": 1
+      }
+    },
+    {
+      "kind": "complete",
+      "operation": {
+        "operation_id": "operation",
+        "native_admission_digest": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "operation_version": 1
+      },
+      "effect_count": 1
+    },
+    {
+      "kind": "partial",
+      "operation": {
+        "operation_id": "operation",
+        "native_admission_digest": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "operation_version": 1
+      },
+      "applied_effects": 1
+    },
+    {
+      "kind": "failed_after_effect",
+      "operation": {
+        "operation_id": "operation",
+        "native_admission_digest": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "operation_version": 1
+      },
+      "applied_effects": 1
+    }
+  ],
+  "controls": [
+    "active",
+    "cancel_requested",
+    "cancelled",
+    "quarantined"
+  ],
+  "releases": [
+    {
+      "kind": "not_available"
+    },
+    {
+      "kind": "pending",
+      "release_id": "release"
+    },
+    {
+      "kind": "withheld",
+      "evidence": "evidence"
+    },
+    {
+      "kind": "released",
+      "release_id": "release"
+    },
+    {
+      "kind": "denied",
+      "reason": "audience_denied"
+    }
+  ],
+  "errors": [
+    {
+      "status": 400,
+      "code": "recovery.invalid_command"
+    },
+    {
+      "status": 403,
+      "code": "recovery.authority_denied"
+    },
+    {
+      "status": 409,
+      "code": "recovery.conflict"
+    },
+    {
+      "status": 409,
+      "code": "recovery.unsupported_profile"
+    },
+    {
+      "status": 409,
+      "code": "recovery.uncovered_mediation"
+    },
+    {
+      "status": 409,
+      "code": "recovery.restart_required"
+    },
+    {
+      "status": 409,
+      "code": "recovery.unknown_effect"
+    },
+    {
+      "status": 409,
+      "code": "recovery.probe_expired"
+    },
+    {
+      "status": 409,
+      "code": "recovery.origin_refused"
+    },
+    {
+      "status": 413,
+      "code": "recovery.projection_too_large"
+    },
+    {
+      "status": 503,
+      "code": "recovery.busy"
+    },
+    {
+      "status": 503,
+      "code": "recovery.unavailable"
+    }
+  ]
+}
+

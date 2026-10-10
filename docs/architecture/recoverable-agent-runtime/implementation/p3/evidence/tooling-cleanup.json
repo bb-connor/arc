@@ -1,0 +1,25 @@
+{
+  "removed": [
+    {
+      "path": "sdks/typescript/node_modules",
+      "kind": "task-owned symbolic dependency link",
+      "target": "/Users/connor/Medica/backbay/standalone/arc/sdks/typescript/node_modules"
+    },
+    {
+      "path": "sdks/typescript/scripts/node_modules",
+      "kind": "task-owned symbolic dependency link",
+      "target": "/Users/connor/Medica/backbay/standalone/arc/sdks/typescript/scripts/node_modules"
+    },
+    {
+      "path": "sdks/typescript/packages/node-http/node_modules",
+      "kind": "task-owned private dependency directory",
+      "external_targets_preserved": true
+    },
+    {
+      "path": "sdks/typescript/packages/conformance/node_modules",
+      "kind": "task-owned private dependency directory",
+      "external_targets_preserved": true
+    }
+  ],
+  "scope": "Only the four temporary dependency-resolution overlays created by this task; external caches preserved."
+}

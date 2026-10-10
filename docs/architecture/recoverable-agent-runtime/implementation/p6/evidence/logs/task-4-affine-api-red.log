@@ -1,0 +1,23 @@
+    Checking chio-control-plane v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-control-plane)
+error[E0599]: no method named `prepare_commit` found for struct `AcquiredNativeSecurityEgress<'a>` in the current scope
+   --> crates/platform/chio-control-plane/src/security/adapters/native_flow.rs:389:22
+    |
+387 |                   let commit = self.custody
+    |  ______________________________-
+388 | |                     .acquire(deadline.ok_or(NativeFlowError::PolicyEvidence)?)?
+389 | |                     .prepare_commit()?;
+    | |                     -^^^^^^^^^^^^^^ method not found in `AcquiredNativeSecurityEgress<'_>`
+    | |_____________________|
+    |
+
+error[E0282]: type annotations needed
+   --> crates/platform/chio-control-plane/src/security/adapters/native_flow.rs:408:13
+    |
+408 |             egress.as_ref(),
+    |             ^^^^^^ cannot infer type
+
+Some errors have detailed explanations: E0282, E0599.
+For more information about an error, try `rustc --explain E0282`.
+error: could not compile `chio-control-plane` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `chio-control-plane` (lib test) due to 2 previous errors

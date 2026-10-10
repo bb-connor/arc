@@ -1,0 +1,22 @@
+    Checking chio-core-types v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-core-types)
+    Checking chio-listing v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-listing)
+    Checking chio-revocation-oracle v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-revocation-oracle)
+    Checking chio-pheromone v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-pheromone)
+    Checking chio-fincred v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-fincred)
+    Checking chio-did v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-did)
+    Checking chio-lineage v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/observability/chio-lineage)
+    Checking chio-attest-verify v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-attest-verify)
+    Checking chio-kernel-core v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-kernel-core)
+    Checking chio-quarantine v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-quarantine)
+    Checking chio-flow v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-flow)
+error[E0425]: cannot find value `grant` in this scope
+   --> crates/security/chio-flow/src/declassification.rs:395:24
+    |
+395 |         authority_key: grant.authority_key().clone(),
+    |                        ^^^^^ not found in this scope
+
+    Checking chio-finding v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-finding)
+    Checking chio-custody-hw v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-custody-hw)
+For more information about this error, try `rustc --explain E0425`.
+error: could not compile `chio-flow` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

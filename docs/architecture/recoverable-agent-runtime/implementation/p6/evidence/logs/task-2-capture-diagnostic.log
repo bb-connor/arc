@@ -1,0 +1,49 @@
+   Compiling chio-kernel v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-kernel)
+   Compiling chio-finding-verifier v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-finding-verifier)
+   Compiling chio-transaction-passport v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-transaction-passport)
+   Compiling chio-risk-comptroller v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-risk-comptroller)
+   Compiling chio-commerce-order v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-commerce-order)
+   Compiling chio-http-session v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-http-session)
+   Compiling chio-guards v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/guards/chio-guards)
+   Compiling chio-agent-web-interop v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-agent-web-interop)
+   Compiling chio-store-sqlite v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-store-sqlite)
+   Compiling chio-edge-metrics v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/protocol/chio-edge-metrics)
+   Compiling chio-cross-protocol v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/protocol/chio-cross-protocol)
+   Compiling chio-mcp-edge v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/protocol/chio-mcp-edge)
+   Compiling chio-trace-validate v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/tooling/chio-trace-validate)
+   Compiling chio-mcp-adapter v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/protocol/chio-mcp-adapter)
+   Compiling chio-policy v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/guards/chio-policy)
+   Compiling chio-data-guards v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/guards/chio-data-guards)
+   Compiling chio-external-guards v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/guards/chio-external-guards)
+   Compiling chio-enterprise-export v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-enterprise-export)
+   Compiling chio-trust-market-context v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-trust-market-context)
+   Compiling chio-finding-challenge v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-finding-challenge)
+   Compiling chio-finding-hosted-edge v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-finding-hosted-edge)
+   Compiling chio-siem v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/observability/chio-siem)
+   Compiling chio-runtime-core v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-runtime-core)
+   Compiling chio-conformance v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/tooling/chio-conformance)
+   Compiling chio-secret-broker v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-secret-broker)
+   Compiling chio-security-kernel v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-security-kernel)
+   Compiling chio-anchor v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-anchor)
+   Compiling chio-process v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-process)
+   Compiling chio-control-plane v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-control-plane)
+    Finished `test` profile [unoptimized] target(s) in 7m 11s
+     Running unittests src/lib.rs (target/debug/deps/chio_control_plane-7c73bd7964d7c479)
+
+running 1 test
+test recovery::tests::knowledge::product::p6_policy_selected_operator_alone_applies_exact_proposal_and_native_target ... 
+thread 'recovery::tests::knowledge::product::p6_policy_selected_operator_alone_applies_exact_proposal_and_native_target' (28097069) panicked at crates/platform/chio-control-plane/src/recovery/tests/knowledge/product.rs:517:5:
+assertion `left == right` failed: Some("security dispatch outcome requires reconciliation: security native dispatch capture callback failed; authoritative recovery required")
+  left: Deny
+ right: Allow
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    recovery::tests::knowledge::product::p6_policy_selected_operator_alone_applies_exact_proposal_and_native_target
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1239 filtered out; finished in 80.18s
+
+error: test failed, to rerun pass `-p chio-control-plane --lib`

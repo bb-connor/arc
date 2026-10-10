@@ -368,7 +368,7 @@ impl Guard for VelocityGuard {
             }
         }
 
-        // Phase 1 - RESERVE. Secure a slot for EVERY genuinely-new bucket this
+        // Reserve capacity. Secure a slot for EVERY genuinely-new bucket this
         // request needs across BOTH maps before consuming from EITHER. A brand-new
         // key with both limits enabled needs two slots (one per map); reserving
         // them together means a request that will be denied for lack of capacity
@@ -382,7 +382,7 @@ impl Guard for VelocityGuard {
             return Ok(GuardDecision::deny(Vec::new()));
         }
 
-        // Phase 2 - obtain both buckets (creating the reserved new ones). Borrow
+        // Obtain both buckets (creating the reserved new ones). Borrow
         // the two disjoint maps through one `&mut VelocityState` so both bucket
         // handles can be held at once.
         let state = &mut *state;
@@ -411,7 +411,7 @@ impl Guard for VelocityGuard {
             None => None,
         };
 
-        // Phase 3 - check BOTH buckets can satisfy the request before consuming
+        // Check BOTH buckets can satisfy the request before consuming
         // from EITHER, then commit both. Peeking (`can_consume`) before consuming
         // means a denial from one limit never depletes the other bucket.
         let spend_cost = spend_units.unwrap_or(0);

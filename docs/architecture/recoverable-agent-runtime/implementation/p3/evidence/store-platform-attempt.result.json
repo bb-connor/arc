@@ -1,0 +1,39 @@
+{
+  "id": "store-platform-attempt",
+  "actual_command": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "chio-core-types",
+    "-p",
+    "chio-security-types",
+    "-p",
+    "chio-flow",
+    "-p",
+    "chio-recovery",
+    "-p",
+    "chio-semantic-contracts",
+    "-p",
+    "chio-process",
+    "-p",
+    "chio-store-sqlite",
+    "-p",
+    "chio-spec-codegen",
+    "-p",
+    "xtask"
+  ],
+  "cwd": ".",
+  "environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "exit_code": 101,
+  "status": "failed",
+  "started_unix_seconds": 1791064647,
+  "duration_seconds": 1742.885,
+  "log": "evidence/store-platform-attempt.log",
+  "log_sha256": "8a6f16fe7077f3f7841101914aa107a6eb99d5f051dacdb93b713323cff0103c",
+  "required_for_local_phase_acceptance": false
+}

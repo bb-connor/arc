@@ -560,7 +560,7 @@ fn build_trust_anchored_checkpoint_publication_records_binding() {
             ),
             trust_anchor_ref: "chio_checkpoint_witness_chain".to_string(),
             signer_cert_ref: "did:web:chio.example#checkpoint-signer".to_string(),
-            publication_profile_version: "phase4-preview.v1".to_string(),
+            publication_profile_version: "evidence-preview.v1".to_string(),
         },
     )
     .expect("build trust-anchored publication");
@@ -639,7 +639,7 @@ fn build_trust_anchored_checkpoint_publication_rejects_invalid_binding() {
             ),
             trust_anchor_ref: "chio_checkpoint_witness_chain".to_string(),
             signer_cert_ref: "".to_string(),
-            publication_profile_version: "phase4-preview.v1".to_string(),
+            publication_profile_version: "evidence-preview.v1".to_string(),
         },
     )
     .expect_err("blank signer certificate ref must be rejected");
@@ -668,7 +668,7 @@ fn trust_anchor_binding_validation_precedes_checkpoint_validation() {
                 ),
             trust_anchor_ref: "chio_checkpoint_witness_chain".to_string(),
             signer_cert_ref: "".to_string(),
-            publication_profile_version: "phase4-preview.v1".to_string(),
+            publication_profile_version: "evidence-preview.v1".to_string(),
         },
     )
     .expect_err("invalid binding must be rejected before the checkpoint");
@@ -695,7 +695,7 @@ fn build_trust_anchored_checkpoint_publication_rejects_mismatched_local_log_iden
                 ),
             trust_anchor_ref: "chio_checkpoint_witness_chain".to_string(),
             signer_cert_ref: "did:web:chio.example#checkpoint-signer".to_string(),
-            publication_profile_version: "phase4-preview.v1".to_string(),
+            publication_profile_version: "evidence-preview.v1".to_string(),
         },
     )
     .expect_err("mismatched local log identity must be rejected");

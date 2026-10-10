@@ -185,6 +185,17 @@ fn validator_for_schema(schema_path: &std::path::Path, schema: &Value) -> jsonsc
                     file_path.insert(0, '/');
                 }
                 resources.push((format!("file://{file_path}"), value.clone()));
+                let relative = path
+                    .strip_prefix(schema_root())
+                    .expect("schema resource is within the schema root")
+                    .to_string_lossy()
+                    .replace('\\', "/");
+                for origin in ["chio.computer", "chio.world"] {
+                    resources.push((
+                        format!("https://{origin}/schemas/chio-wire/v1/{relative}"),
+                        value.clone(),
+                    ));
+                }
                 if let Some(id) = value["$id"].as_str() {
                     resources.push((id.to_string(), value));
                 }

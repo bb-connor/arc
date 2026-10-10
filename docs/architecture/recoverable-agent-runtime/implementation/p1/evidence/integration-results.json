@@ -1,0 +1,1797 @@
+[
+  {
+    "command": [
+      "target/debug/deps/active_defense_recovery-53e4425fbba55c49",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/active_defense_recovery-53e4425fbba55c49.log",
+    "sha256": "b6c60cf8b92e99ce7bc7a269c052e229fce9a71bfcf93d3a5fdc18ef5d88cb8e",
+    "test_summaries": [
+      [
+        "4",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 1.365,
+    "original_log_path": "target/recovery-p1-integration-logs/active_defense_recovery-53e4425fbba55c49.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/agent_web_interop-12f9b66eaaf40c85",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/agent_web_interop-12f9b66eaaf40c85.log",
+    "sha256": "f23089770ffd9f201dcca8202a2546f14f9f48d24be8c196f4078d9c03d14de1",
+    "test_summaries": [
+      [
+        "9",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 1.325,
+    "original_log_path": "target/recovery-p1-integration-logs/agent_web_interop-12f9b66eaaf40c85.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/capability_set_suspension_backend-2b6f5244f0026f76",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/capability_set_suspension_backend-2b6f5244f0026f76.log",
+    "sha256": "6b8efc036a411d412a093d2a7333687d163acb375e35ea4679697d70981d5d8c",
+    "test_summaries": [
+      [
+        "2",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.365,
+    "original_log_path": "target/recovery-p1-integration-logs/capability_set_suspension_backend-2b6f5244f0026f76.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/enterprise_export-e7122a95e2338769",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/enterprise_export-e7122a95e2338769.log",
+    "sha256": "3e53894e79362cdc1a2fbc9f9e76a81fd6327eac8531b31a5cd6f7c2bb67f4ef",
+    "test_summaries": [
+      [
+        "41",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.568,
+    "original_log_path": "target/recovery-p1-integration-logs/enterprise_export-e7122a95e2338769.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/error_projection-9a1388113bab4d54",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/error_projection-9a1388113bab4d54.log",
+    "sha256": "f9854c112b61f4070d1ff03874700c7dc9f4e3f96c3e41cd9ce900c9454bb54a",
+    "test_summaries": [
+      [
+        "2",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.346,
+    "original_log_path": "target/recovery-p1-integration-logs/error_projection-9a1388113bab4d54.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/issuance_freeze_backend-85fe108754041804",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/issuance_freeze_backend-85fe108754041804.log",
+    "sha256": "8ae9e7fe591f559fe067451a489d838deab757fe265f4a1aee46dd6d88646961",
+    "test_summaries": [
+      [
+        "13",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.562,
+    "original_log_path": "target/recovery-p1-integration-logs/issuance_freeze_backend-85fe108754041804.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/native_security_evidence-185ae6410d6eb684",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/native_security_evidence-185ae6410d6eb684.log",
+    "sha256": "574e5cddaa9a7dbb63e917c2f493b5d3f15b9d48cf8c680162fe7b40a5618006",
+    "test_summaries": [
+      [
+        "12",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 1.672,
+    "original_log_path": "target/recovery-p1-integration-logs/native_security_evidence-185ae6410d6eb684.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/response_dry_run-72ec0b6bdc9b936f",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/response_dry_run-72ec0b6bdc9b936f.log",
+    "sha256": "e5ecf66c7f119d06b8473cafc2780fa6b1a0e94c6e30198f1fd92c081e7ffed5",
+    "test_summaries": [
+      [
+        "3",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 1.155,
+    "original_log_path": "target/recovery-p1-integration-logs/response_dry_run-72ec0b6bdc9b936f.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/runtime_boundaries-7ff96f8fd90545bf",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/runtime_boundaries-7ff96f8fd90545bf.log",
+    "sha256": "dcb67f3ebcd38e250fcfa1160df4a72fbfce06edea9a750e1c417acddd82b1c2",
+    "test_summaries": [
+      [
+        "2",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.378,
+    "original_log_path": "target/recovery-p1-integration-logs/runtime_boundaries-7ff96f8fd90545bf.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/runtime_security_passport-b115b4ce95a84c98",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/runtime_security_passport-b115b4ce95a84c98.log",
+    "sha256": "595a6828bc300b19b63c3449fdea3af66685faca2a7d2bbb84b1cf17a93fda63",
+    "test_summaries": [
+      [
+        "38",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.767,
+    "original_log_path": "target/recovery-p1-integration-logs/runtime_security_passport-b115b4ce95a84c98.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/transaction_passport-e90789258fd47f74",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/transaction_passport-e90789258fd47f74.log",
+    "sha256": "f7784d16e28a6a1ada38afaecc3c481b7961cf020c945d1e7e7fdd8fe713871b",
+    "test_summaries": [
+      [
+        "3",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.459,
+    "original_log_path": "target/recovery-p1-integration-logs/transaction_passport-e90789258fd47f74.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/trust_market_context-cc8071a418257c40",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/trust_market_context-cc8071a418257c40.log",
+    "sha256": "129d3e64c812e5cfc5ff3ced605ad285fe2d13ddc4b1e552f2fd3ad95309b799",
+    "test_summaries": [
+      [
+        "20",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.559,
+    "original_log_path": "target/recovery-p1-integration-logs/trust_market_context-cc8071a418257c40.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/web3_ops_qualification-c5cc693d9fa6e1de",
+      "--test-threads=4"
+    ],
+    "exit_code": 101,
+    "log": "evidence/integrations/web3_ops_qualification-c5cc693d9fa6e1de.log",
+    "sha256": "0f86be5673e67236784099aebd769cc260f9567422441fe4885f496ca0be846f",
+    "test_summaries": [
+      [
+        "0",
+        "1",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.624,
+    "original_log_path": "target/recovery-p1-integration-logs/web3_ops_qualification-c5cc693d9fa6e1de.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/adversarial_inputs-729310efc26de835",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/adversarial_inputs-729310efc26de835.log",
+    "sha256": "d48a2bb50388081339ff410f25426577f51f2607e051e0dcb27f9273b2ef33b2",
+    "test_summaries": [
+      [
+        "5",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.418,
+    "original_log_path": "target/recovery-p1-integration-logs/adversarial_inputs-729310efc26de835.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/budget_decision_equivalence-1013b7017de958ce",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/budget_decision_equivalence-1013b7017de958ce.log",
+    "sha256": "267fc990a6393bbb58c3d4f98b108bc7a0500cba43854b95c3734de2692e3086",
+    "test_summaries": [
+      [
+        "9",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 5.862,
+    "original_log_path": "target/recovery-p1-integration-logs/budget_decision_equivalence-1013b7017de958ce.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/composite_budget_store-16f10803eb34918c",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/composite_budget_store-16f10803eb34918c.log",
+    "sha256": "261c6e0fb51b53f259d6b6f8b94d87b9225ed73bce29c238a329998a84680551",
+    "test_summaries": [
+      [
+        "36",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.355,
+    "original_log_path": "target/recovery-p1-integration-logs/composite_budget_store-16f10803eb34918c.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/comptroller_surface_schema-05200a9921b28ae8",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/comptroller_surface_schema-05200a9921b28ae8.log",
+    "sha256": "b153628f2fd438d525d678a5b135b933ec8fdb3d524fcb2db774585fa0d75669",
+    "test_summaries": [
+      [
+        "4",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.641,
+    "original_log_path": "target/recovery-p1-integration-logs/comptroller_surface_schema-05200a9921b28ae8.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/dpop-8dbff7267e492b59",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/dpop-8dbff7267e492b59.log",
+    "sha256": "5d6f1b8e0df41d6d6767408badf95470628440fa5fbafda332ece061948c8867",
+    "test_summaries": [
+      [
+        "13",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.346,
+    "original_log_path": "target/recovery-p1-integration-logs/dpop-8dbff7267e492b59.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/dpop_admission_equivalence-5a92e8a444985436",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/dpop_admission_equivalence-5a92e8a444985436.log",
+    "sha256": "7f0406b6d711f293ac8e26585c79adf763d62c1b8a18098bd92d35839515a42a",
+    "test_summaries": [
+      [
+        "6",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.353,
+    "original_log_path": "target/recovery-p1-integration-logs/dpop_admission_equivalence-5a92e8a444985436.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/dst_drop_injection-b00621eed1ac1291",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/dst_drop_injection-b00621eed1ac1291.log",
+    "sha256": "8e1db20e3fcdd41a2f589329300221536e312aa686c2fa8f26e99d61cd56891d",
+    "test_summaries": [
+      [
+        "4",
+        "0",
+        "2"
+      ]
+    ],
+    "elapsed_seconds": 2.541,
+    "original_log_path": "target/recovery-p1-integration-logs/dst_drop_injection-b00621eed1ac1291.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/durable_admission_sqlite-6fd3298bbd275d23",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/durable_admission_sqlite-6fd3298bbd275d23.log",
+    "sha256": "9e906c140666a612a4bb7b4e1065c06a836988a5ffc82ec6bab84fcf5ed75df5",
+    "test_summaries": [
+      [
+        "15",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 27.109,
+    "original_log_path": "target/recovery-p1-integration-logs/durable_admission_sqlite-6fd3298bbd275d23.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/formal_projection-5c56ce715a3f5d16",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/formal_projection-5c56ce715a3f5d16.log",
+    "sha256": "0ceaedfb78221aaf1a69729b277b4ee047c8076307136d5c01326b9b99e77c28",
+    "test_summaries": [
+      [
+        "4",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.416,
+    "original_log_path": "target/recovery-p1-integration-logs/formal_projection-5c56ce715a3f5d16.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/guard_decision_equivalence-8c3a1cd26422d65e",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/guard_decision_equivalence-8c3a1cd26422d65e.log",
+    "sha256": "4bd9378ebbfde70928c4749e7cd8805a909eb729d956c7aa6cc2c71014a31741",
+    "test_summaries": [
+      [
+        "4",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.272,
+    "original_log_path": "target/recovery-p1-integration-logs/guard_decision_equivalence-8c3a1cd26422d65e.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/loom_concurrency-3ed9457b0b17a053",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/loom_concurrency-3ed9457b0b17a053.log",
+    "sha256": "df166913f47ff1f04202cae9b31df67ed272d692d99a0023a8117dc3029100dd",
+    "test_summaries": [
+      [
+        "0",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.239,
+    "original_log_path": "target/recovery-p1-integration-logs/loom_concurrency-3ed9457b0b17a053.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/metrics_endpoint-1224d79c794cd50e",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/metrics_endpoint-1224d79c794cd50e.log",
+    "sha256": "50a9d42e04f326bc0ba28749560d335aaa863e5912a1d3c5e5a58c10af155aed",
+    "test_summaries": [
+      [
+        "9",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.254,
+    "original_log_path": "target/recovery-p1-integration-logs/metrics_endpoint-1224d79c794cd50e.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/otel_cardinality-017a477a0a48a881",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/otel_cardinality-017a477a0a48a881.log",
+    "sha256": "5365e2f6f8ee84f072ae92f0ea46ecec8449dc657bba3a2644d020944cfa91ac",
+    "test_summaries": [
+      [
+        "4",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.429,
+    "original_log_path": "target/recovery-p1-integration-logs/otel_cardinality-017a477a0a48a881.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/passkey_capability_dispatch-9021718e5c505ebe",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/passkey_capability_dispatch-9021718e5c505ebe.log",
+    "sha256": "ab0241a12970c15139ae3c41c6fbdfc08005ed2a3377994389f4821595003852",
+    "test_summaries": [
+      [
+        "6",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.288,
+    "original_log_path": "target/recovery-p1-integration-logs/passkey_capability_dispatch-9021718e5c505ebe.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/property_budget_store-a4a8010db4118c4d",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/property_budget_store-a4a8010db4118c4d.log",
+    "sha256": "2dee19f05b928b8f388ee8c24a2652bc3ffb43be84a0056a1a9fc5d0e7a14684",
+    "test_summaries": [
+      [
+        "3",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.458,
+    "original_log_path": "target/recovery-p1-integration-logs/property_budget_store-a4a8010db4118c4d.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/property_reservation_ledger-7981646d833101ee",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/property_reservation_ledger-7981646d833101ee.log",
+    "sha256": "dc17dd7ec6f09f368ca5d1c5c800ac2077cb655ed5a6586d0d2ef6832e6b523a",
+    "test_summaries": [
+      [
+        "3",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.984,
+    "original_log_path": "target/recovery-p1-integration-logs/property_reservation_ledger-7981646d833101ee.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/provenance_otel-e53bb2e5143fe1d5",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/provenance_otel-e53bb2e5143fe1d5.log",
+    "sha256": "f18b6d900d5aec6d522e6e4aaaabfb84684c7c2c5eec281a519eb22fd9de69c0",
+    "test_summaries": [
+      [
+        "4",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 2.277,
+    "original_log_path": "target/recovery-p1-integration-logs/provenance_otel-e53bb2e5143fe1d5.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/receipt_decision_equivalence-4fda4803b51be1c5",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/receipt_decision_equivalence-4fda4803b51be1c5.log",
+    "sha256": "fe38a762fd27c88bd85b9212e8f345bd8db94b64be133c8c86af6fecfbe017db",
+    "test_summaries": [
+      [
+        "1",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.318,
+    "original_log_path": "target/recovery-p1-integration-logs/receipt_decision_equivalence-4fda4803b51be1c5.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/receipt_signing_async-f0fd9fca8d4c8c8d",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/receipt_signing_async-f0fd9fca8d4c8c8d.log",
+    "sha256": "0dc0c9752e7a2df6be8fcbed7c2548c28d729f79ab81408f398404a0166b6d7a",
+    "test_summaries": [
+      [
+        "3",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.911,
+    "original_log_path": "target/recovery-p1-integration-logs/receipt_signing_async-f0fd9fca8d4c8c8d.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/replay_proptest-86b5684e5703a1db",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/replay_proptest-86b5684e5703a1db.log",
+    "sha256": "fe5b9d2c0bd82cc4ab3bd209203638569181e2c9a270379c2fcd5ca06993f57f",
+    "test_summaries": [
+      [
+        "3",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 3.389,
+    "original_log_path": "target/recovery-p1-integration-logs/replay_proptest-86b5684e5703a1db.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/retention-e51651996d6e17ad",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/retention-e51651996d6e17ad.log",
+    "sha256": "085dbe7b88069b300eff7efb277c919400fc2a20b0b8f97e56b0143d09a5a74f",
+    "test_summaries": [
+      [
+        "11",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 2.304,
+    "original_log_path": "target/recovery-p1-integration-logs/retention-e51651996d6e17ad.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/revocation_decision_equivalence-d37d4c2a5ca6798f",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/revocation_decision_equivalence-d37d4c2a5ca6798f.log",
+    "sha256": "37684d8283907e0f46bfb0ba9fe6443008c048a84283fc062f2006ce049295fc",
+    "test_summaries": [
+      [
+        "2",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.409,
+    "original_log_path": "target/recovery-p1-integration-logs/revocation_decision_equivalence-d37d4c2a5ca6798f.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/rss_shed-f76496be72c28dd3",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/rss_shed-f76496be72c28dd3.log",
+    "sha256": "081299afc627903b06765af4cb59fff5cc2aba37a9277e73253bcd6856045c91",
+    "test_summaries": [
+      [
+        "1",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.253,
+    "original_log_path": "target/recovery-p1-integration-logs/rss_shed-f76496be72c28dd3.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/settlement_observer_byte_identity-b89c75469804a190",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/settlement_observer_byte_identity-b89c75469804a190.log",
+    "sha256": "f2e30742f8ca0a0d4d74af70c04ba2aecee21360d39a0b75124d54fb3cfd76ce",
+    "test_summaries": [
+      [
+        "2",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.324,
+    "original_log_path": "target/recovery-p1-integration-logs/settlement_observer_byte_identity-b89c75469804a190.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/settlement_routing_sqlite-fff0e7708e3feba3",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/settlement_routing_sqlite-fff0e7708e3feba3.log",
+    "sha256": "3430ec2d6129178e3369399993a135c8b4737f83b97dcf8c29e4aa5092541cf4",
+    "test_summaries": [
+      [
+        "1",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 3.662,
+    "original_log_path": "target/recovery-p1-integration-logs/settlement_routing_sqlite-fff0e7708e3feba3.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/signer_crash-b6de30569878fc84",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/signer_crash-b6de30569878fc84.log",
+    "sha256": "e66c64167ec8184b135df042808476930bb9fc9d634ab7a5a87f2b5ec5fd7c1e",
+    "test_summaries": [
+      [
+        "1",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.457,
+    "original_log_path": "target/recovery-p1-integration-logs/signer_crash-b6de30569878fc84.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/signing_drop_counter-f0b289353c75c57c",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/signing_drop_counter-f0b289353c75c57c.log",
+    "sha256": "ded42011e513235e27d10f3e366aa185110b79275a036551e48b3175acdb27bb",
+    "test_summaries": [
+      [
+        "1",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.447,
+    "original_log_path": "target/recovery-p1-integration-logs/signing_drop_counter-f0b289353c75c57c.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/signing_queue_bound-3b06b7022b97694f",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/signing_queue_bound-3b06b7022b97694f.log",
+    "sha256": "d40f501f7e8b48ff441d561cee6886b10431332ff8aa2d3caa9f7f53aca0eb6c",
+    "test_summaries": [
+      [
+        "12",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.732,
+    "original_log_path": "target/recovery-p1-integration-logs/signing_queue_bound-3b06b7022b97694f.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/stream_byte_limit-4d138d39138a6603",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/stream_byte_limit-4d138d39138a6603.log",
+    "sha256": "1777d7c3f265604820e1a9d9bf3080ebb770b8e5291bd71f108b28c59a702fd5",
+    "test_summaries": [
+      [
+        "4",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.364,
+    "original_log_path": "target/recovery-p1-integration-logs/stream_byte_limit-4d138d39138a6603.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/threshold_approval_records-40343f34b918a5e1",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/threshold_approval_records-40343f34b918a5e1.log",
+    "sha256": "c97a805155f8c29406db1b9550e7613c932b0bccfc5e64566072c8f7e62799fa",
+    "test_summaries": [
+      [
+        "10",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.309,
+    "original_log_path": "target/recovery-p1-integration-logs/threshold_approval_records-40343f34b918a5e1.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/threshold_collector_recovery-f07a7400e14c2adc",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/threshold_collector_recovery-f07a7400e14c2adc.log",
+    "sha256": "5f3c85d5cf98b82738d1a7c77980f52e5965f6d33f9514d0b4d48de9791ef744",
+    "test_summaries": [
+      [
+        "25",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.366,
+    "original_log_path": "target/recovery-p1-integration-logs/threshold_collector_recovery-f07a7400e14c2adc.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/weights_binding-3f1e14cde80ff1af",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/weights_binding-3f1e14cde80ff1af.log",
+    "sha256": "b2e754a1c59479768702b0972e1fdccfb72698ac5c2c6d7187a84a50560a365c",
+    "test_summaries": [
+      [
+        "3",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.348,
+    "original_log_path": "target/recovery-p1-integration-logs/weights_binding-3f1e14cde80ff1af.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/weights_card_refusal-f5c7825b55f6a9fa",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/weights_card_refusal-f5c7825b55f6a9fa.log",
+    "sha256": "6989fecbcc78ab93db6e4dbc98c9ec091748faf2467a08c9dce739923d8cd22c",
+    "test_summaries": [
+      [
+        "7",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.279,
+    "original_log_path": "target/recovery-p1-integration-logs/weights_card_refusal-f5c7825b55f6a9fa.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/aggregate_family-527029acb6a6c491",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/aggregate_family-527029acb6a6c491.log",
+    "sha256": "db2f1c18c98a49a2e293bccb86bc53c3181b43a0553a27f8720c22c198de4a51",
+    "test_summaries": [
+      [
+        "2",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 4.053,
+    "original_log_path": "target/recovery-p1-integration-logs/aggregate_family-527029acb6a6c491.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/child_submission-206c666050609240",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/child_submission-206c666050609240.log",
+    "sha256": "4e8a5d88b76dff45a0d754f7b8df37ac59f20564bb87d2d127c28fcd86688b46",
+    "test_summaries": [
+      [
+        "1",
+        "0",
+        "0"
+      ],
+      [
+        "6",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 6.298,
+    "original_log_path": "target/recovery-p1-integration-logs/child_submission-206c666050609240.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/crash_recovery-063084a3bdd414c7",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/crash_recovery-063084a3bdd414c7.log",
+    "sha256": "9d3851515b0ffee82f610880d21e083532c1bef3e2d2874f280289bc4c146285",
+    "test_summaries": [
+      [
+        "1",
+        "0",
+        "0"
+      ],
+      [
+        "1",
+        "0",
+        "0"
+      ],
+      [
+        "1",
+        "0",
+        "0"
+      ],
+      [
+        "1",
+        "0",
+        "0"
+      ],
+      [
+        "1",
+        "0",
+        "0"
+      ],
+      [
+        "1",
+        "0",
+        "0"
+      ],
+      [
+        "1",
+        "0",
+        "0"
+      ],
+      [
+        "1",
+        "0",
+        "0"
+      ],
+      [
+        "1",
+        "0",
+        "0"
+      ],
+      [
+        "1",
+        "0",
+        "0"
+      ],
+      [
+        "1",
+        "0",
+        "0"
+      ],
+      [
+        "1",
+        "0",
+        "0"
+      ],
+      [
+        "1",
+        "0",
+        "0"
+      ],
+      [
+        "10",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 12.204,
+    "original_log_path": "target/recovery-p1-integration-logs/crash_recovery-063084a3bdd414c7.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/host_routes-2cd92292256cc673",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/host_routes-2cd92292256cc673.log",
+    "sha256": "b81c586e46659666bf793a02e4117c962879e8f20edaf07decdce3a6ca08d334",
+    "test_summaries": [
+      [
+        "4",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 6.118,
+    "original_log_path": "target/recovery-p1-integration-logs/host_routes-2cd92292256cc673.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/mailbox_effect_boundary-c28df91b9c1e755d",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/mailbox_effect_boundary-c28df91b9c1e755d.log",
+    "sha256": "1fff2213e2ee6d6164d1563915bd6f1333da684001405cc83701c2e02a32e818",
+    "test_summaries": [
+      [
+        "1",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 6.545,
+    "original_log_path": "target/recovery-p1-integration-logs/mailbox_effect_boundary-c28df91b9c1e755d.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/mailboxes-ade761256ddae888",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/mailboxes-ade761256ddae888.log",
+    "sha256": "c6efe01089ad1f1690fe1cb58eaefa24ad8c202ba1d1f91cf03884d3a4de9181",
+    "test_summaries": [
+      [
+        "14",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 23.226,
+    "original_log_path": "target/recovery-p1-integration-logs/mailboxes-ade761256ddae888.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/nonce_recovery-5f30566c0c887a35",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/nonce_recovery-5f30566c0c887a35.log",
+    "sha256": "994e53a143cdf1b850fcfa2111992d1d852801b591e9b80cc9e99b6584279a01",
+    "test_summaries": [
+      [
+        "1",
+        "0",
+        "0"
+      ],
+      [
+        "1",
+        "0",
+        "0"
+      ],
+      [
+        "3",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 6.115,
+    "original_log_path": "target/recovery-p1-integration-logs/nonce_recovery-5f30566c0c887a35.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/polyglot_workers-c58de1997638e779",
+      "--test-threads=4"
+    ],
+    "exit_code": 101,
+    "log": "evidence/integrations/polyglot_workers-c58de1997638e779.log",
+    "sha256": "41a6960815d6add4f3fedd717540a1481b656a2552a3b7b8004720666d2d2323",
+    "test_summaries": [
+      [
+        "0",
+        "1",
+        "0"
+      ],
+      [
+        "1",
+        "1",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 2.825,
+    "original_log_path": "target/recovery-p1-integration-logs/polyglot_workers-c58de1997638e779.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/processes-849cf771bebfae39",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/processes-849cf771bebfae39.log",
+    "sha256": "a6d37dca14fb8b24ba1875411b10df2c79cb88821d376f09e2c68c58b7a87a42",
+    "test_summaries": [
+      [
+        "16",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 22.608,
+    "original_log_path": "target/recovery-p1-integration-logs/processes-849cf771bebfae39.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/recovery_offer_binding_lab-e622152f5a33b765",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/recovery_offer_binding_lab-e622152f5a33b765.log",
+    "sha256": "a1966edd2c8575840b4df71c8e9b733fc0b2016eca53bec9dd037572a00e63ff",
+    "test_summaries": [
+      [
+        "2",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 4.084,
+    "original_log_path": "target/recovery-p1-integration-logs/recovery_offer_binding_lab-e622152f5a33b765.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/recovery_p0_baseline-69deb4a225bc4e1b",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/recovery_p0_baseline-69deb4a225bc4e1b.log",
+    "sha256": "4894ea2dd956cdf60aed947c1e679dcbce95c5b9c91cfca7d851cda288eb2911",
+    "test_summaries": [
+      [
+        "1",
+        "0",
+        "1"
+      ]
+    ],
+    "elapsed_seconds": 4.727,
+    "original_log_path": "target/recovery-p1-integration-logs/recovery_p0_baseline-69deb4a225bc4e1b.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/retry_eligibility-5253424fd68bce13",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/retry_eligibility-5253424fd68bce13.log",
+    "sha256": "d1a91c96b5840806fa5929e5027d5aad4fa2746eb0325ed9988268a4356722c0",
+    "test_summaries": [
+      [
+        "2",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 3.61,
+    "original_log_path": "target/recovery-p1-integration-logs/retry_eligibility-5253424fd68bce13.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/state_blobs-bdc21ccf0f9c56d2",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/state_blobs-bdc21ccf0f9c56d2.log",
+    "sha256": "c7d17a49036bbce5399e3368e8feab7fc3581afd33dc66cce527884655ffe1e8",
+    "test_summaries": [
+      [
+        "6",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 6.623,
+    "original_log_path": "target/recovery-p1-integration-logs/state_blobs-bdc21ccf0f9c56d2.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/threshold_recovery-d3496a9679a91653",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/threshold_recovery-d3496a9679a91653.log",
+    "sha256": "082aab86802f8466aa3b07235a4958ab4b4a02a340fc589cbd887a6eee019f39",
+    "test_summaries": [
+      [
+        "2",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 4.973,
+    "original_log_path": "target/recovery-p1-integration-logs/threshold_recovery-d3496a9679a91653.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/worker_protocol-e2a96662abcf825d",
+      "--test-threads=4"
+    ],
+    "exit_code": 101,
+    "log": "evidence/integrations/worker_protocol-e2a96662abcf825d.log",
+    "sha256": "6abf3b3158de9ee191f4c3909587d28910b2ee786c085ef16797e7ef9ab9abf1",
+    "test_summaries": [
+      [
+        "10",
+        "2",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 38.35,
+    "original_log_path": "target/recovery-p1-integration-logs/worker_protocol-e2a96662abcf825d.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/approval_store-46c40c343a231430",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/approval_store-46c40c343a231430.log",
+    "sha256": "f356fd0fb2254b605115b31f0e89426bb529b079023ef3e3e5aaa955ac297072",
+    "test_summaries": [
+      [
+        "7",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.749,
+    "original_log_path": "target/recovery-p1-integration-logs/approval_store-46c40c343a231430.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/caller_execution_ledger-830aa9c1519c9d0d",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/caller_execution_ledger-830aa9c1519c9d0d.log",
+    "sha256": "d47d84cfd9c522d223b015da148867a8d6dcc59466e4593816b47e02660f1add",
+    "test_summaries": [
+      [
+        "9",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 2.522,
+    "original_log_path": "target/recovery-p1-integration-logs/caller_execution_ledger-830aa9c1519c9d0d.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/capability_set_suspensions-de2759d014940709",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/capability_set_suspensions-de2759d014940709.log",
+    "sha256": "b9de9459e11ec19c394c79a5b62719f74b8fd9940ca0e1a325f1433964fe39d0",
+    "test_summaries": [
+      [
+        "3",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.802,
+    "original_log_path": "target/recovery-p1-integration-logs/capability_set_suspensions-de2759d014940709.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/containment_overlay_commands-99e1887b76604272",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/containment_overlay_commands-99e1887b76604272.log",
+    "sha256": "0daf2fedacb434a86fed28f5bba287ec4428be28e740537bf69cf2c2958311de",
+    "test_summaries": [
+      [
+        "3",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.912,
+    "original_log_path": "target/recovery-p1-integration-logs/containment_overlay_commands-99e1887b76604272.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/egress_restrictions-7b0a75fe43a18772",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/egress_restrictions-7b0a75fe43a18772.log",
+    "sha256": "16965199008b71cab7686326a226ffd2d38582a7320bebe77a5b9b241c0bbbab",
+    "test_summaries": [
+      [
+        "3",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.852,
+    "original_log_path": "target/recovery-p1-integration-logs/egress_restrictions-7b0a75fe43a18772.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/enterprise_migration_state-7ebd56769c2a9484",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/enterprise_migration_state-7ebd56769c2a9484.log",
+    "sha256": "31a238332d8de7e9ccc6cdb9c1849b55d888e70aa6a65ee96cac8e86fe79cc65",
+    "test_summaries": [
+      [
+        "12",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.622,
+    "original_log_path": "target/recovery-p1-integration-logs/enterprise_migration_state-7ebd56769c2a9484.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/execution_nonce_caller_execution-91753a7c46e15da0",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/execution_nonce_caller_execution-91753a7c46e15da0.log",
+    "sha256": "9b482b0289e69e42bafa5d6a442e95834305381d8ab1d5ef7274d5a0ab7f11de",
+    "test_summaries": [
+      [
+        "33",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 53.627,
+    "original_log_path": "target/recovery-p1-integration-logs/execution_nonce_caller_execution-91753a7c46e15da0.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/execution_nonce_cumulative_approval-6128b26858d8d44d",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/execution_nonce_cumulative_approval-6128b26858d8d44d.log",
+    "sha256": "3b04b00939d4bb1c3a128cba5b9be05222dfa5913a40c8f5b20dcae47a9dc2a5",
+    "test_summaries": [
+      [
+        "9",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 17.079,
+    "original_log_path": "target/recovery-p1-integration-logs/execution_nonce_cumulative_approval-6128b26858d8d44d.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/execution_nonce_kernel_lifecycle-b39a39bceeb772ff",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/execution_nonce_kernel_lifecycle-b39a39bceeb772ff.log",
+    "sha256": "747fffbdde71c3199f473108f429a45851f9ea9491b704ccca4fee7c21e578c4",
+    "test_summaries": [
+      [
+        "17",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 24.729,
+    "original_log_path": "target/recovery-p1-integration-logs/execution_nonce_kernel_lifecycle-b39a39bceeb772ff.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/execution_nonce_remote_delivery-5d1a55e8b90b337a",
+      "--test-threads=4"
+    ],
+    "exit_code": 101,
+    "log": "evidence/integrations/execution_nonce_remote_delivery-5d1a55e8b90b337a.log",
+    "sha256": "b927725649481aeb47789e3df4cfa4f6b636f197c2ed7ed286200e0973dd2b12",
+    "test_summaries": [
+      [
+        "0",
+        "11",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 6.824,
+    "original_log_path": "target/recovery-p1-integration-logs/execution_nonce_remote_delivery-5d1a55e8b90b337a.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/execution_nonce_store-0387688db048ffdf",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/execution_nonce_store-0387688db048ffdf.log",
+    "sha256": "b861f3fe9fd968dbe8d87ecee825b3a8aa3b4793d87500747d4cd141d4020217",
+    "test_summaries": [
+      [
+        "8",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.536,
+    "original_log_path": "target/recovery-p1-integration-logs/execution_nonce_store-0387688db048ffdf.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/finding_pool_ledger-a3e1b5c61badda10",
+      "--test-threads=4"
+    ],
+    "exit_code": 101,
+    "log": "evidence/integrations/finding_pool_ledger-a3e1b5c61badda10.log",
+    "sha256": "9d13734e0aa50c19760771c0e894c8be11dc125054f534e6b33b5e655b76fd07",
+    "test_summaries": [
+      [
+        "0",
+        "38",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 2.155,
+    "original_log_path": "target/recovery-p1-integration-logs/finding_pool_ledger-a3e1b5c61badda10.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/formal_projection-4560c8f435fcf745",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/formal_projection-4560c8f435fcf745.log",
+    "sha256": "efe0859c61d290804f83074acb9db5df3948bb001fd4e09217654071d95d3033",
+    "test_summaries": [
+      [
+        "5",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 1.233,
+    "original_log_path": "target/recovery-p1-integration-logs/formal_projection-4560c8f435fcf745.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/frost_coordinator-441a557a23bd19c3",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/frost_coordinator-441a557a23bd19c3.log",
+    "sha256": "003b2bf9895cef151f4d39890578170095af509c031d071b7f53042823f6ab69",
+    "test_summaries": [
+      [
+        "5",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 8.24,
+    "original_log_path": "target/recovery-p1-integration-logs/frost_coordinator-441a557a23bd19c3.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/frost_rotation-56276feabf670136",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/frost_rotation-56276feabf670136.log",
+    "sha256": "93e2809784a6d18b93db352ddfeb8f7a617f263550fe7af6a1d91aad0781fda3",
+    "test_summaries": [
+      [
+        "3",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 4.954,
+    "original_log_path": "target/recovery-p1-integration-logs/frost_rotation-56276feabf670136.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/frost_rotation_activation-4a986f647bcc46a5",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/frost_rotation_activation-4a986f647bcc46a5.log",
+    "sha256": "79c12aa87e159d7fc204386ff129e4f8aab324e996ac5e15203dbf79b3365f45",
+    "test_summaries": [
+      [
+        "2",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 3.697,
+    "original_log_path": "target/recovery-p1-integration-logs/frost_rotation_activation-4a986f647bcc46a5.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/frost_signer-16eafc524413da0a",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/frost_signer-16eafc524413da0a.log",
+    "sha256": "6260a8e6e96f47350fd5954c11a2910afa0be6b18c5768e7eda0716c14b5f91c",
+    "test_summaries": [
+      [
+        "6",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 9.2,
+    "original_log_path": "target/recovery-p1-integration-logs/frost_signer-16eafc524413da0a.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/governed_approval_kernel_replay-623d7053b99abba3",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/governed_approval_kernel_replay-623d7053b99abba3.log",
+    "sha256": "4b3c197e968b98e611174b324feefa620cb2e2b2dbd670c3ad738ccbfb0509a9",
+    "test_summaries": [
+      [
+        "1",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 1.184,
+    "original_log_path": "target/recovery-p1-integration-logs/governed_approval_kernel_replay-623d7053b99abba3.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/integration_smoke-0f163b17897690f5",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/integration_smoke-0f163b17897690f5.log",
+    "sha256": "595487487cc68d036561180a74da2f423fa3f171c6daaab49f8d222d172c60df",
+    "test_summaries": [
+      [
+        "5",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 1.18,
+    "original_log_path": "target/recovery-p1-integration-logs/integration_smoke-0f163b17897690f5.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/issuance_freezes-7db00832ed40e6b5",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/issuance_freezes-7db00832ed40e6b5.log",
+    "sha256": "3604d82ae1b1c1d0c142a597dafe26bdce53b83bb2098b36461064616d91b369",
+    "test_summaries": [
+      [
+        "7",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 1.229,
+    "original_log_path": "target/recovery-p1-integration-logs/issuance_freezes-7db00832ed40e6b5.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/loom_receipt_writer-627b2f61c83a54bf",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/loom_receipt_writer-627b2f61c83a54bf.log",
+    "sha256": "df166913f47ff1f04202cae9b31df67ed272d692d99a0023a8117dc3029100dd",
+    "test_summaries": [
+      [
+        "0",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.305,
+    "original_log_path": "target/recovery-p1-integration-logs/loom_receipt_writer-627b2f61c83a54bf.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/memory_provenance_store-3202a4a9096379a4",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/memory_provenance_store-3202a4a9096379a4.log",
+    "sha256": "3b1783d10e73e7a072e54babf7689ef128b5a9ccab149f4a5b1da3e8387e113b",
+    "test_summaries": [
+      [
+        "12",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.45,
+    "original_log_path": "target/recovery-p1-integration-logs/memory_provenance_store-3202a4a9096379a4.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/native_authority_binding-3c2625a4ada2e0c5",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/native_authority_binding-3c2625a4ada2e0c5.log",
+    "sha256": "f883e8cda8b2514c6e68dfae497f263ae3eccf9260d0cffd0b193046f4d147b8",
+    "test_summaries": [
+      [
+        "12",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 29.807,
+    "original_log_path": "target/recovery-p1-integration-logs/native_authority_binding-3c2625a4ada2e0c5.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/receipt_retention_liveness-06031d081534ac72",
+      "--test-threads=4"
+    ],
+    "exit_code": 101,
+    "log": "evidence/integrations/receipt_retention_liveness-06031d081534ac72.log",
+    "sha256": "761895732f7cc3bab06d1d0d842cd1a63ba2e24f3add9a2c1aec8b6c9a1d1694",
+    "test_summaries": [
+      [
+        "2",
+        "3",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 88.769,
+    "original_log_path": "target/recovery-p1-integration-logs/receipt_retention_liveness-06031d081534ac72.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/response_dispatch-38df94d0a90ecfa2",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/response_dispatch-38df94d0a90ecfa2.log",
+    "sha256": "a4d208fd26e312641c988067e385adc2fa333f91d2951e93b03efd6e81a3e7b7",
+    "test_summaries": [
+      [
+        "30",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 4.946,
+    "original_log_path": "target/recovery-p1-integration-logs/response_dispatch-38df94d0a90ecfa2.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/sealed_decoy_registry-91e02274fc534bd7",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/sealed_decoy_registry-91e02274fc534bd7.log",
+    "sha256": "d77af508d1eb4239f1b02577230f8d691d926d73ee8e954ecbd3072fc73fa662",
+    "test_summaries": [
+      [
+        "24",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.715,
+    "original_log_path": "target/recovery-p1-integration-logs/sealed_decoy_registry-91e02274fc534bd7.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/security_release_recovery-48dabf93ed0f0484",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/security_release_recovery-48dabf93ed0f0484.log",
+    "sha256": "2aa6181267ea5101143749a75a79c1fab42d043ae5fdc9dafb070ef292fcf980",
+    "test_summaries": [
+      [
+        "25",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 53.816,
+    "original_log_path": "target/recovery-p1-integration-logs/security_release_recovery-48dabf93ed0f0484.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/security_state-de0e400862fa1e9c",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/security_state-de0e400862fa1e9c.log",
+    "sha256": "16bf6178feba7ef736c35f43b251cf310128791d886625b67873b10977d4b2c5",
+    "test_summaries": [
+      [
+        "33",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 3.257,
+    "original_log_path": "target/recovery-p1-integration-logs/security_state-de0e400862fa1e9c.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/security_state_contract-88f85c9cea3eeb20",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/security_state_contract-88f85c9cea3eeb20.log",
+    "sha256": "90bc5c1b4ab65e85aa09a46382475147db0b1fa0b1c3afbe0823ba5a4ac8199a",
+    "test_summaries": [
+      [
+        "10",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 1.285,
+    "original_log_path": "target/recovery-p1-integration-logs/security_state_contract-88f85c9cea3eeb20.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/session_throttles-e5bb3439bf7923ed",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/session_throttles-e5bb3439bf7923ed.log",
+    "sha256": "ee9e0b822769fb118dd3ca31b42642b93b69b99f4ba64ffe54d51ea78d40390a",
+    "test_summaries": [
+      [
+        "4",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.751,
+    "original_log_path": "target/recovery-p1-integration-logs/session_throttles-e5bb3439bf7923ed.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/settle_attempts_races-eb1dba193d797bb1",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/settle_attempts_races-eb1dba193d797bb1.log",
+    "sha256": "2abd6336e1d0e5641d5c6cd1b302552edb3888d64cd6c5cbaf45333a9eae1b9d",
+    "test_summaries": [
+      [
+        "1",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.777,
+    "original_log_path": "target/recovery-p1-integration-logs/settle_attempts_races-eb1dba193d797bb1.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/tenant_isolation-89c849c4e1bbec81",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/tenant_isolation-89c849c4e1bbec81.log",
+    "sha256": "41e9dda98c01cd41290ab3c728bb05ade16a9799819c0548dc11ac189aed07b6",
+    "test_summaries": [
+      [
+        "4",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 0.779,
+    "original_log_path": "target/recovery-p1-integration-logs/tenant_isolation-89c849c4e1bbec81.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/threshold_collector_recovery-8cd815be48f7d083",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/threshold_collector_recovery-8cd815be48f7d083.log",
+    "sha256": "53d483b0bc1e77ce7efe84b8ea6074cd276c2d30671adf05cc642b9e55ff5f8f",
+    "test_summaries": [
+      [
+        "11",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 1.102,
+    "original_log_path": "target/recovery-p1-integration-logs/threshold_collector_recovery-8cd815be48f7d083.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/threshold_kernel_lifecycle-c2760f358af12d26",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "log": "evidence/integrations/threshold_kernel_lifecycle-c2760f358af12d26.log",
+    "sha256": "e4642e98ec7e6f154e261d3c454a1e30dab85c1e145834124a6955e1e58f82b9",
+    "test_summaries": [
+      [
+        "10",
+        "0",
+        "0"
+      ]
+    ],
+    "elapsed_seconds": 15.248,
+    "original_log_path": "target/recovery-p1-integration-logs/threshold_kernel_lifecycle-c2760f358af12d26.log"
+  }
+]
