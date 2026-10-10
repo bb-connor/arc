@@ -25,18 +25,54 @@ envelope expires or an authority import from the elected leader is unresolved.
 The successful import must belong to the current process and the current
 election term; restart, leader changes and failed synchronization require
 another authenticated import before a follower serves issuer trust.
-Clustered trust reads also require quorum. Local signing custody permits
-direct trust serving only on the currently elected leader; a former custodian
-must satisfy follower confirmation and envelope freshness like every peer.
+Clustered trust reads also require current quorum. The elected leader needs
+live signing custody of its authenticated head and enough authenticated peer
+chain agreements observed in its current term to reach quorum. Each agreement
+binds the configured peer's advertised self URL before and after its envelope;
+an alias for one logical node cannot supply another authority vote. Key possession
+and URL election alone cannot authorize a returning former custodian. Known
+authenticated newer or conflicting history prevents old-head serving even if
+its import refuses replay or that peer later becomes unreachable. A peer with
+an authority error contributes no agreement; a fresh signed majority can still
+admit the leader after a minority's transport failure.
+Refused signed-history evidence retains the maximal authenticated chain within
+the existing chain limit. A shorter valid relay cannot erase that witness or
+create a conflict. Truly incomparable signed histories remain a serving refusal
+for the process, even if a later import encompasses one branch.
+Followers require an elected source that itself admits the imported state
+under stable source leader, quorum and term samples. Internal signed exports
+remain available for convergence before either node can serve, allowing a
+leader to observe signed peer agreement before followers confirm its status.
+Nonleader relays authenticate history but cannot overwrite a follower's
+leader-confirmed envelope; inspection of a consistent prefix does not relax
+the replay rules of an actual import.
 Confirmation binds the exact imported signed envelope, including its issue and
 expiry times and signature. Locally re-signing an old head cannot renew that
-confirmation. Public trust documents and verification use the same admitted
-authority view throughout a read.
+confirmation. Reads recheck leader, term, quorum and the exact admitted view
+before return. Public trust documents and verification use that same view
+throughout construction. A signing operation binds its actual artifact key to
+the admitted live head and rechecks admission before returning the artifact.
 Public JWKS, verifier metadata/discovery and OID4VP issuer verification use
 the same freshness contract and the bounded public passport admission lane.
+Those authority document routes return HTTP 503 when a configured SQLite
+authority cannot pass admission, including absent storage, clock regression or
+unsafe file custody. Generic-market documents and missing plain-seed routes
+retain their existing refusal contracts. With no authority configured, issuer
+metadata remains unsigned with no portable signing key or JWKS; discovery and
+JWKS refuse with 404, and OID4VP trust reads refuse with 409.
+Unconfigured health returns 200 with `configured: false` and `available: true`
+for a successful inspection, while publishing no backend or key material.
 Health then reports unavailable authority with HTTP 503 and degraded peer
-counts; independent revocation and budget replication continue. A successful
-signed authority import restores the health state.
+counts; independent revocation and budget replication continue. An admitted
+leader or a confirmed import from that leader restores authority readiness.
+Authenticated authority inspections use a separate eight-permit, non-queued
+blocking lane. Cancellation retains admission until the worker completes.
+Owner provisioning, mutation fences and SQLite issuance use the service clock
+and configured receiver policy, preserving local clock regression refusal.
+Explicit service startup provisions a configured plain signing seed through
+the owner custody loader. Requests load it only if it still exists; losing
+that seed causes refusal and never creates replacement custody. Keyring-owned
+seeds remain under keyring initialization and are not provisioned by this path.
 Health also returns HTTP 503 when configured authority storage is absent or
 unreadable. Its independent single-permit inspection lane never provisions
 authority storage or occupies authenticated request admission; a cancelled

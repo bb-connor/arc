@@ -9,6 +9,8 @@ use super::report_validation::{
 };
 use super::*;
 
+#[path = "cluster/authority_evidence.rs"]
+mod authority_evidence;
 #[path = "cluster/consensus.rs"]
 mod consensus;
 #[path = "cluster/deltas.rs"]
@@ -25,7 +27,8 @@ pub(crate) use consensus::{
     cluster_authority_lease_view, cluster_authority_read_role,
     cluster_consensus_and_authority_lease_view, cluster_consensus_view, cluster_self_url,
     compute_cluster_consensus_locked, current_budget_event_authority, current_leader_url,
-    handle_internal_cluster_status, ClusterAuthorityReadRole,
+    handle_internal_cluster_status, ClusterAuthorityReadContext, ClusterAuthorityReadRole,
+    ClusterAuthorityServingEvidence,
 };
 pub(crate) use deltas::{
     budget_cursor_from_event, budget_mutation_event_view, budget_mutation_record_from_view,
@@ -54,8 +57,7 @@ pub(crate) use pull_budget::{
     PullError, PullRoundBudget, RevocationPeerContract, PEER_ROUND_WALL_CLOCK_BUDGET,
 };
 pub(crate) use snapshots::{
-    cluster_replication_heads, handle_internal_authority_snapshot,
-    handle_internal_cluster_snapshot, recover_cluster_snapshot,
+    cluster_replication_heads, handle_internal_authority_snapshot, handle_internal_cluster_snapshot,
 };
 
 #[cfg(test)]

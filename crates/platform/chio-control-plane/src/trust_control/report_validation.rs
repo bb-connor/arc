@@ -4,6 +4,7 @@ pub(crate) use authority_admission::inspect_authority_state_blocking;
 
 use super::cluster::{
     cluster_authority_lease_view, cluster_authority_read_role, ClusterAuthorityReadRole,
+    ClusterAuthorityServingEvidence,
 };
 use super::*;
 
@@ -452,6 +453,19 @@ pub(crate) fn validate_authority_issue_auth(
 pub(crate) fn enforce_authority_mutation_fence(
     state: &TrustServiceState,
 ) -> Result<Option<ClusterAuthorityLeaseView>, Response> {
+    if state.cluster.is_some() {
+        let status = load_authority_status_for_state(state)?;
+        let public = status.public_key.as_deref().ok_or_else(|| {
+            plain_http_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "authority replication from the elected leader is unresolved",
+            )
+        })?;
+        let key = PublicKey::from_hex(public).map_err(|error| {
+            plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string())
+        })?;
+        authority_admission::signing_admission(state, &key)?;
+    }
     let Some(authority_lease) = cluster_authority_lease_view(state) else {
         return Ok(None);
     };
@@ -462,9 +476,11 @@ pub(crate) fn enforce_authority_mutation_fence(
         ));
     }
     if let Some(path) = state.config.authority_db_path.as_deref() {
-        SqliteCapabilityAuthority::open(path)
+        open_authority_for_state(state, path)
             .and_then(|authority| {
-                authority.enforce_cluster_fence(&authority_lease.leader_url, authority_lease.term)
+                authority
+                    .enforce_cluster_fence(&authority_lease.leader_url, authority_lease.term)
+                    .map_err(CliError::from)
             })
             .map_err(|error| plain_http_error(StatusCode::CONFLICT, &error.to_string()))?;
     }
@@ -484,9 +500,11 @@ pub(crate) fn refresh_authority_mutation_fence(state: &TrustServiceState) -> Res
     let Some(path) = state.config.authority_db_path.as_deref() else {
         return Ok(());
     };
-    SqliteCapabilityAuthority::open(path)
+    open_authority_for_state(state, path)
         .and_then(|authority| {
-            authority.seed_cluster_fence(Some(&authority_lease.leader_url), authority_lease.term)
+            authority
+                .seed_cluster_fence(Some(&authority_lease.leader_url), authority_lease.term)
+                .map_err(CliError::from)
         })
         .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))?;
     Ok(())
@@ -647,6 +665,18 @@ pub(crate) fn validate_metered_billing_reconciliation_request(
     Ok(())
 }
 
+fn open_authority_for_state(
+    state: &TrustServiceState,
+    path: &Path,
+) -> Result<SqliteCapabilityAuthority, CliError> {
+    SqliteCapabilityAuthority::open_with_clock_and_replication_policy(
+        path,
+        state.finding_challenge_clock.clone(),
+        state.config.authority_replication_clock_policy()?,
+    )
+    .map_err(CliError::from)
+}
+
 pub(crate) fn load_capability_authority(
     state: &TrustServiceState,
 ) -> Result<Box<dyn CapabilityAuthority>, Response> {
@@ -695,7 +725,7 @@ fn load_capability_authority_with_lineage_mode(
                 "witnessed capability authority is unavailable",
             )
         })?;
-        return Ok(wrap(Box::new(authority)));
+        return authority_admission::admit_capability_authority(state, wrap(Box::new(authority)));
     }
     match (
         config.authority_seed_path.as_deref(),
@@ -706,16 +736,15 @@ fn load_capability_authority_with_lineage_mode(
             "trust control service requires either --authority-seed-file or --authority-db, not both",
         )),
         (Some(path), None) => {
-            let keypair = load_or_create_authority_keypair(path).map_err(|error| {
-                plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+            let keypair = crate::load_existing_authority_keypair(path).map_err(|error| {
+                plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string())
             })?;
-            Ok(wrap(Box::new(LocalCapabilityAuthority::new(keypair))))
+            authority_admission::admit_capability_authority(state, wrap(Box::new(LocalCapabilityAuthority::new_with_clock(keypair, state.finding_challenge_clock.clone()))))
         }
-        (None, Some(path)) => SqliteCapabilityAuthority::open(path)
-            .map(|authority| wrap(Box::new(authority)))
-            .map_err(|error| {
-                plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
-            }),
+        (None, Some(path)) => {
+            let authority = open_authority_for_state(state, path).map_err(|error| plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string()))?;
+            authority_admission::admit_capability_authority(state, wrap(Box::new(authority)))
+        },
         (None, None) => Err(plain_http_error(
             StatusCode::CONFLICT,
             "trust control service requires --authority-seed-file or --authority-db",
@@ -741,7 +770,10 @@ pub(crate) fn load_authority_status_for_state(
             };
             let verification = if matches!(
                 &role,
-                Some(ClusterAuthorityReadRole::ConfirmedFollower { .. })
+                Some(ClusterAuthorityReadRole {
+                    evidence: ClusterAuthorityServingEvidence::ConfirmedFollower { .. },
+                    ..
+                })
             ) {
                 public_replicated_authority_verification_status(
                     path,
@@ -758,17 +790,23 @@ pub(crate) fn load_authority_status_for_state(
             .map_err(|error| {
                 plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string())
             })?;
-            if let Some(ClusterAuthorityReadRole::ConfirmedFollower { envelope_digest }) =
-                role.as_ref()
-            {
-                if !verification.matches_imported_envelope(envelope_digest) {
+            let now = state
+                .finding_challenge_clock
+                .unix_millis()
+                .map_err(|error| {
+                    plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string())
+                })?;
+            if !verification.is_live_at(now) {
+                return Err(unavailable());
+            }
+            if let Some(before) = role.as_ref() {
+                let after = cluster_authority_read_role(state).ok_or_else(unavailable)?;
+                if before.context != after.context
+                    || !authority_admission::role_accepts_view(before, &verification, now)
+                    || !authority_admission::role_accepts_view(&after, &verification, now)
+                {
                     return Err(unavailable());
                 }
-            }
-            if matches!(&role, Some(ClusterAuthorityReadRole::ElectedLeader))
-                && !verification.holds_current_signing_custody
-            {
-                return Err(unavailable());
             }
             return Ok(authority_status_response(
                 "sqlite".to_string(),
@@ -897,6 +935,14 @@ pub(crate) fn rotate_authority_for_state(
     state: &TrustServiceState,
 ) -> Result<TrustAuthorityStatus, Response> {
     let Some(keyring) = state.authority_keyring.as_ref() else {
+        if let Some(path) = state.config.authority_db_path.as_deref() {
+            let status = open_authority_for_state(state, path)
+                .and_then(|authority| authority.rotate().map_err(CliError::from))
+                .map_err(|error| {
+                    plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string())
+                })?;
+            return Ok(authority_status_response("sqlite".to_string(), status));
+        }
         return rotate_authority(&state.config);
     };
     let seed_path = state

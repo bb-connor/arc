@@ -297,6 +297,64 @@ pub(crate) struct PeerSyncState {
     /// This process imported a signed authority envelope from this peer. Bare
     /// reachability and stream success cannot attest follower issuer freshness.
     pub(crate) authority_import_confirmation: Option<AuthorityImportConfirmation>,
+    /// Current-term signed peer history agreement for elected-leader admission.
+    pub(crate) authority_agreement_confirmation: Option<AuthorityAgreementConfirmation>,
+    /// Maximal authenticated refused history, retained through transport loss
+    /// and lagging replies. Incomparable authenticated chains stay conflicting.
+    pub(crate) authority_refused_history: Option<AuthorityHistoryWitness>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct AuthorityHistoryWitness {
+    head: String,
+    authenticated_history_commitments: Vec<String>,
+    incomparable: bool,
+}
+
+impl AuthorityHistoryWitness {
+    pub(crate) fn new(evidence: &chio_store_sqlite::authority::AuthorityPeerChainEvidence) -> Self {
+        Self {
+            head: evidence.chain_commitment.clone(),
+            authenticated_history_commitments: evidence
+                .authenticated_history_commitments()
+                .to_vec(),
+            incomparable: false,
+        }
+    }
+
+    /// Compare authenticated peer histories without consulting a cached local
+    /// view. Concurrent local imports cannot erase an unresolved newer head.
+    pub(crate) fn observe(
+        &mut self,
+        evidence: &chio_store_sqlite::authority::AuthorityPeerChainEvidence,
+    ) {
+        if evidence.contains_authenticated_history(&self.head) {
+            self.head = evidence.chain_commitment.clone();
+            self.authenticated_history_commitments =
+                evidence.authenticated_history_commitments().to_vec();
+        } else if !self
+            .authenticated_history_commitments
+            .contains(&evidence.chain_commitment)
+        {
+            self.incomparable = true;
+        }
+    }
+
+    pub(crate) fn head(&self) -> &str {
+        &self.head
+    }
+
+    pub(crate) fn has_conflict(&self) -> bool {
+        self.incomparable
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct AuthorityAgreementConfirmation {
+    pub(crate) leader_url: String,
+    pub(crate) election_term: u64,
+    pub(crate) chain_commitment: String,
+    pub(crate) expires_at: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -529,6 +587,8 @@ impl Default for PeerSyncState {
             force_snapshot: true,
             authority_error: None,
             authority_import_confirmation: None,
+            authority_agreement_confirmation: None,
+            authority_refused_history: None,
         }
     }
 }

@@ -3009,18 +3009,55 @@ not become effective early. An importing follower serves issuer trust only
 while its exact stored envelope is unexpired and this process has successfully
 imported authority from the currently elected leader in the current election
 term. Restart, partition or a failed authority synchronization requires another
-authenticated import. Clustered trust reads require current quorum. Only the
-currently elected leader with local signing custody may serve directly from
-its local authority state; a former custodian still holding an old seed must
-satisfy follower confirmation and envelope freshness. `/v1/authority` and
+authenticated import. Clustered trust reads require current quorum. The
+elected leader must hold its authenticated live head's signing custody and
+observe sufficient authenticated peer chain agreement in the current term to
+reach quorum. Agreement requires the configured peer's exact advertised self
+URL before and after envelope observation. A mismatched identity clears prior
+authority serving evidence while a genuine signed extension may still converge.
+Local key possession or URL election alone grants no serving or
+issuance authority. Known authenticated newer or conflicting history cannot
+become positive custody evidence even after an import refusal or transport
+loss. Refused-history evidence retains the maximal authenticated chain within
+the existing chain limit. A shorter signed prefix cannot erase it or create
+conflict; incomparable authenticated chains remain a process-lifetime refusal.
+An errored peer supplies no agreement, while a fresh authenticated majority
+can admit the leader without an unavailable minority. Followers additionally require the
+elected source to admit the imported state under stable source leader, quorum
+and term samples. Internal signed exports remain available independently of
+public serving admission so this protocol can converge before a leader gains
+signed peer agreement and followers confirm its admitted status.
+Nonleader relays cannot replace a follower's leader-confirmed envelope.
+Authenticating a consistent signed prefix for agreement does not import it or
+weaken actual import replay checks. `/v1/authority` and
 public trust-bearing JWKS, verifier
 metadata and OID4VP verification reads fail closed until that import succeeds.
+Configured SQLite authority admission failures on those document routes return
+HTTP 503, including uninitialized storage, clock regression and unsafe custody.
+This status contract does not change generic-market or missing plain-seed
+refusals. Without authority configuration, issuer metadata remains unsigned
+with no portable signing key or JWKS, while discovery/JWKS return 404 and
+OID4VP trust reads return 409.
+Unconfigured health returns 200 with `configured: false` and `available: true`
+for successful inspection, with no backend or key material.
 Confirmation also binds the complete canonical signed envelope, including
 freshness times and signature. It cannot be renewed by locally re-signing an
 old head. A public trust read uses the same authenticated authority view for
 admission and response construction; an unconfirmed concurrent update cannot
 be substituted into the admitted response. This binding is process state and
-adds no field to the public wire contract.
+adds no field to the public wire contract. Read admission rechecks leader,
+term and quorum after obtaining the exact authenticated local view. Issuance
+also binds the actual artifact signer to the admitted live head and rechecks
+before artifact return. Public discovery metadata uses that admitted view for
+every nested document and refuses a local signer that no longer owns it.
+Authenticated authority inspection runs on a separate eight-permit,
+non-queued blocking lane whose worker retains admission through cancellation.
+Owner provisioning and SQLite mutations use the service clock and configured
+receiver policy without advancing the clock floor from remote timestamps.
+Explicit owner startup provisions a configured plain signing seed before
+serving. Request-time capability loading is existing-only and never recreates
+lost custody. Keyring seed ownership and initialization retain their separate
+contract.
 An authority refusal reports a degraded reachable peer, preserving independent
 revocation, budget and quorum progress.
 

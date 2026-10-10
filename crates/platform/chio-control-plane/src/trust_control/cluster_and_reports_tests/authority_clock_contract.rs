@@ -157,7 +157,7 @@ async fn final_f11_follower_confirmation_is_bound_to_process_leader_and_term() {
     // A restarted process holds the same fresh durable envelope but no peer
     // confirmation. Reachability alone must not resurrect verification trust.
     let mut restarted = state_with_cluster(
-        IMPORTER_URL,
+        &cluster_self_url(&pair.importer).test_unwrap(),
         &[&pair.exporter.url],
         None,
         pair.importer.config.revocation_db_path.clone(),
@@ -500,23 +500,26 @@ async fn final_f11_former_signing_custodian_refuses_missed_root_recovery() {
         .contains(&old_issuer));
 
     let (listener, recovered_url) = ServedPeer::reserve();
-    let mut exporter_state = state_with_cluster(&recovered_url, &[IMPORTER_URL], None, None, None);
+    let (former_listener, former_url) = ServedPeer::reserve_on("127.0.0.2:0");
+    let mut exporter_state = state_with_cluster(&recovered_url, &[&former_url], None, None, None);
     exporter_state.config.authority_db_path = Some(recovered_path);
     exporter_state.finding_challenge_clock = fixed_clock(now + 1);
     let exporter = ServedPeer::serve(listener, recovered_url, exporter_state, None);
     let old_witness = "http://127.0.0.3:3300";
-    let mut state = state_with_cluster(
-        IMPORTER_URL,
-        &[&exporter.url, old_witness],
-        None,
-        None,
-        None,
-    );
+    let mut state =
+        state_with_cluster(&former_url, &[&exporter.url, old_witness], None, None, None);
     state.config.authority_db_path = Some(custodian_path);
     state.finding_challenge_clock = fixed_clock(now);
     update_peer_reachable(&state, old_witness);
-    assert_eq!(current_leader_url(&state).as_deref(), Some(IMPORTER_URL));
-    load_authority_status_for_state(&state).test_unwrap();
+    assert_eq!(
+        current_leader_url(&state).as_deref(),
+        Some(former_url.as_str())
+    );
+    assert_authority_status_refused(
+        load_authority_status_for_state(&state),
+        UNRESOLVED_AUTHORITY_TRUST,
+    )
+    .await;
 
     let import_error = sync_peer(&state, &exporter.url).test_unwrap_err();
     assert!(
@@ -531,8 +534,11 @@ async fn final_f11_former_signing_custodian_refuses_missed_root_recovery() {
     assert_eq!(refused.status(), StatusCode::SERVICE_UNAVAILABLE, "former custodian served an issuer revoked by the new elected leader's authenticated root recovery");
 
     state.config.authority_replication_max_future_skew_seconds = 1;
-    sync_peer(&state, &exporter.url).test_unwrap();
+    authority_evidence_contract::assert_source_unadmitted_sync(sync_peer(&state, &exporter.url));
     state.finding_challenge_clock = fixed_clock(now + 1);
+    let former = ServedPeer::serve(former_listener, former_url, state.clone(), None);
+    sync_peer(&exporter.state, &former.url).test_unwrap();
+    sync_peer(&state, &exporter.url).test_unwrap();
     let status = load_authority_status_for_state(&state).test_unwrap();
     assert_eq!(status.generation, Some(2));
     assert!(!status.trusted_public_keys.contains(&old_issuer.to_hex()));
@@ -542,7 +548,13 @@ async fn final_f11_former_signing_custodian_refuses_missed_root_recovery() {
     );
 }
 
-fn custodian_and_relay() -> (tempfile::TempDir, ServedPeer, TrustServiceState, u64) {
+pub(super) fn custodian_and_relay() -> (
+    tempfile::TempDir,
+    ServedPeer,
+    ServedPeer,
+    TrustServiceState,
+    u64,
+) {
     let directory = chio_test_support::private_tempdir().test_unwrap();
     let now = unix_timestamp_now().test_unwrap();
     let path = directory.path().join("custodian.sqlite3");
@@ -558,20 +570,34 @@ fn custodian_and_relay() -> (tempfile::TempDir, ServedPeer, TrustServiceState, u
     relay
         .apply_signed_snapshot(&authority.signed_snapshot().test_unwrap())
         .test_unwrap();
+    // Model an operator-provisioned copy of the custodian's signing seed on
+    // the elected node. The former custodian still holds the same key, so only
+    // current role and authenticated import confirmation may authorize it.
+    rusqlite::Connection::open(&relay_path)
+        .test_unwrap()
+        .execute(
+            "UPDATE authority_state SET seed_hex = ?1 WHERE singleton_id = 1",
+            [authority.local_keypair().test_unwrap().seed_hex()],
+        )
+        .test_unwrap();
     let (listener, relay_url) = ServedPeer::reserve();
-    let mut relay_state = state_with_cluster(&relay_url, &[IMPORTER_URL], None, None, None);
+    let (former_listener, former_url) = ServedPeer::reserve_on("127.0.0.2:0");
+    let mut relay_state = state_with_cluster(&relay_url, &[&former_url], None, None, None);
     relay_state.config.authority_db_path = Some(relay_path);
     relay_state.finding_challenge_clock = fixed_clock(now);
     let relay = ServedPeer::serve(listener, relay_url, relay_state, None);
-    let mut state = state_with_cluster(IMPORTER_URL, &[&relay.url], None, None, None);
+    let mut state = state_with_cluster(&former_url, &[&relay.url], None, None, None);
     state.config.authority_db_path = Some(path.clone());
     state.finding_challenge_clock = fixed_clock(now);
-    (directory, relay, state, now)
+    let former = ServedPeer::serve(former_listener, former_url, state.clone(), None);
+    sync_peer(&relay.state, &former.url).test_unwrap();
+    load_authority_status_for_state(&relay.state).test_unwrap();
+    (directory, relay, former, state, now)
 }
 
 #[tokio::test]
 async fn final_f11_clustered_signing_custodian_requires_quorum_and_leader_confirmation() {
-    let (_directory, relay, state, _) = custodian_and_relay();
+    let (_directory, relay, _former, state, _) = custodian_and_relay();
     assert_authority_status_refused(
         load_authority_status_for_state(&state),
         UNRESOLVED_AUTHORITY_TRUST,
@@ -589,7 +615,7 @@ async fn final_f11_clustered_signing_custodian_requires_quorum_and_leader_confir
 
 #[tokio::test]
 async fn final_f11_former_custodian_requires_an_unexpired_imported_envelope() {
-    let (_directory, relay, mut state, now) = custodian_and_relay();
+    let (_directory, relay, _former, mut state, now) = custodian_and_relay();
     sync_peer(&state, &relay.url).test_unwrap();
     load_authority_status_for_state(&state).test_unwrap();
     state.finding_challenge_clock = fixed_clock(now + 300);
@@ -606,7 +632,7 @@ async fn final_f11_former_custodian_requires_an_unexpired_imported_envelope() {
 
 #[tokio::test]
 async fn final_f11_former_custodian_cannot_refresh_leader_confirmation_by_resigning_locally() {
-    let (_directory, relay, mut state, now) = custodian_and_relay();
+    let (_directory, relay, _former, mut state, now) = custodian_and_relay();
     sync_peer(&state, &relay.url).test_unwrap();
     load_authority_status_for_state(&state).test_unwrap();
     state.finding_challenge_clock = fixed_clock(now + 300);
@@ -687,7 +713,7 @@ impl Clock for HeldAuthorityViewClock {
 }
 
 #[tokio::test(flavor = "current_thread")]
-async fn final_f11_public_jwks_uses_the_same_authority_view_as_its_admission() {
+async fn final_f11_public_jwks_refuses_unconfirmed_view_change_then_recovers() {
     let mut pair = replication_pair(AuthorityFault::LaggingImporterClock);
     pair.importer.finding_challenge_clock = fixed_clock(pair.provisioned_at + 60);
     pair.importer.config.advertise_url = Some("https://trust.example.com".into());
@@ -726,6 +752,24 @@ async fn final_f11_public_jwks_uses_the_same_authority_view_as_its_admission() {
     .test_unwrap();
     release.send(()).test_unwrap();
     let response = response.await.test_unwrap();
+    assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    let bytes = to_bytes(response.into_body(), 64 * 1024)
+        .await
+        .test_unwrap();
+    let refusal: Value = serde_json::from_slice(&bytes).test_unwrap();
+    assert_eq!(
+        refusal.get("error").and_then(Value::as_str),
+        Some(UNRESOLVED_AUTHORITY_TRUST)
+    );
+    assert!(
+        refusal.get("keys").is_none(),
+        "refused response published keys"
+    );
+
+    sync_peer(&pair.importer, &pair.exporter.url).test_unwrap();
+    let admitted = load_authority_status_for_state(&pair.importer).test_unwrap();
+    assert_ne!(admitted.public_key, previous.public_key);
+    let response = handle_passport_issuer_jwks(State(pair.importer.clone())).await;
     assert_eq!(response.status(), StatusCode::OK);
     let bytes = to_bytes(response.into_body(), 64 * 1024)
         .await
@@ -738,8 +782,8 @@ async fn final_f11_public_jwks_uses_the_same_authority_view_as_its_admission() {
         .collect();
     assert_eq!(
         keys,
-        previous.trusted_public_keys.into_iter().collect(),
-        "public JWKS reread a different authority head after admitting the request's signed view"
+        admitted.trusted_public_keys.into_iter().collect(),
+        "public JWKS did not recover the exact newly admitted authority view"
     );
 }
 

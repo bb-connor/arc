@@ -7,6 +7,8 @@ use chio_credentials::{
     build_oid4vp_request_transport, Oid4vpVerifierMetadata, PortableJwkSet,
     SignedPublicDiscoveryTransparency, SignedPublicIssuerDiscovery,
 };
+use chio_kernel::AuthorityStoreError;
+use chio_security_types::clock::ClockError;
 use chio_store_sqlite::SqliteCapabilityAuthority;
 use rusqlite::{Connection, OpenFlags};
 use std::collections::BTreeSet;
@@ -23,6 +25,8 @@ const UNISSUED_TOKEN_REQUEST: &str = r#"{"grantType":"urn:ietf:params:oauth:gran
 enum Surface {
     /// A signed or plain public metadata document.
     Document,
+    /// A generic-market document with its independent signer contract.
+    GenericDocument,
     /// The liveness report, which describes authority availability.
     Health,
     /// Pre-authorized code redemption, refused for an unissued code.
@@ -91,8 +95,14 @@ impl PublicAuthorityFixture {
             document(PUBLIC_PASSPORT_DISCOVERY_TRANSPARENCY_PATH),
             document(OID4VP_VERIFIER_METADATA_PATH),
             document(PASSPORT_ISSUER_JWKS_PATH),
-            document(PUBLIC_GENERIC_NAMESPACE_PATH),
-            document(PUBLIC_GENERIC_LISTINGS_PATH),
+            PublicCall {
+                surface: Surface::GenericDocument,
+                path: PUBLIC_GENERIC_NAMESPACE_PATH.to_string(),
+            },
+            PublicCall {
+                surface: Surface::GenericDocument,
+                path: PUBLIC_GENERIC_LISTINGS_PATH.to_string(),
+            },
             document(&super::super::super::client::path_with_encoded_param(
                 PUBLIC_PASSPORT_OID4VP_REQUEST_PATH,
                 "request_id",
@@ -119,10 +129,12 @@ impl PublicAuthorityFixture {
                 .uri(&call.path)
                 .header("content-type", "application/json")
                 .body(axum::body::Body::from(UNISSUED_TOKEN_REQUEST))?,
-            Surface::Document | Surface::Health => axum::http::Request::builder()
-                .method("GET")
-                .uri(&call.path)
-                .body(axum::body::Body::empty())?,
+            Surface::Document | Surface::GenericDocument | Surface::Health => {
+                axum::http::Request::builder()
+                    .method("GET")
+                    .uri(&call.path)
+                    .body(axum::body::Body::empty())?
+            }
         };
         let response = super::super::build_router(self.state.clone())
             .oneshot(request)
@@ -174,7 +186,7 @@ fn excerpt(status: StatusCode, body: &[u8]) -> String {
 /// Why the route did not answer from existing authority state, if it did not.
 fn unserved(call: &PublicCall, status: StatusCode, body: &[u8]) -> Option<String> {
     let served = match call.surface {
-        Surface::Document => status == StatusCode::OK,
+        Surface::Document | Surface::GenericDocument => status == StatusCode::OK,
         Surface::Health => {
             status == StatusCode::OK
                 && health_authority(body)
@@ -188,18 +200,91 @@ fn unserved(call: &PublicCall, status: StatusCode, body: &[u8]) -> Option<String
     (!served).then(|| format!("{} not served: {}", call.path, excerpt(status, body)))
 }
 
-/// Why the route did not refuse, if it served an authority it could not inspect.
-fn unrefused(call: &PublicCall, status: StatusCode, body: &[u8]) -> Option<String> {
+#[derive(Clone, Copy)]
+enum AuthorityRefusal {
+    UninitializedSqlite,
+    MissingSeed,
+    ClockRegression,
+    UnsafeFile,
+    UnsafeParent,
+}
+
+impl AuthorityRefusal {
+    fn error(self, call: &PublicCall) -> CliError {
+        match self {
+            Self::UninitializedSqlite => CliError::cli_other_error(
+                "public authority inspection requires a configured authority whose database its owner has initialized".to_string(),
+            ),
+            Self::MissingSeed if call.surface == Surface::Document
+                && !matches!(call.path.as_str(), PASSPORT_ISSUER_METADATA_PATH
+                    | PUBLIC_PASSPORT_ISSUER_DISCOVERY_PATH
+                    | PUBLIC_PASSPORT_VERIFIER_DISCOVERY_PATH
+                    | PUBLIC_PASSPORT_DISCOVERY_TRANSPARENCY_PATH) => CliError::cli_other_error(
+                "OID4VP verifier trust material did not publish any signing keys".to_string(),
+            ),
+            Self::MissingSeed => CliError::cli_other_error(
+                "public authority inspection requires a configured authority signing seed that already exists".to_string(),
+            ),
+            Self::ClockRegression => AuthorityStoreError::Clock(ClockError::WallClockRegression).into(),
+            Self::UnsafeFile => AuthorityStoreError::Fence(
+                "authority file custody: database and sidecars require an owned single-link regular file with mode 0600".to_string(),
+            ).into(),
+            Self::UnsafeParent => AuthorityStoreError::Fence(
+                "authority file custody: database parent must belong to the effective user with mode 0700".to_string(),
+            ).into(),
+        }
+    }
+
+    fn status(self, call: &PublicCall) -> StatusCode {
+        match call.surface {
+            Surface::Health => StatusCode::SERVICE_UNAVAILABLE,
+            Surface::TokenRedemption => StatusCode::CONFLICT,
+            Surface::GenericDocument => match self {
+                Self::UninitializedSqlite | Self::MissingSeed => StatusCode::NOT_FOUND,
+                Self::ClockRegression | Self::UnsafeFile | Self::UnsafeParent => {
+                    StatusCode::CONFLICT
+                }
+            },
+            Surface::Document if matches!(self, Self::MissingSeed) => match call.path.as_str() {
+                PUBLIC_PASSPORT_ISSUER_DISCOVERY_PATH
+                | PUBLIC_PASSPORT_VERIFIER_DISCOVERY_PATH
+                | PUBLIC_PASSPORT_DISCOVERY_TRANSPARENCY_PATH
+                | PASSPORT_ISSUER_JWKS_PATH => StatusCode::NOT_FOUND,
+                _ => StatusCode::CONFLICT,
+            },
+            Surface::Document => StatusCode::SERVICE_UNAVAILABLE,
+        }
+    }
+}
+
+/// Require the exact route/backend refusal and semantic error, rather than
+/// accepting any non-success response from an unrelated failure.
+fn unrefused(
+    call: &PublicCall,
+    status: StatusCode,
+    body: &[u8],
+    refusal: AuthorityRefusal,
+) -> Option<String> {
+    if status != refusal.status(call) {
+        return Some(format!(
+            "{} not refused: {}",
+            call.path,
+            excerpt(status, body)
+        ));
+    }
     let refused = match call.surface {
-        Surface::Document | Surface::TokenRedemption => {
-            status == StatusCode::NOT_FOUND || status == StatusCode::CONFLICT
+        Surface::Document | Surface::GenericDocument | Surface::TokenRedemption => {
+            serde_json::from_slice::<serde_json::Value>(body).is_ok_and(|value| {
+                value == serde_json::json!({"error": refusal.error(call).to_string()})
+            })
         }
         Surface::Health => {
             status == StatusCode::SERVICE_UNAVAILABLE
                 && health_authority(body).is_ok_and(|authority| {
                     authority["configured"] == serde_json::Value::Bool(true)
-                        && (authority["available"] == serde_json::Value::Bool(false)
-                            || authority["publicKey"].is_null())
+                        && authority["available"] == serde_json::Value::Bool(false)
+                        && authority["publicKey"].is_null()
+                        && authority["trustedKeyCount"] == serde_json::json!(0)
                 })
         }
     };
@@ -391,7 +476,12 @@ async fn public_authority_routes_refuse_absent_storage_without_creating_it() -> 
     )?;
     for call in fixture.calls() {
         let (status, body) = fixture.call(&call).await?;
-        violations.extend(unrefused(&call, status, &body));
+        violations.extend(unrefused(
+            &call,
+            status,
+            &body,
+            AuthorityRefusal::UninitializedSqlite,
+        ));
         if missing_parent.exists() {
             violations.push(format!(
                 "{} created the authority parent directory",
@@ -410,7 +500,12 @@ async fn public_authority_routes_refuse_absent_storage_without_creating_it() -> 
     )?;
     for call in fixture.calls() {
         let (status, body) = fixture.call(&call).await?;
-        violations.extend(unrefused(&call, status, &body));
+        violations.extend(unrefused(
+            &call,
+            status,
+            &body,
+            AuthorityRefusal::UninitializedSqlite,
+        ));
         if absent_db.exists() || !sidecars_absent(&absent_db) {
             violations.push(format!("{} created the authority database", call.path));
             for suffix in ["", "-wal", "-shm", "-journal"] {
@@ -432,7 +527,12 @@ async fn public_authority_routes_refuse_absent_storage_without_creating_it() -> 
     )?;
     for call in fixture.calls() {
         let (status, body) = fixture.call(&call).await?;
-        violations.extend(unrefused(&call, status, &body));
+        violations.extend(unrefused(
+            &call,
+            status,
+            &body,
+            AuthorityRefusal::UninitializedSqlite,
+        ));
         if std::fs::metadata(&empty_db)?.len() != 0 || !sidecars_absent(&empty_db) {
             violations.push(format!(
                 "{} initialized an empty authority database",
@@ -451,7 +551,12 @@ async fn public_authority_routes_refuse_absent_storage_without_creating_it() -> 
     )?;
     for call in fixture.calls() {
         let (status, body) = fixture.call(&call).await?;
-        violations.extend(unrefused(&call, status, &body));
+        violations.extend(unrefused(
+            &call,
+            status,
+            &body,
+            AuthorityRefusal::MissingSeed,
+        ));
         if absent_seed.exists() {
             violations.push(format!("{} created an authority seed", call.path));
             std::fs::remove_file(&absent_seed)?;
@@ -642,9 +747,11 @@ async fn public_routes_refuse_absent_authority_with_a_typed_message() -> TestRes
     );
     assert!(!absent_db.exists());
     let (status, body) = fixture.get(PASSPORT_ISSUER_JWKS_PATH).await?;
-    assert_eq!(status, StatusCode::NOT_FOUND);
-    assert!(String::from_utf8_lossy(&body)
-        .contains("requires a configured authority whose database its owner has initialized"));
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&body)?,
+        serde_json::json!({"error": AuthorityRefusal::UninitializedSqlite.error(&PublicCall { surface: Surface::Document, path: PASSPORT_ISSUER_JWKS_PATH.to_string() }).to_string()})
+    );
 
     let directory = chio_test_support::private_tempdir()?;
     let absent_seed = directory.path().join("authority.seed");
@@ -658,6 +765,96 @@ async fn public_routes_refuse_absent_authority_with_a_typed_message() -> TestRes
     assert!(String::from_utf8_lossy(&body)
         .contains("requires a configured authority signing seed that already exists"));
     assert!(!absent_seed.exists());
+    Ok(())
+}
+
+#[tokio::test]
+async fn public_authority_routes_preserve_unsigned_and_unconfigured_contracts() -> TestResult {
+    let (mut fixture, authority_db) = PublicAuthorityFixture::provisioned()?;
+    fixture.state.config.authority_db_path = None;
+    assert_eq!(fixture.state.config.authority_seed_path, None);
+    assert!(fixture.state.authority_keyring.is_none());
+    let witness = AuthorityDataWitness::open(&authority_db)?;
+    let version = witness.data_version()?;
+    let commits = witness.committed_transactions()?;
+    let persisted = witness.persisted()?;
+    for call in fixture
+        .calls()
+        .into_iter()
+        .filter(|call| call.surface != Surface::TokenRedemption)
+    {
+        let (status, body) = fixture.call(&call).await?;
+        match call.surface {
+            Surface::Health => {
+                assert_eq!(status, StatusCode::OK);
+                let authority = health_authority(&body)?;
+                assert_eq!(
+                    authority,
+                    serde_json::json!({
+                        "configured": false,
+                        "available": true,
+                        "backend": null,
+                        "publicKey": null,
+                        "generation": null,
+                        "rotatedAt": null,
+                        "appliesToFutureSessionsOnly": true,
+                        "trustedKeyCount": 0,
+                    })
+                );
+            }
+            Surface::Document if call.path == PASSPORT_ISSUER_METADATA_PATH => {
+                assert_eq!(status, StatusCode::OK);
+                let metadata: chio_credentials::Oid4vciCredentialIssuerMetadata =
+                    serde_json::from_slice(&body)?;
+                assert_eq!(metadata.jwks_uri, None);
+                assert_eq!(metadata.credential_configurations_supported.len(), 1);
+                assert!(metadata
+                    .credential_configurations_supported
+                    .values()
+                    .all(|configuration| configuration.portable_profile.is_none()));
+            }
+            Surface::GenericDocument => {
+                assert_eq!(status, StatusCode::NOT_FOUND);
+                assert_eq!(
+                    serde_json::from_slice::<serde_json::Value>(&body)?,
+                    serde_json::json!({"error": CliError::cli_other_error(
+                    "behavioral feed export requires --authority-seed-file or --authority-db so the export can be signed".to_string(),
+                ).to_string()})
+                );
+            }
+            Surface::Document => {
+                let discovery = matches!(
+                    call.path.as_str(),
+                    PUBLIC_PASSPORT_ISSUER_DISCOVERY_PATH
+                        | PUBLIC_PASSPORT_VERIFIER_DISCOVERY_PATH
+                        | PUBLIC_PASSPORT_DISCOVERY_TRANSPARENCY_PATH
+                );
+                let expected_status = if discovery || call.path == PASSPORT_ISSUER_JWKS_PATH {
+                    StatusCode::NOT_FOUND
+                } else {
+                    StatusCode::CONFLICT
+                };
+                let reason = "OID4VP verifier trust material requires --authority-seed-file or --authority-db";
+                assert_eq!(status, expected_status, "{}", call.path);
+                assert_eq!(
+                    serde_json::from_slice::<serde_json::Value>(&body)?,
+                    serde_json::json!({"error": CliError::cli_other_error(reason.to_string()).to_string()}),
+                    "{}",
+                    call.path,
+                );
+            }
+            Surface::TokenRedemption => unreachable!("filtered entitlement route"),
+        }
+        assert_eq!(
+            witness.data_version()?,
+            version,
+            "{} wrote authority data",
+            call.path
+        );
+        assert_eq!(witness.committed_transactions()?, commits);
+        assert_eq!(witness.persisted()?, persisted);
+        assert!(!fixture.directory.path().join("authority.seed").exists());
+    }
     Ok(())
 }
 
@@ -732,7 +929,12 @@ async fn public_authority_routes_refuse_a_regressed_clock_and_unsafe_custody() -
         let _regressed = chio_test_support::clock::scope_unix_secs(floor_secs - 3_600);
         for call in fixture.calls() {
             let (status, body) = fixture.call(&call).await?;
-            violations.extend(unrefused(&call, status, &body));
+            violations.extend(unrefused(
+                &call,
+                status,
+                &body,
+                AuthorityRefusal::ClockRegression,
+            ));
             if witness.persisted()? != persisted {
                 violations.push(format!("{} changed persisted authority state", call.path));
             }
@@ -743,7 +945,12 @@ async fn public_authority_routes_refuse_a_regressed_clock_and_unsafe_custody() -
     std::fs::set_permissions(&authority_db, std::fs::Permissions::from_mode(0o644))?;
     for call in fixture.calls() {
         let (status, body) = fixture.call(&call).await?;
-        violations.extend(unrefused(&call, status, &body));
+        violations.extend(unrefused(
+            &call,
+            status,
+            &body,
+            AuthorityRefusal::UnsafeFile,
+        ));
         if std::fs::metadata(&authority_db)?.permissions().mode() & 0o7777 != 0o644 {
             violations.push(format!("{} repaired custody", call.path));
         }
@@ -756,7 +963,12 @@ async fn public_authority_routes_refuse_a_regressed_clock_and_unsafe_custody() -
     )?;
     for call in fixture.calls() {
         let (status, body) = fixture.call(&call).await?;
-        violations.extend(unrefused(&call, status, &body));
+        violations.extend(unrefused(
+            &call,
+            status,
+            &body,
+            AuthorityRefusal::UnsafeParent,
+        ));
     }
     std::fs::set_permissions(
         fixture.directory.path(),

@@ -330,7 +330,8 @@ pub(crate) fn apply_cluster_snapshot(
     peer_url: &str,
     snapshot: ClusterStateSnapshotResponse,
 ) -> Result<(), CliError> {
-    recover_cluster_snapshot(state, peer_url, snapshot)?
+    let context = super::authority_evidence::authority_sync_context(state);
+    recover_cluster_snapshot(state, peer_url, snapshot, context)?
 }
 
 /// Recovers every replicated stream in a peer's full snapshot: revocations,
@@ -338,10 +339,11 @@ pub(crate) fn apply_cluster_snapshot(
 /// signed authority envelope is imported after the streams and its outcome is
 /// returned on its own, so a refused envelope never withholds a revocation or
 /// leaves the peer pending a snapshot.
-pub(crate) fn recover_cluster_snapshot(
+pub(super) fn recover_cluster_snapshot(
     state: &TrustServiceState,
     peer_url: &str,
     snapshot: ClusterStateSnapshotResponse,
+    authority_context: Option<ClusterAuthorityReadContext>,
 ) -> Result<SnapshotAuthorityOutcome, CliError> {
     let ClusterStateSnapshotResponse {
         generated_at,
@@ -467,7 +469,7 @@ pub(crate) fn recover_cluster_snapshot(
         );
     }
 
-    let authority = import_snapshot_authority(state, authority);
+    let authority = import_snapshot_authority(state, peer_url, authority, &authority_context);
 
     seed_cluster_authority_from_snapshot(state, election_term, authority_lease.as_ref())?;
 
@@ -503,18 +505,14 @@ pub(crate) fn recover_cluster_snapshot(
 
 fn import_snapshot_authority(
     state: &TrustServiceState,
+    peer_url: &str,
     authority: Option<AuthoritySnapshotView>,
+    context: &Option<ClusterAuthorityReadContext>,
 ) -> SnapshotAuthorityOutcome {
-    let (Some(path), Some(envelope)) = (state.config.authority_db_path.as_deref(), authority)
-    else {
+    let (Some(_), Some(envelope)) = (state.config.authority_db_path.as_deref(), authority) else {
         return Ok(());
     };
-    SqliteCapabilityAuthority::open_with_clock_and_replication_policy(
-        path,
-        state.finding_challenge_clock.clone(),
-        state.config.authority_replication_clock_policy()?,
-    )?
-    .apply_signed_snapshot(&envelope)?;
+    super::authority_evidence::accept_peer_authority_envelope(state, peer_url, &envelope, context)?;
     Ok(())
 }
 

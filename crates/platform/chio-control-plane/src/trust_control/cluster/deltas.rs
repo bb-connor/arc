@@ -411,6 +411,7 @@ pub(crate) fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(),
             return Err(error);
         }
     };
+    super::authority_evidence::observe_peer_authority_identity(state, peer_url, &peer_status);
     update_peer_reachable(state, peer_url);
     let revocation_contract =
         match prepare_peer_revocation_sync(state, peer_url, &peer_status.replication) {
@@ -437,6 +438,7 @@ pub(crate) fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(),
     // the witness set. The advertised heads are captured in `peer_status` and
     // recorded only in `finalize_peer_sync_round`, after the pull round.
     if peer_should_force_snapshot(state, peer_url) {
+        let authority_context = super::authority_evidence::authority_sync_context(state);
         let snapshot = match client.cluster_snapshot() {
             Ok(snapshot) => snapshot,
             Err(error) => {
@@ -463,7 +465,12 @@ pub(crate) fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(),
             update_peer_failure(state, peer_url, error.to_string());
             return Err(error);
         }
-        if let Err(error) = recover_cluster_snapshot(state, peer_url, snapshot)? {
+        if let Err(error) = super::snapshots::recover_cluster_snapshot(
+            state,
+            peer_url,
+            snapshot,
+            authority_context,
+        )? {
             update_peer_authority_error(state, peer_url, error.to_string());
         }
     }
@@ -533,26 +540,13 @@ pub(crate) fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(),
     if peer_was_demoted(state, peer_url) {
         return Ok(());
     }
-    // Bind successful issuer-trust confirmation to the elected leader and
-    // term observed before fetching the envelope. A leadership change during
-    // the fetch or later makes this confirmation unusable for read admission.
-    let confirmation = cluster_consensus_view(state).and_then(|view| {
-        view.leader_url
-            .filter(|leader| view.has_quorum && leader == peer_url)
-            .map(|leader_url| (leader_url, view.election_term))
-    });
-    match sync_peer_authority(state, &client) {
-        Ok(envelope_digest) => {
-            let confirmation = confirmation.zip(envelope_digest).map(
-                |((leader_url, election_term), envelope_digest)| AuthorityImportConfirmation {
-                    leader_url,
-                    election_term,
-                    envelope_digest,
-                },
-            );
-            clear_peer_authority_error(state, peer_url, confirmation);
-            Ok(())
-        }
+    match super::authority_evidence::sync_authority_serving_evidence(
+        state,
+        peer_url,
+        &client,
+        &peer_status,
+    ) {
+        Ok(()) => Ok(()),
         Err(error) => {
             update_peer_authority_error(state, peer_url, error.to_string());
             Err(error)
@@ -680,6 +674,7 @@ pub(crate) fn route_pull(
     }
 }
 
+#[cfg(test)]
 pub(crate) fn sync_peer_authority(
     state: &TrustServiceState,
     client: &TrustControlClient,
@@ -1579,9 +1574,10 @@ fn cluster_peer_count(state: &TrustServiceState) -> usize {
 ///
 /// The single background sync loop visits peers SERIALLY, and one `sync_peer`
 /// visit is FAR more than a single HTTP call: it performs cluster_status, an
-/// optional cluster_snapshot, an authority_snapshot, and then the delta pull
-/// rounds (a shared budget/receipt/lineage round and an independent revocation
-/// round), each blocking call up to `CONTROL_HTTP_TIMEOUT` and each delta round
+/// optional cluster_snapshot, an authority_snapshot, an admitted authority
+/// status and a final cluster_status, alongside the delta pull rounds (a shared
+/// budget/receipt/lineage round and an independent revocation round), each
+/// blocking call up to `CONTROL_HTTP_TIMEOUT` and each delta round
 /// bounded by its wall-clock budget. If a slow-but-reachable peer is visited
 /// before the peer whose ack makes quorum, the wait must outlast a full serial
 /// visit for every preceding peer, or it 503s a write the next peer would have
@@ -1603,13 +1599,14 @@ fn budget_write_quorum_commit_timeout(sync_interval: Duration, peer_count: usize
         .max(Duration::from_secs(5))
         .min(Duration::from_secs(30));
     // Worst-case cost of ONE serial sync_peer visit that must complete for every
-    // peer preceding the quorum peer: the three fixed blocking HTTP stages
-    // (cluster_status, cluster_snapshot, authority_snapshot) each up to
+    // peer preceding the quorum peer: the five fixed blocking HTTP stages
+    // (cluster_status, cluster_snapshot, authority_snapshot, admitted authority
+    // status and final cluster_status) each up to
     // CONTROL_HTTP_TIMEOUT, plus the two wall-clock-bounded delta pull rounds (the
     // shared budget/receipt/lineage round and the independent revocation round).
     let per_peer_sync = CONTROL_HTTP_TIMEOUT
-        .checked_mul(3)
-        .unwrap_or(Duration::from_secs(45))
+        .checked_mul(5)
+        .unwrap_or(Duration::from_secs(75))
         .saturating_add(PEER_ROUND_WALL_CLOCK_BUDGET)
         .saturating_add(PEER_ROUND_WALL_CLOCK_BUDGET);
     // One worst-case cycle over all peers preceding the quorum peer, plus one extra

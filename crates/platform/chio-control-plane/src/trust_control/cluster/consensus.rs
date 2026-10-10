@@ -330,14 +330,31 @@ pub(crate) fn cluster_consensus_view(state: &TrustServiceState) -> Option<Cluste
     cluster_consensus_and_authority_lease_view(state).map(|(consensus, _)| consensus)
 }
 
-#[derive(Clone)]
-pub(crate) enum ClusterAuthorityReadRole {
-    ElectedLeader,
-    ConfirmedFollower { envelope_digest: String },
+#[derive(Clone, PartialEq, Eq)]
+pub(crate) struct ClusterAuthorityReadContext {
+    pub(crate) self_url: String,
+    pub(crate) leader_url: String,
+    pub(crate) election_term: u64,
 }
 
-/// Sample quorum, leadership and peer confirmation together. A local signing
-/// seed does not participate in deciding the consensus role.
+#[derive(Clone)]
+pub(crate) enum ClusterAuthorityServingEvidence {
+    ElectedLeader {
+        quorum_size: usize,
+        agreements: Vec<AuthorityAgreementConfirmation>,
+    },
+    ConfirmedFollower {
+        envelope_digest: String,
+    },
+}
+
+#[derive(Clone)]
+pub(crate) struct ClusterAuthorityReadRole {
+    pub(crate) context: ClusterAuthorityReadContext,
+    pub(crate) evidence: ClusterAuthorityServingEvidence,
+    pub(crate) refused_history_commitments: Vec<String>,
+}
+
 pub(crate) fn cluster_authority_read_role(
     state: &TrustServiceState,
 ) -> Option<ClusterAuthorityReadRole> {
@@ -348,19 +365,73 @@ pub(crate) fn cluster_authority_read_role(
         return None;
     }
     let leader = view.leader_url?;
-    if leader == view.self_url {
-        return Some(ClusterAuthorityReadRole::ElectedLeader);
-    }
-    let peer = guard.peers.get(&leader)?;
-    if peer.authority_error.is_some() || !peer.health.is_reachable() || peer.partitioned {
+    let context = ClusterAuthorityReadContext {
+        self_url: view.self_url.clone(),
+        leader_url: leader.clone(),
+        election_term: view.election_term,
+    };
+    if guard.peers.values().any(|peer| {
+        peer.authority_refused_history
+            .as_ref()
+            .is_some_and(AuthorityHistoryWitness::has_conflict)
+    }) {
         return None;
     }
-    let confirmation = peer.authority_import_confirmation.as_ref()?;
-    (confirmation.leader_url == leader && confirmation.election_term == view.election_term).then(
-        || ClusterAuthorityReadRole::ConfirmedFollower {
+    let refused_history_commitments = guard
+        .peers
+        .values()
+        .filter_map(|peer| {
+            peer.authority_refused_history
+                .as_ref()
+                .map(|witness| witness.head().to_string())
+        })
+        .collect();
+    let evidence = if leader == view.self_url {
+        let lease_seconds = Duration::from_millis(guard.lease_ttl_ms).as_secs().max(1);
+        let observed_now = guard.lease_expires_at?.saturating_sub(lease_seconds);
+        let mut agreements = Vec::new();
+        for peer in guard.peers.values() {
+            let contact_is_fresh = peer
+                .last_contact_at
+                .is_some_and(|at| observed_now <= at.saturating_add(lease_seconds));
+            if peer.partitioned
+                || !peer.health.is_reachable()
+                || !contact_is_fresh
+                || peer.authority_error.is_some()
+            {
+                continue;
+            }
+            if let Some(agreement) = peer.authority_agreement_confirmation.as_ref() {
+                if agreement.leader_url == leader && agreement.election_term == view.election_term {
+                    agreements.push(agreement.clone());
+                }
+            }
+        }
+        if agreements.len().checked_add(1)? < view.quorum_size {
+            return None;
+        }
+        ClusterAuthorityServingEvidence::ElectedLeader {
+            quorum_size: view.quorum_size,
+            agreements,
+        }
+    } else {
+        let peer = guard.peers.get(&leader)?;
+        if peer.authority_error.is_some() || !peer.health.is_reachable() || peer.partitioned {
+            return None;
+        }
+        let confirmation = peer.authority_import_confirmation.as_ref()?;
+        if confirmation.leader_url != leader || confirmation.election_term != view.election_term {
+            return None;
+        }
+        ClusterAuthorityServingEvidence::ConfirmedFollower {
             envelope_digest: confirmation.envelope_digest.clone(),
-        },
-    )
+        }
+    };
+    Some(ClusterAuthorityReadRole {
+        context,
+        evidence,
+        refused_history_commitments,
+    })
 }
 
 pub(crate) fn cluster_consensus_and_authority_lease_view(

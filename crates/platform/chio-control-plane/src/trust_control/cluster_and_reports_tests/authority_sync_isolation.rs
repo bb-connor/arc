@@ -17,6 +17,9 @@ const NO_LIVE_ENVELOPE: &str = "follower has no authenticated live envelope to r
 const RELAY_REGRESSES: &str = "authority envelope replay regresses issuance time";
 const UNPINNED_STARTUP: &str = "clustered trust control requires an out-of-band pinned authority replication anchor in --authority-db; initialize it on the signing custodian with `chio federation authority replication-init` and pin it on every follower with `chio federation authority replication-pin` before starting";
 
+#[path = "authority_evidence_contract.rs"]
+mod authority_evidence_contract;
+
 #[path = "authority_clock_contract.rs"]
 mod authority_clock_contract;
 #[path = "governance_authority.rs"]
@@ -53,16 +56,23 @@ impl AuthorityGate {
 
 /// One peer's internal cluster surface, served over loopback HTTP.
 struct ServedPeer {
+    state: TrustServiceState,
     url: String,
     gate: Option<Arc<AuthorityGate>>,
     snapshot_unavailable: Arc<std::sync::atomic::AtomicBool>,
+    authority_snapshot_unavailable: Arc<std::sync::atomic::AtomicBool>,
+    authority_snapshot_override: Arc<std::sync::Mutex<Option<AuthoritySnapshotView>>>,
     shutdown: Option<tokio::sync::oneshot::Sender<()>>,
     server: Option<std::thread::JoinHandle<()>>,
 }
 
 impl ServedPeer {
     fn reserve() -> (std::net::TcpListener, String) {
-        let listener = std::net::TcpListener::bind("127.0.0.1:0").test_unwrap();
+        Self::reserve_on("127.0.0.1:0")
+    }
+
+    fn reserve_on(address: &str) -> (std::net::TcpListener, String) {
+        let listener = std::net::TcpListener::bind(address).test_unwrap();
         let url = format!("http://{}", listener.local_addr().test_unwrap());
         (listener, url)
     }
@@ -77,6 +87,11 @@ impl ServedPeer {
         let held_gate = gate.clone();
         let snapshot_unavailable = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let served_snapshot_unavailable = snapshot_unavailable.clone();
+        let authority_snapshot_unavailable = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let served_authority_snapshot_unavailable = authority_snapshot_unavailable.clone();
+        let authority_snapshot_override =
+            Arc::new(std::sync::Mutex::new(None::<AuthoritySnapshotView>));
+        let served_authority_snapshot_override = authority_snapshot_override.clone();
         let cluster_snapshot = move |state: State<TrustServiceState>, headers: HeaderMap| {
             let unavailable = served_snapshot_unavailable.clone();
             async move {
@@ -90,14 +105,34 @@ impl ServedPeer {
         let gated_authority_snapshot =
             move |state: State<TrustServiceState>, headers: HeaderMap| {
                 let gate = gate.clone();
+                let unavailable = served_authority_snapshot_unavailable.clone();
+                let snapshot_override = served_authority_snapshot_override.clone();
                 async move {
+                    if let Err(response) = validate_cluster_peer_auth(
+                        &headers,
+                        &state.config,
+                        INTERNAL_AUTHORITY_SNAPSHOT_PATH,
+                    ) {
+                        return response;
+                    }
+                    if unavailable.load(Ordering::SeqCst) {
+                        return plain_http_error(
+                            StatusCode::SERVICE_UNAVAILABLE,
+                            "authority snapshot unavailable",
+                        );
+                    }
                     if let Some(gate) = gate {
                         gate.pass().await;
+                    }
+                    let snapshot = snapshot_override.lock().test_unwrap().clone();
+                    if let Some(snapshot) = snapshot {
+                        return Json(snapshot).into_response();
                     }
                     handle_internal_authority_snapshot(state, headers).await
                 }
             };
         let router = axum::Router::new()
+            .route(AUTHORITY_PATH, get(handle_authority_status))
             .route(
                 INTERNAL_CLUSTER_STATUS_PATH,
                 get(handle_internal_cluster_status),
@@ -111,7 +146,7 @@ impl ServedPeer {
                 INTERNAL_REVOCATIONS_DELTA_PATH,
                 get(handle_internal_revocations_delta),
             )
-            .with_state(state);
+            .with_state(state.clone());
         listener.set_nonblocking(true).test_unwrap();
         let (shutdown, stopped) = tokio::sync::oneshot::channel::<()>();
         let server = std::thread::spawn(move || {
@@ -130,9 +165,12 @@ impl ServedPeer {
             });
         });
         Self {
+            state,
             url,
             gate: held_gate,
             snapshot_unavailable,
+            authority_snapshot_unavailable,
+            authority_snapshot_override,
             shutdown: Some(shutdown),
             server: Some(server),
         }
@@ -170,6 +208,7 @@ enum AuthorityFault {
 struct ReplicationPair {
     _directory: tempfile::TempDir,
     exporter: ServedPeer,
+    _importer_peer: Option<ServedPeer>,
     importer: TrustServiceState,
     exporter_revocations: SqliteRevocationStore,
     provisioned_at: u64,
@@ -195,17 +234,18 @@ fn gated_replication_pair(
     let exporter_authority = directory.path().join("exporter-authority.sqlite3");
     let importer_authority = directory.path().join("importer-authority.sqlite3");
     let (listener, exporter_url) = ServedPeer::reserve();
+    let (importer_listener, importer_url) = ServedPeer::reserve_on("127.0.0.2:0");
 
     let mut exporter = state_with_cluster(
         &exporter_url,
-        &[IMPORTER_URL],
+        &[&importer_url],
         None,
         Some(directory.path().join("exporter-revocations.sqlite3")),
         None,
     );
     exporter.config.authority_db_path = Some(exporter_authority.clone());
     let mut importer = state_with_cluster(
-        IMPORTER_URL,
+        &importer_url,
         &[exporter_url.as_str()],
         None,
         Some(directory.path().join("importer-revocations.sqlite3")),
@@ -290,9 +330,22 @@ fn gated_replication_pair(
             revoked_at: 10,
         })
         .test_unwrap();
+    let exporter = ServedPeer::serve(listener, exporter_url, exporter, gate);
+    let importer_peer = if matches!(fault, AuthorityFault::LaggingImporterClock) {
+        // The cached signed prefix gives the custodian actual current-term
+        // quorum evidence without depending on follower public admission.
+        // No authority import or reachability flag is fabricated by the fixture.
+        let peer = ServedPeer::serve(importer_listener, importer_url, importer.clone(), None);
+        sync_peer(&exporter.state, &peer.url).test_unwrap();
+        load_authority_status_for_state(&exporter.state).test_unwrap();
+        Some(peer)
+    } else {
+        None
+    };
     ReplicationPair {
         _directory: directory,
-        exporter: ServedPeer::serve(listener, exporter_url, exporter, gate),
+        exporter,
+        _importer_peer: importer_peer,
         importer,
         exporter_revocations,
         provisioned_at,

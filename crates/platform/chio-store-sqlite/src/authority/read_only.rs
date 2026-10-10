@@ -50,6 +50,39 @@ pub struct AuthorityVerificationStatus {
     pub status: AuthorityStatus,
     pub holds_current_signing_custody: bool,
     verified_envelope_digest: Option<String>,
+    verified_envelope_expires_at: Option<u64>,
+    inspected_at: UnixMillis,
+    authenticated_history_commitments: Vec<String>,
+}
+
+/// Signed peer history authenticated from the operator-pinned checkpoint.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum AuthorityPeerHistory {
+    ConsistentPrefix,
+    Newer,
+    Conflicting,
+}
+
+#[derive(Clone, Debug)]
+pub struct AuthorityPeerChainEvidence {
+    pub history: AuthorityPeerHistory,
+    pub chain_commitment: String,
+    pub expires_at: u64,
+    pub(super) authenticated_history_commitments: Vec<String>,
+}
+
+impl AuthorityPeerChainEvidence {
+    /// Membership in the peer history verified from the pinned checkpoint.
+    /// Its size is bounded by the existing signed-chain protocol limit.
+    pub fn authenticated_history_commitments(&self) -> &[String] {
+        &self.authenticated_history_commitments
+    }
+
+    pub fn contains_authenticated_history(&self, commitment: &str) -> bool {
+        self.authenticated_history_commitments
+            .iter()
+            .any(|known| known == commitment)
+    }
 }
 
 impl AuthorityVerificationStatus {
@@ -57,6 +90,21 @@ impl AuthorityVerificationStatus {
     /// same read transaction as this status. No digest is added to HTTP status.
     pub fn matches_imported_envelope(&self, expected_digest: &str) -> bool {
         self.verified_envelope_digest.as_deref() == Some(expected_digest)
+    }
+
+    /// Match current-term peer evidence to this same authenticated local view.
+    /// A consistent signed prefix is evidence of history agreement, not import.
+    pub fn contains_authenticated_history(&self, commitment: &str) -> bool {
+        self.authenticated_history_commitments
+            .iter()
+            .any(|known| known == commitment)
+    }
+
+    pub fn is_live_at(&self, now: UnixMillis) -> bool {
+        now >= self.inspected_at
+            && self
+                .verified_envelope_expires_at
+                .is_none_or(|expiry| now.as_secs() < expiry)
     }
 }
 
@@ -139,13 +187,39 @@ impl SqliteAuthorityInspection {
                 } else {
                     None
                 };
+            let verified_envelope_expires_at = if verified_envelope_digest.is_some() {
+                Some(replication::live_envelope_expiry(connection)?)
+            } else {
+                None
+            };
+            let authenticated_history_commitments =
+                replication::authenticated_chain_commitments(connection, &snapshot)?;
             let mut status = SqliteCapabilityAuthority::read_status_from_connection(connection)?;
             status.trusted_public_keys = lifecycle::live_public_keys(&snapshot, now.as_secs())?;
             Ok(AuthorityVerificationStatus {
                 status,
                 holds_current_signing_custody,
                 verified_envelope_digest,
+                verified_envelope_expires_at,
+                inspected_at: now,
+                authenticated_history_commitments,
             })
+        })
+    }
+
+    /// Authenticate the peer's complete envelope and classify its history
+    /// against this local read transaction. No import/replay state is changed.
+    pub fn peer_chain_evidence(
+        &self,
+        envelope: &chio_kernel::authority::replication::SignedAuthoritySnapshot,
+    ) -> Result<AuthorityPeerChainEvidence, AuthorityInspectionError> {
+        self.read(|connection, now| {
+            replication::inspect_peer_chain(
+                connection,
+                envelope,
+                now,
+                self.replication_clock_policy,
+            )
         })
     }
 

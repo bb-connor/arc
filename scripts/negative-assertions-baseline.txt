@@ -574,7 +574,6 @@
 1	crates/platform/chio-control-plane/src/trust_control/cluster_and_reports.rs	auth_helpers_and_metered_billing_validation_cover_error_paths	validate_service_auth(&headers, ).is_err()
 1	crates/platform/chio-control-plane/src/trust_control/cluster_and_reports.rs	oversized_budget_delta_routes_peer_to_force_snapshot_not_wedge	routed.is_err()
 1	crates/platform/chio-control-plane/src/trust_control/cluster_and_reports.rs	oversized_budget_delta_routes_peer_to_force_snapshot_not_wedge	transient.is_err()
-1	crates/platform/chio-control-plane/src/trust_control/config_and_public.rs	public_discovery_uses_local_db_signer_after_replica_snapshot	follower.current_keypair().is_err()
 1	crates/platform/chio-control-plane/src/trust_control/finding_challenge_handlers.rs	challenge_body_deadline_releases_the_submission_lane	try_acquire_challenge_lane(&lane).is_err()
 1	crates/platform/chio-control-plane/src/trust_control/finding_challenge_handlers.rs	challenge_status_rechecks_retained_outcome_bytes	checked_outcome_json(&tampered).is_err()
 1	crates/platform/chio-control-plane/src/trust_control/finding_challenge_handlers.rs	challenge_submission_lane_is_non_queued	try_acquire_challenge_lane(&lane).is_err()

@@ -1612,11 +1612,6 @@ pub(crate) fn cmd_trust_serve(
             ));
         }
     };
-    // The operator-configured database is provisioned before serving, because
-    // unauthenticated routes only inspect authority storage that already exists.
-    if let (Some(path), None) = (authority_db_path, authority_keyring_config_path) {
-        chio_store_sqlite::SqliteCapabilityAuthority::open(path)?;
-    }
     trust_control::serve(trust_control::TrustServiceConfig {
         transport,
         listen,

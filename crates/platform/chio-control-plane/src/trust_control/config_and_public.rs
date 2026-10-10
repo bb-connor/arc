@@ -11,10 +11,11 @@ pub(crate) use generic_listing::{
     build_public_generic_listing_report, build_signed_generic_namespace,
     public_generic_registry_publisher,
 };
-use public_authority_read::resolve_public_authority_signing_key;
+use public_authority_read::resolve_public_authority_signing_key_for_status;
 pub(crate) use public_authority_read::{
     public_authority_status, public_authority_verification_status,
-    public_passport_credential_issuer, public_replicated_authority_verification_status,
+    public_passport_credential_issuer, public_passport_credential_issuer_with_status,
+    public_replicated_authority_verification_status,
     resolve_public_oid4vp_verifier_trusted_public_keys, resolve_public_registry_signing_key,
 };
 
@@ -997,16 +998,6 @@ pub(crate) fn now_unix_secs() -> Result<u64, chio_security_types::clock::ClockEr
     SystemClock.unix_millis().map(|now| now.as_secs())
 }
 
-fn public_discovery_version(
-    config: &TrustServiceConfig,
-    clock: &Arc<dyn Clock>,
-) -> Result<u64, CliError> {
-    Ok(public_authority_status(config, clock)?
-        .generation
-        .unwrap_or(1)
-        .max(1))
-}
-
 fn public_discovery_guardrails() -> PublicDiscoveryImportGuardrails {
     PublicDiscoveryImportGuardrails::default()
 }
@@ -1015,8 +1006,24 @@ pub(crate) fn build_public_issuer_discovery(
     config: &TrustServiceConfig,
     clock: &Arc<dyn Clock>,
 ) -> Result<SignedPublicIssuerDiscovery, CliError> {
-    let signing_key = resolve_public_authority_signing_key(config, clock)?;
-    let metadata = public_passport_credential_issuer(config, clock)?;
+    build_public_issuer_discovery_with_status(config, clock, None)
+}
+
+pub(crate) fn build_public_issuer_discovery_with_status(
+    config: &TrustServiceConfig,
+    clock: &Arc<dyn Clock>,
+    status: Option<&TrustAuthorityStatus>,
+) -> Result<SignedPublicIssuerDiscovery, CliError> {
+    let loaded;
+    let status = match status {
+        Some(status) => status,
+        None => {
+            loaded = public_authority_status(config, clock)?;
+            &loaded
+        }
+    };
+    let signing_key = resolve_public_authority_signing_key_for_status(config, clock, status)?;
+    let metadata = passport_credential_issuer_with(config, |_| Ok(signing_key.clone()))?;
     let now = now_unix_secs()?;
     let metadata_sha256 = sha256_hex(&canonical_json_bytes(&metadata)?);
     let credential_configuration_ids = metadata
@@ -1034,7 +1041,7 @@ pub(crate) fn build_public_issuer_discovery(
         chio_credentials::SignedPublicIssuerDiscoveryInput {
             discovery_id: format!("issuer-discovery:{}", metadata.credential_issuer),
             issuer: metadata.credential_issuer.clone(),
-            version: public_discovery_version(config, clock)?,
+            version: status.generation.unwrap_or(1).max(1),
             published_at: now,
             expires_at: now.saturating_add(PUBLIC_DISCOVERY_TTL_SECS),
             metadata_url: format!(
@@ -1063,11 +1070,16 @@ pub(crate) fn build_public_verifier_discovery_with_status(
     clock: &Arc<dyn Clock>,
     status: Option<&TrustAuthorityStatus>,
 ) -> Result<SignedPublicVerifierDiscovery, CliError> {
-    let signing_key = resolve_public_authority_signing_key(config, clock)?;
-    let metadata = match status {
-        Some(status) => build_oid4vp_verifier_metadata_from_status(config, status)?,
-        None => build_oid4vp_verifier_metadata(config, clock)?,
+    let loaded;
+    let status = match status {
+        Some(status) => status,
+        None => {
+            loaded = public_authority_status(config, clock)?;
+            &loaded
+        }
     };
+    let signing_key = resolve_public_authority_signing_key_for_status(config, clock, status)?;
+    let metadata = build_oid4vp_verifier_metadata_from_status(config, status)?;
     let now = now_unix_secs()?;
     let metadata_sha256 = sha256_hex(&canonical_json_bytes(&metadata)?);
     create_signed_public_verifier_discovery(
@@ -1075,10 +1087,7 @@ pub(crate) fn build_public_verifier_discovery_with_status(
         chio_credentials::SignedPublicVerifierDiscoveryInput {
             discovery_id: format!("verifier-discovery:{}", metadata.verifier_id),
             verifier: metadata.verifier_id.clone(),
-            version: match status {
-                Some(status) => status.generation.unwrap_or(1).max(1),
-                None => public_discovery_version(config, clock)?,
-            },
+            version: status.generation.unwrap_or(1).max(1),
             published_at: now,
             expires_at: now.saturating_add(PUBLIC_DISCOVERY_TTL_SECS),
             metadata_url: format!("{}{OID4VP_VERIFIER_METADATA_PATH}", metadata.verifier_id),
@@ -1103,9 +1112,17 @@ pub(crate) fn build_public_discovery_transparency_with_status(
     clock: &Arc<dyn Clock>,
     status: Option<&TrustAuthorityStatus>,
 ) -> Result<SignedPublicDiscoveryTransparency, CliError> {
-    let signing_key = resolve_public_authority_signing_key(config, clock)?;
-    let issuer = build_public_issuer_discovery(config, clock)?;
-    let verifier = build_public_verifier_discovery_with_status(config, clock, status)?;
+    let loaded;
+    let status = match status {
+        Some(status) => status,
+        None => {
+            loaded = public_authority_status(config, clock)?;
+            &loaded
+        }
+    };
+    let signing_key = resolve_public_authority_signing_key_for_status(config, clock, status)?;
+    let issuer = build_public_issuer_discovery_with_status(config, clock, Some(status))?;
+    let verifier = build_public_verifier_discovery_with_status(config, clock, Some(status))?;
     let now = now_unix_secs()?;
     let publisher = config.advertise_url.as_deref().ok_or_else(|| {
         CliError::cli_other_error(
@@ -1136,10 +1153,7 @@ pub(crate) fn build_public_discovery_transparency_with_status(
         chio_credentials::SignedPublicDiscoveryTransparencyInput {
             transparency_id: format!("public-discovery-transparency:{publisher}"),
             publisher: publisher.to_string(),
-            version: match status {
-                Some(status) => status.generation.unwrap_or(1).max(1),
-                None => public_discovery_version(config, clock)?,
-            },
+            version: status.generation.unwrap_or(1).max(1),
             published_at: now,
             expires_at: now.saturating_add(PUBLIC_DISCOVERY_TTL_SECS),
             entries,
@@ -1556,7 +1570,6 @@ pub(crate) fn build_scim_deprovision_receipt(
 #[cfg(test)]
 mod config_and_public_tests {
     use super::*;
-    use chio_credentials::verify_signed_public_issuer_discovery;
     use chio_test_support::prelude::*;
     use std::path::PathBuf;
 
@@ -1791,13 +1804,13 @@ mod config_and_public_tests {
         assert_eq!(jwks.keys[0].alg, "EdDSA");
         assert_eq!(jwks.keys[0].use_, "sig");
 
-        let discovery_version = public_discovery_version(&config, &clock)
-            .test_expect("derive public discovery version");
-        assert_eq!(discovery_version, 1);
+        let discovery = build_public_issuer_discovery(&config, &clock)
+            .test_expect("build issuer discovery with admitted seed");
+        assert_eq!(discovery.body.version, 1);
     }
 
     #[test]
-    fn public_discovery_uses_local_db_signer_after_replica_snapshot() {
+    fn public_discovery_refuses_local_db_signer_after_replica_snapshot() {
         let directory = chio_test_support::private_tempdir().test_unwrap();
         let source_path = directory.path().join("source.sqlite3");
         let follower_path = directory.path().join("follower.sqlite3");
@@ -1818,7 +1831,16 @@ mod config_and_public_tests {
         assert!(follower
             .apply_signed_snapshot(&snapshot)
             .test_expect("apply source snapshot"));
-        assert!(follower.current_keypair().is_err());
+        let current_custody = follower.current_keypair().test_unwrap_err();
+        assert!(matches!(
+            current_custody,
+            chio_kernel::AuthorityStoreError::Fence(reason)
+                if reason == format!(
+                    "local signing seed public key {} does not match replicated authority public key {}",
+                    follower_local_key.public_key().to_hex(),
+                    snapshot.snapshot.public_key_hex,
+                )
+        ));
 
         let mut config = base_config();
         config.advertise_url = Some("https://trust.example.com".to_string());
@@ -1828,12 +1850,18 @@ mod config_and_public_tests {
             resolve_oid4vp_verifier_signing_key(&config).test_expect("resolve follower signer");
         assert_eq!(signing_key.public_key(), follower_local_key.public_key());
 
-        let issuer = build_public_issuer_discovery(&config, &chio_test_support::clock::clock())
-            .test_expect("build issuer discovery");
-        assert_eq!(
-            issuer.body.signer_public_key,
-            follower_local_key.public_key()
+        let error = build_public_issuer_discovery(&config, &chio_test_support::clock::clock())
+            .test_expect_err("former local signer must not sign admitted replica discovery");
+        assert!(
+            matches!(error, CliError::Chio(_)),
+            "unexpected refusal: {error}"
         );
-        verify_signed_public_issuer_discovery(&issuer).test_expect("verify issuer discovery");
+        assert_eq!(
+            error.to_string(),
+            CliError::cli_other_error(
+                "public discovery signer does not own the admitted live authority head".to_string()
+            )
+            .to_string()
+        );
     }
 }

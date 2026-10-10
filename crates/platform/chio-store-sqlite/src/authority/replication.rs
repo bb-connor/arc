@@ -313,3 +313,78 @@ pub(super) fn decode_lifecycle(
 ) -> Result<chio_kernel::authority::lifecycle::AuthorityKeyLifecycle, AuthorityStoreError> {
     persistence::decode(text)
 }
+
+pub(super) fn inspect_peer_chain(
+    connection: &Connection,
+    envelope: &SignedAuthoritySnapshot,
+    now: UnixMillis,
+    policy: AuthorityEnvelopeClockPolicy,
+) -> Result<super::read_only::AuthorityPeerChainEvidence, AuthorityStoreError> {
+    use super::read_only::{AuthorityPeerChainEvidence, AuthorityPeerHistory};
+    let local = require_replication(connection)?;
+    let current = read_snapshot(connection)?;
+    let (authenticated, commitment) = verify_authority_chain(&local.anchor, &local.chain)?;
+    if authenticated != current || commitment != local.commitment {
+        return Err(refused(
+            "local authority differs from authenticated history",
+        ));
+    }
+    let anchor_commitment = local.anchor.commitment()?;
+    let proof = envelope.verify_with_clock_policy(
+        &local.anchor,
+        &local.anchor.snapshot,
+        &anchor_commitment,
+        now.as_secs(),
+        policy,
+    )?;
+    let history = if local.chain.starts_with(&proof.transitions) {
+        AuthorityPeerHistory::ConsistentPrefix
+    } else if proof.transitions.starts_with(&local.chain) {
+        AuthorityPeerHistory::Newer
+    } else {
+        AuthorityPeerHistory::Conflicting
+    };
+    let mut authenticated_history_commitments = Vec::with_capacity(proof.transitions.len() + 1);
+    authenticated_history_commitments.push(anchor_commitment);
+    for transition in &proof.transitions {
+        authenticated_history_commitments.push(transition.commitment()?);
+    }
+    Ok(AuthorityPeerChainEvidence {
+        history,
+        chain_commitment: proof.chain_commitment.clone(),
+        expires_at: proof.expires_at,
+        authenticated_history_commitments,
+    })
+}
+
+pub(super) fn authenticated_chain_commitments(
+    connection: &Connection,
+    current: &AuthoritySnapshot,
+) -> Result<Vec<String>, AuthorityStoreError> {
+    let Some(local) = read_replication(connection)? else {
+        return Ok(Vec::new());
+    };
+    let (authenticated, commitment) = verify_authority_chain(&local.anchor, &local.chain)?;
+    if &authenticated != current || commitment != local.commitment {
+        return Err(refused(
+            "local authority differs from authenticated history",
+        ));
+    }
+    let mut commitments = Vec::with_capacity(local.chain.len() + 1);
+    commitments.push(local.anchor.commitment()?);
+    for transition in &local.chain {
+        commitments.push(transition.commitment()?);
+    }
+    Ok(commitments)
+}
+
+pub(super) fn live_envelope_expiry(connection: &Connection) -> Result<u64, AuthorityStoreError> {
+    let replication = require_replication(connection)?;
+    replication
+        .latest
+        .and_then(|envelope| envelope.proof)
+        .map(|proof| proof.expires_at)
+        .ok_or_else(|| {
+            refused("follower has no authenticated live envelope for authority verification")
+        })
+}

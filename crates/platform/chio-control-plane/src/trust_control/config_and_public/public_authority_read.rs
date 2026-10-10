@@ -137,3 +137,35 @@ pub(crate) fn public_passport_credential_issuer(
         resolve_public_authority_signing_key(config, clock)
     })
 }
+
+/// Load existing custody only, then bind the actual signer to the exact
+/// admitted live head. A former local seed cannot sign current trust documents.
+pub(crate) fn resolve_public_authority_signing_key_for_status(
+    config: &TrustServiceConfig,
+    clock: &Arc<dyn Clock>,
+    status: &TrustAuthorityStatus,
+) -> Result<Keypair, CliError> {
+    let key = resolve_public_authority_signing_key(config, clock)?;
+    let public = key.public_key().to_hex();
+    if status.public_key.as_deref() != Some(public.as_str())
+        || !status.trusted_public_keys.contains(&public)
+    {
+        return Err(CliError::cli_other_error(
+            "public discovery signer does not own the admitted live authority head".to_string(),
+        ));
+    }
+    Ok(key)
+}
+
+pub(crate) fn public_passport_credential_issuer_with_status(
+    config: &TrustServiceConfig,
+    clock: &Arc<dyn Clock>,
+    status: Option<&TrustAuthorityStatus>,
+) -> Result<Oid4vciCredentialIssuerMetadata, CliError> {
+    match status {
+        Some(status) => passport_credential_issuer_with(config, |config| {
+            resolve_public_authority_signing_key_for_status(config, clock, status)
+        }),
+        None => public_passport_credential_issuer(config, clock),
+    }
+}

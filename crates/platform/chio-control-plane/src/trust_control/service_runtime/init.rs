@@ -12,6 +12,10 @@ use std::time::{Duration, Instant};
 #[path = "init/payload_maintenance.rs"]
 mod payload_maintenance;
 
+#[cfg(test)]
+#[path = "init/authority_provision_tests.rs"]
+mod authority_provision_tests;
+
 pub(crate) async fn serve_async(
     config: TrustServiceConfig,
     injected_joint_authority_store: Option<Arc<SqliteAuthorityStore>>,
@@ -183,6 +187,7 @@ async fn serve_async_inner(
         .map(Arc::new);
     let finding_challenge_clock: Arc<dyn chio_security_types::clock::Clock> =
         Arc::new(chio_security_types::clock::SystemClock);
+    provision_service_authority(&config, finding_challenge_clock.clone())?;
     let cluster = build_cluster_state(&config, local_addr, finding_challenge_clock.clone())?;
     let receipt_store = match anchored_receipt_store {
         Some(store) => Some(store),
@@ -568,4 +573,24 @@ mod windows_authority_tests {
         assert!(std::fs::read_dir(directory.path())?.next().is_none());
         Ok(())
     }
+}
+
+/// The authenticated service owner provisions its database with the same clock
+/// and receiver policy used by runtime inspections and replication.
+pub(super) fn provision_service_authority(
+    config: &TrustServiceConfig,
+    clock: Arc<dyn chio_security_types::clock::Clock>,
+) -> Result<(), CliError> {
+    if config.authority_keyring_config_path.is_none() {
+        if let Some(path) = config.authority_db_path.as_deref() {
+            SqliteCapabilityAuthority::open_with_clock_and_replication_policy(
+                path,
+                clock,
+                config.authority_replication_clock_policy()?,
+            )?;
+        } else if let Some(path) = config.authority_seed_path.as_deref() {
+            load_or_create_authority_keypair(path)?;
+        }
+    }
+    Ok(())
 }

@@ -10,7 +10,7 @@ use super::report_rendering::{
 use super::report_validation::{
     enforce_authority_mutation_fence, inspect_authority_state, load_authority_status_for_state,
     load_capability_authority, refresh_authority_mutation_fence, rotate_authority_for_state,
-    validate_authority_issue_auth, validate_authority_mutation_auth,
+    run_authority_commit, validate_authority_issue_auth, validate_authority_mutation_auth,
     validate_authority_workload_auth, validate_service_auth,
 };
 use super::*;
@@ -72,19 +72,25 @@ pub(crate) async fn handle_rotate_authority(
         Ok(None) => {}
         Err(response) => return response,
     }
-    if let Err(response) = enforce_authority_mutation_fence(&state) {
+    run_authority_commit(&state, |state| Ok(rotate_authority_blocking(state)))
+        .await
+        .unwrap_or_else(std::convert::identity)
+}
+
+fn rotate_authority_blocking(state: &TrustServiceState) -> Response {
+    if let Err(response) = enforce_authority_mutation_fence(state) {
         return response;
     }
-    match rotate_authority_for_state(&state) {
+    match rotate_authority_for_state(state) {
         Ok(status) => {
-            if let Err(response) = refresh_authority_mutation_fence(&state) {
+            if let Err(response) = refresh_authority_mutation_fence(state) {
                 return response;
             }
             respond_after_leader_visible_write(
-                &state,
+                state,
                 "rotated authority was not visible on the leader after write",
                 || {
-                    let visible_status = load_authority_status_for_state(&state)?;
+                    let visible_status = load_authority_status_for_state(state)?;
                     if visible_status.generation == status.generation
                         && visible_status.public_key == status.public_key
                     {
@@ -112,7 +118,18 @@ pub(crate) async fn handle_issue_capability(
         Ok(None) => {}
         Err(response) => return response,
     }
-    if let Err(response) = enforce_authority_mutation_fence(&state) {
+    inspect_authority_state(&state, move |state| {
+        Ok(issue_capability_blocking(state, payload))
+    })
+    .await
+    .unwrap_or_else(std::convert::identity)
+}
+
+fn issue_capability_blocking(
+    state: &TrustServiceState,
+    payload: IssueCapabilityRequest,
+) -> Response {
+    if let Err(response) = enforce_authority_mutation_fence(state) {
         return response;
     }
     let subject = match PublicKey::from_hex(&payload.subject_public_key) {
@@ -127,7 +144,7 @@ pub(crate) async fn handle_issue_capability(
             );
         }
     }
-    match load_capability_authority(&state) {
+    match load_capability_authority(state) {
         Ok(authority) => {
             match authority.issue_capability_with_attestation(
                 &subject,

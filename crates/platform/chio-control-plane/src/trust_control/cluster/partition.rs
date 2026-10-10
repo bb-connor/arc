@@ -40,11 +40,13 @@ pub(crate) async fn handle_internal_cluster_partition(
                 peer_state.partitioned = blocked.contains(peer_url);
                 if peer_state.partitioned {
                     peer_state.authority_import_confirmation = None;
+                    peer_state.authority_agreement_confirmation = None;
                     peer_state.last_error =
                         Some("cluster peer intentionally partitioned".to_string());
                     peer_state.force_snapshot = true;
                 } else if was_partitioned {
                     peer_state.authority_import_confirmation = None;
+                    peer_state.authority_agreement_confirmation = None;
                     peer_state.health = PeerHealth::Unknown;
                     peer_state.last_error = peer_state.authority_error.clone();
                     peer_state.force_snapshot = true;
@@ -65,11 +67,13 @@ pub(crate) async fn handle_internal_cluster_partition(
                 peer_state.partitioned = blocked.contains(peer_url);
                 if peer_state.partitioned {
                     peer_state.authority_import_confirmation = None;
+                    peer_state.authority_agreement_confirmation = None;
                     peer_state.last_error =
                         Some("cluster peer intentionally partitioned".to_string());
                     peer_state.force_snapshot = true;
                 } else if was_partitioned {
                     peer_state.authority_import_confirmation = None;
+                    peer_state.authority_agreement_confirmation = None;
                     peer_state.health = PeerHealth::Unknown;
                     peer_state.last_error = peer_state.authority_error.clone();
                     peer_state.force_snapshot = true;
@@ -150,6 +154,7 @@ pub(crate) fn update_peer_failure(state: &TrustServiceState, peer_url: &str, err
                 if let Some(peer) = guard.peers.get_mut(peer_url) {
                     peer.health = PeerHealth::Unhealthy;
                     peer.authority_import_confirmation = None;
+                    peer.authority_agreement_confirmation = None;
                     peer.last_error = Some(error.clone());
                     peer.force_snapshot = true;
                 }
@@ -159,6 +164,7 @@ pub(crate) fn update_peer_failure(state: &TrustServiceState, peer_url: &str, err
                 if let Some(peer) = guard.peers.get_mut(peer_url) {
                     peer.health = PeerHealth::Unhealthy;
                     peer.authority_import_confirmation = None;
+                    peer.authority_agreement_confirmation = None;
                     peer.last_error = Some(error);
                     peer.force_snapshot = true;
                 }
@@ -185,6 +191,7 @@ pub(crate) fn update_peer_authority_error(
     update_peer_state(state, peer_url, |peer| {
         peer.health = PeerHealth::Degraded;
         peer.authority_import_confirmation = None;
+        peer.authority_agreement_confirmation = None;
         peer.last_error = Some(error.clone());
         peer.authority_error = Some(error);
     });
@@ -196,9 +203,11 @@ pub(crate) fn clear_peer_authority_error(
     state: &TrustServiceState,
     peer_url: &str,
     confirmation: Option<AuthorityImportConfirmation>,
+    agreement: Option<AuthorityAgreementConfirmation>,
 ) {
     update_peer_state(state, peer_url, |peer| {
         peer.authority_import_confirmation = confirmation;
+        peer.authority_agreement_confirmation = agreement;
         let Some(resolved) = peer.authority_error.take() else {
             return;
         };

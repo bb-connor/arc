@@ -25,16 +25,21 @@ where
         // The blocking worker owns admission through success, refusal, panic
         // and cancellation of the caller's async future.
         let _permit = permit;
-        let admitted_status = if inspected_state.cluster.is_some()
-            && inspected_state.config.authority_db_path.is_some()
-        {
-            Some(
-                super::super::report_validation::load_authority_status_for_state(&inspected_state)?,
+        let authority_configured = inspected_state.config.authority_db_path.is_some()
+            || inspected_state.config.authority_seed_path.is_some()
+            || inspected_state.authority_keyring.is_some();
+        if authority_configured {
+            super::super::report_validation::inspect_authority_state_blocking(
+                &inspected_state,
+                |state| {
+                    let admitted_status =
+                        super::super::report_validation::load_authority_status_for_state(state)?;
+                    inspect(state, Some(&admitted_status))
+                },
             )
         } else {
-            None
-        };
-        inspect(&inspected_state, admitted_status.as_ref())
+            inspect(&inspected_state, None)
+        }
     })
     .await
     .map_err(|_| {

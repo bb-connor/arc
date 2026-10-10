@@ -25,7 +25,8 @@ mod read_only;
 mod replication;
 use boundaries::*;
 pub use read_only::{
-    AuthorityInspectionError, AuthorityVerificationStatus, SqliteAuthorityInspection,
+    AuthorityInspectionError, AuthorityPeerChainEvidence, AuthorityPeerHistory,
+    AuthorityVerificationStatus, SqliteAuthorityInspection,
 };
 
 #[cfg(test)]

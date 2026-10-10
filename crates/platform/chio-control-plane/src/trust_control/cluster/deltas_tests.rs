@@ -110,11 +110,11 @@ mod deltas_tests {
     fn quorum_commit_timeout_covers_full_per_peer_sync_and_is_bounded() {
         // The wait must outlast a FULL serial sync_peer visit for every peer
         // preceding the quorum peer, not just one CONTROL_HTTP_TIMEOUT per peer. A
-        // full visit is the three fixed blocking stages plus the two
+        // full visit is the five fixed blocking stages plus the two
         // wall-clock-bounded delta rounds.
         let interval = Duration::from_millis(25);
         let per_peer_sync =
-            CONTROL_HTTP_TIMEOUT * 3 + PEER_ROUND_WALL_CLOCK_BUDGET + PEER_ROUND_WALL_CLOCK_BUDGET;
+            CONTROL_HTTP_TIMEOUT * 5 + PEER_ROUND_WALL_CLOCK_BUDGET + PEER_ROUND_WALL_CLOCK_BUDGET;
 
         assert!(budget_write_quorum_commit_timeout(interval, 0) >= Duration::from_secs(5));
 

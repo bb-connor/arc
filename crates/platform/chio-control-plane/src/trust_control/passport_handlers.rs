@@ -18,19 +18,33 @@ use public_authority_trust::{public_oid4vp_trusted_keys, run_public_authority_tr
 pub(crate) async fn handle_passport_issuer_metadata(
     State(state): State<TrustServiceState>,
 ) -> Response {
-    match public_passport_credential_issuer(&state.config, &state.finding_challenge_clock) {
-        Ok(metadata) => Json(metadata).into_response(),
-        Err(error) => plain_http_error(StatusCode::CONFLICT, &error.to_string()),
-    }
+    run_public_authority_trust_read(&state, |state, status| {
+        match public_passport_credential_issuer_with_status(
+            &state.config,
+            &state.finding_challenge_clock,
+            status,
+        ) {
+            Ok(metadata) => Json(metadata).into_response(),
+            Err(error) => plain_http_error(StatusCode::CONFLICT, &error.to_string()),
+        }
+    })
+    .await
 }
 
 pub(crate) async fn handle_public_passport_issuer_discovery(
     State(state): State<TrustServiceState>,
 ) -> Response {
-    match build_public_issuer_discovery(&state.config, &state.finding_challenge_clock) {
-        Ok(document) => Json(document).into_response(),
-        Err(error) => public_discovery_error_response(&error),
-    }
+    run_public_authority_trust_read(&state, |state, status| {
+        match build_public_issuer_discovery_with_status(
+            &state.config,
+            &state.finding_challenge_clock,
+            status,
+        ) {
+            Ok(document) => Json(document).into_response(),
+            Err(error) => public_discovery_error_response(&error),
+        }
+    })
+    .await
 }
 
 pub(crate) async fn handle_public_passport_verifier_discovery(

@@ -245,3 +245,169 @@ fn inspection_publishes_rotation_and_lifecycle_from_the_owner() -> TestResult {
     assert_eq!(status.issuer_state, revoked.issuer_state);
     Ok(())
 }
+
+#[test]
+fn final_f11_peer_prefix_inspection_preserves_actual_import_replay_refusal() -> TestResult {
+    let (_directory, path, owner) = provisioned()?;
+    owner.initialize_replication("peer-prefix-replay")?;
+    let older = owner.signed_snapshot()?;
+    let later =
+        SqliteCapabilityAuthority::open_with_clock(&path, fixed(PROVISIONED_AT_MS + 2_000))?;
+    let newer = later.signed_snapshot()?;
+    let witness = Witness::open(&path)?;
+    let version = witness.data_version()?;
+    let floor = witness.observed_ms()?;
+    let inspection = SqliteAuthorityInspection::open_existing_with_clock(
+        &path,
+        fixed(PROVISIONED_AT_MS + 2_000),
+    )?;
+    let evidence = inspection.peer_chain_evidence(&older)?;
+    assert_eq!(evidence.history, AuthorityPeerHistory::ConsistentPrefix);
+    assert_eq!(
+        evidence.chain_commitment,
+        older
+            .proof
+            .as_ref()
+            .ok_or("missing signed proof")?
+            .chain_commitment
+    );
+    assert_eq!(
+        witness.data_version()?,
+        version,
+        "peer inspection wrote storage"
+    );
+    assert_eq!(
+        witness.observed_ms()?,
+        floor,
+        "peer inspection advanced the clock floor"
+    );
+    assert!(matches!(
+        later.apply_signed_snapshot(&older),
+        Err(AuthorityStoreError::Fence(reason))
+            if reason == "authority envelope replay regresses issuance time"
+    ));
+    assert_eq!(
+        witness.data_version()?,
+        version,
+        "replay refusal committed a write"
+    );
+    assert_eq!(later.signed_snapshot()?, newer);
+    Ok(())
+}
+
+#[test]
+fn final_f11_peer_history_inspection_distinguishes_extension_prefix_and_fork() -> TestResult {
+    use chio_kernel::authority::replication::{SignedAuthoritySnapshot, SignedAuthorityTransition};
+    let (directory, path, owner) = provisioned()?;
+    let original_key = owner.local_keypair()?;
+    let anchor = owner.initialize_replication("peer-history-classification")?;
+    let prefix = owner.signed_snapshot()?;
+    let fork_key = Keypair::generate();
+    let fork_transition = SignedAuthorityTransition::sign(
+        &anchor,
+        &anchor.snapshot,
+        &anchor.commitment()?,
+        &fork_key.public_key(),
+        PROVISIONED_AT_MS / 1_000,
+        &original_key,
+    )?;
+    let fork = SignedAuthoritySnapshot::sign(
+        &anchor,
+        vec![fork_transition],
+        PROVISIONED_AT_MS / 1_000,
+        &fork_key,
+    )?;
+    owner.rotate()?;
+    let extension = owner.signed_snapshot()?;
+    let inspection =
+        SqliteAuthorityInspection::open_existing_with_clock(&path, fixed(PROVISIONED_AT_MS))?;
+    assert_eq!(
+        inspection.peer_chain_evidence(&prefix)?.history,
+        AuthorityPeerHistory::ConsistentPrefix
+    );
+    assert_eq!(
+        inspection.peer_chain_evidence(&fork)?.history,
+        AuthorityPeerHistory::Conflicting
+    );
+    assert!(matches!(owner.apply_signed_snapshot(&fork),
+        Err(AuthorityStoreError::Fence(reason)) if reason == "authority history conflict"
+    ));
+    let follower_path = directory.path().join("follower.sqlite3");
+    let follower =
+        SqliteCapabilityAuthority::open_with_clock(&follower_path, fixed(PROVISIONED_AT_MS))?;
+    follower.pin_replication_anchor(&anchor)?;
+    follower.apply_signed_snapshot(&prefix)?;
+    let follower_view = SqliteAuthorityInspection::open_existing_with_clock(
+        &follower_path,
+        fixed(PROVISIONED_AT_MS),
+    )?;
+    let evidence = follower_view.peer_chain_evidence(&extension)?;
+    assert_eq!(evidence.history, AuthorityPeerHistory::Newer);
+    assert!(evidence.contains_authenticated_history(&anchor.commitment()?));
+    assert!(evidence.contains_authenticated_history(&evidence.chain_commitment));
+    assert!(!evidence.contains_authenticated_history(
+        &fork
+            .proof
+            .as_ref()
+            .ok_or("missing fork proof")?
+            .chain_commitment
+    ));
+    assert_eq!(evidence.authenticated_history_commitments().len(), 2);
+    assert_eq!(
+        follower_view.status()?.generation,
+        1,
+        "peer evidence imported state"
+    );
+    assert!(follower.apply_signed_snapshot(&extension)?);
+    assert_eq!(follower.status()?.generation, 2);
+    Ok(())
+}
+
+#[test]
+fn final_f11_verification_view_binds_exact_envelope_history_and_exclusive_expiry() -> TestResult {
+    let (directory, _path, owner) = provisioned()?;
+    let anchor = owner.initialize_replication("verification-view-evidence")?;
+    let signed = owner.signed_snapshot()?;
+    let follower_path = directory.path().join("follower.sqlite3");
+    let follower =
+        SqliteCapabilityAuthority::open_with_clock(&follower_path, fixed(PROVISIONED_AT_MS))?;
+    follower.pin_replication_anchor(&anchor)?;
+    follower.apply_signed_snapshot(&signed)?;
+    let inspection = SqliteAuthorityInspection::open_existing_with_clock(
+        &follower_path,
+        fixed(PROVISIONED_AT_MS),
+    )?;
+    let view = inspection.replicated_verification_status()?;
+    let expires_at = signed
+        .proof
+        .as_ref()
+        .ok_or("missing signed proof")?
+        .expires_at
+        * 1_000;
+    assert!(view.matches_imported_envelope(&signed.envelope_digest()?));
+    assert!(view.contains_authenticated_history(&anchor.commitment()?));
+    assert!(view.is_live_at(UnixMillis::new(expires_at - 1)));
+    assert!(
+        !view.is_live_at(UnixMillis::new(expires_at)),
+        "exclusive expiry was extended"
+    );
+    assert!(
+        !view.is_live_at(UnixMillis::new(PROVISIONED_AT_MS - 1)),
+        "local clock rollback was accepted"
+    );
+    owner.rotate()?;
+    let next = owner.signed_snapshot()?;
+    assert!(!view.matches_imported_envelope(&next.envelope_digest()?));
+    follower.apply_signed_snapshot(&next)?;
+    let updated = inspection.replicated_verification_status()?;
+    assert!(updated.contains_authenticated_history(&anchor.commitment()?));
+    assert!(updated.contains_authenticated_history(
+        &next
+            .proof
+            .as_ref()
+            .ok_or("missing next proof")?
+            .chain_commitment
+    ));
+    assert!(updated.matches_imported_envelope(&next.envelope_digest()?));
+    Ok(())
+}
