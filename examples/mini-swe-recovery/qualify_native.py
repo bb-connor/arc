@@ -218,7 +218,7 @@ class Host:
         self.note("kill requested")
         self.process.kill()
 
-    def communicate(self, timeout):
+    def communicate(self, timeout=None):
         try:
             self.process.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
