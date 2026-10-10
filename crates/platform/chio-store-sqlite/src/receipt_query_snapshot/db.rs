@@ -61,6 +61,7 @@ CREATE INDEX sq_t_ts ON snapshot_tool_receipt (tenant, ts, seq);
 CREATE INDEX sq_ts ON snapshot_tool_receipt (ts, seq);
 CREATE INDEX sq_t_capability ON snapshot_tool_receipt (tenant, capability, seq);
 CREATE INDEX sq_capability ON snapshot_tool_receipt (capability, seq);
+CREATE INDEX sq_capability_unsigned ON snapshot_tool_receipt (capability, seq) WHERE subject_signed = 0;
 CREATE INDEX sq_t_tool_server ON snapshot_tool_receipt (tenant, tool_server, seq);
 CREATE INDEX sq_tool_server ON snapshot_tool_receipt (tool_server, seq);
 CREATE INDEX sq_t_tool_name ON snapshot_tool_receipt (tenant, tool_name, seq);
@@ -429,7 +430,7 @@ impl SnapshotDb {
                 let subject_id = intern_dim(&transaction, &mut dims, DIM_SUBJECT, subject)?;
                 let rows = {
                     let mut statement = transaction.prepare_cached(
-                    "SELECT seq, tenant, subject FROM snapshot_tool_receipt INDEXED BY sq_capability
+                    "SELECT seq, tenant, subject FROM snapshot_tool_receipt INDEXED BY sq_capability_unsigned
                      WHERE capability = ?1 AND seq > ?2 AND subject_signed = 0
                      ORDER BY seq LIMIT ?3",
                 )?;

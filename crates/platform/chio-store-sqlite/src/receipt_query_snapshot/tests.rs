@@ -22,3 +22,5 @@ mod support;
 
 #[path = "tests/recovery.rs"]
 mod recovery;
+#[path = "tests/refresh_bounds.rs"]
+mod refresh_bounds;
