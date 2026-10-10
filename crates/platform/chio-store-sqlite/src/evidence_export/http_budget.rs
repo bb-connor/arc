@@ -6,6 +6,7 @@ use chio_kernel::{ReceiptQuerySnapshotError, ReceiptStoreError};
 use serde::Serialize;
 
 pub const HTTP_EVIDENCE_EXPORT_MAX_BYTES: u64 = 32 * 1024 * 1024;
+const BYTE_ALLOWANCE_EXHAUSTED: &str = "HTTP evidence export byte allowance; narrow the selected receipts or use local operator export";
 
 pub(crate) fn refuse(reason: impl Into<String>) -> ReceiptStoreError {
     ReceiptQuerySnapshotError::WorkBudgetExhausted(reason.into()).into()
@@ -25,12 +26,16 @@ impl ByteBudget {
     }
     pub(crate) fn preflight(&self, bytes: u64) -> Result<(), ReceiptStoreError> {
         if bytes > self.remaining {
-            return Err(refuse("HTTP evidence export byte allowance; narrow the selected receipts or use local operator export"));
+            return Err(refuse(BYTE_ALLOWANCE_EXHAUSTED));
         }
         Ok(())
     }
     pub(crate) fn charge(&mut self, value: &impl Serialize) -> Result<(), ReceiptStoreError> {
-        self.remaining -= serialized_bytes(value, self.remaining)?;
+        let bytes = serialized_bytes(value, self.remaining)?;
+        self.remaining = self
+            .remaining
+            .checked_sub(bytes)
+            .ok_or_else(|| refuse(BYTE_ALLOWANCE_EXHAUSTED))?;
         Ok(())
     }
 }
@@ -49,7 +54,7 @@ fn serialized_bytes(value: &impl Serialize, limit: u64) -> Result<u64, ReceiptSt
     };
     let result = serde_json::to_writer(&mut writer, value);
     if writer.exceeded {
-        return Err(refuse("HTTP evidence export byte allowance; narrow the selected receipts or use local operator export"));
+        return Err(refuse(BYTE_ALLOWANCE_EXHAUSTED));
     }
     result.map_err(ReceiptStoreError::from)?;
     Ok(writer.bytes)
@@ -63,13 +68,17 @@ struct CountingWriter {
 impl Write for CountingWriter {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
         let length = crate::integer::count(bytes.len());
-        if length > self.limit.saturating_sub(self.bytes) {
+        let Some(next) = self
+            .bytes
+            .checked_add(length)
+            .filter(|sum| *sum <= self.limit)
+        else {
             self.exceeded = true;
             return Err(io::Error::other(
                 "HTTP evidence export exceeds its byte allowance",
             ));
-        }
-        self.bytes += length;
+        };
+        self.bytes = next;
         Ok(bytes.len())
     }
     fn flush(&mut self) -> io::Result<()> {
