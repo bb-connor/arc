@@ -7,6 +7,24 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Required CI hygiene follow-up (October 10)
+
+Source `058888287f7a15b861c8fd55e17a96d5ee7b57f0` repairs the test-file size failure on candidate
+`4339c98366b5b5e5276e7777db0ebb149871346e`. The existing 3,272-line cap remains enforced;
+health helpers move to a private test module with every assertion and test name
+preserved. The owning cluster binary passes (8 passed, 0 failed, 3 pre-existing
+ignored), strict CLI test lint passes, and structural checks pass. Both workspace
+CI test commands now collect all failing targets with `--no-fail-fast`, while
+retaining failure exit status, test selection, timeouts and environment controls.
+The full CI-contract mutation suite and independent review pass.
+
+The [follow-up audit](audits/required-ci-hygiene-followup-20261010.json) pins those
+results. All **1,965** earlier requirements, sources, current states and historical
+observations are preserved; the ledger now contains **1,967 requirements**.
+Hosted acceptance remains pending on the successor head. The four-check merge
+bar, answered-review requirement, explicit Connor merge go-ahead and documented
+post-merge obligations below remain in force. No release readiness is claimed.
+
 ## Required CI replacement (October 10)
 
 Source `bc4e214f640dc3774e34dbb25c2c20a7a54d2f5a` carries 7 bounded CI repair obligations.
