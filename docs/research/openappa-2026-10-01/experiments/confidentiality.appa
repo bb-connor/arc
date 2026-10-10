@@ -1,0 +1,41 @@
+# A public read and an unrelated approval do not clear an earlier HR read.
+mcp/mail/send {
+  to: "outside@company.test"
+}
+expect allow
+
+mcp/files/read {
+  path: "/hr/salaries.csv"
+}
+expect allow
+
+mcp/mail/send {
+  to: "outside@company.test"
+}
+expect deny
+
+mcp/files/read {
+  path: "/public/handbook.md"
+}
+expect allow
+
+mcp/mail/send {
+  to: "outside@company.test"
+}
+expect deny
+
+mcp/ops/wipe {}
+expect authority approver
+
+mcp/ops/wipe {}
+expect authority approver
+
+mcp/mail/send {
+  to: "outside@company.test"
+}
+expect deny
+
+mcp/mail/send {
+  to: "hr@company.test"
+}
+expect allow

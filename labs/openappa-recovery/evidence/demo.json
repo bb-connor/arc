@@ -1,0 +1,119 @@
+{
+  "already_frozen_denial": {
+    "decision": "continuation_required",
+    "denied_operation_id": "support-issue-1"
+  },
+  "approved_preparation": {
+    "dispatch_authorized": false,
+    "egress_source_label": {
+      "compartments": [],
+      "kind": "known",
+      "owners": {}
+    },
+    "grant_id": "support-grant-1",
+    "source_label": {
+      "compartments": [
+        "customer-support"
+      ],
+      "kind": "known",
+      "owners": {
+        "support-owner": [
+          "support-owner"
+        ]
+      }
+    }
+  },
+  "initial": {
+    "decision": "denied",
+    "offers": [
+      {
+        "action": "request_exact_disclosure_approval",
+        "basis_digest": [
+          26,
+          23,
+          122,
+          26,
+          206,
+          136,
+          167,
+          175,
+          215,
+          116,
+          173,
+          135,
+          19,
+          146,
+          164,
+          52,
+          237,
+          66,
+          84,
+          18,
+          210,
+          58,
+          169,
+          184,
+          138,
+          162,
+          207,
+          175,
+          52,
+          116,
+          236,
+          112
+        ],
+        "expires_at_unix_ms": 180000
+      }
+    ],
+    "reason": "source exceeds policy clearance"
+  },
+  "scope": "Real Chio flow verification and preparation; no grant consumption or tool dispatch",
+  "subsequent_disclosure": {
+    "decision": "denied",
+    "offers": [
+      {
+        "action": "request_exact_disclosure_approval",
+        "basis_digest": [
+          26,
+          23,
+          122,
+          26,
+          206,
+          136,
+          167,
+          175,
+          215,
+          116,
+          173,
+          135,
+          19,
+          146,
+          164,
+          52,
+          237,
+          66,
+          84,
+          18,
+          210,
+          58,
+          169,
+          184,
+          138,
+          162,
+          207,
+          175,
+          52,
+          116,
+          236,
+          112
+        ],
+        "expires_at_unix_ms": 180000
+      }
+    ],
+    "reason": "source exceeds policy clearance"
+  },
+  "unknown_operation": {
+    "decision": "reconcile",
+    "operation_id": "support-issue-1"
+  }
+}
