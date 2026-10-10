@@ -7,6 +7,19 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Export attribution repair integrated (October 10)
+
+The [attribution audit](audits/export-attribution-repair-20261010.json) records
+`ea004c8215` integrated as `c7af747721`, with all seven source files identical.
+Eleven genuine expected-safe failures pass in the final 94-test producer run;
+strict owning lint and static gates pass. The repair checks all selected
+captured subjects before lineage refusal, then rechecks inside each materializing
+transaction. Invalid UTF-8 and oversized subjects cannot skip this comparison.
+
+These are source-bound component results. Authority and crash-recovery repairs,
+combined local qualification, final independent review and exact hosted checks
+remain outstanding. All 1,926 requirement objects and prior states are preserved.
+
 ## Registry admission and remaining recovery repairs (October 10)
 
 The [component checkpoint](audits/registry-core-checkpoint-20261010.json) records
