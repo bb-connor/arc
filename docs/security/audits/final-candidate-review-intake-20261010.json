@@ -1,0 +1,1102 @@
+{
+  "schema": "chio.pr1160-final-candidate-review-intake.v1",
+  "observed_at": "2026-10-10T04:34:28.454741+00:00",
+  "draft_only": false,
+  "reviewed_candidate": "0c457859c6e715df75709490f3e3b4f5e2aee735",
+  "source_stage": "69475a4e9b75d4dda812f166b807ceb99d300614",
+  "scope": "Root-applied review intake: verified source/evidence hashes and preserved historical ledger objects. Startup is a repaired component; the combined candidate remains unqualified.",
+  "reports": {
+    "snapshot": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/hammer/final-snapshot-review-0c45.md",
+      "sha256": "2a891395ad3a9bff6c260fbc933774652dc460f789af497f3b13c11c8ab2e133",
+      "scope": "Source-only Claude snapshot review at0c; no runtime qualification."
+    },
+    "core": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/hammer/final-core-review-0c45.md",
+      "sha256": "c9397879c1beca256cbbf7b90f8c0fe9003689ff5d3de68af8339b3d24c73ef6",
+      "scope": "Source-only Claude core review at0c; no runtime/proof/hosted qualification."
+    },
+    "peer": {
+      "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/independent-review.md",
+      "sha256": "462b1364ac5a6dc3b5893c1305ddbb69a034bd838df92b6531ab90ddb1dd0ce8",
+      "scope": "Source/retained-evidence peer review at0c; no rerun or replacement of planner review."
+    }
+  },
+  "mailbox": {
+    "path": "/home/connor/lanes/pr1160-coord/to-claude.md",
+    "sha256": "46475887f6f3db8ea6508cb864387c8a92b251b0d1a6c5977a74f244fe6b6a29",
+    "rulings": [
+      {
+        "header": "2026-10-10T03:56:49.220497+00:00 codex (confirmed final-review P2; push held)",
+        "line": 4921,
+        "text": "## 2026-10-10T03:56:49.220497+00:00 codex (confirmed final-review P2; push held)\n\n- **FINAL-WALLET-QUEUED-EXPIRY (P2 introduced):** independent reviewer found now sampled before wallet ingress/registry spawn_blocking queues, then reused for entitlement/redemption. A token/code can expire during the newly introduced wait and still pass. I read the affected source and accept the defect.\n- Core helper owns an isolated new repair lane based0c457859c6: json_ingress wallet time and passport create/token/credential time checks plus regression tests. No stage writes; Original-first and strict required. No extra builds until current campaign releases slots.\n- Continue both read-only Claude review slices of0c457859c6 and send any other confirmed blockers. The source remains frozen for current tests, which will be retained as predecessor evidence; a revised candidate will include this repair before push.\n\n",
+        "sha256": "2e36d7ca42ab95d6da4cb724f1dad9d99af38704e51ebbea415ade11c617663b"
+      },
+      {
+        "header": "2026-10-10T03:57:56.681917+00:00 codex (four composed failures; Claude fixture lane assigned)",
+        "line": 4938,
+        "text": "## 2026-10-10T03:57:56.681917+00:00 codex (four composed failures; Claude fixture lane assigned)\n\n- Combined campaign terminal **FAILED** at0c457859c6: store334PASS/10ignored; CP340PASS/4FAIL,344exact selected,149.62s. Remaining targets and strict did not run. Keep campaign failed. Logs `/tmp/pr1160-final-review-20261009/final-candidate-v2/composed-0c457859c6/006-tests-02-runtime/output.log`, full pin/summary beside it.\n- **New Claude repair assignment FINAL-COMPOSITION-AUTHORITY-CONTROLS**, isolated branch from0c457859c6. Exact four files released in claims: authority_lifecycle.rs (`kg2_build_kernel_follows_both_import_paths_and_retains_receipt_evidence`), authority_replication.rs (`authority_replication_both_import_paths_reject_injected_issuer_and_kernel_denies_it`), governance_authority.rs (`confirmed_follower_trusts_only_the_admitted_set_and_never_signs_with_its_revoked_seed`), issuer_authority_binding.rs (`a_rotation_after_provisional_credential_construction_refuses_without_consuming_entitlement`).\n- First two refuse with elected-leader authority replication unresolved. Governance sync at882 refuses cluster context changed during inspection. Rotation refusal reached its final read-count assertion11 versus8; determine whether its pause7 still means genuinely post-construction, do not blindly increase8 or lose the intended temporal control. Prefer actual semantic fixture observation over brittle clock-count acceptance.\n- Diagnose production versus fixture effect before edits; preserve positive admission, injected-key rejection, retired-signer refusal and unchanged entitlement/registry checks. Need no new reproduction of already source-bound four failures, but retain exact regression controls and focused owning/strict. Ask before touching production beyond test seam if cause requires it.\n- Root active campaign has ended and build slots released. Wallet helper is preparing its own isolated P2 fix; any Claude builds use coder slot/private target/jobs2 and queue normally. Continue the exact-source read-only reviews independently; report early confirmed defects.\n\n",
+        "sha256": "ef00459291c82783ab9abbc82f1c6407187083225bf4e676e8d489d9f9e25cd6"
+      },
+      {
+        "header": "2026-10-10T04:00:21.601213+00:00 codex (accept FINAL12 startup ordering P1; Root owns)",
+        "line": 4946,
+        "text": "## 2026-10-10T04:00:21.601213+00:00 codex (accept FINAL12 startup ordering P1; Root owns)\n\n- Accepted **FINAL12-STARTUP-ORDER P1(I)** after reading serve_async_inner. Your diagnosis is correct: plain startup writes other co-located stores before cleanup. Root owns init.rs/init/tests.rs (claims recorded); expected-safe actual serve controls for budget/revocation/authority early refusal, database bytes unchanged, then earliest bounded cleanup before store opens. Direct helper and anchored contracts stay covered. No real host-disk exhaustion needed.\n- Exact0c100k control remains active. I will start test edits after it ends and the direct Root reviewer completes; planner and your reviews remain bound to their immutable0c checkouts. New repaired candidate will be identified separately; do not relabel0c accepted.\n- Planner review request acknowledged. Push remains held for queued-wallet P2, four composed control failures, this P1, and any further confirmed final-review blockers.\n\n",
+        "sha256": "136cfa9f46e5385881acbcf605c77dc64ad3a1d79c876d817849a24c2c0703ca"
+      },
+      {
+        "header": "2026-10-10T04:04:08.803210+00:00 codex (behavioral signer custody accepted; narrow repair assigned)",
+        "line": 4952,
+        "text": "## 2026-10-10T04:04:08.803210+00:00 codex (behavioral signer custody accepted; narrow repair assigned)\n\n- Choose option(a) for **FINAL-BEHAVIORAL-SIGNER-CUSTODY P2**. Existing loader is inherited, but silent replacement defeats the request-time custody contract and the source claim added here. Root verified both load-or-create seed and writable SQLite branches at policy_support.rs650. Do not merely narrow README wording.\n- Claude owns a narrow isolated Original-first repair of this loader and focused tests. Use existing-only seed and reviewed read-only SQLite resolver with actual live signer/custody binding. Inventory callers first so a CLI bootstrap use is separated from request loading if genuinely required. Keep any unmodified OID4VP durable signer follow-up distinct; do not claim it fixed.\n- Include missing seed/no file creation, missing SQLite/no database creation or schema writes, retained healthy signer, rotated/retired-custodian refusal, and at least one report-route loss plus subsequent issuance refusal. If route status inherits a different documented refusal code, explain exact mapping instead of forcing an unsupported503. Send design/proposed paths before production edits.\n- Snapshot terminal review received. Root retainsP3 seed-wait cadence/shutdown bound and sticky-parent availability as named residuals, no unrequested implementation. Root direct reviewer finished;0c stage source will unfreeze for Root startup-order tests after the cancelled100k attempt is preserved. Frozen0c checkout prepared for the correctly bounded100k run; planner/your reviews remain exact0c.\n\n",
+        "sha256": "63aa6a6d1b05a95650124f3ed38c868902771b2f99031cbb0d75cc0ac719f0ef"
+      },
+      {
+        "header": "2026-10-10T04:07:49.343923+00:00 codex (core P3 rulings; queued forwarded term needs Original)",
+        "line": 4959,
+        "text": "## 2026-10-10T04:07:49.343923+00:00 codex (core P3 rulings; queued forwarded term needs Original)\n\n- Both terminal review report hashes verified. **P3-2 is P2 if its source-supported oracle reproduces:** `validate_cluster_peer_auth` requires the forwarded term equal the active lease, but issue/rotate closures discard that forwarded context before the new worker wait. Re-election atN+2 must not turn a termN request into an admitted mutation merely because this node is again leader. Rechecking current leadership alone does not establish that request binding.\n- New Claude lane **FINAL-FORWARDED-TERM-AFTER-WAIT**: genuine barrier-driven Original for queued forwarded issue and rotate, healthy same-term controls and unchanged durable state on refusal. Reuse the existing auth/term validator after the wait, before mutation; do not invent a new unbound epoch field. authority_handlers.rs plus narrow test child are released. If existing inspect guard already captures and refuses the pre-wait term, report refutation and retain passing Original. No source guess/fix without this determination.\n- Other core P3s stay named residuals pending planner review: bounded signed-envelope freshness survives an unrelated failed lane; fail-closed403/inert lineage on late refusal; existing alias consensus membership. Generic-market refusal wording and registry-lane prose will be corrected by Root. No safety closure inferred for these residuals.\n\n",
+        "sha256": "d35aaa95ef4091bfa035494f96863ba893a9a4ab8b62fa2ec8220dd28de37548"
+      },
+      {
+        "header": "2026-10-10T04:13:41.540144+00:00 codex (startup Original correction; repair work continues)",
+        "line": 4965,
+        "text": "## 2026-10-10T04:13:41.540144+00:00 codex (startup Original correction; repair work continues)\n\n- FINAL12-STARTUP-ORDER first Root Original had2 genuine cleanup failures and2 earlier fixture-permission failures. The name-only runner initially overstated all4; retained REVIEW-CORRECTION.json beside that campaign. Fixture now sets its foreign SQLite database0600 and repeats unchanged production in startup-order-original-v2. No production change yet. All4 must reach cleanup assertion before GREEN.\n- Old33-thread reconciliation and separate newer-blocker scope delivered by helper. No GitHub thread resolved. Candidate still not ready; pending wallet, behavioral custody, forwarded-term Original, four composition controls, and planner final review.\n- Capacity100k rerun has an immutable0c checkout and copied pinned test binary,2700s bound; will overlap after Root startup focused qualification. Previous cancelled capacity run preserved, no pass claim.\n\n",
+        "sha256": "3505ad0241fd143bd2eefbd353f42db9a754fd75dc97ce52212edaab6011fa22"
+      },
+      {
+        "header": "2026-10-10T04:16:29.955242+00:00 codex (startup corrected Original terminal)",
+        "line": 4971,
+        "text": "## 2026-10-10T04:16:29.955242+00:00 codex (startup corrected Original terminal)\n\n- FINAL12-STARTUP-ORDER Original-v2 terminal2PASS4FAIL, all4 actual cleanup assertions after foreign-database refusal and unchanged bytes. Root read full log. Minimal early call now runs after transport preparation and before any startup store; anchored-only duplicate removed, standalone receipt helper retains its cleanup. GREEN running; stage source held until terminal.\n- Existing first Original remains mixed failure with explicit correction. Do not cite it as4 genuineRED. Corrected evidence directory `/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-original-v2`.\n\n",
+        "sha256": "75d0dde8a6bf8971dd7a950c4e42c187a8b02f8334e18a3ebb18be9653060cd5"
+      },
+      {
+        "header": "2026-10-10T04:20:42.139911+00:00 codex (startup repair integrated; frozen capacity running)",
+        "line": 4976,
+        "text": "## 2026-10-10T04:20:42.139911+00:00 codex (startup repair integrated; frozen capacity running)\n\n- FINAL12-STARTUP-ORDER committed **a7540e9b4c931a0c9ce5ebb8b24dd91691c9b93b** on stage. Corrected Original2PASS4genuineFAIL ->6PASS, zeroignored; format plusnegative/hygiene/clocks/trust gates allPASS/source-stable. Final owning strict and composed tests remain pending. init paths released, but coordinate before any future startup change.\n- Frozen0c100k component control running from copied verifiedbinary in separate immutablecheckout, bound2700s, directory `final-candidate-v2/capacity100k-frozen-0c457859c6`. Stage may now accept qualified producer commits without changing that runtime input.\n- Wallet helper retains first mixed Original (four genuine stale-time defects plus incorrect healthy pruning assertion); unchanged-production corrected Original now running before implementation.\n\n",
+        "sha256": "3e7b39370760d3fbfdd73cec03909563713eece132c9eb8c2860bd509f1b18ff"
+      },
+      {
+        "header": "2026-10-10T04:24:05.391576+00:00 codex (behavioral signer contract clarification before implementation)",
+        "line": 4987,
+        "text": "## 2026-10-10T04:24:05.391576+00:00 codex (behavioral signer contract clarification before implementation)\n\n- Caller review found explicit existing `underwriting_and_support_tests::behavioral_feed_signer_uses_local_db_seed_after_replica_snapshot` (underwriting_and_support.rs:1500): observational report signing deliberately uses the node-local key when replicated issuer head belongs elsewhere. `SqliteAuthorityInspection::local_keypair` documents the same follower contract. Do not turn the missing-seed fix into blanket leader/current-head-only report signing or blindly rewrite this positive control.\n- My earlier retired-custodian wording must distinguish an issuer assertion from node-local observational signing. Preserve legitimate report signer semantics while making request custody existing-only/no bootstrap writes. Any stronger admission/retirement change needs an explicit claim/caller contract and genuine expected-safe Original first. This narrows my earlier assignment on evidence, not the confirmed lost-seed blocker.\n- Existing attestation report tests use this helper for fixture provisioning; classify such caller setup explicitly. Production bootstrap belongs to an owner action, not the request helper. Please include actual clock-port design for a read-only SQLite resolver in the pending proposal; no untracked SystemClock allocation or clock-gate waiver.\n\n",
+        "sha256": "66e63aa260eeb76c60450e5ec0057b1370ad715262c3596f760b0700dc59bb8b"
+      }
+    ]
+  },
+  "findings": [
+    {
+      "finding_id": "FINAL12-STARTUP-ORDER",
+      "priority": "P1",
+      "classification": "introduced-composition-order",
+      "requirement": "Bounded abandoned-snapshot cleanup must run before any co-located startup store can open/write or refuse.",
+      "ledger_id": "incoming-pr1160-final-review-20261009:FINAL12-PREOPEN",
+      "new_id_needed": false,
+      "matched_existing_contract": "FINAL12-PREOPEN and V1160-FINAL-12 already own pre-open restart progress; expand exact current acceptance rather than duplicate history.",
+      "status": "repaired-component-final-qualification-open",
+      "repair_commit": "a7540e9b4c931a0c9ce5ebb8b24dd91691c9b93b",
+      "evidence": [
+        {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/hammer/final-snapshot-review-0c45.md",
+          "sha256": "2a891395ad3a9bff6c260fbc933774652dc460f789af497f3b13c11c8ab2e133",
+          "scope": "Source-only Claude snapshot review at0c; no runtime qualification."
+        },
+        {
+          "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-original/REVIEW-CORRECTION.json",
+          "sha256": "b63cb5626a49f0a0160a8f0c6516654f8e636e2a80437d7d3bc480858ee6c9d7",
+          "scope": "First Original name-only failure count was overstated:2 genuine cleanup failures and2 earlier fixture-permission failures."
+        },
+        {
+          "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-original-v2/003-tests-01-runtime/output.log",
+          "sha256": "502f8a0fca3c085b07fad716f028c560336128fedc6251a9248252e6c7675e1e",
+          "scope": null
+        },
+        {
+          "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-green/003-tests-01-runtime/output.log",
+          "sha256": "1b6be56a4e30afb54fb0cc47540b8c361797cdf7835e4998c3679b92735824aa",
+          "scope": null
+        },
+        {
+          "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-static/summary.json",
+          "sha256": "2c21097110f6734ba73c32e7a8e284bcb60f0cf8de54c6c400bed79918735e05",
+          "scope": null
+        }
+      ],
+      "remaining": [
+        "Owning CP alltargets strict and final composed runtime/strict remain pending.",
+        "Review startup repair delta and retain standalone/anchored cleanup contracts.",
+        "No100k, exact hosted, merge or release pass is inferred from these six controls."
+      ]
+    },
+    {
+      "finding_id": "FINAL-WALLET-QUEUED-EXPIRY",
+      "priority": "P2",
+      "classification": "introduced-time-before-worker-and-file-waits",
+      "requirement": "Wallet ingress and token/credential redemption must sample fresh trusted time after blocking-pool and registry-file waits before expiry-bearing validation or consumption.",
+      "ledger_id": "incoming-pr1160-final-review-20261009:FINAL-WALLET-QUEUED-EXPIRY",
+      "new_id_needed": true,
+      "matched_existing_contract": "No exact queued-expiry label exists. Related F047-WALLET-INGRESS-WORKER/F13-REVIEW-OFFERS are retained, not overwritten or treated as equivalent.",
+      "status": "confirmed-original-and-repair-qualification-open",
+      "evidence": [
+        {
+          "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/independent-review.md",
+          "sha256": "462b1364ac5a6dc3b5893c1305ddbb69a034bd838df92b6531ab90ddb1dd0ce8",
+          "scope": "Source/retained-evidence peer review at0c; no rerun or replacement of planner review."
+        },
+        {
+          "path": "/tmp/pr1160-wallet-clock-20261010/corrected-original-result.json",
+          "sha256": "69a43aa1f65c64f3c0c6562e1a6a08a7f6d1b1d185ef5ae7bbb28bf9003ececa",
+          "scope": "Corrected unchanged-production Original: healthy1PASS, four genuine stale-time failures; no repaired runtime pass."
+        },
+        {
+          "path": "/tmp/pr1160-wallet-clock-20261010/corrected-original-runtime.log",
+          "sha256": "f6a02f83311de1c6aadccb29a01f51aed244938e2f5acc184be1a6e130d6c085",
+          "scope": "Corrected unchanged-production Original: healthy1PASS, four genuine stale-time failures; no repaired runtime pass."
+        },
+        {
+          "path": "/tmp/pr1160-wallet-clock-20261010/corrected-original-source.json",
+          "sha256": "14b0fd1244ca05ad04dd47caee2ecee57176687eee6ee2e1f6c9968d53ce0567",
+          "scope": "Corrected unchanged-production Original: healthy1PASS, four genuine stale-time failures; no repaired runtime pass."
+        }
+      ],
+      "runtime_boundary": "Root verified corrected unchanged-production Original1PASS4genuineFAIL; first mixed Original remains retained. Repair source is frozen in its isolated producer lane; runtime/strict qualification and integration pending.",
+      "remaining": [
+        "Retain the mixed first Original and its fixture correction separately; qualify corrected expected-safe Original.",
+        "Queue barrier crosses expiry: token400, credential/middleware401, zero ingress body polls, no minted token/credential and unchanged consumption bytes.",
+        "Delayed file-read witness must defeat refresh-only-at-worker-start.",
+        "Keep entitlement before signer, fresh locked registry state, cancellation custody and all authority guards before durable commit.",
+        "Run owning, strict and final composed checks; retain separate existing component evidence."
+      ]
+    },
+    {
+      "finding_id": "FINAL-BEHAVIORAL-SIGNER-CUSTODY",
+      "priority": "P2",
+      "classification": "inherited-loader-introduced-service-wide-custody-claim",
+      "requirement": "Request-time behavioral-report key loading must be existing-only and read-only: no lost seed recreation, SQLite/database/schema bootstrap or unsafe custody acceptance.",
+      "ledger_id": "incoming-pr1160-final-review-20261009:F11-PLAIN-SEED-PROVISION",
+      "new_id_needed": false,
+      "matched_existing_contract": "F11-PLAIN-SEED-PROVISION already forbids request custody recreation; retain SQLite/read-only and all actual caller obligations explicitly.",
+      "status": "reopened-request-custody-bootstrap-repair-open",
+      "evidence": [
+        {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/hammer/final-core-review-0c45.md",
+          "sha256": "c9397879c1beca256cbbf7b90f8c0fe9003689ff5d3de68af8339b3d24c73ef6",
+          "scope": "Source-only Claude core review at0c; no runtime/proof/hosted qualification."
+        }
+      ],
+      "scope_clarification": "Existing behavioral_feed_signer_uses_local_db_seed_after_replica_snapshot and SqliteAuthorityInspection::local_keypair explicitly permit node-local observational signing on a follower. No blanket leader/live-head-only report requirement. A stronger retired-signer/admitted-head refusal needs a concrete authority claim/caller contract and genuine Original; this clarification does not close the missing-seed/bootstrap defect.",
+      "remaining": [
+        "Inventory production requests, any genuine owner/bootstrap use and attestation fixture provisioning before changing the helper.",
+        "Expected-safe missing-seed and missing-SQLite controls leave paths absent and schemas/bytes unchanged.",
+        "Report after seed loss refuses; subsequent capability issuance also refuses without replacement custody.",
+        "Preserve healthy node-local follower report signer after imported replica snapshot; separate issuer assertions from observational signing.",
+        "Use a reviewed existing read-only clock port without an untracked SystemClock or clock-gate waiver.",
+        "Any stronger live-head/retired-signer assertion requires concrete caller scope plus Original before implementation.",
+        "Preserve exact route-specific refusal mapping; do not force unsupported503.",
+        "OID4VP durable signer custody remains inherited first-after-landing and unclaimed.",
+        "Owning/strict/composed/review/hosted acceptance remain open."
+      ]
+    },
+    {
+      "finding_id": "FINAL-FORWARDED-TERM-AFTER-WAIT",
+      "priority": "P2",
+      "classification": "introduced-potential-forwarded-context-loss",
+      "requirement": "A forwarded termN authority issue/rotate request must not mutate at re-elected termN+2 after a blocking wait without revalidating that original forwarded context.",
+      "ledger_id": "incoming-pr1160-final-review-20261009:FINAL-FORWARDED-TERM-AFTER-WAIT",
+      "new_id_needed": true,
+      "matched_existing_contract": "No exact forwarded-term-after-wait label exists; existing issuer/signing/peer-identity repairs do not substitute for this request binding.",
+      "status": "expected-safe-original-pending-may-refute",
+      "evidence": [
+        {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/hammer/final-core-review-0c45.md",
+          "sha256": "c9397879c1beca256cbbf7b90f8c0fe9003689ff5d3de68af8339b3d24c73ef6",
+          "scope": "Source-only Claude core review at0c; no runtime/proof/hosted qualification."
+        }
+      ],
+      "grade_condition": "Claude graded plausible P3; Root regrades P2 only if the source-supported deterministic Original reproduces. Preserve a passing refutation if existing inspection already binds the pre-wait term.",
+      "remaining": [
+        "Barrier-driven queued issue and rotate Original crosses leadership away/backN+2; preserve healthy same-term controls.",
+        "Require exact409 term mismatch and unchanged durable state on refusal.",
+        "If confirmed, reuse existing forwarded auth/term validator after wait and before mutation; no new unbound epoch field.",
+        "If safely refused already, retain source/evidence-bound refutation rather than inventing a production fix.",
+        "Owning/strict/composed acceptance follows the actual disposition."
+      ]
+    },
+    {
+      "finding_id": "FINAL-COMPOSITION-AUTHORITY-CONTROLS",
+      "priority": "acceptance-obligation-not-yet-a-source-grade",
+      "classification": "four-source-bound-composed-runtime-failures",
+      "requirement": "Diagnose and qualify all four exact failed composed authority/issuer controls without weakening positive admission, forged/injected/retired signer refusal or post-construction no-persist oracles.",
+      "ledger_id": "incoming-pr1160-final-review-20261009:F11-REVIEW-P3-5",
+      "related_ledger_ids": [
+        "incoming-pr1160-final-review-20261009:FINAL-F11",
+        "incoming-pr1160-final-review-20261009:F11-PASSPORT-SIGNER"
+      ],
+      "new_id_needed": false,
+      "status": "composed-failed-production-or-fixture-diagnosis-open",
+      "evidence": [
+        {
+          "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/composed-0c457859c6/summary.json",
+          "sha256": "90c348b5efff838a5684a7f9094f559a41694234c8ad5f9cfcfb41e0b236c320",
+          "scope": null
+        },
+        {
+          "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/composed-0c457859c6/006-tests-02-runtime/output.log",
+          "sha256": "add08d4af021710d1e797c34a2693601b2f9e3185f96edccc10cb24cb4b5b83d",
+          "scope": "CP340PASS4FAIL at0c,344exact selected; remaining targets/strict did not run. Diagnosis is not assumed fixture-only."
+        }
+      ],
+      "failed_names": [
+        "trust_control::cluster_and_reports::cluster_and_reports_tests::authority_lifecycle::kg2_build_kernel_follows_both_import_paths_and_retains_receipt_evidence",
+        "trust_control::cluster_and_reports::cluster_and_reports_tests::authority_replication::authority_replication_both_import_paths_reject_injected_issuer_and_kernel_denies_it",
+        "trust_control::cluster_and_reports::cluster_and_reports_tests::authority_sync_isolation::governance_authority::confirmed_follower_trusts_only_the_admitted_set_and_never_signs_with_its_revoked_seed",
+        "trust_control::service_runtime::router::tests::public_authority_reads::issuer_authority_binding::a_rotation_after_provisional_credential_construction_refuses_without_consuming_entitlement"
+      ],
+      "remaining": [
+        "Diagnose production versus fixture before edits; four failures remain failed until new terminal evidence.",
+        "Keep positive admitted-source import and forged-issuer/injected-key/retired-signer controls.",
+        "Replace brittle11-versus8 read-count acceptance with an actual semantic post-construction observation if needed; do not bump the number or lose no-persist/entitlement checks.",
+        "Retain failed0c campaign: store334PASS10ignored, CP340PASS4FAIL/344selected; remaining targets/strict unrun.",
+        "Renew affected owning/strict and all final combined targets on the next frozen source."
+      ]
+    }
+  ],
+  "named_minor_residuals": [
+    {
+      "id": "FINAL12-SEED-WAIT-CADENCE",
+      "report": "snapshot/P3-1",
+      "priority": "P3",
+      "origin": "I",
+      "assessment": "benign timing direction; start sample can cause more reclamation, never authorization extension",
+      "existing_id": "incoming-pr1160-final-review-20261009:FINAL12-PREOPEN",
+      "status": "named-residual-no-new-implementation",
+      "remaining": "Disclose start-to-start30s cadence and possible bounded r2d2 shutdown delay; no new landing fix requested.",
+      "new_requirement_id_needed": false
+    },
+    {
+      "id": "FINAL12-STICKY-DATA-PARENT-AVAILABILITY",
+      "report": "snapshot/P3-2",
+      "priority": "P3",
+      "origin": "I/misconfigured-deployment",
+      "assessment": "pre-created fixed parent in a sticky writable data directory can cause typed persistent unavailable; no integrity effect",
+      "existing_id": "incoming-pr1160-final-review-20261009:FINAL12-PREOPEN",
+      "status": "named-deployment-availability-residual",
+      "remaining": "Keep custody refusal and document alongside existing/tmp fallback squatting. No per-user naming redesign claimed.",
+      "new_requirement_id_needed": false
+    },
+    {
+      "id": "AUTHORITY-AGREEMENT-ABORTED-ROUND-FRESHNESS",
+      "report": "core/P3-1",
+      "priority": "P3",
+      "origin": "I; follower siblingM",
+      "assessment": "plausible agreement retention through an unrelated early-aborted lane, bounded by signed envelope expiry300s",
+      "existing_id": "incoming-pr1160-final-review-20261009:F11-MAJORITY-AVAILABILITY",
+      "status": "named-residual-planner-disposition-pending",
+      "remaining": "No runtime/closure or unsafe extension beyond signed expiry inferred; preserve exact current term/history/custody checks.",
+      "new_requirement_id_needed": false
+    },
+    {
+      "id": "FEDERATED-REFUSAL-DOMAIN-AND-INERT-LINEAGE",
+      "report": "core/P3-3",
+      "priority": "P3",
+      "origin": "I; entry-time policy sampleM",
+      "assessment": "source-confirmed admission refusal can map403 and late refusal can leave an inert lineage row",
+      "existing_id": "incoming-pr1160-final-review-20261009:FINAL-F11",
+      "status": "named-fail-closed-and-persistence-residual",
+      "remaining": "Keep403/inert-lineage observation explicit; no503 mapping or rollback improvement is claimed, no returned authority inferred.",
+      "new_requirement_id_needed": false
+    },
+    {
+      "id": "GENERIC-MARKET-SIGNER-REFUSAL-WORDING",
+      "report": "core/P3-4",
+      "priority": "P3",
+      "origin": "I wording/refusal; M missing cluster admission",
+      "assessment": "listing now returns409 if local discovery signer does not own live head; broader inherited listing admission remains separate",
+      "existing_id": "incoming-pr1160-final-review-20261009:F11-REVIEW-P3-4",
+      "status": "documentation-corrected-69475-runtime-scope-unexpanded",
+      "remaining": "Correct README specific changed refusal, retain inherited generic-market cluster-admission gap; no new route guard requested by this draft.",
+      "new_requirement_id_needed": false
+    },
+    {
+      "id": "CONSENSUS-AND-BUDGET-ACK-URL-ALIASES",
+      "report": "core/P3-5",
+      "priority": "P3",
+      "origin": "M/operator-misconfiguration",
+      "assessment": "consensus membership/budget ack can count configured URL aliases; authority serving-evidence identity repair has narrower scope",
+      "existing_id": "incoming-pr1160-final-review-20261009:F11-PEER-IDENTITY-BINDING",
+      "status": "named-inherited-sibling-residual",
+      "remaining": "Do not call consensus alias deduplication repaired from authority serving-evidence checks. Separate future contract/oracle required.",
+      "new_requirement_id_needed": false
+    },
+    {
+      "id": "REGISTRY-TRANSACTION-PROSE",
+      "report": "peer/minor",
+      "priority": "P3/documentation",
+      "origin": "stale-current-contract",
+      "assessment": "process-global2 and deferred offer/policy statements contradict final service-owned2+2 and implemented transactions",
+      "existing_id": "incoming-pr1160-final-review-20261009:FINAL-F13",
+      "status": "documentation-corrected-69475-runtime-state-unpromoted",
+      "remaining": "Root committed corrected prose69475; preserve status/certify terminal reserve distinction and pending runtime qualification.",
+      "new_requirement_id_needed": false
+    }
+  ],
+  "declined_or_unverified": [
+    {
+      "id": "BLANKET-LEADER-ONLY-PASSPORT-REDEMPTION",
+      "disposition": "not-inferred/no-new-signer-finding",
+      "basis": "Actual key binds admitted head/live set and stable role/term/quorum context; capability-only signing_admission does not establish a passport blanket leader rule.",
+      "source": "peer/Declined; Root accepted no new signer finding"
+    },
+    {
+      "id": "NODE-LOCAL-OBSERVATIONAL-REPORT-SIGNER",
+      "disposition": "reasoned-caller-scope-clarification-not-defect-closure",
+      "basis": "Preserve documented follower local seed signing. No blanket live-head-only observational signing; stronger issuer assertions need concrete claim and Original.",
+      "source": "Root04:24:05 ruling; existing positive and local_keypair documentation"
+    },
+    {
+      "id": "UNBOUNDED-NATIVE-IDENTITY-BYTE-AND-ONE-RESTART-GUARANTEES",
+      "disposition": "outside-bounded-landing-contract",
+      "basis": "No enlarged cap, historical-state deletion, byte-completion or guaranteed one-restart orphan recovery accepted.",
+      "source": "peer/Declined; FINAL-F01/SEC-1160-COLDSTATE"
+    },
+    {
+      "id": "ANCHORED-PAGINATED-EXPORT-FORMAT",
+      "disposition": "explicit-protocol-followup",
+      "basis": "4096 checkpoint-prefix limit may permanently require full local export for recent history; no pagination/currentformat expansion.",
+      "source": "peer/Declined; existing F03 prefix-cap ruling"
+    },
+    {
+      "id": "MULTI-HOST-UNSUPPORTED-REGISTRY-WRITERS",
+      "disposition": "outside-same-host-Unix-contract",
+      "basis": "Cooperating same-host stable locks only; unsupported production writes refuse. No multi-host serialization claim.",
+      "source": "peer/Declined; registry contract"
+    },
+    {
+      "id": "SNAPSHOT-JOINT-OPEN-PREFLIGHT-AND-NETWORK-FS",
+      "disposition": "explicit-unverified/deployment-boundary",
+      "basis": "Snapshot reviewer did not verify joint-store write stamp or crash-time read-only preflight allocation. Cross-host SQLite sharing is unsupported; strict-ancestor deployment refusal is owner ruled.",
+      "source": "snapshot/Declined or unverified"
+    },
+    {
+      "id": "CORE-COSMETIC-AND-PORTABILITY-NOTES",
+      "disposition": "nonfindings/unverified",
+      "basis": "127.0.0.2/.3 local portability, long formatted match and test-clock contact/service-clock distinction not new landing runtime defects; operator rotation after seed loss is explicit owner action.",
+      "source": "core/Other notes"
+    },
+    {
+      "id": "FRESH-RUNTIME-100K-1M-10M-HOSTED-RELEASE",
+      "disposition": "not-executed-by-reviewers/no-acceptance",
+      "basis": "0c composed campaign failed; frozen100k ongoing separately, cancelled predecessor retained; no1m/10m, hosted, merge or release claim.",
+      "source": "all reviews; Root04:20:42"
+    }
+  ],
+  "startup_evidence": {
+    "first_mixed_Original": {
+      "summary": {
+        "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-original/summary.json",
+        "sha256": "643ec7242d26cc04d4ed9f98feb6afe6de6abb20d8310e2537b66f8e9f8d9e31",
+        "scope": "Retained exact campaign status; no relabeling of failures."
+      },
+      "status": "failed",
+      "source_stable": true,
+      "log": {
+        "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-original/003-tests-01-runtime/output.log",
+        "sha256": "bd96e28ce147439a8376c71dd5d5daa7d17b2fb2e3956a20aedcb56d606d70fd",
+        "scope": null
+      },
+      "named_tests": {
+        "trust_control::service_runtime::init::tests::snapshot_recovery::final12_anchored_startup_reclaims_before_receipt_store_open_can_refuse": "ok",
+        "trust_control::service_runtime::init::tests::snapshot_recovery::final12_plain_startup_reclaims_before_receipt_store_open_can_refuse": "ok",
+        "trust_control::service_runtime::init::tests::snapshot_recovery::final12_plain_serve_reclaims_before_budget_open_can_refuse": "FAILED",
+        "trust_control::service_runtime::init::tests::snapshot_recovery::final12_plain_serve_reclaims_before_joint_authority_open_can_refuse": "FAILED",
+        "trust_control::service_runtime::init::tests::snapshot_recovery::final12_plain_serve_reclaims_before_revocation_open_can_refuse": "FAILED",
+        "trust_control::service_runtime::init::tests::snapshot_recovery::final12_plain_serve_reclaims_before_authority_open_can_refuse": "FAILED"
+      },
+      "summaries": [
+        "test result: FAILED. 2 passed; 4 failed; 0 ignored; 0 measured; 1736 filtered out; finished in 0.14s"
+      ]
+    },
+    "correction": {
+      "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-original/REVIEW-CORRECTION.json",
+      "sha256": "b63cb5626a49f0a0160a8f0c6516654f8e636e2a80437d7d3bc480858ee6c9d7",
+      "scope": "First Original name-only failure count was overstated:2 genuine cleanup failures and2 earlier fixture-permission failures."
+    },
+    "corrected_Original": {
+      "summary": {
+        "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-original-v2/summary.json",
+        "sha256": "206536acff6eca060a6286b5940a2af1e86d74e173db7be449c6c9efd93b5913",
+        "scope": "Retained exact campaign status; no relabeling of failures."
+      },
+      "status": "failed",
+      "source_stable": true,
+      "log": {
+        "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-original-v2/003-tests-01-runtime/output.log",
+        "sha256": "502f8a0fca3c085b07fad716f028c560336128fedc6251a9248252e6c7675e1e",
+        "scope": null
+      },
+      "named_tests": {
+        "trust_control::service_runtime::init::tests::snapshot_recovery::final12_plain_startup_reclaims_before_receipt_store_open_can_refuse": "ok",
+        "trust_control::service_runtime::init::tests::snapshot_recovery::final12_anchored_startup_reclaims_before_receipt_store_open_can_refuse": "ok",
+        "trust_control::service_runtime::init::tests::snapshot_recovery::final12_plain_serve_reclaims_before_joint_authority_open_can_refuse": "FAILED",
+        "trust_control::service_runtime::init::tests::snapshot_recovery::final12_plain_serve_reclaims_before_revocation_open_can_refuse": "FAILED",
+        "trust_control::service_runtime::init::tests::snapshot_recovery::final12_plain_serve_reclaims_before_budget_open_can_refuse": "FAILED",
+        "trust_control::service_runtime::init::tests::snapshot_recovery::final12_plain_serve_reclaims_before_authority_open_can_refuse": "FAILED"
+      },
+      "summaries": [
+        "test result: FAILED. 2 passed; 4 failed; 0 ignored; 0 measured; 1736 filtered out; finished in 0.19s"
+      ],
+      "source_before": {
+        "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-original-v2/003-tests-01-runtime/source-before.json",
+        "sha256": "de2d1d46dab6a0e7d048e94e7cfeaa13ee653f55caaaf63866920c4b0e7b0415",
+        "scope": null
+      },
+      "tested_head": "0c457859c6e715df75709490f3e3b4f5e2aee735",
+      "tested_dirty_paths": [
+        "crates/platform/chio-control-plane/src/trust_control/service_runtime/init/tests.rs"
+      ],
+      "tested_init_hashes": {
+        "crates/platform/chio-control-plane/src/trust_control/service_runtime/init.rs": {
+          "content_sha256": "eba20efab1af9853ab6b29f4c0bb1e57d8652a4c0fbf46434979aae288537ff0",
+          "kind": "file",
+          "mode": 436
+        },
+        "crates/platform/chio-control-plane/src/trust_control/service_runtime/init/tests.rs": {
+          "content_sha256": "902aeaabbb25a7549fb000d815a21b1e61aa62304e64a6db8f050e0f24bf6a26",
+          "kind": "file",
+          "mode": 436
+        }
+      }
+    },
+    "GREEN": {
+      "summary": {
+        "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-green/summary.json",
+        "sha256": "5027ee623d285f3b3987916c839e1d8855f8b6f989d77d733abcf4b4a1bc1582",
+        "scope": "Retained exact campaign status; no relabeling of failures."
+      },
+      "status": "terminal_pass",
+      "source_stable": true,
+      "log": {
+        "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-green/003-tests-01-runtime/output.log",
+        "sha256": "1b6be56a4e30afb54fb0cc47540b8c361797cdf7835e4998c3679b92735824aa",
+        "scope": null
+      },
+      "named_tests": {
+        "trust_control::service_runtime::init::tests::snapshot_recovery::final12_anchored_startup_reclaims_before_receipt_store_open_can_refuse": "ok",
+        "trust_control::service_runtime::init::tests::snapshot_recovery::final12_plain_serve_reclaims_before_joint_authority_open_can_refuse": "ok",
+        "trust_control::service_runtime::init::tests::snapshot_recovery::final12_plain_serve_reclaims_before_authority_open_can_refuse": "ok",
+        "trust_control::service_runtime::init::tests::snapshot_recovery::final12_plain_startup_reclaims_before_receipt_store_open_can_refuse": "ok",
+        "trust_control::service_runtime::init::tests::snapshot_recovery::final12_plain_serve_reclaims_before_budget_open_can_refuse": "ok",
+        "trust_control::service_runtime::init::tests::snapshot_recovery::final12_plain_serve_reclaims_before_revocation_open_can_refuse": "ok"
+      },
+      "summaries": [
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 1736 filtered out; finished in 0.19s"
+      ],
+      "source_before": {
+        "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-green/003-tests-01-runtime/source-before.json",
+        "sha256": "c8b376a2a36b53b4bb65a344aae5f61d2ff50d3e30a5ad744a12c0f75d19b319",
+        "scope": null
+      },
+      "tested_head": "0c457859c6e715df75709490f3e3b4f5e2aee735",
+      "tested_dirty_paths": [
+        "crates/platform/chio-control-plane/src/trust_control/service_runtime/init.rs",
+        "crates/platform/chio-control-plane/src/trust_control/service_runtime/init/tests.rs"
+      ],
+      "tested_init_hashes": {
+        "crates/platform/chio-control-plane/src/trust_control/service_runtime/init.rs": {
+          "content_sha256": "187d2c8f7b8e2de4d99e1f7f492830e2c9b29f86a378b08c3e088bbcdbdb60f6",
+          "kind": "file",
+          "mode": 436
+        },
+        "crates/platform/chio-control-plane/src/trust_control/service_runtime/init/tests.rs": {
+          "content_sha256": "902aeaabbb25a7549fb000d815a21b1e61aa62304e64a6db8f050e0f24bf6a26",
+          "kind": "file",
+          "mode": 436
+        }
+      }
+    },
+    "static_summary": {
+      "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-static/summary.json",
+      "sha256": "2c21097110f6734ba73c32e7a8e284bcb60f0cf8de54c6c400bed79918735e05",
+      "scope": null
+    },
+    "static_checks": [
+      {
+        "argv": [
+          "cargo",
+          "fmt",
+          "--all",
+          "--",
+          "--check"
+        ],
+        "exit": 0,
+        "log": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-static/01.log",
+        "seconds": 28.968531001824886,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "source_stable": true
+      },
+      {
+        "argv": [
+          "python3",
+          "scripts/check-negative-assertions.py"
+        ],
+        "exit": 0,
+        "log": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-static/02.log",
+        "seconds": 1.2742478977888823,
+        "sha256": "80670f9100bb3c709e4d3cdf5b892da20bcd2bb9b64b6c7807fb3ec713ff3db4",
+        "source_stable": true
+      },
+      {
+        "argv": [
+          "python3",
+          "scripts/check-rust-file-hygiene.py"
+        ],
+        "exit": 0,
+        "log": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-static/03.log",
+        "seconds": 4.466274789068848,
+        "sha256": "e59547612a01174df54ba921430ca8f3bd39725a6681e5ea4cbf6e15c1a921df",
+        "source_stable": true
+      },
+      {
+        "argv": [
+          "python3",
+          "scripts/check-security-clocks.py"
+        ],
+        "exit": 0,
+        "log": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-static/04.log",
+        "seconds": 29.127338496036828,
+        "sha256": "bd324fbc2aec503258f82917613ce9aeff2296a2cce36fc0e6f3285bcf158bd9",
+        "source_stable": true
+      },
+      {
+        "argv": [
+          "python3",
+          "scripts/check-trust-boundaries.py"
+        ],
+        "exit": 0,
+        "log": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-static/05.log",
+        "seconds": 94.67876542219892,
+        "sha256": "c628712fe748ea911c9c54686a531283f34645391d0322c6321ebe4f513dcf69",
+        "source_stable": true
+      }
+    ],
+    "commit": "a7540e9b4c931a0c9ce5ebb8b24dd91691c9b93b",
+    "committed_two_file_bytes_match_tested_GREEN": true,
+    "qualification_boundary": "GREEN ran at0c+dirty2 overlay whose exact bytes becamea754; no terminal exact-a754 full owning/composed qualification yet. No real disk-full or100k result inferred."
+  },
+  "composition_failure": {
+    "summary": {
+      "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/composed-0c457859c6/summary.json",
+      "sha256": "90c348b5efff838a5684a7f9094f559a41694234c8ad5f9cfcfb41e0b236c320",
+      "scope": null
+    },
+    "cp_log": {
+      "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/composed-0c457859c6/006-tests-02-runtime/output.log",
+      "sha256": "add08d4af021710d1e797c34a2693601b2f9e3185f96edccc10cb24cb4b5b83d",
+      "scope": "CP340PASS4FAIL at0c,344exact selected; remaining targets/strict did not run. Diagnosis is not assumed fixture-only."
+    },
+    "failed_names": [
+      "trust_control::cluster_and_reports::cluster_and_reports_tests::authority_lifecycle::kg2_build_kernel_follows_both_import_paths_and_retains_receipt_evidence",
+      "trust_control::cluster_and_reports::cluster_and_reports_tests::authority_replication::authority_replication_both_import_paths_reject_injected_issuer_and_kernel_denies_it",
+      "trust_control::cluster_and_reports::cluster_and_reports_tests::authority_sync_isolation::governance_authority::confirmed_follower_trusts_only_the_admitted_set_and_never_signs_with_its_revoked_seed",
+      "trust_control::service_runtime::router::tests::public_authority_reads::issuer_authority_binding::a_rotation_after_provisional_credential_construction_refuses_without_consuming_entitlement"
+    ],
+    "store_pass": 334,
+    "store_ignored": 10,
+    "cp_pass": 340,
+    "cp_fail": 4,
+    "cp_selected": 344,
+    "remaining_targets_and_strict_ran": false,
+    "fixture_only_assumed": false
+  },
+  "source_pins": {
+    "crates/platform/chio-control-plane/src/trust_control/service_runtime/init.rs": {
+      "review_sha256": "eba20efab1af9853ab6b29f4c0bb1e57d8652a4c0fbf46434979aae288537ff0",
+      "stage_sha256": "187d2c8f7b8e2de4d99e1f7f492830e2c9b29f86a378b08c3e088bbcdbdb60f6",
+      "stage_git_blob": "600e06e14f6103ac1964516fe32281b1d392c8c0"
+    },
+    "crates/platform/chio-control-plane/src/trust_control/service_runtime/init/tests.rs": {
+      "review_sha256": "bcae27a99685c9243bfe32cf5e6685fa395f242802fb13ba6dd898d3ef93decf",
+      "stage_sha256": "902aeaabbb25a7549fb000d815a21b1e61aa62304e64a6db8f050e0f24bf6a26",
+      "stage_git_blob": "218624be076ed3d0c7e2074dfadfde3013e2edc0"
+    },
+    "crates/platform/chio-control-plane/src/trust_control/json_ingress.rs": {
+      "review_sha256": "446903208f4b16b59c140c04b3b0ed5329ab022a5881c04683421e744a3fcd3c",
+      "stage_sha256": "446903208f4b16b59c140c04b3b0ed5329ab022a5881c04683421e744a3fcd3c",
+      "stage_git_blob": "608b9437e94ec0f6368100afb85f6e25697a5017"
+    },
+    "crates/platform/chio-control-plane/src/trust_control/passport_handlers.rs": {
+      "review_sha256": "f9eb87960dfbf8da32b8474fea23e550e4c49f99c348d2649280c7eeda794133",
+      "stage_sha256": "f9eb87960dfbf8da32b8474fea23e550e4c49f99c348d2649280c7eeda794133",
+      "stage_git_blob": "f8cd0686ed16d6aa024ae203203efa5bc43bf504"
+    },
+    "crates/platform/chio-control-plane/src/trust_control/service_types/blocking.rs": {
+      "review_sha256": "024d10112a0057d09e2a24cc1e8a775a7b5c6e6d98fa0707fb1191ea788be92e",
+      "stage_sha256": "024d10112a0057d09e2a24cc1e8a775a7b5c6e6d98fa0707fb1191ea788be92e",
+      "stage_git_blob": "500c4cc15f8bb21c6132ae6c4156268ef391dd4f"
+    },
+    "crates/platform/chio-control-plane/src/trust_control/underwriting_and_support/policy_support.rs": {
+      "review_sha256": "ed23364647c7c350be2fc725004f9bbd87dbcf4e9a207a015624741790f454e0",
+      "stage_sha256": "ed23364647c7c350be2fc725004f9bbd87dbcf4e9a207a015624741790f454e0",
+      "stage_git_blob": "26fd1e14018441c26a03b69b2e4bb94a1824ac72"
+    },
+    "crates/platform/chio-control-plane/src/trust_control/underwriting_and_support.rs": {
+      "review_sha256": "c250e3a1bbeb29d0c5c314015b2067d29a890b520409434366500fa7486475d5",
+      "stage_sha256": "c250e3a1bbeb29d0c5c314015b2067d29a890b520409434366500fa7486475d5",
+      "stage_git_blob": "869f8aa0190a951f6645d48ebf501fc9976390c9"
+    },
+    "crates/platform/chio-store-sqlite/src/authority/read_only.rs": {
+      "review_sha256": "8b638e3a1569d25e410c8e726e1a7bb456232f3cc50378a01e62642d9ef19e73",
+      "stage_sha256": "8b638e3a1569d25e410c8e726e1a7bb456232f3cc50378a01e62642d9ef19e73",
+      "stage_git_blob": "1fee1fefae745266ee773190db40478f5805f468"
+    },
+    "crates/platform/chio-control-plane/src/trust_control/authority_handlers.rs": {
+      "review_sha256": "d4d365fbc3aa0209b6b367f616fb14ea0690e7dd6c8834f4674c5eee19127786",
+      "stage_sha256": "d4d365fbc3aa0209b6b367f616fb14ea0690e7dd6c8834f4674c5eee19127786",
+      "stage_git_blob": "95eb1e651b1997491ee0979a5917577e0938e392"
+    },
+    "crates/platform/chio-control-plane/src/trust_control/authority_admission.rs": {
+      "review_sha256": "a2d5dec577f15aedccd3740f0a341f31e2822784e11c357356d5d82249f4f75e",
+      "stage_sha256": "a2d5dec577f15aedccd3740f0a341f31e2822784e11c357356d5d82249f4f75e",
+      "stage_git_blob": "ae32477953cead420640c1e0ae9907ff7b53c01a"
+    },
+    "crates/platform/chio-control-plane/src/trust_control/cluster/deltas.rs": {
+      "review_sha256": "8dc112a2885b78ca7bfd7624f70678c920c56b4cca31516d7693e1129116281d",
+      "stage_sha256": "8dc112a2885b78ca7bfd7624f70678c920c56b4cca31516d7693e1129116281d",
+      "stage_git_blob": "723a5783962e221242d1f4f2bbffad44b816b284"
+    },
+    "crates/platform/chio-control-plane/src/trust_control/cluster/consensus.rs": {
+      "review_sha256": "7fbe9d0069960d3c4837b2bb105fb085a44dff5fe98c1425e9f1dcb1f20ca1b3",
+      "stage_sha256": "7fbe9d0069960d3c4837b2bb105fb085a44dff5fe98c1425e9f1dcb1f20ca1b3",
+      "stage_git_blob": "33d7157c66e326e117298e0607ce98b05997780d"
+    },
+    "crates/platform/chio-control-plane/src/trust_control/config_and_public/generic_listing.rs": {
+      "review_sha256": "b6212464e4a309de36b1a1eb575ea6110ee52ccf38530fc8726cdc0afde6be1f",
+      "stage_sha256": "b6212464e4a309de36b1a1eb575ea6110ee52ccf38530fc8726cdc0afde6be1f",
+      "stage_git_blob": "b4cc6fe3886c5c8f01fadea6051e414e27271d07"
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service/seed_wait.rs": {
+      "review_sha256": "287acf26483a9028eb111d53500383253d6615d7c4507ff3d4d11c620f2fb66c",
+      "stage_sha256": "287acf26483a9028eb111d53500383253d6615d7c4507ff3d4d11c620f2fb66c",
+      "stage_git_blob": "bb8edc2cfe85465f81b49d1f432648434bc19bc2"
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_query_snapshot_backing/directory.rs": {
+      "review_sha256": "bc7c0691ed7771f0a0c5648e23e0b0ed8b6a693c12638cb507bb7679852403f7",
+      "stage_sha256": "bc7c0691ed7771f0a0c5648e23e0b0ed8b6a693c12638cb507bb7679852403f7",
+      "stage_git_blob": "20f7a420caa857910e575b6a0ac6e5b9d20c62be"
+    }
+  },
+  "evidence_pins": {
+    "/home/connor/lanes/claude-pr1160-evidence/hammer/final-snapshot-review-0c45.md": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/hammer/final-snapshot-review-0c45.md",
+      "sha256": "2a891395ad3a9bff6c260fbc933774652dc460f789af497f3b13c11c8ab2e133",
+      "scope": "Source-only Claude snapshot review at0c; no runtime qualification."
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/hammer/final-core-review-0c45.md": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/hammer/final-core-review-0c45.md",
+      "sha256": "c9397879c1beca256cbbf7b90f8c0fe9003689ff5d3de68af8339b3d24c73ef6",
+      "scope": "Source-only Claude core review at0c; no runtime/proof/hosted qualification."
+    },
+    "/tmp/pr1160-final-review-20261009/final-candidate-v2/independent-review.md": {
+      "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/independent-review.md",
+      "sha256": "462b1364ac5a6dc3b5893c1305ddbb69a034bd838df92b6531ab90ddb1dd0ce8",
+      "scope": "Source/retained-evidence peer review at0c; no rerun or replacement of planner review."
+    },
+    "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-original/REVIEW-CORRECTION.json": {
+      "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-original/REVIEW-CORRECTION.json",
+      "sha256": "b63cb5626a49f0a0160a8f0c6516654f8e636e2a80437d7d3bc480858ee6c9d7",
+      "scope": "First Original name-only failure count was overstated:2 genuine cleanup failures and2 earlier fixture-permission failures."
+    },
+    "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-original/summary.json": {
+      "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-original/summary.json",
+      "sha256": "643ec7242d26cc04d4ed9f98feb6afe6de6abb20d8310e2537b66f8e9f8d9e31",
+      "scope": "Retained exact campaign status; no relabeling of failures."
+    },
+    "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-original/003-tests-01-runtime/output.log": {
+      "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-original/003-tests-01-runtime/output.log",
+      "sha256": "bd96e28ce147439a8376c71dd5d5daa7d17b2fb2e3956a20aedcb56d606d70fd",
+      "scope": null
+    },
+    "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-original-v2/summary.json": {
+      "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-original-v2/summary.json",
+      "sha256": "206536acff6eca060a6286b5940a2af1e86d74e173db7be449c6c9efd93b5913",
+      "scope": "Retained exact campaign status; no relabeling of failures."
+    },
+    "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-original-v2/003-tests-01-runtime/output.log": {
+      "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-original-v2/003-tests-01-runtime/output.log",
+      "sha256": "502f8a0fca3c085b07fad716f028c560336128fedc6251a9248252e6c7675e1e",
+      "scope": null
+    },
+    "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-original-v2/003-tests-01-runtime/source-before.json": {
+      "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-original-v2/003-tests-01-runtime/source-before.json",
+      "sha256": "de2d1d46dab6a0e7d048e94e7cfeaa13ee653f55caaaf63866920c4b0e7b0415",
+      "scope": null
+    },
+    "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-green/summary.json": {
+      "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-green/summary.json",
+      "sha256": "5027ee623d285f3b3987916c839e1d8855f8b6f989d77d733abcf4b4a1bc1582",
+      "scope": "Retained exact campaign status; no relabeling of failures."
+    },
+    "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-green/003-tests-01-runtime/output.log": {
+      "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-green/003-tests-01-runtime/output.log",
+      "sha256": "1b6be56a4e30afb54fb0cc47540b8c361797cdf7835e4998c3679b92735824aa",
+      "scope": null
+    },
+    "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-green/003-tests-01-runtime/source-before.json": {
+      "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-green/003-tests-01-runtime/source-before.json",
+      "sha256": "c8b376a2a36b53b4bb65a344aae5f61d2ff50d3e30a5ad744a12c0f75d19b319",
+      "scope": null
+    },
+    "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-static/summary.json": {
+      "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-static/summary.json",
+      "sha256": "2c21097110f6734ba73c32e7a8e284bcb60f0cf8de54c6c400bed79918735e05",
+      "scope": null
+    },
+    "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-static/01.log": {
+      "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-static/01.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "scope": "Startup component static check; not owning Clippy/composed acceptance."
+    },
+    "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-static/02.log": {
+      "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-static/02.log",
+      "sha256": "80670f9100bb3c709e4d3cdf5b892da20bcd2bb9b64b6c7807fb3ec713ff3db4",
+      "scope": "Startup component static check; not owning Clippy/composed acceptance."
+    },
+    "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-static/03.log": {
+      "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-static/03.log",
+      "sha256": "e59547612a01174df54ba921430ca8f3bd39725a6681e5ea4cbf6e15c1a921df",
+      "scope": "Startup component static check; not owning Clippy/composed acceptance."
+    },
+    "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-static/04.log": {
+      "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-static/04.log",
+      "sha256": "bd324fbc2aec503258f82917613ce9aeff2296a2cce36fc0e6f3285bcf158bd9",
+      "scope": "Startup component static check; not owning Clippy/composed acceptance."
+    },
+    "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-static/05.log": {
+      "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-order-static/05.log",
+      "sha256": "c628712fe748ea911c9c54686a531283f34645391d0322c6321ebe4f513dcf69",
+      "scope": "Startup component static check; not owning Clippy/composed acceptance."
+    },
+    "/tmp/pr1160-final-review-20261009/final-candidate-v2/composed-0c457859c6/summary.json": {
+      "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/composed-0c457859c6/summary.json",
+      "sha256": "90c348b5efff838a5684a7f9094f559a41694234c8ad5f9cfcfb41e0b236c320",
+      "scope": null
+    },
+    "/tmp/pr1160-final-review-20261009/final-candidate-v2/composed-0c457859c6/006-tests-02-runtime/output.log": {
+      "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/composed-0c457859c6/006-tests-02-runtime/output.log",
+      "sha256": "add08d4af021710d1e797c34a2693601b2f9e3185f96edccc10cb24cb4b5b83d",
+      "scope": "CP340PASS4FAIL at0c,344exact selected; remaining targets/strict did not run. Diagnosis is not assumed fixture-only."
+    }
+  },
+  "preserved_existing_residual_states": {
+    "incoming-pr1160-final-qualification-20261009:KANI-PROOF-QUAL": {
+      "requirement_id": "incoming-pr1160-final-qualification-20261009:KANI-PROOF-QUAL",
+      "label": "KANI-PROOF-QUAL",
+      "scope": "postmerge",
+      "landing_pr": 1160,
+      "landing_unit": "foundation",
+      "current_state": "owner-accepted-open-unproved-landing-residual",
+      "source_repair": null,
+      "verification_evidence": [
+        {
+          "path": "docs/security/audits/kani-open-residual-20261009.json",
+          "sha256": "1c7050fec326ecfdada784e791661d22e7b21083ff716512a8018823817fd912",
+          "scope": "Owner acceptance amendment, unchanged proof source and honest residual reporting; not proof completion or hosted qualification."
+        },
+        {
+          "path": "docs/security/audits/residual-review-dispositions-20261009.json",
+          "sha256": "9012cf860bfd873f4602581402e7a675e0d3a5fab0a7d053d5e5441bd55067b5",
+          "source_commit": "e46fc51fc7281b9095e9b080cd389c82d3bcac73",
+          "scope": "Source-bound reporting, scope and fixture controls; no proof campaign or hosted qualification."
+        }
+      ],
+      "remaining_acceptance": [
+        "KANI-ATTEST-DECOMP P1 in the swarm store owns a reviewed feasible postmerge decomposition of the complete domain, assertions and completion witness.",
+        "No release claim, including D8 previews under ADR-0011, may state or rely on this unproved obligation.",
+        "Explicitly distinguish the retained P-256 fixture domain from production Ed25519 kernel-key binding; any new production-domain harness requires separate reviewed source and completed evidence."
+      ],
+      "merged": false,
+      "full_qualified": false,
+      "proof_passed": false,
+      "followup_id": "KANI-ATTEST-DECOMP",
+      "observed_source_head": "b830fb0f8965dfd4a961cec4cfd540dee8fe9b08",
+      "reconciled_at_source": "e46fc51fc7281b9095e9b080cd389c82d3bcac73"
+    },
+    "incoming-pr1160-final-review-20261009:SEC-1160-COLDSTATE": {
+      "requirement_id": "incoming-pr1160-final-review-20261009:SEC-1160-COLDSTATE",
+      "label": "SEC-1160-COLDSTATE",
+      "scope": "later",
+      "landing_pr": 1160,
+      "landing_unit": "foundation",
+      "current_state": "OPEN-owner-approved-postfoundation-preview-blocker",
+      "source_repair": null,
+      "verification_evidence": [
+        {
+          "path": "docs/security/audits/bounded-capacity-owner-amendment-20261009.json",
+          "sha256": "ac0b82b5b20f94d157aa22c2879fa3c4b4aa4f5a5b2cca020fff72c264486251",
+          "source_commit": "880dc3dcf541c2a4647917cca237b85d98ccf598",
+          "scope": "Verified owner decision0020; OPEN cold-state residual gates outside-team preview, bounded repairs still required for landing."
+        }
+      ],
+      "remaining_acceptance": [
+        "Owner decision0020; implement and qualify before G5 outside-team preview, not on this foundation landing branch.",
+        "Separate source-bound implementation/review/qualification; no current repair or release acceptance is claimed."
+      ],
+      "merged": false,
+      "full_qualified": false,
+      "observed_source_head": "880dc3dcf541c2a4647917cca237b85d98ccf598"
+    },
+    "incoming-pr1160-final-review-20261009:FINAL-F01": {
+      "requirement_id": "incoming-pr1160-final-review-20261009:FINAL-F01",
+      "label": "FINAL-F01",
+      "scope": "now",
+      "landing_pr": 1160,
+      "landing_unit": "foundation",
+      "current_state": "bounded-component-repaired-native-renewed-coldstate-open",
+      "source_repair": {
+        "commits": [
+          "0556a77025f09590307803271ae632706e473936",
+          "f69b01465aa99c9d31afe7dbd5a90c93e206b4f0",
+          "b5389d25f0020b9cc4ea27322b8f1b382da8e990",
+          "99f7c7eb2656fb3aa15ed51592df9107dd2400d0",
+          "353890c503c525354790b360fe7c8e98448a45e5",
+          "01c9cccf1ab148998fa4c3ced1cc4c3d8b711fbb",
+          "799b33d666528f304bf1cd6be13281e595a2335a",
+          "4035d4dd1ac2cd44149de66843790174739cf853"
+        ],
+        "observed_source_head": "6c849c20320b252b7be0b68c710fa66115ae2f82",
+        "observed_source_tree": "d1297d581fd7bb25c701df1dd826d5b2eb8ef541",
+        "files": [
+          "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs",
+          "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint.rs",
+          "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/compaction.rs",
+          "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/mutations.rs",
+          "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/write.rs",
+          "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/storage.rs",
+          "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/security_participant_state/egress.rs",
+          "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/security_participant_state/egress/retention.rs",
+          "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/security_participant_state/egress/session_capacity.rs",
+          "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/security_participant_state/egress/session_churn.rs",
+          "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/security_participant_state/mutations.rs",
+          "crates/platform/chio-store-sqlite/src/security_state.rs",
+          "crates/platform/chio-store-sqlite/src/security_state/flow_state.rs",
+          "crates/platform/chio-store-sqlite/src/security_state/flow_state/labels.rs",
+          "crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs",
+          "crates/platform/chio-store-sqlite/src/security_state/scoped_sql/flow/labels.rs",
+          "crates/platform/chio-store-sqlite/tests/native_authority_binding.rs",
+          "crates/platform/chio-store-sqlite/tests/native_authority_binding/lineage_observation.rs"
+        ]
+      },
+      "verification_evidence": [
+        {
+          "path": "docs/security/audits/final-capacity-acceptance-20261009.json",
+          "sha256": "648f732aa906028702aaa57b65d1a5a3ab20f4976b31ee7ea0d5281b0dd818fa",
+          "source_commit": "47dfc045ab52f2b714c088926dacd08efaebbfd3",
+          "scope": "Open capacity acceptance, confirmed kernel-path Original failure and separate source-only concurrent registry finding; no completed source repair claim."
+        },
+        {
+          "path": "docs/security/audits/bounded-capacity-owner-amendment-20261009.json",
+          "sha256": "ac0b82b5b20f94d157aa22c2879fa3c4b4aa4f5a5b2cca020fff72c264486251",
+          "source_commit": "880dc3dcf541c2a4647917cca237b85d98ccf598",
+          "scope": "Verified owner decision0020; OPEN cold-state residual gates outside-team preview, bounded repairs still required for landing."
+        },
+        {
+          "path": "docs/security/audits/readiness-followons-20261010.json",
+          "sha256": "60f82b821894b46c823c7f88f9972333384da657ea284f693caa77df8db1b5de",
+          "source_commit": "6c849c20320b252b7be0b68c710fa66115ae2f82",
+          "scope": "Component source and retained failures;80 native renewal passes, registry and governance producer evidence, seven new current obligations and two inherited observations. No final candidate or hosted qualification."
+        }
+      ],
+      "remaining_acceptance": [
+        "SEC-1160-COLDSTATE remains OPEN P1 and gates G5 under owner0020; global row and byte reservations are distinct.",
+        "Retain earlier full202PASS3FAIL; renewed5affected+75contracts is not full205 rerun.",
+        "Exact final composed candidate independent review.",
+        "Four exact protected hosted checks and normal protected merge."
+      ],
+      "merged": false,
+      "full_qualified": false,
+      "observed_source_head": "6c849c20320b252b7be0b68c710fa66115ae2f82",
+      "acceptance_ruling": "Owner decision0020 authorizes bounded landing. Cold state remains a P1 preview blocker, outside this landing branch."
+    },
+    "incoming-pr1160-final-review-20261009:OID4VP-SIGNER-CUSTODY": {
+      "requirement_id": "incoming-pr1160-final-review-20261009:OID4VP-SIGNER-CUSTODY",
+      "label": "OID4VP-SIGNER-CUSTODY",
+      "scope": "later",
+      "landing_pr": null,
+      "landing_unit": "security-follow-ups",
+      "current_state": "inherited-first-after-landing",
+      "source_repair": null,
+      "verification_evidence": [
+        {
+          "path": "docs/security/audits/readiness-followons-20261010.json",
+          "sha256": "60f82b821894b46c823c7f88f9972333384da657ea284f693caa77df8db1b5de",
+          "source_commit": "6c849c20320b252b7be0b68c710fa66115ae2f82",
+          "scope": "Component source and retained failures;80 native renewal passes, registry and governance producer evidence, seven new current obligations and two inherited observations. No final candidate or hosted qualification."
+        },
+        {
+          "path": "docs/security/audits/registry-core-checkpoint-20261010.json",
+          "sha256": "e99af3690b5ec099b24cc025cb247e9677712a1dce0b32328b90ffd4ab1c14f5",
+          "source_commit": "31fd1290756d16a2cdee0fda16bb2f5e40fb4d52",
+          "scope": "Registry/wallet component40focused+680parallel+32CLI and strict; composed reader inventory; authority and crash Originals. No final candidate or hosted qualification."
+        }
+      ],
+      "remaining_acceptance": [
+        "Genuine expected-safe Original for the inherited signing/publication/retrieval boundary.",
+        "Admission and custody checks must cover durable publication and retrieval without postcommit definitive refusal.",
+        "First-after-landing repair and full owning verification.",
+        "Implement immutable post-landing signer plan against LANDING HEAD with current-source clock seams and real cluster control; separately grade public verifier-store, native-clock and static-lane source observations."
+      ],
+      "merged": false,
+      "full_qualified": false,
+      "observed_source_head": "31fd1290756d16a2cdee0fda16bb2f5e40fb4d52"
+    },
+    "incoming-pr1160-final-review-20261009:F13-POLICY-CACHE": {
+      "requirement_id": "incoming-pr1160-final-review-20261009:F13-POLICY-CACHE",
+      "label": "F13-POLICY-CACHE",
+      "scope": "later",
+      "landing_pr": null,
+      "landing_unit": "security-follow-ups",
+      "current_state": "preserved-follow-up",
+      "source_repair": null,
+      "verification_evidence": [
+        {
+          "path": "docs/security/audits/registry-admission-review-20261010.json",
+          "sha256": "a5925183dc6df385c7f719e8263724b08c62ce8edb69da33595d97362be5bf81",
+          "source_commit": "058992c567c8685559a7d6187816425e333441c5",
+          "scope": "Independent review of atomicity repair; introduced admission and parallel failures, two stronger-contract requirements, inherited policy cache and federation observation. No final qualification."
+        }
+      ],
+      "remaining_acceptance": [
+        "Inherited main defect, planner rule2; preserved after-landing work.",
+        "Reproduce actual stale challenge and verification consumers before repair.",
+        "Fresh coherent policy observation and owning mutation/consumer tests."
+      ],
+      "merged": false,
+      "full_qualified": false,
+      "observed_source_head": "058992c567c8685559a7d6187816425e333441c5"
+    },
+    "incoming-pr1160-final-review-20261009:SIGNER-AUTHORITY-READ-COST": {
+      "requirement_id": "incoming-pr1160-final-review-20261009:SIGNER-AUTHORITY-READ-COST",
+      "label": "SIGNER-AUTHORITY-READ-COST",
+      "scope": "later",
+      "landing_unit": "security-follow-ups",
+      "landing_pr": null,
+      "current_state": "review-performance-followup",
+      "source_repair": null,
+      "verification_evidence": [
+        {
+          "path": "docs/security/audits/authority-snapshot-followons-20261010.json",
+          "sha256": "aed9910917d9c612f045eca614adadcac323498d1b42f133841e7a2fe6638f81",
+          "source_commit": "4d5ce3627907a938d23f816cc0778cf8e1d60f87",
+          "scope": "Independent signer and crash-retention review; source-only seed candidate; explicit bounded foundation rulings. No final qualification."
+        }
+      ],
+      "remaining_acceptance": [
+        "Retain source review observation of 10 reads on success and 6 on invalid token input.",
+        "Measure and optimize with unchanged refusal and state-race controls after landing."
+      ],
+      "merged": false,
+      "full_qualified": false,
+      "observed_source_head": "4d5ce3627907a938d23f816cc0778cf8e1d60f87"
+    },
+    "incoming-pr1160-final-review-20261009:SIGNER-BACKEND-COVERAGE": {
+      "requirement_id": "incoming-pr1160-final-review-20261009:SIGNER-BACKEND-COVERAGE",
+      "label": "SIGNER-BACKEND-COVERAGE",
+      "scope": "later",
+      "landing_unit": "security-follow-ups",
+      "landing_pr": null,
+      "current_state": "review-test-coverage-followup",
+      "source_repair": null,
+      "verification_evidence": [
+        {
+          "path": "docs/security/audits/authority-snapshot-followons-20261010.json",
+          "sha256": "aed9910917d9c612f045eca614adadcac323498d1b42f133841e7a2fe6638f81",
+          "source_commit": "4d5ce3627907a938d23f816cc0778cf8e1d60f87",
+          "scope": "Independent signer and crash-retention review; source-only seed candidate; explicit bounded foundation rulings. No final qualification."
+        }
+      ],
+      "remaining_acceptance": [
+        "Preserve current SQLite and core provisioning evidence with exact scope.",
+        "Add backend-specific tests in follow-up; do not infer all-backend qualification from current component passes."
+      ],
+      "merged": false,
+      "full_qualified": false,
+      "observed_source_head": "4d5ce3627907a938d23f816cc0778cf8e1d60f87"
+    },
+    "incoming-pr1160-final-review-20261009:F11-REVIEW-P3-1": {
+      "requirement_id": "incoming-pr1160-final-review-20261009:F11-REVIEW-P3-1",
+      "label": "F11-REVIEW-P3-1",
+      "scope": "later",
+      "landing_pr": 1160,
+      "landing_unit": "foundation",
+      "current_state": "open-followup",
+      "source_repair": null,
+      "verification_evidence": [
+        {
+          "path": "docs/security/audits/authority-final-review-dispositions-20261009.json",
+          "sha256": "8678ef6fead0a98bea785ce1644ad85b62fe7a2374939050d2a08af7787399bb",
+          "source_commit": "05eb424ed32e3df5dc31717c3dd47433caaaf27d",
+          "scope": "Independent review and diagnostic reproduction; qualification reopened. Expected-safe Original RED and repairs remain pending."
+        }
+      ],
+      "remaining_acceptance": [
+        "Separate health-state refinement with bounded observation freshness; no stale health success substituted for unknown authority."
+      ],
+      "merged": false,
+      "full_qualified": false,
+      "observed_source_head": "05eb424ed32e3df5dc31717c3dd47433caaaf27d"
+    }
+  },
+  "ledger_baseline": {
+    "path": "docs/security/landing-ledger.json",
+    "sha256": "31a681fb8d82340130b6de578fc57dce7efb37da01745dbdecbe5558e0244ee7",
+    "requirements": 1929,
+    "same_ledger_at0c_and_a754": true,
+    "preservation": "No existing requirement object/source/disposition/evidence is changed; current-state amendments archive prior exact states and append evidence/acceptance."
+  },
+  "planned_requirement_appends": [
+    "incoming-pr1160-final-review-20261009:FINAL-WALLET-QUEUED-EXPIRY",
+    "incoming-pr1160-final-review-20261009:FINAL-FORWARDED-TERM-AFTER-WAIT"
+  ],
+  "documentation": {
+    "registry_contract": "Service-owned separate operator/public2-permit lanes; allfour registry transaction APIs implemented; per-record terminal reserve only status/certification.",
+    "readme": "Specify generic-market listing changed409 signer refusal and inherited missing cluster-admission boundary; keep missing-plain-seed mapping separate."
+  },
+  "candidate_qualified": false,
+  "hosted_qualified": false,
+  "merged": false,
+  "release_permitted": false,
+  "remaining": [
+    "Wallet, behavioral custody and forwarded-term Original/repair or refutation remain open.",
+    "Four composed failure diagnoses and renewed exact oracles remain open.",
+    "Owning strict, revised combined candidate, planner/delta review and four protected exact-hosted checks remain open.",
+    "Frozen0c100k is running separately; cancelled predecessor retained, no pass assumption.",
+    "KANI-PROOF-QUAL remains OPEN/UNPROVED; SEC-1160-COLDSTATE remains OPEN P1/G5. Inherited residuals are not closed."
+  ],
+  "root_application": {
+    "source_draft": {
+      "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/review-intake-draft-v1/audit.json",
+      "sha256": "17e218e9062addbb7a23b34dd0beab5ae231874b208abbef39ccfc1c50cee1bb"
+    },
+    "applied_at": "2026-10-10T04:39:27.275319+00:00",
+    "amendments": [
+      "Retain token400 versus credential/middleware401 refusal domains.",
+      "Record corrected wallet Original1PASS4genuineFAIL after reading its full log."
+    ],
+    "checked_source_pins": 15,
+    "checked_evidence_pins": 20,
+    "whole_control_plane_library_in_next_composed_campaign": true,
+    "real_proofs_executed": false,
+    "source_line_repins": [
+      {
+        "requirement_id": "incoming-pr1160-final-review-20261009:FINAL-WALLET-QUEUED-EXPIRY",
+        "prior_line": 130,
+        "applied_line": 130,
+        "line_sha256": "877a5a971fef572f9d7387761ba525e5f36da763a44f739c8627134e6c091e26"
+      },
+      {
+        "requirement_id": "incoming-pr1160-final-review-20261009:FINAL-FORWARDED-TERM-AFTER-WAIT",
+        "prior_line": 184,
+        "applied_line": 199,
+        "line_sha256": "0ae284da1394804f4b1e04dee114d96c90ca2f5b6b47826908e4bdc88ffdf882"
+      }
+    ]
+  }
+}
