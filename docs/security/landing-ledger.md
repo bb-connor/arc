@@ -7,6 +7,17 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Rewritten passport authority admission (October 10)
+
+The ledger now preserves **1,899 requirements**. The additional
+[passport authority obligation](audits/passport-authority-review-disposition-20261010.json)
+tracks a confirmed source gap on the three rewritten offer, token and credential
+handlers: atomic registry writes alone do not bind configured issuer material to
+admitted authority. The shared admission guard and actual signer checks must run
+inside the transaction before persistence. This remains open pending a genuine
+Original, repair, qualification and independent composition review. All 1,898
+prior requirement objects and their evidence remain unchanged.
+
 ## Registry, export and operator composition (October 9)
 
 The [component audit](audits/registry-export-operator-composition-20261009.json)
