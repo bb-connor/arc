@@ -70,6 +70,10 @@ pub(in crate::admission_operation_store) use workflow_reservations::{
 };
 
 #[cfg(test)]
+#[path = "participant_namespace_isolation_tests.rs"]
+mod participant_namespace_isolation_tests;
+
+#[cfg(test)]
 #[path = "projection_presence_tests.rs"]
 mod projection_presence_tests;
 
