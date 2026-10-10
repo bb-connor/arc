@@ -3,34 +3,22 @@
 //! their exact owning writer; command, workflow, quota, planning, capacity and
 //! original-ownership keys refuse before any payload or quota is consulted.
 use super::*;
+use crate::serving_owner::ProvisionedAuthority;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 struct Fixture {
-    _temp: tempfile::TempDir,
-    _authority: crate::SqliteAuthorityStore,
     store: SqliteAdmissionOperationStore,
     scope: RecoveryScopeV1,
     foreign_scope: RecoveryScopeV1,
     provisioned_records: i64,
+    _authority: ProvisionedAuthority,
 }
 
 impl Fixture {
     fn new() -> TestResult<Self> {
-        let temp = tempfile::tempdir()?;
-        // Match the anchored store fixtures: the authority parent directory is
-        // owner-only. Provisioning refuses anything group or world writable.
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(temp.path(), std::fs::Permissions::from_mode(0o700))?;
-        }
-        let database = temp.path().join("authority.db");
-        let lock_root = temp.path().join("locks");
-        std::fs::create_dir(&lock_root)?;
-        crate::SqliteAuthorityStore::provision(&database, &lock_root)?;
-        let authority = crate::SqliteAuthorityStore::open_serving(&database, &lock_root)?;
-        let store = authority.admission_operation_store();
+        let authority = ProvisionedAuthority::open();
+        let store = authority.authority.admission_operation_store();
         let mut connection = store.connection()?;
         let read = store.begin_read(&mut connection)?;
         let provisioned_records: i64 = read.query_row(
@@ -50,7 +38,6 @@ impl Fixture {
             process_id: ProcessId::new("participant-isolation-foreign-process")?,
         };
         Ok(Self {
-            _temp: temp,
             _authority: authority,
             store,
             scope,

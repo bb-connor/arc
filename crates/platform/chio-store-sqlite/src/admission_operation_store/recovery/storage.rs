@@ -69,7 +69,7 @@ pub(in crate::admission_operation_store) use workflow_reservations::{
     workflow_report_requested, workflow_resume_requested, WorkflowWriteClass,
 };
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 #[path = "participant_namespace_isolation_tests.rs"]
 mod participant_namespace_isolation_tests;
 
