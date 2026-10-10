@@ -175,6 +175,20 @@ fn valid_ed25519_and_hybrid_transport_encodings_round_trip() -> TestResult {
     Ok(())
 }
 
+#[test]
+fn p256_borrowed_hex_matches_wire_encoding_for_every_byte() -> TestResult {
+    // Transport-shape fixtures exercise every nibble without claiming curve membership.
+    for byte in u8::MIN..=u8::MAX {
+        let mut encoded_point = [byte; 65];
+        encoded_point[0] = 4;
+        let key = PublicKey::from_p256_sec1(&encoded_point)?;
+        let expected = format!("p256:{}", hex::encode(encoded_point));
+        assert_eq!(key.to_hex(), expected);
+        assert_eq!(key.with_hex_bytes(<[u8]>::to_vec), expected.as_bytes());
+    }
+    Ok(())
+}
+
 fn maximal_der_signature(scalar_bytes: u8) -> Vec<u8> {
     // A SEQUENCE of two positive INTEGERs requiring leading sign octets.
     let mut der = vec![0x30, 2 * (scalar_bytes + 3)];
@@ -203,6 +217,7 @@ fn ecdsa_and_hybrid_wire_bounds_preserve_maximal_encodings() -> TestResult {
         ),
     ] {
         let key_wire = key.to_hex();
+        assert_eq!(key.with_hex_bytes(<[u8]>::to_vec), key_wire.as_bytes());
         let signature_wire = signature.to_hex();
         let key_alias = key_wire.replacen(prefix, &format!("{prefix}0x"), 1);
         let signature_alias = signature_wire.replacen(prefix, &format!("{prefix}0x"), 1);
