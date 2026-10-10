@@ -15,6 +15,8 @@ mod extend;
 mod fetch;
 #[path = "receipt_query_snapshot/pass.rs"]
 mod pass;
+#[path = "receipt_query_snapshot/preopen.rs"]
+mod preopen;
 #[path = "receipt_query_snapshot/project.rs"]
 pub(crate) mod project;
 #[path = "receipt_query_snapshot/query.rs"]
@@ -24,6 +26,7 @@ mod service;
 #[path = "receipt_query_snapshot/walk.rs"]
 mod walk;
 
+pub use preopen::reclaim_abandoned_snapshots;
 pub use service::{
     ReceiptQuerySnapshotConfig, ReceiptQuerySnapshotRecovery, ReceiptQuerySnapshotRecoveryError,
     ReceiptQuerySnapshotRecoveryStatus, ReceiptQuerySnapshotState, ReceiptQuerySnapshotStatus,

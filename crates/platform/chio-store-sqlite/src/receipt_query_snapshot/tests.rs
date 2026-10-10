@@ -14,6 +14,9 @@ mod memory;
 #[cfg(target_os = "linux")]
 #[path = "tests/placement.rs"]
 mod placement;
+#[cfg(target_os = "linux")]
+#[path = "tests/preopen.rs"]
+mod preopen;
 #[path = "tests/publication.rs"]
 mod publication;
 #[path = "tests/query.rs"]
