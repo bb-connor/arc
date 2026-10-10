@@ -83,6 +83,21 @@ run_exact_target --label "signed watermark vectors" --expected \
   -- cargo test -p chio-decoy --test watermark_vectors
 
 run_exact_target --label "pre-dispatch tripwire adapters" --allow-filtered --expected \
+  tripwire_arguments::argument_detector_failure_prevents_dispatch_without_fabricating_a_hit \
+  tripwire_arguments::argument_object_keys_are_inspected \
+  tripwire_arguments::browser_cookie_argument_is_denied_before_dispatch_with_evidence \
+  tripwire_arguments::clean_arguments_allow_without_fabricating_detection_evidence \
+  tripwire_arguments::cookie_assignment_is_denied \
+  tripwire_arguments::credential_argument_is_denied_before_dispatch_with_evidence \
+  tripwire_arguments::credential_in_authorization_header_is_denied \
+  tripwire_arguments::dotted_hostname_is_preserved_inside_url \
+  tripwire_arguments::file_marker_argument_is_denied_before_dispatch_with_evidence \
+  tripwire_arguments::file_marker_inside_quoted_command_is_denied \
+  tripwire_arguments::hostname_inside_url_is_denied \
+  tripwire_arguments::internal_hostname_argument_is_denied_before_dispatch_with_evidence \
+  tripwire_arguments::oversized_argument_work_is_refused_before_detector_or_dispatch \
+  tripwire_arguments::padded_credentials_next_to_command_delimiters_are_denied \
+  tripwire_arguments::padded_credentials_preserve_slashes_and_padding \
   tripwire_content_digest_separates_identity_and_replays_exactly \
   tripwire_emits_canonical_event_with_existing_observation_receipt_lineage \
   tripwire_event_outage_still_emits_closed_native_observation_receipt \
@@ -128,4 +143,4 @@ run_exact_target --label "native canary and honey-tool pre-dispatch denial" --al
   honey_tool_pre_dispatch_denial \
   -- cargo test -p chio-conformance --test active_defense pre_dispatch_denial
 
-echo "Deception security gate passed (85 exact tests)"
+echo "Deception security gate passed (100 exact tests)"
