@@ -222,3 +222,28 @@ separately from genuine source failures. The one-hour local workspace run
 expired during compilation without reaching tests; it remains incomplete.
 Reuse its build artifacts for focused checks rather than repeating that cold
 campaign. No full-workspace pass follows from successful focused checks.
+
+
+### Dependency-budget repair discovered by the real Cargo preflight
+
+The actual graph check found 73 packages against the helper ceiling of 72 and
+482 against the broker ceiling of 481. Both graphs gained only `ascii 1.1.0`
+through `chio-core-types` in `b830fb0f89`. Preserve both ceilings and the gate's
+existing 12 controls. Remove that dependency by using checked byte buffers and
+safe UTF-8 conversion in the shared encoder; retain the 135-byte P-256 stack
+path, exact wire rendering, non-ASCII compatibility fallback and proof refusal
+branches. No alternate proof implementation or unsafe conversion is permitted.
+
+Original wire and exhaustive-prefix controls pass before the refactor and serve
+as preservation evidence. The dependency gate supplies genuine Original RED.
+Require whole owning tests, strict all-target lint, `no_std` compilation,
+downstream attestation and real FIPS-family wire controls. Regenerate only the
+active deployment locks and current fingerprints, preserving all versions,
+checksums and historical audit inputs.
+
+The native reviewer identified a possible symbolic cost from UTF-8 validation
+on allocating rendering paths. Keep the safe allocation transfer instead of
+adding another allocation for unmeasured proof convenience. The fixed P-256
+prehash path consumes stack bytes directly. Record the possible proof cost as
+unverified; no earlier proof pass qualifies the changed source. Kani remains
+OPEN/UNPROVED, and no additional proof campaign is run.
