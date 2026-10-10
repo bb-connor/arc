@@ -7,6 +7,21 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Final repair review intake (October 10)
+
+The ledger preserves **1,940 requirements**. The two control-plane fixture
+repairs are integrated with local evidence. Independent review and local tests
+identified three additional production obligations in the budget and CLI repair
+batch, plus five signed-read fixture preconditions. Their exact sources,
+Original failures and remaining acceptance are in the
+[repair review intake](audits/final-repair-review-intake-20261010.json).
+
+Published `633cf1d2f6` remains withdrawn. Existing certification now passes
+13 tests with one ignored on the unpublished CLI component, but its nine new
+custody tests failed on an invalid shared fixture before exercising their
+intended boundaries. Those failures remain retained and require corrected input
+and a new run. No replacement candidate, hosted qualification or merge is claimed.
+
 ## Candidate withdrawn; local repairs in progress (October 10)
 
 Published `633cf1d2f6` is **withdrawn as a landing candidate**. On its identical
