@@ -12,7 +12,7 @@ use chio_kernel::evidence_export::{
     EvidenceChildReceiptRecord, EvidenceChildReceiptScope, EvidenceExportQuery,
     EvidenceToolReceiptRecord,
 };
-use chio_kernel::ReceiptStoreError;
+use chio_kernel::{ReceiptQuerySnapshotError, ReceiptStoreError};
 use rusqlite::{params, Connection, OptionalExtension};
 
 use super::{checkpoint_digest, invalid, Lease};
@@ -30,7 +30,7 @@ const CHUNK: i64 = 128;
 /// owned snapshot authenticated. Refuse this request without dropping serving
 /// custody for other tenants, as the local full export reader does.
 fn metadata_refusal(reason: impl Into<String>) -> ReceiptStoreError {
-    ReceiptStoreError::Conflict(reason.into())
+    ReceiptQuerySnapshotError::ExportRefused(reason.into()).into()
 }
 
 fn live_read<T>(
@@ -73,7 +73,7 @@ pub(super) fn reject_legacy(lease: &Lease<'_>) -> Result<(), ReceiptStoreError> 
                     |row| row.get::<_, bool>(0),
                 )?
             {
-                return Err(ReceiptStoreError::ReadBoundary("legacy mutable receipt history cannot be exported as authenticated evidence; preserve the original database and use a new evidence database".into()));
+                return Err(metadata_refusal("legacy mutable receipt history cannot be exported as authenticated evidence; preserve the original database and use a new evidence database"));
             }
         }
         Ok(())
@@ -346,6 +346,9 @@ pub(super) fn checkpoints(
             bytes.preflight(core_bytes.saturating_add(binding_bytes))?;
             SqliteReceiptStore::enrich_transparency_on_connection(live, partial).map_err(|error| {
                 match error {
+                    chio_kernel::evidence_export::EvidenceExportError::ReceiptStore(
+                        ReceiptStoreError::Conflict(reason),
+                    ) => metadata_refusal(reason),
                     chio_kernel::evidence_export::EvidenceExportError::ReceiptStore(error) => error,
                     error => metadata_refusal(error.to_string()),
                 }
@@ -425,7 +428,10 @@ pub(super) fn lineage(
                 };
                 snapshot
                     .validate_for_transport()
-                    .map_err(|error| metadata_refusal(error.to_string()))?;
+                    .map_err(|error| match error {
+                        ReceiptStoreError::Conflict(reason) => metadata_refusal(reason),
+                        other => other,
+                    })?;
                 Ok(Some(snapshot))
             })?;
             let Some(snapshot) = snapshot else {

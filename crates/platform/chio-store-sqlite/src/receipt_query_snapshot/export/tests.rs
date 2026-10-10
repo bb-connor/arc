@@ -18,6 +18,18 @@ pub(super) fn after_selection(through: u64) {
     }
 }
 
+fn wait_until_ready(snapshots: &ReceiptQuerySnapshots) {
+    // The notification carries readiness; this timeout only bounds a hung test.
+    let status = snapshots.wait_for_recovery(Duration::from_secs(600), |status| {
+        !matches!(
+            status.state,
+            ReceiptQuerySnapshotState::WaitingForWriterSeed
+                | ReceiptQuerySnapshotState::Building { .. }
+        )
+    });
+    assert_eq!(status.state, ReceiptQuerySnapshotState::Ready, "{status:?}");
+}
+
 fn fixture(
     count: u64,
     batch: u64,
@@ -50,15 +62,7 @@ fn fixture(
     store.flush_receipt_writes().unwrap();
     config.recertify_interval = Duration::from_secs(3_600);
     let snapshots = Arc::new(ReceiptQuerySnapshots::start(Arc::clone(&store), config).unwrap());
-    let deadline = Instant::now() + Duration::from_secs(10);
-    while snapshots.status().state != ReceiptQuerySnapshotState::Ready {
-        assert!(
-            Instant::now() < deadline,
-            "snapshot did not become ready: {:?}",
-            snapshots.status()
-        );
-        std::thread::sleep(Duration::from_millis(5));
-    }
+    wait_until_ready(&snapshots);
     (directory, store, snapshots)
 }
 
@@ -224,11 +228,7 @@ fn child_and_tool_counts_share_one_receipt_allowance_without_truncation() {
     let snapshots =
         ReceiptQuerySnapshots::start(Arc::clone(&store), ReceiptQuerySnapshotConfig::default())
             .unwrap();
-    let deadline = Instant::now() + Duration::from_secs(10);
-    while snapshots.status().state != ReceiptQuerySnapshotState::Ready {
-        assert!(Instant::now() < deadline, "snapshot did not become ready");
-        std::thread::sleep(Duration::from_millis(5));
-    }
+    wait_until_ready(&snapshots);
     let query = EvidenceExportQuery::admin_all();
     let (bundle, _, _) = snapshots
         .build_export(
@@ -478,7 +478,7 @@ fn missing_owned_checkpoint_prefix_invalidates_the_shared_snapshot() {
 }
 
 #[test]
-fn mutable_publication_metadata_refusal_keeps_the_snapshot_ready() {
+fn divergent_publication_enrichment_refuses_export_but_preserves_owned_receipt_queries() {
     let (directory, _store, snapshots) = fixture(
         1,
         1,
@@ -503,8 +503,9 @@ fn mutable_publication_metadata_refusal_keeps_the_snapshot_ready() {
     );
     assert!(
         matches!(
-            error,
-            EvidenceExportError::ReceiptStore(ReceiptStoreError::Conflict(_))
+            &error,
+            EvidenceExportError::ReceiptStore(ReceiptStoreError::QuerySnapshot(ReceiptQuerySnapshotError::ExportRefused(reason)))
+                if reason == "checkpoint 1 publication metadata diverges from persisted projection"
         ),
         "{error:?}"
     );
@@ -538,11 +539,7 @@ fn child_rotation_after_capture_preserves_admin_export_and_snapshot_custody() {
         },
     )
     .unwrap();
-    let deadline = Instant::now() + Duration::from_secs(10);
-    while snapshots.status().state != ReceiptQuerySnapshotState::Ready {
-        assert!(Instant::now() < deadline, "snapshot did not become ready");
-        std::thread::sleep(Duration::from_millis(5));
-    }
+    wait_until_ready(&snapshots);
     let archive = directory.path().join("archive.db");
     let rotated_store = Arc::clone(&store);
     let archive_check = archive.clone();
@@ -557,5 +554,46 @@ fn child_rotation_after_capture_preserves_admin_export_and_snapshot_custody() {
     assert_eq!(bundle.tool_receipts.len(), 1);
     assert_eq!(bundle.child_receipts.len(), 1);
     assert_eq!(snapshots.status().state, ReceiptQuerySnapshotState::Ready);
+    snapshots.shutdown();
+}
+
+#[test]
+fn malformed_mutable_publication_binding_refuses_export_with_triggers_enabled() {
+    let (directory, _store, snapshots) = fixture(
+        1,
+        1,
+        ReceiptQuerySnapshotConfig {
+            extension_tick: Duration::from_secs(60),
+            ..ReceiptQuerySnapshotConfig::default()
+        },
+    );
+    let connection = rusqlite::Connection::open(directory.path().join("live.db")).unwrap();
+    assert!(connection
+        .db_config(rusqlite::config::DbConfig::SQLITE_DBCONFIG_ENABLE_TRIGGER)
+        .unwrap());
+    connection.execute(
+        "INSERT INTO checkpoint_publication_trust_anchor_bindings (checkpoint_seq, binding_json) VALUES (1, '{}')",
+        [],
+    ).unwrap();
+    let query = EvidenceExportQuery::tenant_scoped("a");
+    let error = snapshots
+        .build_evidence_export_bundle_with_transparency(&query)
+        .unwrap_err();
+    assert!(
+        matches!(
+            &error,
+            EvidenceExportError::ReceiptStore(ReceiptStoreError::QuerySnapshot(ReceiptQuerySnapshotError::ExportRefused(reason)))
+                if reason == "urn:chio:error:attest:signed-json-invalid-shape"
+        ),
+        "{error:?}"
+    );
+    assert_eq!(snapshots.status().state, ReceiptQuerySnapshotState::Ready);
+    assert_eq!(
+        snapshots
+            .query_receipts(&query.as_receipt_query(None))
+            .unwrap()
+            .total_count,
+        1
+    );
     snapshots.shutdown();
 }

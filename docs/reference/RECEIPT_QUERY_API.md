@@ -265,10 +265,13 @@ with code `receipt_query_snapshot_stale`.
 ## Authenticated Query Snapshots
 
 The snapshot serves `GET /v1/receipts/query`,
-`GET /v1/agents/{subject_key}/receipts` and `GET /v1/receipts/tools`. Child
-receipts (`/v1/receipts/children`), `/v1/receipts/analytics`, the
-`/v1/reports/*` endpoints and `POST /v1/evidence/export` read the receipt
-store directly and carry no `snapshot` field.
+`GET /v1/agents/{subject_key}/receipts` and `GET /v1/receipts/tools`.
+`POST /v1/evidence/export` also selects from the authenticated snapshot and
+returns its captured watermark; it has separate complete-bundle ceilings and
+[export refusal rules](../security/receipt-http-evidence-export.md). Child
+receipts (`/v1/receipts/children`), `/v1/receipts/analytics` and the
+`/v1/reports/*` endpoints read the receipt store directly and carry no
+`snapshot` field.
 
 ### As-Of Semantics
 
@@ -376,6 +379,7 @@ seconds.
 | `receipt_query_snapshot_unavailable` | `503` | absent | no | A resource outcome: snapshot quota exhausted, a receipt above the per-receipt limit, a read whose payload fetch or head read exhausted its SQL work budget, an I/O failure of the snapshot's private storage, or a snapshot service that is not running. Not an integrity failure. Quota and per-receipt outcomes need operator action. |
 | `receipt_query_snapshot_invalid` | `500` | absent | no | Integrity failure: a returned receipt no longer matches what the snapshot authenticated, the build or a recertification pass found a difference or a regressed receipt log, the snapshot's private storage failed its custody checks, or the receipt writer head is poisoned. |
 | `receipt_query_work_budget_exhausted` | `422` | absent | no | The selection and count exceeded 10,000,000 SQLite VM steps. No rows and no count are returned. Narrow the query, for example with an equality filter or a tighter time window. |
+| `receipt_query_export_refused` | `422` | absent | no | Evidence export only: current lineage or publication metadata cannot form a valid complete bundle. No bundle is returned; the authenticated snapshot remains usable by other requests. |
 
 Clients retry only `receipt_query_snapshot_building`,
 `receipt_query_snapshot_stale` and `receipt_query_busy`, after the

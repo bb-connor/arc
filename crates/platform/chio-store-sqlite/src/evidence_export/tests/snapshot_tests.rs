@@ -3,7 +3,7 @@ use crate::receipt_query_snapshot::{
     ReceiptQuerySnapshotConfig, ReceiptQuerySnapshotState, ReceiptQuerySnapshots,
 };
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 fn start(store: Arc<SqliteReceiptStore>) -> ReceiptQuerySnapshots {
     let snapshots = ReceiptQuerySnapshots::start(
@@ -14,15 +14,14 @@ fn start(store: Arc<SqliteReceiptStore>) -> ReceiptQuerySnapshots {
         },
     )
     .unwrap();
-    let deadline = Instant::now() + Duration::from_secs(10);
-    while snapshots.status().state != ReceiptQuerySnapshotState::Ready {
-        assert!(
-            Instant::now() < deadline,
-            "snapshot did not become ready: {:?}",
-            snapshots.status()
-        );
-        std::thread::sleep(Duration::from_millis(5));
-    }
+    let status = snapshots.wait_for_recovery(Duration::from_secs(600), |status| {
+        !matches!(
+            status.state,
+            ReceiptQuerySnapshotState::WaitingForWriterSeed
+                | ReceiptQuerySnapshotState::Building { .. }
+        )
+    });
+    assert_eq!(status.state, ReceiptQuerySnapshotState::Ready, "{status:?}");
     snapshots
 }
 
@@ -424,7 +423,32 @@ fn assert_lineage_refusal_keeps_other_tenant_readable(kind: UnexportableLineage)
     }
     let snapshots = start(Arc::clone(&store));
     let query = EvidenceExportQuery::tenant_scoped("a");
-    assert!(store.build_evidence_export_bundle(&query).is_err());
+    let (local_reason, snapshot_reason) = match kind {
+        UnexportableLineage::Legacy => (
+            "capability lineage cap-0 uses legacy projection provenance outside the local migration boundary",
+            "capability lineage cap-0 uses legacy projection provenance outside the local migration boundary",
+        ),
+        UnexportableLineage::Deep => (
+            "combined delegation chain for cap-0 exceeds 32 capabilities",
+            "export capability lineage contains a cycle or exceeds 32 records",
+        ),
+        UnexportableLineage::Cycle => (
+            "combined delegation chain for cap-0 contains a cycle at cap-0",
+            "export capability lineage contains a cycle or exceeds 32 records",
+        ),
+        UnexportableLineage::MissingParent => (
+            "combined delegation chain for cap-0 references missing parent missing-federated-parent",
+            "export capability lineage references a missing parent",
+        ),
+    };
+    let local_error = store.build_evidence_export_bundle(&query).unwrap_err();
+    assert!(
+        matches!(
+            &local_error,
+            EvidenceExportError::ReceiptStore(ReceiptStoreError::Conflict(reason)) if reason == local_reason
+        ),
+        "{local_error:?}"
+    );
     let other_query = EvidenceExportQuery::tenant_scoped("b").as_receipt_query(None);
     assert_eq!(
         snapshots.query_receipts(&other_query).unwrap().total_count,
@@ -443,8 +467,9 @@ fn assert_lineage_refusal_keeps_other_tenant_readable(kind: UnexportableLineage)
     assert_eq!(other.unwrap().total_count, 1);
     assert!(
         matches!(
-            error,
-            EvidenceExportError::ReceiptStore(ReceiptStoreError::Conflict(_))
+            &error,
+            EvidenceExportError::ReceiptStore(ReceiptStoreError::QuerySnapshot(chio_kernel::ReceiptQuerySnapshotError::ExportRefused(reason)))
+                if reason == snapshot_reason
         ),
         "{error:?}"
     );

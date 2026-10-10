@@ -588,6 +588,10 @@ fn nested_sqlite_resource_failures_are_unavailable_and_other_classes_keep_theirs
             "nested SQLite code {code} on a read became {read:?}"
         );
     }
+    assert!(matches!(
+        walker(ReceiptQuerySnapshotError::ExportRefused("legacy lineage".into()).into()),
+        WalkError::Unavailable(reason) if reason == "legacy lineage"
+    ));
     // Interruption, contention, work budgets and integrity keep their class.
     assert!(matches!(
         walker(ReceiptStoreError::Sqlite(sqlite_failure(

@@ -247,7 +247,8 @@ fn classify(error: ReceiptStoreError, guard: Option<&StepGuard<'_>>) -> WalkErro
     if let ReceiptStoreError::QuerySnapshot(snapshot) = &error {
         return match snapshot {
             ReceiptQuerySnapshotError::Invalid(reason) => WalkError::Integrity(reason.clone()),
-            ReceiptQuerySnapshotError::Unavailable(reason) => {
+            ReceiptQuerySnapshotError::Unavailable(reason)
+            | ReceiptQuerySnapshotError::ExportRefused(reason) => {
                 WalkError::Unavailable(reason.clone())
             }
             ReceiptQuerySnapshotError::WorkBudgetExhausted(_) => WalkError::WalkerBudget,

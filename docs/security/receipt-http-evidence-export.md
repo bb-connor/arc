@@ -23,12 +23,23 @@ omit child payloads that have no tenant join path, as in the local export.
 
 A transport-ineligible live lineage (including a supported legacy projection,
 a cycle, excessive depth or a missing parent) refuses only that export with a
-typed conflict. Unauthenticated publication enrichment has the same request-only
+HTTP 422 and code `receipt_query_export_refused`. No partial bundle or
+`Retry-After` is returned; changing the unsupported metadata requires operator
+action. Unauthenticated publication enrichment has the same request-only
 boundary. These refusals do not invalidate the shared authenticated snapshot or
 interrupt another tenant's receipt reads. In contrast, missing or altered owned
 checkpoint data, incomplete proof hashes, changed selected payloads, and a
 mismatch or deletion of captured unsigned attribution invalidate that served
 snapshot. The service must rebuild authenticated state before serving it again.
+
+Publication enrichment remains outside the owned receipt query projection.
+A malformed mutable trust-anchor binding, missing publication metadata, or a
+publication-core row that disagrees with the verified checkpoint therefore
+refuses the export while leaving authenticated receipt reads available. This is
+an explicit request boundary, including out-of-band corruption of that metadata;
+no inconsistent publication is returned. Checkpoint bytes themselves must still
+match the authenticated digest, and the next complete snapshot authentication
+continues to reject corrupted immutable publication metadata.
 
 The existing unpaginated HTTP response has these request ceilings:
 

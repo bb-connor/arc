@@ -994,7 +994,8 @@ pub(crate) fn snapshot_error_response(error: ReceiptStoreError) -> Response {
     use chio_kernel::receipt_query::ReceiptQuerySnapshotError;
     let status = match &error {
         ReceiptQuerySnapshotError::Invalid(_) => StatusCode::INTERNAL_SERVER_ERROR,
-        ReceiptQuerySnapshotError::WorkBudgetExhausted(_) => StatusCode::UNPROCESSABLE_ENTITY,
+        ReceiptQuerySnapshotError::WorkBudgetExhausted(_)
+        | ReceiptQuerySnapshotError::ExportRefused(_) => StatusCode::UNPROCESSABLE_ENTITY,
         ReceiptQuerySnapshotError::Building { .. }
         | ReceiptQuerySnapshotError::Stale
         | ReceiptQuerySnapshotError::Busy

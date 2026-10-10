@@ -12,6 +12,22 @@ use tower::ServiceExt;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
+async fn wait_until_ready(snapshots: Arc<ReceiptQuerySnapshots>) -> TestResult {
+    let status = tokio::task::spawn_blocking(move || {
+        // A hang guard, not a snapshot construction performance requirement.
+        snapshots.wait_for_recovery(Duration::from_secs(600), |status| {
+            !matches!(
+                status.state,
+                ReceiptQuerySnapshotState::WaitingForWriterSeed
+                    | ReceiptQuerySnapshotState::Building { .. }
+            )
+        })
+    })
+    .await?;
+    assert_eq!(status.state, ReceiptQuerySnapshotState::Ready, "{status:?}");
+    Ok(())
+}
+
 async fn export(
     state: TrustServiceState,
 ) -> Result<(StatusCode, Value), Box<dyn std::error::Error>> {
@@ -92,12 +108,7 @@ async fn tenant_export_does_not_reauthenticate_unselected_tenant_payloads() -> T
             ..ReceiptQuerySnapshotConfig::default()
         },
     )?);
-    tokio::time::timeout(Duration::from_secs(10), async {
-        while snapshots.status().state != ReceiptQuerySnapshotState::Ready {
-            tokio::time::sleep(Duration::from_millis(5)).await;
-        }
-    })
-    .await?;
+    wait_until_ready(Arc::clone(&snapshots)).await?;
     let baseline = store.build_evidence_export_bundle(
         &chio_kernel::evidence_export::EvidenceExportQuery::tenant_scoped("tenant-a"),
     )?;
@@ -159,12 +170,7 @@ async fn oversized_tenant_export_returns_422_without_bundle_or_snapshot_invalida
         Arc::clone(&store),
         ReceiptQuerySnapshotConfig::default(),
     )?);
-    tokio::time::timeout(Duration::from_secs(10), async {
-        while snapshots.status().state != ReceiptQuerySnapshotState::Ready {
-            tokio::time::sleep(Duration::from_millis(5)).await;
-        }
-    })
-    .await?;
+    wait_until_ready(Arc::clone(&snapshots)).await?;
     let mut state = metrics_state("snapshot-secret");
     state.receipt_store = Some(store);
     state.receipt_query_snapshots = Some(Arc::clone(&snapshots));
@@ -185,6 +191,79 @@ async fn oversized_tenant_export_returns_422_without_bundle_or_snapshot_invalida
             )?
             .total_count,
         4_097
+    );
+    snapshots.shutdown();
+    Ok(())
+}
+
+#[tokio::test]
+async fn legacy_lineage_refusal_returns_typed_422_and_preserves_other_tenants() -> TestResult {
+    let directory = chio_test_support::private_tempdir()?;
+    let path = directory.path().join("receipts.db");
+    let store = Arc::new(SqliteReceiptStore::open(&path)?);
+    let connection = rusqlite::Connection::open(&path)?;
+    assert_eq!(
+        connection.execute(
+            "INSERT INTO capability_lineage (capability_id, subject_key, issuer_key, issued_at, expires_at, grants_json, delegation_depth, provenance) VALUES ('cap-legacy', 'legacy-subject', 'legacy-issuer', 1, 100, '{}', 0, 'legacy_projection')",
+            [],
+        )?,
+        1
+    );
+    drop(connection);
+    let signer = Keypair::from_seed(&[43; 32]);
+    let template = super::receipt_store_ownership_tests::signed_receipt(&signer)?.body();
+    for (id, tenant, capability) in [
+        ("legacy-a", "tenant-a", "cap-legacy"),
+        ("plain-b", "tenant-b", "cap-plain"),
+    ] {
+        let mut body = template.clone();
+        body.id = id.into();
+        body.tenant_id = Some(tenant.into());
+        body.capability_id = capability.into();
+        store.append_chio_receipt(&ChioReceipt::sign(body, &signer)?)?;
+    }
+    let snapshots = Arc::new(ReceiptQuerySnapshots::start(
+        Arc::clone(&store),
+        ReceiptQuerySnapshotConfig::default(),
+    )?);
+    wait_until_ready(Arc::clone(&snapshots)).await?;
+    let mut state = metrics_state("snapshot-secret");
+    state.receipt_store = Some(store);
+    state.receipt_query_snapshots = Some(Arc::clone(&snapshots));
+    state
+        .config
+        .tenant_read_tokens
+        .insert("tenant-a".into(), "tenant-secret".into());
+    state
+        .config
+        .tenant_read_tokens
+        .insert("tenant-b".into(), "tenant-b-secret".into());
+    let (status, body) = export(state.clone()).await?;
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/evidence/export")
+        .header(AUTHORIZATION, "Bearer tenant-b-secret")
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_vec(&json!({
+            "query": chio_kernel::evidence_export::EvidenceExportQuery::tenant_scoped("tenant-b"),
+            "requireProofs": false,
+        }))?))?;
+    let response = super::super::build_router(state).oneshot(request).await?;
+    let b_status = response.status();
+    let bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024).await?;
+    let b_body: Value = serde_json::from_slice(&bytes)?;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+    assert_eq!(body["code"], "receipt_query_export_refused");
+    assert_eq!(body["error"], "receipt evidence export refused: capability lineage cap-legacy uses legacy projection provenance outside the local migration boundary");
+    assert!(body.get("bundle").is_none(), "{body}");
+    assert_eq!(snapshots.status().state, ReceiptQuerySnapshotState::Ready);
+    assert_eq!(b_status, StatusCode::OK, "{b_body}");
+    assert_eq!(
+        b_body["bundle"]["toolReceipts"]
+            .as_array()
+            .test_expect("receipts")
+            .len(),
+        1
     );
     snapshots.shutdown();
     Ok(())

@@ -373,6 +373,10 @@ pub enum ReceiptQuerySnapshotError {
     Invalid(String),
     #[error("{0} exhausted its SQL work budget")]
     WorkBudgetExhausted(String),
+    /// Current export metadata cannot form a valid bundle. The authenticated
+    /// receipt projection remains usable by other requests.
+    #[error("receipt evidence export refused: {0}")]
+    ExportRefused(String),
 }
 
 impl ReceiptQuerySnapshotError {
@@ -386,6 +390,7 @@ impl ReceiptQuerySnapshotError {
             Self::Unavailable(_) => "receipt_query_snapshot_unavailable",
             Self::Invalid(_) => "receipt_query_snapshot_invalid",
             Self::WorkBudgetExhausted(_) => "receipt_query_work_budget_exhausted",
+            Self::ExportRefused(_) => "receipt_query_export_refused",
         }
     }
 
@@ -397,7 +402,10 @@ impl ReceiptQuerySnapshotError {
             Self::Building { .. } => Some(5),
             Self::Stale => Some(2),
             Self::Busy => Some(1),
-            Self::Unavailable(_) | Self::Invalid(_) | Self::WorkBudgetExhausted(_) => None,
+            Self::Unavailable(_)
+            | Self::Invalid(_)
+            | Self::WorkBudgetExhausted(_)
+            | Self::ExportRefused(_) => None,
         }
     }
 }
@@ -462,6 +470,11 @@ mod snapshot_wire_tests {
             (
                 ReceiptQuerySnapshotError::WorkBudgetExhausted("receipt query".into()),
                 "receipt_query_work_budget_exhausted",
+                None,
+            ),
+            (
+                ReceiptQuerySnapshotError::ExportRefused("legacy lineage".into()),
+                "receipt_query_export_refused",
                 None,
             ),
         ];
