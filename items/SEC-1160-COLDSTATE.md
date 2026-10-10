@@ -47,3 +47,4 @@ Start from the lane design `claude-pr1160-evidence/hammer/tickets/final-f01-cold
 ## Log
 - 2026-10-09T21:28:44Z connor: created
 - 2026-10-09T21:54:07Z connor: brief wording corrected (#1160 not yet merged), per Root 2026-10-09
+- 2026-10-10T00:54:19Z connor: planning (read-only design + test plan) owned by the ws2 #1160 Claude lead from 2026-10-10; code only after #1160's LANDING HEAD on a post-merge branch
