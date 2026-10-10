@@ -17978,7 +17978,7 @@
       "load#2::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::decode",
       "load#3::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::decode",
       "snapshot::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::decode",
-      "update::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::update_registry"
+      "update#2::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::update_registry"
     ],
     "crates/platform/chio-control-plane/src/policy/loader.rs": [
       "load_policy::format-yaml::from_str",
