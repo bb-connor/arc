@@ -24,6 +24,19 @@ where
     .await
 }
 
+/// Run a bounded commit whose operation checks final authority admission inside
+/// its transaction before persistence. There is no outer post-commit refusal.
+pub(crate) async fn run_authority_commit<T, F>(
+    state: &TrustServiceState,
+    commit: F,
+) -> Result<T, Response>
+where
+    T: Send + 'static,
+    F: FnOnce(&TrustServiceState) -> Result<T, Response> + Send + 'static,
+{
+    authority_admission::run_authority_commit(state, commit).await
+}
+
 pub(crate) fn budget_visibility_matches(
     allowed: bool,
     invocation_count: Option<u32>,

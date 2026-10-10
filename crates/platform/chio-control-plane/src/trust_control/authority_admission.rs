@@ -41,6 +41,47 @@ where
     T: Send + 'static,
     F: FnOnce(&TrustServiceState) -> Result<T, Response> + Send + 'static,
 {
+    run_blocking_authority_task(state, move |state| {
+        let context = inspection_cluster_context(state)?;
+        let result = operation(state)?;
+        if context != inspection_cluster_context(state)? {
+            return Err(plain_http_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                CLUSTER_CHANGED,
+            ));
+        }
+        Ok(result)
+    })
+    .await
+}
+
+/// Submit an operation that owns final admission inside its commit transaction.
+/// The worker checks initial quorum/context and holds the same process permit;
+/// it adds no refusal after an operation may have durably committed. A guard
+/// observation is not atomic with an unrelated database's commit.
+pub(crate) async fn run_authority_commit<T, F>(
+    state: &TrustServiceState,
+    commit: F,
+) -> Result<T, Response>
+where
+    T: Send + 'static,
+    F: FnOnce(&TrustServiceState) -> Result<T, Response> + Send + 'static,
+{
+    run_blocking_authority_task(state, move |state| {
+        inspection_cluster_context(state)?;
+        commit(state)
+    })
+    .await
+}
+
+async fn run_blocking_authority_task<T, F>(
+    state: &TrustServiceState,
+    operation: F,
+) -> Result<T, Response>
+where
+    T: Send + 'static,
+    F: FnOnce(&TrustServiceState) -> Result<T, Response> + Send + 'static,
+{
     let permit = state
         .authority_inspection_lane
         .clone()
@@ -54,15 +95,7 @@ where
     let inspected_state = state.clone();
     tokio::task::spawn_blocking(move || {
         let _permit = permit;
-        let context = inspection_cluster_context(&inspected_state)?;
-        let result = operation(&inspected_state)?;
-        if context != inspection_cluster_context(&inspected_state)? {
-            return Err(plain_http_error(
-                StatusCode::SERVICE_UNAVAILABLE,
-                CLUSTER_CHANGED,
-            ));
-        }
-        Ok(result)
+        operation(&inspected_state)
     })
     .await
     .map_err(|_| {

@@ -844,3 +844,34 @@ async fn final_f11_inspection_sync_guard_rechecks_election_term() {
     )
     .await;
 }
+
+#[tokio::test]
+async fn final_f11_inspection_commit_checks_initial_context_without_late_refusal() {
+    let peer_url = "http://127.0.0.2:3301";
+    let state = state_with_cluster(IMPORTER_URL, &[peer_url], None, None, None);
+    assert_inspection_refused(
+        run_authority_commit(&state, |_| -> Result<(), Response> {
+            panic!("commit work entered without initial quorum")
+        })
+        .await,
+        "cluster authority context changed during inspection",
+    )
+    .await;
+    update_peer_reachable(&state, peer_url);
+    let result = run_authority_commit(&state, |state| {
+        // This models a completed, already-guarded transaction. The outer
+        // worker must not turn its committed success into a late refusal.
+        state
+            .cluster
+            .as_ref()
+            .test_unwrap()
+            .lock()
+            .test_unwrap()
+            .election_term += 1;
+        Ok("committed")
+    })
+    .await
+    .test_unwrap();
+    assert_eq!(result, "committed");
+    assert_eq!(state.authority_inspection_lane.available_permits(), 8);
+}
