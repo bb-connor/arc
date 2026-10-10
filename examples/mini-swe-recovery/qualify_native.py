@@ -215,9 +215,11 @@ def queries(directory):
 
 def finish(process, directory, success=True):
     out, err = process.communicate(timeout=180)
-    (directory / "run-report.json").write_text(redact(out))
-    (directory / "run-stderr.txt").write_text(redact(err))
-    assert (process.returncode == 0) == success, (out, err)
+    ok = (process.returncode == 0) == success
+    if not ok:
+        (directory / "run-report.json").write_text(redact(out))
+        (directory / "run-stderr.txt").write_text(redact(err))
+    assert ok, (out, err)
     return json.loads(out), err
 
 
