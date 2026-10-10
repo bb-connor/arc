@@ -7,6 +7,18 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Wallet repair and frozen capacity checkpoint (October 10)
+
+The wallet wait/expiry repair is integrated at `7cd19d4cc7`: 30 focused tests,
+strict control-plane Clippy and six static gates passed on its producer source.
+The [component audit](audits/wallet-expiry-and-capacity-20261010.json) preserves
+the corrected Original (one pass, four genuine failures) and earlier failures.
+The frozen `0c457859c6` storage binary also passed the actual 100,000-receipt
+covered-range test in 1,429 seconds. That result does not qualify the revised
+whole candidate or establish million-scale capacity. All **1,931 requirements**
+remain preserved; combined runtime, remaining repairs, independent review and
+the four protected hosted checks are still pending.
+
 ## Final candidate review intake (October 10)
 
 The [review intake](audits/final-candidate-review-intake-20261010.json) preserves
