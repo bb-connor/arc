@@ -1,0 +1,1251 @@
+{
+  "schema": "chio.security.earlier-repair-reconciliation.v1",
+  "observed_utc": "2026-10-10T03:21:36.470344+00:00",
+  "source_stage": "183d3c4319749aec4e1cc9dc321169cfaae8d461",
+  "scope": "Twelve prior component states reconciled against existing commits and retained evidence. No runtime rerun or final candidate qualification.",
+  "input": {
+    "path": "/tmp/pr1160-final-review-20261009/early-ledger-reconciliation.json",
+    "sha256": "112b69ac9aed2ea790766d188d0ee3003ed4f6f38d5d080bf030a7341a52fac0"
+  },
+  "components": {
+    "FINAL-F02": {
+      "requirement_id": "incoming-pr1160-final-review-20261009:FINAL-F02",
+      "proposed_current_state": "local-component-qualified-candidate-pending",
+      "proposed_source_repair": {
+        "commits": [
+          "685a6acba83bbbded170a345fcb3fbb89f8632e7",
+          "aa7cd4d3b007ec198740f3c699e0c8024eb6704e",
+          "6db15e29380788194569f0978b79ea33528eb61f"
+        ],
+        "files": [
+          "crates/platform/chio-control-plane/src/certify/mod.rs",
+          "crates/platform/chio-control-plane/src/certify/registry.rs",
+          "crates/platform/chio-control-plane/src/certify/registry/fixtures.rs",
+          "crates/platform/chio-control-plane/src/certify/registry/older_registry_files.rs",
+          "crates/platform/chio-control-plane/src/certify/registry/revocation_capacity.rs",
+          "crates/platform/chio-control-plane/src/passport_verifier.rs",
+          "crates/platform/chio-control-plane/src/passport_verifier/tests/fixtures.rs",
+          "crates/platform/chio-control-plane/src/passport_verifier/tests/older_registry_files.rs",
+          "crates/platform/chio-control-plane/src/passport_verifier/tests/revocation_capacity.rs",
+          "crates/platform/chio-control-plane/src/signed_input.rs",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests.rs",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/registry_revocation_capacity.rs"
+        ],
+        "ancestry_only_at_requested_stage": "183d3c4319749aec4e1cc9dc321169cfaae8d461",
+        "claim": "Committed source integration verified by ancestry/file lists; no current production review or new runtime executed."
+      },
+      "add_verification_evidence": [
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/registry-export-operator-composition-20261009.json",
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/final-capacity-acceptance-20261009.json",
+        "/tmp/pr1160-final-review-20261009/F02-PRODUCER-VERIFICATION.json",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f02/original-red-base-8f3dfac6b6.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f02/green-focused.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f02/fallback-green.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f02/supersede-original-red-at-2b39ace069.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f02/supersede-green.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f02/supersede-clippy.log"
+      ],
+      "implementation_status": "Content-defined terminal headroom, no-regression legacy fallback and supersede order guard integrated; retained Original/owning/strict component evidence exists. Prior F13/current-source composition obligations are no longer absent implementation; final candidate gates remain.",
+      "completed_prior_obligations": [
+        "Genuine capacity and supersede Originals, focused owning/strict verification and source composition are recorded."
+      ],
+      "actually_unclosed_distinct_obligations": [],
+      "proposed_remaining_acceptance": [
+        "Renew final frozen composed owning/default checks and independent candidate delta review; historical local component passes are not exact-candidate qualification.",
+        "Publish exact candidate, obtain the four protected exact-SHA hosted checks, and complete normal protected merge.",
+        "Retain KANI-PROOF-QUAL OPEN/UNPROVED and SEC-1160-COLDSTATE OPEN P1 gating G5 under existing owner decisions; no proof, release or outside-team preview claim."
+      ],
+      "component_boundary": {
+        "prior_acceptance_ruling": "Planner21:25:32Z accepts content-defined reserve plus no-regression legacy fallback for pre-release landing, with explicit full-file limitation and owner-run archival follow-up.",
+        "prior_component_boundary": "Owner-accepted old-format exact-cap files may refuse a growing revocation and retain the unchanged active record; operator archival remains required. No unconditional legacy revocation claim.",
+        "preservation": "Existing exact-cap legacy files may refuse a growing revocation without changing active bytes. Preserve recorded pre-release/dev-test acceptance and follow-up; no blanket revocation-progress, cap-increase, record deletion or new archival feature claim."
+      },
+      "related_followups_preserved": []
+    },
+    "FINAL-F04": {
+      "requirement_id": "incoming-pr1160-final-review-20261009:FINAL-F04",
+      "proposed_current_state": "local-component-qualified-candidate-pending",
+      "proposed_source_repair": {
+        "commits": [
+          "d9e3359e3a9ed5adafba9f25ee8b929c0ef3c660",
+          "c2c37c36c98e2bebad8deb6ebdfb589255acb8d3",
+          "13ec138d238fb546ca09dfff67a35dcf63c9506e",
+          "b15c7383f5430eb3942e5fbed110b0570b9adf5c",
+          "9472d40c951993f4de4af1b2800454ad5fe8401f"
+        ],
+        "files": [
+          "crates/platform/chio-control-plane/src/trust_control.rs",
+          "crates/platform/chio-control-plane/src/trust_control/json_ingress.rs",
+          "crates/platform/chio-control-plane/src/trust_control/receipt_query_service.rs",
+          "crates/platform/chio-control-plane/src/trust_control/receipt_snapshot_admin.rs",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/receipt_query_snapshot_tests.rs",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/receipt_snapshot_recovery_tests.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/db.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service/health.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service/health_tests.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service/recovery.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/generation_observer.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/recovery.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/service.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/walk.rs",
+          "docs/security/audits/receipt-public-health-privacy-qualification-20261009.json",
+          "docs/security/audits/receipt-recovery-health-qualification-20261009.json",
+          "docs/superpowers/plans/2026-10-09-final-review-repairs.md",
+          "docs/superpowers/specs/2026-10-09-authenticated-receipt-query-snapshots-design.md"
+        ],
+        "ancestry_only_at_requested_stage": "183d3c4319749aec4e1cc9dc321169cfaae8d461",
+        "claim": "Committed source integration verified by ancestry/file lists; no current production review or new runtime executed."
+      },
+      "add_verification_evidence": [
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/receipt-recovery-health-qualification-20261009.json",
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/receipt-public-health-privacy-qualification-20261009.json",
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/registry-export-operator-composition-20261009.json",
+        "/tmp/pr1160-final-review-20261009/health/original.log",
+        "/tmp/pr1160-final-review-20261009/recovery/original.log",
+        "/tmp/pr1160-final-review-20261009/composed/snapshots.log",
+        "/tmp/pr1160-final-review-20261009/composed/http-components-green.log",
+        "/tmp/pr1160-final-review-20261009/composed/clippy.log"
+      ],
+      "implementation_status": "Recoverable FULL/Capacity/RowCap outcomes, bounded retry/quota growth and lock-independent sampled public health integrated; operator HTTP entry point is also integrated. Public health exact ready/unavailable/stopped shapes have local evidence.",
+      "completed_prior_obligations": [
+        "Library recovery and health Originals/GREEN, public disclosure Original/GREEN, strict/fmt, operator entry point and deterministic quota controls already recorded."
+      ],
+      "actually_unclosed_distinct_obligations": [],
+      "proposed_remaining_acceptance": [
+        "Renew final frozen composed owning/default checks and independent candidate delta review; historical local component passes are not exact-candidate qualification.",
+        "Publish exact candidate, obtain the four protected exact-SHA hosted checks, and complete normal protected merge.",
+        "Retain KANI-PROOF-QUAL OPEN/UNPROVED and SEC-1160-COLDSTATE OPEN P1 gating G5 under existing owner decisions; no proof, release or outside-team preview claim."
+      ],
+      "component_boundary": "Public /health exposes configured/state only and consumes no receipt admission or database hold. Operator runtime quota is monotone/local and does not bypass integrity; persisted deployment configuration remains explicit.",
+      "related_followups_preserved": [
+        "ROOT-REVIEW-P3-4 building-state HTTP coverage remains a distinct open verification obligation."
+      ]
+    },
+    "FINAL-F09": {
+      "requirement_id": "incoming-pr1160-final-review-20261009:FINAL-F09",
+      "proposed_current_state": "local-component-qualified-candidate-pending",
+      "proposed_source_repair": {
+        "commits": [
+          "d9e3359e3a9ed5adafba9f25ee8b929c0ef3c660",
+          "c2c37c36c98e2bebad8deb6ebdfb589255acb8d3",
+          "13ec138d238fb546ca09dfff67a35dcf63c9506e",
+          "b15c7383f5430eb3942e5fbed110b0570b9adf5c",
+          "9472d40c951993f4de4af1b2800454ad5fe8401f"
+        ],
+        "files": [
+          "crates/platform/chio-control-plane/src/trust_control.rs",
+          "crates/platform/chio-control-plane/src/trust_control/json_ingress.rs",
+          "crates/platform/chio-control-plane/src/trust_control/receipt_query_service.rs",
+          "crates/platform/chio-control-plane/src/trust_control/receipt_snapshot_admin.rs",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/receipt_query_snapshot_tests.rs",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/receipt_snapshot_recovery_tests.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/db.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service/health.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service/health_tests.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service/recovery.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/generation_observer.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/recovery.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/service.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/walk.rs",
+          "docs/security/audits/receipt-public-health-privacy-qualification-20261009.json",
+          "docs/security/audits/receipt-recovery-health-qualification-20261009.json",
+          "docs/superpowers/plans/2026-10-09-final-review-repairs.md",
+          "docs/superpowers/specs/2026-10-09-authenticated-receipt-query-snapshots-design.md"
+        ],
+        "ancestry_only_at_requested_stage": "183d3c4319749aec4e1cc9dc321169cfaae8d461",
+        "claim": "Committed source integration verified by ancestry/file lists; no current production review or new runtime executed."
+      },
+      "add_verification_evidence": [
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/receipt-recovery-health-qualification-20261009.json",
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/receipt-public-health-privacy-qualification-20261009.json",
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/registry-export-operator-composition-20261009.json",
+        "/tmp/pr1160-final-review-20261009/health/original.log",
+        "/tmp/pr1160-final-review-20261009/recovery/original.log",
+        "/tmp/pr1160-final-review-20261009/composed/snapshots.log",
+        "/tmp/pr1160-final-review-20261009/composed/http-components-green.log",
+        "/tmp/pr1160-final-review-20261009/composed/clippy.log"
+      ],
+      "implementation_status": "Recoverable FULL/Capacity/RowCap outcomes, bounded retry/quota growth and lock-independent sampled public health integrated; operator HTTP entry point is also integrated. Public health exact ready/unavailable/stopped shapes have local evidence.",
+      "completed_prior_obligations": [
+        "Library recovery and health Originals/GREEN, public disclosure Original/GREEN, strict/fmt, operator entry point and deterministic quota controls already recorded."
+      ],
+      "actually_unclosed_distinct_obligations": [],
+      "proposed_remaining_acceptance": [
+        "Renew final frozen composed owning/default checks and independent candidate delta review; historical local component passes are not exact-candidate qualification.",
+        "Publish exact candidate, obtain the four protected exact-SHA hosted checks, and complete normal protected merge.",
+        "Retain KANI-PROOF-QUAL OPEN/UNPROVED and SEC-1160-COLDSTATE OPEN P1 gating G5 under existing owner decisions; no proof, release or outside-team preview claim."
+      ],
+      "component_boundary": "Public /health exposes configured/state only and consumes no receipt admission or database hold. Operator runtime quota is monotone/local and does not bypass integrity; persisted deployment configuration remains explicit.",
+      "related_followups_preserved": [
+        "ROOT-REVIEW-P3-4 building-state HTTP coverage remains a distinct open verification obligation."
+      ]
+    },
+    "FINAL-F12": {
+      "requirement_id": "incoming-pr1160-final-review-20261009:FINAL-F12",
+      "proposed_current_state": "local-component-qualified-candidate-pending",
+      "proposed_source_repair": {
+        "commits": [
+          "f69b01465aa99c9d31afe7dbd5a90c93e206b4f0",
+          "b5389d25f0020b9cc4ea27322b8f1b382da8e990",
+          "4035d4dd1ac2cd44149de66843790174739cf853"
+        ],
+        "files": [
+          "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/security_participant_state/egress/retention.rs",
+          "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/security_participant_state/egress/session_churn.rs",
+          "crates/platform/chio-store-sqlite/src/security_state/flow_state/labels.rs",
+          "crates/platform/chio-store-sqlite/src/security_state/scoped_sql/flow/labels.rs",
+          "crates/platform/chio-store-sqlite/tests/native_authority_binding.rs",
+          "crates/platform/chio-store-sqlite/tests/native_authority_binding/lineage_observation.rs"
+        ],
+        "ancestry_only_at_requested_stage": "183d3c4319749aec4e1cc9dc321169cfaae8d461",
+        "claim": "Committed source integration verified by ancestry/file lists; no current production review or new runtime executed."
+      },
+      "add_verification_evidence": [
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/final-capacity-acceptance-20261009.json",
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/bounded-capacity-owner-amendment-20261009.json",
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/readiness-followons-20261010.json",
+        "/tmp/pr1160-final-review-20261009/F01-F02-F12-COMPOSITION.json",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f01/side-lineage-observation-base.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f01/f12-original-red.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f01/f12-green-1.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f01/f12-clippy.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f01/f12b-original-red.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f01/f12b-green.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f01/corrected-integration.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f01/f12-mutation-epoch.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f01/f12-mutation-context.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f01/f12-mutation-session-context.log",
+        "/tmp/pr1160-final-review-20261009/capacity-correction-renewal/native-contracts.log",
+        "/tmp/pr1160-final-review-20261009/capacity-correction-renewal/native-correction-five.log",
+        "/tmp/pr1160-final-review-20261009/runtime-supplement/strict.log"
+      ],
+      "implementation_status": "Native second-lineage refresh and missing-epoch/session/context integrity guards integrated; later missing-principal corner repair and meaningful fixture correction are integrated too. Kernel-path positive/negative and affected native renewal logs retained.",
+      "completed_prior_obligations": [
+        "Original kernel second-lineage refusal, repaired refresh, missing-epoch negative controls, mutation controls and later missing-principal guard/fixture correction all have separate source-bound evidence.",
+        "80 affected/native-contract renewal passes at ca642 are recorded; this is not a new full205 rerun."
+      ],
+      "actually_unclosed_distinct_obligations": [],
+      "proposed_remaining_acceptance": [
+        "Renew final frozen composed owning/default checks and independent candidate delta review; historical local component passes are not exact-candidate qualification.",
+        "Publish exact candidate, obtain the four protected exact-SHA hosted checks, and complete normal protected merge.",
+        "Retain KANI-PROOF-QUAL OPEN/UNPROVED and SEC-1160-COLDSTATE OPEN P1 gating G5 under existing owner decisions; no proof, release or outside-team preview claim."
+      ],
+      "component_boundary": "FINAL-F12 is native security lineage/epoch accounting. It is distinct from active FINAL-12 receipt projection crash/reclamation work; do not use one label to close the other.",
+      "related_followups_preserved": [
+        "SEC-1160-COLDSTATE remains separate OPEN P1/G5 gate under bounded landing amendment."
+      ],
+      "direct_named_control_evidence": {
+        "evidence": "/tmp/pr1160-final-review-20261009/capacity-correction-renewal/native-contracts.log",
+        "matching_terminal_pass_names": [
+          "lineage_observation::existing_principal_refreshes_a_second_lineage_through_the_kernel",
+          "lineage_observation::missing_principal_label_under_an_existing_epoch_is_refused_by_the_legacy_reader",
+          "lineage_observation::rows_without_their_isolation_epoch_are_still_refused"
+        ],
+        "requested_markers": [
+          "existing_principal_refreshes_a_second_lineage_through_the_kernel",
+          "rows_without_their_isolation_epoch_are_still_refused",
+          "missing_principal_label_under_an_existing_epoch_is_refused_by_the_legacy_reader"
+        ],
+        "missing_markers": []
+      }
+    },
+    "FINAL-F04-OPERATOR": {
+      "requirement_id": "incoming-pr1160-final-review-20261009:FINAL-F04-OPERATOR",
+      "proposed_current_state": "local-component-qualified-candidate-pending",
+      "proposed_source_repair": {
+        "commits": [
+          "13ec138d238fb546ca09dfff67a35dcf63c9506e",
+          "b15c7383f5430eb3942e5fbed110b0570b9adf5c",
+          "9472d40c951993f4de4af1b2800454ad5fe8401f"
+        ],
+        "files": [
+          "crates/platform/chio-control-plane/src/trust_control.rs",
+          "crates/platform/chio-control-plane/src/trust_control/json_ingress.rs",
+          "crates/platform/chio-control-plane/src/trust_control/receipt_snapshot_admin.rs",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/receipt_snapshot_recovery_tests.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service/recovery.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/recovery.rs"
+        ],
+        "ancestry_only_at_requested_stage": "183d3c4319749aec4e1cc9dc321169cfaae8d461",
+        "claim": "Committed source integration verified by ancestry/file lists; no current production review or new runtime executed."
+      },
+      "add_verification_evidence": [
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/registry-export-operator-composition-20261009.json",
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/root-repair-review-dispositions-20261009.json",
+        "/tmp/pr1160-final-review-20261009/OPERATOR-PRODUCER-VERIFICATION.json",
+        "/tmp/pr1160-final-review-20261009/OPERATOR-PRE-HANDOFF-REVIEW.json",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f04-operator/original-red-http.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f04-operator/green-http-recovery.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f04-operator/green-store-recovery.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f04-operator/clippy.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f04-operator/fmt-check.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f04-operator/source-sha256-at-8f8e246342.txt"
+      ],
+      "implementation_status": "Admin-authenticated local-node recovery route with bounded quota growth/requested retry, exact wake epochs/reasons and cancellation controls integrated and locally tested.",
+      "completed_prior_obligations": [
+        "Actual HTTP Original and five HTTP/six store recovery controls, wrong/missing/tenant auth before body, actual quota recovery, request-vs-deadline wake and dropped-request no-change controls."
+      ],
+      "actually_unclosed_distinct_obligations": [],
+      "proposed_remaining_acceptance": [
+        "Renew final frozen composed owning/default checks and independent candidate delta review; historical local component passes are not exact-candidate qualification.",
+        "Publish exact candidate, obtain the four protected exact-SHA hosted checks, and complete normal protected merge.",
+        "Retain KANI-PROOF-QUAL OPEN/UNPROVED and SEC-1160-COLDSTATE OPEN P1 gating G5 under existing owner decisions; no proof, release or outside-team preview claim."
+      ],
+      "component_boundary": "Scheduling acknowledgement, no forced healthy rebuild, no integrity backoff shortening, no persisted configuration mutation.",
+      "related_followups_preserved": [
+        "ROOT-REVIEW-P3-4 explicit Building health observation remains separately unverified."
+      ]
+    },
+    "ROOT-REVIEW-P3-2": {
+      "requirement_id": "incoming-pr1160-final-review-20261009:ROOT-REVIEW-P3-2",
+      "proposed_current_state": "local-component-qualified-candidate-pending",
+      "proposed_source_repair": {
+        "commits": [
+          "13ec138d238fb546ca09dfff67a35dcf63c9506e",
+          "b15c7383f5430eb3942e5fbed110b0570b9adf5c",
+          "9472d40c951993f4de4af1b2800454ad5fe8401f"
+        ],
+        "files": [
+          "crates/platform/chio-control-plane/src/trust_control.rs",
+          "crates/platform/chio-control-plane/src/trust_control/json_ingress.rs",
+          "crates/platform/chio-control-plane/src/trust_control/receipt_snapshot_admin.rs",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/receipt_snapshot_recovery_tests.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service/recovery.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/recovery.rs"
+        ],
+        "ancestry_only_at_requested_stage": "183d3c4319749aec4e1cc9dc321169cfaae8d461",
+        "claim": "Committed source integration verified by ancestry/file lists; no current production review or new runtime executed."
+      },
+      "add_verification_evidence": [
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/registry-export-operator-composition-20261009.json",
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/root-repair-review-dispositions-20261009.json",
+        "/tmp/pr1160-final-review-20261009/OPERATOR-PRODUCER-VERIFICATION.json",
+        "/tmp/pr1160-final-review-20261009/OPERATOR-PRE-HANDOFF-REVIEW.json",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f04-operator/original-red-http.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f04-operator/green-http-recovery.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f04-operator/green-store-recovery.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f04-operator/clippy.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f04-operator/fmt-check.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f04-operator/source-sha256-at-8f8e246342.txt"
+      ],
+      "implementation_status": "Explicit retry/quota wake vs deadline and request cancellation are directly asserted, rather than inferred from successful recovery.",
+      "completed_prior_obligations": [
+        "Integrated committed HTTP test asserts (retry_wakes,quota_wakes,deadline_wakes)=(1,0,0) and (0,1,0), retry request/answer epochs, dropped request no mutation; matching exact controls pass in retained logs."
+      ],
+      "actually_unclosed_distinct_obligations": [],
+      "proposed_remaining_acceptance": [
+        "Renew final frozen composed owning/default checks and independent candidate delta review; historical local component passes are not exact-candidate qualification.",
+        "Publish exact candidate, obtain the four protected exact-SHA hosted checks, and complete normal protected merge.",
+        "Retain KANI-PROOF-QUAL OPEN/UNPROVED and SEC-1160-COLDSTATE OPEN P1 gating G5 under existing owner decisions; no proof, release or outside-team preview claim."
+      ],
+      "component_boundary": null,
+      "related_followups_preserved": [],
+      "direct_named_control_evidence": {
+        "evidence": "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f04-operator/green-http-recovery.log",
+        "matching_terminal_pass_names": [
+          "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::recovery::a_dropped_recovery_request_changes_nothing_and_a_stopped_service_refuses_cleanly",
+          "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::recovery::http_reads_recover_after_quota_growth_and_still_verify_selected_payloads",
+          "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::recovery::operator_retry_wakes_an_unchanged_quota_backoff_by_request_not_by_its_deadline"
+        ],
+        "requested_markers": [
+          "operator_retry_wakes_an_unchanged_quota_backoff_by_request_not_by_its_deadline",
+          "a_dropped_recovery_request_changes_nothing_and_a_stopped_service_refuses_cleanly",
+          "http_reads_recover_after_quota_growth_and_still_verify_selected_payloads"
+        ],
+        "missing_markers": []
+      }
+    },
+    "ROOT-REVIEW-P3-4": {
+      "requirement_id": "incoming-pr1160-final-review-20261009:ROOT-REVIEW-P3-4",
+      "proposed_current_state": "unavailable-and-ready-controls-qualified-building-coverage-open",
+      "proposed_source_repair": {
+        "commits": [
+          "c2c37c36c98e2bebad8deb6ebdfb589255acb8d3",
+          "9472d40c951993f4de4af1b2800454ad5fe8401f"
+        ],
+        "files": [
+          "crates/platform/chio-control-plane/src/trust_control.rs",
+          "crates/platform/chio-control-plane/src/trust_control/json_ingress.rs",
+          "crates/platform/chio-control-plane/src/trust_control/receipt_query_service.rs",
+          "crates/platform/chio-control-plane/src/trust_control/receipt_snapshot_admin.rs",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/receipt_query_snapshot_tests.rs",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/receipt_snapshot_recovery_tests.rs",
+          "docs/security/audits/receipt-public-health-privacy-qualification-20261009.json",
+          "docs/superpowers/plans/2026-10-09-final-review-repairs.md",
+          "docs/superpowers/specs/2026-10-09-authenticated-receipt-query-snapshots-design.md"
+        ],
+        "ancestry_only_at_requested_stage": "183d3c4319749aec4e1cc9dc321169cfaae8d461",
+        "claim": "Committed source integration verified by ancestry/file lists; no current production review or new runtime executed."
+      },
+      "add_verification_evidence": [
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/root-repair-review-dispositions-20261009.json",
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/receipt-public-health-privacy-qualification-20261009.json",
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/registry-export-operator-composition-20261009.json",
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/root-repair-review-dispositions-20261009.json",
+        "/tmp/pr1160-final-review-20261009/OPERATOR-PRODUCER-VERIFICATION.json",
+        "/tmp/pr1160-final-review-20261009/OPERATOR-PRE-HANDOFF-REVIEW.json",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f04-operator/original-red-http.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f04-operator/green-http-recovery.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f04-operator/green-store-recovery.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f04-operator/clippy.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f04-operator/fmt-check.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f04-operator/source-sha256-at-8f8e246342.txt"
+      ],
+      "implementation_status": "Public health shape is locally evidenced in Ready, actual quota-Unavailable and Stopped states. No explicit Building-phase /health observation was found in the committed cited controls; generic E::Building response-status mapping is a different test.",
+      "completed_prior_obligations": [
+        "Exact ready and actual quota-unavailable/stopped JSON shape controls already integrated and passing."
+      ],
+      "actually_unclosed_distinct_obligations": [
+        "Add/qualify deterministic actual Building-phase unauthenticated /health exact {configured:true,state:building}, including exhausted receipt admission; preserve no counts/raw diagnostics. Root has confirmed this coverage remains unverified."
+      ],
+      "proposed_remaining_acceptance": [
+        "Add/qualify deterministic actual Building-phase unauthenticated /health exact {configured:true,state:building}, including exhausted receipt admission; preserve no counts/raw diagnostics. Root has confirmed this coverage remains unverified.",
+        "Renew final frozen composed owning/default checks and independent candidate delta review; historical local component passes are not exact-candidate qualification.",
+        "Publish exact candidate, obtain the four protected exact-SHA hosted checks, and complete normal protected merge.",
+        "Retain KANI-PROOF-QUAL OPEN/UNPROVED and SEC-1160-COLDSTATE OPEN P1 gating G5 under existing owner decisions; no proof, release or outside-team preview claim."
+      ],
+      "component_boundary": "Missing verification, not a newly confirmed production defect; no coverage closure inferred from FINAL-F04-OPERATOR.",
+      "related_followups_preserved": [],
+      "direct_named_control_evidence": {
+        "evidence": "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f04-operator/green-http-recovery.log",
+        "matching_terminal_pass_names": [
+          "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::recovery::http_reads_recover_after_quota_growth_and_still_verify_selected_payloads"
+        ],
+        "requested_markers": [
+          "http_reads_recover_after_quota_growth_and_still_verify_selected_payloads"
+        ],
+        "missing_markers": []
+      }
+    },
+    "F03-REVIEW-P1-A": {
+      "requirement_id": "incoming-pr1160-final-review-20261009:F03-REVIEW-P1-A",
+      "proposed_current_state": "local-component-repaired-candidate-pending",
+      "proposed_source_repair": {
+        "commits": [
+          "7d1a89e354be8372cee9f62b72692ba1ee19e437",
+          "ca642eb18aa6cbaebffa7da11bfaf33edc943535",
+          "c7af747721e22173d0ee268ad8f3b143c907af71"
+        ],
+        "files": [
+          "crates/kernel/chio-kernel/src/receipt_query.rs",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/evidence_snapshot_export_tests.rs",
+          "crates/platform/chio-control-plane/src/trust_control/underwriting_and_support/policy_support.rs",
+          "crates/platform/chio-store-sqlite/src/evidence_export/tests/snapshot_tests.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export/metadata.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export/proofs.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export/tests.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/query.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/walk.rs",
+          "docs/reference/RECEIPT_QUERY_API.md",
+          "docs/security/receipt-http-evidence-export.md",
+          "spec/WIRE_PROTOCOL.md"
+        ],
+        "ancestry_only_at_requested_stage": "183d3c4319749aec4e1cc9dc321169cfaae8d461",
+        "claim": "Committed source integration verified by ancestry/file lists; no current production review or new runtime executed."
+      },
+      "add_verification_evidence": [
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/receipt-export-review-dispositions-20261009.json",
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/registry-export-operator-composition-20261009.json",
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/readiness-followons-20261010.json",
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/export-attribution-repair-20261010.json",
+        "/tmp/pr1160-export-refusals-20261009/qualification.json",
+        "/tmp/pr1160-export-refusals-20261009/lineage-and-projection-original.log",
+        "/tmp/pr1160-export-refusals-20261009/lineage-and-projection-green.log",
+        "/tmp/pr1160-export-refusals-20261009/owning-export-snapshot-http.log",
+        "/tmp/pr1160-export-refusals-20261009/strict-owning.log",
+        "/tmp/pr1160-export-refusals-20261009/final-format.log",
+        "/tmp/pr1160-export-contract-final-20261009/qualification.json",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/clippy-strict.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/final-source.patch",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/green-final.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/original-red.log"
+      ],
+      "implementation_status": "Legacy/cycle/depth/missing-parent live metadata refuses only the current export, preserving Ready and other tenants. Later typed-refusal and captured-attribution ordering repair integrated; actual attribution/payload/proof corruption remains Invalid.",
+      "completed_prior_obligations": [
+        "Expected-safe unchanged-production Original0PASS6FAIL; repaired targeted11 and owning58CP/187store retained.",
+        "Later HTTP typed422 and latest attribution producer29CP+65store/strict/fmt evidence retained separately."
+      ],
+      "actually_unclosed_distinct_obligations": [],
+      "proposed_remaining_acceptance": [
+        "Renew final frozen composed owning/default checks and independent candidate delta review; historical local component passes are not exact-candidate qualification.",
+        "Publish exact candidate, obtain the four protected exact-SHA hosted checks, and complete normal protected merge.",
+        "Retain KANI-PROOF-QUAL OPEN/UNPROVED and SEC-1160-COLDSTATE OPEN P1 gating G5 under existing owner decisions; no proof, release or outside-team preview claim."
+      ],
+      "component_boundary": "Authenticated captured attribution corruption is deliberately invalidating; supported mutable/unsupported export metadata refusal is request-scoped.",
+      "related_followups_preserved": [
+        "F03-P3-C/D/E reviewed minor debt remains independently tracked; latest attribution follow-on has its own evidence."
+      ]
+    },
+    "F03-REVIEW-P2-A": {
+      "requirement_id": "incoming-pr1160-final-review-20261009:F03-REVIEW-P2-A",
+      "proposed_current_state": "local-component-repaired-candidate-pending",
+      "proposed_source_repair": {
+        "commits": [
+          "7d1a89e354be8372cee9f62b72692ba1ee19e437",
+          "ca642eb18aa6cbaebffa7da11bfaf33edc943535",
+          "c7af747721e22173d0ee268ad8f3b143c907af71"
+        ],
+        "files": [
+          "crates/kernel/chio-kernel/src/receipt_query.rs",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/evidence_snapshot_export_tests.rs",
+          "crates/platform/chio-control-plane/src/trust_control/underwriting_and_support/policy_support.rs",
+          "crates/platform/chio-store-sqlite/src/evidence_export/tests/snapshot_tests.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export/metadata.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export/proofs.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export/tests.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/query.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/walk.rs",
+          "docs/reference/RECEIPT_QUERY_API.md",
+          "docs/security/receipt-http-evidence-export.md",
+          "spec/WIRE_PROTOCOL.md"
+        ],
+        "ancestry_only_at_requested_stage": "183d3c4319749aec4e1cc9dc321169cfaae8d461",
+        "claim": "Committed source integration verified by ancestry/file lists; no current production review or new runtime executed."
+      },
+      "add_verification_evidence": [
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/receipt-export-review-dispositions-20261009.json",
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/registry-export-operator-composition-20261009.json",
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/readiness-followons-20261010.json",
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/export-attribution-repair-20261010.json",
+        "/tmp/pr1160-export-refusals-20261009/qualification.json",
+        "/tmp/pr1160-export-refusals-20261009/lineage-and-projection-original.log",
+        "/tmp/pr1160-export-refusals-20261009/lineage-and-projection-green.log",
+        "/tmp/pr1160-export-refusals-20261009/owning-export-snapshot-http.log",
+        "/tmp/pr1160-export-refusals-20261009/strict-owning.log",
+        "/tmp/pr1160-export-refusals-20261009/final-format.log",
+        "/tmp/pr1160-export-contract-final-20261009/qualification.json",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/clippy-strict.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/final-source.patch",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/green-final.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/original-red.log"
+      ],
+      "implementation_status": "Per-request refusal plus actual4097-receipt HTTP422/work-budget code/no-bundle/Ready contract integrated and locally evidenced; builder-dependent short deadline was repaired with condition-based readiness and bounded producer control.",
+      "completed_prior_obligations": [
+        "Actual HTTP work-budget control and tenant continuation controls pass; typed lineage422 Original and repaired contract packet exist."
+      ],
+      "actually_unclosed_distinct_obligations": [],
+      "proposed_remaining_acceptance": [
+        "Renew final frozen composed owning/default checks and independent candidate delta review; historical local component passes are not exact-candidate qualification.",
+        "Publish exact candidate, obtain the four protected exact-SHA hosted checks, and complete normal protected merge.",
+        "Retain KANI-PROOF-QUAL OPEN/UNPROVED and SEC-1160-COLDSTATE OPEN P1 gating G5 under existing owner decisions; no proof, release or outside-team preview claim."
+      ],
+      "component_boundary": "Unchanged4096 selection/32MiB bytes/4096prefix/131072proof leaf budgets. No truncation or cap widening; full local export availability remains explicit.",
+      "related_followups_preserved": [],
+      "direct_named_control_evidence": {
+        "evidence": "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/green-final.log",
+        "matching_terminal_pass_names": [
+          "trust_control::service_runtime::router::tests::evidence_snapshot_export_tests::legacy_lineage_refusal_returns_typed_422_and_preserves_other_tenants",
+          "trust_control::service_runtime::router::tests::evidence_snapshot_export_tests::oversized_tenant_export_returns_422_without_bundle_or_snapshot_invalidation"
+        ],
+        "requested_markers": [
+          "oversized_tenant_export_returns_422_without_bundle_or_snapshot_invalidation",
+          "legacy_lineage_refusal_returns_typed_422_and_preserves_other_tenants"
+        ],
+        "missing_markers": []
+      }
+    },
+    "F03-REVIEW-P3-A": {
+      "requirement_id": "incoming-pr1160-final-review-20261009:F03-REVIEW-P3-A",
+      "proposed_current_state": "source-reviewed-refuted-positive-control-passed",
+      "proposed_source_repair": {
+        "commits": [
+          "7d1a89e354be8372cee9f62b72692ba1ee19e437"
+        ],
+        "files": [
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/evidence_snapshot_export_tests.rs",
+          "crates/platform/chio-store-sqlite/src/evidence_export/tests/snapshot_tests.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export/metadata.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export/proofs.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export/tests.rs"
+        ],
+        "ancestry_only_at_requested_stage": "183d3c4319749aec4e1cc9dc321169cfaae8d461",
+        "claim": "Committed source integration verified by ancestry/file lists; no current production review or new runtime executed."
+      },
+      "add_verification_evidence": [
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/receipt-export-review-dispositions-20261009.json",
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/registry-export-operator-composition-20261009.json",
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/readiness-followons-20261010.json",
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/export-attribution-repair-20261010.json",
+        "/tmp/pr1160-export-refusals-20261009/qualification.json",
+        "/tmp/pr1160-export-refusals-20261009/lineage-and-projection-original.log",
+        "/tmp/pr1160-export-refusals-20261009/lineage-and-projection-green.log",
+        "/tmp/pr1160-export-refusals-20261009/owning-export-snapshot-http.log",
+        "/tmp/pr1160-export-refusals-20261009/strict-owning.log",
+        "/tmp/pr1160-export-refusals-20261009/final-format.log",
+        "/tmp/pr1160-export-contract-final-20261009/qualification.json",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/clippy-strict.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/final-source.patch",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/green-final.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/original-red.log"
+      ],
+      "implementation_status": "Suggested legitimate child-rotation race was refuted by reviewed transaction/publication order; deterministic after-capture rotation positive is passing. No bounded retry, bug fix, or Original RED was invented.",
+      "completed_prior_obligations": [
+        "Archive publication precedes atomic live delete/watermark; live watermark+lookup share read transaction. Source review and direct child rotation positive retained."
+      ],
+      "actually_unclosed_distinct_obligations": [],
+      "proposed_remaining_acceptance": [
+        "Renew final frozen composed owning/default checks and independent candidate delta review; historical local component passes are not exact-candidate qualification.",
+        "Publish exact candidate, obtain the four protected exact-SHA hosted checks, and complete normal protected merge.",
+        "Retain KANI-PROOF-QUAL OPEN/UNPROVED and SEC-1160-COLDSTATE OPEN P1 gating G5 under existing owner decisions; no proof, release or outside-team preview claim."
+      ],
+      "component_boundary": "Refuted as a legitimate rotation interleaving for current supported source ordering: archive copy committed before atomic delete+watermark; child read pins live watermark and lookup in one transaction. Deterministic after-capture child rotation preserves export/Ready. No retry/Original RED invented.",
+      "related_followups_preserved": [],
+      "direct_named_control_evidence": {
+        "evidence": "/tmp/pr1160-export-refusals-20261009/owning-export-snapshot-http.log",
+        "matching_terminal_pass_names": [
+          "receipt_query_snapshot::export::tests::child_rotation_after_capture_preserves_admin_export_and_snapshot_custody"
+        ],
+        "requested_markers": [
+          "child_rotation_after_capture_preserves_admin_export_and_snapshot_custody"
+        ],
+        "missing_markers": []
+      }
+    },
+    "F03-REVIEW-P3-B": {
+      "requirement_id": "incoming-pr1160-final-review-20261009:F03-REVIEW-P3-B",
+      "proposed_current_state": "local-component-repaired-candidate-pending",
+      "proposed_source_repair": {
+        "commits": [
+          "7d1a89e354be8372cee9f62b72692ba1ee19e437",
+          "ca642eb18aa6cbaebffa7da11bfaf33edc943535",
+          "c7af747721e22173d0ee268ad8f3b143c907af71"
+        ],
+        "files": [
+          "crates/kernel/chio-kernel/src/receipt_query.rs",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/evidence_snapshot_export_tests.rs",
+          "crates/platform/chio-control-plane/src/trust_control/underwriting_and_support/policy_support.rs",
+          "crates/platform/chio-store-sqlite/src/evidence_export/tests/snapshot_tests.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export/metadata.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export/proofs.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export/tests.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/query.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/walk.rs",
+          "docs/reference/RECEIPT_QUERY_API.md",
+          "docs/security/receipt-http-evidence-export.md",
+          "spec/WIRE_PROTOCOL.md"
+        ],
+        "ancestry_only_at_requested_stage": "183d3c4319749aec4e1cc9dc321169cfaae8d461",
+        "claim": "Committed source integration verified by ancestry/file lists; no current production review or new runtime executed."
+      },
+      "add_verification_evidence": [
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/receipt-export-review-dispositions-20261009.json",
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/registry-export-operator-composition-20261009.json",
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/readiness-followons-20261010.json",
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/export-attribution-repair-20261010.json",
+        "/tmp/pr1160-export-refusals-20261009/qualification.json",
+        "/tmp/pr1160-export-refusals-20261009/lineage-and-projection-original.log",
+        "/tmp/pr1160-export-refusals-20261009/lineage-and-projection-green.log",
+        "/tmp/pr1160-export-refusals-20261009/owning-export-snapshot-http.log",
+        "/tmp/pr1160-export-refusals-20261009/strict-owning.log",
+        "/tmp/pr1160-export-refusals-20261009/final-format.log",
+        "/tmp/pr1160-export-contract-final-20261009/qualification.json",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/clippy-strict.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/final-source.patch",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/green-final.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/original-red.log"
+      ],
+      "implementation_status": "False shared invalidation classified/repaired: digest-matching unsupported historical whole-bundle representation and mutable publication metadata refuse only request; missing owned checkpoint prefix and real payload/proof/captured attribution corruption invalidate.",
+      "completed_prior_obligations": [
+        "Confirmed missing-prefix and mutable-metadata expected-safe Originals plus direct fail-closed controls retained; no historic protocol expansion."
+      ],
+      "actually_unclosed_distinct_obligations": [],
+      "proposed_remaining_acceptance": [
+        "Renew final frozen composed owning/default checks and independent candidate delta review; historical local component passes are not exact-candidate qualification.",
+        "Publish exact candidate, obtain the four protected exact-SHA hosted checks, and complete normal protected merge.",
+        "Retain KANI-PROOF-QUAL OPEN/UNPROVED and SEC-1160-COLDSTATE OPEN P1 gating G5 under existing owner decisions; no proof, release or outside-team preview claim."
+      ],
+      "component_boundary": "RegradedP2 and repaired: missing owned checkpoint prefix/proof construction corruption invalidates; mutable publication metadata and digest-matching whole-bundle representation failure refuse only the request. Walker shares validate_checkpoint/predecessor and additionally chain_root; no new historical protocol support.",
+      "related_followups_preserved": []
+    },
+    "F11-REVIEW-P2-2": {
+      "requirement_id": "incoming-pr1160-final-review-20261009:F11-REVIEW-P2-2",
+      "proposed_current_state": "governance-and-fee-binding-components-qualified-candidate-pending",
+      "proposed_source_repair": {
+        "commits": [
+          "e24ee3351466cf94ec1defae453413f80d452da4",
+          "a800b26ddaee5083272ae439e7051731f1aa105c"
+        ],
+        "files": [
+          "crates/platform/chio-control-plane/src/trust_control/certification_handlers.rs",
+          "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports_tests/authority_sync_isolation.rs",
+          "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports_tests/governance_authority.rs",
+          "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports_tests/governed_fee_binding.rs",
+          "crates/platform/chio-control-plane/src/trust_control/fiscal_runtime.rs",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/issuance.rs",
+          "crates/platform/chio-store-sqlite/src/fiscal_store.rs",
+          "crates/platform/chio-store-sqlite/src/fiscal_store/legacy_fee_binding.rs"
+        ],
+        "ancestry_only_at_requested_stage": "183d3c4319749aec4e1cc9dc321169cfaae8d461",
+        "claim": "Committed source integration verified by ancestry/file lists; no current production review or new runtime executed."
+      },
+      "add_verification_evidence": [
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/readiness-followons-20261010.json",
+        "/home/connor/lanes/pr1160-landing-final/docs/security/audits/fee-wallet-review-20261010.json",
+        "/tmp/pr1160-final-review-20261009/FEE-BINDING-PRODUCER-VERIFIED.json",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/f11-governance/original-red/red-at-base-799b33d666.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/f11-governance/green/governance_authority-at-aa10c68ac7.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/f11-governance/green/owning-filters-1.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/f11-governance/green/clippy-1.log",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/f11-governance/green/fmt-check.log",
+        "/tmp/pr1160-fee-composition-20261010/composed-fee.log",
+        "/tmp/pr1160-fee-composition-20261010/composed-fee.json",
+        "/tmp/pr1160-fee-composition-20261010/composed-store-fiscal.log",
+        "/tmp/pr1160-fee-composition-20261010/composed-store-fiscal.json",
+        "/home/connor/lanes/claude-pr1160-evidence/vfix/f11-fee-binding/ERRATA.md"
+      ],
+      "implementation_status": "Admitted live service-authority trust for reviewed governance/local penalty paths integrated with direct Original/16control/109owning/strict evidence. Separate fee-binding refusal-after-persistence follow-on is now integrated and source-bound21governance/15fiscal composition passes exist.",
+      "completed_prior_obligations": [
+        "Expired/stale follower governance expected-safe Original, admitted actual trust path and public-auth-before-read controls recorded.",
+        "F11-FEE-BINDING-REFUSAL a800 completes final authority observation before fiscal new/idempotent commit and rollback on refusal; stale current-state wording must not leave it implementation-open."
+      ],
+      "actually_unclosed_distinct_obligations": [
+        "Final composition against current Core admitted-authority repair and exact signer predicates remains open; no review of active Core source was performed."
+      ],
+      "proposed_remaining_acceptance": [
+        "Final composition against current Core admitted-authority repair and exact signer predicates remains open; no review of active Core source was performed.",
+        "Renew final frozen composed owning/default checks and independent candidate delta review; historical local component passes are not exact-candidate qualification.",
+        "Publish exact candidate, obtain the four protected exact-SHA hosted checks, and complete normal protected merge.",
+        "Retain KANI-PROOF-QUAL OPEN/UNPROVED and SEC-1160-COLDSTATE OPEN P1 gating G5 under existing owner decisions; no proof, release or outside-team preview claim."
+      ],
+      "component_boundary": {
+        "forwarding": "UNVERIFIED here and by the producer. Historical pinned ticket-copy incorrectly claimed Root coverage; live tickets and ERRATA correct this.",
+        "errata_preserved": {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/f11-fee-binding/ERRATA.md",
+          "sha256": "a1f07549abb20aaf64d4f8eb7a78aa8073d476705562feb18e0a4fc7b267b4d4"
+        },
+        "cross_database": "Final authority observation inside fiscal transaction before either new or idempotent commit; refusal rolls back. Separate databases do not provide atomic cross-database authorization and commit."
+      },
+      "related_followups_preserved": [
+        "GOVERNANCE-CASE-TRUST remains the recorded inherited/not-runtime-confirmed follow-up; do not silently claim arbitrary self-signature-only case evaluator closure.",
+        "Live keyring/forwarding fixture breadth remains explicitly limited in historical packet; local component status is not final backend qualification."
+      ]
+    }
+  },
+  "verified_artifacts": {
+    "/home/connor/lanes/pr1160-landing-final/docs/security/audits/registry-export-operator-composition-20261009.json": {
+      "path": "/home/connor/lanes/pr1160-landing-final/docs/security/audits/registry-export-operator-composition-20261009.json",
+      "available": true,
+      "sha256": "944a2c8c87c105c96a6ebeaaea4ce46f93b7ea284e37e5430081ffaf9bf50b11",
+      "committed_at": "183d3c4319749aec4e1cc9dc321169cfaae8d461",
+      "committed_sha256": "944a2c8c87c105c96a6ebeaaea4ce46f93b7ea284e37e5430081ffaf9bf50b11",
+      "matches_committed_bytes": true
+    },
+    "/home/connor/lanes/pr1160-landing-final/docs/security/audits/receipt-recovery-health-qualification-20261009.json": {
+      "path": "/home/connor/lanes/pr1160-landing-final/docs/security/audits/receipt-recovery-health-qualification-20261009.json",
+      "available": true,
+      "sha256": "5ce2adc485a327f44da1c4d1dd15cff68a96253dc49e8b59c73763ae49e64250",
+      "committed_at": "183d3c4319749aec4e1cc9dc321169cfaae8d461",
+      "committed_sha256": "5ce2adc485a327f44da1c4d1dd15cff68a96253dc49e8b59c73763ae49e64250",
+      "matches_committed_bytes": true
+    },
+    "/home/connor/lanes/pr1160-landing-final/docs/security/audits/receipt-public-health-privacy-qualification-20261009.json": {
+      "path": "/home/connor/lanes/pr1160-landing-final/docs/security/audits/receipt-public-health-privacy-qualification-20261009.json",
+      "available": true,
+      "sha256": "d27636754dc2368f7022510bdf83b19152441bd589d7e938cd50a10d770a2de1",
+      "committed_at": "183d3c4319749aec4e1cc9dc321169cfaae8d461",
+      "committed_sha256": "d27636754dc2368f7022510bdf83b19152441bd589d7e938cd50a10d770a2de1",
+      "matches_committed_bytes": true
+    },
+    "/home/connor/lanes/pr1160-landing-final/docs/security/audits/root-repair-review-dispositions-20261009.json": {
+      "path": "/home/connor/lanes/pr1160-landing-final/docs/security/audits/root-repair-review-dispositions-20261009.json",
+      "available": true,
+      "sha256": "83080296f44eefbc908445364443a514851af2500a81478a2b73afedb9dd70fa",
+      "committed_at": "183d3c4319749aec4e1cc9dc321169cfaae8d461",
+      "committed_sha256": "83080296f44eefbc908445364443a514851af2500a81478a2b73afedb9dd70fa",
+      "matches_committed_bytes": true
+    },
+    "/home/connor/lanes/pr1160-landing-final/docs/security/audits/final-capacity-acceptance-20261009.json": {
+      "path": "/home/connor/lanes/pr1160-landing-final/docs/security/audits/final-capacity-acceptance-20261009.json",
+      "available": true,
+      "sha256": "648f732aa906028702aaa57b65d1a5a3ab20f4976b31ee7ea0d5281b0dd818fa",
+      "committed_at": "183d3c4319749aec4e1cc9dc321169cfaae8d461",
+      "committed_sha256": "648f732aa906028702aaa57b65d1a5a3ab20f4976b31ee7ea0d5281b0dd818fa",
+      "matches_committed_bytes": true
+    },
+    "/home/connor/lanes/pr1160-landing-final/docs/security/audits/bounded-capacity-owner-amendment-20261009.json": {
+      "path": "/home/connor/lanes/pr1160-landing-final/docs/security/audits/bounded-capacity-owner-amendment-20261009.json",
+      "available": true,
+      "sha256": "ac0b82b5b20f94d157aa22c2879fa3c4b4aa4f5a5b2cca020fff72c264486251",
+      "committed_at": "183d3c4319749aec4e1cc9dc321169cfaae8d461",
+      "committed_sha256": "ac0b82b5b20f94d157aa22c2879fa3c4b4aa4f5a5b2cca020fff72c264486251",
+      "matches_committed_bytes": true
+    },
+    "/home/connor/lanes/pr1160-landing-final/docs/security/audits/readiness-followons-20261010.json": {
+      "path": "/home/connor/lanes/pr1160-landing-final/docs/security/audits/readiness-followons-20261010.json",
+      "available": true,
+      "sha256": "60f82b821894b46c823c7f88f9972333384da657ea284f693caa77df8db1b5de",
+      "committed_at": "183d3c4319749aec4e1cc9dc321169cfaae8d461",
+      "committed_sha256": "60f82b821894b46c823c7f88f9972333384da657ea284f693caa77df8db1b5de",
+      "matches_committed_bytes": true
+    },
+    "/home/connor/lanes/pr1160-landing-final/docs/security/audits/fee-wallet-review-20261010.json": {
+      "path": "/home/connor/lanes/pr1160-landing-final/docs/security/audits/fee-wallet-review-20261010.json",
+      "available": true,
+      "sha256": "3cd17f09b4c2496eb058ad550b790905821915b00420d7d9ca250994e1b0761a",
+      "committed_at": "183d3c4319749aec4e1cc9dc321169cfaae8d461",
+      "committed_sha256": "3cd17f09b4c2496eb058ad550b790905821915b00420d7d9ca250994e1b0761a",
+      "matches_committed_bytes": true
+    },
+    "/home/connor/lanes/pr1160-landing-final/docs/security/audits/export-attribution-repair-20261010.json": {
+      "path": "/home/connor/lanes/pr1160-landing-final/docs/security/audits/export-attribution-repair-20261010.json",
+      "available": true,
+      "sha256": "f3e9d0c15eee4cb72a01a3866130b1c6d6c8efea1de94fc553141aedf85ac865",
+      "committed_at": "183d3c4319749aec4e1cc9dc321169cfaae8d461",
+      "committed_sha256": "f3e9d0c15eee4cb72a01a3866130b1c6d6c8efea1de94fc553141aedf85ac865",
+      "matches_committed_bytes": true
+    },
+    "/home/connor/lanes/pr1160-landing-final/docs/security/audits/receipt-export-review-dispositions-20261009.json": {
+      "path": "/home/connor/lanes/pr1160-landing-final/docs/security/audits/receipt-export-review-dispositions-20261009.json",
+      "available": true,
+      "sha256": "dd6f57029b1748c4fd7e4b509356d166f8141dab1e195deb52fbec4e81cd2c0a",
+      "committed_at": "183d3c4319749aec4e1cc9dc321169cfaae8d461",
+      "committed_sha256": "dd6f57029b1748c4fd7e4b509356d166f8141dab1e195deb52fbec4e81cd2c0a",
+      "matches_committed_bytes": true
+    },
+    "/tmp/pr1160-final-review-20261009/F02-PRODUCER-VERIFICATION.json": {
+      "path": "/tmp/pr1160-final-review-20261009/F02-PRODUCER-VERIFICATION.json",
+      "available": true,
+      "sha256": "741d8076ad553e02985e296d5459e52740b506169517efbf2450ca9425e5c68f"
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f02/original-red-base-8f3dfac6b6.log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f02/original-red-base-8f3dfac6b6.log",
+      "available": true,
+      "sha256": "70b8d9458e9bf24de01833fd1bfa91f6aafd163cb083443f003fa447613ed802",
+      "terminal_summaries": [
+        "test result: FAILED. 2 passed; 13 failed; 0 ignored; 0 measured; 1576 filtered out; finished in 48.18s"
+      ]
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f02/green-focused.log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f02/green-focused.log",
+      "available": true,
+      "sha256": "ce4d705244c4476ca594b87e6e950db62abf43eaac0d26c45e8cb4ee4d7936b8",
+      "terminal_summaries": [
+        "test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 1576 filtered out; finished in 118.61s"
+      ]
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f02/fallback-green.log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f02/fallback-green.log",
+      "available": true,
+      "sha256": "d05d613de7348a606de177334c6436c8516fe69b6f60d4a17ea99a9334b5881e",
+      "terminal_summaries": [
+        "test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 1576 filtered out; finished in 208.56s"
+      ]
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f02/supersede-original-red-at-2b39ace069.log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f02/supersede-original-red-at-2b39ace069.log",
+      "available": true,
+      "sha256": "00fb19d238b340ffbbc5b2ab8348a5b69ea604d4a63837a35777329896fe3604",
+      "terminal_summaries": [
+        "test result: FAILED. 7 passed; 2 failed; 0 ignored; 0 measured; 1593 filtered out; finished in 1.04s"
+      ]
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f02/supersede-green.log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f02/supersede-green.log",
+      "available": true,
+      "sha256": "4eeb579f5bf03ccee1232fb15341b4974b4a95f55b2fec072f9f4dc1d38402ab",
+      "terminal_summaries": [
+        "test result: ok. 55 passed; 0 failed; 0 ignored; 0 measured; 1547 filtered out; finished in 216.10s"
+      ]
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f02/supersede-clippy.log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f02/supersede-clippy.log",
+      "available": true,
+      "sha256": "528308786fa7264da87d98f7595bf8189df03a3f9f26cf6e72af0276a4cbb3ef",
+      "terminal_summaries": []
+    },
+    "/tmp/pr1160-final-review-20261009/health/original.log": {
+      "path": "/tmp/pr1160-final-review-20261009/health/original.log",
+      "available": true,
+      "sha256": "0db84438383e62eac52009585e17bf31781497ccc14059c46f81c1a4ddc388ce",
+      "terminal_summaries": [
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1576 filtered out; finished in 0.35s"
+      ]
+    },
+    "/tmp/pr1160-final-review-20261009/recovery/original.log": {
+      "path": "/tmp/pr1160-final-review-20261009/recovery/original.log",
+      "available": true,
+      "sha256": "940641e05271be0caf7e1392dd44f23d3245988fabf86de821afbb67c09c577b",
+      "terminal_summaries": [
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2274 filtered out; finished in 5.85s"
+      ]
+    },
+    "/tmp/pr1160-final-review-20261009/composed/snapshots.log": {
+      "path": "/tmp/pr1160-final-review-20261009/composed/snapshots.log",
+      "available": true,
+      "sha256": "d5673e1b77a796e3515dea831a4f77f0cf1be1283fe7a3c28c86b1205d24566d",
+      "terminal_summaries": [
+        "test result: ok. 138 passed; 0 failed; 7 ignored; 0 measured; 2135 filtered out; finished in 96.91s"
+      ]
+    },
+    "/tmp/pr1160-final-review-20261009/composed/http-components-green.log": {
+      "path": "/tmp/pr1160-final-review-20261009/composed/http-components-green.log",
+      "available": true,
+      "sha256": "29a0418fa73aeb26bfe130d2b66a6d50c008dc3f057658a3e34a06abb6b6916d",
+      "terminal_summaries": [
+        "test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 1555 filtered out; finished in 7.86s"
+      ]
+    },
+    "/tmp/pr1160-final-review-20261009/composed/clippy.log": {
+      "path": "/tmp/pr1160-final-review-20261009/composed/clippy.log",
+      "available": true,
+      "sha256": "6f85f9e344f4fe08c9a963d744fbe29319c823af2d9f9a5454c343d2d0865a91",
+      "terminal_summaries": []
+    },
+    "/tmp/pr1160-final-review-20261009/F01-F02-F12-COMPOSITION.json": {
+      "path": "/tmp/pr1160-final-review-20261009/F01-F02-F12-COMPOSITION.json",
+      "available": true,
+      "sha256": "294be2fd501de3924b77d5bef0af49d16ff4bc53eb5fb8dcb95f6dab66e330ba"
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f01/side-lineage-observation-base.log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f01/side-lineage-observation-base.log",
+      "available": true,
+      "sha256": "12451015cb9aa11d54cdb681ba17bbce161e2d173e013e7230c48820197c39f0",
+      "terminal_summaries": [
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 1.85s"
+      ]
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f01/f12-original-red.log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f01/f12-original-red.log",
+      "available": true,
+      "sha256": "dddc8dbf31309d90c3190a9310c5d57a37d80d7e822f62e191ddf336b5010baa",
+      "terminal_summaries": [
+        "test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 12 filtered out; finished in 1.91s"
+      ]
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f01/f12-green-1.log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f01/f12-green-1.log",
+      "available": true,
+      "sha256": "8eab21dba4ab5e4b3f7ebf29079bf60e0ee6c146e9bca9b30518f6ffdc5a59ff",
+      "terminal_summaries": [
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 3.81s"
+      ]
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f01/f12-clippy.log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f01/f12-clippy.log",
+      "available": true,
+      "sha256": "1b8039e33e07e246a94c57914bb400498864db14b220bdf6f8227a27faa50863",
+      "terminal_summaries": []
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f01/f12b-original-red.log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f01/f12b-original-red.log",
+      "available": true,
+      "sha256": "f5b231dfd8d6d29b9eae8883d95d0997ebb3ed069648f6ed544c9b999429b96b",
+      "terminal_summaries": [
+        "test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 4.83s",
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2286 filtered out; finished in 2.69s"
+      ]
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f01/f12b-green.log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f01/f12b-green.log",
+      "available": true,
+      "sha256": "6196a41b56d7bd2314184da6b1f5600fd0f1cfb2d0d80e138e05e5ec837aa89b",
+      "terminal_summaries": [
+        "test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 32.39s",
+        "test result: ok. 44 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.43s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.66s",
+        "test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 2260 filtered out; finished in 17.66s"
+      ]
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f01/corrected-integration.log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f01/corrected-integration.log",
+      "available": true,
+      "sha256": "29aaad16678cc07b2b02eadec3d2c7989f7b0c7ebe657a76cbc8db0986c717dc",
+      "terminal_summaries": [
+        "test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 32.76s",
+        "test result: ok. 44 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.54s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.72s"
+      ]
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f01/f12-mutation-epoch.log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f01/f12-mutation-epoch.log",
+      "available": true,
+      "sha256": "1c8ee7b6d0d91a59276898ecde7ce3e5f72ea503fd55724357def03bb22a8289",
+      "terminal_summaries": [
+        "test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 3.59s"
+      ]
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f01/f12-mutation-context.log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f01/f12-mutation-context.log",
+      "available": true,
+      "sha256": "10b269ed501e121c3f2af79a5cec6e7b76fc54478a7d44e4c2bbeb275278e816",
+      "terminal_summaries": [
+        "test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 3.52s"
+      ]
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f01/f12-mutation-session-context.log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f01/f12-mutation-session-context.log",
+      "available": true,
+      "sha256": "ff2e66a120ebcc53074bcd18cdf6d76ce3d3a66150f21a4abf890070cee849a4",
+      "terminal_summaries": [
+        "test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 3.55s",
+        "test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 42 filtered out; finished in 0.23s"
+      ]
+    },
+    "/tmp/pr1160-final-review-20261009/capacity-correction-renewal/native-contracts.log": {
+      "path": "/tmp/pr1160-final-review-20261009/capacity-correction-renewal/native-contracts.log",
+      "available": true,
+      "sha256": "0a85b2fa6b57d6b93529560c36d07753d6b49e55358a841175a1cd5e4b439270",
+      "terminal_summaries": [
+        "test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 42.70s",
+        "test result: ok. 44 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.27s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.22s"
+      ]
+    },
+    "/tmp/pr1160-final-review-20261009/capacity-correction-renewal/native-correction-five.log": {
+      "path": "/tmp/pr1160-final-review-20261009/capacity-correction-renewal/native-correction-five.log",
+      "available": true,
+      "sha256": "83fa3a49478bb61c8e0695c3a7d1a159169875b543ed4768e0c772692bd2bd7f",
+      "terminal_summaries": [
+        "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 2326 filtered out; finished in 130.36s"
+      ]
+    },
+    "/tmp/pr1160-final-review-20261009/runtime-supplement/strict.log": {
+      "path": "/tmp/pr1160-final-review-20261009/runtime-supplement/strict.log",
+      "available": true,
+      "sha256": "3f154ce80c4c97c690aad12a324f50e461ee761f13348563e884a16a1af033ac",
+      "terminal_summaries": []
+    },
+    "/tmp/pr1160-final-review-20261009/OPERATOR-PRODUCER-VERIFICATION.json": {
+      "path": "/tmp/pr1160-final-review-20261009/OPERATOR-PRODUCER-VERIFICATION.json",
+      "available": true,
+      "sha256": "00e00a1decba485728a3c8c2ddf3034b6b10a1b734ad3f0346779cf7ad689aa0"
+    },
+    "/tmp/pr1160-final-review-20261009/OPERATOR-PRE-HANDOFF-REVIEW.json": {
+      "path": "/tmp/pr1160-final-review-20261009/OPERATOR-PRE-HANDOFF-REVIEW.json",
+      "available": true,
+      "sha256": "b45db18cf86d38c6efd1ea4ee520c90621a5707e19931a1b78f707100f73d3c9"
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f04-operator/original-red-http.log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f04-operator/original-red-http.log",
+      "available": true,
+      "sha256": "d3dc9bdb0e192f295907c5a85da3d871e15718b3c6619444ced5f04569db895d",
+      "terminal_summaries": [
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1583 filtered out; finished in 3.95s"
+      ]
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f04-operator/green-http-recovery.log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f04-operator/green-http-recovery.log",
+      "available": true,
+      "sha256": "7a19d5c337f59f2c68dc0812f7846460a4878916be9f7a2bc156f7f08f89e53b",
+      "terminal_summaries": [
+        "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 1582 filtered out; finished in 8.21s"
+      ]
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f04-operator/green-store-recovery.log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f04-operator/green-store-recovery.log",
+      "available": true,
+      "sha256": "bdf4c3157edb0b7ac2e7261f74bceb3c7f2d63cb82b1eb35805549584a4b6013",
+      "terminal_summaries": [
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 2295 filtered out; finished in 6.71s"
+      ]
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f04-operator/clippy.log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f04-operator/clippy.log",
+      "available": true,
+      "sha256": "0b054502639eb1d512d928d6c73f8e55bdd90f0c3b967f2e80c86b0af5b7e9f3",
+      "terminal_summaries": []
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f04-operator/fmt-check.log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f04-operator/fmt-check.log",
+      "available": true,
+      "sha256": "93ff7811a209e2a8479230bbb9b6bc19f7f311d3af383ec350c1db2a7e7d5494",
+      "terminal_summaries": []
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f04-operator/source-sha256-at-8f8e246342.txt": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/final-f04-operator/source-sha256-at-8f8e246342.txt",
+      "available": true,
+      "sha256": "1bc74662159873fd4109bed7017522bd2eb20fc2d217d56fb1d9f8ccc9944f8b"
+    },
+    "/tmp/pr1160-export-refusals-20261009/qualification.json": {
+      "path": "/tmp/pr1160-export-refusals-20261009/qualification.json",
+      "available": true,
+      "sha256": "5b66912926707bbb31a172e3bd3a5ba04a0a92439857efd39852799063fc386d"
+    },
+    "/tmp/pr1160-export-refusals-20261009/lineage-and-projection-original.log": {
+      "path": "/tmp/pr1160-export-refusals-20261009/lineage-and-projection-original.log",
+      "available": true,
+      "sha256": "f8cc0e8b46dc80e7ae5a7ecfacf18074b441ab6f2d133b306bab588e498174e1",
+      "terminal_summaries": [
+        "test result: FAILED. 0 passed; 6 failed; 0 ignored; 0 measured; 2297 filtered out; finished in 0.82s"
+      ],
+      "expected_sha256": "f8cc0e8b46dc80e7ae5a7ecfacf18074b441ab6f2d133b306bab588e498174e1",
+      "hash_matches_expected": true
+    },
+    "/tmp/pr1160-export-refusals-20261009/lineage-and-projection-green.log": {
+      "path": "/tmp/pr1160-export-refusals-20261009/lineage-and-projection-green.log",
+      "available": true,
+      "sha256": "7a2939fcbe3e6aadce166e202f2e637c08797dd7e5433a4744009826c89103ae",
+      "terminal_summaries": [
+        "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 2292 filtered out; finished in 1.13s"
+      ],
+      "expected_sha256": "7a2939fcbe3e6aadce166e202f2e637c08797dd7e5433a4744009826c89103ae",
+      "hash_matches_expected": true
+    },
+    "/tmp/pr1160-export-refusals-20261009/owning-export-snapshot-http.log": {
+      "path": "/tmp/pr1160-export-refusals-20261009/owning-export-snapshot-http.log",
+      "available": true,
+      "sha256": "ddf552bb70255ce6d7e8325220bff5c22e3a9be01b44dfc71144e5ab812473b9",
+      "terminal_summaries": [
+        "test result: ok. 58 passed; 0 failed; 0 ignored; 0 measured; 1526 filtered out; finished in 38.34s",
+        "test result: ok. 187 passed; 0 failed; 7 ignored; 0 measured; 2113 filtered out; finished in 64.49s"
+      ],
+      "expected_sha256": "ddf552bb70255ce6d7e8325220bff5c22e3a9be01b44dfc71144e5ab812473b9",
+      "hash_matches_expected": true
+    },
+    "/tmp/pr1160-export-refusals-20261009/strict-owning.log": {
+      "path": "/tmp/pr1160-export-refusals-20261009/strict-owning.log",
+      "available": true,
+      "sha256": "9418c52ef9af2a1f238c1366a4172a8389ff67e4a311fe285f00c5f0d409bc6f",
+      "terminal_summaries": [],
+      "expected_sha256": "9418c52ef9af2a1f238c1366a4172a8389ff67e4a311fe285f00c5f0d409bc6f",
+      "hash_matches_expected": true
+    },
+    "/tmp/pr1160-export-refusals-20261009/final-format.log": {
+      "path": "/tmp/pr1160-export-refusals-20261009/final-format.log",
+      "available": true,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "terminal_summaries": [],
+      "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hash_matches_expected": true
+    },
+    "/tmp/pr1160-export-contract-final-20261009/qualification.json": {
+      "path": "/tmp/pr1160-export-contract-final-20261009/qualification.json",
+      "available": true,
+      "sha256": "b80109616b22a7fd27d3aa5b6e0ab205983f63df934e688cb317119d012de75e"
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/clippy-strict.log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/clippy-strict.log",
+      "available": true,
+      "sha256": "6cf7ad1890db16c40e16e74c1fbd36b1e3e3fdf237a284789e04de2c01ec50bb",
+      "terminal_summaries": [],
+      "expected_sha256": "6cf7ad1890db16c40e16e74c1fbd36b1e3e3fdf237a284789e04de2c01ec50bb",
+      "hash_matches_expected": true
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/final-source.patch": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/final-source.patch",
+      "available": true,
+      "sha256": "9ce5c7b8ccbdf036e2a0a123d9cd049bece1b37606ee8a3c4bc2d5b01f964e4f",
+      "expected_sha256": "9ce5c7b8ccbdf036e2a0a123d9cd049bece1b37606ee8a3c4bc2d5b01f964e4f",
+      "hash_matches_expected": true
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/green-final.log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/green-final.log",
+      "available": true,
+      "sha256": "58137a6b9ae8f30a4f816d6d5ba05751540c4e5605b0bd4352b944be6ac021b5",
+      "terminal_summaries": [
+        "test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 1635 filtered out; finished in 114.39s",
+        "test result: ok. 65 passed; 0 failed; 0 ignored; 0 measured; 2283 filtered out; finished in 29.04s"
+      ],
+      "expected_sha256": "58137a6b9ae8f30a4f816d6d5ba05751540c4e5605b0bd4352b944be6ac021b5",
+      "hash_matches_expected": true
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/original-red.log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/f03-attribution/original-red.log",
+      "available": true,
+      "sha256": "b346fd7c637899a36c855bb60d4ef35029d083226a555bee821addb2f18d1dc1",
+      "terminal_summaries": [
+        "test result: FAILED. 7 passed; 4 failed; 0 ignored; 0 measured; 1653 filtered out; finished in 114.81s",
+        "test result: FAILED. 31 passed; 7 failed; 0 ignored; 0 measured; 2308 filtered out; finished in 28.59s"
+      ],
+      "expected_sha256": "b346fd7c637899a36c855bb60d4ef35029d083226a555bee821addb2f18d1dc1",
+      "hash_matches_expected": true
+    },
+    "/tmp/pr1160-final-review-20261009/FEE-BINDING-PRODUCER-VERIFIED.json": {
+      "path": "/tmp/pr1160-final-review-20261009/FEE-BINDING-PRODUCER-VERIFIED.json",
+      "available": true,
+      "sha256": "1a298c74a8079e2a9be2a93fe18948826437a3ad974d3c0218e1cf06ea5b1cd3"
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/f11-governance/original-red/red-at-base-799b33d666.log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/f11-governance/original-red/red-at-base-799b33d666.log",
+      "available": true,
+      "sha256": "f052ef8cf432cc05a70198486740771c1da0f14629de77ef95bfe899ecf04892",
+      "terminal_summaries": [
+        "test result: FAILED. 0 passed; 7 failed; 0 ignored; 0 measured; 1631 filtered out; finished in 0.76s"
+      ]
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/f11-governance/green/governance_authority-at-aa10c68ac7.log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/f11-governance/green/governance_authority-at-aa10c68ac7.log",
+      "available": true,
+      "sha256": "94a7bbf0c5d03942014dc5d2324248e51dc79d18406328d157abe2d6738b6ae6",
+      "terminal_summaries": [
+        "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 1635 filtered out; finished in 1.45s"
+      ]
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/f11-governance/green/owning-filters-1.log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/f11-governance/green/owning-filters-1.log",
+      "available": true,
+      "sha256": "aa671a7171111eeb1279f638accf1b7059165b33ee1cf5dea560f4e02c2aad66",
+      "terminal_summaries": [
+        "test result: ok. 109 passed; 0 failed; 0 ignored; 0 measured; 1542 filtered out; finished in 138.47s"
+      ]
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/f11-governance/green/clippy-1.log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/f11-governance/green/clippy-1.log",
+      "available": true,
+      "sha256": "9a6c4f58cb0c9c567bbfb20bac0d57ed67c63c22e43b93b03c8c7b92628197c6",
+      "terminal_summaries": []
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/f11-governance/green/fmt-check.log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/f11-governance/green/fmt-check.log",
+      "available": true,
+      "sha256": "93ff7811a209e2a8479230bbb9b6bc19f7f311d3af383ec350c1db2a7e7d5494",
+      "terminal_summaries": []
+    },
+    "/tmp/pr1160-fee-composition-20261010/composed-fee.log": {
+      "path": "/tmp/pr1160-fee-composition-20261010/composed-fee.log",
+      "available": true,
+      "sha256": "7734b576ed4b6cc3adc24d358e848b01738598098c6ca0d2a15dd62e4b61e096",
+      "terminal_summaries": [
+        "test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 1678 filtered out; finished in 7.14s"
+      ]
+    },
+    "/tmp/pr1160-fee-composition-20261010/composed-fee.json": {
+      "path": "/tmp/pr1160-fee-composition-20261010/composed-fee.json",
+      "available": true,
+      "sha256": "17a85e3e8654bbeb77aa0f11e9c8b9340a5c3fd6e6be8c9dc601e7c6a99df29a"
+    },
+    "/tmp/pr1160-fee-composition-20261010/composed-store-fiscal.log": {
+      "path": "/tmp/pr1160-fee-composition-20261010/composed-store-fiscal.log",
+      "available": true,
+      "sha256": "ca5362a1cddea089eabe882f2d370d64ed7649eb4082e38245b7f95cf038130d",
+      "terminal_summaries": [
+        "test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 2316 filtered out; finished in 11.45s"
+      ]
+    },
+    "/tmp/pr1160-fee-composition-20261010/composed-store-fiscal.json": {
+      "path": "/tmp/pr1160-fee-composition-20261010/composed-store-fiscal.json",
+      "available": true,
+      "sha256": "654e916a65e4f3b0bbe370d8d111d8d6b33ae8aefb3d311286bb819c68af5eba"
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/vfix/f11-fee-binding/ERRATA.md": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/f11-fee-binding/ERRATA.md",
+      "available": true,
+      "sha256": "a1f07549abb20aaf64d4f8eb7a78aa8073d476705562feb18e0a4fc7b267b4d4",
+      "expected_sha256": "a1f07549abb20aaf64d4f8eb7a78aa8073d476705562feb18e0a4fc7b267b4d4",
+      "hash_matches_expected": true
+    }
+  },
+  "distinct_remaining": [
+    "ROOT-REVIEW-P3-4 actual Building HTTP exact privacy shape verification remains open, independently confirmed by Root.",
+    "F11 forwarding is explicitly UNVERIFIED; retained ERRATA prevents source-only or other-lane inference.",
+    "Recorded GOV-CASE inherited follow-up and Core/whole-candidate composition/review/hosted/merge remain distinct.",
+    "KANI-PROOF-QUAL and SEC-1160-COLDSTATE keep original owner boundaries."
+  ],
+  "merged": false,
+  "hosted_qualified": false
+}
