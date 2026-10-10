@@ -2892,11 +2892,13 @@ fn trust_control_cluster_snapshot_replays_holds_and_mutation_events() {
         &[url_a.clone(), url_b.clone()],
     );
 
-    wait_for_node_health(
-        &client,
-        &late_url,
-        service_token,
-        "late budget node health reachable",
+    // Budget replication stays available even when the elected leader lacks
+    // signing custody and correctly reports unavailable authority health.
+    wait_until_with_diagnostics(
+        "late budget node authenticated control reachable",
+        Duration::from_secs(30),
+        || try_internal_cluster_status(&client, &late_url, service_token).is_some(),
+        || cluster_status_diagnostics(&client, &all_urls, service_token),
     );
 
     wait_until_with_diagnostics(
@@ -2914,7 +2916,9 @@ fn trust_control_cluster_snapshot_replays_holds_and_mutation_events() {
             ) else {
                 return false;
             };
-            status["leaderUrl"].as_str().is_some()
+            status["leaderUrl"].as_str() == Some(late_url.as_str())
+                && status["role"].as_str() == Some("leader")
+                && status["electionTerm"].as_u64().is_some_and(|term| term > 0)
                 && status["hasQuorum"].as_bool() == Some(true)
                 && status["reachableNodes"].as_u64().unwrap_or(0) >= 2
                 && budgets["count"].as_u64() == Some(1)
@@ -2924,6 +2928,21 @@ fn trust_control_cluster_snapshot_replays_holds_and_mutation_events() {
         },
         || cluster_status_diagnostics(&client, &all_urls, service_token),
     );
+
+    let health_response = client
+        .get(format!("{late_url}/health"))
+        .header(AUTHORIZATION, bearer(service_token))
+        .send()
+        .expect("read late leader health");
+    assert_eq!(
+        health_response.status(),
+        reqwest::StatusCode::SERVICE_UNAVAILABLE
+    );
+    let health: Value = health_response.json().expect("decode late leader health");
+    assert_eq!(health["leaderUrl"].as_str(), Some(late_url.as_str()));
+    assert_eq!(health["ok"].as_bool(), Some(false));
+    assert_eq!(health["authority"]["configured"].as_bool(), Some(true));
+    assert_eq!(health["authority"]["available"].as_bool(), Some(false));
 
     let late_store = SqliteBudgetStore::open(&late_budget_db).expect("open late budget db");
     let pre_reconcile_events = late_store
