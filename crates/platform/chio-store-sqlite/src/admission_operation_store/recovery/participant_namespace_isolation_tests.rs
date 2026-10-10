@@ -212,6 +212,29 @@ fn participant_writer_retains_the_exact_foreign_family_owner() -> TestResult {
                 .version,
             2
         );
+        let foreign_scope = scope_key(&fixture.foreign_scope)?;
+        for (replacement_scope, replacement_kind) in [
+            (foreign_scope.as_str(), "command"),
+            (scope.as_str(), "workflow"),
+        ] {
+            let before = tx.total_changes();
+            let error = persist_record(
+                &tx,
+                &fixture.store.serving_owner,
+                &key,
+                replacement_scope,
+                replacement_kind,
+                &payload,
+                None,
+            )
+            .err()
+            .ok_or("participant record ownership was rebound")?;
+            assert_eq!(
+                error.to_string(),
+                "admission operation invariant failed: protected record ownership changed"
+            );
+            assert_eq!(tx.total_changes(), before);
+        }
         fixture.store.commit_write(tx)?;
         fixture.store.sync_after_write(&connection)?;
     }

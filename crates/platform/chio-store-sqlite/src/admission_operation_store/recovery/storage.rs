@@ -454,6 +454,9 @@ fn persist_record(
         return Err(invariant("recovery record quota exhausted"));
     }
     let version = raw(tx, key)?.map_or(Ok(1), |row| {
+        if row.scope != scope || row.kind != kind {
+            return Err(invariant("protected record ownership changed"));
+        }
         row.version
             .checked_add(1)
             .ok_or_else(|| invariant("recovery version exhausted"))
