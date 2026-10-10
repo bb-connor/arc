@@ -1,0 +1,7 @@
+{"url": "http://host.docker.internal:27604/echo", "n": 500, "body_bytes": 1042, "token": true, "statuses": {"200": 500}, "p50_ms": 2.192, "p90_ms": 4.378, "p99_ms": 7.837, "max_ms": 9.309, "mean_ms": 2.711}
+{"url": "http://host.openshell.internal:27604/echo", "n": 500, "body_bytes": 1042, "token": true, "statuses": {"200": 500}, "p50_ms": 8.567, "p90_ms": 14.871, "p99_ms": 21.648, "max_ms": 24.579, "mean_ms": 9.457}
+{"url": "http://host.openshell.internal:27604/echo", "n": 500, "body_bytes": 1042, "token": true, "statuses": {"200": 500}, "p50_ms": 11.322, "p90_ms": 19.254, "p99_ms": 28.152, "max_ms": 33.485, "mean_ms": 12.157}
+{"url": "http://host.docker.internal:27604/echo", "n": 300, "body_bytes": 65554, "token": true, "statuses": {"200": 300}, "p50_ms": 3.619, "p90_ms": 7.02, "p99_ms": 11.831, "max_ms": 15.312, "mean_ms": 4.439}
+{"url": "http://host.openshell.internal:27604/echo", "n": 300, "body_bytes": 65554, "token": true, "statuses": {"200": 300}, "p50_ms": 14.153, "p90_ms": 24.511, "p99_ms": 41.073, "max_ms": 62.415, "mean_ms": 16.028}
+{"url": "http://host.docker.internal:27604/echo", "n": 100, "body_bytes": 1048594, "token": true, "statuses": {"200": 100}, "p50_ms": 11.921, "p90_ms": 18.041, "p99_ms": 26.63, "max_ms": 26.63, "mean_ms": 12.65}
+{"url": "http://host.openshell.internal:27604/echo", "n": 100, "body_bytes": 1048594, "token": true, "statuses": {"200": 100}, "p50_ms": 38.681, "p90_ms": 55.941, "p99_ms": 74.447, "max_ms": 74.447, "mean_ms": 39.777}
